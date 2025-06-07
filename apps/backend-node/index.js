@@ -12,7 +12,7 @@ const allowedOrigin =
   process.env.NODE_ENV === "production"
     ? "https://prompt-git-main-fullstuffdevelopers-projects.vercel.app"
     : "*"; // allow all in development
-
+console.log("Allowed Origin:", allowedOrigin);
 app.use(
   cors({
     origin: allowedOrigin,
@@ -28,3 +28,14 @@ const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`🚀 Server ready at http://localhost:${PORT}`);
 });
+
+import cors from "cors";
+
+// CORS Middleware (exact Vercel domain recommended in prod)
+app.use(
+  cors({
+    origin: "https://prompt-git-main-fullstuffdevelopers-projects.vercel.app",
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type"],
+  })
+);
