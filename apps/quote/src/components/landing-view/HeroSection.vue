@@ -24,23 +24,15 @@
 <script setup></script> -->
 <template>
   <section
-    class="relative py-24 px-6 text-center bg-gradient-to-br from-white via-indigo-50 to-purple-100"
+    class="relative py-32 px-6 text-center text-white bg-cover bg-center"
+    style="background-image: url('/assets/hero-bg-image.png')"
   >
-    <!-- Optional Video BG -->
-    <!-- 
-      <video autoplay loop muted playsinline class="absolute inset-0 w-full h-full object-cover opacity-20 -z-10">
-        <source src="/videos/quote-hero.mp4" type="video/mp4" />
-      </video>
-      -->
+    <div class="absolute inset-0 bg-black opacity-30 -z-10"></div>
 
-    <h1 class="text-5xl font-bold text-gray-900 mb-4">Turn Your Idea into a Quote, Instantly</h1>
-    <p class="text-lg text-gray-600 max-w-2xl mx-auto mb-8">
+    <h1 class="text-5xl font-extrabold drop-shadow-xl">Turn Your Idea into a Quote, Instantly</h1>
+    <p class="text-xl text-white/90 max-w-2xl mx-auto mt-4 drop-shadow">
       Enter a product idea. We’ll show you cost, timeline, and stack — in seconds.
     </p>
-
-    <el-button type="primary" size="large" class="px-10" @click="$router.push('/#quote')">
-      Get Started
-    </el-button>
   </section>
 </template>
 

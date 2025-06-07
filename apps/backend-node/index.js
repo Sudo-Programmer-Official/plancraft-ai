@@ -1,36 +1,43 @@
-import express from "express";
-import cors from "cors";
-import dotenv from "dotenv";
-import quoteRoutes from "./routes/quote.js";
+// import express from "express";
+// import cors from "cors";
+// import dotenv from "dotenv";
+// import quoteRoutes from "./routes/quote.js";
 
-dotenv.config();
+// dotenv.config();
 
-const app = express();
-// app.use(cors());
-// Enable CORS for all origins (safe for dev, restrict later in prod)
-const allowedOrigin =
-  process.env.NODE_ENV === "production" ? "https://www.prompt2quote.com" : "*"; // allow all in development
-console.log("Allowed Origin:", allowedOrigin);
-app.use(
-  cors({
-    origin: allowedOrigin,
-    methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type"],
-  })
-);
-app.use(express.json());
+// const app = express();
+// // app.use(cors());
+// const allowedOrigins = [
+//   "https://www.prompt2quote.com",
+//   "https://prompt2quote.com",
+//   "http://localhost:5173",
+// ];
+// // const allowedOrigin =
+// //   process.env.NODE_ENV === "production"
+// //     ? "https://www.prompt2quote.com"
+// //     : "http://localhost:5173";
+// if (allowedOrigins.includes(origin)) {
+//   app.use(
+//     cors({
+//       origin: allowedOrigin,
+//       methods: ["GET", "POST", "OPTIONS"],
+//       allowedHeaders: ["Content-Type"],
+//     })
+//   );
+// }
+// app.use(express.json());
 
-// ✅ Add this route to verify deployment success
-app.get("/", (req, res) => {
-  res.send("Backend is live!");
-});
+// // ✅ Add this route to verify deployment success
+// app.get("/", (req, res) => {
+//   res.send("Backend is live!");
+// });
 
-app.use("/api/quote", quoteRoutes);
+// app.use("/api/quote", quoteRoutes);
 
-const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server ready at http://localhost:${PORT}`);
-});
+// const PORT = process.env.PORT || 4000;
+// app.listen(PORT, () => {
+//   console.log(`🚀 Server ready at http://localhost:${PORT}`);
+// });
 
 // import cors from "cors";
 
@@ -42,3 +49,49 @@ app.listen(PORT, () => {
 //     allowedHeaders: ["Content-Type"],
 //   })
 // );
+
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import quoteRoutes from "./routes/quote.js";
+
+dotenv.config();
+
+const app = express();
+
+// Allow list of origins
+const allowedOrigins = [
+  "https://www.prompt2quote.com",
+  "https://prompt2quote.com",
+  "http://localhost:5173",
+];
+
+// Dynamic origin resolver for CORS
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // allow requests with no origin (e.g., mobile apps, curl)
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type"],
+  })
+);
+
+app.use(express.json());
+
+// ✅ Health check route
+app.get("/", (req, res) => {
+  res.send("Backend is live!");
+});
+
+app.use("/api/quote", quoteRoutes);
+
+const PORT = process.env.PORT || 4000;
+app.listen(PORT, () => {
+  console.log(`🚀 Server ready at http://localhost:${PORT}`);
+});
