@@ -29,13 +29,13 @@ app.listen(PORT, () => {
   console.log(`🚀 Server ready at http://localhost:${PORT}`);
 });
 
-import cors from "cors";
+// import cors from "cors";
 
-// CORS Middleware (exact Vercel domain recommended in prod)
-app.use(
-  cors({
-    origin: "https://prompt-git-main-fullstuffdevelopers-projects.vercel.app",
-    methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type"],
-  })
-);
+// // CORS Middleware (exact Vercel domain recommended in prod)
+// app.use(
+//   cors({
+//     origin: "https://prompt-git-main-fullstuffdevelopers-projects.vercel.app",
+//     methods: ["GET", "POST", "OPTIONS"],
+//     allowedHeaders: ["Content-Type"],
+//   })
+// );
