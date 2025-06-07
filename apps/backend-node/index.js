@@ -9,9 +9,7 @@ const app = express();
 // app.use(cors());
 // Enable CORS for all origins (safe for dev, restrict later in prod)
 const allowedOrigin =
-  process.env.NODE_ENV === "production"
-    ? "https://prompt-git-main-fullstuffdevelopers-projects.vercel.app"
-    : "*"; // allow all in development
+  process.env.NODE_ENV === "production" ? "https://www.prompt2quote.com" : "*"; // allow all in development
 console.log("Allowed Origin:", allowedOrigin);
 app.use(
   cors({
