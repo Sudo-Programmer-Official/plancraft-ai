@@ -1,39 +1,51 @@
-<!-- <template>
-  <section class="text-center py-12 bg-gradient-to-r from-purple-100 via-white to-indigo-100">
-    <h1 class="text-4xl font-bold text-purple-800">Turn Your Idea into a Quote, Instantly</h1>
-    <p class="text-lg text-gray-700 mt-2">
-      Enter a product idea. We’ll show you cost, timeline, and stack.
-    </p>
+<template>
+  <section
+    class="w-full h-screen bg-cover bg-center flex items-center justify-center text-white px-4"
+    :style="`background-image: url(${heroImage})`"
+  >
+    <!-- Inside Hero Section -->
+    <div class="absolute top-8 left-12 z-10 h-24">
+      <img :src="logo" alt="Prompt2Quote Logo" class="h-24 md:h-16 drop-shadow-md" height="44" />
+    </div>
+
+    <div class="text-center max-w-2xl mx-auto">
+      <h1 class="text-5xl sm:text-6xl font-bold leading-tight mb-4 text-white drop-shadow-lg">
+        Turn Your Idea into a <br class="hidden sm:inline" />
+        Quote, Instantly
+      </h1>
+      <p class="text-lg sm:text-xl text-white/90 mb-8">
+        Enter a product idea. We’ll show you cost, timeline, <br class="hidden sm:inline" />
+        and stack — in seconds.
+      </p>
+
+      <div class="bg-white/90 backdrop-blur-sm rounded-xl p-6 max-w-xl mx-auto shadow-lg">
+        <el-input
+          v-model="quoteStore.idea"
+          placeholder="⚙️ ai app"
+          size="large"
+          class="mb-4"
+          :disabled="quoteStore.loading"
+          clearable
+        />
+        <el-button
+          type="primary"
+          size="large"
+          class="w-full"
+          :loading="quoteStore.loading"
+          @click="quoteStore.generateQuote"
+        >
+          {{ quoteStore.loading ? 'Generating...' : 'Generate Quote' }}
+        </el-button>
+      </div>
+    </div>
   </section>
 </template>
 
 <script setup>
-// Presentation only
-</script> -->
+import heroImage from '@/assets/images/hero-bg-image.png'
+import logo from '@/assets/images/logo.svg'
+import { useQuoteStore } from '@/stores/quoteStore'
+const quoteStore = useQuoteStore()
+</script>
 
-<!-- <template>
-  <section class="text-center py-16 bg-gradient-to-r from-indigo-50 via-white to-purple-50">
-    <h1 class="text-5xl font-bold text-indigo-800 mb-4">Turn Your Idea into a Quote, Instantly</h1>
-    <p class="text-lg text-gray-700 max-w-xl mx-auto">
-      Enter a product idea. We’ll show you cost, timeline, and stack.
-    </p>
-    <el-button class="mt-8" type="primary" size="large">Get Started</el-button>
-  </section>
-</template>
-
-<script setup></script> -->
-<template>
-  <section
-    class="relative py-32 px-6 text-center text-white bg-cover bg-center"
-    style="background-image: url('/assets/hero-bg-image.png')"
-  >
-    <div class="absolute inset-0 bg-black opacity-30 -z-10"></div>
-
-    <h1 class="text-5xl font-extrabold drop-shadow-xl">Turn Your Idea into a Quote, Instantly</h1>
-    <p class="text-xl text-white/90 max-w-2xl mx-auto mt-4 drop-shadow">
-      Enter a product idea. We’ll show you cost, timeline, and stack — in seconds.
-    </p>
-  </section>
-</template>
-
-<script setup></script>
+<style lang="scss" scoped></style>

@@ -1,28 +1,35 @@
 <template>
-  <div class="bg-white py-10 px-6 rounded shadow max-w-xl mx-auto text-center mt-12">
-    <p class="mb-4 text-lg font-semibold text-gray-800">Want to save your quote?</p>
+  <section class="bg-white py-20 px-6">
+    <div class="max-w-xl mx-auto text-center">
+      <h2 class="text-2xl font-bold text-gray-800 mb-4">Want to save your quote?</h2>
+      <p class="text-gray-600 mb-6">We’ll send it to your email so you don’t lose it.</p>
 
-    <el-input
-      v-model="email"
-      placeholder="Enter your email"
-      type="email"
-      size="large"
-      class="w-full mb-4"
-      clearable
-    />
+      <div class="flex flex-col sm:flex-row items-center gap-4">
+        <el-input
+          v-model="email"
+          placeholder="Enter your email"
+          type="email"
+          size="large"
+          class="w-full flex-1"
+          clearable
+        />
 
-    <el-button
-      type="primary"
-      size="large"
-      class="w-full sm:w-auto"
-      :disabled="!isValidEmail"
-      @click="submitEmail"
-    >
-      Send Quote to Email
-    </el-button>
+        <el-button
+          type="primary"
+          size="large"
+          class="px-6 py-3 font-semibold"
+          :disabled="!isValidEmail"
+          @click="submitEmail"
+        >
+          Send Quote
+        </el-button>
+      </div>
 
-    <p v-if="submitted" class="text-green-600 mt-4">✅ Quote sent to {{ email }}</p>
-  </div>
+      <p v-if="submitted" class="text-green-600 mt-6">
+        ✅ Quote sent to <strong>{{ email }}</strong>
+      </p>
+    </div>
+  </section>
 </template>
 
 <script setup>
@@ -40,6 +47,5 @@ function submitEmail() {
   if (!isValidEmail.value) return
   submitted.value = true
   console.log('Email sent to:', email.value)
-  // You can later hook into Firebase, EmailOctopus, or your Node backend here.
 }
 </script>
