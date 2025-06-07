@@ -60,13 +60,13 @@ __pycache__/
 *.py[cod]
 
 # Optional: Ignore backend uploads/data folders
-apps/backend-node/uploads/
-apps/backend-node/node_modules/
-apps/backend-node/results_*.json
-apps/backend-node/results_*.csv
+# apps/backend-node/uploads/
+# apps/backend-node/node_modules/
+# apps/backend-node/results_*.json
+# apps/backend-node/results_*.csv
 
 # Ignore ALL node_modules in monorepo (root, apps, shared)
-**/node_modules/
-node_modules/
-apps/*/node_modules/
-shared/*/node_modules/
+# **/node_modules/
+# node_modules/
+# apps/*/node_modules/
+# shared/*/node_modules/
