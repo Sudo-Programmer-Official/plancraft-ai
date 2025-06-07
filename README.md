@@ -1,7 +1,3 @@
-Here’s a full README.md file for your Prompt2Quote project, structured professionally and optimized for open-source or internal sharing:
-
-⸻
-
 ✅ README.md
 
 # Prompt2Quote
@@ -127,7 +123,3 @@ Planned: MIT License / Private SaaS License
 ⸻
 
 Designed and built with ❤️ by Abhishek Kumar Jha
-
----
-
-Let me know when you'd like me to commit this to your repo or if you'd like a separate version for `Prompt2Code` or `Prompt2Page`.
