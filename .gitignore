@@ -51,9 +51,9 @@ temp/
 *.code-workspace
 
 # Tailwind CSS build artifacts
-tailwind.config.js
-postcss.config.js
-prettier.config.js
+# tailwind.config.js
+# postcss.config.js
+# prettier.config.js
 
 # Python cache (if ever used in shared utils)
 __pycache__/
