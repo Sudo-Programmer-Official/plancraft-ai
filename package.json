@@ -1,0 +1,9 @@
+{
+  "name": "prompt2-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev:quote": "pnpm --filter quote dev",
+    "dev:page": "pnpm --filter page dev"
+  }
+}
