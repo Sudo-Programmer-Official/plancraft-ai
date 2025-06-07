@@ -25,7 +25,8 @@ const router = express.Router();
 // Preflight handler
 router.options("/", (req, res) => {
   res.set({
-    "Access-Control-Allow-Origin": "*", // Replace with your frontend domain in prod
+    "Access-Control-Allow-Origin":
+      "https://prompt-git-main-fullstuffdevelopers-projects.vercel.app", // Replace with your frontend domain in prod
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Max-Age": "86400",
@@ -35,7 +36,8 @@ router.options("/", (req, res) => {
 
 router.post("/", async (req, res) => {
   res.set({
-    "Access-Control-Allow-Origin": "*", // Replace with your frontend domain
+    "Access-Control-Allow-Origin":
+      "https://prompt-git-main-fullstuffdevelopers-projects.vercel.app", // Replace with your frontend domain
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
   });
 
