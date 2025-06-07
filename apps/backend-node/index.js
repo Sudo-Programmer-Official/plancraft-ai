@@ -8,9 +8,14 @@ dotenv.config();
 const app = express();
 // app.use(cors());
 // Enable CORS for all origins (safe for dev, restrict later in prod)
+const allowedOrigin =
+  process.env.NODE_ENV === "production"
+    ? "https://prompt-git-main-fullstuffdevelopers-projects.vercel.app"
+    : "*"; // allow all in development
+
 app.use(
   cors({
-    origin: "*", // ✅ Change this later in production
+    origin: allowedOrigin,
     methods: ["GET", "POST", "OPTIONS"],
     allowedHeaders: ["Content-Type"],
   })
