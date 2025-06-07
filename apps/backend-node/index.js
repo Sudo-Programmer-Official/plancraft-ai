@@ -22,6 +22,11 @@ app.use(
 );
 app.use(express.json());
 
+// ✅ Add this route to verify deployment success
+app.get("/", (req, res) => {
+  res.send("Backend is live!");
+});
+
 app.use("/api/quote", quoteRoutes);
 
 const PORT = process.env.PORT || 4000;
