@@ -6,6 +6,7 @@ import axios from 'axios'
 //   return res.data
 // }
 // src/services/quoteService.js
+console.log('API_BASE:', import.meta.env.VITE_API_BASE)
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4000'
 
 export async function fetchQuote(idea) {
