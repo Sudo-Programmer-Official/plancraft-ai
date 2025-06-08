@@ -88,24 +88,25 @@ async function sendMessage() {
     </div>
 
     <div v-if="chatLog.length" class="mt-6 space-y-4 max-h-[40vh] overflow-y-auto pr-2">
-    <div
-  v-for="(msg, index) in chatLog"
-  :key="index"
-  :class="[
-    'p-4 rounded-md border text-sm',
-    msg.role === 'user'
-      ? 'bg-blue-50 border-blue-200 text-blue-800'
-      : 'bg-gray-50 border-gray-200 text-gray-800',
-  ]"
->
-  <p class="text-xs font-semibold mb-1">
-    {{ msg.role === 'user' ? '👤 You' : '🤖 AI Assistant' }}
-  </p>
-  <p class="whitespace-pre-line">{{ msg.content }}</p>
-  <div id="chat-scroll-anchor"></div>
-</div>
-    <div v-else class="text-gray-400 text-sm text-center mt-4">
-      💬 Ask a follow-up question about your quote.
+      <div
+        v-for="(msg, index) in chatLog"
+        :key="index"
+        :class="[
+          'p-4 rounded-md border text-sm',
+          msg.role === 'user'
+            ? 'bg-blue-50 border-blue-200 text-blue-800'
+            : 'bg-gray-50 border-gray-200 text-gray-800',
+        ]"
+      >
+        <p class="text-xs font-semibold mb-1">
+          {{ msg.role === 'user' ? '👤 You' : '🤖 AI Assistant' }}
+        </p>
+        <p class="whitespace-pre-line">{{ msg.content }}</p>
+        <div id="chat-scroll-anchor"></div>
+      </div>
+      <div v-else class="text-gray-400 text-sm text-center mt-4">
+        💬 Ask a follow-up question about your quote.
+      </div>
     </div>
   </div>
 </template>
