@@ -82,6 +82,30 @@ async function sendMessage() {
       resize="none"
       class="w-full"
     />
+    <!-- File Upload -->
+    <el-upload
+      class="upload-demo"
+      :auto-upload="false"
+      :multiple="true"
+      :on-change="handleFileChange"
+      :show-file-list="false"
+      accept=".pdf,.txt,.docx,.md"
+    >
+      <p class="text-xs text-gray-400 mt-1">
+        You can attach pitch decks, briefs, or product docs for better answers.
+      </p>
+      <el-button text icon="el-icon-plus ml-2">
+        <span class="text-sm text-gray-600">Attach a file</span>
+      </el-button>
+    </el-upload>
+
+    <!-- File Preview -->
+    <div v-if="selectedFiles.length" class="text-xs text-gray-700">
+      <span class="font-semibold">Attached:</span>
+      <span v-for="(file, index) in selectedFiles" :key="index" class="ml-2">
+        {{ file.name }}
+      </span>
+    </div>
 
     <div class="flex justify-end">
       <el-button type="primary" :loading="loading" @click="sendMessage"> Ask Assistant </el-button>
@@ -114,6 +138,14 @@ async function sendMessage() {
 <script setup>
 import { ref, watch, onMounted } from 'vue'
 import { useQuoteStore } from '@/stores/quoteStore'
+import useMultiFileUpload from '@/composables/useMultiFileUpload'
+
+const selectedFiles = ref([])
+const { uploadFiles, downloadUrls } = useMultiFileUpload()
+
+function handleFileChange(fileObj) {
+  selectedFiles.value = fileObj.fileList.map((f) => f.raw)
+}
 
 const userMessage = ref('')
 const loading = ref(false)
@@ -132,13 +164,44 @@ const scrollToBottom = () => {
   }, 100)
 }
 
+// async function sendMessage() {
+//   const message = userMessage.value.trim()
+//   if (!message) return
+//   if (selectedFiles.value.length > 0) {
+//     await uploadFiles(selectedFiles.value)
+//     const fileUrl = downloadUrls.value?.[0] || ''
+//     await quoteStore.askAssistantMessageWithFile(userMessage.value, fileUrl)
+//   } else {
+//     await quoteStore.askAssistantMessage(userMessage.value)
+//   }
+//   loading.value = true
+//   try {
+//     await quoteStore.askAssistantMessage(message)
+//     userMessage.value = ''
+//     scrollToBottom()
+//   } catch (err) {
+//     quoteStore.addChatMessage({
+//       role: 'assistant',
+//       content: '⚠️ Something went wrong. Please try again.',
+//     })
+//   } finally {
+//     loading.value = false
+//   }
+// }
 async function sendMessage() {
   const message = userMessage.value.trim()
   if (!message) return
 
   loading.value = true
+
   try {
-    await quoteStore.askAssistantMessage(message)
+    if (selectedFiles.value.length > 0) {
+      await uploadFiles(selectedFiles.value)
+      const fileUrl = downloadUrls.value?.[0] || ''
+      await quoteStore.askAssistantMessageWithFile(message, fileUrl)
+    } else {
+      await quoteStore.askAssistantMessage(message)
+    }
     userMessage.value = ''
     scrollToBottom()
   } catch (err) {

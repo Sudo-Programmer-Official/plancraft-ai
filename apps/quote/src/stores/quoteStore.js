@@ -101,6 +101,53 @@ export const useQuoteStore = defineStore('quote', {
         this.addChatMessage({ role: 'assistant', content: '⚠️ Assistant failed. Try again.' })
       }
     },
+    async askAssistantMessageWithFile(userMessage, fileUrl) {
+      const userPrompt = userMessage.trim()
+      if (!userPrompt) return
+
+      const fullPrompt = `Here’s the current quote:\n${JSON.stringify(this.quote, null, 2)}\n\nUser says: ${userPrompt}\n\nRefer to this file for additional context: ${fileUrl}`
+
+      const userMsg = { role: 'user', content: userPrompt }
+      this.addChatMessage(userMsg)
+
+      try {
+        const aiReply = await askAssistant(fullPrompt)
+        const aiMsg = { role: 'assistant', content: aiReply }
+        this.addChatMessage(aiMsg)
+      } catch (err) {
+        this.addChatMessage({ role: 'assistant', content: '⚠️ Assistant failed. Try again.' })
+      }
+    },
+    async askAssistantMessageWithFile(userMessage, fileUrl) {
+      const userPrompt = userMessage.trim()
+      if (!userPrompt) return
+
+      // Log user message in chat
+      const userMsg = { role: 'user', content: userPrompt }
+      this.addChatMessage(userMsg)
+
+      // Build contextual assistant prompt
+      const fullPrompt = `
+    Here is the current AI-generated quote:
+    ${JSON.stringify(this.quote, null, 2)}
+    
+    User asks: ${userPrompt}
+    
+    Also refer to this attached file for additional context:
+    ${fileUrl}
+      `.trim()
+
+      try {
+        const aiReply = await askAssistant(fullPrompt)
+        const aiMsg = { role: 'assistant', content: aiReply }
+        this.addChatMessage(aiMsg)
+      } catch (err) {
+        this.addChatMessage({
+          role: 'assistant',
+          content: '⚠️ Assistant failed. Try again.',
+        })
+      }
+    },
     // async askAssistantMessage(userMessage) {
     //   const userPrompt = userMessage.trim()
     //   if (!userPrompt) return
