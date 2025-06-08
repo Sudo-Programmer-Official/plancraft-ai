@@ -94,7 +94,7 @@ async function sendMessage() {
       <p class="text-xs text-gray-400 mt-1">
         You can attach pitch decks, briefs, or product docs for better answers.
       </p>
-      <el-button text icon="el-icon-plus ml-2">
+      <el-button text :icon="Plus">
         <span class="text-sm text-gray-600">Attach a file</span>
       </el-button>
     </el-upload>
@@ -139,6 +139,7 @@ async function sendMessage() {
 import { ref, watch, onMounted } from 'vue'
 import { useQuoteStore } from '@/stores/quoteStore'
 import useMultiFileUpload from '@/composables/useMultiFileUpload'
+import { Plus } from '@element-plus/icons-vue'
 
 const selectedFiles = ref([])
 const { uploadFiles, downloadUrls } = useMultiFileUpload()
