@@ -54,6 +54,8 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import quoteRoutes from "./routes/quote.js";
+import uploadRoutes from "./routes/upload.js";
+import askRoutes from "./routes/ask.js";
 
 dotenv.config();
 
@@ -90,6 +92,8 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api/quote", quoteRoutes);
+app.use("/api/upload", uploadRoutes);
+app.use("/api/ask", askRoutes);
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {

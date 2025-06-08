@@ -6,6 +6,8 @@ import router from './router'
 import { createPinia } from 'pinia'
 import 'element-plus/dist/index.css'
 import ElementPlus from 'element-plus'
+// ✅ Import your Firebase initialization (this is the important part)
+import '@/firebase/init'
 
 // main.js
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'

@@ -1,6 +1,6 @@
 import express from "express";
+import { extractTextFromUrl } from "../utils/responseFormulator.js";
 import { getQuoteFromIdea } from "../services/openaiService.js";
-import { extractTextFromUrl } from "../utils/responseFormatter.js";
 
 const router = express.Router();
 
@@ -10,6 +10,7 @@ const allowedOrigins = [
   "http://localhost:5173",
 ];
 
+// CORS preflight
 router.options("/", (req, res) => {
   const origin = req.headers.origin;
   if (allowedOrigins.includes(origin)) {
@@ -23,6 +24,7 @@ router.options("/", (req, res) => {
   res.sendStatus(204);
 });
 
+// POST: Upload + Extract + Generate Quote
 router.post("/", async (req, res) => {
   const origin = req.headers.origin;
   if (allowedOrigins.includes(origin)) {
@@ -30,29 +32,31 @@ router.post("/", async (req, res) => {
     res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
   }
 
-  const { idea, fileUrl } = req.body;
-  if (!idea) return res.status(400).json({ error: "Idea is required" });
-
   try {
-    let fullPrompt = idea;
-
-    // if (fileUrl) {
-    //   // Optionally fetch content of the file from Firebase
-
-    //   const fileResponse = await fetch(fileUrl);
-    //   const fileText = await fileResponse.text();
-
-    //   fullPrompt = `${idea}\n\nAdditional context from file:\n${fileText}`;
-    // }
-    // Inside your route logic
-    if (fileUrl) {
-      const fileText = await extractTextFromUrl(fileUrl);
-      fullPrompt = `${idea}\n\nAdditional context from file:\n${fileText}`;
+    const { fileUrl, idea } = req.body;
+    if (!fileUrl || !idea) {
+      return res
+        .status(400)
+        .json({ error: "Both fileUrl and idea are required" });
     }
-    const result = await getQuoteFromIdea(fullPrompt);
-    res.json(result);
+
+    // Extract text from file
+    const fileText = await extractTextFromUrl(fileUrl);
+
+    // Merge into final prompt
+    const fullPrompt = `${idea}\n\nAdditional context from file:\n${fileText}`;
+
+    // Get quote from OpenAI
+    const quote = await getQuoteFromIdea(fullPrompt);
+
+    res.status(200).json({
+      fileUrl,
+      extractedText: fileText,
+      quote,
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("Upload + Quote error:", err);
+    res.status(500).json({ error: "Failed to process upload and quote" });
   }
 });
 

@@ -16,6 +16,20 @@
           AI Powered
         </span>
       </h2>
+      <!-- Below your <h2> title, inside Title Bar -->
+      <el-select
+        v-model="selectedVersion"
+        placeholder="View past versions"
+        size="small"
+        class="ml-auto w-56"
+      >
+        <el-option
+          v-for="q in quoteStore.quoteHistory"
+          :key="q.version"
+          :label="`v${q.version} • ${new Date(q.createdAt).toLocaleDateString()}`"
+          :value="q.version"
+        />
+      </el-select>
     </div>
 
     <!-- Scrollable Body -->
@@ -69,14 +83,23 @@
         </p>
       </div>
     </div>
+    <div class="mt-8">
+      <el-collapse v-model="activeSections">
+        <el-collapse-item name="chat" title="🗣️ Want to tweak or ask questions?">
+          <ChatAssistant :quote="quote" :key="quote?.version || quote?.createdAt || 'chat'" />
+        </el-collapse-item>
+      </el-collapse>
+    </div>
 
     <!-- Footer with Actions -->
     <template #footer>
       <div class="flex flex-col sm:flex-row justify-between items-center w-full gap-4">
         <p class="text-xs text-gray-500">Quote generated using GPT-4 + industry presets</p>
         <div class="flex gap-3">
-          <el-button type="success" plain>Export as PDF</el-button>
-          <el-button type="primary" plain>Email this</el-button>
+          <!-- <el-button type="success" plain>Export as PDF</el-button>
+          <el-button type="primary" plain>Email this</el-button> -->
+          <el-button type="success" plain @click="handleExport('pdf')">Export as PDF</el-button>
+          <el-button type="primary" plain @click="handleExport('zip')">Export All (ZIP)</el-button>
         </div>
       </div>
     </template>
@@ -85,15 +108,25 @@
 
 <script setup>
 import { ref, watch, computed, nextTick } from 'vue'
+import { exportPDF, exportMarkdown, exportZip } from '@/utils/exportUtils'
 import { useQuoteStore } from '@/stores/quoteStore'
 import { useWindowSize } from '@vueuse/core'
 
 const quoteStore = useQuoteStore()
 const quote = computed(() => quoteStore.quote)
+const chatLog = computed(() => quoteStore.chatLog)
 const visible = ref(false)
+const activeSections = ref(['chat']) // Default section open
 
 const { width } = useWindowSize()
 const dialogWidth = computed(() => (width.value < 640 ? '90vw' : '40%'))
+const selectedVersion = ref(null)
+
+watch(selectedVersion, (version) => {
+  if (version) {
+    quoteStore.revertToVersion(version)
+  }
+})
 
 watch(quote, async (newVal) => {
   if (newVal) {
@@ -102,8 +135,26 @@ watch(quote, async (newVal) => {
   }
 })
 
+watch(quote, async (newVal) => {
+  if (newVal) {
+    await nextTick()
+    visible.value = true
+    document.querySelector('.custom-quote-dialog')?.scrollIntoView({ behavior: 'smooth' })
+  }
+})
+
 function handleClose() {
   visible.value = false
+}
+function handleExport(type) {
+  if (!quote.value) return
+  if (type === 'pdf') exportPDF(quote.value, chatLog.value || [])
+  if (type === 'zip') exportZip(quote.value, chatLog.value || [])
+  if (type === 'md') {
+    const md = exportMarkdown(quote.value, chatLog.value || [])
+    const blob = new Blob([md], { type: 'text/markdown' })
+    saveAs(blob, 'quote-summary.md')
+  }
 }
 </script>
 
@@ -112,5 +163,13 @@ function handleClose() {
   max-height: 65vh;
   overflow-y: auto;
   padding-right: 1rem;
+}
+
+.custom-quote-dialog .el-dialog__body::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-quote-dialog .el-dialog__body::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
 }
 </style>

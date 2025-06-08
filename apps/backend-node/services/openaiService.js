@@ -54,3 +54,44 @@ export async function getQuoteFromIdea(idea) {
   const message = response.choices[0].message.content;
   return JSON.parse(message);
 }
+
+export async function getChatReply(userPrompt, currentQuote = null) {
+  const systemMessage = {
+    role: "system",
+    content:
+      "You are a highly experienced AI consultant helping users refine software project estimates and features based on their feedback.",
+  };
+
+  const userMessage = {
+    role: "user",
+    content: `
+Here is the current AI-generated quote:
+${JSON.stringify(currentQuote, null, 2)}
+
+The user says: ${userPrompt}
+
+👉 If you're suggesting edits to stack, timeline, or estimate, please format like this:
+🛠️ Suggested Stack Update: ...
+⏱️ Updated Timeline: ...
+💸 Revised Estimate: ...
+🧩 Suggested Features: [Feature 1, Feature 2, ...]
+
+Only include updates if applicable.
+Respond concisely and clearly.
+    `.trim(),
+  };
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [systemMessage, userMessage],
+      temperature: 0.7,
+    });
+
+    const replyContent = response.choices[0].message.content;
+    return { content: replyContent };
+  } catch (error) {
+    console.error("❌ GPT-4 Chat Reply Error:", error);
+    return { content: "⚠️ Assistant failed. Please try again later." };
+  }
+}
