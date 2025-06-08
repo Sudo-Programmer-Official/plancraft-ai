@@ -2,7 +2,8 @@
   <el-dialog
     v-model="visible"
     title="🎉 Your AI-Generated Quote"
-    width="600px"
+    :width="dialogWidth"
+    :height="dialogHeight"
     class="rounded-xl"
     :close-on-click-modal="false"
     :append-to-body="true"
@@ -46,9 +47,13 @@
 
 <script setup>
 import { ref, watch, nextTick, computed } from 'vue'
+import { useWindowSize } from '@vueuse/core'
 import { useQuoteStore } from '@/stores/quoteStore'
 
 const quoteStore = useQuoteStore()
+const { width } = useWindowSize()
+const dialogWidth = computed(() => (width.value < 640 ? '90vw' : '40%'))
+const dialogHeight = computed(() => (width.value < 640 ? 'auto' : '60vh'))
 const quote = computed(() => quoteStore.quote)
 const visible = ref(false)
 
@@ -63,3 +68,12 @@ function handleClose() {
   visible.value = false
 }
 </script>
+
+<style lang="scss" scoped>
+/* For dialog height & scroll */
+.custom-quote-dialog .el-dialog__body {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 1rem;
+}
+</style>
