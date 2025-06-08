@@ -1,7 +1,7 @@
 // utils/responseFormatter.js
 
 import fetch from "node-fetch";
-import pdfParse from "pdf-parse";
+// import pdfParse from "pdf-parse";
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
 
@@ -15,8 +15,13 @@ export async function extractTextFromUrl(fileUrl) {
 
   const buffer = Buffer.from(await res.arrayBuffer());
 
+  //   if (contentType.includes("pdf")) {
+  //     const pdfParse = (await import("pdf-parse")).default; // load only when needed
+  //     const data = await pdfParse(buffer);
+  //     return data.text;
+  //   }
   if (contentType.includes("pdf")) {
-    const pdfParse = (await import("pdf-parse")).default; // load only when needed
+    const { default: pdfParse } = await import("pdf-parse");
     const data = await pdfParse(buffer);
     return data.text;
   }
