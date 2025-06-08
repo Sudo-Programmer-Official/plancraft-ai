@@ -53,7 +53,7 @@
         <p class="text-xs font-semibold mb-1">
           {{ msg.role === 'user' ? '👤 You' : '🤖 AI Assistant' }}
         </p>
-        <p class="whitespace-pre-line" v-if="!tryParseJson(msg.content)">
+        <p class="whitespace-pre-line" v-if="msg.content && !tryParseJson(msg.content)">
           {{ msg.content }}
         </p>
         <div v-if="msg.role === 'assistant'" class="text-right mt-2">
@@ -109,6 +109,11 @@ const scrollToBottom = () => {
   }, 100)
 }
 function applyToQuote(content) {
+  console.log('Applying to quote:', content)
+  if (!content || content === 'null') {
+    ElMessage.warning('⚠️ Nothing to apply.')
+    return
+  }
   autoAppendToQuote(content, quoteStore)
   ElMessage.success('Added to quote successfully!')
 }
@@ -142,6 +147,7 @@ function tryParseJson(str) {
   try {
     return JSON.parse(str)
   } catch (e) {
+    console.error('Error parsing JSON:', e)
     return null
   }
 }

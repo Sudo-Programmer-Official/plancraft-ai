@@ -74,3 +74,14 @@ export async function exportZip(quote, chatLog) {
   const blob = await zip.generateAsync({ type: 'blob' })
   saveAs(blob, 'project-briefing.zip')
 }
+
+export async function exportQuoteFile(type, quote, chat) {
+  if (!quote) return
+  if (type === 'pdf') exportPDF(quote, chat)
+  else if (type === 'zip') exportZip(quote, chat)
+  else if (type === 'md') {
+    const md = exportMarkdown(quote, chat)
+    const blob = new Blob([md], { type: 'text/markdown' })
+    saveAs(blob, 'quote-summary.md')
+  }
+}
