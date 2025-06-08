@@ -86,7 +86,11 @@
     <div class="mt-8">
       <el-collapse v-model="activeSections">
         <el-collapse-item name="chat" title="🗣️ Want to tweak or ask questions?">
-          <ChatAssistant :quote="quote" :key="quote?.version || quote?.createdAt || 'chat'" />
+          <ChatAssistant
+            v-if="quote"
+            :quote="quote"
+            :key="quote?.version || quote?.createdAt || 'chat'"
+          />
         </el-collapse-item>
       </el-collapse>
     </div>
@@ -111,6 +115,7 @@ import { ref, watch, computed, nextTick } from 'vue'
 import { exportPDF, exportMarkdown, exportZip } from '@/utils/exportUtils'
 import { useQuoteStore } from '@/stores/quoteStore'
 import { useWindowSize } from '@vueuse/core'
+import ChatAssistant from './ChatAssistant.vue'
 
 const quoteStore = useQuoteStore()
 const quote = computed(() => quoteStore.quote)
