@@ -125,7 +125,16 @@ async function sendMessage() {
         <p class="text-xs font-semibold mb-1">
           {{ msg.role === 'user' ? '👤 You' : '🤖 AI Assistant' }}
         </p>
-        <p class="whitespace-pre-line">{{ msg.content }}</p>
+        <p class="whitespace-pre-line" v-if="!tryParseJson(msg.content)">
+          {{ msg.content }}
+        </p>
+
+        <div
+          v-else
+          class="bg-gray-50 border border-dashed border-gray-300 p-3 rounded-md text-xs text-gray-800 whitespace-pre-wrap overflow-x-auto"
+        >
+          <pre>{{ JSON.stringify(tryParseJson(msg.content), null, 2) }}</pre>
+        </div>
         <div id="chat-scroll-anchor"></div>
       </div>
     </div>
@@ -212,6 +221,13 @@ async function sendMessage() {
     })
   } finally {
     loading.value = false
+  }
+}
+function tryParseJson(str) {
+  try {
+    return JSON.parse(str)
+  } catch (e) {
+    return null
   }
 }
 </script>
