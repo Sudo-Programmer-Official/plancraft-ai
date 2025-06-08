@@ -6,7 +6,6 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { useQuoteStore } from '@/stores/quoteStore'
 import QuoteDialog from './QuoteDialog.vue'
-import { computed } from 'vue'
 const quoteStore = useQuoteStore()
 const quote = computed(() => quoteStore.quote)
 const quoteCardRef = ref(null)
