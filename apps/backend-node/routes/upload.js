@@ -1,5 +1,5 @@
 import express from "express";
-import { extractTextFromUrl } from "../utils/responseFormulator.js";
+import { extractTextFromUrl } from "../utils/responseFormatter.js";
 import { getQuoteFromIdea } from "../services/openaiService.js";
 
 const router = express.Router();
