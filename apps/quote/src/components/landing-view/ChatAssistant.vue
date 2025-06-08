@@ -104,9 +104,9 @@ async function sendMessage() {
         <p class="whitespace-pre-line">{{ msg.content }}</p>
         <div id="chat-scroll-anchor"></div>
       </div>
-      <div v-else class="text-gray-400 text-sm text-center mt-4">
-        💬 Ask a follow-up question about your quote.
-      </div>
+    </div>
+    <div v-else class="text-gray-400 text-sm text-center mt-4">
+      💬 Ask a follow-up question about your quote.
     </div>
   </div>
 </template>
