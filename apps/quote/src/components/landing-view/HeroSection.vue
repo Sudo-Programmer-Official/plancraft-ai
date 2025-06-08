@@ -34,6 +34,18 @@
 
         <!-- File Upload UI -->
         <div class="flex items-center gap-3">
+          <!-- <el-upload
+            class="upload-demo"
+            :auto-upload="false"
+            :multiple="true"
+            :on-change="handleFileChange"
+            :show-file-list="false"
+            accept=".pdf,.txt,.docx,.md"
+          >
+            <el-button>
+              <span class="text-sm text-gray-600">Attach a file</span>
+            </el-button>
+          </el-upload> -->
           <el-upload
             class="upload-demo"
             :auto-upload="false"
@@ -42,9 +54,7 @@
             :show-file-list="false"
             accept=".pdf,.txt,.docx,.md"
           >
-            <el-button text icon="el-icon-plus ml-2">
-              <!-- <Upload class="text-gray-500" /> -->
-              <el-icon><Upload /></el-icon>
+            <el-button text :icon="Plus">
               <span class="text-sm text-gray-600">Attach a file</span>
             </el-button>
           </el-upload>
@@ -76,20 +86,28 @@
 <script setup>
 import heroImage from '@/assets/images/hero-bg-image.png'
 import { View } from '@element-plus/icons-vue'
+import { defineComponent } from 'vue'
 import logo from '@/assets/images/logo.svg'
-import { Upload } from '@element-plus/icons-vue'
+// import { Upload } from '@element-plus/icons-vue'
 import { useQuoteStore } from '@/stores/quoteStore'
 import { ref } from 'vue'
 import useMultiFileUpload from '@/composables/useMultiFileUpload' // ← Your existing composable
-
+import { Plus } from '@element-plus/icons-vue'
 const quoteStore = useQuoteStore()
 const selectedFiles = ref([])
 const { uploadFiles, downloadUrls } = useMultiFileUpload()
+function handleFileChange(file, fileList) {
+  selectedFiles.value = fileList.map((f) => f.raw)
+}
+
+// defineComponent({
+//   components: { Upload },
+// })
 
 // Handle File Change
-function handleFileChange(fileObj) {
-  selectedFiles.value = fileObj.fileList.map((f) => f.raw)
-}
+// function handleFileChange(fileObj) {
+//   selectedFiles.value = fileObj.fileList.map((f) => f.raw)
+// }
 
 // Handle Generate Button
 async function handleGenerate() {

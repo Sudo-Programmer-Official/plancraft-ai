@@ -9,7 +9,7 @@
       :file-list="fileList"
       accept=".pdf,.txt,.docx"
     >
-      <i class="el-icon-upload" />
+      <!-- <i class="el-icon-upload" /> -->
       <div class="el-upload__text">Drop files here or <em>click to upload</em></div>
     </el-upload>
 
