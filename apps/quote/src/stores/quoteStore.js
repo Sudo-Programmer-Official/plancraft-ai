@@ -1,7 +1,12 @@
 // quoteStore.js
 import { defineStore } from 'pinia'
 // import { fetchQuote } from '@/services/quoteService'
-import { fetchQuote, askAssistant, fetchQuoteWithFile } from '@/services/quoteService'
+import {
+  fetchQuote,
+  askAssistant,
+  fetchQuoteWithFile,
+  finalizeQuoteWithChat,
+} from '@/services/quoteService'
 
 export const useQuoteStore = defineStore('quote', {
   state: () => ({
@@ -36,6 +41,29 @@ export const useQuoteStore = defineStore('quote', {
         console.error('Quote fetch failed:', err)
       } finally {
         this.loading = false
+      }
+    },
+    async finalizeAndRegenerateQuote() {
+      if (!this.quote || this.chatLog.length === 0) {
+        console.warn('Quote or chat log missing.')
+        return
+      }
+      try {
+        const result = await finalizeQuoteWithChat({
+          quote: this.quote,
+          chatLog: this.chatLog,
+        })
+        this.quote = result // overwrite or merge
+        this.finalizedQuotes.push({
+          quote: result,
+          version: this.versionCounter++,
+          finalizedAt: new Date().toISOString(),
+          idea: this.idea,
+          chatLog: [...this.chatLog],
+        })
+        console.log('✅ Final quote regenerated:', result)
+      } catch (err) {
+        console.error('❌ Finalize failed', err)
       }
     },
     finalizeCurrentQuote() {

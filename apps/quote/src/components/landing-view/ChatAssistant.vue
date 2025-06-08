@@ -56,11 +56,11 @@
         <p class="whitespace-pre-line" v-if="msg.content && !tryParseJson(msg.content)">
           {{ msg.content }}
         </p>
-        <div v-if="msg.role === 'assistant'" class="text-right mt-2">
+        <!-- <div v-if="msg.role === 'assistant'" class="text-right mt-2">
           <el-button size="small" type="primary" plain @click="applyToQuote(msg.content)">
             📌 Apply to Quote
           </el-button>
-        </div>
+        </div> -->
 
         <div
           v-else

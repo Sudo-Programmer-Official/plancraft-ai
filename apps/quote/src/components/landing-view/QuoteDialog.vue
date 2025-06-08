@@ -128,22 +128,55 @@ watch(quote, async (newVal) => {
     document.querySelector('.custom-quote-dialog')?.scrollIntoView({ behavior: 'smooth' })
   }
 })
-function finalizeQuote(type = 'pdf') {
-  if (!quote.value) return
+// function finalizeQuote(type = 'pdf') {
+//   if (!quote.value) return
 
-  quoteStore.finalizeCurrentQuote()
-  const latestFinal = quoteStore.latestFinalizedQuote
-  if (!latestFinal) return
+//   quoteStore.finalizeCurrentQuote()
+//   const latestFinal = quoteStore.latestFinalizedQuote
+//   if (!latestFinal) return
 
-  if (type === 'pdf') exportPDF(latestFinal.quote, latestFinal.chatLog || [])
-  if (type === 'zip') exportZip(latestFinal.quote, latestFinal.chatLog || [])
-  if (type === 'md') {
-    const md = exportMarkdown(latestFinal.quote, latestFinal.chatLog || [])
-    const blob = new Blob([md], { type: 'text/markdown' })
-    saveAs(blob, 'quote-summary.md')
+//   if (type === 'pdf') exportPDF(latestFinal.quote, latestFinal.chatLog || [])
+//   if (type === 'zip') exportZip(latestFinal.quote, latestFinal.chatLog || [])
+//   if (type === 'md') {
+//     const md = exportMarkdown(latestFinal.quote, latestFinal.chatLog || [])
+//     const blob = new Blob([md], { type: 'text/markdown' })
+//     saveAs(blob, 'quote-summary.md')
+//   }
+
+//   console.log('✅ Finalized & exported:', latestFinal)
+// }
+async function finalizeQuote(type = 'pdf') {
+  if (!quote.value || !chatLog.value) return
+
+  try {
+    // 🔁 Regenerate finalized version using backend
+    const regenerated = await quoteStore.finalizeAndRegenerateQuote({
+      quote: quote.value,
+      chatLog: chatLog.value,
+    })
+
+    // 💾 Save it into the store (optional if store tracks finalized separately)
+    quoteStore.finalizedQuotes.push({
+      version: quoteStore.versionCounter++,
+      idea: quoteStore.idea,
+      quote: regenerated,
+      chatLog: [...chatLog.value],
+      finalizedAt: new Date().toISOString(),
+    })
+
+    // 📁 Then export as per requested format
+    if (type === 'pdf') exportPDF(regenerated, chatLog.value)
+    if (type === 'zip') exportZip(regenerated, chatLog.value)
+    if (type === 'md') {
+      const md = exportMarkdown(regenerated, chatLog.value)
+      const blob = new Blob([md], { type: 'text/markdown' })
+      saveAs(blob, 'quote-summary.md')
+    }
+
+    console.log('✅ Finalized & exported via backend:', regenerated)
+  } catch (err) {
+    console.error('❌ Finalization via backend failed:', err)
   }
-
-  console.log('✅ Finalized & exported:', latestFinal)
 }
 
 function handleClose() {

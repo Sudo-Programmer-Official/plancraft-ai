@@ -29,3 +29,11 @@ export async function fetchQuoteWithFile({ idea, fileUrl }) {
   })
   return res.data
 }
+
+export async function finalizeQuoteWithChat({ quote, chatLog }) {
+  const res = await axios.post(`${API_BASE}/api/finalize`, {
+    quote,
+    chatLog,
+  })
+  return res.data
+}

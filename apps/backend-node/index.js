@@ -56,6 +56,7 @@ import dotenv from "dotenv";
 import quoteRoutes from "./routes/quote.js";
 import uploadRoutes from "./routes/upload.js";
 import askRoutes from "./routes/ask.js";
+import finalizeRoutes from "./routes/finalize.js";
 
 dotenv.config();
 
@@ -94,6 +95,7 @@ app.get("/", (req, res) => {
 app.use("/api/quote", quoteRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/ask", askRoutes);
+app.use("/api/finalize", finalizeRoutes);
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
