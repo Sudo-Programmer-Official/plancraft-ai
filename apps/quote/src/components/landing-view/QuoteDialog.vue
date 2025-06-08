@@ -32,31 +32,29 @@
         </el-select>
       </div>
 
-      <!-- Body -->
+      <!-- Split View Layout -->
       <div
-        class="max-h-[65vh] overflow-y-auto pr-2 space-y-8 text-gray-800 text-base leading-relaxed"
+        class="max-h-[65vh] overflow-y-auto pr-2 flex flex-col lg:flex-row gap-6 text-gray-800 text-base leading-relaxed"
       >
-        <QuoteSection title="💡 Stack Recommendation" :content="quote.stack" />
-        <QuoteSection title="🗓️ Timeline Estimate" :content="quote.timeline" />
-        <QuoteSection title="💰 Cost Estimate" :content="quote.estimate" />
-        <QuoteSection title="🧩 Suggested Features" :content="quote.features?.join(', ')" />
-        <QuoteSection title="⚙️ Why This Stack?" :content="quote.notes" />
-        <QuoteSection title="📊 Market Insight" :content="quote.marketInsight" />
-      </div>
+        <!-- Quote Summary -->
+        <div class="lg:w-1/2 space-y-6">
+          <QuoteSection title="💡 Stack Recommendation" :content="quote.stack" />
+          <QuoteSection title="🗓️ Timeline Estimate" :content="quote.timeline" />
+          <QuoteSection title="💰 Cost Estimate" :content="quote.estimate" />
+          <QuoteSection title="🧩 Suggested Features" :content="quote.features?.join(', ')" />
+          <QuoteSection title="⚙️ Why This Stack?" :content="quote.notes" />
+          <QuoteSection title="📊 Market Insight" :content="quote.marketInsight" />
+        </div>
 
-      <!-- Assistant -->
-      <div class="mt-8">
-        <el-collapse v-model="activeSections">
-          <el-collapse-item name="chat" title="🗣️ Want to tweak or ask questions?">
-            <ChatAssistant
-              v-if="quote"
-              :quote="quote"
-              :key="quote?.version || quote?.createdAt || 'chat'"
-            />
-          </el-collapse-item>
-        </el-collapse>
+        <!-- Chat Assistant -->
+        <div class="lg:w-1/2">
+          <ChatAssistant
+            v-if="quote"
+            :quote="quote"
+            :key="quote?.version || quote?.createdAt || 'chat'"
+          />
+        </div>
       </div>
-
       <!-- Footer -->
       <template #footer>
         <div class="flex flex-col sm:flex-row justify-between items-center w-full gap-4">
@@ -91,7 +89,7 @@ const activeSections = ref(['chat'])
 const selectedVersion = ref(null)
 
 const { width } = useWindowSize()
-const dialogWidth = computed(() => (width.value < 640 ? '90vw' : '40%'))
+const dialogWidth = computed(() => (width.value < 640 ? '90vw' : '80%'))
 
 watch(selectedVersion, (version) => {
   if (version) quoteStore.revertToVersion(version)
