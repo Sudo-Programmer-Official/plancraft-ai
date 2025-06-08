@@ -1,5 +1,5 @@
 <template>
-  <div v-if="quote" class="max-w-2xl mx-auto mt-10">
+  <div ref="quoteCardRef" v-if="quote" class="max-w-2xl mx-auto mt-10">
     <el-card shadow="hover" class="bg-white rounded-xl border border-gray-200 px-6 py-8">
       <div class="text-purple-700 text-2xl font-bold mb-6 flex items-center gap-2">
         🎉 Your AI-Generated Quote
@@ -36,8 +36,17 @@
 </template>
 
 <script setup>
+import { ref, computed, watch, nextTick } from 'vue'
 import { useQuoteStore } from '@/stores/quoteStore'
 import { computed } from 'vue'
 const quoteStore = useQuoteStore()
 const quote = computed(() => quoteStore.quote)
+const quoteCardRef = ref(null)
+
+watch(quote, async (newVal) => {
+  if (newVal) {
+    await nextTick()
+    quoteCardRef.value?.scrollIntoView({ behavior: 'smooth' })
+  }
+})
 </script>
