@@ -1,7 +1,7 @@
 // quoteStore.js
 import { defineStore } from 'pinia'
 // import { fetchQuote } from '@/services/quoteService'
-import { fetchQuote, askAssistant, fetchQuoteWithFile } from '@/services/quoteService'
+import { fetchQuote, askAssistant, fetchQuoteWithFile, askAssistant } from '@/services/quoteService'
 
 export const useQuoteStore = defineStore('quote', {
   state: () => ({
@@ -94,7 +94,7 @@ export const useQuoteStore = defineStore('quote', {
       this.addChatMessage(userMsg)
 
       try {
-        const aiReply = await getChatReply(userPrompt, this.quote)
+        const aiReply = await askAssistant(userPrompt, this.quote)
         const aiMsg = { role: 'assistant', content: aiReply.content }
         this.addChatMessage(aiMsg)
       } catch (err) {
