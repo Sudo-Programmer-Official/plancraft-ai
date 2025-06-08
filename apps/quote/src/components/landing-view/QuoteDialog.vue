@@ -32,12 +32,12 @@
         </el-select>
       </div>
 
-      <!-- Split View Layout -->
+      <!-- Split Panel -->
       <div
-        class="max-h-[65vh] overflow-y-auto pr-2 flex flex-col lg:flex-row gap-6 text-gray-800 text-base leading-relaxed"
+        class="max-h-[65vh] overflow-y-auto flex flex-col lg:flex-row gap-8 text-gray-800 text-base leading-relaxed"
       >
         <!-- Quote Summary -->
-        <div class="lg:w-1/2 space-y-6">
+        <div class="lg:w-2/3 space-y-6 pr-2">
           <QuoteSection title="💡 Stack Recommendation" :content="quote.stack" />
           <QuoteSection title="🗓️ Timeline Estimate" :content="quote.timeline" />
           <QuoteSection title="💰 Cost Estimate" :content="quote.estimate" />
@@ -47,7 +47,10 @@
         </div>
 
         <!-- Chat Assistant -->
-        <div class="lg:w-1/2">
+        <div
+          class="lg:w-1/3 bg-gray-50 rounded-xl border border-gray-200 p-4 flex flex-col shadow-sm"
+        >
+          <h3 class="font-semibold text-sm text-gray-700 mb-3">🗣️ Ask Assistant</h3>
           <ChatAssistant
             v-if="quote"
             :quote="quote"
