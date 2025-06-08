@@ -21,7 +21,7 @@
         v-model="selectedVersion"
         placeholder="View past versions"
         size="small"
-        class="ml-auto w-56"
+        class="ml-auto max-w-[160px] sm:max-w-[200px] truncate"
       >
         <el-option
           v-for="q in quoteStore.quoteHistory"
@@ -158,7 +158,7 @@ function handleExport(type) {
 }
 </script>
 
-<style>
+<style lang="scss" scoped>
 .custom-quote-dialog .el-dialog__body {
   max-height: 65vh;
   overflow-y: auto;
@@ -171,5 +171,10 @@ function handleExport(type) {
 .custom-quote-dialog .el-dialog__body::-webkit-scrollbar-thumb {
   background-color: rgba(0, 0, 0, 0.1);
   border-radius: 8px;
+}
+.el-select .el-input__inner {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>
