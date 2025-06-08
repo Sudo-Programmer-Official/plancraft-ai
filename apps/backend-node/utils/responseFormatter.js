@@ -1,4 +1,4 @@
-// utils/responseFormulator.js
+// utils/responseFormatter.js
 
 import fetch from "node-fetch";
 import pdfParse from "pdf-parse";
@@ -16,6 +16,7 @@ export async function extractTextFromUrl(fileUrl) {
   const buffer = Buffer.from(await res.arrayBuffer());
 
   if (contentType.includes("pdf")) {
+    const pdfParse = (await import("pdf-parse")).default; // dynamic load
     const data = await pdfParse(buffer);
     return data.text;
   }
