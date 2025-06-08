@@ -16,10 +16,16 @@ export async function extractTextFromUrl(fileUrl) {
   const buffer = Buffer.from(await res.arrayBuffer());
 
   if (contentType.includes("pdf")) {
-    const pdfParse = (await import("pdf-parse")).default; // dynamic load
+    const pdfParse = (await import("pdf-parse")).default; // load only when needed
     const data = await pdfParse(buffer);
     return data.text;
   }
+
+  //   if (contentType.includes("pdf")) {
+  //     const pdfParse = (await import("pdf-parse")).default; // dynamic load
+  //     const data = await pdfParse(buffer);
+  //     return data.text;
+  //   }
 
   if (contentType.includes("officedocument.wordprocessingml.document")) {
     const { value } = await mammoth.extractRawText({ buffer });
