@@ -45,7 +45,7 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, nextTick, computed } from 'vue'
 import { useQuoteStore } from '@/stores/quoteStore'
 
 const quoteStore = useQuoteStore()
