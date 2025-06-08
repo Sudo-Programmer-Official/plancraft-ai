@@ -38,12 +38,18 @@
       >
         <!-- Quote Summary -->
         <div class="lg:w-2/3 space-y-6 pr-2">
-          <QuoteSection title="💡 Stack Recommendation" :content="quote.stack" />
+          <!-- <QuoteSection title="💡 Stack Recommendation" :content="quote.stack" />
           <QuoteSection title="🗓️ Timeline Estimate" :content="quote.timeline" />
           <QuoteSection title="💰 Cost Estimate" :content="quote.estimate" />
           <QuoteSection title="🧩 Suggested Features" :content="quote.features?.join(', ')" />
           <QuoteSection title="⚙️ Why This Stack?" :content="quote.notes" />
-          <QuoteSection title="📊 Market Insight" :content="quote.marketInsight" />
+          <QuoteSection title="📊 Market Insight" :content="quote.marketInsight" /> -->
+          <QuoteSection
+            v-for="section in quoteSections"
+            :key="section.key"
+            :title="`${section.icon} ${section.title}`"
+            :content="quote[section.key] || '-'"
+          />
         </div>
 
         <!-- Chat Assistant -->
@@ -61,13 +67,16 @@
       <!-- Footer -->
       <template #footer>
         <div class="flex flex-col sm:flex-row justify-between items-center w-full gap-4">
-          <p class="text-xs text-gray-500">Quote generated using GPT-4 + industry presets</p>
           <div class="flex gap-3">
+            <el-button plain type="info" @click="viewFinal = true">📝 View Final Report</el-button>
             <el-button type="primary" @click="finalizeQuote">📌 Finalize This Quote</el-button>
             <el-button type="success" plain @click="handleExport('pdf')">Export as PDF</el-button>
             <el-button type="primary" plain @click="handleExport('zip')"
               >Export All (ZIP)</el-button
             >
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">Quote generated using GPT-4 + industry presets</p>
           </div>
         </div>
       </template>
@@ -78,10 +87,12 @@
 <script setup>
 import { ref, watch, computed, nextTick } from 'vue'
 import { useQuoteStore } from '@/stores/quoteStore'
+import { ElMessage } from 'element-plus'
 import { exportPDF, exportZip, exportMarkdown } from '@/utils/exportUtils'
 import { useWindowSize } from '@vueuse/core'
 import ChatAssistant from './ChatAssistant.vue'
 import QuoteSection from './QuoteSection.vue'
+import { saveAs } from 'file-saver'
 
 const quoteStore = useQuoteStore()
 const quote = computed(() => quoteStore.quote)
@@ -90,6 +101,18 @@ const chatLog = computed(() => quoteStore.chatLog)
 const visible = ref(false)
 const activeSections = ref(['chat'])
 const selectedVersion = ref(null)
+
+const quoteSections = [
+  { title: 'Vision Summary', icon: '🎯', key: 'vision' },
+  { title: 'Stack Recommendation', icon: '💡', key: 'stack' },
+  { title: 'Architecture Plan', icon: '🏗️', key: 'architecture' },
+  { title: 'Suggested Features', icon: '🧩', key: 'features' },
+  { title: 'Timeline Estimate', icon: '📆', key: 'timeline' },
+  { title: 'Cost Estimate', icon: '💰', key: 'estimate' },
+  { title: 'Market Insight', icon: '📊', key: 'marketInsight' },
+  { title: 'Risks & Assumptions', icon: '⚠️', key: 'notes' },
+  { title: 'Next Steps', icon: '🚀', key: 'nextSteps' },
+]
 
 const { width } = useWindowSize()
 const dialogWidth = computed(() => (width.value < 640 ? '90vw' : '80%'))
@@ -105,21 +128,38 @@ watch(quote, async (newVal) => {
     document.querySelector('.custom-quote-dialog')?.scrollIntoView({ behavior: 'smooth' })
   }
 })
+function finalizeQuote(type = 'pdf') {
+  if (!quote.value) return
+
+  quoteStore.finalizeCurrentQuote()
+  const latestFinal = quoteStore.latestFinalizedQuote
+  if (!latestFinal) return
+
+  if (type === 'pdf') exportPDF(latestFinal.quote, latestFinal.chatLog || [])
+  if (type === 'zip') exportZip(latestFinal.quote, latestFinal.chatLog || [])
+  if (type === 'md') {
+    const md = exportMarkdown(latestFinal.quote, latestFinal.chatLog || [])
+    const blob = new Blob([md], { type: 'text/markdown' })
+    saveAs(blob, 'quote-summary.md')
+  }
+
+  console.log('✅ Finalized & exported:', latestFinal)
+}
 
 function handleClose() {
   visible.value = false
 }
 
-function finalizeQuote() {
-  if (!quote.value) return
-  quoteStore.quoteHistory.push({
-    version: quoteStore.versionCounter++,
-    idea: quoteStore.idea,
-    quote: quote.value,
-    chatLog: [...quoteStore.chatLog],
-    createdAt: new Date().toISOString(),
-  })
-}
+// function finalizeQuote() {
+//   if (!quote.value) return
+//   quoteStore.quoteHistory.push({
+//     version: quoteStore.versionCounter++,
+//     idea: quoteStore.idea,
+//     quote: quote.value,
+//     chatLog: [...quoteStore.chatLog],
+//     createdAt: new Date().toISOString(),
+//   })
+// }
 
 function handleExport(type) {
   if (!quote.value) return
@@ -130,6 +170,7 @@ function handleExport(type) {
     const blob = new Blob([md], { type: 'text/markdown' })
     saveAs(blob, 'quote-summary.md')
   }
+  ElMessage.success('📝 Finalized and exported!')
 }
 </script>
 
@@ -150,5 +191,14 @@ function handleExport(type) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .custom-quote-dialog .el-dialog__body {
+    flex-direction: column !important;
+    padding: 0.5rem;
+  }
+}
+.custom-quote-dialog {
+  overflow-x: hidden;
 }
 </style>

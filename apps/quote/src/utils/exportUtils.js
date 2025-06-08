@@ -2,18 +2,52 @@ import jsPDF from 'jspdf'
 import JSZip from 'jszip'
 import { saveAs } from 'file-saver'
 
-export function exportPDF(quote, chatLog) {
+const defaultQuoteSections = [
+  { title: 'Vision Summary', icon: '🎯', key: 'vision' },
+  { title: 'Stack Recommendation', icon: '💡', key: 'stack' },
+  { title: 'Architecture Plan', icon: '🏗️', key: 'architecture' },
+  { title: 'Suggested Features', icon: '🧩', key: 'features' },
+  { title: 'Timeline Estimate', icon: '📆', key: 'timeline' },
+  { title: 'Cost Estimate', icon: '💰', key: 'estimate' },
+  { title: 'Market Insight', icon: '📊', key: 'marketInsight' },
+  { title: 'Risks & Assumptions', icon: '⚠️', key: 'notes' },
+  { title: 'Next Steps', icon: '🚀', key: 'nextSteps' },
+]
+
+export function exportPDF(quote, chatLog = []) {
   const doc = new jsPDF()
+  doc.setFontSize(16)
+  doc.text('🚀 AI-Generated Quote Report', 10, 15)
 
-  doc.text('🚀 AI-Generated Quote', 10, 10)
-  doc.text(`📦 Stack: ${quote.stack}`, 10, 20)
-  doc.text(`📆 Timeline: ${quote.timeline}`, 10, 30)
-  doc.text(`💰 Estimate: ${quote.estimate}`, 10, 40)
+  let y = 25
+  doc.setFontSize(12)
 
-  doc.text('🧠 Chat Log:', 10, 60)
-  chatLog.forEach((msg, i) => {
-    const prefix = msg.role === 'user' ? 'You: ' : 'AI: '
-    doc.text(`${prefix}${msg.content}`, 10, 70 + i * 10)
+  for (const section of defaultQuoteSections) {
+    const value = quote[section.key]
+    if (!value) continue
+
+    doc.setFont(undefined, 'bold')
+    doc.text(`${section.icon} ${section.title}`, 10, y)
+    y += 7
+    doc.setFont(undefined, 'normal')
+
+    const content = Array.isArray(value) ? value.join(', ') : String(value)
+    const splitContent = doc.splitTextToSize(content, 180)
+    doc.text(splitContent, 10, y)
+    y += splitContent.length * 6 + 5
+  }
+
+  // Chat log
+  doc.setFont(undefined, 'bold')
+  doc.text('💬 Chat Log', 10, y)
+  y += 7
+  doc.setFont(undefined, 'normal')
+
+  chatLog.forEach((msg) => {
+    const prefix = msg.role === 'user' ? '👤 You: ' : '🤖 AI: '
+    const content = doc.splitTextToSize(`${prefix}${msg.content}`, 180)
+    doc.text(content, 10, y)
+    y += content.length * 6 + 3
   })
 
   doc.save('quote-summary.pdf')

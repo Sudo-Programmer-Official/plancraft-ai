@@ -11,7 +11,13 @@ export const useQuoteStore = defineStore('quote', {
     quoteHistory: [],
     chatLog: [],
     versionCounter: 1,
+    finalizedQuotes: [], // ✅ NEW
   }),
+  getters: {
+    getters: {
+      latestFinalizedQuote: (state) => state.finalizedQuotes.at(-1),
+    },
+  },
   actions: {
     async generateQuote() {
       this.loading = true
@@ -31,6 +37,26 @@ export const useQuoteStore = defineStore('quote', {
       } finally {
         this.loading = false
       }
+    },
+    finalizeCurrentQuote() {
+      if (!this.quote) return
+
+      const finalized = {
+        version: this.versionCounter,
+        idea: this.idea,
+        quote: this.quote,
+        chatLog: [...this.chatLog],
+        finalizedAt: new Date().toISOString(),
+      }
+
+      this.finalizedQuotes.push(finalized)
+      this.versionCounter++
+
+      // Optional: Add to history as well if needed
+      this.quoteHistory.push({
+        ...finalized,
+        createdAt: finalized.finalizedAt,
+      })
     },
     addChatMessage(message) {
       this.chatLog.push(message)

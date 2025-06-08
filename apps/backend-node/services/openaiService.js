@@ -20,22 +20,41 @@ export async function getQuoteFromIdea(idea) {
   //   "estimate": "$4,000 - $7,000"
   // }
   // `;
+  // const prompt = `
+  // You are a senior software architect and product strategist.
+
+  // Given the startup idea: "${idea}", generate a high-level feasibility report in JSON format.
+
+  // Respond with:
+  // {
+  //   "stack": "Frontend + Backend + Database + Optional Infra",
+  //   "timeline": "X-Y weeks",
+  //   "estimate": "USD $X - $Y",
+  //   "features": ["Feature 1", "Feature 2", "Optional Feature 3"],
+  //   "marketInsight": "Short insight on the app's relevance in today’s market.",
+  //   "notes": "Any assumptions or edge considerations."
+  // }
+
+  // Be concise but useful. Respond only with valid JSON.
+  // `;
   const prompt = `
-  You are a senior software architect and product strategist.
+  You are a senior AI software strategist.
 
-  Given the startup idea: "${idea}", generate a high-level feasibility report in JSON format.
+  Given the startup idea: "${idea}", generate a high-level project report in JSON format with the following sections:
 
-  Respond with:
   {
-    "stack": "Frontend + Backend + Database + Optional Infra",
-    "timeline": "X-Y weeks",
-    "estimate": "USD $X - $Y",
-    "features": ["Feature 1", "Feature 2", "Optional Feature 3"],
-    "marketInsight": "Short insight on the app's relevance in today’s market.",
-    "notes": "Any assumptions or edge considerations."
+    "vision": "Brief summary of what this product is and who it’s for",
+    "stack": "Recommended frontend, backend, database, infra",
+    "architecture": "Optional high-level architectural breakdown (if applicable)",
+    "features": ["List of MVP-level features"],
+    "timeline": "Estimated delivery time (e.g. '6–10 weeks')",
+    "estimate": "Estimated budget range in USD",
+    "marketInsight": "Why this idea is relevant now",
+    "notes": "Risks, assumptions, or dependencies",
+    "nextSteps": "What should the user do next (e.g., refine features, build MVP, validate)"
   }
 
-  Be concise but useful. Respond only with valid JSON.
+  Respond ONLY with valid JSON. Be concise but insightful.
   `;
 
   const response = await openai.chat.completions.create({
