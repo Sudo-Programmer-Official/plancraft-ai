@@ -1,5 +1,5 @@
 <template>
-  <main class="flex flex-col items-center justify-center">
+  <main class="flex flex-col items-center justify-center overflow-x-hidden">
     <HeroSection />
     <!-- <PromptInput /> -->
     <QuoteCard />

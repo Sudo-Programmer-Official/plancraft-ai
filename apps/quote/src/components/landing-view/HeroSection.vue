@@ -5,12 +5,17 @@
   >
     <!-- Logo -->
     <div class="absolute top-8 left-12 z-10 h-24">
-      <img :src="logo" alt="Prompt2Quote Logo" class="h-24 md:h-16 drop-shadow-md" height="44" />
+      <img
+        :src="logo"
+        alt="Prompt2Quote Logo"
+        class="sm:h-16 md:h-24 lg:h-24 md:h-16 drop-shadow-md"
+        height="44"
+      />
     </div>
 
     <!-- Main Content -->
     <div class="text-center max-w-2xl mx-auto">
-      <h1 class="text-5xl sm:text-6xl font-bold leading-tight mb-4 text-white drop-shadow-lg">
+      <h1 class="text-5xl sm:text-5xl font-bold leading-tight mb-4 text-white drop-shadow-lg">
         Turn Your Idea into a <br class="hidden sm:inline" />
         Quote, Instantly
       </h1>
@@ -20,7 +25,10 @@
       </p>
 
       <!-- Input Card -->
-      <div class="bg-white/90 backdrop-blur-sm rounded-xl p-6 max-w-xl mx-auto shadow-lg space-y-4">
+      <!-- <div class="bg-white/90 backdrop-blur-sm rounded-xl p-6 max-w-xl mx-auto shadow-lg space-y-4"> -->
+      <div
+        class="bg-white/90 backdrop-blur-sm rounded-xl p-4 sm:p-6 max-w-md w-full mx-auto shadow"
+      >
         <!-- Idea Textarea -->
         <el-input
           v-model="quoteStore.idea"
