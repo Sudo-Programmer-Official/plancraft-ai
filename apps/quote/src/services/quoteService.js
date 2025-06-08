@@ -8,9 +8,18 @@ export async function fetchQuote(idea) {
   const res = await axios.post(`${API_BASE}/api/quote`, { idea })
   return res.data
 }
-export async function askAssistant(prompt) {
-  const res = await axios.post(`${API_BASE}/api/ask`, { prompt })
-  return res.data // or res.data.result depending on backend shape
+// export async function askAssistant(prompt) {
+//   const res = await axios.post(`${API_BASE}/api/ask`, { prompt })
+//   return res.data // or res.data.result depending on backend shape
+// }
+export async function askAssistant(prompt, quote = null) {
+  let fullPrompt = prompt
+  if (quote) {
+    fullPrompt = `Here’s the current quote:\n${JSON.stringify(quote, null, 2)}\n\nUser says: ${prompt}`
+  }
+
+  const res = await axios.post(`${API_BASE}/api/ask`, { prompt: fullPrompt })
+  return res.data
 }
 
 export async function fetchQuoteWithFile({ idea, fileUrl }) {

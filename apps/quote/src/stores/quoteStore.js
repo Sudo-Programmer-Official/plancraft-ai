@@ -1,7 +1,7 @@
 // quoteStore.js
 import { defineStore } from 'pinia'
 // import { fetchQuote } from '@/services/quoteService'
-import { fetchQuote, askAssistant, fetchQuoteWithFile, askAssistant } from '@/services/quoteService'
+import { fetchQuote, askAssistant, fetchQuoteWithFile } from '@/services/quoteService'
 
 export const useQuoteStore = defineStore('quote', {
   state: () => ({
