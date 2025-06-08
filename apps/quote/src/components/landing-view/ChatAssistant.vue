@@ -1,75 +1,3 @@
-<!-- <template>
-  <div class="space-y-4">
-    <el-input
-      type="textarea"
-      v-model="userMessage"
-      placeholder="Ask how to improve features, tech stack, or timeline..."
-      :rows="3"
-      resize="none"
-      class="w-full"
-    />
-
-    <div class="flex justify-end">
-      <el-button type="primary" :loading="loading" @click="sendMessage"> Ask </el-button>
-    </div>
-
-    <div v-if="chatHistory.length" class="mt-6 space-y-4">
-      <div
-        v-for="(msg, index) in chatHistory"
-        :key="index"
-        class="p-4 rounded-md border border-gray-200 bg-gray-50"
-      >
-        <p class="text-sm text-gray-500 mb-2">{{ msg.role === 'user' ? 'You' : 'AI' }}:</p>
-        <p class="text-gray-800 whitespace-pre-line">{{ msg.content }}</p>
-      </div>
-    </div>
-  </div>
-</template>
-
-<script setup>
-import { ref } from 'vue'
-import { askAssistant } from '@/services/aiService'
-
-const props = defineProps({
-  quote: Object,
-})
-
-const userMessage = ref('')
-const chatHistory = ref([])
-const loading = ref(false)
-
-async function sendMessage() {
-  if (!userMessage.value.trim()) return
-
-  loading.value = true
-  const userInput = userMessage.value.trim()
-  chatHistory.value.push({ role: 'user', content: userInput })
-  userMessage.value = ''
-
-  const fullPrompt = `Here is the current AI-generated quote:
-  ${JSON.stringify(props.quote, null, 2)}
-  
-  The user asks: ${userInput}`
-
-  try {
-    const response = await askAssistant(fullPrompt)
-    chatHistory.value.push({ role: 'assistant', content: response })
-  } catch (err) {
-    chatHistory.value.push({
-      role: 'assistant',
-      content: '⚠️ Something went wrong. Please try again.',
-    })
-  } finally {
-    loading.value = false
-  }
-}
-</script>
-
-<style scoped>
-.el-input__inner {
-  font-family: inherit;
-}
-</style> -->
 <template>
   <div class="space-y-4">
     <el-input
@@ -128,6 +56,11 @@ async function sendMessage() {
         <p class="whitespace-pre-line" v-if="!tryParseJson(msg.content)">
           {{ msg.content }}
         </p>
+        <div v-if="msg.role === 'assistant'" class="text-right mt-2">
+          <el-button size="small" type="primary" plain @click="applyToQuote(msg.content)">
+            📌 Apply to Quote
+          </el-button>
+        </div>
 
         <div
           v-else
@@ -149,6 +82,8 @@ import { ref, watch, onMounted } from 'vue'
 import { useQuoteStore } from '@/stores/quoteStore'
 import useMultiFileUpload from '@/composables/useMultiFileUpload'
 import { Plus } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { autoAppendToQuote } from '@/utils/helper'
 
 const selectedFiles = ref([])
 const { uploadFiles, downloadUrls } = useMultiFileUpload()
@@ -173,31 +108,10 @@ const scrollToBottom = () => {
     el?.scrollIntoView({ behavior: 'smooth' })
   }, 100)
 }
-
-// async function sendMessage() {
-//   const message = userMessage.value.trim()
-//   if (!message) return
-//   if (selectedFiles.value.length > 0) {
-//     await uploadFiles(selectedFiles.value)
-//     const fileUrl = downloadUrls.value?.[0] || ''
-//     await quoteStore.askAssistantMessageWithFile(userMessage.value, fileUrl)
-//   } else {
-//     await quoteStore.askAssistantMessage(userMessage.value)
-//   }
-//   loading.value = true
-//   try {
-//     await quoteStore.askAssistantMessage(message)
-//     userMessage.value = ''
-//     scrollToBottom()
-//   } catch (err) {
-//     quoteStore.addChatMessage({
-//       role: 'assistant',
-//       content: '⚠️ Something went wrong. Please try again.',
-//     })
-//   } finally {
-//     loading.value = false
-//   }
-// }
+function applyToQuote(content) {
+  autoAppendToQuote(content, quoteStore)
+  ElMessage.success('Added to quote successfully!')
+}
 async function sendMessage() {
   const message = userMessage.value.trim()
   if (!message) return
@@ -215,6 +129,7 @@ async function sendMessage() {
     userMessage.value = ''
     scrollToBottom()
   } catch (err) {
+    console.log('Error in sendMessage:', err)
     quoteStore.addChatMessage({
       role: 'assistant',
       content: '⚠️ Something went wrong. Please try again.',

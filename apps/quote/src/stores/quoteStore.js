@@ -112,6 +112,45 @@ export const useQuoteStore = defineStore('quote', {
         this.loading = false
       }
     },
+    // appendToQuoteField(key, value) {
+    //   if (!this.quote) return
+
+    //   if (Array.isArray(this.quote[key])) {
+    //     const existing = this.quote[key] || []
+    //     const combined = [...new Set([...existing, ...value])]
+    //     this.quote[key] = combined
+    //   } else if (typeof this.quote[key] === 'object') {
+    //     this.quote[key] = { ...this.quote[key], ...value }
+    //   } else if (typeof this.quote[key] === 'string') {
+    //     this.quote[key] = this.quote[key]
+    //       ? `${this.quote[key]}\n\n---\n\n${value}`
+    //       : value
+    //   } else {
+    //     this.quote[key] = value
+    //   }
+    // },
+    appendToQuoteField(key, value) {
+      if (!this.quote) return
+
+      const existing = this.quote[key]
+
+      if (!existing) {
+        // Section doesn't exist yet – create it directly
+        this.quote[key] = value
+        return
+      }
+
+      if (Array.isArray(existing)) {
+        const combined = [...new Set([...existing, ...value])]
+        this.quote[key] = combined
+      } else if (typeof existing === 'object') {
+        this.quote[key] = { ...existing, ...value }
+      } else if (typeof existing === 'string') {
+        this.quote[key] = `${existing}\n\n---\n\n${value}`
+      } else {
+        this.quote[key] = value
+      }
+    },
     async askAssistantMessage(userMessage) {
       const userPrompt = userMessage.trim()
       if (!userPrompt) return
