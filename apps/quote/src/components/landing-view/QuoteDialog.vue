@@ -8,7 +8,7 @@
     class="rounded-xl"
     :custom-class="'custom-quote-dialog'"
   >
-    <!-- Title Bar -->
+    <!-- Header -->
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-2xl font-bold text-purple-700 flex items-center gap-2">
         🎉 Your AI-Generated Quote
@@ -16,7 +16,6 @@
           AI Powered
         </span>
       </h2>
-      <!-- Below your <h2> title, inside Title Bar -->
       <el-select
         v-model="selectedVersion"
         placeholder="View past versions"
@@ -32,57 +31,19 @@
       </el-select>
     </div>
 
-    <!-- Scrollable Body -->
+    <!-- Body -->
     <div
       class="max-h-[65vh] overflow-y-auto pr-2 space-y-8 text-gray-800 text-base leading-relaxed"
     >
-      <!-- Stack Summary -->
-      <div>
-        <h3 class="font-bold text-xl mb-2">💡 Stack Recommendation</h3>
-        <p>{{ quote.stack }}</p>
-      </div>
-
-      <!-- Timeline -->
-      <div>
-        <h3 class="font-bold text-xl mb-2">📆 Timeline Estimate</h3>
-        <p>{{ quote.timeline }}</p>
-      </div>
-
-      <!-- Estimate -->
-      <div>
-        <h3 class="font-bold text-xl mb-2">💰 Cost Estimate</h3>
-        <p>{{ quote.estimate }}</p>
-      </div>
-
-      <!-- Feature Suggestions -->
-      <div>
-        <h3 class="font-bold text-xl mb-2">🧩 Suggested Features</h3>
-        <ul class="list-disc list-inside space-y-1">
-          <li>User authentication (email + Google login)</li>
-          <li>Admin dashboard for insights</li>
-          <li>Analytics & usage tracking</li>
-          <li>Optional: AI-based recommendation engine</li>
-        </ul>
-      </div>
-
-      <!-- Stack Justification -->
-      <div>
-        <h3 class="font-bold text-xl mb-2">⚙️ Why This Stack?</h3>
-        <p>
-          Technologies like React Native and Firebase allow rapid MVP development with reduced
-          infrastructure overhead, scalability, and native-like UX.
-        </p>
-      </div>
-
-      <!-- Market Context -->
-      <div>
-        <h3 class="font-bold text-xl mb-2">📊 Market Insight</h3>
-        <p>
-          This type of app is gaining traction in sectors like education, fitness, and SaaS. A clean
-          launch strategy paired with the right features can help it stand out.
-        </p>
-      </div>
+      <QuoteSection title="💡 Stack Recommendation" :content="quote.stack" />
+      <QuoteSection title="🗓️ Timeline Estimate" :content="quote.timeline" />
+      <QuoteSection title="💰 Cost Estimate" :content="quote.estimate" />
+      <QuoteSection title="🧩 Suggested Features" :content="quote.features?.join(', ')" />
+      <QuoteSection title="⚙️ Why This Stack?" :content="quote.notes" />
+      <QuoteSection title="📊 Market Insight" :content="quote.marketInsight" />
     </div>
+
+    <!-- Assistant -->
     <div class="mt-8">
       <el-collapse v-model="activeSections">
         <el-collapse-item name="chat" title="🗣️ Want to tweak or ask questions?">
@@ -95,13 +56,11 @@
       </el-collapse>
     </div>
 
-    <!-- Footer with Actions -->
+    <!-- Footer -->
     <template #footer>
       <div class="flex flex-col sm:flex-row justify-between items-center w-full gap-4">
         <p class="text-xs text-gray-500">Quote generated using GPT-4 + industry presets</p>
         <div class="flex gap-3">
-          <!-- <el-button type="success" plain>Export as PDF</el-button>
-          <el-button type="primary" plain>Email this</el-button> -->
           <el-button type="success" plain @click="handleExport('pdf')">Export as PDF</el-button>
           <el-button type="primary" plain @click="handleExport('zip')">Export All (ZIP)</el-button>
         </div>
@@ -112,32 +71,25 @@
 
 <script setup>
 import { ref, watch, computed, nextTick } from 'vue'
-import { exportPDF, exportMarkdown, exportZip } from '@/utils/exportUtils'
 import { useQuoteStore } from '@/stores/quoteStore'
+import { exportPDF, exportZip, exportMarkdown } from '@/utils/exportUtils'
 import { useWindowSize } from '@vueuse/core'
 import ChatAssistant from './ChatAssistant.vue'
+import QuoteSection from './QuoteSection.vue'
 
 const quoteStore = useQuoteStore()
 const quote = computed(() => quoteStore.quote)
 const chatLog = computed(() => quoteStore.chatLog)
+
 const visible = ref(false)
-const activeSections = ref(['chat']) // Default section open
+const activeSections = ref(['chat'])
+const selectedVersion = ref(null)
 
 const { width } = useWindowSize()
 const dialogWidth = computed(() => (width.value < 640 ? '90vw' : '40%'))
-const selectedVersion = ref(null)
 
 watch(selectedVersion, (version) => {
-  if (version) {
-    quoteStore.revertToVersion(version)
-  }
-})
-
-watch(quote, async (newVal) => {
-  if (newVal) {
-    await nextTick()
-    visible.value = true
-  }
+  if (version) quoteStore.revertToVersion(version)
 })
 
 watch(quote, async (newVal) => {
@@ -151,6 +103,7 @@ watch(quote, async (newVal) => {
 function handleClose() {
   visible.value = false
 }
+
 function handleExport(type) {
   if (!quote.value) return
   if (type === 'pdf') exportPDF(quote.value, chatLog.value || [])
@@ -163,13 +116,12 @@ function handleExport(type) {
 }
 </script>
 
-<style lang="scss" scoped>
+<style scoped lang="scss">
 .custom-quote-dialog .el-dialog__body {
   max-height: 65vh;
   overflow-y: auto;
   padding-right: 1rem;
 }
-
 .custom-quote-dialog .el-dialog__body::-webkit-scrollbar {
   width: 6px;
 }
