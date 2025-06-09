@@ -62,10 +62,14 @@
         </div> -->
 
         <div
-          v-else
+          v-else-if="tryParseJson(msg.content)"
           class="bg-gray-50 border border-dashed border-gray-300 p-3 rounded-md text-xs text-gray-800 whitespace-pre-wrap overflow-x-auto"
         >
           <pre>{{ JSON.stringify(tryParseJson(msg.content), null, 2) }}</pre>
+        </div>
+
+        <div v-else class="whitespace-pre-line">
+          {{ msg.content }}
         </div>
       </div>
       <div id="chat-scroll-anchor"></div>
@@ -142,11 +146,22 @@ async function sendMessage() {
     loading.value = false
   }
 }
+// function tryParseJson(str) {
+//   console.log('Trying to parse JSON:', str)
+//   if (typeof str !== 'string') return null
+//   try {
+//     return JSON.parse(str)
+//   } catch (e) {
+//     console.error('Error parsing JSON:', e)
+//     return null
+//   }
+// }
 function tryParseJson(str) {
-  console.log('Trying to parse JSON:', str)
-  if (typeof str !== 'string') return null
+  if (!str || typeof str !== 'string') return null
+  const trimmed = str.trim()
+  if (!(trimmed.startsWith('{') || trimmed.startsWith('['))) return null
   try {
-    return JSON.parse(str)
+    return JSON.parse(trimmed)
   } catch (e) {
     console.error('Error parsing JSON:', e)
     return null
