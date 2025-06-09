@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf'
 import JSZip from 'jszip'
 import { saveAs } from 'file-saver'
+import htmlDocx from 'html-docx-js'
 
 const defaultQuoteSections = [
   { title: 'Vision Summary', icon: '🎯', key: 'vision' },
@@ -13,6 +14,27 @@ const defaultQuoteSections = [
   { title: 'Risks & Assumptions', icon: '⚠️', key: 'notes' },
   { title: 'Next Steps', icon: '🚀', key: 'nextSteps' },
 ]
+
+export function exportDocx(quote, chatLog) {
+  let html = `
+    <h1>🚀 AI-Generated Quote Report</h1>
+    <h2>🎯 Vision Summary</h2><p>${quote.vision}</p>
+    <h2>💡 Stack Recommendation</h2><pre>${JSON.stringify(quote.stack, null, 2)}</pre>
+    <h2>🏗️ Architecture Plan</h2><p>${quote.architecture}</p>
+    <h2>🧩 Suggested Features</h2><ul>${quote.features?.map((f) => `<li>${f}</li>`).join('')}</ul>
+    <h2>📆 Timeline Estimate</h2><p>${quote.timeline}</p>
+    <h2>💰 Cost Estimate</h2><p>${quote.estimate}</p>
+    <h2>📊 Market Insight</h2><p>${quote.marketInsight}</p>
+    <h2>⚠️ Risks & Assumptions</h2><p>${quote.notes}</p>
+    <h2>🚀 Next Steps</h2><p>${quote.nextSteps}</p>
+    <h2>💬 Chat Log</h2><ul>
+      ${chatLog.map((msg) => `<li><strong>${msg.role === 'user' ? 'You' : 'AI'}:</strong> ${msg.content}</li>`).join('')}
+    </ul>
+  `
+
+  const blob = htmlDocx.asBlob(html)
+  saveAs(blob, 'quote-summary.docx')
+}
 
 export function exportPDF(quote, chatLog = []) {
   const doc = new jsPDF()

@@ -92,10 +92,11 @@
           <div class="flex gap-3">
             <el-button plain type="info" @click="viewFinal = true">📝 View Final Report</el-button>
             <el-button type="primary" @click="finalizeQuote">📌 Finalize This Quote</el-button>
+            <el-button plain @click="handleExport('docx')">Export as DOCX</el-button>
             <el-button type="success" plain @click="handleExport('pdf')">Export as PDF</el-button>
-            <el-button type="primary" plain @click="handleExport('zip')"
+            <!-- <el-button type="primary" plain @click="handleExport('zip')"
               >Export All (ZIP)</el-button
-            >
+            > -->
           </div>
           <div>
             <p class="text-xs text-gray-500">Quote generated using GPT-4 + industry presets</p>
@@ -110,7 +111,7 @@
 import { ref, watch, computed, nextTick } from 'vue'
 import { useQuoteStore } from '@/stores/quoteStore'
 import { ElMessage } from 'element-plus'
-import { exportPDF, exportZip, exportMarkdown } from '@/utils/exportUtils'
+import { exportPDF, exportZip, exportMarkdown, exportDocx } from '@/utils/exportUtils'
 import { useWindowSize } from '@vueuse/core'
 import ChatAssistant from './ChatAssistant.vue'
 import QuoteSection from './QuoteSection.vue'
@@ -218,6 +219,7 @@ function handleExport(type) {
   if (!quote.value) return
   if (type === 'pdf') exportPDF(quote.value, chatLog.value || [])
   if (type === 'zip') exportZip(quote.value, chatLog.value || [])
+  if (type === 'docx') exportDocx(quote.value, chatLog.value || [])
   if (type === 'md') {
     const md = exportMarkdown(quote.value, chatLog.value || [])
     const blob = new Blob([md], { type: 'text/markdown' })
