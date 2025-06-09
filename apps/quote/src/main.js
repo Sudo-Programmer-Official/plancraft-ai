@@ -6,7 +6,6 @@ import router from './router'
 import { createPinia } from 'pinia'
 import 'element-plus/dist/index.css'
 import ElementPlus from 'element-plus'
-import { createMetaManager } from 'vue-meta'
 import { initMixpanel } from './utils/mixpanel'
 
 // ✅ Import your Firebase initialization (this is the important part)
@@ -26,6 +25,5 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 }
 app.use(router)
 app.use(head)
-app.use(createMetaManager())
 app.use(createPinia())
 app.mount('#app')
