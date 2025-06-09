@@ -10,7 +10,7 @@
       :custom-class="'custom-quote-dialog'"
     >
       <!-- Header -->
-      <div class="flex items-center justify-between mb-4">
+      <!-- <div class="flex items-center justify-between mb-4">
         <h2 class="text-2xl font-bold text-purple-700 flex items-center gap-2">
           🎉 Your AI-Generated Quote
           <span class="bg-purple-100 text-purple-700 text-xs font-semibold px-2 py-1 rounded-full">
@@ -22,6 +22,28 @@
           placeholder="View past versions"
           size="small"
           class="ml-auto max-w-[160px] sm:max-w-[200px] truncate"
+        >
+          <el-option
+            v-for="q in quoteStore.quoteHistory"
+            :key="q.version"
+            :label="`v${q.version} • ${new Date(q.createdAt).toLocaleDateString()}`"
+            :value="q.version"
+          />
+        </el-select>
+      </div> -->
+      <!-- Header -->
+      <div class="flex flex-wrap sm:flex-nowrap items-start justify-between gap-2 mb-4">
+        <h2 class="text-2xl font-bold text-purple-700 flex items-center gap-2 leading-snug">
+          🎉 Your AI-Generated Quote
+          <span class="bg-purple-100 text-purple-700 text-xs font-semibold px-2 py-1 rounded-full">
+            AI Powered
+          </span>
+        </h2>
+        <el-select
+          v-model="selectedVersion"
+          placeholder="View past versions"
+          size="small"
+          class="ml-auto sm:max-w-[200px] w-full truncate"
         >
           <el-option
             v-for="q in quoteStore.quoteHistory"
@@ -231,5 +253,28 @@ function handleExport(type) {
 }
 .custom-quote-dialog {
   overflow-x: hidden;
+}
+@media (max-width: 640px) {
+  .custom-quote-dialog .el-dialog__body {
+    flex-direction: column !important;
+    padding: 0.5rem;
+  }
+
+  .custom-quote-dialog h2 {
+    font-size: 1.25rem !important; /* shrink headline */
+    flex-wrap: wrap;
+    line-height: 1.3;
+  }
+
+  .custom-quote-dialog .el-select {
+    width: 100% !important;
+    margin-top: 0.5rem;
+  }
+
+  .custom-quote-dialog .el-dialog__header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.5rem;
+  }
 }
 </style>
