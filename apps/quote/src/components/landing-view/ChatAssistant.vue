@@ -38,7 +38,6 @@
     <div class="flex justify-end">
       <el-button type="primary" :loading="loading" @click="sendMessage"> Ask Assistant </el-button>
     </div>
-
     <div v-if="chatLog.length" class="mt-6 space-y-4 max-h-[40vh] overflow-y-auto pr-2">
       <div
         v-for="(msg, index) in chatLog"
@@ -68,8 +67,8 @@
         >
           <pre>{{ JSON.stringify(tryParseJson(msg.content), null, 2) }}</pre>
         </div>
-        <div id="chat-scroll-anchor"></div>
       </div>
+      <div id="chat-scroll-anchor"></div>
     </div>
     <div v-else class="text-gray-400 text-sm text-center mt-4">
       💬 Ask a follow-up question about your quote.
@@ -144,6 +143,8 @@ async function sendMessage() {
   }
 }
 function tryParseJson(str) {
+  console.log('Trying to parse JSON:', str)
+  if (typeof str !== 'string') return null
   try {
     return JSON.parse(str)
   } catch (e) {
