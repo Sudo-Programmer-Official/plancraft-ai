@@ -49,6 +49,7 @@ export const useQuoteStore = defineStore('quote', {
         return
       }
       try {
+        console.log('Finalizing quote...', this.quote, this.chatLog)
         const result = await finalizeQuoteWithChat({
           quote: this.quote,
           chatLog: this.chatLog,

@@ -150,6 +150,7 @@ async function finalizeQuote(type = 'pdf') {
 
   try {
     // 🔁 Regenerate finalized version using backend
+    console.log('🔁 Regenerating finalized version...', quote.value, chatLog)
     const regenerated = await quoteStore.finalizeAndRegenerateQuote({
       quote: quote.value,
       chatLog: chatLog.value,
