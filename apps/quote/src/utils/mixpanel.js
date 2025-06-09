@@ -1,7 +1,5 @@
 // src/utils/mixpanel.js
 import mixpanel from 'mixpanel-browser'
-import dotenv from 'dotenv'
-dotenv.config()
 
 const PROJECT_TOKEN = import.meta.env.PROJECT_TOKEN
 
