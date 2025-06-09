@@ -49,7 +49,6 @@ export const useQuoteStore = defineStore('quote', {
         return
       }
       try {
-        console.log('Finalizing quote...', this.quote, this.chatLog)
         const result = await finalizeQuoteWithChat({
           idea: this.quote,
           chatLog: this.chatLog,
@@ -62,7 +61,7 @@ export const useQuoteStore = defineStore('quote', {
           idea: this.idea,
           chatLog: [...this.chatLog],
         })
-        console.log('✅ Final quote regenerated:', result)
+        return result
       } catch (err) {
         console.error('❌ Finalize failed', err)
       }

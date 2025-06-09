@@ -150,7 +150,6 @@ async function finalizeQuote(type = 'pdf') {
 
   try {
     // 🔁 Regenerate finalized version using backend
-    console.log('🔁 Regenerating finalized version...', quote.value, chatLog)
     const regenerated = await quoteStore.finalizeAndRegenerateQuote({
       quote: quote.value,
       chatLog: chatLog.value,
@@ -165,16 +164,14 @@ async function finalizeQuote(type = 'pdf') {
       finalizedAt: new Date().toISOString(),
     })
 
-    // 📁 Then export as per requested format
-    if (type === 'pdf') exportPDF(regenerated, chatLog.value)
-    if (type === 'zip') exportZip(regenerated, chatLog.value)
-    if (type === 'md') {
-      const md = exportMarkdown(regenerated, chatLog.value)
-      const blob = new Blob([md], { type: 'text/markdown' })
-      saveAs(blob, 'quote-summary.md')
-    }
-
-    console.log('✅ Finalized & exported via backend:', regenerated)
+    // // 📁 Then export as per requested format
+    // if (type === 'pdf') exportPDF(regenerated, chatLog.value)
+    // if (type === 'zip') exportZip(regenerated, chatLog.value)
+    // if (type === 'md') {
+    //   const md = exportMarkdown(regenerated, chatLog.value)
+    //   const blob = new Blob([md], { type: 'text/markdown' })
+    //   saveAs(blob, 'quote-summary.md')
+    // }
   } catch (err) {
     console.error('❌ Finalization via backend failed:', err)
   }

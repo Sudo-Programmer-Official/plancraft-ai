@@ -31,7 +31,6 @@ export async function fetchQuoteWithFile({ idea, fileUrl }) {
 }
 
 export async function finalizeQuoteWithChat({ idea, chatLog }) {
-  console.log('finalizeQuoteWithChat', idea, chatLog)
   const res = await axios.post(`${API_BASE}/api/finalize`, {
     idea,
     chatLog,
