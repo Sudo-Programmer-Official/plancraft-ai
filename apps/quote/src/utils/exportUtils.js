@@ -1,7 +1,6 @@
 import jsPDF from 'jspdf'
 import JSZip from 'jszip'
 import { saveAs } from 'file-saver'
-import htmlDocx from 'html-docx-js'
 
 const defaultQuoteSections = [
   { title: 'Vision Summary', icon: '🎯', key: 'vision' },
@@ -15,26 +14,71 @@ const defaultQuoteSections = [
   { title: 'Next Steps', icon: '🚀', key: 'nextSteps' },
 ]
 
-export function exportDocx(quote, chatLog) {
-  let html = `
-    <h1>🚀 AI-Generated Quote Report</h1>
-    <h2>🎯 Vision Summary</h2><p>${quote.vision}</p>
-    <h2>💡 Stack Recommendation</h2><pre>${JSON.stringify(quote.stack, null, 2)}</pre>
-    <h2>🏗️ Architecture Plan</h2><p>${quote.architecture}</p>
-    <h2>🧩 Suggested Features</h2><ul>${quote.features?.map((f) => `<li>${f}</li>`).join('')}</ul>
-    <h2>📆 Timeline Estimate</h2><p>${quote.timeline}</p>
-    <h2>💰 Cost Estimate</h2><p>${quote.estimate}</p>
-    <h2>📊 Market Insight</h2><p>${quote.marketInsight}</p>
-    <h2>⚠️ Risks & Assumptions</h2><p>${quote.notes}</p>
-    <h2>🚀 Next Steps</h2><p>${quote.nextSteps}</p>
-    <h2>💬 Chat Log</h2><ul>
-      ${chatLog.map((msg) => `<li><strong>${msg.role === 'user' ? 'You' : 'AI'}:</strong> ${msg.content}</li>`).join('')}
-    </ul>
-  `
+import { Document, Packer, Paragraph, TextRun } from 'docx'
 
-  const blob = htmlDocx.asBlob(html)
-  saveAs(blob, 'quote-summary.docx')
+export function exportDocx(quote, chatLog = []) {
+  const doc = new Document({
+    sections: [
+      {
+        children: [
+          new Paragraph({
+            children: [new TextRun({ text: '🚀 AI-Generated Quote Report', bold: true, size: 32 })],
+          }),
+          new Paragraph(''),
+          new Paragraph(`🎯 Vision: ${quote.vision}`),
+          new Paragraph(
+            `💡 Stack: ${typeof quote.stack === 'string' ? quote.stack : JSON.stringify(quote.stack)}`,
+          ),
+          new Paragraph(`🏗 Architecture: ${quote.architecture}`),
+          new Paragraph(
+            `🧩 Features: ${Array.isArray(quote.features) ? quote.features.join(', ') : quote.features}`,
+          ),
+          new Paragraph(`📆 Timeline: ${quote.timeline}`),
+          new Paragraph(`💰 Estimate: ${quote.estimate}`),
+          new Paragraph(`📊 Insight: ${quote.marketInsight}`),
+          new Paragraph(`⚠️ Notes: ${quote.notes}`),
+          new Paragraph(`🚀 Next Steps: ${quote.nextSteps}`),
+          new Paragraph(''),
+          new Paragraph('💬 Chat Log:'),
+          ...chatLog.map(
+            (m) =>
+              new Paragraph({
+                children: [
+                  new TextRun({ text: `${m.role === 'user' ? 'You' : 'AI'}: `, bold: true }),
+                  new TextRun(m.content),
+                ],
+              }),
+          ),
+        ],
+      },
+    ],
+  })
+
+  Packer.toBlob(doc).then((blob) => {
+    saveAs(blob, 'quote-summary.docx')
+  })
 }
+
+// export function exportDocx(quote, chatLog) {
+//   let html = `
+//     <h1>🚀 AI-Generated Quote Report</h1>
+//     <h2>🎯 Vision Summary</h2><p>${quote.vision}</p>
+//     <h2>💡 Stack Recommendation</h2><pre>${JSON.stringify(quote.stack, null, 2)}</pre>
+//     <h2>🏗️ Architecture Plan</h2><p>${quote.architecture}</p>
+//     <h2>🧩 Suggested Features</h2><ul>${quote.features?.map((f) => `<li>${f}</li>`).join('')}</ul>
+//     <h2>📆 Timeline Estimate</h2><p>${quote.timeline}</p>
+//     <h2>💰 Cost Estimate</h2><p>${quote.estimate}</p>
+//     <h2>📊 Market Insight</h2><p>${quote.marketInsight}</p>
+//     <h2>⚠️ Risks & Assumptions</h2><p>${quote.notes}</p>
+//     <h2>🚀 Next Steps</h2><p>${quote.nextSteps}</p>
+//     <h2>💬 Chat Log</h2><ul>
+//       ${chatLog.map((msg) => `<li><strong>${msg.role === 'user' ? 'You' : 'AI'}:</strong> ${msg.content}</li>`).join('')}
+//     </ul>
+//   `
+
+//   const blob = htmlDocx.asBlob(html)
+//   saveAs(blob, 'quote-summary.docx')
+// }
 
 export function exportPDF(quote, chatLog = []) {
   const doc = new jsPDF()

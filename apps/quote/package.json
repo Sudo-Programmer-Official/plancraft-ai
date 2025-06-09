@@ -17,6 +17,7 @@
     "@tailwindcss/postcss": "^4.1.8",
     "@tailwindcss/vite": "^4.1.8",
     "axios": "^1.9.0",
+    "docx": "^9.5.0",
     "element-plus": "^2.10.0",
     "file-saver": "^2.0.5",
     "firebase": "^11.9.0",
