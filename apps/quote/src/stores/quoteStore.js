@@ -51,7 +51,7 @@ export const useQuoteStore = defineStore('quote', {
       try {
         console.log('Finalizing quote...', this.quote, this.chatLog)
         const result = await finalizeQuoteWithChat({
-          quote: this.quote,
+          idea: this.quote,
           chatLog: this.chatLog,
         })
         this.quote = result // overwrite or merge
