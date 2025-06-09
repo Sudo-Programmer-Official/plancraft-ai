@@ -109,6 +109,7 @@
 
 <script setup>
 import { ref, watch, computed, nextTick } from 'vue'
+import { trackEvent } from '@/utils/mixpanel'
 import { useQuoteStore } from '@/stores/quoteStore'
 import { ElMessage } from 'element-plus'
 import { exportPDF, exportZip, exportMarkdown, exportDocx } from '@/utils/exportUtils'
@@ -185,6 +186,10 @@ async function finalizeQuote(type = 'pdf') {
       quote: regenerated,
       chatLog: [...chatLog.value],
       finalizedAt: new Date().toISOString(),
+    })
+    trackEvent('Quote Finalized', {
+      version: quoteStore.versionCounter,
+      idea: quoteStore.idea,
     })
 
     // // 📁 Then export as per requested format

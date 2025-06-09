@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import LandingView from '../views/LandingView.vue'
+import { trackEvent } from '@/utils/mixpanel'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -27,6 +28,13 @@ const router = createRouter({
       props: true,
     },
   ],
+})
+
+router.afterEach((to) => {
+  trackEvent('Page View', {
+    page: to.fullPath,
+    name: to.name,
+  })
 })
 
 export default router
