@@ -27,6 +27,9 @@ const router = createRouter({
       component: () => import('@/views/BlogPost.vue'),
       props: true,
     },
+    { path: '/privacy-policy', component: () => import('@/views/PrivacyPolicy.vue') },
+    { path: '/terms', component: () => import('@/views/TermsOfService.vue') },
+    { path: '/contact', component: () => import('@/views/ContactForm.vue') },
   ],
 })
 
