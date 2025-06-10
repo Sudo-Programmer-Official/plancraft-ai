@@ -7,7 +7,7 @@ import { createPinia } from 'pinia'
 import 'element-plus/dist/index.css'
 import ElementPlus from 'element-plus'
 import { initMixpanel } from './utils/mixpanel'
-import VueGtag from 'vue-gtag'
+import { VueGtag } from 'vue-gtag'
 
 // ✅ Import your Firebase initialization (this is the important part)
 import '@/firebase/init'
