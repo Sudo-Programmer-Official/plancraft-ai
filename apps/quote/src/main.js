@@ -28,7 +28,11 @@ initMixpanel()
 //   },
 //   router,
 // )
-
+router.afterEach((to) => {
+  window.gtag('config', 'G-N8V946JNDH', {
+    page_path: to.fullPath,
+  })
+})
 // router.afterEach((to) => {
 //   VueGtag('config', 'G-N8V946JNDH', {
 //     page_path: to.fullPath,
