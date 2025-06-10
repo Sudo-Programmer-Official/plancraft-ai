@@ -7,7 +7,7 @@ import { createPinia } from 'pinia'
 import 'element-plus/dist/index.css'
 import ElementPlus from 'element-plus'
 import { initMixpanel } from './utils/mixpanel'
-import { VueGtag } from 'vue-gtag'
+// import { VueGtag } from 'vue-gtag'
 
 // ✅ Import your Firebase initialization (this is the important part)
 import '@/firebase/init'
@@ -21,13 +21,13 @@ const app = createApp(App)
 app.use(ElementPlus)
 initMixpanel()
 
-app.use(
-  VueGtag,
-  {
-    config: { id: 'G-N8V946JNDH' },
-  },
-  router,
-)
+// app.use(
+//   VueGtag,
+//   {
+//     config: { id: 'G-N8V946JNDH' },
+//   },
+//   router,
+// )
 
 // router.afterEach((to) => {
 //   VueGtag('config', 'G-N8V946JNDH', {
