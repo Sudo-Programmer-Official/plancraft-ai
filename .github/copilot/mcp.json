@@ -1,6 +1,7 @@
 {
   "mcpServers": {
     "dev-toolkit": {
+      "type": "http",
       "url": "https://abhishekai2025.github.io/dev-toolkit/mcp-context.json",
       "auth": {
         "type": "none"
