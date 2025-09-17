@@ -25,6 +25,21 @@ Dashboard	Cross-device (phone + browser)
 
 ⸻
 
+## 🔁 Branching Strategy
+
+- `main` → Production-ready code only
+- `develop` → Latest merged features for testing
+- `feature/*` → One task or module per branch (e.g. `feature/journal-ui`)
+
+### Workflow
+1. Create a branch: `git checkout -b feature/your-task-name`
+2. Open Codex → assign task
+3. Codex writes code → you push to feature branch
+4. Review & test → merge into `develop`
+5. When stable → merge `develop` → `main`
+
+-------
+
 ✨ What You Want Now
 
 You want to:
