@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "scripts": {
     "dev:quote": "pnpm --filter quote dev",
-    "dev:page": "pnpm --filter page dev"
+    "dev:page": "pnpm --filter page dev",
+    "lint": "pnpm -r --if-present lint"
   }
 }
