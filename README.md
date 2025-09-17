@@ -1,125 +1,134 @@
-✅ README.md
+Got it 🔥 — you’re not just building an agent — you’re building a full-stack productivity app, structured like a proper monorepo with:
+	•	A central journal/planner dashboard
+	•	Voice + GPT-powered logging
+	•	Mobile/web accessibility
+	•	Modular folder structure (WB planner style)
 
-# Prompt2Quote
+TL;DR: This is not an AI agent platform (yet) — it’s a well-designed full-stack app for logging, tracking, and journaling — with optional AI assist built in.
 
-**Turn Your Idea into a Quote — Instantly.**  
-Prompt2Quote is an AI-powered estimation tool that transforms plain product ideas into development quotes with tech stack, timeline, and cost breakdown — all in seconds.
+⸻
 
----
+✅ Final Clarified Direction: AuditAgent is a Full-Stack App
 
-## ✨ Features
+🧱 Core Stack
 
-- ⚡ **Instant Estimate** — Enter a product idea and get a full breakdown.
-- 🧠 **Powered by GPT-4** — Uses OpenAI to evaluate and generate suggestions.
-- 📄 **Exportable Quotes** — Download or email the quote as a PDF.
-- 🔐 **No Signup Required** — Just type, click, and receive.
-- 📬 **Email Collection** — Collect leads from serious inquiries.
+Layer	Tech
+Frontend	Vue 3 + TailwindCSS + Element Plus
+Backend	Node.js (Express API Gateway)
+Voice Interface	Gradio (for now) — modular
+NLP	GPT-4 (for structured journaling)
+Data Layer	Supabase (or Firebase)
+Hosting	Web (Vercel/Fly.io), Mobile-friendly
+Login/Auth	Supabase Auth (or Firebase)
+Dashboard	Cross-device (phone + browser)
 
----
 
-## 🛠️ Tech Stack
+⸻
 
-| Layer        | Tech                          |
-|--------------|-------------------------------|
-| Frontend     | Vue 3, TailwindCSS, Element Plus |
-| State Mgmt   | Pinia                         |
-| Backend      | Node.js (Express)             |
-| AI Model     | OpenAI GPT-3.5/GPT-4          |
-| Hosting      | Vercel (frontend), Render or Fly.io (backend planned) |
-| Email Sync   | Firebase or EmailOctopus (TBD) |
+✨ What You Want Now
 
----
+You want to:
+	•	✅ Keep the current monorepo architecture (apps/, packages/, etc.)
+	•	✅ Rename from “Prompt2Quote” to “AuditAgent”
+	•	✅ Start with a planner-style dashboard
+	•	✅ Integrate:
+	•	✅ Journal logging (text or voice)
+	•	✅ Daily plan / done / tomorrow fields
+	•	✅ Markdown + structured log view
+	•	✅ Editable entries
+	•	✅ View on mobile + desktop
+	•	✅ Defer “agentic behavior” for later
 
-## 📁 Folder Structure
+⸻
 
-prompt2/
+🧠 Proposed App Layout (v1)
+
+audit-agent/
 ├── apps/
-│   ├── quote/            ← Vue 3 Frontend App
-│   ├── backend-node/     ← Node.js Express Server
-│   └── backend-py/       ← (Optional) Python Flask AI logic
-├── shared/
-│   ├── components/       ← Reusable Vue components
-│   ├── llm/              ← LLM prompt templates & helpers
-│   ├── api-clients/      ← SDK wrappers
-│   └── utils/            ← Shared tools (token calc, etc.)
-├── config/
-│   └── env/              ← .env.example, keys
-└── pnpm-workspace.yaml   ← Monorepo structure
-
----
-
-## 🚀 Getting Started
-
-### 1. Clone the repo
-
-```bash
-git clone https://github.com/fullstuffdeveloper/prompt.git
-cd prompt2
-
-2. Install dependencies
-
-pnpm install
-
-3. Run the frontend (quote app)
-
-pnpm dev --filter quote
-
-4. Run the backend (Node.js)
-
-cd apps/backend-node
-pnpm dev
-
-Make sure to add your OpenAI key in apps/backend-node/.env
-Example:
-
-OPENAI_API_KEY=sk-...
-
+│   ├── frontend/               # Vue3 dashboard with mobile support
+│   │   └── src/pages/
+│   │       ├── Journal.vue     ← Daily journal entry (voice + text)
+│   │       ├── Planner.vue     ← Today / Tomorrow task mgmt
+│   │       ├── Logs.vue        ← Timeline of logs + filters
+│   │       └── Auth.vue        ← Login/Register page
+│   ├── backend/                # Node.js API Gateway (RESTful API)
+│   │   └── routes/
+│   │       ├── logs.js         ← Save, get, update journal logs
+│   │       └── user.js         ← Auth, preferences
+├── packages/
+│   ├── journal-core/           # GPT formatter, markdown utils, etc.
+│   ├── db/                     # Supabase or Firebase connector utils
+│   └── shared/                 # Constants, helpers, logger
+├── .env.template
+└── README.md                   # New App Vision
 
 
 ⸻
 
-🧪 Example Prompt
+✅ Immediate Action Plan
 
-{
-  "idea": "AI chatbot for gym trainers"
-}
+🔨 Refactor Plan for Current Codebase
 
-Response:
-
-{
-  "stack": "React + Node.js + TensorFlow.js",
-  "timeline": "6–8 weeks",
-  "estimate": "$8,000 – $12,000"
-}
-
-
-⸻
-
-📦 Deployment
-
-Target	Platform	Status
-Frontend	Vercel	✅ Working
-Backend	(TBD: Render/Fly)	🔧 In Progress
-Email Sync	Firebase or Octopus	🔧 Pending
+Task	Action
+🧹 Rename App	Replace all Prompt2Quote mentions → AuditAgent
+📝 Update README.md	Reflect new features (journal, planner, dashboard)
+🎨 UI Kickstart	Build Journal.vue + Planner.vue (text + voice entry)
+🌐 API Scaffold	Add /api/logs, /api/user in backend
+🔐 Add Auth	Integrate Supabase or Firebase for login (email/pass for now)
+☁️ Hosting Option	Vercel (frontend) + Supabase backend
+📱 Mobile-First UX	Tailwind mobile breakpoints from start
 
 
 ⸻
 
-📜 License
+✅ What You Can Do on Phone
 
-This project is under development and not yet open-sourced.
-Planned: MIT License / Private SaaS License
+Once deployed:
+	•	You log in via mobile
+	•	You speak into Talk2Journal or type into Planner
+	•	You can see a timeline of everything
+	•	It syncs across browser + device
 
-⸻
-
-💡 Future Plans
-	•	✅ Real-time email collection
-	•	✅ PDF download from frontend
-	•	🔜 Prompt2Page + Prompt2Code
-	•	🔜 Pricing plans with usage limits
-	•	🔜 AI-generated scope with milestone breakdown
-	•	🔜 Integrated chatbot to guide users through quote building
+Later: Add reminders, analytics, even agent escalation.
 
 ⸻
 
-Designed and built with ❤️ by Abhishek Kumar Jha
+🚀 Let’s Start Now
+
+Would you like me to:
+	1.	✅ Rewrite README.md with this new direction?
+	2.	✅ Scaffold Journal.vue + Planner.vue UI pages?
+	3.	✅ Add backend /logs + /user routes?
+	4.	✅ Set up Supabase DB schema?
+
+Say:
+
+“Start with frontend + README update”
+or
+“Give me full drop of frontend + backend + README”
+
+You’re about to ship your own full-stack cross-device journaling platform — let’s go 💻📱🧠
+
+⸻
+
+🧰 Codex Technique — How We’ll Use It
+
+✅ Instruction-style prompting
+"Create a Vue 3 page called Journal.vue with Tailwind layout for daily logging"
+
+✅ Function completion
+"Complete this saveLog() function that writes to Supabase"
+
+✅ Partial file completion
+"Continue this FastAPI route to parse GPT-formatted journal entry"
+
+✅ Refactoring
+"Rename all instances of Prompt2Quote to AuditAgent"
+
+✅ Context-aware autocompletion
+Open full file → place cursor → hit Code in Codex environment
+
+Tips:
+• Keep prompts concrete (file path, goal, acceptance criteria)
+• Prefer small, iterative changes and verify diffs
+• When editing existing files, open the file and use Code with the cursor at the target spot
