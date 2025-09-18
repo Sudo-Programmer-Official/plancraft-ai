@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
-import LandingView from '../views/LandingView.vue'
+import LandingPage from '../views/LandingPage.vue'
 import { trackEvent } from '@/utils/mixpanel'
 
 const getCurrentUser = () =>
@@ -24,7 +24,7 @@ const router = createRouter({
     {
       path: '/',
       name: 'landing',
-      component: LandingView, // Set as homepage
+      component: LandingPage, // Set as homepage
     },
     {
       path: '/about',
