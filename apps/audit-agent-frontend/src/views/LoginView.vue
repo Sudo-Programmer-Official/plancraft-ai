@@ -1,8 +1,27 @@
+<script setup>
+import { useAuthStore } from "@/stores/authStore";
+import { useRouter } from "vue-router";
+
+const router = useRouter();
+const auth = useAuthStore();
+
+const loginAsGuest = async () => {
+  await auth.loginAsGuest();
+  router.push("/journal");
+};
+
+const loginWithGoogle = async () => {
+  await auth.loginWithGoogle();
+  router.push("/journal");
+};
+</script>
+
 <template>
-  <section class="page page--center">
-    <h1 class="page__title">Login</h1>
-    <p class="page__description">Please log in to access your account.</p>
-  </section>
+  <div class="text-center mt-12">
+    <h1 class="text-3xl font-semibold">Sign In to AuditAgent</h1>
+    <el-button class="mt-4" @click="loginWithGoogle">Continue with Google</el-button>
+    <el-button class="mt-2" @click="loginAsGuest">Continue as Guest</el-button>
+  </div>
 </template>
 
 <style scoped>
