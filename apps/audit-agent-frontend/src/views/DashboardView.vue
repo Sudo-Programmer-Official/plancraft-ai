@@ -41,13 +41,26 @@
         ></div>
       </div>
     </div>
+    <!-- AI Summary Card -->
+     <!-- AI Insights Card -->
+    <div class="bg-gray-900/80 rounded-xl p-6 shadow-lg hover:shadow-green-500/40 transition">
+      <h3 class="font-semibold mb-3">🤖 AI Insights</h3>
+      <div v-if="aiSummary" class="text-sm space-y-2">
+        <p><strong>Completed %:</strong> {{ aiSummary["Completed %"] }}%</p>
+        <p><strong>Pending:</strong> {{ aiSummary["Pending items"] }}</p>
+        <p><strong>Focus:</strong> {{ aiSummary["Suggested focus for today"] }}</p>
+      </div>
+      <p v-else class="text-gray-400">Fetching AI insights…</p>
+    </div>
   </main>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { collection, onSnapshot, updateDoc, doc } from 'firebase/firestore'
 import { db } from '@/firebase/init'
+import { summarizeTasks } from '@/services/aiService'
+const aiSummary = ref(null);
 
 const dailyTasks = ref([])
 const weeklyTasks = ref([])
@@ -82,6 +95,26 @@ onMounted(() => {
 onUnmounted(() => {
   if (unsubscribe.value) unsubscribe.value()
 })
+
+async function fetchAISummary() {
+  try {
+    const tasks = [
+      ...dailyTasks.value,
+      ...weeklyTasks.value,
+      ...monthlyTasks.value,
+    ];
+    aiSummary.value = await summarizeTasks(tasks);
+  } catch (err) {
+    console.error("Task summary failed:", err);
+  }
+}
+
+// Call once tasks are loaded
+watch([dailyTasks, weeklyTasks, monthlyTasks], () => {
+  if (dailyTasks.value.length || weeklyTasks.value.length || monthlyTasks.value.length) {
+    fetchAISummary();
+  }
+});
 
 const progressBarWidth = computed(() => {
   const done = monthlyTasks.value.filter(t => t.completed).length

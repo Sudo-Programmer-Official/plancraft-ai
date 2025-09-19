@@ -93,6 +93,7 @@ import { ref, onMounted, nextTick } from 'vue';
 import { saveEntryToFirebase, fetchEntries } from '@/services/firebaseService'
 import { useVoiceRecorder } from '@/composables/useVoiceRecorder'
 import { useAIEnhancer } from '@/composables/useAIEnhancer'
+import { enhanceJournal } from '@/services/aiService'
 
 const moods = [
   { emoji: '😊', label: 'Happy' },
@@ -108,10 +109,19 @@ const enhancedText = ref('');
 const logs = ref([]);
 const logsSection = ref(null);
 
+// const { isRecording, startRecording, stopRecording } = useVoiceRecorder(async (raw) => {
+//   enhancedText.value = await useAIEnhancer(raw);
+//   entryText.value = enhancedText.value;
+// })
 const { isRecording, startRecording, stopRecording } = useVoiceRecorder(async (raw) => {
-  enhancedText.value = await useAIEnhancer(raw);
-  entryText.value = enhancedText.value;
-})
+  try {
+    const enhanced = await enhanceJournal(raw);
+    enhancedText.value = enhanced;
+    entryText.value = enhanced;
+  } catch (err) {
+    console.error("Journal enhance failed:", err);
+  }
+});
 
 function selectMood(mood) {
   selectedMood.value = mood;
