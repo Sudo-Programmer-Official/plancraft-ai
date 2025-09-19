@@ -1,0 +1,33 @@
+mutation SeedData @auth(level: USER) {
+  user_upsert(data: {
+    id: "550e8400-e29b-41d4-a716-446655440000",
+    createdAt: "2024-03-15T12:00:00Z",
+    displayName: "Seed User",
+    email: "seed@example.com",
+    uid: "seeduserid"
+  })
+  dailyEntry_upsert(data: {
+    id: "650e8400-e29b-41d4-a716-446655440001",
+    userId: "550e8400-e29b-41d4-a716-446655440000",
+    createdAt: "2024-03-15T13:00:00Z",
+    entryDate: "2024-03-15",
+    mood: "Happy",
+    notes: "Seeded daily entry"
+  })
+  task_upsert(data: {
+    id: "750e8400-e29b-41d4-a716-446655440002",
+    dailyEntryId: "650e8400-e29b-41d4-a716-446655440001",
+    createdAt: "2024-03-15T14:00:00Z",
+    description: "Seeded task",
+    isCompleted: false,
+    priority: 1
+  })
+  voiceMemo_upsert(data: {
+    id: "850e8400-e29b-41d4-a716-446655440003",
+    dailyEntryId: "650e8400-e29b-41d4-a716-446655440001",
+    audioFileUrl: "http://example.com/seed.mp3",
+    createdAt: "2024-03-15T15:00:00Z",
+    duration: 60,
+    transcription: "Seeded voice memo"
+  })
+}

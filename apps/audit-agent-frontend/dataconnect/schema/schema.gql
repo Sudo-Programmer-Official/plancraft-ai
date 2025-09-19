@@ -1,0 +1,31 @@
+type User @table {
+  uid: String!
+  createdAt: Timestamp!
+  email: String
+  displayName: String
+}
+
+type DailyEntry @table {
+  user: User
+  entryDate: Date!
+  createdAt: Timestamp!
+  mood: String
+  notes: String
+}
+
+type Task @table {
+  dailyEntry: DailyEntry
+  description: String!
+  isCompleted: Boolean!
+  createdAt: Timestamp!
+  dueDate: Date
+  priority: Int
+}
+
+type VoiceMemo @table {
+  dailyEntry: DailyEntry
+  audioFileUrl: String!
+  duration: Int!
+  createdAt: Timestamp!
+  transcription: String
+}

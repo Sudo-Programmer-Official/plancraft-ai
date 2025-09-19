@@ -1,0 +1,38 @@
+# Inserts a new user with the current user's id
+mutation CreateCurrentUser @auth(level: USER) {
+  user_insert(data: {
+    uid_expr: "auth.uid",
+    createdAt_expr: "request.time"
+  })
+}
+
+# Retrieves the current user's data
+query GetCurrentUser @auth(level: USER) {
+  user(key: {uid_expr: "auth.uid"}) {
+    id
+    uid
+    email
+    displayName
+    createdAt
+  }
+}
+
+# Creates a new daily entry for the current user
+mutation CreateDailyEntry @auth(level: USER) {
+  dailyEntry_insert(data: {
+    userId_expr: "auth.uid",
+    createdAt_expr: "request.time",
+    entryDate_date: { today: true }
+  })
+}
+
+# Lists daily entries for the current user
+query ListDailyEntries @auth(level: USER) {
+  dailyEntries(where: {userId: {eq_expr: "auth.uid"}}) {
+    id
+    createdAt
+    entryDate
+    mood
+    notes
+  }
+}
