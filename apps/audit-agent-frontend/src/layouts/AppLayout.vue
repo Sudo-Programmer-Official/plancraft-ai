@@ -35,9 +35,24 @@
       <!-- Header -->
       <header class="sticky top-0 z-10 bg-gray-950/60 backdrop-blur-xl border-b border-gray-800 p-4 flex justify-between items-center">
         <h2 class="text-2xl font-semibold capitalize">{{ $route.name }}</h2>
+
+        <!-- Right Section -->
         <div class="flex items-center gap-4">
           <TaskDialog /> <!-- extracted Add Task -->
-          <img src="https://i.pravatar.cc/40" alt="avatar" class="rounded-full w-10 h-10" />
+
+          <!-- User Info + Logout -->
+          <span v-if="authStore.isLoggedIn" class="text-sm text-gray-300">
+            {{ authStore.user?.displayName || "Guest" }}
+          </span>
+          <button
+            v-if="authStore.isLoggedIn"
+            @click="handleLogout"
+            class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg text-sm"
+          >
+            Logout
+          </button>
+
+          <img v-if="authStore.isLoggedIn" :src="authStore.user?.photoURL || 'https://i.pravatar.cc/40'" alt="avatar" class="rounded-full w-10 h-10" />
         </div>
       </header>
 
@@ -50,16 +65,25 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import TaskDialog from '@/components/TaskDialog.vue'
+import { ref } from "vue"
+import { useRouter } from "vue-router"
+import { useAuthStore } from "@/stores/authStore"
+import TaskDialog from "@/components/TaskDialog.vue"
 
 const sidebarOpen = ref(true)
+const router = useRouter()
+const authStore = useAuthStore()
 
 const tabs = [
-  { name: 'Dashboard', icon: '🏠', path: '/dashboard' },
-  { name: 'Daily', icon: '📅', path: '/daily' },
-  { name: 'Weekly', icon: '📆', path: '/weekly' },
-  { name: 'Monthly', icon: '🌙', path: '/monthly' },
-  { name: 'Journal', icon: '📝', path: '/journal' },
+  { name: "Dashboard", icon: "🏠", path: "/dashboard" },
+  { name: "Daily", icon: "📅", path: "/daily" },
+  { name: "Weekly", icon: "📆", path: "/weekly" },
+  { name: "Monthly", icon: "🌙", path: "/monthly" },
+  { name: "Journal", icon: "📝", path: "/journal" },
 ]
+
+async function handleLogout() {
+  await authStore.logout()
+  router.push("/login")
+}
 </script>
