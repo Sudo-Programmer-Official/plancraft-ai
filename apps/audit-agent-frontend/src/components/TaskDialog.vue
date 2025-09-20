@@ -1,129 +1,122 @@
 <template>
-  <div>
-    <!-- Open Button -->
-    <button
-      @click="openModal"
-      class="bg-gray-800 px-4 py-2 rounded hover:bg-indigo-600 transition"
-    >
-      ➕ Add Task
-    </button>
+  <div class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999]">
+    <div class="bg-white text-gray-900 p-6 rounded-xl w-full max-w-md relative z-[10000]">
+      <h3 class="text-lg font-bold mb-4">
+        {{ form.id ? '✏️ Edit Task' : '➕ New Task' }}
+      </h3>
 
-    <!-- Modal -->
-    <div
-      v-if="showModal"
-      class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999]"
-    >
-      <div class="bg-white text-gray-900 p-6 rounded-xl w-full max-w-md relative z-[10000]">
-        <h3 class="text-lg font-bold mb-4">
-          {{ editMode ? '✏️ Edit Task' : '➕ New Task' }}
-        </h3>
+      <!-- Form -->
+      <div class="space-y-4">
+        <!-- Title -->
+        <input
+          v-model="form.title"
+          placeholder="Title"
+          class="w-full p-3 border rounded"
+        />
 
-        <!-- Form -->
-        <div class="space-y-4">
-          <input
-            v-model="taskForm.text"
-            placeholder="Task description"
-            class="w-full p-3 border rounded"
-          />
-          <input
-            v-model="taskForm.date"
-            type="date"
-            class="w-full p-3 border rounded"
-          />
-        </div>
+        <!-- Details -->
+        <textarea
+          v-model="form.details"
+          placeholder="Details..."
+          rows="3"
+          class="w-full p-3 border rounded"
+        ></textarea>
 
-        <!-- Actions -->
-        <div class="flex justify-end gap-3 mt-6">
-          <button @click="closeModal" class="px-4 py-2 rounded bg-gray-300">Cancel</button>
-          <button
-            @click="saveTask"
-            class="px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700"
-          >
-            Save
-          </button>
-        </div>
+        <!-- Voice Recorder -->
+        <button
+          @click="toggleRecording"
+          :class="isRecording ? 'bg-red-500' : 'bg-indigo-600'"
+          class="px-3 py-2 rounded text-white mt-2"
+        >
+          {{ isRecording ? '🎙️ Recording… Tap to Stop' : '🎤 Add by Voice' }}
+        </button>
+
+        <!-- Date -->
+        <input
+          v-model="form.date"
+          type="date"
+          class="w-full p-3 border rounded"
+        />
+      </div>
+
+      <!-- Actions -->
+      <div class="flex justify-end gap-3 mt-6">
+        <button @click="$emit('close')" class="px-4 py-2 rounded bg-gray-300">
+          Cancel
+        </button>
+        <button
+          @click="save"
+          class="px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700"
+        >
+          Save
+        </button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { collection, addDoc, updateDoc, doc } from 'firebase/firestore'
-import { db, auth } from '@/firebase/init'
+import { ref, watch } from "vue"
+import { addTaskToFirebase, updateTaskInFirebase } from "@/services/firebaseService"
+import { useVoiceRecorder } from "@/composables/useVoiceRecorder"
 
-/**
- * Props (optional if you also want to reuse for editing tasks)
- */
 const props = defineProps({
   task: { type: Object, default: null }
 })
-const emit = defineEmits(['saved'])
+const emit = defineEmits(["saved", "close"])
 
-const showModal = ref(false)
-const editMode = ref(false)
-const editingTaskId = ref(null)
+const today = new Date().toISOString().split("T")[0]
 
-const today = new Date().toISOString().split('T')[0]
-
-const taskForm = ref({
-  text: '',
+const form = ref({
+  id: null,
+  title: "",
+  details: "",
   date: today,
   completed: false,
+  logs: [],
 })
 
-/**
- * Open Modal (supports edit or new)
- */
-function openModal(task = null) {
-  showModal.value = true
-  if (task) {
-    editMode.value = true
-    editingTaskId.value = task.id
-    taskForm.value = {
-      text: task.text,
-      date: task.date,
-      completed: task.completed ?? false,
+// Watch for incoming task (edit mode)
+watch(
+  () => props.task,
+  (t) => {
+    if (t) {
+      form.value = { ...t }
+    } else {
+      form.value = {
+        id: null,
+        title: "",
+        details: "",
+        date: today,
+        completed: false,
+        logs: [],
+      }
     }
-  } else {
-    editMode.value = false
-    editingTaskId.value = null
-    taskForm.value = {
-      text: '',
-      date: today,
-      completed: false,
-    }
-  }
+  },
+  { immediate: true }
+)
+
+// Voice recorder for details
+const { isRecording, startRecording, stopRecording } = useVoiceRecorder(async (rawText) => {
+  form.value.details = rawText
+})
+
+function toggleRecording() {
+  isRecording.value ? stopRecording() : startRecording()
 }
 
-/**
- * Close Modal
- */
-function closeModal() {
-  showModal.value = false
-}
+// Save new or update existing task
+async function save() {
+  if (!form.value.title.trim()) return
 
-/**
- * Save Task (new or update)
- */
-async function saveTask() {
-  if (!taskForm.value.text.trim()) return
-
-  const payload = {
-    text: taskForm.value.text,
-    date: taskForm.value.date,
-    completed: taskForm.value.completed,
-    userId: auth.currentUser?.uid || null,
-    createdAt: new Date(),
-  }
-
-  if (editMode.value && editingTaskId.value) {
-    await updateDoc(doc(db, 'tasks', editingTaskId.value), payload)
+  if (form.value.id) {
+    await updateTaskInFirebase(form.value)
   } else {
-    await addDoc(collection(db, 'tasks'), payload)
+    const saved = await addTaskToFirebase(form.value)
+    form.value.id = saved.id // assign Firestore doc id
   }
 
-  emit('saved') // ✅ notify parent to refresh
-  closeModal()
+  emit("saved")
+  emit("close")
 }
 </script>

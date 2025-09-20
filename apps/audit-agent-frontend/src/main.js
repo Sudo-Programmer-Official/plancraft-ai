@@ -6,7 +6,8 @@ import router from './router'
 import { createPinia } from 'pinia'
 import 'element-plus/dist/index.css'
 import ElementPlus from 'element-plus'
-import { initMixpanel } from './utils/mixpanel'
+// import { initMixpanel } from './utils/mixpanel'
+import { useAuthStore } from "@/stores/authStore";
 // import { VueGtag } from 'vue-gtag'
 
 // ✅ Import your Firebase initialization (this is the important part)
@@ -19,7 +20,7 @@ import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 
 const app = createApp(App)
 app.use(ElementPlus)
-initMixpanel()
+// initMixpanel()
 
 // app.use(
 //   VueGtag,
@@ -45,4 +46,6 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 app.use(router)
 app.use(head)
 app.use(createPinia())
+const authStore = useAuthStore();
+authStore.init();
 app.mount('#app')

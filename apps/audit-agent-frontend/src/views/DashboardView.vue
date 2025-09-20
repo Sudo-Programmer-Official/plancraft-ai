@@ -2,22 +2,26 @@
 <template>
   <main class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
     <!-- Daily Card -->
-    <div class="bg-gray-900/80 rounded-xl p-6 shadow-lg hover:shadow-indigo-500/40 transition">
-      <h3 class="font-semibold mb-3">📅 Daily Tasks</h3>
-      <ul v-if="dailyTasks.length" class="space-y-2 text-sm">
-        <li v-for="task in dailyTasks" :key="task.id" class="flex justify-between items-center p-2 rounded bg-gray-800">
-          <div class="flex flex-col">
-            <span>{{ task.text }}</span>
-            <small class="text-gray-400">{{ task.date }}</small>
-          </div>
-          <button @click="toggleComplete(task)" class="text-xs px-2 py-1 rounded"
-            :class="task.completed ? 'bg-green-600' : 'bg-red-600'">
-            {{ task.completed ? 'Done' : 'Pending' }}
-          </button>
-        </li>
-      </ul>
-      <p v-else class="text-gray-400 text-sm">No tasks today.</p>
-    </div>
+   <!-- Daily Card -->
+<div class="bg-gray-900/80 rounded-xl p-6 shadow-lg">
+  <h3 class="font-semibold mb-3">📅 Daily Tasks</h3>
+  <ul v-if="dailyTasks.length" class="space-y-2 text-sm max-h-64 overflow-y-auto pr-2">
+    <li v-for="task in dailyTasks" :key="task.id" 
+        class="flex justify-between items-center p-2 rounded bg-gray-800">
+      <div class="flex flex-col">
+        <span :class="{ 'line-through text-gray-500': task.completed }">{{ task.title }}</span>
+        <small class="text-gray-400">{{ task.date }}</small>
+      </div>
+      <button 
+        @click="toggleComplete(task)" 
+        class="text-xs px-2 py-1 rounded"
+        :class="task.completed ? 'bg-green-600' : 'bg-red-600'">
+        {{ task.completed ? 'Done' : 'Pending' }}
+      </button>
+    </li>
+  </ul>
+  <p v-else class="text-gray-400 text-sm">No tasks today.</p>
+</div>
 
     <!-- Weekly Card -->
     <div class="bg-gray-900/80 rounded-xl p-6 shadow-lg hover:shadow-purple-500/40 transition">

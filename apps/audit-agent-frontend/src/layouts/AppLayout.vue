@@ -38,7 +38,10 @@
 
         <!-- Right Section -->
         <div class="flex items-center gap-4">
-          <TaskDialog /> <!-- extracted Add Task -->
+          <!-- Inside Header -->
+          <!-- <button @click="showModal = true">+ Add Task</button> -->
+          <!-- <TaskModal v-if="showModal" /> -->
+          <!-- <TaskDialog v-if="showModal"/> -->
 
           <!-- User Info + Logout -->
           <span v-if="authStore.isLoggedIn" class="text-sm text-gray-300">
@@ -73,6 +76,7 @@ import TaskDialog from "@/components/TaskDialog.vue"
 const sidebarOpen = ref(true)
 const router = useRouter()
 const authStore = useAuthStore()
+const showModal = ref(false)
 
 const tabs = [
   { name: "Dashboard", icon: "🏠", path: "/dashboard" },
