@@ -113,8 +113,8 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { collection, onSnapshot, updateDoc, doc } from 'firebase/firestore'
-import { db } from '@/firebase/init'
+import { collection, onSnapshot, updateDoc, doc, query, where } from 'firebase/firestore'
+import { db, auth } from '@/firebase/init'
 import { summarizeTasks } from '@/services/aiService'
 
 const aiSummary = ref(null)
@@ -134,15 +134,23 @@ const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0)
 const unsubscribe = ref(null)
 
 onMounted(() => {
-  const tasksCol = collection(db, 'tasks')
-  unsubscribe.value = onSnapshot(tasksCol, (snapshot) => {
-    const allTasks = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
-    dailyTasks.value = allTasks.filter((t) => t.date === today.toISOString().split('T')[0])
-    weeklyTasks.value = allTasks.filter((t) => {
+  const user = auth.currentUser
+  if (!user) return
+
+  const tasksQuery = query(
+    collection(db, 'tasks'),
+    where('userId', '==', user.uid)
+  )
+
+  unsubscribe.value = onSnapshot(tasksQuery, (snapshot) => {
+    const userTasks = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+
+    dailyTasks.value = userTasks.filter((t) => t.date === today.toISOString().split('T')[0])
+    weeklyTasks.value = userTasks.filter((t) => {
       const d = new Date(t.date)
       return d >= startOfWeek && d <= endOfWeek
     })
-    monthlyTasks.value = allTasks.filter((t) => {
+    monthlyTasks.value = userTasks.filter((t) => {
       const d = new Date(t.date)
       return d >= startOfMonth && d <= endOfMonth
     })
