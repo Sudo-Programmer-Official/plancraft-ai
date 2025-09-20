@@ -46,7 +46,26 @@ import multer from 'multer'
 import OpenAI from 'openai'
 import { toFile } from 'openai/uploads'
 
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'https://audit-agent-66451.web.app',
+  'https://audit-agent-66451.firebaseapp.com',
+]
+
 const router = express.Router()
+router.use((req, res, next) => {
+  const origin = req.headers.origin || ''
+  const allowAny = process.env.ALLOW_DEV_ANY_ORIGIN === '1'
+  const isDevVite = /:\d+$/.test(origin) && /:\d+$/.test(origin) && /:5173$/.test(origin)
+  if (allowAny || allowedOrigins.includes(origin) || isDevVite) {
+    res.set('Access-Control-Allow-Origin', origin)
+  }
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+  res.set('Access-Control-Allow-Methods', 'POST,OPTIONS')
+  if (req.method === 'OPTIONS') return res.sendStatus(204)
+  next()
+})
 
 // Store file in memory (don’t write to disk)
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } })

@@ -11,19 +11,21 @@ const app = express();
 // Allow list of origins
 const allowedOrigins = [
   "https://audit-agent-66451.web.app",
-  "https://audit-agent-66451.firebaseapp.com/",
+  "https://audit-agent-66451.firebaseapp.com",
   "http://localhost:5173",
+  "http://127.0.0.1:5173",
 ];
 
 // Dynamic origin resolver for CORS
 app.use(
   cors({
     origin: function (origin, callback) {
-      // allow requests with no origin (e.g., mobile apps, curl)
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
+      const allowAny = process.env.ALLOW_DEV_ANY_ORIGIN === '1'
+      const isDevVite = !!origin && /:5173$/.test(origin)
+      if (!origin || allowAny || allowedOrigins.includes(origin) || isDevVite) {
+        callback(null, true)
       } else {
-        callback(new Error("Not allowed by CORS"));
+        callback(new Error("Not allowed by CORS"))
       }
     },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],

@@ -33,17 +33,18 @@
 import { ref } from "vue"
 import VoiceRecorder from "@/components/VoiceRecorder.vue"
 import { enhanceJournal } from "@/services/aiService"
-import { fetchTasks, addTaskToFirebase, updateTaskInFirebase } from "@/services/firebaseService"
+import { addTaskToFirebase } from "@/services/firebaseService"
 import { useTasks } from "@/composables/useTasks"
 
-const {loadTasks } = useTasks()
+const { tasks, loadTasks } = useTasks()
 
-const tasks = ref([])
 const planningInput = ref("")
 const enhancedText = ref("")
 
 function handleTranscript(text) {
   planningInput.value = text
+  // Optional: auto-enhance right away
+  // enhanceJournal(text).then(e => enhancedText.value = e)
 }
 
 async function generateTasks() {
@@ -74,7 +75,6 @@ async function generateTasks() {
     console.error("Task generation failed:", err)
   } finally {
     await loadTasks()
-    // planningInput.value = ""
   }
 }
 </script>

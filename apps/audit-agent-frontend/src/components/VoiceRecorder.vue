@@ -17,11 +17,11 @@
   </div>
 </template>
 
-<script setup>
+<!-- <script setup>
 import { ref, computed } from 'vue'
 import { useSpeechToText } from '@/utils/voiceHelper'
 import { recordAndSendToBackend } from '@/utils/backendRecorder'
-import { isMobileBrowser, isSafari } from '@/utils/deviceHelper'
+import { isMobileBrowser } from '@/utils/deviceHelper'
 
 const emit = defineEmits(['transcribed'])
 
@@ -68,6 +68,60 @@ async function toggleRecording() {
       mediaRecorder.stop()
       mediaRecorder = null
     }
+    isRecording.value = false
+  }
+}
+</script> --><script setup>
+import { ref } from 'vue'
+import { useSpeechToText } from '@/utils/voiceHelper'
+import { recordAndSendToBackend } from '@/utils/backendRecorder'
+import { isMobileBrowser } from '@/utils/deviceHelper'
+
+const emit = defineEmits(['transcribed'])
+
+const transcript = ref('')
+const isRecording = ref(false)
+let recognition = null
+let mediaRecorder = null
+
+async function toggleRecording() {
+  try {
+    if (!isRecording.value) {
+      // Always stop anything lingering
+      recognition?.stop(); mediaRecorder?.stop()
+
+      // Mobile (iOS Safari / Android Chrome) → backend; desktop Chrome/Edge → Web Speech
+      const useBackend = isMobileBrowser()
+
+      if (!useBackend) {
+        recognition = useSpeechToText(
+          t => { transcript.value = t; emit('transcribed', t) },
+          t => { transcript.value = t; emit('transcribed', t) }
+        )
+        if (recognition) recognition.start()
+      }
+
+      if (useBackend || !recognition) {
+        mediaRecorder = await recordAndSendToBackend(
+          t => {
+            // Live partials + final
+            transcript.value = t
+            emit('transcribed', t)
+          },
+          { timeSliceMs: 2500 }
+        )
+      }
+
+      isRecording.value = true
+    } else {
+      recognition?.stop()
+      mediaRecorder?.stop()
+      isRecording.value = false
+    }
+  } catch (e) {
+    console.error('🎤 start/stop failed:', e)
+    recognition?.stop()
+    mediaRecorder?.stop()
     isRecording.value = false
   }
 }
