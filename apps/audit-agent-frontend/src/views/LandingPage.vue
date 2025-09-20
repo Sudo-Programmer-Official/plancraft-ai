@@ -12,19 +12,13 @@
     <!-- Hero -->
     <!-- Hero -->
     <section
-      id="hero"
-      class="relative isolate overflow-hidden flex flex-col items-center justify-center text-center min-h-[80vh] px-6"
-      aria-labelledby="hero-title"
+      class="relative py-24 md:py-32 bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 overflow-hidden"
     >
-      <!-- Star Background -->
-      <div
-        class="absolute inset-0 -z-10 bg-gradient-to-b from-indigo-900 via-purple-900 to-slate-950"
-      >
-        <div class="absolute inset-0" ref="stars"></div>
-      </div>
+      <!-- 🌠 Falling stars background -->
+      <canvas ref="starsCanvas" class="absolute inset-0 w-full h-full z-0"></canvas>
 
       <!-- Hero Content -->
-      <div class="relative z-10 max-w-4xl mx-auto">
+      <div class="relative z-10 max-w-4xl mx-auto text-center">
         <h1
           id="hero-title"
           class="text-5xl md:text-7xl font-extrabold tracking-tight text-white drop-shadow-lg"
@@ -162,9 +156,15 @@
           <el-card
             v-for="(t, idx) in testimonials"
             :key="idx"
-            class="bg-slate-800/80 backdrop-blur-md rounded-2xl border border-slate-700 shadow-lg hover:shadow-xl p-6 transition-all"
-            data-aos="fade-up"
+            class="rounded-2xl border shadow-lg hover:shadow-xl transition-all"
+            :body-style="{ padding: '24px' }"
             :data-aos-delay="100 * idx"
+            data-aos="fade-up"
+            style="
+              --el-card-bg-color: rgba(2, 6, 23, 0.9); /* slate-950/90 */
+              --el-card-border-color: rgb(51, 65, 85); /* slate-700 */
+              color: #e5e7eb; /* text-slate-200 */
+            "
           >
             <div class="flex items-start gap-4">
               <div
@@ -173,8 +173,11 @@
               >
                 {{ t.author.charAt(0) }}
               </div>
+
               <div>
-                <blockquote class="text-slate-100 text-lg">“{{ t.quote }}”</blockquote>
+                <blockquote class="text-slate-100 leading-relaxed text-base md:text-lg">
+                  “{{ t.quote }}”
+                </blockquote>
                 <div class="mt-2 text-sm text-slate-400">— {{ t.author }}</div>
               </div>
             </div>
@@ -257,6 +260,40 @@ onMounted(() => {
     star.style.animationDuration = `${2 + Math.random() * 3}s`
     stars.value.appendChild(star)
   }
+})
+
+const starsCanvas = ref(null)
+
+onMounted(() => {
+  const canvas = starsCanvas.value
+  const ctx = canvas.getContext('2d')
+  canvas.width = window.innerWidth
+  canvas.height = window.innerHeight
+
+  const stars = Array.from({ length: 100 }, () => ({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    radius: Math.random() * 1.5,
+    speed: Math.random() * 1 + 0.5,
+  }))
+
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.fillStyle = 'white'
+    stars.forEach((star) => {
+      ctx.beginPath()
+      ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2)
+      ctx.fill()
+      star.y += star.speed
+      if (star.y > canvas.height) {
+        star.y = 0
+        star.x = Math.random() * canvas.width
+      }
+    })
+    requestAnimationFrame(animate)
+  }
+
+  animate()
 })
 
 const features = [
