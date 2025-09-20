@@ -1,22 +1,42 @@
 // src/utils/voiceHelper.js
 // TODO(CODEX): Transcribe voice using Web Speech API
+// src/utils/voiceHelper.js
 export function useSpeechToText(onResult, onEnd) {
-  const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)()
-  recognition.lang = 'en-US'
-  recognition.continuous = false
-  recognition.interimResults = false
+  const SpeechRecognition =
+    window.SpeechRecognition || window.webkitSpeechRecognition
+
+  if (!SpeechRecognition) {
+    console.warn("⚠️ Web Speech API not supported in this browser.")
+    return null
+  }
+
+  const recognition = new SpeechRecognition()
+  recognition.lang = "en-US"
+  recognition.continuous = true
+  recognition.interimResults = true
+
+  let finalTranscript = ""
 
   recognition.onresult = (event) => {
-    const transcript = event.results[0][0].transcript
-    onResult(transcript)
+    let interimTranscript = ""
+    for (let i = event.resultIndex; i < event.results.length; ++i) {
+      const transcript = event.results[i][0].transcript
+      if (event.results[i].isFinal) {
+        finalTranscript += transcript + " "
+      } else {
+        interimTranscript += transcript
+      }
+    }
+    onResult(finalTranscript.trim() + " " + interimTranscript.trim())
   }
 
   recognition.onerror = (e) => {
-    console.error('Speech error', e)
-    onResult('')
+    console.error("🎤 Speech error:", e.error)
   }
 
-  recognition.onend = onEnd
+  recognition.onend = () => {
+    onEnd?.(finalTranscript.trim())
+  }
 
   return recognition
 }
