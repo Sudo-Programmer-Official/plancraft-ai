@@ -9,54 +9,16 @@
     </button>
 
     <p class="flex-1 text-gray-200">
-      {{ (isRecording ? '🎤 Listening...' : 'Tap to start speaking') }}
+      <!-- Desktop = live listening, Mobile = recording until stop -->
+      {{ isRecording
+        ? (forceBackend ? '🎤 Recording... stop to transcribe' : '🎤 Listening...')
+        : 'Tap to start speaking' }}
     </p>
   </div>
 </template>
 
-<!-- <script setup>
-import { ref } from 'vue'
-import { useSpeechToText } from '@/utils/voiceHelper'
-import { recordAndSendToBackend } from '@/utils/backendRecorder'
-
-const emit = defineEmits(['transcribed'])
-
-const transcript = ref("")
-const isRecording = ref(false)
-let recognition = null
-let mediaRecorder = null
-
-function toggleRecording() {
-  if (!isRecording.value) {
-    recognition = useSpeechToText(
-      (text) => {
-        transcript.value = text
-        emit('transcribed', text)
-      },
-      (finalText) => {
-        transcript.value = finalText
-        emit('transcribed', finalText)
-      }
-    )
-
-    if (recognition) recognition.start()
-    else {
-      recordAndSendToBackend((text) => {
-        transcript.value = text
-        emit('transcribed', text)
-      }).then((rec) => (mediaRecorder = rec))
-    }
-
-    isRecording.value = true
-  } else {
-    if (recognition) recognition.stop()
-    if (mediaRecorder) mediaRecorder.stop()
-    isRecording.value = false
-  }
-}
-</script> -->
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useSpeechToText } from '@/utils/voiceHelper'
 import { recordAndSendToBackend } from '@/utils/backendRecorder'
 import { isMobileBrowser, isSafari } from '@/utils/deviceHelper'
@@ -68,13 +30,13 @@ const isRecording = ref(false)
 let recognition = null
 let mediaRecorder = null
 
-function toggleRecording() {
-  if (!isRecording.value) {
-    // ✅ Decide based on environment
-    const forceBackend = isMobileBrowser() || isSafari()
+// ✅ compute once so template can use it
+const forceBackend = computed(() => isMobileBrowser() || isSafari())
 
-    if (!forceBackend) {
-      // Desktop Chrome/Edge → use Web Speech API
+async function toggleRecording() {
+  if (!isRecording.value) {
+    if (!forceBackend.value) {
+      // Desktop Chrome/Edge → Web Speech API
       recognition = useSpeechToText(
         (text) => {
           transcript.value = text
@@ -88,18 +50,24 @@ function toggleRecording() {
       if (recognition) recognition.start()
     }
 
-    if (forceBackend || !recognition) {
+    if (forceBackend.value || !recognition) {
       // Mobile/iOS Safari/Android → fallback to Whisper backend
-      recordAndSendToBackend((text) => {
+      mediaRecorder = await recordAndSendToBackend((text) => {
         transcript.value = text
         emit('transcribed', text)
-      }).then((rec) => (mediaRecorder = rec))
+      })
     }
 
     isRecording.value = true
   } else {
-    if (recognition) recognition.stop()
-    if (mediaRecorder) mediaRecorder.stop()
+    if (recognition) {
+      recognition.stop()
+      recognition = null
+    }
+    if (mediaRecorder) {
+      mediaRecorder.stop()
+      mediaRecorder = null
+    }
     isRecording.value = false
   }
 }
