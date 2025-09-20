@@ -37,12 +37,12 @@
             rows="5"
             class="w-full p-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none text-gray-700"
           ></textarea>
-          <p v-if="enhancedText" class="text-sm text-indigo-500 italic">
+          <!-- <p v-if="enhancedText" class="text-sm text-indigo-500 italic">
             ✨ Enhanced: {{ enhancedText }}
-          </p>
+          </p> -->
 
           <div class="flex flex-wrap justify-between gap-3">
-            <button
+            <!-- <button
               @click="toggleRecording"
               :class="[
                 'px-6 py-2 rounded-full font-medium transition',
@@ -50,15 +50,19 @@
               ]"
             >
               {{ isRecording ? '🎙️ Recording… Tap to Stop' : '🎤 Start Recording' }}
-            </button>
+            </button> -->
+            <VoiceRecorder @transcribed="handleTranscript" />
 
-            <button
-              @click="saveEntry"
-              :disabled="!entryText.trim() && !selectedMood"
-              class="bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white px-6 py-2 rounded-full transition"
-            >
-              Save Entry
-            </button>
+         <button
+  @click="saveEntry"
+  :disabled="!entryText.trim() && !selectedMood"
+  class="bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white px-6 py-2 rounded-full transition"
+>
+  Save Entry
+</button>
+            <p v-if="enhancedText" class="text-sm text-indigo-500 italic mt-2">
+  ✨ Enhanced: {{ enhancedText }}
+</p>
           </div>
         </div>
       </section>
@@ -89,10 +93,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue';
+import { ref, onMounted, nextTick } from 'vue'
 import { saveEntryToFirebase, fetchEntries } from '@/services/firebaseService'
 import { useVoiceRecorder } from '@/composables/useVoiceRecorder'
-import { useAIEnhancer } from '@/composables/useAIEnhancer'
 import { enhanceJournal } from '@/services/aiService'
 
 const moods = [
@@ -101,87 +104,121 @@ const moods = [
   { emoji: '😢', label: 'Sad' },
   { emoji: '😠', label: 'Frustrated' },
   { emoji: '😐', label: 'Neutral' },
-];
+]
 
-const selectedMood = ref(null);
-const entryText = ref('');
-const enhancedText = ref('');
-const logs = ref([]);
-const logsSection = ref(null);
+const selectedMood = ref(null)
+const entryText = ref('')       // raw speech
+const enhancedText = ref('')    // AI version
+const logs = ref([])
+const logsSection = ref(null)
 
-// const { isRecording, startRecording, stopRecording } = useVoiceRecorder(async (raw) => {
-//   enhancedText.value = await useAIEnhancer(raw);
-//   entryText.value = enhancedText.value;
+const { isRecording, startRecording, stopRecording } = useVoiceRecorder((raw) => {
+  entryText.value = raw // only raw, no AI calls here
+})
+
+// const { isRecording, startRecording, stopRecording } = useVoiceRecorder((raw) => {
+//   entryText.value = raw // always keep raw
 // })
-const { isRecording, startRecording, stopRecording } = useVoiceRecorder(async (raw) => {
-  try {
-    const enhanced = await enhanceJournal(raw);
-    enhancedText.value = enhanced;
-    entryText.value = enhanced;
-  } catch (err) {
-    console.error("Journal enhance failed:", err);
+
+// Run enhance when recording stops
+async function toggleRecording() {
+  if (isRecording.value) {
+    stopRecording()
+
+    if (entryText.value.trim()) {
+      try {
+        // immediately show a placeholder
+        enhancedText.value = "⏳ Enhancing..."
+        const enhanced = await enhanceJournal(entryText.value.trim())
+        enhancedText.value = enhanced
+      } catch (err) {
+        console.error("Enhance failed:", err)
+        enhancedText.value = ""
+      }
+    }
+  } else {
+    startRecording()
+    enhancedText.value = "" // clear while speaking
   }
-});
+}
 
 function selectMood(mood) {
-  selectedMood.value = mood;
+  selectedMood.value = mood
 }
 
-function toggleRecording() {
-  isRecording.value ? stopRecording() : startRecording();
+function handleTranscript(text) {
+  entryText.value = text
 }
 
+// async function toggleRecording() {
+//   if (isRecording.value) {
+//     stopRecording()
+//     // call AI once after stopping
+//     if (entryText.value.trim()) {
+//       try {
+//         enhancedText.value = await enhanceJournal(entryText.value.trim())
+//       } catch (err) {
+//         console.error('Enhance failed:', err)
+//       }
+//     }
+//   } else {
+//     startRecording()
+//     enhancedText.value = '' // clear while speaking
+//   }
+// }
+
+// async function saveEntry() {
+//   if (!entryText.value.trim() && !selectedMood.value) return
+
+//   const entry = {
+//     id: crypto.randomUUID?.() || Date.now(),
+//     date: new Date().toLocaleString(),
+//     mood: selectedMood.value,
+//     text: enhancedText.value?.trim() || entryText.value.trim(),
+//     rawText: entryText.value.trim(),
+//     enhancedText: enhancedText.value,
+//     timestamp: Date.now(),
+//   }
+
+//   await saveEntryToFirebase(entry)
+//   logs.value.unshift(entry)
+
+//   nextTick(() => {
+//     if (logsSection.value) logsSection.value.scrollTop = 0
+//   })
+
+//   entryText.value = ''
+//   selectedMood.value = null
+//   enhancedText.value = ''
+// }
 async function saveEntry() {
-  if (!entryText.value.trim() && !selectedMood.value) return;
+  if (!entryText.value.trim() && !selectedMood.value) return
 
-  const entry = {
-    id: crypto.randomUUID?.() || Date.now(),
-    date: new Date().toLocaleString(),
-    mood: selectedMood.value,
-    text: entryText.value.trim(),
-    timestamp: Date.now(),
-  };
+  try {
+    const enhanced = await enhanceJournal(entryText.value)
+    enhancedText.value = enhanced
 
-  await saveEntryToFirebase(entry);
-  logs.value.unshift(entry);
-
-  nextTick(() => {
-    if (logsSection.value) {
-      logsSection.value.scrollTop = 0;
+    const entry = {
+      id: crypto.randomUUID?.() || Date.now(),
+      date: new Date().toLocaleString(),
+      mood: selectedMood.value,
+      text: enhanced,         // ✅ store enhanced
+      rawText: entryText.value, // optional
+      timestamp: Date.now(),
     }
-  });
 
-  entryText.value = '';
-  selectedMood.value = null;
-  enhancedText.value = '';
+    await saveEntryToFirebase(entry)
+    logs.value.unshift(entry)
+
+    entryText.value = ""
+    selectedMood.value = null
+    enhancedText.value = ""
+  } catch (err) {
+    console.error("Enhance failed:", err)
+  }
 }
 
 onMounted(async () => {
   logs.value = await fetchEntries()
 })
 </script>
-
-<style scoped>
-@keyframes fade-in {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@keyframes fade-in-delay {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@keyframes slide-up {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-.animate-fade-in {
-  animation: fade-in 0.8s ease forwards;
-}
-.animate-fade-in-delay {
-  animation: fade-in-delay 1.2s ease forwards;
-}
-.animate-slide-up {
-  animation: slide-up 1s ease forwards;
-}
-</style>

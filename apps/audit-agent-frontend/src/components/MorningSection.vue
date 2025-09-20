@@ -1,74 +1,74 @@
 <template>
-  <section class="bg-slate-800/60 p-6 rounded-xl shadow-md mb-8">
-    <h2 class="text-lg font-semibold text-white">🌅 Morning Planning</h2>
-    <p class="text-gray-400 text-sm mb-3">Speak or type your plan for today, we'll split it into tasks.</p>
+  <section class="bg-slate-800/60 p-5 rounded-xl shadow-md">
+    <!-- Title -->
+    <h2 class="text-lg font-semibold text-white mb-3">🌅 Morning Planning</h2>
 
+    <!-- Input -->
     <textarea
-      v-model="planText"
-      placeholder="E.g., Finish feature A, attend class, go for a run..."
-      rows="3"
-      class="w-full p-3 rounded-md bg-slate-900/40 border border-slate-700 text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+      v-model="planningInput"
+      placeholder="Speak or type your plan for today..."
+      rows="2"
+      class="w-full p-3 rounded-md bg-slate-900/40 border border-slate-700 text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 mb-2 resize-none"
     ></textarea>
 
-    <div class="flex gap-3 mt-3">
-      <button
-        @click="toggleRecording"
-        :class="isRecording ? 'bg-red-500' : 'bg-indigo-600'"
-        class="px-4 py-2 rounded-md text-white"
-      >
-        {{ isRecording ? '🎙️ Recording… Tap to Stop' : '🎤 Start Recording' }}
-      </button>
+    <!-- Enhanced text -->
+    <p v-if="enhancedText" class="text-indigo-400 text-sm italic mb-3">
+      ✨ Enhanced: {{ enhancedText }}
+    </p>
 
+    <!-- Actions -->
+    <div class="flex flex-wrap gap-3">
+      <VoiceRecorder @transcribed="handleTranscript" />
       <button
         @click="generateTasks"
-        class="bg-green-600 px-4 py-2 rounded-md text-white"
+        class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-md text-white transition"
       >
-        + Generate Tasks
+        ➕ Generate Tasks
       </button>
     </div>
   </section>
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { useVoiceRecorder } from '@/composables/useVoiceRecorder'
-import { generateTasksFromText } from '@/services/aiService'
-import { addTaskToFirebase, fetchTasksForToday } from '@/services/firebaseService'
-import { useTasks } from '@/composables/useTasks'
+import { ref } from "vue"
+import VoiceRecorder from "@/components/VoiceRecorder.vue"
+import { enhanceJournal } from "@/services/aiService"
+import { fetchTasks, addTaskToFirebase, updateTaskInFirebase } from "@/services/firebaseService"
 
-const planText = ref('')
-const isRecording = ref(false)
+const tasks = ref([])
+const planningInput = ref("")
+const enhancedText = ref("")
 
-const { tasks, loadTasks } = useTasks() // ✅ shared state
-
-const { startRecording, stopRecording } = useVoiceRecorder(async (raw) => {
-  planText.value = raw // speech-to-text result
-})
-
-function toggleRecording() {
-  if (isRecording.value) stopRecording()
-  else startRecording()
-  isRecording.value = !isRecording.value
+function handleTranscript(text) {
+  planningInput.value = text
 }
 
 async function generateTasks() {
-  if (!planText.value.trim()) return
+  if (!planningInput.value.trim()) return
 
-  const titles = await generateTasksFromText(planText.value)
+  try {
+    const enhanced = await enhanceJournal(planningInput.value)
+    enhancedText.value = enhanced
 
-  for (const title of titles) {
-    await addTaskToFirebase({
-      title,
-      details: '',
-      date: new Date().toISOString().split('T')[0],
-      completed: false,
-      logs: [],
-    })
+    const splitTasks = enhanced
+      .split(/[.,]/)
+      .map((t) => t.trim())
+      .filter(Boolean)
+
+    for (const [i, t] of splitTasks.entries()) {
+      const newTask = {
+        title: t,
+        details: "",
+        completed: false,
+        date: new Date().toISOString().split("T")[0],
+        order: tasks.value.length + i,
+        logs: [],
+      }
+      const saved = await addTaskToFirebase(newTask)
+      tasks.value.push(saved)
+    }
+  } catch (err) {
+    console.error("Task generation failed:", err)
   }
-
-  // ✅ Refresh tasks immediately
-  tasks.value = await fetchTasksForToday()
-
-  planText.value = ''
 }
 </script>

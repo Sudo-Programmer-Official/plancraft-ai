@@ -8,7 +8,7 @@ const API_BASE_URL = rawBase.replace(/\/+$/, "");
 // Create axios instance with defaults
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 20000, // 20s safety timeout
+  timeout: 40000, // 20s safety timeout
   headers: {
     "Content-Type": "application/json",
   },

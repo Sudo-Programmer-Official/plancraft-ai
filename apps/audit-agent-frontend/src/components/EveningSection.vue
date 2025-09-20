@@ -10,18 +10,18 @@
       class="w-full p-3 rounded-md bg-slate-900/40 border border-slate-700 text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-400"
     ></textarea>
 
-    <div class="flex gap-3 mt-3">
-      <button
-        @click="toggleRecording"
-        :class="isRecording ? 'bg-red-500' : 'bg-indigo-600'"
-        class="px-4 py-2 rounded-md text-white"
-      >
-        {{ isRecording ? '🎙️ Recording… Tap to Stop' : '🎤 Start Recording' }}
-      </button>
+    <!-- Show AI enhanced reflection -->
+    <p v-if="enhancedText" class="text-indigo-400 text-sm italic mt-2">
+      ✨ Enhanced: {{ enhancedText }}
+    </p>
+
+    <div class="flex gap-3 mt-3 flex-wrap">
+      <!-- VoiceRecorder (same as Journal page) -->
+      <VoiceRecorder @transcribed="handleTranscript" />
 
       <button
         @click="saveReflection"
-        class="bg-green-600 px-4 py-2 rounded-md text-white"
+        class="bg-green-600 px-4 py-2 rounded-md text-white hover:bg-green-700"
       >
         Save Reflection
       </button>
@@ -30,33 +30,42 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { useVoiceRecorder } from '@/composables/useVoiceRecorder'
-import { saveEntryToFirebase } from '@/services/firebaseService'
+import { ref } from "vue"
+import VoiceRecorder from "@/components/VoiceRecorder.vue"
+import { saveEntryToFirebase } from "@/services/firebaseService"
+import { enhanceJournal } from "@/services/aiService"
 
-const reflectionText = ref('')
-const isRecording = ref(false)
+const reflectionText = ref("")
+const enhancedText = ref("")
 
-const { startRecording, stopRecording } = useVoiceRecorder(async (raw) => {
+function handleTranscript(raw) {
   reflectionText.value = raw
-})
+  enhanceReflection(raw)
+}
 
-function toggleRecording() {
-  if (isRecording.value) stopRecording()
-  else startRecording()
-  isRecording.value = !isRecording.value
+async function enhanceReflection(raw) {
+  try {
+    const enhanced = await enhanceJournal(raw) // reuse AI enhancer
+    enhancedText.value = enhanced
+  } catch (err) {
+    console.error("Evening enhance failed:", err)
+  }
 }
 
 async function saveReflection() {
   if (!reflectionText.value.trim()) return
+
   const entry = {
-    id: crypto.randomUUID(),
-    text: reflectionText.value,
-    type: 'evening',
+    id: crypto.randomUUID?.() || Date.now(),
+    text: reflectionText.value.trim(),
+    enhanced: enhancedText.value || null,
+    type: "evening",
     date: new Date().toLocaleString(),
-    timestamp: Date.now()
+    timestamp: Date.now(),
   }
+
   await saveEntryToFirebase(entry)
-  reflectionText.value = ''
+  reflectionText.value = ""
+  enhancedText.value = ""
 }
 </script>

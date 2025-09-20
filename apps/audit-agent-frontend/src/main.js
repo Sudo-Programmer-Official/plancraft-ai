@@ -8,6 +8,8 @@ import 'element-plus/dist/index.css'
 import ElementPlus from 'element-plus'
 // import { initMixpanel } from './utils/mixpanel'
 import { useAuthStore } from "@/stores/authStore";
+import VoiceRecorder from '@/components/VoiceRecorder.vue'
+
 // import { VueGtag } from 'vue-gtag'
 
 // ✅ Import your Firebase initialization (this is the important part)
@@ -43,6 +45,7 @@ router.afterEach((to) => {
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
   app.component(key, component)
 }
+app.component('VoiceRecorder', VoiceRecorder)
 app.use(router)
 app.use(head)
 app.use(createPinia())

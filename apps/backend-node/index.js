@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import aiRoutes from "./routes/aiRoutes.js";
+import transcribeRoutes from "./routes/transcribeRoutes.js";
 
 dotenv.config();
 
@@ -47,6 +48,7 @@ app.get("/health", (req, res) => res.status(200).send("OK"));
 
 // Routes
 app.use("/api/ai", aiRoutes);
+app.use("/api", transcribeRoutes); // exposes POST /api/transcribe
 
 const PORT = 4000;
 app.listen(PORT, () => {
