@@ -38,14 +38,28 @@ export async function enhanceJournal(text) {
 export async function summarizeTasks(tasks) {
   try {
     const res = await api.post("/tasks/summarize", { tasks });
-    return safeGet(res, "summary", {
-      completedPct: 0,
-      pending: [],
-      focus: "",
-    });
+
+    // Normalize keys for frontend (camelCase)
+    const summary = res.data?.summary || {};
+
+    return {
+      completedPct: summary["Completed %"] ?? summary.completedPct ?? 0,
+      pending: summary["Pending items"] ?? summary.pending ?? 0,
+      focus: summary["Suggested focus for today"] ?? summary.focus ?? "",
+      quickWins: summary["Quick wins"] ?? summary.quickWins ?? [],
+      heavyLifts: summary["Heavy lifts"] ?? summary.heavyLifts ?? [],
+      weeklyWarning: summary["Weekly warning"] ?? summary.weeklyWarning ?? "",
+    };
   } catch (err) {
     console.error("❌ Task Summarize API Error:", err?.response?.data || err.message);
-    throw new Error("Failed to summarize tasks. Please try again later.");
+    return {
+      completedPct: 0,
+      pending: 0,
+      focus: "",
+      quickWins: [],
+      heavyLifts: [],
+      weeklyWarning: "",
+    };
   }
 }
 

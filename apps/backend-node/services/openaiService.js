@@ -67,21 +67,46 @@ Return only the improved text.
 }
 
 // ✨ Task Summarizer
+// export async function summarizeTasks(tasks) {
+//   const prompt = `
+// You are an AI productivity coach. Given these tasks:
+// ${JSON.stringify(tasks, null, 2)}
+
+// Summarize progress with:
+// - Completed %
+// - Pending items
+// - Suggested focus for today
+// Return valid JSON only.
+//   `;
+//   const content = await chatWithFallback({ messages: [{ role: "user", content: prompt }], temperature: 0.5 });
+//   return JSON.parse(content);
+// }
 export async function summarizeTasks(tasks) {
   const prompt = `
-You are an AI productivity coach. Given these tasks:
-${JSON.stringify(tasks, null, 2)}
+You are an assistant analyzing a task list. 
+Return a JSON object with:
 
-Summarize progress with:
-- Completed %
-- Pending items
-- Suggested focus for today
-Return valid JSON only.
-  `;
-  const content = await chatWithFallback({ messages: [{ role: "user", content: prompt }], temperature: 0.5 });
-  return JSON.parse(content);
+{
+  "Completed %": <number>,
+  "Pending items": <number>,
+  "Suggested focus for today": "<string>",
+  "Quick wins": [ "<string>", "<string>" ],
+  "Heavy lifts": [ "<string>", "<string>" ],
+  "Weekly warning": "<string>"
 }
 
+Tasks:
+${JSON.stringify(tasks, null, 2)}
+`
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-3.5-turbo",
+    messages: [{ role: "user", content: prompt }],
+    response_format: { type: "json_object" }
+  })
+
+  return JSON.parse(response.choices[0].message.content)
+}
 // ✨ Quote Generator
 export async function getQuoteFromIdea(idea) {
   const prompt = `
