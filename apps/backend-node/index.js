@@ -37,6 +37,8 @@ app.get("/", (req, res) => {
   res.send("Backend is live!");
 });
 
+// server.js or app.js
+app.get("/health", (req, res) => res.status(200).send("OK"));
 // app.use("/api/quote", quoteRoutes);
 // app.use("/api/upload", uploadRoutes);
 // app.use("/api/ask", askRoutes);
