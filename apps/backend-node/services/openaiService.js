@@ -156,46 +156,91 @@ Return only the improved response.
 }
 
 // ✨ Split free‑form text into actionable tasks
+// export async function splitTasks(input, { maxItems = 6, context = "" } = {}) {
+//   const system = {
+//     role: "system",
+//     content:
+//       "You are a behavioral design + productivity coach. You turn vague notes into small, emotionally inviting, do-able tasks.",
+//   }
+
+//   const schema = `
+// Return ONLY valid JSON matching this schema:
+// {
+//   "tasks": [
+//     {
+//       "title": "Action verb + clear outcome (5–8 words)",
+//       "details": "Concise specifics and success criteria; tools/resources if relevant",
+//       "estimate_minutes": 10,
+//       "energy": "low|medium|high",
+//       "context": "home|work|computer|phone|errand|meeting|deep-work|planning",
+//       "priority": 1
+//     }
+//   ]
+// }`
+
+//   const rules = `
+// Rules:
+// - Break into at most ${maxItems} atomic tasks. Each must be independently completable.
+// - Start each title with a concrete verb (e.g., Draft, Email, Outline, Book, Review).
+// - Avoid vague titles like "today", "ASAP", "ongoing", or single-keyword items.
+// - Make tasks psychologically inviting: small scope, clear win, friendly tone.
+// - Prefer short estimates (10–30 minutes). Set "estimate_minutes" accordingly.
+// - If input is too vague, include a first task to Clarify scope (e.g., "Outline success criteria for X").
+// - Keep output minimal; do not add commentary, markdown, or extra fields.
+// `
+
+//   const user = {
+//     role: "user",
+//     content: `${context ? `Context: ${context}\n` : ""}Notes to split:\n"""${input}"""\n\n${schema}\n${rules}`,
+//   }
+
+//   const content = await chatWithFallback({ messages: [system, user], temperature: 0.4 })
+
+//   // Best‑effort parse. The prompt already forces raw JSON.
+//   return JSON.parse(content)
+// }
+
 export async function splitTasks(input, { maxItems = 6, context = "" } = {}) {
   const system = {
     role: "system",
     content:
-      "You are a behavioral design + productivity coach. You turn vague notes into small, emotionally inviting, do-able tasks.",
-  }
+      "You are a productivity coach. Convert free-form notes into a strict list of short, actionable tasks."
+  };
 
   const schema = `
-Return ONLY valid JSON matching this schema:
+Return ONLY valid JSON in this format:
 {
   "tasks": [
     {
-      "title": "Action verb + clear outcome (5–8 words)",
-      "details": "Concise specifics and success criteria; tools/resources if relevant",
-      "estimate_minutes": 10,
+      "title": "Action verb + clear outcome (max 8 words)",
+      "details": "Specifics or success criteria",
+      "estimate_minutes": 15,
       "energy": "low|medium|high",
       "context": "home|work|computer|phone|errand|meeting|deep-work|planning",
       "priority": 1
     }
   ]
-}`
+}`;
 
   const rules = `
 Rules:
-- Break into at most ${maxItems} atomic tasks. Each must be independently completable.
-- Start each title with a concrete verb (e.g., Draft, Email, Outline, Book, Review).
-- Avoid vague titles like "today", "ASAP", "ongoing", or single-keyword items.
-- Make tasks psychologically inviting: small scope, clear win, friendly tone.
-- Prefer short estimates (10–30 minutes). Set "estimate_minutes" accordingly.
-- If input is too vague, include a first task to Clarify scope (e.g., "Outline success criteria for X").
-- Keep output minimal; do not add commentary, markdown, or extra fields.
-`
+- At most ${maxItems} tasks.
+- Each task must start with a verb (e.g., Write, Review, Prepare, Go).
+- No sequence words like "First", "Second", "Lastly".
+- No reflections like "I feel grateful" or "Today is tough".
+- Each task should be atomic, completable in 10–30 minutes.
+- Do not include duplicates or vague filler sentences.
+`;
 
   const user = {
     role: "user",
-    content: `${context ? `Context: ${context}\n` : ""}Notes to split:\n"""${input}"""\n\n${schema}\n${rules}`,
-  }
+    content: `${context ? `Context: ${context}\n` : ""}User notes:\n"""${input}"""\n\n${schema}\n${rules}`,
+  };
 
-  const content = await chatWithFallback({ messages: [system, user], temperature: 0.4 })
+  const content = await chatWithFallback({
+    messages: [system, user],
+    temperature: 0.2, // more deterministic
+  });
 
-  // Best‑effort parse. The prompt already forces raw JSON.
-  return JSON.parse(content)
+  return JSON.parse(content);
 }

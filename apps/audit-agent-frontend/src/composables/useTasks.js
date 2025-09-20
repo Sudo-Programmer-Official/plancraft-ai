@@ -2,6 +2,8 @@
 import { ref } from "vue"
 import {
   fetchTasksForToday,
+  fetchTasksByDate,
+  fetchTasksBetween,
   addTaskToFirebase,
   updateTaskInFirebase,
   deleteTaskFromFirebase,
@@ -17,6 +19,22 @@ export function useTasks() {
    */
   async function loadTasks() {
     tasks.value = await fetchTasksForToday()
+    initialized = true
+  }
+
+  /**
+   * Load tasks for a specific date (YYYY-MM-DD)
+   */
+  async function loadTasksForDate(dateStr) {
+    tasks.value = await fetchTasksByDate(dateStr)
+    initialized = true
+  }
+
+  /**
+   * Load tasks for a date range inclusive (YYYY-MM-DD)
+   */
+  async function loadTasksForRange(startYMD, endYMD) {
+    tasks.value = await fetchTasksBetween(startYMD, endYMD)
     initialized = true
   }
 
@@ -88,6 +106,8 @@ export function useTasks() {
   return {
     tasks,
     loadTasks,
+    loadTasksForDate,
+    loadTasksForRange,
     addTask,
     toggleComplete,
     addLog,

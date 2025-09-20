@@ -192,6 +192,40 @@ export async function fetchTasksForToday() {
 }
 
 /**
+ * 🗓 Fetch tasks for a specific date (YYYY-MM-DD)
+ */
+export async function fetchTasksByDate(dateStr) {
+  const user = auth.currentUser;
+  if (!user) return [];
+  const qy = query(
+    tasksRef,
+    where('userId', '==', user.uid),
+    where('date', '==', dateStr),
+    orderBy('order', 'asc'),
+  )
+  const snap = await getDocs(qy)
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+}
+
+/**
+ * 📅 Fetch tasks between two dates inclusive (YYYY-MM-DD)
+ */
+export async function fetchTasksBetween(startYMD, endYMD) {
+  const user = auth.currentUser;
+  if (!user) return [];
+  const qy = query(
+    tasksRef,
+    where('userId', '==', user.uid),
+    where('date', '>=', startYMD),
+    where('date', '<=', endYMD),
+    orderBy('date', 'asc'),
+    orderBy('order', 'asc'),
+  )
+  const snap = await getDocs(qy)
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+}
+
+/**
  * ➕ Add a new task
  */
 /**

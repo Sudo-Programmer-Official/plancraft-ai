@@ -37,7 +37,7 @@
           </button>
         </div>
 
-        <ul class="space-y-3">
+        <TransitionGroup name="fade-move" tag="ul" class="space-y-3">
           <li
             v-for="task in filteredTasks"
             :key="task.id"
@@ -61,13 +61,13 @@
               </span>
               <input
                 type="checkbox"
-                v-model="task.completed"
+                :checked="task.completed"
                 @change="toggleComplete(task)"
                 class="w-5 h-5 accent-indigo-500"
               />
             </div>
           </li>
-        </ul>
+        </TransitionGroup>
       </section>
 
       <!-- View Monthly -->
@@ -81,22 +81,21 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
 import { useTasks } from "@/composables/useTasks";
 
-const { tasks, toggleComplete, loadTasks, addTaskToFirebase } = useTasks();
+const { tasks, toggleComplete, loadTasksForRange, addTask } = useTasks();
 
 const days = [
-  { label: "Mon", value: 1 },
-  { label: "Tue", value: 2 },
-  { label: "Wed", value: 3 },
-  { label: "Thu", value: 4 },
-  { label: "Fri", value: 5 },
-  { label: "Sat", value: 6 },
-  { label: "Sun", value: 0 },
+  { label: "Mon", value: 0 },
+  { label: "Tue", value: 1 },
+  { label: "Wed", value: 2 },
+  { label: "Thu", value: 3 },
+  { label: "Fri", value: 4 },
+  { label: "Sat", value: 5 },
+  { label: "Sun", value: 6 },
 ];
 
-const selectedDay = ref(new Date().getDay());
 const selectedDate = ref(new Date());
 const showAddTask = ref(false);
 
@@ -107,9 +106,6 @@ const newTask = ref({
   completed: false,
 });
 
-// const filteredTasks = computed(() =>
-//   tasks.value.filter((task) => new Date(task.date).getDay() === selectedDay.value)
-// );
 function toYMD(date) {
   return new Date(date).toISOString().split("T")[0];
 }
@@ -123,21 +119,20 @@ const filteredTasks = computed(() =>
 const completedCount = computed(() => tasks.value.filter((t) => t.completed).length);
 const remainingCount = computed(() => tasks.value.filter((t) => !t.completed).length);
 
-const dayLabel = computed(() => {
-  const day = days.find((d) => d.value === selectedDate.value);
-  return day ? day.label : "";
-});
+const dayLabel = computed(() => selectedDate.value.toLocaleDateString('en-US', { weekday: 'long' }));
+
+const currentWeekStart = computed(() => startOfWeek(selectedDate.value))
 
 function formatDate(dateStr) {
   const date = new Date(dateStr);
   return date.toDateString().slice(4, 10);
 }
 
-async function addTask() {
+async function addTaskLocal() {
   if (!newTask.value.title.trim()) return;
 
-  await addTaskToFirebase({ ...newTask.value });
-  await loadTasks();
+  await addTask({ ...newTask.value });
+  await loadWeek();
 
   newTask.value = {
     title: "",
@@ -148,5 +143,40 @@ async function addTask() {
   showAddTask.value = false;
 }
 
-onMounted(loadTasks);
+function startOfWeek(d) {
+  const day = d.getDay();
+  const diff = (day === 0 ? -6 : 1) - day; // Monday as start
+  const s = new Date(d);
+  s.setDate(d.getDate() + diff);
+  s.setHours(0,0,0,0)
+  return s;
+}
+function endOfWeek(d) {
+  const s = startOfWeek(d);
+  const e = new Date(s);
+  e.setDate(s.getDate() + 6);
+  e.setHours(23,59,59,999)
+  return e;
+}
+
+function ymd(d) { return d.toISOString().split('T')[0] }
+
+async function loadWeek() {
+  const s = startOfWeek(selectedDate.value)
+  const e = endOfWeek(selectedDate.value)
+  await loadTasksForRange(ymd(s), ymd(e))
+}
+
+watch(selectedDate, loadWeek)
+onMounted(loadWeek)
 </script>
+
+<style scoped>
+.fade-move-enter-active, .fade-move-leave-active {
+  transition: all 200ms ease;
+}
+.fade-move-enter-from, .fade-move-leave-to {
+  opacity: 0;
+  transform: translateY(4px);
+}
+</style>

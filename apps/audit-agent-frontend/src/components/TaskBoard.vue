@@ -119,3 +119,8 @@ async function reload() {
 
 onMounted(loadTasks)
 </script>
+
+<style scoped>
+.v-move, .v-enter-active, .v-leave-active { transition: all 180ms ease; }
+.v-enter-from, .v-leave-to { opacity: 0; transform: translateY(4px); }
+</style>
