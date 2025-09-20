@@ -1,46 +1,3 @@
-// // routes/transcribeRoutes.js
-// import express from 'express'
-// import multer from 'multer'
-// import OpenAI from 'openai'
-// import { toFile } from 'openai/uploads'
-
-// const router = express.Router()
-// const upload = multer({ limits: { fileSize: 25 * 1024 * 1024 } }) // 25MB limit
-
-// const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-// const TRANSCRIBE_MODEL = process.env.OPENAI_TRANSCRIBE_MODEL || 'whisper-1'
-
-// // POST /api/transcribe
-// router.post('/transcribe', upload.single('file'), async (req, res) => {
-//   try {
-//     if (!req.file || !req.file.buffer) {
-//       return res.status(400).json({ error: 'No audio file provided (field name should be "file").' })
-//     }
-
-//     const filename = req.file.originalname || 'audio.webm'
-//     const file = await toFile(req.file.buffer, filename)
-
-//     const response = await openai.audio.transcriptions.create({
-//       file,
-//       model: TRANSCRIBE_MODEL,
-//       // language: 'en', // optionally hint
-//       // response_format: 'json', // default returns { text }
-//     })
-
-//     res.json({ text: response.text })
-//   } catch (err) {
-//     // eslint-disable-next-line no-console
-//     console.error('Transcription failed:', err)
-//     let status = 500
-//     let message = 'Transcription failed'
-//     if (err?.status) status = err.status
-//     if (typeof err?.message === 'string') message = err.message
-//     res.status(status).json({ error: message })
-//   }
-// })
-
-// export default router
-
 import express from 'express'
 import multer from 'multer'
 import OpenAI from 'openai'
@@ -57,7 +14,7 @@ const router = express.Router()
 router.use((req, res, next) => {
   const origin = req.headers.origin || ''
   const allowAny = process.env.ALLOW_DEV_ANY_ORIGIN === '1'
-  const isDevVite = /:\d+$/.test(origin) && /:\d+$/.test(origin) && /:5173$/.test(origin)
+  const isDevVite = /:5173$/.test(origin)
   if (allowAny || allowedOrigins.includes(origin) || isDevVite) {
     res.set('Access-Control-Allow-Origin', origin)
   }
@@ -74,9 +31,9 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
 // Prefer env, otherwise try modern transcribe models first
 const DEFAULT_TRANSCRIBE_MODELS = [
-  'gpt-4o-mini-transcribe',
-  'gpt-4o-transcribe',
   'whisper-1',
+  'gpt-4o-mini-transcribe',
+  'gpt-4o-transcribe'
 ]
 
 function resolveModelList() {
@@ -111,7 +68,6 @@ async function transcribeWithFallback(fileBuffer, filename) {
       const msg = err?.error?.message || err?.message || ''
       const isAccess = code === 'model_not_found' || status === 403 || /does not have access to model/i.test(msg)
       if (isAccess) {
-        // eslint-disable-next-line no-console
         console.warn(`[transcribe] Model '${model}' unavailable. Trying next…`)
         continue
       }
@@ -119,13 +75,12 @@ async function transcribeWithFallback(fileBuffer, filename) {
     }
   }
   const friendly = new Error(
-    `All configured transcription models are unavailable. Set OPENAI_TRANSCRIBE_MODEL/OPENAI_TRANSCRIBE_FALLBACKS or check project access.`,
+    `All configured transcription models are unavailable. ` +
+      `Set OPENAI_TRANSCRIBE_MODEL/OPENAI_TRANSCRIBE_FALLBACKS or check project access.`,
   )
   friendly.cause = lastErr
   throw friendly
 }
-// const TRANSCRIBE_MODEL = process.env.OPENAI_TRANSCRIBE_MODEL || 'whisper-1'
-const TRANSCRIBE_MODEL = 'whisper-1'
 
 // POST /api/transcribe
 router.post('/transcribe', upload.single('file'), async (req, res) => {
