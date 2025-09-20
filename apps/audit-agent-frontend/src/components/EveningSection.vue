@@ -34,6 +34,8 @@ import { ref } from "vue"
 import VoiceRecorder from "@/components/VoiceRecorder.vue"
 import { saveEntryToFirebase } from "@/services/firebaseService"
 import { enhanceJournal } from "@/services/aiService"
+import { useTasks } from "@/composables/useTasks"
+const {loadTasks } = useTasks()
 
 const reflectionText = ref("")
 const enhancedText = ref("")
@@ -65,6 +67,7 @@ async function saveReflection() {
   }
 
   await saveEntryToFirebase(entry)
+  await loadTasks() // refresh tasks in case of updates
   reflectionText.value = ""
   enhancedText.value = ""
 }

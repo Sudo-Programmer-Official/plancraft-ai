@@ -1,84 +1,5 @@
-// import { ref, onMounted } from "vue";
-// import { fetchTasks, addTaskToFirebase, updateTaskInFirebase } from "@/services/firebaseService";
-
-// export function useTasks() {
-//   const tasks = ref([]);
-
-//   async function loadTasks() {
-//     tasks.value = await fetchTasks();
-//   }
-
-//   async function addTask() {
-//     const newTask = {
-//       title: "New Task",
-//       details: "",
-//       completed: false,
-//       reflection: "",
-//       date: new Date().toLocaleDateString(),
-//       timestamp: Date.now(),
-//     };
-//     const savedTask = await addTaskToFirebase(newTask);
-//     tasks.value.unshift(savedTask);
-//   }
-
-//   async function toggleComplete(task) {
-//     task.completed = !task.completed;
-//     await updateTaskInFirebase(task);
-//   }
-
-//   onMounted(loadTasks);
-
-//   return { tasks, addTask, toggleComplete, loadTasks };
-// }
-
-// import { ref } from "vue"
-// import { addTaskToFirebase, updateTaskInFirebase } from "@/services/firebaseService"
-
-// const tasks = ref([])
-
-// export function useTasks() {
-//   async function addTask() {
-//     const newTask = {
-//       id: Date.now().toString(),
-//       title: "New Task",
-//       details: "",
-//       completed: false,
-//       logs: [],
-//       date: new Date().toLocaleDateString(),
-//     }
-//     tasks.value.push(newTask)
-//     await addTaskToFirebase(newTask)
-//   }
-
-//   async function toggleComplete(task) {
-//     task.completed = !task.completed
-//     await updateTaskInFirebase(task)
-//   }
-
-//   function addLog(task) {
-//     if (!task.newLog) return
-//     task.logs.push(task.newLog)
-//     task.newLog = ""
-//     updateTaskInFirebase(task)
-//   }
-
-//   async function persistOrder() {
-//     for (const task of tasks.value) {
-//       await updateTaskInFirebase(task)
-//     }
-//   }
-//   async function updateTaskOrder() {
-//   tasks.value.forEach(async (task, index) => {
-//     await updateTaskInFirebase({ ...task, order: index })
-//   })
-// }
-
-//   return { tasks, addTask, toggleComplete, addLog, persistOrder, updateTaskOrder }
-// }
-
-
 // src/composables/useTasks.js
-import { ref, onMounted } from "vue"
+import { ref } from "vue"
 import {
   fetchTasksForToday,
   addTaskToFirebase,
@@ -86,7 +7,9 @@ import {
   deleteTaskFromFirebase,
 } from "@/services/firebaseService"
 
+// 🔗 Shared singleton state
 const tasks = ref([])
+let initialized = false
 
 export function useTasks() {
   /**
@@ -94,13 +17,14 @@ export function useTasks() {
    */
   async function loadTasks() {
     tasks.value = await fetchTasksForToday()
+    initialized = true
   }
 
   /**
    * ➕ Add new task
    */
-  async function addTask() {
-    const newTask = {
+  async function addTask(newTask = null) {
+    const baseTask = {
       id: Date.now().toString(),
       title: "New Task",
       details: "",
@@ -110,23 +34,24 @@ export function useTasks() {
       createdAt: Date.now(),
     }
 
-    // Save to Firestore → get back with real ID
-    const saved = await addTaskToFirebase(newTask)
+    const task = { ...baseTask, ...(newTask || {}) }
+
+    const saved = await addTaskToFirebase(task)
     tasks.value.unshift(saved)
   }
 
   /**
    * ✅ Toggle completion
    */
-async function toggleComplete(task) {
-  try {
-    task.completed = !task.completed
-    await updateTaskInFirebase(task) // your service already handles this
-  } catch (err) {
-    console.error("Failed to toggle complete:", err)
-    task.completed = !task.completed // rollback on error
+  async function toggleComplete(task) {
+    try {
+      task.completed = !task.completed
+      await updateTaskInFirebase(task)
+    } catch (err) {
+      console.error("Failed to toggle complete:", err)
+      task.completed = !task.completed // rollback on error
+    }
   }
-}
 
   /**
    * 📝 Add log (quick notes) for a task
@@ -150,15 +75,6 @@ async function toggleComplete(task) {
   }
 
   /**
-   * 💾 Update task order (alias, more explicit)
-   */
-  async function updateTaskOrder() {
-    for (const [index, task] of tasks.value.entries()) {
-      await updateTaskInFirebase({ ...task, order: index })
-    }
-  }
-
-  /**
    * 🗑 Delete task
    */
   async function deleteTask(task) {
@@ -166,8 +82,8 @@ async function toggleComplete(task) {
     tasks.value = tasks.value.filter((t) => t.id !== task.id)
   }
 
-  // 🚀 Load tasks automatically when mounted
-  onMounted(loadTasks)
+  // 🔹 Only load once when app starts
+  if (!initialized) loadTasks()
 
   return {
     tasks,
@@ -176,7 +92,6 @@ async function toggleComplete(task) {
     toggleComplete,
     addLog,
     persistOrder,
-    updateTaskOrder,
     deleteTask,
   }
 }

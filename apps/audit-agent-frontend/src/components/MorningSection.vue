@@ -34,6 +34,9 @@ import { ref } from "vue"
 import VoiceRecorder from "@/components/VoiceRecorder.vue"
 import { enhanceJournal } from "@/services/aiService"
 import { fetchTasks, addTaskToFirebase, updateTaskInFirebase } from "@/services/firebaseService"
+import { useTasks } from "@/composables/useTasks"
+
+const {loadTasks } = useTasks()
 
 const tasks = ref([])
 const planningInput = ref("")
@@ -69,6 +72,9 @@ async function generateTasks() {
     }
   } catch (err) {
     console.error("Task generation failed:", err)
+  } finally {
+    await loadTasks()
+    // planningInput.value = ""
   }
 }
 </script>

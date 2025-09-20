@@ -69,7 +69,12 @@ export async function summarizeTasks(tasks) {
 export async function generateTasksFromText(text) {
   try {
     const res = await api.post("/split-tasks", { text });
-    return safeGet(res, "tasks", []);
+    const raw = res?.data?.tasks ?? []
+    // Normalize: accept array of strings or array of objects with title
+    const tasks = Array.isArray(raw)
+      ? raw.map((t) => (typeof t === 'string' ? t : (t?.title ?? ''))).filter(Boolean)
+      : []
+    return tasks
   } catch (err) {
     console.error("❌ Generate Tasks API Error:", err?.response?.data || err.message);
     throw new Error("Failed to generate tasks. Please try again later.");
