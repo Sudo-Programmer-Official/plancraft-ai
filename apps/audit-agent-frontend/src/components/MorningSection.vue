@@ -11,10 +11,7 @@
       class="w-full p-3 rounded-md bg-slate-900/40 border border-slate-700 text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 mb-2 resize-none"
     ></textarea>
 
-    <!-- Enhanced text -->
-    <p v-if="enhancedText" class="text-indigo-400 text-sm italic mb-3">
-      ✨ Enhanced: {{ enhancedText }}
-    </p>
+    <!-- Enhanced text intentionally hidden in Morning Planning -->
 
     <!-- Actions -->
     <div class="flex flex-wrap gap-3">
@@ -32,34 +29,26 @@
 <script setup>
 import { ref } from "vue"
 import VoiceRecorder from "@/components/VoiceRecorder.vue"
-import { enhanceJournal } from "@/services/aiService"
+import { generateTasksFromText } from "@/services/aiService"
 import { addTaskToFirebase } from "@/services/firebaseService"
 import { useTasks } from "@/composables/useTasks"
 
 const { tasks, loadTasks } = useTasks()
 
 const planningInput = ref("")
-const enhancedText = ref("")
+// No enhanced text shown in Morning Planning by design
 
 function handleTranscript(text) {
   planningInput.value = text
-  // Optional: auto-enhance right away
-  // enhanceJournal(text).then(e => enhancedText.value = e)
+  // Morning view does not show enhanced text; just capture raw
 }
 
 async function generateTasks() {
   if (!planningInput.value.trim()) return
 
   try {
-    const enhanced = await enhanceJournal(planningInput.value)
-    enhancedText.value = enhanced
-
-    const splitTasks = enhanced
-      .split(/[.,]/)
-      .map((t) => t.trim())
-      .filter(Boolean)
-
-    for (const [i, t] of splitTasks.entries()) {
+    const items = await generateTasksFromText(planningInput.value)
+    for (const [i, t] of items.entries()) {
       const newTask = {
         title: t,
         details: "",

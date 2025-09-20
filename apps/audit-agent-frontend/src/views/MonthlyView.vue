@@ -47,7 +47,7 @@
         </button>
       </div>
 
-      <ul class="space-y-3">
+      <TransitionGroup name="fade-move" tag="ul" class="space-y-3">
         <li
           v-for="task in tasksForSelectedDay"
           :key="task.id"
@@ -67,13 +67,13 @@
           <div class="flex items-center gap-3">
             <input
               type="checkbox"
-              v-model="task.completed"
+              :checked="task.completed"
               @change="toggleComplete(task)"
               class="w-5 h-5 accent-indigo-500"
             />
           </div>
         </li>
-      </ul>
+      </TransitionGroup>
     </section>
 
     <!-- Add Task Modal -->
@@ -105,7 +105,7 @@
             Cancel
           </button>
           <button
-            @click="addTask"
+            @click="addTaskLocal"
             class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white"
           >
             Save
@@ -117,10 +117,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
 import { useTasks } from "@/composables/useTasks";
 
-const { tasks, toggleComplete, loadTasks, addTaskToFirebase } = useTasks();
+const { tasks, toggleComplete, loadTasksForRange, addTask } = useTasks();
 
 const today = new Date();
 const selectedDate = ref(new Date());
@@ -231,14 +231,28 @@ function nextMonth() {
   }
 }
 
-async function addTask() {
+async function addTaskLocal() {
   if (!newTask.value.title.trim()) return;
   newTask.value.date = selectedDate.value.toISOString().slice(0, 10);
-  await addTaskToFirebase({ ...newTask.value });
-  await loadTasks();
+  await addTask({ ...newTask.value });
+  await loadMonth();
   newTask.value = { title: "", details: "", date: today.toISOString().slice(0, 10), completed: false };
   showAddTask.value = false;
 }
 
-onMounted(loadTasks);
+function ymd(d) { return d.toISOString().split('T')[0] }
+async function loadMonth() {
+  const start = new Date(currentYear.value, currentMonth.value, 1)
+  const end = new Date(currentYear.value, currentMonth.value + 1, 0)
+  await loadTasksForRange(ymd(start), ymd(end))
+}
+
+watch([currentMonth, currentYear], loadMonth)
+watch(selectedDate, loadMonth)
+onMounted(loadMonth);
 </script>
+
+<style scoped>
+.fade-move-enter-active, .fade-move-leave-active { transition: all 200ms ease; }
+.fade-move-enter-from, .fade-move-leave-to { opacity: 0; transform: translateY(4px); }
+</style>
