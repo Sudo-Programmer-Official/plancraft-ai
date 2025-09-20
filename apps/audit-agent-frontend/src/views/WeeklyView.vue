@@ -15,7 +15,7 @@
         <button
           v-for="day in days"
           :key="day.label"
-          @click="selectedDay = day.value"
+          @click="selectedDate = new Date(currentWeekStart.getFullYear(), currentWeekStart.getMonth(), currentWeekStart.getDate() + day.value)"
           :class="[
             'px-3 py-1 rounded-lg font-medium transition',
             selectedDay === day.value ? 'bg-indigo-500 text-white' : 'text-gray-400 hover:text-white'
@@ -97,6 +97,7 @@ const days = [
 ];
 
 const selectedDay = ref(new Date().getDay());
+const selectedDate = ref(new Date());
 const showAddTask = ref(false);
 
 const newTask = ref({
@@ -106,15 +107,24 @@ const newTask = ref({
   completed: false,
 });
 
+// const filteredTasks = computed(() =>
+//   tasks.value.filter((task) => new Date(task.date).getDay() === selectedDay.value)
+// );
+function toYMD(date) {
+  return new Date(date).toISOString().split("T")[0];
+}
+
 const filteredTasks = computed(() =>
-  tasks.value.filter((task) => new Date(task.date).getDay() === selectedDay.value)
+  tasks.value.filter(
+    (task) => toYMD(task.date) === toYMD(selectedDate.value)
+  )
 );
 
 const completedCount = computed(() => tasks.value.filter((t) => t.completed).length);
 const remainingCount = computed(() => tasks.value.filter((t) => !t.completed).length);
 
 const dayLabel = computed(() => {
-  const day = days.find((d) => d.value === selectedDay.value);
+  const day = days.find((d) => d.value === selectedDate.value);
   return day ? day.label : "";
 });
 

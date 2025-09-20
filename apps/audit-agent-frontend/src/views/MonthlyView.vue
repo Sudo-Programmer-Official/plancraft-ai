@@ -161,6 +161,10 @@ function getCalendarDays(month, year) {
   return days;
 }
 
+function toYMD(date) {
+  return new Date(date).toISOString().split("T")[0];
+}
+
 const calendarDays = computed(() => getCalendarDays(currentMonth.value, currentYear.value));
 
 function isToday(date) {
@@ -187,12 +191,25 @@ const currentMonthLabel = computed(() =>
   new Date(currentYear.value, currentMonth.value).toLocaleString("default", { month: "long" })
 );
 
-const selectedDateLabel = computed(() => selectedDate.value.toDateString());
+// const selectedDateLabel = computed(() => selectedDate.value.toDateString());
+const selectedDateLabel = computed(() =>
+  selectedDate.value.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  })
+);
 
+// const tasksForSelectedDay = computed(() =>
+//   tasks.value.filter(
+//     (task) =>
+//       new Date(task.date).toDateString() === selectedDate.value.toDateString()
+//   )
+// );
 const tasksForSelectedDay = computed(() =>
   tasks.value.filter(
-    (task) =>
-      new Date(task.date).toDateString() === selectedDate.value.toDateString()
+    (task) => toYMD(task.date) === toYMD(selectedDate.value)
   )
 );
 
