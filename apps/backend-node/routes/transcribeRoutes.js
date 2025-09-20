@@ -71,7 +71,8 @@ router.use((req, res, next) => {
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } })
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-const TRANSCRIBE_MODEL = process.env.OPENAI_TRANSCRIBE_MODEL || 'whisper-1'
+// const TRANSCRIBE_MODEL = process.env.OPENAI_TRANSCRIBE_MODEL || 'whisper-1'
+const TRANSCRIBE_MODEL = 'whisper-1'
 
 // POST /api/transcribe
 router.post('/transcribe', upload.single('file'), async (req, res) => {
