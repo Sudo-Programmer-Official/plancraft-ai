@@ -9,7 +9,7 @@ const app = express();
 
 // Allow list of origins
 const allowedOrigins = [
-  "https://audit-agent-66451.web.app/",
+  "https://audit-agent-66451.web.app",
   "https://audit-agent-66451.firebaseapp.com/",
   "http://localhost:5173",
 ];
@@ -25,8 +25,9 @@ app.use(
         callback(new Error("Not allowed by CORS"));
       }
     },
-    methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true
   })
 );
 
