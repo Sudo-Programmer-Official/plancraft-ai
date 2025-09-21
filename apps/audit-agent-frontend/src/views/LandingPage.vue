@@ -34,30 +34,34 @@
           Pause, plan, and reflect — with gentle voice journaling, smart tasks, and mindful insights
           guiding your daily flow.
         </p>
-       <div
-  class="mt-10 flex flex-col sm:flex-row gap-4 justify-center"
-  data-aos="zoom-in"
-  data-aos-delay="250"
->
-  <el-button
-    class="!ml-0"
-    type="primary"
-    size="large"
-    aria-label="Log in to AuditAgent"
-    @click="goToLogin"
-  >
-    🚀 Get Started
-  </el-button>
-  <el-button
-    class="!ml-0"
-    size="large"
-    plain
-    aria-label="Continue as guest"
-    @click="continueAsGuest"
-  >
-    🌿 Continue as Guest
-  </el-button>
-</div>
+        <div
+          class="mt-10 flex flex-col sm:flex-row gap-4 justify-center"
+          data-aos="zoom-in"
+          data-aos-delay="250"
+        >
+          <el-button
+            class="!ml-0"
+            type="primary"
+            size="large"
+            aria-label="Log in to AuditAgent"
+            @click="goToLogin"
+          >
+            🚀 Get Started
+          </el-button>
+          <el-button
+            class="!ml-0"
+            size="large"
+            plain
+            aria-label="Continue as guest"
+            @click="continueAsGuest"
+          >
+            🌿 Continue as Guest
+          </el-button>
+        
+        </div>
+          <el-button id="installBtn" size="large" type="success" style="display: none">
+            📲 Install App
+          </el-button>
       </div>
     </section>
 

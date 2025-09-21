@@ -28,6 +28,7 @@
         >
           Continue as Guest
         </button>
+        
       </div>
 
       <p v-if="authStore.loading" class="text-sm text-gray-400 mt-6">✨ Preparing your space...</p>

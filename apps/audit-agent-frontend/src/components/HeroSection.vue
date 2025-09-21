@@ -41,18 +41,26 @@
       <el-button size="large" plain aria-label="Continue as guest" @click="continueAsGuest">
         🌿 Continue as Guest
       </el-button>
+       <el-button
+    id="installBtn"
+    size="large"
+    type="success"
+    style="display: none"
+  >
+    📲 Install App
+  </el-button>
     </div>
   </div>
 </section>
 
 <script setup>
-import { ref, onMounted } from "vue"
+import { ref, onMounted } from 'vue'
 
 const starsCanvas = ref(null)
 
 onMounted(() => {
   const canvas = starsCanvas.value
-  const ctx = canvas.getContext("2d")
+  const ctx = canvas.getContext('2d')
   canvas.width = window.innerWidth
   canvas.height = window.innerHeight
 
@@ -65,7 +73,7 @@ onMounted(() => {
 
   function animate() {
     ctx.clearRect(0, 0, canvas.width, canvas.height)
-    ctx.fillStyle = "white"
+    ctx.fillStyle = 'white'
     stars.forEach((star) => {
       ctx.beginPath()
       ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2)
