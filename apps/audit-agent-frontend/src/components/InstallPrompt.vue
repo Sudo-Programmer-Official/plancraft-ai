@@ -1,32 +1,52 @@
 <template>
-  <div
-    v-if="visible"
-    class="fixed bottom-6 inset-x-4 bg-indigo-600 text-white rounded-2xl shadow-xl p-4 flex items-center justify-between z-50"
-  >
-    <div>
-      <h3 class="font-bold text-lg">📲 Install AuditAgent</h3>
-      <p class="text-sm opacity-90">
-        Add AuditAgent to your home screen for <br />
-        1-tap access to tasks, journaling & insights.
-      </p>
-    </div>
-    <button
-      class="ml-4 bg-white text-indigo-700 font-semibold px-4 py-2 rounded-xl shadow hover:bg-indigo-100 transition"
-      @click="install"
+  <!-- 🔹 Android/Chrome PWA prompt -->
+  <transition name="fade-slide">
+    <div
+      v-if="visible"
+      class="fixed bottom-6 inset-x-4 bg-indigo-600 text-white rounded-2xl shadow-xl p-4 flex items-center justify-between z-50"
     >
-      Install
-    </button>
-  </div>
-  <!-- inside InstallPrompt.vue -->
+      <div>
+        <h3 class="font-bold text-lg">📲 Install AuditAgent</h3>
+        <p class="text-sm opacity-90">
+          Add AuditAgent to your home screen for <br />
+          1-tap access to tasks, journaling & insights.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button
+          class="bg-white text-indigo-700 font-semibold px-4 py-2 rounded-xl shadow hover:bg-indigo-100 transition"
+          @click="install"
+        >
+          Install
+        </button>
+        <button
+          class="text-sm opacity-80 underline"
+          @click="dismiss"
+        >
+          Dismiss
+        </button>
+      </div>
+    </div>
+  </transition>
+
+  <!-- 🔹 iOS Safari hint -->
+  <transition name="fade-slide">
     <div
       v-if="iosHint"
-      class="fixed bottom-6 inset-x-4 bg-slate-800 text-white rounded-xl p-4 text-center shadow-lg"
+      class="fixed bottom-6 inset-x-4 bg-slate-800 text-white rounded-xl p-4 text-center shadow-lg z-50"
     >
       <p class="text-sm">
-        📱 To install AuditAgent on iPhone: tap <strong>Share</strong> → 
-        <strong>Add to Home Screen</strong>.
+        📱 To install <strong>AuditAgent</strong>: tap
+        <strong>Share</strong> → <strong>Add to Home Screen</strong>.
       </p>
+      <button
+        class="mt-2 text-xs opacity-80 underline"
+        @click="dismissIos"
+      >
+        Got it
+      </button>
     </div>
+  </transition>
 </template>
 
 <script setup>
@@ -50,11 +70,24 @@ function markDismissed() {
 }
 
 // --- PWA prompt for Chrome/Android ---
-window.addEventListener("beforeinstallprompt", (e) => {
+onMounted(() => {
   if (alreadyDismissed()) return
-  e.preventDefault()
-  deferredPrompt = e
-  visible.value = true
+  window.addEventListener(
+    "beforeinstallprompt",
+    (e) => {
+      e.preventDefault()
+      deferredPrompt = e
+      visible.value = true
+    },
+    { once: true } // ensure it only fires once
+  )
+
+  // --- iOS Safari hint ---
+  const isIos = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase())
+  const isStandalone = "standalone" in navigator && navigator.standalone
+  if (!alreadyDismissed() && isIos && !isStandalone) {
+    iosHint.value = true
+  }
 })
 
 function install() {
@@ -77,18 +110,20 @@ function dismiss() {
   markDismissed()
 }
 
-// --- iOS Safari hint ---
-onMounted(() => {
-  if (alreadyDismissed()) return
-  const isIos = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase())
-  const isStandalone = "standalone" in navigator && navigator.standalone
-  if (isIos && !isStandalone) {
-    iosHint.value = true
-  }
-})
-
 function dismissIos() {
   iosHint.value = false
   markDismissed()
 }
 </script>
+
+<style scoped>
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: all 0.3s ease;
+}
+.fade-slide-enter-from,
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(20px);
+}
+</style>
