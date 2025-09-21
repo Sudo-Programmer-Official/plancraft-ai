@@ -131,7 +131,7 @@ const showAddTask = ref(false);
 const newTask = ref({
   title: "",
   details: "",
-  date: today.toISOString().slice(0, 10),
+  date: toYMD(new Date()),
   completed: false,
 });
 
@@ -161,8 +161,13 @@ function getCalendarDays(month, year) {
   return days;
 }
 
+// function toYMD(date) {
+//   return new Date(date).toISOString().split("T")[0];
+// }
 function toYMD(date) {
-  return new Date(date).toISOString().split("T")[0];
+  const d = new Date(date)
+  d.setHours(0, 0, 0, 0) // local midnight
+  return d.toLocaleDateString("en-CA") // "2025-09-20"
 }
 
 const calendarDays = computed(() => getCalendarDays(currentMonth.value, currentYear.value));
