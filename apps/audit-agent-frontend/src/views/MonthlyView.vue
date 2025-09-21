@@ -212,11 +212,18 @@ const selectedDateLabel = computed(() =>
 //       new Date(task.date).toDateString() === selectedDate.value.toDateString()
 //   )
 // );
-const tasksForSelectedDay = computed(() =>
-  tasks.value.filter(
-    (task) => toYMD(task.date) === toYMD(selectedDate.value)
-  )
-);
+// const tasksForSelectedDay = computed(() =>
+//   tasks.value.filter(
+//     (task) => toYMD(task.date) === toYMD(selectedDate.value)
+//   )
+// );
+const tasksForSelectedDay = computed(() => {
+  const target = toYMD(selectedDate.value) // e.g., "2025-09-21"
+  return tasks.value.filter((task) => {
+    const taskDate = typeof task.date === "string" ? task.date : toYMD(task.date)
+    return taskDate === target
+  })
+})
 
 function prevMonth() {
   if (currentMonth.value === 0) {
@@ -236,13 +243,27 @@ function nextMonth() {
   }
 }
 
+// async function addTaskLocal() {
+//   if (!newTask.value.title.trim()) return;
+//   newTask.value.date = selectedDate.value.toISOString().slice(0, 10);
+//   await addTask({ ...newTask.value });
+//   await loadMonth();
+//   newTask.value = { title: "", details: "", date: today.toISOString().slice(0, 10), completed: false };
+//   showAddTask.value = false;
 async function addTaskLocal() {
-  if (!newTask.value.title.trim()) return;
-  newTask.value.date = selectedDate.value.toISOString().slice(0, 10);
-  await addTask({ ...newTask.value });
-  await loadMonth();
-  newTask.value = { title: "", details: "", date: today.toISOString().slice(0, 10), completed: false };
-  showAddTask.value = false;
+  if (!newTask.value.title.trim()) return
+
+  newTask.value.date = toYMD(selectedDate.value) // always store normalized string
+  await addTask({ ...newTask.value })
+  await loadMonth()
+
+  newTask.value = {
+    title: "",
+    details: "",
+    date: toYMD(today), // default today in YYYY-MM-DD
+    completed: false,
+  }
+  showAddTask.value = false
 }
 
 function ymd(d) { return d.toISOString().split('T')[0] }

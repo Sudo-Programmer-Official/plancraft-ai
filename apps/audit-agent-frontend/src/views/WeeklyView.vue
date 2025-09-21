@@ -103,78 +103,78 @@ const days = [
 const selectedDate = ref(new Date());
 const showAddTask = ref(false);
 
+// --- Helpers ---
 function toYMD(date) {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0); // local midnight
-  return d.toLocaleDateString("en-CA"); // "2025-09-20"
+  return d.toLocaleDateString("en-CA"); // "YYYY-MM-DD"
 }
 
+// ✅ Always store as YYYY-MM-DD string
 const newTask = ref({
   title: "",
   details: "",
-  date: toYMD(new Date()), // ✅ fixed
+  date: toYMD(new Date()),
   completed: false,
 });
 
-const filteredTasks = computed(() =>
-  tasks.value.filter(task => toYMD(task.date) === toYMD(selectedDate.value))
-);
+// --- Filtering ---
+const filteredTasks = computed(() => {
+  const target = toYMD(selectedDate.value);
+  return tasks.value.filter((task) => {
+    const taskDate = typeof task.date === "string" ? task.date : toYMD(task.date);
+    return taskDate === target;
+  });
+});
 
+// --- Stats ---
 const completedCount = computed(() => tasks.value.filter((t) => t.completed).length);
 const remainingCount = computed(() => tasks.value.filter((t) => !t.completed).length);
 
 const dayLabel = computed(() =>
-  selectedDate.value.toLocaleDateString("en-US", { weekday: "long" })
+  selectedDate.value.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })
 );
 
 const currentWeekStart = computed(() => startOfWeek(selectedDate.value));
 
-// Index of selected day within the current week (Mon=0 .. Sun=6)
+// --- Indexing ---
 const selectedDay = computed(() => {
   const s = currentWeekStart.value;
-  const d = selectedDate.value;
   const start = new Date(s.getFullYear(), s.getMonth(), s.getDate());
-  const sel = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const diffDays = Math.round((sel - start) / (1000 * 60 * 60 * 24));
-  return Math.max(0, Math.min(6, diffDays));
+  const sel = new Date(selectedDate.value.getFullYear(), selectedDate.value.getMonth(), selectedDate.value.getDate());
+  return Math.round((sel - start) / (1000 * 60 * 60 * 24));
 });
 
-// Highlight today's day if the viewed week is the current week
 const todayIndex = computed(() => {
   const now = new Date();
-  const sameWeek = startOfWeek(now).toDateString() === currentWeekStart.value.toDateString();
+  const sameWeek = toYMD(startOfWeek(now)) === toYMD(currentWeekStart.value);
   if (!sameWeek) return null;
-  const s = currentWeekStart.value;
-  const start = new Date(s.getFullYear(), s.getMonth(), s.getDate());
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  return Math.round((todayStart - start) / (1000 * 60 * 60 * 24));
+  return Math.round((now - currentWeekStart.value) / (1000 * 60 * 60 * 24));
 });
 
+// --- Format (no UTC shift) ---
 function formatDate(dateStr) {
-  const date = new Date(dateStr);
-  return date.toDateString().slice(4, 10);
+  return dateStr; // already YYYY-MM-DD, safe to display
 }
 
+// --- Add Task ---
 async function addTaskLocal() {
   if (!newTask.value.title.trim()) return;
+  newTask.value.date = toYMD(selectedDate.value); // ✅ normalize
   await addTask({ ...newTask.value });
   await loadWeek();
-  newTask.value = {
-    title: "",
-    details: "",
-    date: toYMD(new Date()), // ✅ fixed
-    completed: false,
-  };
+  newTask.value = { title: "", details: "", date: toYMD(new Date()), completed: false };
   showAddTask.value = false;
 }
 
+// --- Week Helpers ---
 function startOfWeek(d) {
-  const day = d.getDay();
+  const date = new Date(d);
+  const day = date.getDay(); // Sun=0..Sat=6
   const diff = (day === 0 ? -6 : 1) - day; // Monday start
-  const s = new Date(d);
-  s.setDate(d.getDate() + diff);
-  s.setHours(0, 0, 0, 0);
-  return s;
+  date.setDate(date.getDate() + diff);
+  date.setHours(0, 0, 0, 0);
+  return date;
 }
 
 function endOfWeek(d) {
@@ -185,20 +185,16 @@ function endOfWeek(d) {
   return e;
 }
 
-function ymd(d) {
-  return toYMD(d); // ✅ delegate to fixed helper
-}
-
 async function loadWeek() {
   const s = startOfWeek(selectedDate.value);
   const e = endOfWeek(selectedDate.value);
-  await loadTasksForRange(ymd(s), ymd(e));
+  await loadTasksForRange(toYMD(s), toYMD(e));
 }
 
 watch(selectedDate, loadWeek);
 onMounted(() => {
   const now = new Date();
-  selectedDate.value = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // local midnight
+  selectedDate.value = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // normalized
   loadWeek();
 });
 </script>

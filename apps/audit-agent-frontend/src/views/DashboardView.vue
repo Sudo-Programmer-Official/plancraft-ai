@@ -140,10 +140,31 @@ const weeklyTasks = ref([])
 const monthlyTasks = ref([])
 
 const today = new Date()
+
+// --- Helpers ---
+function toYMD(date) {
+  const d = new Date(date)
+  d.setHours(0, 0, 0, 0) // local midnight
+  return d.toLocaleDateString('en-CA') // "YYYY-MM-DD"
+}
+function ymdRange(start, end) {
+  const days = []
+  const d = new Date(start)
+  while (d <= end) {
+    days.push(toYMD(d))
+    d.setDate(d.getDate() + 1)
+  }
+  return days
+}
+
+// --- Ranges ---
 const startOfWeek = new Date(today)
-startOfWeek.setDate(today.getDate() - today.getDay())
+startOfWeek.setDate(today.getDate() - (today.getDay() === 0 ? 6 : today.getDay() - 1)) // Mon start
+startOfWeek.setHours(0, 0, 0, 0)
+
 const endOfWeek = new Date(startOfWeek)
 endOfWeek.setDate(startOfWeek.getDate() + 6)
+
 const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
 const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0)
 
@@ -161,15 +182,19 @@ onMounted(() => {
   unsubscribe.value = onSnapshot(tasksQuery, (snapshot) => {
     const userTasks = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
 
-    dailyTasks.value = userTasks.filter((t) => t.date === today.toISOString().split('T')[0])
-    weeklyTasks.value = userTasks.filter((t) => {
-      const d = new Date(t.date)
-      return d >= startOfWeek && d <= endOfWeek
-    })
-    monthlyTasks.value = userTasks.filter((t) => {
-      const d = new Date(t.date)
-      return d >= startOfMonth && d <= endOfMonth
-    })
+    // Normalize task.date → always YYYY-MM-DD string
+    const normalized = userTasks.map((t) => ({
+      ...t,
+      date: typeof t.date === 'string' ? t.date : toYMD(t.date),
+    }))
+
+    dailyTasks.value = normalized.filter((t) => t.date === toYMD(today))
+
+    const weekDays = ymdRange(startOfWeek, endOfWeek)
+    weeklyTasks.value = normalized.filter((t) => weekDays.includes(t.date))
+
+    const monthDays = ymdRange(startOfMonth, endOfMonth)
+    monthlyTasks.value = normalized.filter((t) => monthDays.includes(t.date))
   })
 })
 
@@ -186,7 +211,6 @@ async function fetchAISummary() {
   }
 }
 
-// Auto-refresh AI insights
 watch([dailyTasks, weeklyTasks, monthlyTasks], () => {
   if (dailyTasks.value.length || weeklyTasks.value.length || monthlyTasks.value.length) {
     fetchAISummary()
@@ -199,9 +223,9 @@ const progressBarWidth = computed(() => {
   return `${Math.round((done / total) * 100)}%`
 })
 
-const sortedDaily = computed(() => {
-  return [...dailyTasks.value].sort((a, b) => a.completed - b.completed)
-})
+const sortedDaily = computed(() =>
+  [...dailyTasks.value].sort((a, b) => a.completed - b.completed)
+)
 
 const doneWeekly = computed(() => weeklyTasks.value.filter((t) => t.completed).length)
 const doneMonthly = computed(() => monthlyTasks.value.filter((t) => t.completed).length)
