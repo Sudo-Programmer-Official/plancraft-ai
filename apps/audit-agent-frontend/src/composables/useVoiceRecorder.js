@@ -97,7 +97,7 @@ export function useVoiceRecorder(onTranscription) {
       if (!SpeechRecognition) {
         // alert("Speech recognition not supported in this browser")
         // return
-         // Fallback to backend if not supported
+        // Fallback to backend if not supported
         mediaRecorder = await recordAndSendToBackend(onTranscription)
         isRecording.value = true
         return

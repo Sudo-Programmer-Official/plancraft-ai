@@ -182,7 +182,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import LandingPage from '../views/LandingPage.vue'
-import { trackEvent } from '@/utils/mixpanel'
+// import { trackEvent } from '@/utils/mixpanel'
 import AppLayout from '@/layouts/AppLayout.vue'
 
 const getCurrentUser = () =>
@@ -216,6 +216,7 @@ const router = createRouter({
         { path: 'weekly', name: 'weekly', component: () => import('@/views/WeeklyView.vue') },
         { path: 'monthly', name: 'monthly', component: () => import('@/views/MonthlyView.vue') },
         { path: 'journal', name: 'journal', component: () => import('@/views/JournalView.vue') },
+        { path: 'morning', name: 'morning', component: () => import('@/views/MorningView.vue') },
         { path: 'today', name: 'today', component: () => import('@/views/TodayView.vue') },
         { path: 'planner', name: 'planner', component: () => import('@/views/PlannerView.vue') },
         { path: 'timeline', name: 'timeline', component: () => import('@/views/TimelineView.vue') },
@@ -235,8 +236,8 @@ router.beforeEach(async (to, from, next) => {
   next()
 })
 
-router.afterEach((to) => {
-  trackEvent('Page View', { page: to.fullPath, name: to.name })
-})
+// router.afterEach((to) => {
+//   trackEvent('Page View', { page: to.fullPath, name: to.name })
+// })
 
 export default router

@@ -51,15 +51,19 @@ async function loginGoogle() {
 
 async function loginGuest() {
   await authStore.loginAsGuest()
-  if (authStore.user) router.push("/dashboard")
+  if (authStore.user) router.push("/morning")
 }
-
 // --- Star animation ---
 onMounted(() => {
   const canvas = starsCanvas.value
   const ctx = canvas.getContext("2d")
-  canvas.width = window.innerWidth
-  canvas.height = window.innerHeight
+
+  function resize() {
+    canvas.width = window.innerWidth
+    canvas.height = window.innerHeight
+  }
+  window.addEventListener("resize", resize)
+  resize()
 
   const stars = Array.from({ length: 100 }, () => ({
     x: Math.random() * canvas.width,

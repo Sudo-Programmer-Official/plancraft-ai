@@ -5,60 +5,84 @@
       <h1 class="text-3xl font-bold">Today's Tasks</h1>
       <p class="text-slate-400">Plan, act, and reflect — one day at a time.</p>
     </header>
-    <MorningSection />
 
-    <!-- Task List with Drag -->
-    <TaskBoard />
-     <EveningSection />
+    <!-- Guest Mode Banner -->
+    <div
+      v-if="!authStore.isLoggedIn"
+      class="bg-yellow-500 text-black px-4 py-2 rounded-lg text-center mb-6 font-medium"
+    >
+      ⚠️ You're in <strong>Guest Mode</strong>. Tasks are temporary.
+      <RouterLink to="/signup" class="underline font-semibold">Sign up</RouterLink> to save them.
+    </div>
+
+    <!-- Sections -->
+    <MorningSection />
+    <TaskBoard
+      :tasks="tasks"
+      @update="updateTask"
+      @toggle="toggleComplete"
+      @delete="deleteTask"
+    />
+    <EveningSection />
   </div>
 </template>
 
 <script setup>
-import draggable from "vuedraggable"
 import { ref, onMounted } from "vue"
+import { useAuthStore } from "@/stores/authStore"
 import { fetchTasks, addTaskToFirebase, updateTaskInFirebase } from "@/services/firebaseService"
+import { useRoute } from "vue-router"
+
 import MorningSection from "@/components/MorningSection.vue"
 import TaskBoard from "@/components/TaskBoard.vue"
 import EveningSection from "@/components/EveningSection.vue"
 
+const route = useRoute()
 const tasks = ref([])
+const authStore = useAuthStore()
 
 onMounted(async () => {
-  tasks.value = await fetchTasks()
+  if (authStore.isLoggedIn) {
+    // ✅ Logged-in user → Firestore
+    tasks.value = await fetchTasks()
+  } else if (route.query.tasks) {
+    // ✅ Guest user with tasks from query string
+    try {
+      const raw = JSON.parse(route.query.tasks)
+      tasks.value = raw.map((t, idx) => ({
+        id: `guest-${Date.now()}-${idx}`,
+        title: typeof t === "string" ? t : t.title || "Untitled Task",
+        details: typeof t === "object" ? t.details || "" : "",
+        completed: false,
+        logs: [],
+        date: new Date().toISOString().split("T")[0],
+        order: idx,
+      }))
+      localStorage.setItem("guestTasks", JSON.stringify(tasks.value))
+    } catch (err) {
+      console.error("❌ Failed to parse guest tasks:", err)
+    }
+  } else {
+    // ✅ Guest fallback → load from localStorage
+    const cached = localStorage.getItem("guestTasks")
+    tasks.value = cached ? JSON.parse(cached) : []
+  }
 })
 
-async function addTask() {
-  const newTask = {
-    title: "New Task",
-    details: "",
-    completed: false,
-    date: new Date().toISOString().split("T")[0],
-    order: tasks.value.length,
-    logs: []
+async function updateTask(task) {
+  if (authStore.isLoggedIn) {
+    await updateTaskInFirebase(task)
+  } else {
+    localStorage.setItem("guestTasks", JSON.stringify(tasks.value))
   }
-  const saved = await addTaskToFirebase(newTask)
-  tasks.value.push(saved)
 }
 
 async function toggleComplete(task) {
-  await updateTaskInFirebase(task)
-}
-
-async function updateTask(task) {
-  await updateTaskInFirebase(task)
-}
-
-async function addLog(task) {
-  if (!task.newLog) return
-  task.logs = [...(task.logs || []), { text: task.newLog, createdAt: Date.now() }]
-  task.newLog = ""
-  await updateTaskInFirebase(task)
-}
-
-async function updateOrder() {
-  tasks.value.forEach(async (task, index) => {
-    task.order = index
+  task.completed = !task.completed
+  if (authStore.isLoggedIn) {
     await updateTaskInFirebase(task)
-  })
+  } else {
+    localStorage.setItem("guestTasks", JSON.stringify(tasks.value))
+  }
 }
 </script>

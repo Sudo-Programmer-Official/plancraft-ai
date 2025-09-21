@@ -1,5 +1,6 @@
 // src/composables/useTasks.js
 import { ref } from "vue"
+import { useAuthStore } from "@/stores/authStore"
 import {
   fetchTasksForToday,
   fetchTasksByDate,
@@ -14,11 +15,18 @@ const tasks = ref([])
 let initialized = false
 
 export function useTasks() {
+  const authStore = useAuthStore()
+
   /**
-   * 🔄 Load tasks from Firestore for today (and current user)
+   * 🔄 Load tasks (today / from cache)
    */
   async function loadTasks() {
-    tasks.value = await fetchTasksForToday()
+    if (authStore.isLoggedIn) {
+      tasks.value = await fetchTasksForToday()
+    } else {
+      const cached = localStorage.getItem("guestTasks")
+      tasks.value = cached ? JSON.parse(cached) : []
+    }
     initialized = true
   }
 
@@ -26,7 +34,12 @@ export function useTasks() {
    * Load tasks for a specific date (YYYY-MM-DD)
    */
   async function loadTasksForDate(dateStr) {
-    tasks.value = await fetchTasksByDate(dateStr)
+    if (authStore.isLoggedIn) {
+      tasks.value = await fetchTasksByDate(dateStr)
+    } else {
+      const cached = localStorage.getItem("guestTasks")
+      tasks.value = cached ? JSON.parse(cached) : []
+    }
     initialized = true
   }
 
@@ -34,7 +47,12 @@ export function useTasks() {
    * Load tasks for a date range inclusive (YYYY-MM-DD)
    */
   async function loadTasksForRange(startYMD, endYMD) {
-    tasks.value = await fetchTasksBetween(startYMD, endYMD)
+    if (authStore.isLoggedIn) {
+      tasks.value = await fetchTasksBetween(startYMD, endYMD)
+    } else {
+      const cached = localStorage.getItem("guestTasks")
+      tasks.value = cached ? JSON.parse(cached) : []
+    }
     initialized = true
   }
 
@@ -54,8 +72,13 @@ export function useTasks() {
 
     const task = { ...baseTask, ...(newTask || {}) }
 
-    const saved = await addTaskToFirebase(task)
-    tasks.value.unshift(saved)
+    if (authStore.isLoggedIn) {
+      const saved = await addTaskToFirebase(task)
+      tasks.value.unshift(saved)
+    } else {
+      tasks.value.unshift(task)
+      localStorage.setItem("guestTasks", JSON.stringify(tasks.value))
+    }
   }
 
   /**
@@ -64,7 +87,11 @@ export function useTasks() {
   async function toggleComplete(task) {
     try {
       task.completed = !task.completed
-      await updateTaskInFirebase(task)
+      if (authStore.isLoggedIn) {
+        await updateTaskInFirebase(task)
+      } else {
+        localStorage.setItem("guestTasks", JSON.stringify(tasks.value))
+      }
     } catch (err) {
       console.error("Failed to toggle complete:", err)
       task.completed = !task.completed // rollback on error
@@ -79,7 +106,12 @@ export function useTasks() {
     task.logs = task.logs || []
     task.logs.push(task.newLog.trim())
     task.newLog = ""
-    await updateTaskInFirebase(task)
+
+    if (authStore.isLoggedIn) {
+      await updateTaskInFirebase(task)
+    } else {
+      localStorage.setItem("guestTasks", JSON.stringify(tasks.value))
+    }
   }
 
   /**
@@ -88,7 +120,12 @@ export function useTasks() {
   async function persistOrder() {
     for (const [index, task] of tasks.value.entries()) {
       task.order = index
-      await updateTaskInFirebase(task)
+      if (authStore.isLoggedIn) {
+        await updateTaskInFirebase(task)
+      }
+    }
+    if (!authStore.isLoggedIn) {
+      localStorage.setItem("guestTasks", JSON.stringify(tasks.value))
     }
   }
 
@@ -96,8 +133,13 @@ export function useTasks() {
    * 🗑 Delete task
    */
   async function deleteTask(task) {
-    await deleteTaskFromFirebase(task.id)
+    if (authStore.isLoggedIn) {
+      await deleteTaskFromFirebase(task.id)
+    }
     tasks.value = tasks.value.filter((t) => t.id !== task.id)
+    if (!authStore.isLoggedIn) {
+      localStorage.setItem("guestTasks", JSON.stringify(tasks.value))
+    }
   }
 
   // 🔹 Only load once when app starts

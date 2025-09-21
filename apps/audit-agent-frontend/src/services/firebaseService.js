@@ -310,3 +310,31 @@ export async function fetchEntries() {
   const snapshot = await getDocs(q);
   return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
+
+/**
+ * 💾 Save multiple tasks at once (batch)
+ */
+export async function saveTasksToFirebase(tasks) {
+  const user = auth.currentUser
+  if (!user) throw new Error("User not logged in")
+
+  const results = []
+  for (const [index, task] of tasks.entries()) {
+    const payload = {
+      title: task.title || "New Task",
+      details: task.details || "",
+      completed: task.completed ?? false,
+      logs: task.logs ?? [],
+      attachments: task.attachments ?? [],
+      date: task.date || new Date().toISOString().split("T")[0],
+      order: task.order ?? index,
+      userId: user.uid,
+      createdAt: serverTimestamp(),
+    }
+
+    const docRef = await addDoc(tasksRef, payload)
+    results.push({ id: docRef.id, ...payload })
+  }
+
+  return results
+}
