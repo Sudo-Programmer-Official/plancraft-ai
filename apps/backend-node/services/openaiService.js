@@ -200,6 +200,50 @@ Return only the improved response.
 //   return JSON.parse(content)
 // }
 
+// export async function splitTasks(input, { maxItems = 6, context = "" } = {}) {
+//   const system = {
+//     role: "system",
+//     content:
+//       "You are a productivity coach. Convert free-form notes into a strict list of short, actionable tasks."
+//   };
+
+//   const schema = `
+// Return ONLY valid JSON in this format:
+// {
+//   "tasks": [
+//     {
+//       "title": "Action verb + clear outcome (max 8 words)",
+//       "details": "Specifics or success criteria",
+//       "estimate_minutes": 15,
+//       "energy": "low|medium|high",
+//       "context": "home|work|computer|phone|errand|meeting|deep-work|planning",
+//       "priority": 1
+//     }
+//   ]
+// }`;
+
+//   const rules = `
+// Rules:
+// - At most ${maxItems} tasks.
+// - Each task must start with a verb (e.g., Write, Review, Prepare, Go).
+// - No sequence words like "First", "Second", "Lastly".
+// - No reflections like "I feel grateful" or "Today is tough".
+// - Each task should be atomic, completable in 10–30 minutes.
+// - Do not include duplicates or vague filler sentences.
+// `;
+
+//   const user = {
+//     role: "user",
+//     content: `${context ? `Context: ${context}\n` : ""}User notes:\n"""${input}"""\n\n${schema}\n${rules}`,
+//   };
+
+//   const content = await chatWithFallback({
+//     messages: [system, user],
+//     temperature: 0.2, // more deterministic
+//   });
+
+//   return JSON.parse(content);
+// }
 export async function splitTasks(input, { maxItems = 6, context = "" } = {}) {
   const system = {
     role: "system",
@@ -239,8 +283,30 @@ Rules:
 
   const content = await chatWithFallback({
     messages: [system, user],
-    temperature: 0.2, // more deterministic
+    temperature: 0.2,
   });
 
-  return JSON.parse(content);
+  // 🔹 Sanitize output before parsing
+  let cleaned = content.trim();
+
+  // Strip ```json ... ``` fences if present
+  cleaned = cleaned.replace(/^```json\s*/i, "").replace(/```$/i, "").trim();
+
+  // Extra fallback: if multiple JSON objects exist, extract the first {...}
+  if (!cleaned.startsWith("{")) {
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (match) {
+      cleaned = match[0];
+    }
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch (err) {
+    console.error("❌ Failed to parse AI JSON:", cleaned);
+    throw err;
+  }
+
+  return parsed;
 }
