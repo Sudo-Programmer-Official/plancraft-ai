@@ -1,19 +1,21 @@
 <template>
-  <div class="bg-gray-900/80 rounded-xl p-4 flex items-center gap-3 shadow-lg">
-    <button
-      @click="toggleRecording"
-      class="px-4 py-2 rounded-lg"
-      :class="isRecording ? 'bg-red-600' : 'bg-indigo-600'"
-    >
-      {{ isRecording ? 'Stop Recording' : 'Start Recording' }}
-    </button>
+  <div class="bg-gray-900/80 rounded-xl shadow-lg">
+    <div class="flex flex-col items-center gap-2">
+      <button
+        @click="toggleRecording"
+        class="px-4 py-2 rounded-lg w-full sm:w-auto"
+        :class="isRecording ? 'bg-red-600' : 'bg-indigo-600'"
+      >
+        {{ isRecording ? 'Stop Recording' : 'Start Recording' }}
+      </button>
 
-    <p class="flex-1 text-gray-200">
-      <!-- Desktop = live listening, Mobile = recording until stop -->
-      {{ isRecording
-        ? (forceBackend ? '🎤 Recording... stop to transcribe' : '🎤 Listening...')
-        : 'Tap to start speaking' }}
-    </p>
+      <p class="text-gray-200 text-sm text-center">
+        <!-- Desktop = live listening, Mobile = recording until stop -->
+        {{ isRecording
+          ? (forceBackend ? '🎤 Recording... stop to transcribe' : '🎤 Listening...')
+          : 'Tap to start speaking' }}
+      </p>
+    </div>
   </div>
 </template>
 
