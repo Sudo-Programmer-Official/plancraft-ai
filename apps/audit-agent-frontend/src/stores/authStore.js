@@ -15,6 +15,7 @@ export const useAuthStore = defineStore("authStore", {
     user: null,
     token: null,
     loading: true, // start in loading mode until init runs
+    guest: false
   }),
 
   actions: {
@@ -60,6 +61,7 @@ export const useAuthStore = defineStore("authStore", {
       try {
         const user = await signInAsGuest();
         this.user = user;
+        this.guest = true;
         this.token = await user.getIdToken();
         localStorage.setItem("user", JSON.stringify(this.user));
         localStorage.setItem("token", this.token);
@@ -73,6 +75,7 @@ export const useAuthStore = defineStore("authStore", {
       try {
         const user = await signInWithGoogle();
         this.user = user;
+        this.guest = false;
         this.token = await user.getIdToken();
         localStorage.setItem("user", JSON.stringify(this.user));
         localStorage.setItem("token", this.token);
@@ -84,6 +87,7 @@ export const useAuthStore = defineStore("authStore", {
     async logout() {
       await signOutUser();
       this.user = null;
+      this.guest = false;
       this.token = null;
       localStorage.removeItem("user");
       localStorage.removeItem("token");
@@ -92,5 +96,6 @@ export const useAuthStore = defineStore("authStore", {
 
   getters: {
     isLoggedIn: (state) => !!state.user,
+    isGuest: (state) => state.guest === true
   },
 });

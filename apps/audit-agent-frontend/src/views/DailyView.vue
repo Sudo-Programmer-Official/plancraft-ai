@@ -1,11 +1,12 @@
 <template>
   <div class="min-h-screen bg-gradient-to-br from-slate-900 to-indigo-950 px-4 sm:px-6 py-8 text-white">
+    <GuestBanner :isGuest="authStore.guest" @login="redirectToLogin" />
     <!-- Header -->
     <header class="text-center mb-12">
       <h1 class="text-3xl sm:text-4xl font-bold">Today's Tasks</h1>
       <p class="text-indigo-300">Plan, act, and reflect — one day at a time.</p>
     </header>
-
+    <!-- Main Content -->
     <main class="max-w-4xl mx-auto space-y-10">
       <MorningSection />
       <TaskBoard />
@@ -21,12 +22,19 @@ import { fetchTasks, addTaskToFirebase, updateTaskInFirebase } from "@/services/
 import MorningSection from "@/components/MorningSection.vue"
 import TaskBoard from "@/components/TaskBoard.vue"
 import EveningSection from "@/components/EveningSection.vue"
+import GuestBanner from "@/components/GuestBanner.vue"
 
 const tasks = ref([])
+import { useAuthStore } from '@/stores/authStore'
+const authStore = useAuthStore()
 
 onMounted(async () => {
   tasks.value = await fetchTasks()
 })
+
+function redirectToLogin() {
+  window.location.href = "/login"
+}
 
 async function addTask() {
   const newTask = {

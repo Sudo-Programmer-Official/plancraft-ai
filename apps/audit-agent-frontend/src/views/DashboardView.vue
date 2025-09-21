@@ -3,7 +3,7 @@
   <main
     class="px-2 py-4 sm:px-4 md:px-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"
   >
-    <GuestBanner :isGuest="true" @login="redirectToLogin" /> 
+    <GuestBanner :isGuest="authStore.guest" @login="redirectToLogin" /> 
 
     <!-- Daily Card -->
     <div class="bg-gray-900/80 rounded-xl p-4 sm:p-6 shadow-lg">
@@ -135,8 +135,10 @@ import { collection, onSnapshot, updateDoc, doc, query, where } from 'firebase/f
 import { db, auth } from '@/firebase/init'
 import { summarizeTasks } from '@/services/aiService'
 import GuestBanner from '@/components/GuestBanner.vue'
+import { useAuthStore } from '@/stores/authStore'
 
 const aiSummary = ref(null)
+const authStore = useAuthStore()
 
 const dailyTasks = ref([])
 const weeklyTasks = ref([])

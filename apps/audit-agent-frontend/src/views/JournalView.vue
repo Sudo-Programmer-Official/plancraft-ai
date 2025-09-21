@@ -1,5 +1,6 @@
 <template>
   <div class="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-900 px-4 sm:px-6 py-8 text-white">
+    <guest-banner :isGuest="authStore.guest" @login="redirectToLogin" />
     <!-- Header -->
     <header class="text-center mb-12">
       <h1 class="text-3xl sm:text-4xl font-bold mb-2 animate-fade-in">
@@ -90,6 +91,11 @@ import { ref, onMounted } from 'vue'
 import { saveEntryToFirebase, fetchEntries } from '@/services/firebaseService'
 import { useVoiceRecorder } from '@/composables/useVoiceRecorder'
 import { enhanceJournal } from '@/services/aiService'
+import GuestBanner from '@/components/GuestBanner.vue'
+import { useAuthStore } from '@/stores/authStore'
+
+
+const authStore = useAuthStore()
 
 const moods = [
   { emoji: '😊', label: 'Happy' },
