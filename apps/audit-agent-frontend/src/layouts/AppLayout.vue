@@ -5,13 +5,39 @@
       class="hidden md:flex flex-col h-screen transition-all duration-300 bg-gray-950/70 backdrop-blur-xl"
       :class="sidebarOpen ? 'w-64' : 'w-20'"
     >
-      <div class="flex items-center justify-between p-4 border-b border-gray-700">
-        <h1 v-if="sidebarOpen" class="text-lg font-bold">🌙 AuditAgent</h1>
-        <button @click="sidebarOpen = !sidebarOpen" class="p-2 hover:bg-gray-800 rounded">
-          <span v-if="sidebarOpen">⬅️</span>
-          <span v-else>➡️</span>
-        </button>
-      </div>
+    <div class="flex items-center justify-between p-4 border-b border-gray-700">
+      <h1 v-if="sidebarOpen" class="text-lg font-bold">🌙 AuditAgent</h1>
+      <button
+        @click="sidebarOpen = !sidebarOpen"
+        class="p-2 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 transition-colors"
+        aria-label="Toggle sidebar"
+      >
+        <svg
+          v-if="sidebarOpen"
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-5 w-5 text-indigo-300"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <!-- Left Arrow -->
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M15 19l-7-7 7-7" />
+        </svg>
+        <svg
+          v-else
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-5 w-5 text-indigo-300"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <!-- Right Arrow -->
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+    </div>
 
       <!-- Nav links -->
       <nav class="flex-1 mt-4 space-y-2 overflow-y-auto">
