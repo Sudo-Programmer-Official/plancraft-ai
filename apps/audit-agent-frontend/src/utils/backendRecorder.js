@@ -68,15 +68,27 @@ if (/\/api\/ai$/i.test(__rawBase)) {
 }
 const API_BASE = __rawBase
 
+// function pickAudioMime() {
+//   const candidates = [
+//     'audio/webm;codecs=opus', // Android Chrome
+//     'audio/webm',
+//     'audio/mp4',              // iOS Safari
+//     'audio/mpeg',             // safari fallback -> mp3
+//     'audio/aac'
+//   ]
+//   return candidates.find(t => window.MediaRecorder?.isTypeSupported?.(t)) || ''
+// }
 function pickAudioMime() {
-  const candidates = [
-    'audio/webm;codecs=opus', // Android Chrome
-    'audio/webm',
-    'audio/mp4',              // iOS Safari
-    'audio/mpeg',             // safari fallback -> mp3
-    'audio/aac'
-  ]
-  return candidates.find(t => window.MediaRecorder?.isTypeSupported?.(t)) || ''
+  if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+    return "audio/webm;codecs=opus"; // ✅ best choice for Chrome/Firefox/Android
+  }
+  if (MediaRecorder.isTypeSupported("audio/webm")) {
+    return "audio/webm";
+  }
+  if (MediaRecorder.isTypeSupported("audio/mp4")) {
+    return "audio/mp4"; // ✅ fallback for iOS Safari
+  }
+  return "audio/wav"; // ✅ final fallback, universally accepted
 }
 
 // onResult is called with partials during recording and final on stop
@@ -137,7 +149,16 @@ export async function recordAndSendToBackend(onResult, { timeSliceMs = 2500 } = 
     try {
       stopped = true
       const type = mimeType || 'audio/webm'
-      const ext  = type.includes('mp4') ? 'm4a' : type.includes('mpeg') ? 'mp3' : type.includes('aac') ? 'aac' : 'webm'
+      // const ext  = type.includes('mp4') ? 'm4a' : type.includes('mpeg') ? 'mp3' : type.includes('aac') ? 'aac' : 'webm'
+      const ext = type.includes('mp4')
+  ? 'm4a'
+  : type.includes('mpeg')
+    ? 'mp3'
+    : type.includes('aac')
+      ? 'aac'
+      : type.includes('wav')
+        ? 'wav'
+        : 'webm'
       const blob = new Blob(chunks, { type })
       const fd   = new FormData()
       fd.append('file', blob, `speech.${ext}`)
