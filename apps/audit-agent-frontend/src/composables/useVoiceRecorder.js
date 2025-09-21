@@ -95,7 +95,11 @@ export function useVoiceRecorder(onTranscription) {
       const SpeechRecognition =
         window.SpeechRecognition || window.webkitSpeechRecognition
       if (!SpeechRecognition) {
-        alert("Speech recognition not supported in this browser")
+        // alert("Speech recognition not supported in this browser")
+        // return
+         // Fallback to backend if not supported
+        mediaRecorder = await recordAndSendToBackend(onTranscription)
+        isRecording.value = true
         return
       }
 
