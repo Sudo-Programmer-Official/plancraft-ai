@@ -1,62 +1,81 @@
 <template>
-  <div class="prose mx-auto max-w-3xl px-4 py-10 text-gray-800">
-    <h1 class="text-3xl font-bold text-purple-700">📜 Terms of Service</h1>
-
-    <p>
-      Welcome to Prompt2Quote. By using our platform, you agree to the following terms and
-      conditions:
+  <div class="max-w-4xl mx-auto px-6 py-12 text-gray-200">
+    <h1 class="text-3xl font-bold mb-6">📜 Terms & Conditions</h1>
+    <p class="mb-6">
+      Welcome to <strong>AuditAgent</strong>. By using our application, you agree to the
+      following terms. Please read them carefully.
     </p>
 
-    <h2>1. Acceptance of Terms</h2>
-    <p>
-      By accessing or using Prompt2Quote, you agree to be bound by these Terms of Service and our
-      Privacy Policy. If you do not agree, please do not use our service.
-    </p>
+    <div class="space-y-8">
+      <!-- Section 1 -->
+      <section>
+        <h2 class="text-xl font-semibold mb-2">1. Acceptance of Terms</h2>
+        <p>
+          By accessing or using AuditAgent, you agree to comply with these Terms &
+          Conditions. If you do not agree, you must not use the service.
+        </p>
+      </section>
 
-    <h2>2. Use of the Platform</h2>
-    <ul>
-      <li>✅ You may use Prompt2Quote to generate product quotes for personal or business use.</li>
-      <li>
-        ❌ You must not misuse the platform, reverse engineer, or exploit it for unlawful purposes.
-      </li>
-    </ul>
+      <!-- Section 2 -->
+      <section>
+        <h2 class="text-xl font-semibold mb-2">2. Use of Service</h2>
+        <p>
+          AuditAgent is designed to help you plan daily, weekly, and monthly goals. You
+          agree not to misuse the service, attempt unauthorized access, or disrupt our
+          systems.
+        </p>
+      </section>
 
-    <h2>3. Intellectual Property</h2>
-    <p>
-      All content, features, and functionality provided by Prompt2Quote are owned by us and
-      protected by applicable intellectual property laws.
-    </p>
+      <!-- Section 3 -->
+      <section>
+        <h2 class="text-xl font-semibold mb-2">3. Data & Privacy</h2>
+        <p>
+          We respect your privacy. Guest data is temporary and not saved. Logged-in users’
+          data is securely stored. For more details, please review our
+          <router-link to="/privacy" class="text-blue-400 underline">Privacy Policy</router-link>.
+        </p>
+      </section>
 
-    <h2>4. Quote Accuracy</h2>
-    <p>
-      All AI-generated estimates are approximations and should not be treated as official binding
-      contracts. Always consult with professionals before making financial or strategic decisions.
-    </p>
+      <!-- Section 4 -->
+      <section>
+        <h2 class="text-xl font-semibold mb-2">4. Accounts</h2>
+        <p>
+          You are responsible for maintaining the security of your account. We are not
+          liable for any loss or damage arising from unauthorized use of your account.
+        </p>
+      </section>
 
-    <h2>5. Limitation of Liability</h2>
-    <p>
-      Prompt2Quote is provided “as is.” We make no guarantees regarding availability, performance,
-      or accuracy and disclaim all liability for damages.
-    </p>
+      <!-- Section 5 -->
+      <section>
+        <h2 class="text-xl font-semibold mb-2">5. Limitation of Liability</h2>
+        <p>
+          AuditAgent is provided “as is.” We are not liable for indirect, incidental, or
+          consequential damages that may result from using our service.
+        </p>
+      </section>
 
-    <h2>6. Changes to Terms</h2>
-    <p>
-      We may update these terms occasionally. Continued use of the service implies acceptance of the
-      latest terms.
-    </p>
+      <!-- Section 6 -->
+      <section>
+        <h2 class="text-xl font-semibold mb-2">6. Changes to Terms</h2>
+        <p>
+          We may update these Terms from time to time. Continued use of the service means
+          you accept the revised Terms.
+        </p>
+      </section>
+    </div>
 
-    <p class="text-sm text-gray-500 mt-8">Last updated: June 2025</p>
+    <!-- Footer -->
+    <div class="mt-12 text-sm text-gray-400">
+      <p>
+        If you have questions about these Terms, contact us at
+        <a href="mailto:help@sudoprogrammer.com" class="text-blue-400 underline">
+          help@sudoprogrammer.com
+        </a>.
+      </p>
+    </div>
   </div>
 </template>
 
 <script setup>
-// No additional logic needed
+// Static page, no script needed
 </script>
-
-<style scoped>
-.prose h2 {
-  font-size: 1.25rem;
-  margin-top: 1.5rem;
-  color: #4c1d95; /* purple-900 */
-}
-</style>

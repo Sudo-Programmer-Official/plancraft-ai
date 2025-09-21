@@ -1,54 +1,62 @@
 <template>
-  <section class="max-w-3xl mx-auto px-4 py-10 text-gray-800">
-    <h1 class="text-3xl font-bold mb-6 text-purple-700">Privacy Policy</h1>
+  <div class="max-w-4xl mx-auto px-6 py-12 text-gray-200">
+    <h1 class="text-3xl font-bold mb-6">Privacy Policy</h1>
+    <p class="mb-4 text-sm text-gray-400">Last updated: September 21, 2025</p>
 
-    <p class="mb-4">
-      At Prompt2Quote, we value your privacy. This document outlines how we collect, use, and
-      protect your information when you use our application.
+    <p class="mb-6">
+      At <strong>AuditAgent</strong>, operated by <strong>SudoProgrammer</strong>, your privacy is very important to us. 
+      This Privacy Policy explains how we collect, use, and safeguard your information when you use our application and services.
     </p>
 
-    <h2 class="text-xl font-semibold mt-6 mb-2">1. Information We Collect</h2>
-    <ul class="list-disc list-inside mb-4">
-      <li>Your idea prompts and quote inputs</li>
-      <li>Email address (only when you choose to save quotes via email)</li>
-      <li>Basic usage analytics (non-identifiable data)</li>
+    <h2 class="text-xl font-semibold mt-8 mb-4">1. Information We Collect</h2>
+    <ul class="list-disc pl-6 mb-6 space-y-2">
+      <li>Account information (name, email, profile photo).</li>
+      <li>Guest session data (temporary tasks, journal entries).</li>
+      <li>Usage data (app interactions, analytics events).</li>
+      <li>Audio files submitted for transcription (processed via OpenAI APIs).</li>
     </ul>
 
-    <h2 class="text-xl font-semibold mt-6 mb-2">2. How We Use Your Information</h2>
-    <ul class="list-disc list-inside mb-4">
-      <li>To generate your quote and save version history</li>
-      <li>To improve user experience and support features</li>
-      <li>To communicate important updates, if opted in</li>
+    <h2 class="text-xl font-semibold mt-8 mb-4">2. How We Use Your Information</h2>
+    <p class="mb-6">
+      We use your information only to provide and improve our services:
+    </p>
+    <ul class="list-disc pl-6 mb-6 space-y-2">
+      <li>Sync your tasks, goals, and journaling data across devices.</li>
+      <li>Generate personalized insights and reminders.</li>
+      <li>Maintain account security and prevent misuse.</li>
+      <li>Improve our AI-based productivity features.</li>
     </ul>
 
-    <h2 class="text-xl font-semibold mt-6 mb-2">3. Data Sharing & Third Parties</h2>
-    <p class="mb-4">
-      We do <strong>not</strong> sell or share your personal data with any third-party companies.
-      However, we use trusted services (e.g., OpenAI, Firebase, Mixpanel) for infrastructure and
-      analytics.
+    <h2 class="text-xl font-semibold mt-8 mb-4">3. Data Storage and Security</h2>
+    <p class="mb-6">
+      All data is securely stored using <strong>Firebase</strong> and <strong>Render</strong> services. 
+      We apply encryption in transit (HTTPS) and use industry-standard safeguards to protect your data. 
+      Guest mode data is <strong>not saved permanently</strong>.
     </p>
 
-    <h2 class="text-xl font-semibold mt-6 mb-2">4. Data Security</h2>
-    <p class="mb-4">
-      We implement best practices to protect your data in transit and at rest. Sensitive data like
-      your prompts and chat logs are not made public or indexed.
+    <h2 class="text-xl font-semibold mt-8 mb-4">4. Sharing of Information</h2>
+    <p class="mb-6">
+      We do not sell or rent your data. Limited third-party services may process your data to enable functionality:
+    </p>
+    <ul class="list-disc pl-6 mb-6 space-y-2">
+      <li><strong>Firebase</strong> (authentication, storage, analytics)</li>
+      <li><strong>OpenAI</strong> (audio transcription and AI insights)</li>
+    </ul>
+
+    <h2 class="text-xl font-semibold mt-8 mb-4">5. Your Rights</h2>
+    <p class="mb-6">
+      You may request to <strong>access, update, or delete</strong> your data anytime. 
+      For assistance, contact us at <a href="mailto:help@sudoprogrammer.com" class="text-blue-400 underline">help@sudoprogrammer.com</a>.
     </p>
 
-    <h2 class="text-xl font-semibold mt-6 mb-2">5. Your Rights</h2>
-    <p class="mb-4">
-      You can request deletion of your saved quotes or email history by contacting us at
-      <a href="mailto:support@prompt2quote.com" class="text-blue-600 underline"
-        >support@prompt2quote.com</a
-      >.
+    <h2 class="text-xl font-semibold mt-8 mb-4">6. Contact Us</h2>
+    <p>
+      If you have any questions about this Privacy Policy, please contact us:
     </p>
-
-    <p class="mt-8 text-sm text-gray-500">Last updated: June 9, 2025</p>
-  </section>
+    <ul class="list-disc pl-6 mt-2 space-y-1">
+      <li>Email: <a href="mailto:help@sudoprogrammer.com" class="text-blue-400 underline">help@sudoprogrammer.com</a></li>
+      <li>Website: <a href="https://sudoprogrammer.com" class="text-blue-400 underline" target="_blank">sudoprogrammer.com</a></li>
+      <li>Founder: <a href="https://www.linkedin.com/in/fullstuffdeveloper/" class="text-blue-400 underline" target="_blank">LinkedIn</a></li>
+    </ul>
+  </div>
 </template>
-
-<script setup>
-// No logic needed
-</script>
-
-<style scoped></style>
-/**** Optional custom styling ****/

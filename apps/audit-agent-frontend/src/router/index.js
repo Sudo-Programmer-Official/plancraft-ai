@@ -182,8 +182,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import LandingPage from '../views/LandingPage.vue'
-import { trackEvent } from '@/utils/mixpanel'
+// import { trackEvent } from '@/utils/mixpanel'
 import AppLayout from '@/layouts/AppLayout.vue'
+import PrivacyPolicy from '@/views/PrivacyPolicy.vue'
+import Terms from '@/views/TermsOfService.vue'
+import Contact from '@/views/ContactForm.vue'
+// import { useAuthStore } from '@/stores/authStore'
 
 const getCurrentUser = () =>
   new Promise((resolve) => {
@@ -205,7 +209,9 @@ const router = createRouter({
   routes: [
     { path: '/', name: 'landing', component: LandingPage },
     { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue') },
-
+    { path: '/privacy', component: PrivacyPolicy },
+    { path: '/terms', component: Terms },
+    { path: '/contact', component: Contact },
     {
       path: '/',
       component: AppLayout,

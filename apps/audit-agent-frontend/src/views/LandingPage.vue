@@ -235,7 +235,7 @@
         <p>
           Built with <span aria-hidden="true">❤</span> by
           <a
-            href="https://github.com/abhishekkumarjha"
+            href="https://www.linkedin.com/in/fullstuffdeveloper/"
             target="_blank"
             rel="noopener"
             class="underline hover:text-indigo-400"
@@ -256,6 +256,14 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
+import { useAuthStore } from '@/stores/authStore'
+
+function continueAsGuest() {
+  const authStore = useAuthStore()
+  authStore.loginAsGuest().then(() => {
+    router.push({ name: 'dashboard' }) // or 'journal' if that’s your main entry
+  })
+}
 
 const router = useRouter()
 
@@ -345,9 +353,9 @@ const testimonials = [
 function goToLogin() {
   router.push('/login')
 }
-function continueAsGuest() {
-  router.push({ name: 'journal', query: { guest: '1' } })
-}
+// function continueAsGuest() {
+//   router.push({ name: 'journal', query: { guest: '1' } })
+// }
 
 onMounted(() => {
   if (!stars.value) return
