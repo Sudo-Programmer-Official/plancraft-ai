@@ -163,7 +163,8 @@ export async function recordAndSendToBackend(onResult, { timeSliceMs = 2500 } = 
   mediaRecorder.onstop = async () => {
     try {
       stopped = true
-      const type = mimeType || 'audio/webm'
+      // const type = mimeType || 'audio/webm'
+      const type = "audio/wav"
       // const ext  = type.includes('mp4') ? 'm4a' : type.includes('mpeg') ? 'mp3' : type.includes('aac') ? 'aac' : 'webm'
       const ext = type.includes('mp4')
   ? 'm4a'
