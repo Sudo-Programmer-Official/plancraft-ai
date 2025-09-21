@@ -217,14 +217,15 @@ export async function recordAndSendToBackend(onResult, { timeSliceMs = 2500 } = 
   if (type.includes('aac')) return 'aac'
   if (type.includes('wav')) return 'wav'
   if (type.includes('webm')) return 'webm'
-  return 'wav' // ✅ final safety net
+  return 'webm' // ✅ final safety net
 }
 
 mediaRecorder.onstop = async () => {
   try {
     stopped = true
 
-    const type = mimeType || 'audio/wav'   // ✅ default to wav if browser didn’t give us one
+    // const type = mimeType || 'audio/wav'   // ✅ default to wav if browser didn’t give us one
+    const type = 'audio/webm'   // ✅ default to wav if browser didn’t give us one
     const ext = getExtensionFromMime(type)
 
     // wrap blob with matching mimetype + extension

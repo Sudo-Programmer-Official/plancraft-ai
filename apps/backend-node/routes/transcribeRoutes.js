@@ -114,12 +114,23 @@ router.post("/transcribe", upload.single("file"), async (req, res) => {
     }
 
     // 🔹 Normalize extension
-    let ext = "wav"; // default
+    // let ext = "wav"; // default
+    // const mime = req.file.mimetype || "";
+    // if (mime.includes("mp4") || mime.includes("aac")) ext = "m4a";
+    // else if (mime.includes("mpeg")) ext = "mp3";
+    // else if (mime.includes("ogg") || mime.includes("oga")) ext = "ogg";
+    // else if (mime.includes("webm")) ext = "webm"; // keep as fallback
+
+    // const safeName = `speech.${ext}`;
+    let ext = "wav"; // fallback
     const mime = req.file.mimetype || "";
-    if (mime.includes("mp4") || mime.includes("aac")) ext = "m4a";
-    else if (mime.includes("mpeg")) ext = "mp3";
+
+    if (mime.includes("mp4") || mime.includes("aac") || mime.includes("m4a")) ext = "m4a";
+    else if (mime.includes("mpeg") || mime.includes("mp3")) ext = "mp3";
     else if (mime.includes("ogg") || mime.includes("oga")) ext = "ogg";
-    else if (mime.includes("webm")) ext = "webm"; // keep as fallback
+    else if (mime.includes("webm")) ext = "webm";
+    else if (mime.includes("wav")) ext = "wav";
+    else if (mime.includes("flac")) ext = "flac"; // add just in case
 
     const safeName = `speech.${ext}`;
 
