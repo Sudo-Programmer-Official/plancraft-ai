@@ -9,6 +9,12 @@ import ElementPlus from 'element-plus'
 // import { initMixpanel } from './utils/mixpanel'
 import { useAuthStore } from "@/stores/authStore";
 import VoiceRecorder from '@/components/VoiceRecorder.vue'
+import { registerSW } from 'virtual:pwa-register'
+
+const updateSW = registerSW({
+  onNeedRefresh() { console.log('New content available. Refresh!') },
+  onOfflineReady() { console.log('App ready to work offline.') },
+})
 
 // import { VueGtag } from 'vue-gtag'
 
