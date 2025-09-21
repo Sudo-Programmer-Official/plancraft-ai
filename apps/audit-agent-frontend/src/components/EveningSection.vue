@@ -1,27 +1,24 @@
 <template>
-  <section class="bg-slate-800/60 p-6 rounded-xl shadow-md">
-    <h2 class="text-lg font-semibold text-white">🌙 Evening Reflection</h2>
-    <p class="text-gray-400 text-sm mb-3">Wind down, reflect, and note your progress.</p>
+  <section class="bg-white/10 backdrop-blur-md p-6 rounded-2xl shadow-md border border-white/10">
+    <h2 class="text-lg sm:text-xl font-semibold">🌙 Evening Reflection</h2>
+    <p class="text-gray-400 text-sm mb-4">Wind down, reflect, and note your progress.</p>
 
     <textarea
       v-model="reflectionText"
       placeholder="What went well? What could be better?"
       rows="3"
-      class="w-full p-3 rounded-md bg-slate-900/40 border border-slate-700 text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+      class="w-full p-3 rounded-lg bg-slate-900/40 border border-slate-700 text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
     ></textarea>
 
-    <!-- Show AI enhanced reflection -->
     <p v-if="enhancedText" class="text-indigo-400 text-sm italic mt-2">
       ✨ Enhanced: {{ enhancedText }}
     </p>
 
-    <div class="flex gap-3 mt-3 flex-wrap">
-      <!-- VoiceRecorder (same as Journal page) -->
-      <VoiceRecorder @transcribed="handleTranscript" />
-
+    <div class="flex flex-wrap gap-3 mt-4">
+      <VoiceRecorder @transcribed="handleTranscript" class="flex-1" />
       <button
         @click="saveReflection"
-        class="bg-green-600 px-4 py-2 rounded-md text-white hover:bg-green-700"
+        class="flex-1 bg-green-600 px-4 py-2 rounded-lg text-white hover:bg-green-700"
       >
         Save Reflection
       </button>

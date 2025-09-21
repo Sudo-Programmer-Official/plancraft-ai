@@ -1,19 +1,16 @@
 <template>
-  <section class="max-w-4xl mx-auto mb-12">
-    <h2 class="text-2xl font-semibold mb-4">📋 Today's Tasks</h2>
+  <section class="bg-white/10 backdrop-blur-md p-6 rounded-2xl shadow-md border border-white/10">
+    <h2 class="text-lg sm:text-xl font-semibold mb-4">📋 Today's Tasks</h2>
 
-    <!-- Draggable task list -->
     <draggable
       v-model="tasks"
       item-key="id"
-      class="space-y-3"
+      class="space-y-4"
       handle=".drag-handle"
       @end="persistOrder"
     >
       <template #item="{ element: task }">
-        <div
-          class="bg-slate-800/60 p-4 rounded-xl shadow flex items-start gap-3"
-        >
+        <div class="bg-slate-900/40 p-4 rounded-xl shadow flex items-start gap-3 border border-slate-700/50">
           <!-- Checkbox -->
           <input
             type="checkbox"
@@ -24,10 +21,9 @@
 
           <!-- Task body -->
           <div class="flex-1">
-            <!-- Title + date -->
             <div class="flex justify-between items-center">
               <span
-                class="text-lg font-medium select-none"
+                class="text-base sm:text-lg font-medium"
                 :class="{ 'line-through text-slate-500': task.completed }"
               >
                 {{ task.title }}
@@ -35,20 +31,14 @@
               <span class="text-xs text-slate-400">{{ task.date }}</span>
             </div>
 
-            <!-- Details -->
             <p v-if="task.details" class="mt-2 text-sm text-slate-300">
               {{ task.details }}
             </p>
 
-            <!-- Logs -->
-            <ul
-              v-if="task.logs?.length"
-              class="mt-2 space-y-1 text-xs text-slate-400"
-            >
+            <ul v-if="task.logs?.length" class="mt-2 space-y-1 text-xs text-slate-400">
               <li v-for="(log, idx) in task.logs" :key="idx">– {{ log }}</li>
             </ul>
 
-            <!-- Actions -->
             <div class="flex gap-2 mt-3">
               <button
                 @click="openDialog(task)"
@@ -66,12 +56,11 @@
           </div>
 
           <!-- Drag handle -->
-          <span class="drag-handle cursor-grab ml-2 text-slate-500">☰</span>
+          <span class="drag-handle cursor-grab text-slate-500 ml-2">☰</span>
         </div>
       </template>
     </draggable>
 
-    <!-- Add Task Button -->
     <div class="flex justify-end mt-6">
       <button
         @click="openDialog()"
@@ -81,7 +70,6 @@
       </button>
     </div>
 
-    <!-- Modal -->
     <TaskDialog
       v-if="showDialog"
       :task="selectedTask"

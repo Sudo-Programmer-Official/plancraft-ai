@@ -1,15 +1,16 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-slate-900 to-indigo-950 p-6 text-white">
+  <div class="min-h-screen bg-gradient-to-br from-slate-900 to-indigo-950 px-4 sm:px-6 py-8 text-white">
     <!-- Header -->
-    <header class="text-center mb-8">
-      <h1 class="text-3xl font-bold">Today's Tasks</h1>
-      <p class="text-slate-400">Plan, act, and reflect — one day at a time.</p>
+    <header class="text-center mb-12">
+      <h1 class="text-3xl sm:text-4xl font-bold">Today's Tasks</h1>
+      <p class="text-indigo-300">Plan, act, and reflect — one day at a time.</p>
     </header>
-    <MorningSection />
 
-    <!-- Task List with Drag -->
-    <TaskBoard />
-     <EveningSection />
+    <main class="max-w-4xl mx-auto space-y-10">
+      <MorningSection />
+      <TaskBoard />
+      <EveningSection />
+    </main>
   </div>
 </template>
 

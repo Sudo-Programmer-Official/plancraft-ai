@@ -1,79 +1,83 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-900 px-6 py-8 text-white">
-    <header class="text-center mb-10">
-      <h1 class="text-4xl font-bold text-white mb-2 animate-fade-in">
+  <div class="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-900 px-4 sm:px-6 py-8 text-white">
+    <!-- Header -->
+    <header class="text-center mb-12">
+      <h1 class="text-3xl sm:text-4xl font-bold mb-2 animate-fade-in">
         Today's Reflections
       </h1>
-      <p class="text-lg text-indigo-200 animate-fade-in-delay">
+      <p class="text-base sm:text-lg text-indigo-200 animate-fade-in-delay">
         Write, breathe, and let go — your personal sanctuary awaits.
       </p>
     </header>
 
-    <main class="max-w-4xl mx-auto grid gap-6 animate-slide-up">
+    <main class="max-w-4xl mx-auto grid gap-8 animate-slide-up">
       <!-- Mood Tracker -->
-      <section class="bg-white/10 backdrop-blur-md p-6 rounded-2xl shadow-md border border-white/10">
-        <h2 class="text-xl font-semibold text-white mb-3">How are you feeling?</h2>
+      <section class="bg-white/10 backdrop-blur-md p-5 sm:p-6 rounded-2xl shadow-md border border-white/10">
+        <h2 class="text-lg sm:text-xl font-semibold mb-4">How are you feeling?</h2>
         <div class="grid grid-cols-5 gap-3">
           <button
             v-for="mood in moods"
             :key="mood.emoji"
             @click="selectMood(mood)"
-            class="p-4 rounded-xl border border-white/20 hover:bg-indigo-600/30 transition flex flex-col items-center"
+            class="p-3 sm:p-4 rounded-xl border border-white/20 hover:bg-indigo-600/30 transition flex flex-col items-center"
             :class="{ 'bg-indigo-700/40': selectedMood?.emoji === mood.emoji }"
           >
-            <span class="text-3xl">{{ mood.emoji }}</span>
-            <p class="text-xs text-indigo-200 mt-1">{{ mood.label }}</p>
+            <span class="text-2xl sm:text-3xl">{{ mood.emoji }}</span>
+            <p class="text-xs sm:text-sm text-indigo-200 mt-1">{{ mood.label }}</p>
           </button>
         </div>
       </section>
 
       <!-- Voice Journal -->
-      <section class="bg-white/10 backdrop-blur-md p-6 rounded-2xl shadow-md border border-white/10">
-        <h2 class="text-xl font-semibold text-white mb-3">Voice Journal</h2>
+      <section class="bg-white/10 backdrop-blur-md p-5 sm:p-6 rounded-2xl shadow-md border border-white/10">
+        <h2 class="text-lg sm:text-xl font-semibold mb-4">Voice Journal</h2>
         <div class="flex flex-col gap-4">
           <textarea
             v-model="entryText"
             placeholder="What’s on your mind today..."
-            rows="5"
+            rows="4"
             class="w-full p-4 rounded-xl border border-white/20 bg-slate-900/40 focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none text-white placeholder-indigo-300"
           ></textarea>
 
-          <div class="flex flex-wrap justify-between gap-3">
-            <VoiceRecorder @transcribed="handleTranscript" />
+          <!-- Buttons aligned -->
+          <div class="flex flex-wrap gap-3">
+            <VoiceRecorder @transcribed="handleTranscript" class="flex-1" />
 
             <button
               @click="saveEntry"
               :disabled="!entryText.trim() && !selectedMood"
-              class="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white px-6 py-2 rounded-full transition"
+              class="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium shadow transition"
             >
               Save Entry
             </button>
-
-            <p v-if="enhancedText" class="text-sm text-indigo-300 italic mt-2">
-              ✨ Enhanced: {{ enhancedText }}
-            </p>
           </div>
+
+          <p v-if="enhancedText" class="text-sm text-indigo-300 italic mt-2">
+            ✨ Enhanced: {{ enhancedText }}
+          </p>
         </div>
       </section>
 
       <!-- Previous Logs -->
       <section
         v-if="logs.length"
-        class="bg-white/10 backdrop-blur-md p-6 rounded-2xl shadow-md border border-white/10"
+        class="bg-white/10 backdrop-blur-md p-5 sm:p-6 rounded-2xl shadow-md border border-white/10"
         ref="logsSection"
       >
-        <h2 class="text-xl font-semibold text-white mb-3">Previous Entries</h2>
-        <ul class="space-y-3 max-h-72 overflow-y-auto pr-1">
+        <h2 class="text-lg sm:text-xl font-semibold mb-4">Previous Entries</h2>
+        <ul class="space-y-4 max-h-80 overflow-y-auto pr-1">
           <li
             v-for="log in logs"
             :key="log.id"
-            class="border border-white/10 p-4 rounded-xl text-sm text-indigo-200 bg-slate-900/40 hover:bg-indigo-700/30 cursor-pointer"
+            class="border border-white/10 p-4 rounded-xl text-sm sm:text-base text-indigo-200 bg-slate-900/40 hover:bg-indigo-700/30 transition"
           >
-            <div class="flex items-center justify-between mb-1">
-              <span class="font-medium text-indigo-100">{{ log.date }}</span>
+            <div class="flex items-center justify-between mb-2">
+              <span class="font-medium text-indigo-100 text-xs sm:text-sm">
+                {{ log.date }}
+              </span>
               <span class="text-xl">{{ log.mood?.emoji }}</span>
             </div>
-            <p class="text-indigo-200">{{ log.text }}</p>
+            <p class="text-indigo-200 leading-relaxed">{{ log.text }}</p>
           </li>
         </ul>
       </section>
