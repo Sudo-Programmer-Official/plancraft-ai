@@ -83,14 +83,40 @@ async function transcribeWithFallback(fileBuffer, filename) {
 }
 
 // POST /api/transcribe
+// router.post('/transcribe', upload.single('file'), async (req, res) => {
+//   try {
+//     if (!req.file || !req.file.buffer) {
+//       return res.status(400).json({ error: 'No audio file provided. Use field name "file".' })
+//     }
+
+//     const filename = req.file.originalname || 'audio.webm'
+//     const { text, model } = await transcribeWithFallback(req.file.buffer, filename)
+//     res.json({ text, model })
+//   } catch (err) {
+//     console.error('❌ Transcription failed:', err)
+//     res.status(err?.status || 500).json({ error: err?.message || 'Transcription failed' })
+//   }
+// })
+// POST /api/transcribe
 router.post('/transcribe', upload.single('file'), async (req, res) => {
   try {
     if (!req.file || !req.file.buffer) {
       return res.status(400).json({ error: 'No audio file provided. Use field name "file".' })
     }
 
-    const filename = req.file.originalname || 'audio.webm'
-    const { text, model } = await transcribeWithFallback(req.file.buffer, filename)
+    // 🔹 Normalize extension
+    let ext = 'webm'
+    const mime = req.file.mimetype || ''
+    if (mime.includes('mp4') || mime.includes('aac')) ext = 'm4a'
+    else if (mime.includes('mpeg')) ext = 'mp3'
+    else if (mime.includes('wav')) ext = 'wav'
+    else if (mime.includes('ogg') || mime.includes('oga')) ext = 'ogg'
+
+    const safeName = `speech.${ext}`
+
+    console.log(`🎤 Received file -> mimetype: ${mime}, saved as: ${safeName}`)
+
+    const { text, model } = await transcribeWithFallback(req.file.buffer, safeName)
     res.json({ text, model })
   } catch (err) {
     console.error('❌ Transcription failed:', err)

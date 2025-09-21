@@ -78,17 +78,23 @@ const API_BASE = __rawBase
 //   ]
 //   return candidates.find(t => window.MediaRecorder?.isTypeSupported?.(t)) || ''
 // }
+// function pickAudioMime() {
+//   if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+//     return "audio/webm;codecs=opus"; // ✅ best choice for Chrome/Firefox/Android
+//   }
+//   if (MediaRecorder.isTypeSupported("audio/webm")) {
+//     return "audio/webm";
+//   }
+//   if (MediaRecorder.isTypeSupported("audio/mp4")) {
+//     return "audio/mp4"; // ✅ fallback for iOS Safari
+//   }
+//   return "audio/wav"; // ✅ final fallback, universally accepted
+// }
 function pickAudioMime() {
-  if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
-    return "audio/webm;codecs=opus"; // ✅ best choice for Chrome/Firefox/Android
-  }
-  if (MediaRecorder.isTypeSupported("audio/webm")) {
-    return "audio/webm";
-  }
-  if (MediaRecorder.isTypeSupported("audio/mp4")) {
-    return "audio/mp4"; // ✅ fallback for iOS Safari
-  }
-  return "audio/wav"; // ✅ final fallback, universally accepted
+  if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) return "audio/webm;codecs=opus";
+  if (MediaRecorder.isTypeSupported("audio/webm")) return "audio/webm";
+  if (MediaRecorder.isTypeSupported("audio/mp4")) return "audio/mp4";
+  return "audio/wav";
 }
 
 // onResult is called with partials during recording and final on stop
@@ -127,7 +133,16 @@ export async function recordAndSendToBackend(onResult, { timeSliceMs = 2500 } = 
     busy = true
     try {
       const type = mimeType || 'audio/webm'
-      const ext = type.includes('mp4') ? 'm4a' : type.includes('mpeg') ? 'mp3' : type.includes('aac') ? 'aac' : 'webm'
+      // const ext = type.includes('mp4') ? 'm4a' : type.includes('mpeg') ? 'mp3' : type.includes('aac') ? 'aac' : 'webm'
+      const ext = type.includes('mp4')
+  ? 'm4a'
+  : type.includes('mpeg')
+    ? 'mp3'
+    : type.includes('aac')
+      ? 'aac'
+      : type.includes('wav')
+        ? 'wav'
+        : 'webm'
       const fd = new FormData()
       fd.append('file', next, `chunk.${ext}`)
       const res = await fetch(`${API_BASE}/transcribe`, { method: 'POST', body: fd })
@@ -159,7 +174,8 @@ export async function recordAndSendToBackend(onResult, { timeSliceMs = 2500 } = 
       : type.includes('wav')
         ? 'wav'
         : 'webm'
-      const blob = new Blob(chunks, { type })
+      // const blob = new Blob(chunks, { type })
+      const blob = new Blob(chunks, { type: `audio/${ext}` })
       const fd   = new FormData()
       fd.append('file', blob, `speech.${ext}`)
 
