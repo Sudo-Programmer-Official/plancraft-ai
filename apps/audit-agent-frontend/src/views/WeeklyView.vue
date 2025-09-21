@@ -18,7 +18,11 @@
           @click="selectedDate = new Date(currentWeekStart.getFullYear(), currentWeekStart.getMonth(), currentWeekStart.getDate() + day.value)"
           :class="[
             'px-3 py-1 rounded-lg font-medium transition',
-            selectedDay === day.value ? 'bg-indigo-500 text-white' : 'text-gray-400 hover:text-white'
+            selectedDay === day.value
+              ? 'bg-indigo-500 text-white'
+              : (todayIndex !== null && todayIndex === day.value)
+                ? 'bg-indigo-700/50 text-white border border-indigo-400'
+                : 'text-gray-400 hover:text-white'
           ]"
         >
           {{ day.label }}
@@ -122,6 +126,27 @@ const remainingCount = computed(() => tasks.value.filter((t) => !t.completed).le
 const dayLabel = computed(() => selectedDate.value.toLocaleDateString('en-US', { weekday: 'long' }));
 
 const currentWeekStart = computed(() => startOfWeek(selectedDate.value))
+
+// Index of selected day within the current week (Mon=0 .. Sun=6)
+const selectedDay = computed(() => {
+  const s = currentWeekStart.value;
+  const d = selectedDate.value;
+  const start = new Date(s.getFullYear(), s.getMonth(), s.getDate());
+  const sel = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diffDays = Math.round((sel - start) / (1000 * 60 * 60 * 24));
+  return Math.max(0, Math.min(6, diffDays));
+});
+
+// Highlight today's day if the viewed week is the current week
+const todayIndex = computed(() => {
+  const now = new Date();
+  const sameWeek = startOfWeek(now).toDateString() === currentWeekStart.value.toDateString();
+  if (!sameWeek) return null;
+  const s = currentWeekStart.value;
+  const start = new Date(s.getFullYear(), s.getMonth(), s.getDate());
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((todayStart - start) / (1000 * 60 * 60 * 24));
+});
 
 function formatDate(dateStr) {
   const date = new Date(dateStr);
