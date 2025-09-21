@@ -235,8 +235,8 @@ router.beforeEach(async (to, from, next) => {
   next()
 })
 
-router.afterEach((to) => {
-  trackEvent('Page View', { page: to.fullPath, name: to.name })
-})
+// router.afterEach((to) => {
+//   trackEvent('Page View', { page: to.fullPath, name: to.name })
+// })
 
 export default router
