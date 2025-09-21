@@ -249,7 +249,15 @@ async function loadMonth() {
 
 watch([currentMonth, currentYear], loadMonth)
 watch(selectedDate, loadMonth)
-onMounted(loadMonth);
+// onMounted(loadMonth);
+onMounted(() => {
+  // Normalize today to midnight so comparisons work
+  const now = new Date()
+  selectedDate.value = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+
+  // Load current month tasks immediately
+  loadMonth()
+})
 </script>
 
 <style scoped>

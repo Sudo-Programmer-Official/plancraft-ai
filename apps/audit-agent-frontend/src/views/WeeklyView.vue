@@ -193,7 +193,13 @@ async function loadWeek() {
 }
 
 watch(selectedDate, loadWeek)
-onMounted(loadWeek)
+// onMounted(loadWeek)
+onMounted(() => {
+  // Force selectedDate to today at midnight
+  const now = new Date()
+  selectedDate.value = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  loadWeek()
+})
 </script>
 
 <style scoped>
