@@ -1,5 +1,7 @@
 // src/composables/useTasks.js
 import { ref } from "vue"
+import { trackEvent } from '@/services/analytics'
+import { useAuthStore } from '@/stores/authStore'
 import {
   fetchTasksForToday,
   fetchTasksByDate,
@@ -14,6 +16,7 @@ const tasks = ref([])
 let initialized = false
 
 export function useTasks() {
+  const authStore = useAuthStore()
   /**
    * 🔄 Load tasks from Firestore for today (and current user)
    */
@@ -56,6 +59,14 @@ export function useTasks() {
 
     const saved = await addTaskToFirebase(task)
     tasks.value.unshift(saved)
+    try {
+      trackEvent('Task Created', {
+        source: newTask?.source || 'journal',
+        guest: !!authStore?.isGuest,
+      })
+    } catch (e) {
+      console.warn('analytics: Task Created track failed', e)
+    }
   }
 
   /**
@@ -65,6 +76,13 @@ export function useTasks() {
     try {
       task.completed = !task.completed
       await updateTaskInFirebase(task)
+      if (task.completed) {
+        try {
+          trackEvent('Task Completed', { taskId: task.id })
+        } catch (e) {
+          console.warn('analytics: Task Completed track failed', e)
+        }
+      }
     } catch (err) {
       console.error("Failed to toggle complete:", err)
       task.completed = !task.completed // rollback on error

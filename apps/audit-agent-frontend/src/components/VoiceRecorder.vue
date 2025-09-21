@@ -71,11 +71,13 @@ async function toggleRecording() {
     isRecording.value = false
   }
 }
-</script> --><script setup>
+//</script> -->
+<script setup>
 import { ref } from 'vue'
 import { useSpeechToText } from '@/utils/voiceHelper'
 import { recordAndSendToBackend } from '@/utils/backendRecorder'
 import { isMobileBrowser } from '@/utils/deviceHelper'
+import { trackEvent } from '@/services/analytics'
 
 const emit = defineEmits(['transcribed'])
 
@@ -116,6 +118,12 @@ async function toggleRecording() {
     } else {
       recognition?.stop()
       mediaRecorder?.stop()
+      try {
+        const len = (transcript.value || '').length
+        trackEvent('Voice Transcribed', { length: len })
+      } catch (e) {
+        console.warn('analytics: Voice Transcribed track failed', e)
+      }
       isRecording.value = false
     }
   } catch (e) {

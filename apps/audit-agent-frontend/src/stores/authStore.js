@@ -7,6 +7,8 @@ import {
 } from "@/services/authService";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import firebaseApp from "@/firebase/init";
+import { identifyUser, trackEvent } from '@/services/analytics'
+
 
 const auth = getAuth(firebaseApp);
 
@@ -43,6 +45,7 @@ export const useAuthStore = defineStore("authStore", {
             photoURL: user.photoURL,
           };
           this.token = await user.getIdToken();
+          identifyUser(this.user)
 
           localStorage.setItem("user", JSON.stringify(this.user));
           localStorage.setItem("token", this.token);
@@ -86,6 +89,7 @@ export const useAuthStore = defineStore("authStore", {
 
     async logout() {
       await signOutUser();
+      try { trackEvent('Logout') } catch {}
       this.user = null;
       this.guest = false;
       this.token = null;

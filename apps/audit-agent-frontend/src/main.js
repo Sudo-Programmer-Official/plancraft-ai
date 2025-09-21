@@ -150,6 +150,8 @@ import { useAuthStore } from '@/stores/authStore'
 import VoiceRecorder from '@/components/VoiceRecorder.vue'
 import { createHead } from '@vueuse/head'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
+import { initAnalytics, bindRouter } from '@/services/analytics'
+
 
 // ✅ Firebase init
 import '@/firebase/init'
@@ -180,11 +182,13 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 app.component('VoiceRecorder', VoiceRecorder)
 
 // Analytics (Google gtag)
-router.afterEach((to) => {
-  window.gtag?.('config', 'G-N8V946JNDH', {
-    page_path: to.fullPath,
-  })
-})
+// router.afterEach((to) => {
+//   window.gtag?.('config', 'G-N8V946JNDH', {
+//     page_path: to.fullPath,
+//   })
+// })
+initAnalytics()
+bindRouter(router)
 
 // Auth store init
 const authStore = useAuthStore()
