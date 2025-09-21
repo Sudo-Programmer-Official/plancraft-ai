@@ -1,8 +1,10 @@
 <!-- src/views/DashboardView.vue -->
 <template>
-  <main class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+  <main
+    class="px-2 py-4 sm:px-4 md:px-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"
+  >
     <!-- Daily Card -->
-    <div class="bg-gray-900/80 rounded-xl p-6 shadow-lg">
+    <div class="bg-gray-900/80 rounded-xl p-4 sm:p-6 shadow-lg">
       <h3 class="font-semibold mb-3">📅 Daily Tasks</h3>
       <ul
         v-if="sortedDaily.length"
@@ -32,7 +34,9 @@
     </div>
 
     <!-- Weekly Card -->
-    <div class="bg-gray-900/80 rounded-xl p-6 shadow-lg hover:shadow-purple-500/40 transition">
+    <div
+      class="bg-gray-900/80 rounded-xl p-4 sm:p-6 shadow-lg hover:shadow-purple-500/40 transition"
+    >
       <h3 class="font-semibold mb-3">📆 Weekly Overview</h3>
       <p class="text-sm text-gray-400">
         {{ doneWeekly }}/{{ weeklyTasks.length }} completed this week
@@ -52,7 +56,9 @@
     </div>
 
     <!-- Monthly Card -->
-    <div class="bg-gray-900/80 rounded-xl p-6 shadow-lg hover:shadow-pink-500/40 transition">
+    <div
+      class="bg-gray-900/80 rounded-xl p-4 sm:p-6 shadow-lg hover:shadow-pink-500/40 transition"
+    >
       <h3 class="font-semibold mb-3">🌙 Monthly Goals</h3>
       <p class="text-sm text-gray-400">
         {{ doneMonthly }}/{{ monthlyTasks.length }} completed this month
@@ -65,49 +71,59 @@
       </div>
     </div>
 
-    <!-- AI Summary Card -->
-   <!-- AI Insights Card -->
-<div class="bg-gray-900/80 rounded-xl p-6 shadow-lg hover:shadow-green-500/40 transition col-span-1 lg:col-span-3">
-  <h3 class="font-semibold text-lg mb-4 flex items-center gap-2">
-    🤖 AI Insights
-  </h3>
+    <!-- AI Insights Card -->
+    <div
+      class="bg-gray-900/80 rounded-xl p-4 sm:p-6 shadow-lg hover:shadow-green-500/40 transition col-span-1 sm:col-span-2 lg:col-span-3"
+    >
+      <h3 class="font-semibold text-lg mb-4 flex items-center gap-2">
+        🤖 AI Insights
+      </h3>
 
-  <div v-if="aiSummary" class="text-sm space-y-4">
-    <!-- Progress Overview -->
-    <div class="flex justify-between items-center">
-      <span><strong>✅ Completed:</strong> {{ aiSummary.completedPct }}%</span>
-      <span><strong>📌 Pending:</strong> {{ aiSummary.pending }}</span>
+      <div v-if="aiSummary" class="text-sm space-y-4">
+        <!-- Progress Overview -->
+        <div class="flex justify-between items-center">
+          <span><strong>✅ Completed:</strong> {{ aiSummary.completedPct }}%</span>
+          <span><strong>📌 Pending:</strong> {{ aiSummary.pending }}</span>
+        </div>
+
+        <!-- Focus -->
+        <div class="bg-indigo-900/40 p-3 rounded border border-indigo-600">
+          <p><strong>🎯 Focus:</strong> {{ aiSummary.focus }}</p>
+        </div>
+
+        <!-- Quick Wins -->
+        <div
+          v-if="aiSummary.quickWins.length"
+          class="bg-green-900/30 p-3 rounded border border-green-600"
+        >
+          <p class="font-medium mb-2">⚡ Quick Wins</p>
+          <ul class="list-disc list-inside space-y-1 text-gray-300">
+            <li v-for="(q, i) in aiSummary.quickWins" :key="i">{{ q }}</li>
+          </ul>
+        </div>
+
+        <!-- Heavy Lifts -->
+        <div
+          v-if="aiSummary.heavyLifts.length"
+          class="bg-yellow-900/30 p-3 rounded border border-yellow-600"
+        >
+          <p class="font-medium mb-2">🏋 Heavy Lifts</p>
+          <ul class="list-disc list-inside space-y-1 text-gray-300">
+            <li v-for="(h, i) in aiSummary.heavyLifts" :key="i">{{ h }}</li>
+          </ul>
+        </div>
+
+        <!-- Weekly Warning -->
+        <div
+          v-if="aiSummary.weeklyWarning"
+          class="bg-red-900/30 p-3 rounded border border-red-600"
+        >
+          <p><strong>⚠ Weekly Warning:</strong> {{ aiSummary.weeklyWarning }}</p>
+        </div>
+      </div>
+
+      <p v-else class="text-gray-400">Fetching AI insights…</p>
     </div>
-
-    <!-- Focus -->
-    <div class="bg-indigo-900/40 p-3 rounded border border-indigo-600">
-      <p><strong>🎯 Focus:</strong> {{ aiSummary.focus }}</p>
-    </div>
-
-    <!-- Quick Wins -->
-    <div v-if="aiSummary.quickWins.length" class="bg-green-900/30 p-3 rounded border border-green-600">
-      <p class="font-medium mb-2">⚡ Quick Wins</p>
-      <ul class="list-disc list-inside space-y-1 text-gray-300">
-        <li v-for="(q, i) in aiSummary.quickWins" :key="i">{{ q }}</li>
-      </ul>
-    </div>
-
-    <!-- Heavy Lifts -->
-    <div v-if="aiSummary.heavyLifts.length" class="bg-yellow-900/30 p-3 rounded border border-yellow-600">
-      <p class="font-medium mb-2">🏋 Heavy Lifts</p>
-      <ul class="list-disc list-inside space-y-1 text-gray-300">
-        <li v-for="(h, i) in aiSummary.heavyLifts" :key="i">{{ h }}</li>
-      </ul>
-    </div>
-
-    <!-- Weekly Warning -->
-    <div v-if="aiSummary.weeklyWarning" class="bg-red-900/30 p-3 rounded border border-red-600">
-      <p><strong>⚠ Weekly Warning:</strong> {{ aiSummary.weeklyWarning }}</p>
-    </div>
-  </div>
-
-  <p v-else class="text-gray-400">Fetching AI insights…</p>
-</div>
   </main>
 </template>
 
