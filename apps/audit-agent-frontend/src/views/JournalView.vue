@@ -53,7 +53,6 @@
             <el-button
               type="primary"
               @click="saveEntry"
-              :disabled="!entryText.trim() && !selectedMood"
               class="w-full sm:w-auto px-4 py-2 rounded-lg text-white font-medium shadow-md
          bg-gradient-to-r from-emerald-700 via-teal-800 to-cyan-700
          hover:from-emerald-800 hover:via-teal-900 hover:to-cyan-800

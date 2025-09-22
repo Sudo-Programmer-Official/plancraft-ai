@@ -1,4 +1,26 @@
 <template>
+  <!-- Added: Standardized Add Task header and Monthly link -->
+  <div class="flex items-center justify-between mb-4">
+    <button
+      @click="openPlanner"
+      class="flex items-center gap-2 
+             bg-gradient-to-r from-indigo-500 via-purple-600 to-pink-500
+             hover:from-indigo-600 hover:via-purple-700 hover:to-pink-600
+             text-white px-3 sm:px-4 py-1.5 sm:py-2 
+             rounded-lg shadow-md text-sm sm:text-base font-medium 
+             transition-all duration-200"
+    >
+      <span class="text-base sm:text-lg">➕</span>
+      <span>Add Task</span>
+    </button>
+
+    <RouterLink 
+      to="/monthly" 
+      class="text-sm sm:text-base text-indigo-600 hover:text-indigo-800 underline"
+    >
+      📆 View Monthly
+    </RouterLink>
+  </div>
   <div class="min-h-screen bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900 text-white overflow-x-hidden">
     <!-- Page Container -->
     <div class="max-w-4xl mx-auto px-4 sm:px-6 py-10 w-full">
@@ -33,12 +55,12 @@
       <section class="bg-black/30 rounded-2xl p-6 shadow-lg">
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-xl font-semibold">Tasks for {{ dayLabel }}</h2>
-          <button
+          <!-- <button
             @click="showAddTask = true"
             class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-medium"
           >
             + Add Task
-          </button>
+          </button> -->
         </div>
 
         <TransitionGroup name="fade-move" tag="ul" class="space-y-3">
@@ -75,16 +97,34 @@
       </section>
 
       <!-- View Monthly -->
-      <div class="mt-8 text-center">
+      <!-- <div class="mt-8 text-center">
         <button class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 rounded-full font-medium transition">
           View Monthly
         </button>
-      </div>
+      </div> -->
     </div>
   </div>
+  <!-- Added: Centralized Task Planner Dialog reuse -->
+  <TaskPlannerDialog
+    v-if="showPlanner"
+    :open="showPlanner"
+    :date="plannerDate"
+    @saved="reload"
+    @close="closePlanner"
+  />
 </template>
 
 <script setup>
+// Added: Task planner state + imports
+import { ref as vueRef } from 'vue'
+import TaskPlannerDialog from '@/components/TaskPlannerDialog.vue'
+import { toLocalDateKey as _toLocalDateKey } from '@/utils/dateHelper.js'
+
+const showPlanner = vueRef(false)
+const plannerDate = _toLocalDateKey(new Date())
+const openPlanner = () => { showPlanner.value = true }
+const closePlanner = () => { showPlanner.value = false }
+const reload = () => {}
 import { ref, computed, watch, onMounted } from "vue";
 import { useTasks } from "@/composables/useTasks";
 
