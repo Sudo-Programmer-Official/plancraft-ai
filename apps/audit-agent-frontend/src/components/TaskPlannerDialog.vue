@@ -170,6 +170,27 @@ function closeDialog() {
   emit('close')
 }
 </script>
+<style scoped>
+/* Dialog title readable on dark gradient */
+:deep(.el-dialog__header .el-dialog__title) {
+  color: #ffffff !important;
+}
+
+/* Dark-theme friendly date input */
+:deep(.el-date-editor .el-input__wrapper) {
+  background-color: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  box-shadow: none !important;
+}
+
+:deep(.el-input__inner) {
+  color: #ffffff !important;
+}
+
+:deep(.el-input__inner::placeholder) {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+</style>
 
 <style lang="scss">
 /* Dialog background */
