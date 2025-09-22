@@ -1,4 +1,37 @@
 <template>
+  <!-- Brand logo at top-left of hero (landing only) -->
+  <div class="fixed top-4 left-4 z-20">
+    <img
+      src="/logo-bg-remove.png"
+      alt="PlanCraftAI Logo"
+      class="w-14 h-14 sm:w-16 sm:h-16 drop-shadow-xl select-none"
+    />
+  </div>
+  
+  <!-- AI-friendly content: About + Features (visible, semantic) -->
+  <!-- <section aria-label="About PlanCraftAI" class="max-w-4xl mx-auto mt-24 px-6">
+    <h2 class="text-2xl font-semibold text-slate-100">About PlanCraftAI</h2>
+    <p class="mt-2 text-slate-300">
+      PlanCraftAI helps you plan, journal, and reflect with voice journaling, AI-powered task planning, and mindful insights. Your private productivity companion for peaceful focus.
+    </p>
+  </section>
+  <section aria-label="Key Features" class="max-w-4xl mx-auto mt-8 px-6">
+    <h2 class="text-2xl font-semibold text-slate-100">Key Features</h2>
+    <ul class="mt-2 list-disc pl-6 space-y-1 text-slate-200">
+      <li>Voice Journaling for quick, hands-free capture</li>
+      <li>Smart Planner that generates tasks with AI</li>
+      <li>Mood Reflection and sentiment trends</li>
+      <li>Daily Flow to review, plan, and focus</li>
+    </ul>
+  </section> -->
+  <!-- Brand logo at top of hero -->
+  <!-- <div class="flex flex-col items-center justify-center">
+    <img
+      src="/logo.png"
+      alt="PlanCraftAI Logo"
+      class="mx-auto mb-6 w-24 h-24 drop-shadow-lg"
+    />
+  </div> -->
   <div
     class="relative min-h-screen flex flex-col text-gray-800 dark:text-slate-100 overflow-hidden"
   >
@@ -230,26 +263,29 @@
     </section>
 
     <!-- Footer -->
-    <footer class="py-8 text-center text-sm text-indigo-300 bg-slate-950" data-aos="fade-in">
-      <div class="max-w-7xl mx-auto px-6">
-        <p>
-          Built with <span aria-hidden="true">❤</span> by
-          <a
-            href="https://www.linkedin.com/in/fullstuffdeveloper/"
-            target="_blank"
-            rel="noopener"
-            class="underline hover:text-indigo-400"
-            >Abhishek</a
-          >
-          • AuditAgent
-        </p>
-        <div class="mt-2 space-x-4">
-          <RouterLink to="/privacy-policy" class="hover:underline">Privacy</RouterLink>
-          <RouterLink to="/terms" class="hover:underline">Terms</RouterLink>
-          <RouterLink to="/contact" class="hover:underline">Contact</RouterLink>
-        </div>
-      </div>
-    </footer>
+   <footer class="py-8 text-center text-sm text-indigo-300 bg-slate-950" data-aos="fade-in">
+  <div class="max-w-7xl mx-auto px-6">
+    <p class="flex flex-col sm:flex-row justify-center items-center gap-2">
+      <span>
+        Built with <span aria-hidden="true">❤</span> by
+        <a
+          href="https://www.linkedin.com/in/fullstuffdeveloper/"
+          target="_blank"
+          rel="noopener"
+          class="underline hover:text-indigo-400"
+        >
+          Abhishek
+        </a>
+      </span>
+      <span>• <strong>PlanCraftAI</strong></span>
+    </p>
+    <div class="mt-3 space-x-4">
+      <RouterLink to="/privacy-policy" class="hover:underline">Privacy</RouterLink>
+      <RouterLink to="/terms" class="hover:underline">Terms</RouterLink>
+      <RouterLink to="/contact" class="hover:underline">Contact</RouterLink>
+    </div>
+  </div>
+</footer>
   </div>
 </template>
 

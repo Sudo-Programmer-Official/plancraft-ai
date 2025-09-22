@@ -1,4 +1,29 @@
 <template>
+  <!-- Brand logo at top-left of hero (landing only) -->
+  <div class="fixed top-4 left-4 z-20">
+    <img
+      src="/logo-bg-remove.png"
+      alt="PlanCraftAI Logo"
+      class="w-14 h-14 sm:w-16 sm:h-16 drop-shadow-xl select-none"
+    />
+  </div>
+  
+  <!-- AI-friendly content: About + Features (visible, semantic) -->
+  <section aria-label="About PlanCraftAI" class="max-w-4xl mx-auto mt-24 px-6">
+    <h2 class="text-2xl font-semibold text-slate-100">About PlanCraftAI</h2>
+    <p class="mt-2 text-slate-300">
+      PlanCraftAI helps you plan, journal, and reflect with voice journaling, AI-powered task planning, and mindful insights. Your private productivity companion for peaceful focus.
+    </p>
+  </section>
+  <section aria-label="Key Features" class="max-w-4xl mx-auto mt-8 px-6">
+    <h2 class="text-2xl font-semibold text-slate-100">Key Features</h2>
+    <ul class="mt-2 list-disc pl-6 space-y-1 text-slate-200">
+      <li>Voice Journaling for quick, hands-free capture</li>
+      <li>Smart Planner that generates tasks with AI</li>
+      <li>Mood Reflection and sentiment trends</li>
+      <li>Daily Flow to review, plan, and focus</li>
+    </ul>
+  </section>
   <div class="bg-gradient-to-b from-blue-50 to-white text-gray-800">
     <!-- Section 1: Hero -->
     <section class="min-h-screen flex flex-col justify-center items-center text-center px-6">

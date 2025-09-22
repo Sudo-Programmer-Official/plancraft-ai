@@ -155,6 +155,34 @@
       </main>
     </div>
   </div>
+  <footer class="py-8 text-center text-sm text-indigo-300 bg-slate-950" data-aos="fade-in">
+    <div class="max-w-7xl mx-auto px-6">
+      <img
+        src="/logo.png"
+        alt="PlanCraftAI Logo"
+        class="mx-auto mb-6 w-16 h-16 sm:w-20 sm:h-20 drop-shadow-lg"
+      />
+      <p class="flex flex-col sm:flex-row justify-center items-center gap-2">
+        <span>
+          Built with <span aria-hidden="true">❤</span> by
+          <a
+            href="https://www.linkedin.com/in/fullstuffdeveloper/"
+            target="_blank"
+            rel="noopener"
+            class="underline hover:text-indigo-400"
+          >
+            Abhishek
+          </a>
+        </span>
+        <span>• <strong>PlanCraftAI</strong></span>
+      </p>
+      <div class="mt-3 space-x-4">
+        <RouterLink to="/privacy-policy" class="hover:underline">Privacy</RouterLink>
+        <RouterLink to="/terms" class="hover:underline">Terms</RouterLink>
+        <RouterLink to="/contact" class="hover:underline">Contact</RouterLink>
+      </div>
+    </div>
+  </footer>
 </template>
 
 <script setup>

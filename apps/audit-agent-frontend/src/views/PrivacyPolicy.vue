@@ -1,4 +1,6 @@
 <template>
+  <div class="min-h-screen bg-gradient-to-b from-indigo-900 via-purple-900 to-slate-950 text-slate-100">
+    <div class="max-w-4xl mx-auto py-16 px-6">
   <div class="max-w-4xl mx-auto px-6 py-12 text-gray-200">
     <h1 class="text-3xl font-bold mb-6">Privacy Policy</h1>
     <p class="mb-4 text-sm text-gray-400">Last updated: September 21, 2025</p>
@@ -58,5 +60,7 @@
       <li>Website: <a href="https://sudoprogrammer.com" class="text-blue-400 underline" target="_blank">sudoprogrammer.com</a></li>
       <li>Founder: <a href="https://www.linkedin.com/in/fullstuffdeveloper/" class="text-blue-400 underline" target="_blank">LinkedIn</a></li>
     </ul>
+  </div>
+    </div>
   </div>
 </template>

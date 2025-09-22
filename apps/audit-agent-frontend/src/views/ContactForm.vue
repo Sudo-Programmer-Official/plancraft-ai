@@ -1,4 +1,6 @@
 <template>
+  <div class="min-h-screen bg-gradient-to-b from-indigo-900 via-purple-900 to-slate-950 text-slate-100">
+    <div class="max-w-4xl mx-auto py-16 px-6">
   <div class="max-w-3xl mx-auto px-6 py-12 text-gray-200">
     <h1 class="text-3xl font-bold mb-6">📬 Contact Us</h1>
     <p class="mb-6">
@@ -76,6 +78,8 @@
           Abhishek Kumar Jha
         </a>
       </div>
+    </div>
+  </div>
     </div>
   </div>
 </template>
