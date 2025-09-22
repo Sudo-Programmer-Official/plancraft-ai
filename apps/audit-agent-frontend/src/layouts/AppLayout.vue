@@ -130,8 +130,8 @@
 
         <!-- Right Section -->
         <div class="flex items-center gap-4">
-          <span v-if="authStore.isLoggedIn" class="text-sm text-gray-300">
-            {{ authStore.user?.displayName || "Guest" }}
+         <span v-if="authStore.isLoggedIn" class="text-sm text-gray-300">
+            {{ authStore.user?.displayName?.split(' ')[0] || "Guest" }}
           </span>
           <button
             v-if="authStore.isLoggedIn"
