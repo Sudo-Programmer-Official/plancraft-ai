@@ -28,7 +28,7 @@
     <!-- Section 1: Hero -->
     <section class="min-h-screen flex flex-col justify-center items-center text-center px-6">
       <h1 class="text-5xl font-bold mb-4 leading-tight">Your Peaceful Daily Reflection</h1>
-      <p class="text-lg max-w-xl mb-6">AuditAgent helps you pause, reflect, and grow — one voice note at a time.</p>
+      <p class="text-lg max-w-xl mb-6">PlanCraftAI helps you pause, reflect, and grow — one voice note at a time.</p>
       <div class="flex gap-4">
         <el-button type="primary" size="large" @click="goToLogin">Log In</el-button>
         <el-button plain size="large" @click="continueAsGuest">Continue as Guest</el-button>
@@ -38,7 +38,7 @@
     <!-- Section 2: How It Helps -->
     <section class="py-20 bg-white">
       <div class="max-w-6xl mx-auto px-6 text-center">
-        <h2 class="text-3xl font-semibold mb-12">Why Use AuditAgent?</h2>
+        <h2 class="text-3xl font-semibold mb-12">Why Use PlanCraftAI?</h2>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div>
             <el-icon><i-ep-microphone /></el-icon>
@@ -107,7 +107,7 @@
 
     <!-- Footer -->
     <footer class="bg-white py-6 text-center text-sm text-gray-500">
-      Built with ❤️ by Abhishek • AuditAgent 2025
+      Built with ❤️ by Abhishek • PlanCraftAI 2025
     </footer>
   </div>
 </template>

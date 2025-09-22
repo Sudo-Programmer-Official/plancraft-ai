@@ -76,7 +76,7 @@
             class="!ml-0"
             type="primary"
             size="large"
-            aria-label="Log in to AuditAgent"
+            aria-label="Log in to PlanCraftAI"
             @click="goToLogin"
           >
             🚀 Get Started
@@ -98,8 +98,8 @@
       </div>
     </section>
 
-    <!-- Why Use AuditAgent -->
-    <!-- Why Use AuditAgent -->
+    <!-- Why Use PlanCraftAI -->
+    <!-- Why Use PlanCraftAI -->
     <section
       id="features"
       class="py-20 relative bg-gradient-to-b from-violet-900/30 to-indigo-950/50"
@@ -111,7 +111,7 @@
       <div class="max-w-7xl mx-auto px-6">
         <div class="text-center mb-16" data-aos="fade-up">
           <h2 id="why-title" class="text-4xl md:text-5xl font-extrabold text-white drop-shadow">
-            Why Use AuditAgent?
+            Why Use PlanCraftAI?
           </h2>
           <p class="mt-4 text-indigo-200 max-w-2xl mx-auto text-lg">
             Designed to be mindful and supportive — not overwhelming.
