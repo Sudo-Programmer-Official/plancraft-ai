@@ -13,15 +13,26 @@
     <p v-if="enhancedText" class="text-indigo-400 text-sm italic mt-2">
       ✨ Enhanced: {{ enhancedText }}
     </p>
-
-    <div class="flex flex-wrap gap-3 mt-4">
-      <VoiceRecorder @transcribed="handleTranscript" class="flex-1" />
-      <button
-        @click="saveReflection"
-        class="flex-1 bg-green-600 px-4 py-2 rounded-lg text-white hover:bg-green-700"
-      >
-        Save Reflection
-      </button>
+  
+    <div class="action-row flex flex-col sm:flex-row sm:justify-end sm:items-center gap-3 sm:gap-4 mt-4">
+      <!-- Voice Recorder: full width on mobile, compact on desktop -->
+      <div class="w-full sm:w-auto sm:flex-none">
+        <VoiceRecorder @transcribed="handleTranscript" class="w-full sm:w-auto" />
+      </div>
+  
+      <!-- Save Reflection button: right-aligned on desktop -->
+      <div class="w-full sm:w-auto sm:flex-none">
+        <button
+          @click="saveReflection"
+          class="w-full sm:w-auto px-4 py-2 rounded-lg text-white font-medium shadow-md
+             bg-gradient-to-r from-emerald-700 via-teal-800 to-cyan-700
+             hover:from-emerald-800 hover:via-teal-900 hover:to-cyan-800
+             transition-all duration-300
+             [text-shadow:_0_1px_2px_rgba(0,0,0,0.6)]"
+        >
+          💾 Save Reflection
+        </button>
+      </div>
     </div>
   </section>
 </template>
@@ -32,6 +43,7 @@ import VoiceRecorder from "@/components/VoiceRecorder.vue"
 import { saveEntryToFirebase } from "@/services/firebaseService"
 import { enhanceJournal } from "@/services/aiService"
 import { useTasks } from "@/composables/useTasks"
+import { toLocalDateKey } from "@/utils/dateHelper"
 const {loadTasks } = useTasks()
 
 const reflectionText = ref("")
@@ -54,14 +66,15 @@ async function enhanceReflection(raw) {
 async function saveReflection() {
   if (!reflectionText.value.trim()) return
 
-  const entry = {
-    id: crypto.randomUUID?.() || Date.now(),
-    text: reflectionText.value.trim(),
-    enhanced: enhancedText.value || null,
-    type: "evening",
-    date: new Date().toLocaleString(),
-    timestamp: Date.now(),
-  }
+    const entry = {
+      id: crypto.randomUUID?.() || Date.now(),
+      text: reflectionText.value.trim(),
+      enhanced: enhancedText.value || null,
+      type: "evening",
+      // Store normalized local date string; avoid timezone drift
+      date: toLocalDateKey(new Date()),
+      timestamp: Date.now(),
+    }
 
   await saveEntryToFirebase(entry)
   await loadTasks() // refresh tasks in case of updates
