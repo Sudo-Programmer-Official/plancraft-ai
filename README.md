@@ -8,7 +8,7 @@ TL;DR: This is not an AI agent platform (yet) — it’s a well-designed full-st
 
 ⸻
 
-✅ Final Clarified Direction: AuditAgent is a Full-Stack App
+✅ Final Clarified Direction: PlanCraftAI is a Full-Stack App
 
 🧱 Core Stack
 
@@ -44,7 +44,7 @@ Dashboard	Cross-device (phone + browser)
 
 You want to:
 	•	✅ Keep the current monorepo architecture (apps/, packages/, etc.)
-	•	✅ Rename from “Prompt2Quote” to “AuditAgent”
+	•	✅ Rename from “Prompt2Quote” to “PlanCraftAI”
 	•	✅ Start with a planner-style dashboard
 	•	✅ Integrate:
 	•	✅ Journal logging (text or voice)
@@ -85,7 +85,7 @@ audit-agent/
 🔨 Refactor Plan for Current Codebase
 
 Task	Action
-🧹 Rename App	Replace all Prompt2Quote mentions → AuditAgent
+🧹 Rename App	Replace all Prompt2Quote mentions → PlanCraftAI
 📝 Update README.md	Reflect new features (journal, planner, dashboard)
 🎨 UI Kickstart	Build Journal.vue + Planner.vue (text + voice entry)
 🌐 API Scaffold	Add /api/logs, /api/user in backend
@@ -138,7 +138,7 @@ You’re about to ship your own full-stack cross-device journaling platform — 
 "Continue this FastAPI route to parse GPT-formatted journal entry"
 
 ✅ Refactoring
-"Rename all instances of Prompt2Quote to AuditAgent"
+"Rename all instances of Prompt2Quote to PlanCraftAI"
 
 ✅ Context-aware autocompletion
 Open full file → place cursor → hit Code in Codex environment
@@ -154,13 +154,13 @@ Let’s ship this in 4 perfectly-packed drops. You’re literally building a mic
 
 ⸻
 
-✅ 1. Final README.md for AuditAgent
+✅ 1. Final README.md for PlanCraftAI
 
-📋 Codex Task Board – AuditAgent
+📋 Codex Task Board – PlanCraftAI
 
-# 🚀 AuditAgent – Voice-First Productivity Dashboard
+# 🚀 PlanCraftAI – Voice-First Productivity Dashboard
 
-AuditAgent is a modular full-stack productivity app focused on voice journaling, planning, and timeline logs — powered by Firebase + GPT + Vue 3.
+PlanCraftAI is a modular full-stack productivity app focused on voice journaling, planning, and timeline logs — powered by Firebase + GPT + Vue 3.
 
 ---
 

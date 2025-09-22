@@ -9,7 +9,7 @@
       class="flex flex-col"
     >
       <div class="flex items-center justify-between p-4 border-b border-gray-700">
-        <h1 v-if="sidebarOpen" class="text-lg font-bold">🌙 AuditAgent</h1>
+        <h1 v-if="sidebarOpen" class="text-lg font-bold">🌙 PlanCraftAI</h1>
         <button @click="sidebarOpen = !sidebarOpen" class="p-2 hover:bg-gray-800 rounded">
           <span v-if="sidebarOpen">⬅️</span>
           <span v-else>➡️</span>

@@ -6,7 +6,7 @@
     <p class="mb-4 text-sm text-gray-400">Last updated: September 21, 2025</p>
 
     <p class="mb-6">
-      At <strong>AuditAgent</strong>, operated by <strong>SudoProgrammer</strong>, your privacy is very important to us. 
+      At <strong>PlanCraftAI</strong>, operated by <strong>SudoProgrammer</strong>, your privacy is very important to us. 
       This Privacy Policy explains how we collect, use, and safeguard your information when you use our application and services.
     </p>
 

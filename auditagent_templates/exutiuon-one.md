@@ -1,4 +1,4 @@
-That’s exactly the direction your AuditAgent / CallYogi platform should move toward: solving real daily problems with simple flows that feel natural to users. From your ideas + the documented plan in your AI Voice Assistant for Healthcare doc ￼, here’s how we can align everything:
+That’s exactly the direction your PlanCraftAI / CallYogi platform should move toward: solving real daily problems with simple flows that feel natural to users. From your ideas + the documented plan in your AI Voice Assistant for Healthcare doc ￼, here’s how we can align everything:
 
 ⸻
 

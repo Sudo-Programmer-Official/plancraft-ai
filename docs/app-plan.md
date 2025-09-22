@@ -1,4 +1,4 @@
-Got it ✅ — you’re designing AuditAgent as a daily voice-first journal + planner dashboard, built for:
+Got it ✅ — you’re designing PlanCraftAI as a daily voice-first journal + planner dashboard, built for:
 
 🧠 Your Ideal Workflow
 
@@ -6,7 +6,7 @@ Wake up → speak your plan → AI logs + organizes → you track progress → c
 
 ⸻
 
-🔁 Final Vision: AuditAgent Workflow
+🔁 Final Vision: PlanCraftAI Workflow
 
 Here’s what the system will do — aligned to your real-life flow:
 
@@ -54,7 +54,7 @@ Feature	Status	Notes
 
 🔮 What It’ll Feel Like (Your Daily Flow)
 
-“Hey AuditAgent, today I want to work on my resume, fix the backend, and record my video demo.”
+“Hey PlanCraftAI, today I want to work on my resume, fix the backend, and record my video demo.”
 
 🟢 You speak → transcript shown → AI converts it into structured daily log (like: ["resume", "backend", "video demo"] with timestamp and mood)
 

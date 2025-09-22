@@ -2,7 +2,7 @@ Perfect 👍 Let’s build a detailed CodeX pipeline guide for your project so t
 
 ⸻
 
-📌 CodeX Pipeline Guide — AuditAgent
+📌 CodeX Pipeline Guide — PlanCraftAI
 
 ⸻
 

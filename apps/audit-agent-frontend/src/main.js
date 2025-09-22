@@ -133,7 +133,7 @@
 
 // if (isIos() && !isInStandaloneMode()) {
 //   // Show your custom "Add to Home Screen" banner
-//   alert("📲 To install AuditAgent, tap Share → 'Add to Home Screen'");
+//   alert("📲 To install PlanCraftAI, tap Share → 'Add to Home Screen'");
 // }
 // app.mount('#app')
 

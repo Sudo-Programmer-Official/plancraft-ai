@@ -33,7 +33,7 @@
       <el-button
         type="primary"
         size="large"
-        aria-label="Log in to AuditAgent"
+        aria-label="Log in to PlanCraftAI"
         @click="goToLogin"
       >
         🚀 Get Started

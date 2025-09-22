@@ -7,7 +7,7 @@
 
     <!-- Login card -->
     <div class="relative z-10 bg-gray-900/60 backdrop-blur-lg rounded-2xl shadow-2xl p-10 w-full max-w-md text-center animate-fade-in">
-      <h1 class="text-3xl font-bold text-white mb-4">🌙 AuditAgent</h1>
+      <h1 class="text-3xl font-bold text-white mb-4">🌙 PlanCraftAI</h1>
       <p class="text-gray-300 mb-8">Your AI-powered productivity companion</p>
 
       <!-- Login Buttons -->

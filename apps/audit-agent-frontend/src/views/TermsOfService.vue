@@ -4,7 +4,7 @@
   <div class="max-w-4xl mx-auto px-6 py-12 text-gray-200">
     <h1 class="text-3xl font-bold mb-6">📜 Terms & Conditions</h1>
     <p class="mb-6">
-      Welcome to <strong>AuditAgent</strong>. By using our application, you agree to the
+      Welcome to <strong>PlanCraftAI</strong>. By using our application, you agree to the
       following terms. Please read them carefully.
     </p>
 
@@ -13,7 +13,7 @@
       <section>
         <h2 class="text-xl font-semibold mb-2">1. Acceptance of Terms</h2>
         <p>
-          By accessing or using AuditAgent, you agree to comply with these Terms &
+          By accessing or using PlanCraftAI, you agree to comply with these Terms &
           Conditions. If you do not agree, you must not use the service.
         </p>
       </section>
@@ -22,7 +22,7 @@
       <section>
         <h2 class="text-xl font-semibold mb-2">2. Use of Service</h2>
         <p>
-          AuditAgent is designed to help you plan daily, weekly, and monthly goals. You
+          PlanCraftAI is designed to help you plan daily, weekly, and monthly goals. You
           agree not to misuse the service, attempt unauthorized access, or disrupt our
           systems.
         </p>
@@ -51,7 +51,7 @@
       <section>
         <h2 class="text-xl font-semibold mb-2">5. Limitation of Liability</h2>
         <p>
-          AuditAgent is provided “as is.” We are not liable for indirect, incidental, or
+          PlanCraftAI is provided “as is.” We are not liable for indirect, incidental, or
           consequential damages that may result from using our service.
         </p>
       </section>

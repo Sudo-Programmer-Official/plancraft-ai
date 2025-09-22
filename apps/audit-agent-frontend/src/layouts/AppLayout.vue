@@ -6,7 +6,7 @@
       :class="sidebarOpen ? 'w-64' : 'w-20'"
     >
     <div class="flex items-center justify-between p-4 border-b border-gray-700">
-      <h1 v-if="sidebarOpen" class="text-lg font-bold">🌙 AuditAgent</h1>
+      <h1 v-if="sidebarOpen" class="text-lg font-bold">🌙 PlanCraftAI</h1>
       <button
         @click="sidebarOpen = !sidebarOpen"
         class="p-2 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 transition-colors"
@@ -75,7 +75,7 @@
         <div class="absolute left-0 top-0 bottom-0 w-64 bg-gray-900 p-4 flex flex-col">
           <!-- Header -->
           <div class="flex justify-between items-center mb-6">
-            <h1 class="text-lg font-bold">🌙 AuditAgent</h1>
+            <h1 class="text-lg font-bold">🌙 PlanCraftAI</h1>
             <button @click="mobileMenu = false" class="p-2 rounded hover:bg-gray-800">
               ✖️
             </button>

@@ -6,9 +6,9 @@
       class="fixed bottom-6 inset-x-4 bg-indigo-600 text-white rounded-2xl shadow-xl p-4 flex items-center justify-between z-50"
     >
       <div>
-        <h3 class="font-bold text-lg">📲 Install AuditAgent</h3>
+        <h3 class="font-bold text-lg">📲 Install PlanCraftAI</h3>
         <p class="text-sm opacity-90">
-          Add AuditAgent to your home screen for <br />
+          Add PlanCraftAI to your home screen for <br />
           1-tap access to tasks, journaling & insights.
         </p>
       </div>
@@ -36,7 +36,7 @@
       class="fixed bottom-6 inset-x-4 bg-slate-800 text-white rounded-xl p-4 text-center shadow-lg z-50"
     >
       <p class="text-sm">
-        📱 To install <strong>AuditAgent</strong>: tap
+        📱 To install <strong>PlanCraftAI</strong>: tap
         <strong>Share</strong> → <strong>Add to Home Screen</strong>.
       </p>
       <button

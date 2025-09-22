@@ -1,6 +1,6 @@
-## AuditAgent — Calm Productivity, Every Day
+## PlanCraftAI — Calm Productivity, Every Day
 
-AuditAgent is a mindful planning and reflection app built with Vue 3 + TailwindCSS on the frontend and an Express/Node backend. It blends voice journaling, gentle AI enhancements, and task management so you can plan mornings, reflect in evenings, and grow through small, emotionally inviting steps.
+PlanCraftAI is a mindful planning and reflection app built with Vue 3 + TailwindCSS on the frontend and an Express/Node backend. It blends voice journaling, gentle AI enhancements, and task management so you can plan mornings, reflect in evenings, and grow through small, emotionally inviting steps.
 
 ### Vision
 Help people form a sustainable daily rhythm: plan clearly, capture progress effortlessly (voice or text), and end the day with a grounded reflection. The tone is calm, supportive, and non-judgmental.

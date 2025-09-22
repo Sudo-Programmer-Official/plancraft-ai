@@ -1,4 +1,4 @@
-# 📋 Codex Task Board – AuditAgent
+# 📋 Codex Task Board – PlanCraftAI
 
 ## ✅ Completed
 - [x] Journal.vue page (textarea, date, save to Firebase)

@@ -1,12 +1,15 @@
 <template>
   <!-- Brand logo at top-left of hero (landing only) -->
-  <div class="fixed top-4 left-4 z-20">
-    <img
-      src="/logo-bg-remove.png"
-      alt="PlanCraftAI Logo"
-      class="w-14 h-14 sm:w-16 sm:h-16 drop-shadow-xl select-none"
-    />
-  </div>
+ <!-- <header class="fixed top-0 left-0 w-full z-30 flex items-center bg-transparent px-4 py-3">
+    <RouterLink to="/" class="flex items-center">
+      <img
+        src="/logo-bg-remove.png"
+        alt="PlanCraftAI Logo"
+        class="h-10 w-auto sm:h-12 md:h-14 drop-shadow-lg select-none"
+      />
+      <span class="ml-2 text-lg font-bold text-white hidden sm:inline">PlanCraftAI</span>
+    </RouterLink>
+  </header> -->
   
   <!-- AI-friendly content: About + Features (visible, semantic) -->
   <!-- <section aria-label="About PlanCraftAI" class="max-w-4xl mx-auto mt-24 px-6">
@@ -47,6 +50,17 @@
     <section
       class="relative py-24 md:py-32 bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 overflow-hidden"
     >
+<!-- Inside your hero <section> -->
+<div class="absolute top-6 left-6 z-20 flex items-center gap-2">
+  <img
+    src="/logo-bg-remove.png"
+    alt="PlanCraftAI Logo"
+    class="h-10 w-auto sm:h-12 md:h-14 drop-shadow-lg select-none"
+  />
+  <span class="text-lg sm:text-xl md:text-2xl font-bold text-white tracking-tight">
+    PlanCraftAI
+  </span>
+</div>
       <!-- 🌠 Falling stars background -->
       <canvas ref="starsCanvas" class="absolute inset-0 w-full h-full z-0"></canvas>
 
