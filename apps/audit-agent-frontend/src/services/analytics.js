@@ -4,7 +4,7 @@ import mixpanel from 'mixpanel-browser'
 let initialized = false
 
 function getToken() {
-  console.log('TOKEN?', import.meta.env.VITE_MIXPANEL_TOKEN)
+  // console.log('TOKEN?', import.meta.env.VITE_MIXPANEL_TOKEN)
   return import.meta?.env?.VITE_MIXPANEL_TOKEN || ''
 }
 
