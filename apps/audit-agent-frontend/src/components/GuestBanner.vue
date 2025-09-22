@@ -7,8 +7,7 @@
       <div class="flex items-start sm:items-center gap-2">
         <span class="text-lg mr-2">⚠️</span>
         <span class="text-sm sm:text-base">
-          You are in <strong>Guest Mode</strong>. Data won’t be saved.  
-          Please log in to keep your progress.
+          <strong>Guest Mode</strong> data is temporary. Log in for encrypted storage, private to you — even we can’t read it.
         </span>
       </div>
 
