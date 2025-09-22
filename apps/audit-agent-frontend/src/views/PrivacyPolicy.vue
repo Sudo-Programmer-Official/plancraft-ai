@@ -48,7 +48,7 @@
     <h2 class="text-xl font-semibold mt-8 mb-4">5. Your Rights</h2>
     <p class="mb-6">
       You may request to <strong>access, update, or delete</strong> your data anytime. 
-      For assistance, contact us at <a href="mailto:help@sudoprogrammer.com" class="text-blue-400 underline">help@sudoprogrammer.com</a>.
+      For assistance, contact us at <a href="mailto:support@plancraftai.com" class="text-blue-400 underline">support@plancraftai.com</a>.
     </p>
 
     <h2 class="text-xl font-semibold mt-8 mb-4">6. Contact Us</h2>
@@ -56,7 +56,7 @@
       If you have any questions about this Privacy Policy, please contact us:
     </p>
     <ul class="list-disc pl-6 mt-2 space-y-1">
-      <li>Email: <a href="mailto:help@sudoprogrammer.com" class="text-blue-400 underline">help@sudoprogrammer.com</a></li>
+      <li>Email: <a href="mailto:support@plancraftai.com" class="text-blue-400 underline">support@plancraftai.com</a></li>
       <li>Website: <a href="https://sudoprogrammer.com" class="text-blue-400 underline" target="_blank">sudoprogrammer.com</a></li>
       <li>Founder: <a href="https://www.linkedin.com/in/fullstuffdeveloper/" class="text-blue-400 underline" target="_blank">LinkedIn</a></li>
     </ul>

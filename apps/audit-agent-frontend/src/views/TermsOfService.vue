@@ -70,8 +70,8 @@
     <div class="mt-12 text-sm text-gray-400">
       <p>
         If you have questions about these Terms, contact us at
-        <a href="mailto:help@sudoprogrammer.com" class="text-blue-400 underline">
-          help@sudoprogrammer.com
+        <a href="mailto:support@plancraftai.com" class="text-blue-400 underline">
+          support@plancraftai.com
         </a>.
       </p>
     </div>

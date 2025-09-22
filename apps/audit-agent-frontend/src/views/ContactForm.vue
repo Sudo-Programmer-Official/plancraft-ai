@@ -56,8 +56,8 @@
     <div class="space-y-6">
       <div class="bg-gray-800/60 rounded-lg p-6 shadow-md">
         <h2 class="text-xl font-semibold mb-2">📧 Email</h2>
-        <a href="mailto:help@sudoprogrammer.com" class="text-blue-400 underline">
-          help@sudoprogrammer.com
+        <a href="mailto:support@plancraftai.com" class="text-blue-400 underline">
+          support@plancraftai.com
         </a>
       </div>
 
