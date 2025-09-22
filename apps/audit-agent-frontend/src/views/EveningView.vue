@@ -11,12 +11,15 @@
     ></textarea>
 
     <div class="flex gap-4 mt-4">
-      <button
+      <el-button
         @click="saveReflection"
-        class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded text-white"
+        class="w-full sm:w-auto px-4 py-2 rounded-lg text-white font-medium shadow-md
+         bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500
+         hover:from-emerald-600 hover:via-teal-600 hover:to-cyan-600
+         transition-all duration-200"
       >
         Save Reflection
-      </button>
+      </el-button>
     </div>
   </section>
 </template>

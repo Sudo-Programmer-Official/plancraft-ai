@@ -1,13 +1,16 @@
 <template>
-  <div class="bg-gray-900/80 rounded-xl shadow-lg">
+  <div>
     <div class="flex flex-col items-center gap-2">
-      <button
+      <el-button
+      :type="isRecording ? 'danger' : 'primary'"
         @click="toggleRecording"
-        class="px-4 py-2 rounded-lg w-full sm:w-auto"
-        :class="isRecording ? 'bg-red-600' : 'bg-indigo-600'"
+        class="w-full sm:w-auto px-4 py-2 rounded-lg text-white font-medium shadow-md
+         bg-gradient-to-r from-blue-500 via-indigo-600 to-purple-600
+         hover:from-blue-600 hover:via-indigo-700 hover:to-purple-700
+         transition-all duration-200"
       >
         {{ isRecording ? 'Stop Recording' : 'Start Recording' }}
-      </button>
+      </el-button>
 
       <p class="text-gray-200 text-sm text-center">
         <!-- Desktop = live listening, Mobile = recording until stop -->
@@ -19,61 +22,6 @@
   </div>
 </template>
 
-<!-- <script setup>
-import { ref, computed } from 'vue'
-import { useSpeechToText } from '@/utils/voiceHelper'
-import { recordAndSendToBackend } from '@/utils/backendRecorder'
-import { isMobileBrowser } from '@/utils/deviceHelper'
-
-const emit = defineEmits(['transcribed'])
-
-const transcript = ref("")
-const isRecording = ref(false)
-let recognition = null
-let mediaRecorder = null
-
-// ✅ compute once so template can use it
-const forceBackend = computed(() => isMobileBrowser() || isSafari())
-
-async function toggleRecording() {
-  if (!isRecording.value) {
-    if (!forceBackend.value) {
-      // Desktop Chrome/Edge → Web Speech API
-      recognition = useSpeechToText(
-        (text) => {
-          transcript.value = text
-          emit('transcribed', text)
-        },
-        (finalText) => {
-          transcript.value = finalText
-          emit('transcribed', finalText)
-        }
-      )
-      if (recognition) recognition.start()
-    }
-
-    if (forceBackend.value || !recognition) {
-      // Mobile/iOS Safari/Android → fallback to Whisper backend
-      mediaRecorder = await recordAndSendToBackend((text) => {
-        transcript.value = text
-        emit('transcribed', text)
-      })
-    }
-
-    isRecording.value = true
-  } else {
-    if (recognition) {
-      recognition.stop()
-      recognition = null
-    }
-    if (mediaRecorder) {
-      mediaRecorder.stop()
-      mediaRecorder = null
-    }
-    isRecording.value = false
-  }
-}
-//</script> -->
 <script setup>
 import { ref } from 'vue'
 import { useSpeechToText } from '@/utils/voiceHelper'

@@ -11,7 +11,7 @@
       class="w-full p-3 rounded-lg bg-slate-900/40 border border-slate-700 text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 mb-4 resize-none"
     ></textarea>
 
-    <div class="action-row flex flex-col sm:flex-row sm:justify-end sm:items-center gap-3 sm:gap-4">
+    <div class="action-row items-baseline flex flex-col sm:flex-row sm:justify-end sm:items-center gap-3 sm:gap-4">
       <!-- Voice Recorder: full width on mobile, shrink to content on desktop -->
       <div class="w-full sm:w-auto sm:flex-none">
         <VoiceRecorder @transcribed="handleTranscript" class="w-full sm:w-auto" />
@@ -76,3 +76,16 @@ async function generateTasks() {
   }
 }
 </script>
+
+<style scoped>
+.action-row {
+  /* Stack vertically on small screens, horizontal on larger */
+  /* flex-direction: column; */
+}
+@media (min-width: 640px) {
+  .action-row {
+    flex-direction: row;
+    align-items: baseline !important;
+  }
+}
+</style>

@@ -120,9 +120,12 @@
             </svg>
           </button>
           <h2 class="text-2xl font-semibold capitalize">{{ $route.name }}</h2>
-          <span class="text-gray-400 text-sm">
-            {{ new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' }) }}
-          </span>
+         <span class="text-gray-400 text-sm mt-1 sm:mt-0">
+    {{ new Date().toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
+    }) }}
+  </span>
         </div>
 
         <!-- Right Section -->

@@ -124,6 +124,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore'
 import { db, auth } from '@/firebase/init'
+import { toLocalDateKey } from '@/utils/dateHelper'
 import { useAuthStore } from '@/stores/authStore'
 
 // Pinia auth store instance
@@ -147,7 +148,7 @@ const dailyTasks = ref([])
 const weeklyTasks = ref([])
 const monthlyTasks = ref([])
 
-const today = new Date()
+  const today = new Date()
 const startOfWeek = new Date(today)
 startOfWeek.setDate(today.getDate() - today.getDay())
 const endOfWeek = new Date(startOfWeek)
@@ -158,21 +159,31 @@ const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0)
 
 const unsubscribe = ref(null)
 
-onMounted(() => {
-  const tasksCol = collection(db, 'tasks')
-  unsubscribe.value = onSnapshot(tasksCol, (snapshot) => {
-    const allTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-    dailyTasks.value = allTasks.filter(t => t.date === today.toISOString().split('T')[0])
-    weeklyTasks.value = allTasks.filter(t => {
-      const d = new Date(t.date)
-      return d >= startOfWeek && d <= endOfWeek
-    })
-    monthlyTasks.value = allTasks.filter(t => {
-      const d = new Date(t.date)
-      return d >= startOfMonth && d <= endOfMonth
+  onMounted(() => {
+    const tasksCol = collection(db, 'tasks')
+    unsubscribe.value = onSnapshot(tasksCol, (snapshot) => {
+      const allTasks = snapshot.docs.map(doc => {
+        const data = doc.data()
+        return { id: doc.id, ...data, date: typeof data.date === 'string' ? data.date : (data.date?.toDate ? toLocalDateKey(data.date.toDate()) : toLocalDateKey(new Date(data.date))) }
+      })
+      dailyTasks.value = allTasks.filter(t => t.date === toLocalDateKey(today))
+      weeklyTasks.value = allTasks.filter(t => {
+        // Compare by string key to avoid timezone parsing issues
+        const key = t.date
+        const days = []
+        const d = new Date(startOfWeek)
+        while (d <= endOfWeek) { days.push(toLocalDateKey(d)); d.setDate(d.getDate()+1) }
+        return days.includes(key)
+      })
+      monthlyTasks.value = allTasks.filter(t => {
+        const key = t.date
+        const days = []
+        const d = new Date(startOfMonth)
+        while (d <= endOfMonth) { days.push(toLocalDateKey(d)); d.setDate(d.getDate()+1) }
+        return days.includes(key)
+      })
     })
   })
-})
 
 onUnmounted(() => {
   if (unsubscribe.value) unsubscribe.value()
@@ -184,16 +195,16 @@ const progressBarWidth = computed(() => {
   return `${Math.round((done / total) * 100)}%`
 })
 
-const taskForm = ref({
-  text: '',
-  date: today.toISOString().split('T')[0],
-  completed: false,
-})
+  const taskForm = ref({
+    text: '',
+    date: toLocalDateKey(today),
+    completed: false,
+  })
 
 function openAddModal() {
   editMode.value = false
   editingTaskId.value = null
-  taskForm.value = { text: '', date: today.toISOString().split('T')[0], completed: false }
+    taskForm.value = { text: '', date: toLocalDateKey(today), completed: false }
   showModal.value = true
 }
 
@@ -222,11 +233,11 @@ function closeModal() {
 async function saveTask() {
   if (!taskForm.value.text.trim()) return
 
-  const payload = {
-    text: taskForm.value.text,
-    date: new Date(taskForm.value.date),
-    completed: taskForm.value.completed,
-  }
+    const payload = {
+      text: taskForm.value.text,
+      date: taskForm.value.date, // store as YYYY-MM-DD
+      completed: taskForm.value.completed,
+    }
 
   if (editMode.value && editingTaskId.value) {
     await updateDoc(doc(db, 'tasks', editingTaskId.value), payload)

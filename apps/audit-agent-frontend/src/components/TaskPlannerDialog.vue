@@ -2,12 +2,21 @@
   <el-dialog
     v-model="internalOpen"
     :title="`📅 Plan for ${formattedDate}`"
-    width="500px"
-    class="rounded-2xl"
+    :width="dialogWidth"
+    class="task-planner-dialog"
     destroy-on-close
+    :style="{
+    background: 'linear-gradient(145deg, #1e1b4b, #312e81, #4c1d95)',
+    color: '#e2e8f0',
+    borderRadius: '0.5rem',
+    boxShadow: '0 8px 30px rgba(0,0,0,0.6)',
+    border: '1px solid rgba(255,255,255,0.08)',
+    backdropFilter: 'blur(12px)'
+  }"
+    @close="closeDialog"
   >
     <!-- Date Picker -->
-    <div class="mb-4">
+    <div class="mb-5">
       <label class="block text-sm text-slate-300 mb-1">Select Date</label>
       <el-date-picker
         v-model="selectedDate"
@@ -26,17 +35,19 @@
       :rows="4"
       placeholder="Speak or type your plan..."
       resize="none"
-      class="mb-4"
+      class="mb-5"
     />
 
     <!-- Voice + Generate -->
-    <div class="flex gap-3 mb-6">
-      <div class="flex-1 flex flex-col items-center">
+    <div class="flex gap-4 mb-6">
+      <!-- Voice Recorder -->
+      <div class="flex flex-col items-center">
         <VoiceRecorder @transcribed="handleTranscript" class="w-full" />
-        <span class="text-xs text-slate-400 mt-1">Tap to start speaking</span>
+        <!-- <span class="text-xs text-slate-400 mt-1">Tap to start speaking</span> -->
       </div>
 
-      <div class="flex-1 flex flex-col items-center">
+      <!-- Generate Tasks -->
+      <div class="flex flex-col items-center">
         <el-button
           type="success"
           @click="generateTasks"
@@ -50,52 +61,59 @@
     </div>
 
     <!-- Footer -->
-    <template #footer>
-      <el-button @click="closeDialog">Cancel</el-button>
-    </template>
+    <!-- <template #footer>
+      <el-button @click="closeDialog" plain>Cancel</el-button>
+    </template> -->
   </el-dialog>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, onMounted } from 'vue'
 import { ElNotification } from 'element-plus'
 import VoiceRecorder from '@/components/VoiceRecorder.vue'
 import { generateTasksFromText } from '@/services/aiService'
 import { addTaskToFirebase } from '@/services/firebaseService'
 import { useTasks } from '@/composables/useTasks'
+import { toLocalDateKey, parseLocalDateKey } from '@/utils/dateHelper'
 
 const props = defineProps({
   open: Boolean,
-  date: { type: [String, Date], default: () => new Date().toISOString().split('T')[0] },
+  date: { type: [String, Date], default: () => toLocalDateKey(new Date()) },
 })
 const emit = defineEmits(['close', 'saved'])
 
 const { tasks, loadTasks } = useTasks()
 
-// Reactive states
 const internalOpen = ref(props.open)
 const input = ref('')
-const selectedDate = ref(props.date) // always string (YYYY-MM-DD)
+const selectedDate = ref(
+  typeof props.date === 'string' ? props.date : toLocalDateKey(props.date)
+)
 const loading = ref(false)
+// responsive dialog width
+const screenWidth = ref(window.innerWidth)
 
-// Keep internalOpen synced with parent
+function handleResize() {
+  screenWidth.value = window.innerWidth
+}
+
+onMounted(() => {
+  window.addEventListener("resize", handleResize)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", handleResize)
+})
+
+const dialogWidth = computed(() => {
+  return screenWidth.value < 640 ? "90%" : "520px"
+})
+
 watch(() => props.open, (val) => (internalOpen.value = val))
 watch(internalOpen, (val) => { if (!val) emit('close') })
 
-// Format header date
 const formattedDate = computed(() => {
-  let dateStr = selectedDate.value
-  if (dateStr instanceof Date) dateStr = dateStr.toISOString().split('T')[0]
-
-  if (typeof dateStr === 'string') {
-    const [year, month, day] = dateStr.split('-').map(Number)
-    return new Date(year, month - 1, day).toLocaleDateString(undefined, {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-    })
-  }
-  return new Date().toLocaleDateString(undefined, {
+  const dateObj = parseLocalDateKey(selectedDate.value)
+  return dateObj.toLocaleDateString(undefined, {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
@@ -116,7 +134,7 @@ async function generateTasks() {
         title: t,
         details: '',
         completed: false,
-        date: selectedDate.value,
+        date: toLocalDateKey(parseLocalDateKey(selectedDate.value)),
         order: tasks.value.length + i,
         logs: [],
       }
@@ -153,10 +171,147 @@ function closeDialog() {
 }
 </script>
 
-<style scoped>
-.el-dialog {
-  background-color: #0f172a; /* slate-900 */
-  color: #e2e8f0; /* gray-200 */
+<style lang="scss">
+/* Dialog background */
+.task-planner-dialog .el-dialog {
+  background: linear-gradient(145deg, #1e1b4b, #312e81, #4c1d95);
+  color: #e2e8f0;
   border-radius: 1rem;
+  padding: 1rem;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+
+  
 }
+
+
+
+/* Title */
+.task-planner-dialog .el-dialog__header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: #f8fafc;
+  font-weight: 600;
+}
+
+/* Inputs */
+.task-planner-dialog .el-input__inner,
+.task-planner-dialog .el-textarea__inner {
+  background-color: rgba(255, 255, 255, 0.1);  /* semi-transparent */
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.task-planner-dialog .el-input__inner::placeholder,
+.task-planner-dialog .el-textarea__inner::placeholder {
+  color: #cbd5e1;  /* light slate */
+}
+
+/* Voice + Generate buttons aligned */
+.task-planner-dialog .el-button {
+  font-weight: 500;
+  border-radius: 0.5rem;
+}
+.task-planner-dialog .el-button--success {
+  background: #22c55e; /* green-500 */
+  border: none;
+}
+.task-planner-dialog .el-button--success:hover {
+  background: #16a34a; /* green-600 */
+}
+.task-planner-dialog .el-button--default {
+  background: transparent;
+  color: #94a3b8;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Footer */
+.task-planner-dialog .el-dialog__footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 1rem;
+}
+/* TaskPlannerDialog.vue or global theme file */
+
+/* Date picker dropdown (popper) */
+.task-planner-dialog .el-picker-panel {
+  background: linear-gradient(135deg, #1e1b4b, #312e81, #4c1d95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.75rem !important;
+  color: #f1f5f9 !important; /* slate-100 */
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+}
+
+/* Calendar header (year/month nav) */
+.task-planner-dialog .el-date-picker__header,
+.task-planner-dialog .el-picker-panel__icon-btn {
+  color: #f8fafc !important;
+}
+
+/* Weekday labels */
+.task-planner-dialog .el-date-table th {
+  color: #cbd5e1 !important; /* slate-300 */
+}
+
+/* Days */
+.task-planner-dialog .el-date-table td {
+  color: #e2e8f0 !important; /* slate-200 */
+  border-radius: 0.5rem;
+  transition: background 0.2s ease;
+}
+
+/* Hovered day */
+.task-planner-dialog .el-date-table td:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Selected day */
+// .task-planner-dialog .el-date-table td.current {
+//   background: #6366f1 !important; /* indigo-500 */
+//   color: white !important;
+// }
+
+/* Today’s day */
+// .task-planner-dialog .el-date-table td.today {
+//   border: 1px solid #38bdf8 !important; /* cyan-400 */
+// }
+/* === Date Picker Popup (Global Override) === */
+.el-picker-panel {
+  background: linear-gradient(145deg, #1e1b4b, #312e81, #4c1d95) !important;
+  border-radius: 0.75rem !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #f1f5f9 !important; /* slate-100 */
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* Header (year/month nav + arrows) */
+.el-picker-panel__icon-btn,
+.el-date-picker__header,
+.el-date-picker__header-label {
+  color: #f8fafc !important;
+}
+
+/* Weekday labels */
+.el-date-table th {
+  color: #cbd5e1 !important; /* slate-300 */
+}
+
+/* Normal days */
+.el-date-table td {
+  color: #e2e8f0 !important; /* slate-200 */
+  border-radius: 0.5rem !important;
+  transition: background 0.2s ease;
+}
+
+/* Hover effect */
+.el-date-table td:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Selected day */
+.el-date-table td.current {
+  background: #6366f1 !important; /* indigo-500 */
+  color: white !important;
+}
+
+/* Today highlight */
+// .el-date-table td.today {
+//   border: 1px solid #38bdf8 !important; /* cyan-400 */
+// }
 </style>

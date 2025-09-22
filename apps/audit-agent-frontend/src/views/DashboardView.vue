@@ -8,16 +8,19 @@
     <!-- Daily Card -->
    <!-- Daily Card -->
 <div class="bg-gray-900/80 rounded-xl p-4 sm:p-6 shadow-lg">
-  <div class="flex justify-between items-center mb-3">
-    <h3 class="font-semibold">📅 Daily Tasks</h3>
-    <button
-      @click="openPlanner"
-      class="text-xs px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded"
-    >
-      ➕ Plan My Day
-    </button>
-  </div>
-
+<div class="flex justify-between items-center mb-3">
+  <h3 class="font-semibold">📅 Daily Tasks</h3>
+  <button
+    @click="openPlanner"
+    class="flex items-center text-xs px-3 py-1 rounded-lg font-medium
+           bg-gradient-to-r from-pink-500 to-indigo-600 
+           hover:from-pink-600 hover:to-indigo-700 
+           text-white shadow-md transition"
+  >
+    <span class="mr-1 text-yellow-300 animate-pulse">➕</span>
+    Plan My Day
+  </button>
+</div>
   <ul
     v-if="sortedDaily.length"
     class="space-y-2 text-sm max-h-64 overflow-y-auto pr-2 custom-scroll"
@@ -153,6 +156,7 @@ import { ref, computed, onMounted, onUnmounted, watchEffect } from 'vue'
 import { collection, onSnapshot, updateDoc, doc, query, where } from 'firebase/firestore'
 import { db, auth } from '@/firebase/init'
 import { onAuthStateChanged } from 'firebase/auth'
+import { toLocalDateKey } from '@/utils/dateHelper'
 import { summarizeTasks } from '@/services/aiService'
 import GuestBanner from '@/components/GuestBanner.vue'
 import { useAuthStore } from '@/stores/authStore'
@@ -174,9 +178,8 @@ const selectedDate = ref(today)
 
 // Helpers
 function toYMD(date) {
-  const d = new Date(date)
-  d.setHours(0, 0, 0, 0)
-  return d.toLocaleDateString('en-CA')
+  if (typeof date === 'string') return date
+  return toLocalDateKey(date)
 }
 function ymdRange(start, end) {
   const days = []
@@ -223,16 +226,14 @@ onMounted(() => {
 
     if (unsubscribe.value) unsubscribe.value()
     unsubscribe.value = onSnapshot(tasksQuery, (snapshot) => {
-      const userTasks = snapshot.docs.map((docSnap) => {
-        const data = docSnap.data()
-        return {
-          id: docSnap.id,
-          ...data,
-          date: typeof data.date === 'string'
-            ? data.date
-            : toYMD(data.date?.toDate?.() || data.date),
-        }
-      })
+        const userTasks = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data()
+          return {
+            id: docSnap.id,
+            ...data,
+            date: typeof data.date === 'string' ? data.date : toYMD(data.date?.toDate?.() || data.date),
+          }
+        })
 
       dailyTasks.value = userTasks.filter((t) => t.date === toYMD(today))
 

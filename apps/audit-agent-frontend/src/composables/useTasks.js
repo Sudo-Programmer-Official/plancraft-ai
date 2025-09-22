@@ -2,6 +2,7 @@
 import { ref } from "vue"
 import { trackEvent } from '@/services/analytics'
 import { useAuthStore } from '@/stores/authStore'
+import { toLocalDateKey } from '@/utils/dateHelper'
 import {
   fetchTasksForToday,
   fetchTasksByDate,
@@ -51,7 +52,7 @@ export function useTasks() {
       details: "",
       completed: false,
       logs: [],
-      date: new Date().toISOString().split("T")[0], // YYYY-MM-DD
+      date: toLocalDateKey(new Date()), // YYYY-MM-DD local
       createdAt: Date.now(),
     }
 

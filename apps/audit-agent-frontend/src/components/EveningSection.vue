@@ -82,3 +82,16 @@ async function saveReflection() {
   enhancedText.value = ""
 }
 </script>
+
+<style scoped>
+.action-row {
+  /* Stack vertically on small screens, horizontal on larger */
+  /* flex-direction: column; */
+}
+@media (min-width: 640px) {
+  .action-row {
+    flex-direction: row;
+    align-items: baseline !important;
+  }
+}
+</style>

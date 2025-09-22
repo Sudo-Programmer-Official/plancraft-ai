@@ -161,6 +161,7 @@ import {
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import firebaseApp from "@/firebase/init";
+import { toLocalDateKey } from "@/utils/dateHelper";
 
 const db = getFirestore(firebaseApp);
 const auth = getAuth(firebaseApp);
@@ -178,7 +179,7 @@ export async function fetchTasksForToday() {
   const user = auth.currentUser;
   if (!user) return [];
 
-  const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+  const today = toLocalDateKey(new Date()); // YYYY-MM-DD local
 
   const q = query(
     tasksRef,
@@ -188,7 +189,14 @@ export async function fetchTasksForToday() {
   );
 
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+  return snapshot.docs.map((d) => {
+    const data = d.data();
+    return {
+      id: d.id,
+      ...data,
+      date: typeof data.date === 'string' ? data.date : toLocalDateKey(data.date),
+    };
+  });
 }
 
 /**
@@ -204,7 +212,10 @@ export async function fetchTasksByDate(dateStr) {
     orderBy('order', 'asc'),
   )
   const snap = await getDocs(qy)
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+  return snap.docs.map(d => {
+    const data = d.data()
+    return { id: d.id, ...data, date: typeof data.date === 'string' ? data.date : toLocalDateKey(data.date) }
+  })
 }
 
 /**
@@ -222,7 +233,10 @@ export async function fetchTasksBetween(startYMD, endYMD) {
     orderBy('order', 'asc'),
   )
   const snap = await getDocs(qy)
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+  return snap.docs.map(d => {
+    const data = d.data()
+    return { id: d.id, ...data, date: typeof data.date === 'string' ? data.date : toLocalDateKey(data.date) }
+  })
 }
 
 /**
@@ -231,22 +245,24 @@ export async function fetchTasksBetween(startYMD, endYMD) {
 /**
  * ✅ Add a new task to Firestore
  */
-export async function addTaskToFirebase(task) {
+  export async function addTaskToFirebase(task) {
   const user = auth.currentUser;
   if (!user) throw new Error("User not logged in");
 
   // Prepare safe payload
-  const payload = {
-    title: task.title || "New Task",
-    details: task.details || "",
-    completed: task.completed ?? false,
-    logs: task.logs ?? [],
-    attachments: task.attachments ?? [],
-    date: task.date || new Date().toISOString().split("T")[0], // YYYY-MM-DD
-    order: task.order ?? 0,
-    userId: user.uid,
-    createdAt: serverTimestamp(),
-  };
+    const payload = {
+      title: task.title || "New Task",
+      details: task.details || "",
+      completed: task.completed ?? false,
+      logs: task.logs ?? [],
+      attachments: task.attachments ?? [],
+      date: typeof task.date === 'string' && /\d{4}-\d{2}-\d{2}/.test(task.date)
+        ? task.date
+        : toLocalDateKey(new Date()), // YYYY-MM-DD
+      order: task.order ?? 0,
+      userId: user.uid,
+      createdAt: serverTimestamp(),
+    };
 
   const docRef = await addDoc(tasksRef, payload);
 
