@@ -10,6 +10,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const router = express.Router();
 
 const allowedOrigins = [
+  "https://plancraftai.com",
   "http://localhost:5173", // dev
   "https://audit-agent-66451.web.app", // prod
   "https://audit-agent-66451.firebaseapp.com", // prod

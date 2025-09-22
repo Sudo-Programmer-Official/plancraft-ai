@@ -4,6 +4,7 @@ import OpenAI from "openai";
 import { toFile } from "openai/uploads";
 
 const allowedOrigins = [
+  "https://plancraftai.com",
   "http://localhost:5173",
   "http://127.0.0.1:5173",
   "https://audit-agent-66451.web.app",

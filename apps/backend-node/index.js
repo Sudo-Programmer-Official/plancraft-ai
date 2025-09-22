@@ -10,6 +10,7 @@ const app = express();
 
 // Allow list of origins
 const allowedOrigins = [
+  "https://plancraftai.com",
   "https://audit-agent-66451.web.app",
   "https://audit-agent-66451.firebaseapp.com",
   "http://localhost:5173",
