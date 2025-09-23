@@ -276,9 +276,13 @@ const progressBarWidth = computed(() => {
 })
 
 const sortedDaily = computed(() =>
-  [...dailyTasks.value].sort((a, b) =>
-    (a.completed - b.completed) || (a.order - b.order || 0)
-  )
+  [...dailyTasks.value].sort((a, b) => {
+    // First: incomplete tasks before completed
+    if (a.completed !== b.completed) return a.completed - b.completed
+    
+    // Then: newest first by createdAt
+    return (b.createdAt || 0) - (a.createdAt || 0)
+  })
 )
 
 const doneWeekly = computed(() => weeklyTasks.value.filter((t) => t.completed).length)
