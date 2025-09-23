@@ -62,11 +62,14 @@ importers:
         specifier: ^14.1.0
         version: 14.1.0
       mixpanel-browser:
-        specifier: ^2.65.0
+        specifier: ^2.70.0
         version: 2.70.0
       pinia:
         specifier: ^3.0.1
         version: 3.0.3(vue@3.5.21)
+      recordrtc:
+        specifier: ^5.6.2
+        version: 5.6.2
       sass:
         specifier: ^1.89.1
         version: 1.92.1
@@ -3669,6 +3672,9 @@ packages:
   readdirp@4.1.2:
     resolution: {integrity: sha512-GDhwkLfywWL2s6vEjyhri+eXmfH6j1L7JE27WhqLeYzoh/A3DBaYGEj2H/HFZCn/kMfim73FXxEJTw06WtxQwg==}
     engines: {node: '>= 14.18.0'}
+
+  recordrtc@5.6.2:
+    resolution: {integrity: sha512-1QNKKNtl7+KcwD1lyOgP3ZlbiJ1d0HtXnypUy7yq49xEERxk31PHvE9RCciDrulPCY7WJ+oz0R9hpNxgsIurGQ==}
 
   reflect.getprototypeof@1.0.10:
     resolution: {integrity: sha512-00o4I+DVrefhv+nX0ulyi3biSHCPDe+yLv5o/p6d/UVlirijB8E16FtfwSAi4g3tcqrQ4lRAqQSoFEZJehYEcw==}
@@ -8227,6 +8233,8 @@ snapshots:
       picomatch: 2.3.1
 
   readdirp@4.1.2: {}
+
+  recordrtc@5.6.2: {}
 
   reflect.getprototypeof@1.0.10:
     dependencies:

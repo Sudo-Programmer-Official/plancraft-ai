@@ -125,9 +125,13 @@ router.post("/transcribe", upload.single("file"), async (req, res) => {
     let ext = "wav"; // fallback
     const mime = req.file.mimetype || "";
 
+    // if (mime.includes("ogg") || mime.includes("oga")) {
+    //   ext = "webm"; // normalize to webm
+    // }
+
     if (mime.includes("mp4") || mime.includes("aac") || mime.includes("m4a")) ext = "m4a";
     else if (mime.includes("mpeg") || mime.includes("mp3")) ext = "mp3";
-    else if (mime.includes("ogg") || mime.includes("oga")) ext = "ogg";
+    else if (mime.includes("ogg") || mime.includes("oga")) ext = "webm";
     else if (mime.includes("webm")) ext = "webm";
     else if (mime.includes("wav")) ext = "wav";
     else if (mime.includes("flac")) ext = "flac"; // add just in case
@@ -143,9 +147,14 @@ router.post("/transcribe", upload.single("file"), async (req, res) => {
     res.json({ text, model });
   } catch (err) {
     console.error("❌ Transcription failed:", err);
-    res
-      .status(err?.status || 500)
-      .json({ error: err?.message || "Transcription failed" });
+    // res
+    //   .status(err?.status || 500)
+    //   .json({ error: err?.message || "Transcription failed" });
+    res.status(err?.status || 500).json({
+  error: err?.message || "Transcription failed",
+  code: err?.code || err?.error?.code,
+  type: err?.type,
+})
   }
 });
 
