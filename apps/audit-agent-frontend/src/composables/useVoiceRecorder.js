@@ -56,7 +56,7 @@ function isMobile() {
 }
 
 // 🔹 Backend fallback (Whisper/Google STT via /api/transcribe)
-async function recordAndSendToBackend(onResult) {
+async function recordAndSendToBackendold(onResult) {
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
   const mediaRecorder = new MediaRecorder(stream)
 
@@ -98,6 +98,34 @@ async function recordAndSendToBackend(onResult) {
 }
 
   mediaRecorder.start()
+  return mediaRecorder
+}
+
+// utils/backendRecorder.js
+export async function recordAndSendToBackend(onResult) {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+  const mediaRecorder = new MediaRecorder(stream, {
+    mimeType: "audio/webm;codecs=opus"
+  })
+
+  const chunks = []
+  mediaRecorder.ondataavailable = (e) => chunks.push(e.data)
+
+  mediaRecorder.onstop = async () => {
+    try {
+      const blob = new Blob(chunks, { type: "audio/webm;codecs=opus" })
+      const formData = new FormData()
+      formData.append("file", blob, "speech.webm")
+
+      const res = await fetch("/api/transcribe", { method: "POST", body: formData })
+      const data = await res.json()
+      if (data.text) onResult(data.text)   // ✅ Only emit once
+    } catch (err) {
+      console.error("❌ Backend transcription failed:", err)
+    }
+  }
+
+  mediaRecorder.start()   // no timeslice → 1 file only
   return mediaRecorder
 }
 

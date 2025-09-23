@@ -53,16 +53,22 @@ async function toggleRecording() {
         if (recognition) recognition.start()
       }
 
+      // if (useBackend || !recognition) {
+      //   mediaRecorder = await recordAndSendToBackend(
+      //     t => {
+      //       // Live partials + final
+      //       transcript.value = t
+      //       emit('transcribed', t)
+      //     },
+      //     { timeSliceMs: 2500 }
+      //   )
+      // }
       if (useBackend || !recognition) {
-        mediaRecorder = await recordAndSendToBackend(
-          t => {
-            // Live partials + final
-            transcript.value = t
-            emit('transcribed', t)
-          },
-          { timeSliceMs: 2500 }
-        )
-      }
+  mediaRecorder = await recordAndSendToBackend((t) => {
+    transcript.value = t
+    emit("transcribed", t)
+  })
+}
 
       isRecording.value = true
     } else {
