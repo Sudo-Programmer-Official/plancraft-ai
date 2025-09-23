@@ -53,9 +53,14 @@
           @click="generateTasks"
           :loading="loading"
           :disabled="!input.trim()"
-          class="w-full h-11"
+          class="w-full sm:w-auto px-4 py-2 rounded-lg text-white font-medium shadow-md
+         bg-gradient-to-r from-emerald-700 via-teal-800 to-cyan-700
+         hover:from-emerald-800 hover:via-teal-900 hover:to-cyan-800
+         transition-all duration-300
+         [text-shadow:_0_1px_2px_rgba(0,0,0,0.6)]"
         >
-          {{ loading ? '⏳ Generating...' : '➕ Generate Tasks' }}
+            <template v-if="transcribing">⌛ Transcribing…</template>
+  <template v-else>{{ loading ? '⏳ Generating...' : '➕ Generate Tasks' }}</template>
         </el-button>
       </div>
     </div>
@@ -90,6 +95,8 @@ const selectedDate = ref(
   typeof props.date === 'string' ? props.date : toLocalDateKey(props.date)
 )
 const loading = ref(false)
+const transcribing = ref(false)   // ⬅ add this
+
 // responsive dialog width
 const screenWidth = ref(window.innerWidth)
 
@@ -122,6 +129,12 @@ const formattedDate = computed(() => {
 
 function handleTranscript(text) {
   input.value = text
+   // When transcript arrives after stop, run 3-second "transcribing" lock
+  transcribing.value = true
+  setTimeout(() => {
+    transcribing.value = false
+  }, 2000) // block for 3s
+  // turn off the mic
 }
 
 async function generateTasks() {
@@ -161,6 +174,7 @@ async function generateTasks() {
     })
   } finally {
     loading.value = false
+    input.value = ''
     await loadTasks()
   }
 }
