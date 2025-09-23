@@ -1,5 +1,5 @@
 // src/composables/useTasks.js
-import { ref } from "vue"
+import { ref } from 'vue'
 import { trackEvent } from '@/services/analytics'
 import { useAuthStore } from '@/stores/authStore'
 import { toLocalDateKey } from '@/utils/dateHelper'
@@ -10,7 +10,7 @@ import {
   addTaskToFirebase,
   updateTaskInFirebase,
   deleteTaskFromFirebase,
-} from "@/services/firebaseService"
+} from '@/services/firebaseService'
 
 // 🔗 Shared singleton state
 const tasks = ref([])
@@ -22,7 +22,16 @@ export function useTasks() {
    * 🔄 Load tasks from Firestore for today (and current user)
    */
   async function loadTasks() {
-    tasks.value = await fetchTasksForToday()
+    let raw = await fetchTasksForToday()
+
+    // Ensure newest first + incomplete before complete
+    tasks.value = raw.sort((a, b) => {
+      if (a.completed !== b.completed) {
+        return a.completed - b.completed // incomplete first
+      }
+      return (b.createdAt || 0) - (a.createdAt || 0) // newest first
+    })
+
     initialized = true
   }
 
@@ -30,7 +39,15 @@ export function useTasks() {
    * Load tasks for a specific date (YYYY-MM-DD)
    */
   async function loadTasksForDate(dateStr) {
-    tasks.value = await fetchTasksByDate(dateStr)
+    let raw = await fetchTasksByDate(dateStr)
+
+    tasks.value = raw.sort((a, b) => {
+      if (a.completed !== b.completed) {
+        return a.completed - b.completed
+      }
+      return (b.createdAt || 0) - (a.createdAt || 0)
+    })
+
     initialized = true
   }
 
@@ -39,6 +56,15 @@ export function useTasks() {
    */
   async function loadTasksForRange(startYMD, endYMD) {
     tasks.value = await fetchTasksBetween(startYMD, endYMD)
+
+    // add sorting if needed
+    tasks.value.sort((a, b) => {
+      if (a.completed !== b.completed) {
+        return a.completed - b.completed // incomplete first
+      }
+      return (b.createdAt || 0) - (a.createdAt || 0) // newest first
+    })
+
     initialized = true
   }
 
@@ -48,8 +74,8 @@ export function useTasks() {
   async function addTask(newTask = null) {
     const baseTask = {
       id: Date.now().toString(),
-      title: "New Task",
-      details: "",
+      title: 'New Task',
+      details: '',
       completed: false,
       logs: [],
       date: toLocalDateKey(new Date()), // YYYY-MM-DD local
@@ -85,7 +111,7 @@ export function useTasks() {
         }
       }
     } catch (err) {
-      console.error("Failed to toggle complete:", err)
+      console.error('Failed to toggle complete:', err)
       task.completed = !task.completed // rollback on error
     }
   }
@@ -97,7 +123,7 @@ export function useTasks() {
     if (!task.newLog || !task.newLog.trim()) return
     task.logs = task.logs || []
     task.logs.push(task.newLog.trim())
-    task.newLog = ""
+    task.newLog = ''
     await updateTaskInFirebase(task)
   }
 
