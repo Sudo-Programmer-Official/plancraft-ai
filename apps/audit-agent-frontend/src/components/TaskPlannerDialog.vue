@@ -225,6 +225,9 @@ function closeDialog() {
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   color: #f8fafc;
   font-weight: 600;
+  .el-dialog__title {
+    color: #f1f5f9 !important;
+  }
 }
 
 /* Inputs */
