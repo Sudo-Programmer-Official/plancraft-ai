@@ -5,12 +5,13 @@ import {
   signInWithGoogle,
   signOutUser,
 } from "@/services/authService";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence } from "firebase/auth";
 import firebaseApp from "@/firebase/init";
 import { identifyUser, trackEvent } from '@/services/analytics'
 
 
 const auth = getAuth(firebaseApp);
+setPersistence(auth, browserLocalPersistence);
 
 export const useAuthStore = defineStore("authStore", {
   state: () => ({
