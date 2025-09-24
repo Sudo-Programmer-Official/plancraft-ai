@@ -29,16 +29,25 @@
     </div>
   </transition>
 
-  <!-- 🔹 iOS Safari hint -->
+  <!-- 🔹 iOS Safari / Instagram hint -->
   <transition name="fade-slide">
     <div
       v-if="iosHint"
       class="fixed bottom-6 inset-x-4 bg-slate-800 text-white rounded-xl p-4 text-center shadow-lg z-50"
     >
-      <p class="text-sm">
-        📱 To install <strong>PlanCraftAI</strong>: tap
-        <strong>Share</strong> → <strong>Add to Home Screen</strong>.
-      </p>
+      <div v-if="isInstagram">
+        <p class="text-sm">
+          ⚠️ You’re inside <strong>Instagram</strong>.<br />
+          Please tap <strong>⋯</strong> → <strong>Open in Safari</strong>.  
+          From Safari you can then <strong>Add to Home Screen</strong>.
+        </p>
+      </div>
+      <div v-else>
+        <p class="text-sm">
+          📱 To install <strong>PlanCraftAI</strong>: tap
+          <strong>Share</strong> → <strong>Add to Home Screen</strong>.
+        </p>
+      </div>
       <button
         class="mt-2 text-xs opacity-80 underline"
         @click="dismissIos"
@@ -54,6 +63,7 @@ import { ref, onMounted } from "vue"
 
 const visible = ref(false)
 const iosHint = ref(false)
+const isInstagram = ref(false)
 let deferredPrompt = null
 
 // --- LocalStorage helpers ---
@@ -61,9 +71,8 @@ const STORAGE_KEY = "auditagent_install_prompt_dismissed"
 function alreadyDismissed() {
   const lastDismissed = localStorage.getItem(STORAGE_KEY)
   if (!lastDismissed) return false
-  // expire after 7 days
   const diff = Date.now() - parseInt(lastDismissed, 10)
-  return diff < 7 * 24 * 60 * 60 * 1000
+  return diff < 7 * 24 * 60 * 60 * 1000 // 7 days
 }
 function markDismissed() {
   localStorage.setItem(STORAGE_KEY, Date.now().toString())
@@ -79,14 +88,17 @@ onMounted(() => {
       deferredPrompt = e
       visible.value = true
     },
-    { once: true } // ensure it only fires once
+    { once: true }
   )
 
-  // --- iOS Safari hint ---
-  const isIos = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase())
-  const isStandalone = "standalone" in navigator && navigator.standalone
-  if (!alreadyDismissed() && isIos && !isStandalone) {
+  // --- iOS Safari / Instagram detection ---
+  const ua = navigator.userAgent.toLowerCase()
+  const isIos = /iphone|ipad|ipod/.test(ua)
+  const standalone = "standalone" in navigator && navigator.standalone
+
+  if (!alreadyDismissed() && isIos && !standalone) {
     iosHint.value = true
+    isInstagram.value = ua.includes("instagram")
   }
 })
 
