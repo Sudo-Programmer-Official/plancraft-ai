@@ -1,20 +1,34 @@
 import RecordRTC from "recordrtc"
 
-// ✅ Normalize API_BASE so we never accidentally hit /api/ai/transcribe
 let __rawBase =
   import.meta.env.VITE_TRANSCRIBE_BASE_URL ||
   import.meta.env.VITE_API_BASE_URL ||
   "http://localhost:4000/api"
 
-__rawBase = (__rawBase || "").replace(/\/+$/, "") // strip trailing slashes
+__rawBase = (__rawBase || "").replace(/\/+$/, "")
 if (/\/api\/ai$/i.test(__rawBase)) {
   __rawBase = __rawBase.replace(/\/api\/ai$/i, "/api")
 }
 const API_BASE = __rawBase
 
+function getMimeType() {
+  const ua = navigator.userAgent.toLowerCase()
+  if (/safari/.test(ua) && !/chrome/.test(ua)) {
+    // Safari prefers mp4/wav
+    return "audio/mp4"
+  }
+  if (/firefox/.test(ua)) {
+    // Firefox prefers ogg
+    return "audio/ogg;codecs=opus"
+  }
+  // Default for Chrome/Edge
+  return "audio/webm;codecs=opus"
+}
+
 function getExt(mime) {
   if (!mime) return "wav"
   if (mime.includes("mp4")) return "m4a"
+  if (mime.includes("ogg")) return "ogg"
   if (mime.includes("mpeg")) return "mp3"
   if (mime.includes("aac")) return "aac"
   if (mime.includes("wav")) return "wav"
@@ -24,64 +38,42 @@ function getExt(mime) {
 export async function recordAndSendToBackend(onResult, { timeSliceMs = 4000 } = {}) {
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
 
-  const mimeType =
-    RecordRTC.getFromSupportedMimeTypes?.([
-      "audio/webm;codecs=opus",
-      "audio/webm",
-      "audio/mp4",
-      "audio/mpeg",
-    ]) || "audio/webm"
-
+  const mimeType = getMimeType()
   const ext = getExt(mimeType)
 
-  // const recorder = new RecordRTC(stream, {
-  //   type: "audio",
-  //   mimeType,
-  //   timeSlice: timeSliceMs,
-  //   ondataavailable: async (blob) => {
-  //     if (blob.size < 2048) return
-  //     try {
-  //       const fd = new FormData()
-  //       fd.append("file", blob, `chunk.${ext}`)
-  //       const res = await fetch(`${API_BASE}/transcribe`, { method: "POST", body: fd })
-  //       const data = await res.json()
-  //       if (data?.text) onResult(data.text, false) // partial
-  //     } catch (err) {
-  //       console.warn("⚠️ Live transcription failed", err)
-  //     }
-  //   },
-  // })
   const recorder = new RecordRTC(stream, {
-  type: "audio",
-  mimeType: "audio/webm;codecs=opus",  // ✅ force webm instead of ogg
-  timeSlice: 4000,
-  ondataavailable: async (blob) => {
-    if (blob.size < 500) return
-    try {
-      const fd = new FormData()
-      fd.append("file", blob, "chunk.webm")
-      const res = await fetch(`${API_BASE}/transcribe`, { method: "POST", body: fd })
-      const data = await res.json()
-      if (data?.text) onResult(data.text, false)
-    } catch (err) {
-      console.warn("⚠️ Live transcription failed", err)
-    }
-  },
-})
+    type: "audio",
+    mimeType,
+    timeSlice: timeSliceMs,
+    ondataavailable: async (blob) => {
+      // Safari sometimes gives <1KB chunks → skip them
+      if (!blob || blob.size < 2048) return
+      try {
+        const fd = new FormData()
+        fd.append("file", blob, `chunk.${ext}`)
+        const res = await fetch(`${API_BASE}/transcribe`, { method: "POST", body: fd })
+        const data = await res.json()
+        if (data?.text) onResult(data.text, false)
+      } catch (err) {
+        console.warn("⚠️ Live transcription failed", err)
+      }
+    },
+  })
 
   recorder.startRecording()
 
-  // 🔹 Finalizer
   recorder._stop = () =>
     new Promise((resolve) => {
       recorder.stopRecording(async () => {
         const blob = recorder.getBlob()
         try {
-          const fd = new FormData()
-          fd.append("file", blob, `speech.${ext}`)
-          const res = await fetch(`${API_BASE}/transcribe`, { method: "POST", body: fd })
-          const data = await res.json()
-          if (data?.text) onResult(data.text, true) // final
+          if (blob && blob.size > 1024) {
+            const fd = new FormData()
+            fd.append("file", blob, `speech.${ext}`)
+            const res = await fetch(`${API_BASE}/transcribe`, { method: "POST", body: fd })
+            const data = await res.json()
+            if (data?.text) onResult(data.text, true)
+          }
         } catch (err) {
           console.error("❌ Final transcription failed", err)
         } finally {
