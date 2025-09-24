@@ -27,31 +27,36 @@ export default defineConfig({
         name: 'Peaceful Productivity',
         short_name: 'Productivity',
         description: 'Pause, plan, and reflect with mindful journaling and tasks',
-        theme_color: '#4f46e5',      // matches your indigo brand
+        theme_color: '#4f46e5', // matches your indigo brand
         background_color: '#111827', // slate/indigo background
         display: 'standalone',
         scope: '/',
         start_url: '/',
         icons: [
           {
-            src: '/pwa-192x192.png',
+            src: '/icons/icon-192x192.png',
             sizes: '192x192',
-            type: 'image/png'
+            type: 'image/png',
           },
           {
-            src: '/pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png'
+            src: '/icons/icon-384x384.png',
+            sizes: '384x384',
+            type: 'image/png',
           },
           {
-            src: '/pwa-512x512.png',
+            src: '/icons/icon-512x512.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable'
-          }
-        ]
-      }
-    })
+          },
+          {
+            src: '/icons/icon-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any maskable',
+          },
+        ],
+      },
+    }),
   ],
   resolve: {
     alias: {
