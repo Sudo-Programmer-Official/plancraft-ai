@@ -254,12 +254,33 @@ async function redirectToLogin() {
   window.location.href = '/login?redirect=/dashboard'
 }
 
+// async function fetchAISummary() {
+//   try {
+//     const allTasks = [...dailyTasks.value, ...weeklyTasks.value, ...monthlyTasks.value]
+//     aiSummary.value = await summarizeTasks(allTasks)
+//   } catch (err) {
+//     console.error('Task summary failed:', err)
+//   }
+// }
 async function fetchAISummary() {
   try {
-    const allTasks = [...dailyTasks.value, ...weeklyTasks.value, ...monthlyTasks.value]
-    aiSummary.value = await summarizeTasks(allTasks)
+    const allTasks = [
+      ...dailyTasks.value,
+      ...weeklyTasks.value,
+      ...monthlyTasks.value
+    ]
+
+    // Safety: pass only compact task objects (id, title, completed, date)
+    const compacted = allTasks.map(t => ({
+      id: t.id,
+      title: t.title,
+      completed: !!t.completed,
+      date: t.date
+    }))
+
+    aiSummary.value = await summarizeTasks(compacted)
   } catch (err) {
-    console.error('Task summary failed:', err)
+    console.error('❌ Task summary failed:', err.message || err)
   }
 }
 

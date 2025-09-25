@@ -50,7 +50,15 @@ router.post("/tasks/summarize", async (req, res) => {
       return res.status(400).json({ error: "Tasks should be an array" });
     }
 
-    const summary = await summarizeTasks(tasks);
+     // 🔹 Compact here before sending to OpenAI
+    const safeTasks = (tasks || []).map(t => ({
+      title: (t.title || "").slice(0, 120),
+      completed: !!t.completed,
+      date: t.date || null,
+    }));
+
+
+    const summary = await summarizeTasks(safeTasks);
     res.json({ summary });
   } catch (err) {
     console.error("❌ Task Summarize Error:", err);

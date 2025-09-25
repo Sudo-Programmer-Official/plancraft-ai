@@ -11,6 +11,7 @@ const FALLBACK_MODELS = (
   process.env.OPENAI_MODEL_FALLBACKS?.split(",") || [
     // Ordered by preference; edit via env if needed
     "gpt-3.5-turbo",
+    "gpt-3.5-turbo-16k",
     "gpt-4.1-mini",
     "gpt-4.1",
   ]
@@ -81,31 +82,215 @@ Return only the improved text.
 //   const content = await chatWithFallback({ messages: [{ role: "user", content: prompt }], temperature: 0.5 });
 //   return JSON.parse(content);
 // }
+// export async function summarizeTasks(tasks) {
+//   const prompt = `
+// You are an assistant analyzing a task list. 
+// Return a JSON object with:
+
+// {
+//   "Completed %": <number>,
+//   "Pending items": <number>,
+//   "Suggested focus for today": "<string>",
+//   "Quick wins": [ "<string>", "<string>" ],
+//   "Heavy lifts": [ "<string>", "<string>" ],
+//   "Weekly warning": "<string>"
+// }
+
+// Tasks:
+// ${JSON.stringify(tasks, null, 2)}
+// `
+
+//   const response = await openai.chat.completions.create({
+//     model: "gpt-3.5-turbo",
+//     messages: [{ role: "user", content: prompt }],
+//     response_format: { type: "json_object" }
+//   })
+
+//   return JSON.parse(response.choices[0].message.content)
+// }
+// services/openaiService.js
+
 export async function summarizeTasks(tasks) {
-  const prompt = `
-You are an assistant analyzing a task list. 
-Return a JSON object with:
+  if (!tasks || !tasks.length) {
+    return {
+      "Completed %": 0,
+      "Pending items": 0,
+      "Suggested focus for today": "No tasks found",
+      "Quick wins": [],
+      "Heavy lifts": [],
+      "Weekly warning": ""
+    }
+  }
 
-{
-  "Completed %": <number>,
-  "Pending items": <number>,
-  "Suggested focus for today": "<string>",
-  "Quick wins": [ "<string>", "<string>" ],
-  "Heavy lifts": [ "<string>", "<string>" ],
-  "Weekly warning": "<string>"
-}
-
-Tasks:
-${JSON.stringify(tasks, null, 2)}
-`
-
-  const response = await openai.chat.completions.create({
-    model: "gpt-3.5-turbo",
-    messages: [{ role: "user", content: prompt }],
-    response_format: { type: "json_object" }
+  // 🔹 Compact tasks to avoid huge prompts (drop large fields; truncate)
+  const MAX_TITLE = 160
+  const MAX_DETAILS = 240
+  const compact = (t) => ({
+    title: String(t.title || "").slice(0, MAX_TITLE),
+    details: String(t.details || "").slice(0, MAX_DETAILS),
+    completed: !!t.completed,
+    date: t.date || undefined,
   })
 
-  return JSON.parse(response.choices[0].message.content)
+  const compacted = tasks.map(compact)
+
+  // 🔹 Compute simple metrics locally (no need to query LLM)
+  const total = compacted.length
+  const completedCount = compacted.filter((t) => t.completed).length
+  const pendingCount = total - completedCount
+  const completedPct = total ? Math.round((completedCount / total) * 100) : 0
+
+  // 🔹 Prepare only pending tasks for focus suggestions
+  const pendingTasks = compacted.filter((t) => !t.completed)
+  // Further reduce payload to only essentials: a short string per task
+  const modelItems = pendingTasks.map((t) => {
+    const title = t.title || ""
+    const details = t.details || ""
+    const combined = details ? `${title} — ${details}` : title
+    // Keep strings compact; downstream prompt expects short strings
+    return combined.slice(0, 280)
+  })
+
+  // 🔹 Chunk by character budget instead of count
+  const BUDGET = Number(process.env.SUMMARY_PROMPT_CHAR_BUDGET || 9000) // chars
+  const serialize = (arr) => JSON.stringify(arr) // compact (no pretty print)
+  const chunks = []
+  let current = []
+  let currentLen = 2 // for surrounding []
+  for (const item of modelItems) {
+    const itemStr = (current.length ? "," : "") + JSON.stringify(item)
+    if (currentLen + itemStr.length > BUDGET && current.length) {
+      chunks.push(current)
+      current = [item]
+      currentLen = 2 + JSON.stringify(item).length
+    } else {
+      current.push(item)
+      currentLen += itemStr.length
+    }
+  }
+  if (current.length) chunks.push(current)
+
+  // Fallback if no pending tasks; still return stats
+  if (!chunks.length) {
+    return {
+      "Completed %": completedPct,
+      "Pending items": pendingCount,
+      "Suggested focus for today": completedPct === 100 ? "Great job — plan tomorrow’s top 3." : "Pick one high-impact task and 2 quick wins.",
+      "Quick wins": [],
+      "Heavy lifts": [],
+      "Weekly warning": "",
+    }
+  }
+
+  // 🔹 Summarize each chunk safely with automatic backoff if still too large
+  async function summarizeChunkSafe(list) {
+    let slice = list
+    while (slice.length) {
+      const prompt = `You are an AI productivity coach. From the following pending tasks, provide a concise suggestion.\n\nTasks (JSON array of short strings):\n${serialize(slice)}\n\nReturn ONLY valid JSON:\n{\n  "Suggested focus": "<string>",\n  "Quick wins": ["<string>", "<string>"],\n  "Heavy lifts": ["<string>", "<string>"]\n}`
+      try {
+        const res = await chatWithFallback({
+          modelList: ["gpt-3.5-turbo", "gpt-4.1-mini"],
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.3,
+        })
+        const cleaned = res.replace(/^```json\s*/i, "").replace(/```$/i, "").trim()
+        return JSON.parse(cleaned)
+      } catch (err) {
+        const msg = err?.error?.message || err?.message || ""
+        const code = err?.code || err?.error?.code
+        const tooLong = /context length|maximum context length|too many tokens/i.test(msg)
+        if (tooLong || code === "context_length_exceeded") {
+          // Reduce slice size and try again
+          if (slice.length <= 5) throw err
+          slice = slice.slice(0, Math.ceil(slice.length / 2))
+          continue
+        }
+        throw err
+      }
+    }
+    // Should not reach here
+    return { "Suggested focus": "", "Quick wins": [], "Heavy lifts": [] }
+  }
+
+  const partials = []
+  for (const c of chunks) {
+    try {
+      const part = await summarizeChunkSafe(c)
+      partials.push(part)
+    } catch (e) {
+      console.warn("⚠️ Failed to summarize a chunk:", e?.message || e)
+    }
+  }
+
+  // 🔹 Merge partials into final using the model (keep payload small)
+  const MERGE_MAX_PARTS = Number(process.env.SUMMARY_MERGE_MAX_PARTS || 24)
+  const MERGE_BUDGET = Number(process.env.SUMMARY_MERGE_CHAR_BUDGET || 6000)
+
+  const compactPart = (p) => ({
+    "Suggested focus": String(p["Suggested focus"] || "").slice(0, 200),
+    "Quick wins": (p["Quick wins"] || []).map((s) => String(s).slice(0, 120)).slice(0, 3),
+    "Heavy lifts": (p["Heavy lifts"] || []).map((s) => String(s).slice(0, 120)).slice(0, 3),
+  })
+
+  let selected = partials.slice(0, MERGE_MAX_PARTS).map(compactPart)
+  let mergePayloadObj = { stats: { total, completedCount, pendingCount, completedPct }, parts: selected }
+  let mergePayload = JSON.stringify(mergePayloadObj)
+  while (mergePayload.length > MERGE_BUDGET && selected.length > 1) {
+    // Trim parts until under budget
+    selected = selected.slice(0, Math.ceil(selected.length / 2))
+    mergePayloadObj = { stats: mergePayloadObj.stats, parts: selected }
+    mergePayload = JSON.stringify(mergePayloadObj)
+  }
+
+  // If still over budget or no parts, fallback locally
+  if (!selected.length || mergePayload.length > MERGE_BUDGET) {
+    return {
+      "Completed %": completedPct,
+      "Pending items": pendingCount,
+      "Suggested focus for today": pendingCount ? "Pick one high-impact task and 2 quick wins." : "Great job — plan tomorrow’s top 3.",
+      "Quick wins": partials.flatMap(p => p["Quick wins"] || []).slice(0, 3),
+      "Heavy lifts": partials.flatMap(p => p["Heavy lifts"] || []).slice(0, 3),
+      "Weekly warning": "",
+    }
+  }
+
+  const mergePrompt = `You are an AI productivity coach. Merge these partial suggestions and stats into a single concise dashboard.\n\nData (JSON):\n${mergePayload}\n\nReturn ONLY valid JSON with fields:\n{\n  "Completed %": <number>,\n  "Pending items": <number>,\n  "Suggested focus for today": "<string>",\n  "Quick wins": ["<string>", "<string>"],\n  "Heavy lifts": ["<string>", "<string>"],\n  "Weekly warning": "<string>"\n}`
+
+  try {
+    const final = await chatWithFallback({
+      modelList: ["gpt-3.5-turbo", "gpt-4.1-mini"],
+      messages: [{ role: "user", content: mergePrompt }],
+      temperature: 0.3,
+    })
+    const cleaned = final.replace(/^```json\s*/i, "").replace(/```$/i, "").trim()
+    const parsed = JSON.parse(cleaned)
+    parsed["Completed %"] = Number(parsed["Completed %"]) || completedPct
+    parsed["Pending items"] = Number(parsed["Pending items"]) || pendingCount
+    return parsed
+  } catch (e) {
+    const msg = e?.error?.message || e?.message || ""
+    const tooLong = /context length|maximum context length|too many tokens/i.test(msg)
+    if (tooLong) {
+      // Final local fallback if merge still too long
+      return {
+        "Completed %": completedPct,
+        "Pending items": pendingCount,
+        "Suggested focus for today": pendingCount ? "Pick one high-impact task and 2 quick wins." : "Great job — plan tomorrow’s top 3.",
+        "Quick wins": partials.flatMap(p => p["Quick wins"] || []).slice(0, 3),
+        "Heavy lifts": partials.flatMap(p => p["Heavy lifts"] || []).slice(0, 3),
+        "Weekly warning": "",
+      }
+    }
+    console.warn("⚠️ Merge step failed, falling back to local stats:", e?.message || e)
+    return {
+      "Completed %": completedPct,
+      "Pending items": pendingCount,
+      "Suggested focus for today": pendingCount ? "Pick one high-impact task and 2 quick wins." : "Great job — plan tomorrow’s top 3.",
+      "Quick wins": partials.flatMap(p => p["Quick wins"] || []).slice(0, 3),
+      "Heavy lifts": partials.flatMap(p => p["Heavy lifts"] || []).slice(0, 3),
+      "Weekly warning": "",
+    }
+  }
 }
 // ✨ Quote Generator
 export async function getQuoteFromIdea(idea) {
@@ -155,95 +340,6 @@ Return only the improved response.
   return chatWithFallback({ messages: [{ role: "user", content: prompt }], temperature: 0.4 });
 }
 
-// ✨ Split free‑form text into actionable tasks
-// export async function splitTasks(input, { maxItems = 6, context = "" } = {}) {
-//   const system = {
-//     role: "system",
-//     content:
-//       "You are a behavioral design + productivity coach. You turn vague notes into small, emotionally inviting, do-able tasks.",
-//   }
-
-//   const schema = `
-// Return ONLY valid JSON matching this schema:
-// {
-//   "tasks": [
-//     {
-//       "title": "Action verb + clear outcome (5–8 words)",
-//       "details": "Concise specifics and success criteria; tools/resources if relevant",
-//       "estimate_minutes": 10,
-//       "energy": "low|medium|high",
-//       "context": "home|work|computer|phone|errand|meeting|deep-work|planning",
-//       "priority": 1
-//     }
-//   ]
-// }`
-
-//   const rules = `
-// Rules:
-// - Break into at most ${maxItems} atomic tasks. Each must be independently completable.
-// - Start each title with a concrete verb (e.g., Draft, Email, Outline, Book, Review).
-// - Avoid vague titles like "today", "ASAP", "ongoing", or single-keyword items.
-// - Make tasks psychologically inviting: small scope, clear win, friendly tone.
-// - Prefer short estimates (10–30 minutes). Set "estimate_minutes" accordingly.
-// - If input is too vague, include a first task to Clarify scope (e.g., "Outline success criteria for X").
-// - Keep output minimal; do not add commentary, markdown, or extra fields.
-// `
-
-//   const user = {
-//     role: "user",
-//     content: `${context ? `Context: ${context}\n` : ""}Notes to split:\n"""${input}"""\n\n${schema}\n${rules}`,
-//   }
-
-//   const content = await chatWithFallback({ messages: [system, user], temperature: 0.4 })
-
-//   // Best‑effort parse. The prompt already forces raw JSON.
-//   return JSON.parse(content)
-// }
-
-// export async function splitTasks(input, { maxItems = 6, context = "" } = {}) {
-//   const system = {
-//     role: "system",
-//     content:
-//       "You are a productivity coach. Convert free-form notes into a strict list of short, actionable tasks."
-//   };
-
-//   const schema = `
-// Return ONLY valid JSON in this format:
-// {
-//   "tasks": [
-//     {
-//       "title": "Action verb + clear outcome (max 8 words)",
-//       "details": "Specifics or success criteria",
-//       "estimate_minutes": 15,
-//       "energy": "low|medium|high",
-//       "context": "home|work|computer|phone|errand|meeting|deep-work|planning",
-//       "priority": 1
-//     }
-//   ]
-// }`;
-
-//   const rules = `
-// Rules:
-// - At most ${maxItems} tasks.
-// - Each task must start with a verb (e.g., Write, Review, Prepare, Go).
-// - No sequence words like "First", "Second", "Lastly".
-// - No reflections like "I feel grateful" or "Today is tough".
-// - Each task should be atomic, completable in 10–30 minutes.
-// - Do not include duplicates or vague filler sentences.
-// `;
-
-//   const user = {
-//     role: "user",
-//     content: `${context ? `Context: ${context}\n` : ""}User notes:\n"""${input}"""\n\n${schema}\n${rules}`,
-//   };
-
-//   const content = await chatWithFallback({
-//     messages: [system, user],
-//     temperature: 0.2, // more deterministic
-//   });
-
-//   return JSON.parse(content);
-// }
 export async function splitTasks(input, { maxItems = 6, context = "" } = {}) {
   const system = {
     role: "system",
