@@ -36,8 +36,8 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 // Prefer env, otherwise try modern transcribe models first
 // TODO: allow more models over time
 const DEFAULT_TRANSCRIBE_MODELS = [
-  "gpt-4o-transcribe",
-  "whisper-1"
+  "whisper-1",
+  "gpt-4o-transcribe"
 ];
 
 function resolveModelList() {
