@@ -273,18 +273,28 @@ export async function fetchTasksBetween(startYMD, endYMD) {
 /**
  * ✅ Update an existing task in Firestore
  */
+// export async function updateTaskInFirebase(task) {
+//   if (!task.id) throw new Error("Task missing Firestore ID");
+
+//   const { id, createdAt, ...updates } = task; 
+//   // strip `createdAt` because serverTimestamp() is managed by Firestore
+
+//   const docRef = doc(db, "tasks", id);
+
+//   await updateDoc(docRef, {
+//     ...updates,
+//     updatedAt: serverTimestamp(), // track last update
+//   });
+// }
 export async function updateTaskInFirebase(task) {
-  if (!task.id) throw new Error("Task missing Firestore ID");
-
-  const { id, createdAt, ...updates } = task; 
-  // strip `createdAt` because serverTimestamp() is managed by Firestore
-
-  const docRef = doc(db, "tasks", id);
-
+  console.log("updateTaskInFirebase called with task:", task);
+  if (!task.id) throw new Error("Task missing Firestore ID")
+  const { id, createdAt, ...updates } = task
+  const docRef = doc(db, "tasks", id)
   await updateDoc(docRef, {
     ...updates,
-    updatedAt: serverTimestamp(), // track last update
-  });
+    updatedAt: serverTimestamp(),
+  })
 }
 
 /**

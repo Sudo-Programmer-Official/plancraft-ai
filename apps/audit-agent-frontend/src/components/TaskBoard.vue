@@ -86,7 +86,8 @@
   v-if="showPlanner"
   :open="showPlanner"
   :date="today"
-  @saved="reload"
+  :task="selectedTask"
+  @saved="handleSave"
   @close="closePlanner"
 />
 </template>
@@ -96,6 +97,7 @@ import draggable from 'vuedraggable'
 import { ref, onMounted } from 'vue'
 import { useTasks } from '@/composables/useTasks'
 // import TaskDialog from '@/components/TaskDialog.vue'
+import { addTaskToFirebase, updateTaskInFirebase } from '@/services/firebaseService'
 import TaskPlannerDialog from './TaskPlannerDialog.vue'
 import { toLocalDateKey } from '@/utils/dateHelper'
 
@@ -113,9 +115,20 @@ function openPlanner() {
 }
 function closePlanner() {
   showPlanner.value = false
+  selectedTask.value = null
 }
 
-async function reload() {
+// async function reload() {
+//   await loadTasks()
+//   closePlanner()
+// }
+
+async function handleSave(task) {
+  if (task.id) {
+    await updateTaskInFirebase(task)
+  } else {
+    await addTaskToFirebase(task)
+  }
   await loadTasks()
   closePlanner()
 }
@@ -125,6 +138,7 @@ async function reload() {
 function openDialog(task = null) {
   selectedTask.value = task
   showDialog.value = true
+  showPlanner.value = true
 }
 
 // function closeDialog() {

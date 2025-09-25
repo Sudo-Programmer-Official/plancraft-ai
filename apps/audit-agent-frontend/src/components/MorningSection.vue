@@ -73,6 +73,7 @@ async function generateTasks() {
     console.error('Task generation failed:', err)
   } finally {
     await loadTasks()
+    planningInput.value = ''
   }
 }
 </script>

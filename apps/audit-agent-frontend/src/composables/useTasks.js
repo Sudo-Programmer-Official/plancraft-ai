@@ -72,8 +72,9 @@ export function useTasks() {
    * ➕ Add new task
    */
   async function addTask(newTask = null) {
+      if (!newTask) throw new Error("Task data is required")
     const baseTask = {
-      id: Date.now().toString(),
+      // id: Date.now().toString(),
       title: 'New Task',
       details: '',
       completed: false,
