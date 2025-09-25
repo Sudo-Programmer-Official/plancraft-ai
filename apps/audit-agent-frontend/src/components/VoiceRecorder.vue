@@ -24,7 +24,6 @@
 <script setup>
 import { ref } from "vue"
 import { recordAndSendToBackend } from "@/utils/backendRecorder"
-import { isMobileBrowser } from "@/utils/deviceHelper"
 import { trackEvent } from "@/services/analytics"
 
 const emit = defineEmits(["transcribed"])
@@ -42,10 +41,10 @@ async function toggleRecording() {
       isRecording.value = true
       isTranscribing.value = false
 
-      recorder = await recordAndSendToBackend((text, final = false) => {
+      recorder = await recordAndSendToBackend((text, isFinal) => {
         transcript.value = text
         emit("transcribed", text)
-        if (final) {
+        if (isFinal) {
           isTranscribing.value = false
         }
       })

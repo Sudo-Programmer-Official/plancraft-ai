@@ -13,3 +13,18 @@ export function isSafari() {
   const isRealSafari = /^((?!chrome|android).)*safari/i.test(ua)
   return isIOS || isRealSafari
 }
+
+export function isChrome() {
+  const ua = navigator.userAgent
+  return /chrome|chromium|crios/i.test(ua) && !/edge|edgios|edga/i.test(ua)
+}
+
+export function isFirefox() {
+  const ua = navigator.userAgent
+  return /firefox|fxios/i.test(ua)
+}
+
+export function isEdge() {
+  const ua = navigator.userAgent
+  return /edg/i.test(ua)
+}
