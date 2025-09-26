@@ -143,6 +143,12 @@
       >
         📋 Copy
       </button>
+      <button
+  @click="shareEntry(log.text)"
+  class="mt-2 ml-2 text-xs px-3 py-1 rounded-lg border border-green-500 bg-green-900/40 hover:bg-green-700 text-green-200 transition"
+>
+  🔗 Share
+</button>
           </li>
         </ul>
       </section>
@@ -267,6 +273,16 @@ async function saveEntry() {
     enhancedText.value = ''
   } catch (err) {
     console.error('Enhance failed:', err)
+  }
+}
+function shareEntry(text) {
+  if (navigator.share) {
+    navigator.share({
+      title: "My Reflection 🌱",
+      text,
+    }).catch(err => console.log("Share canceled", err))
+  } else {
+    copyToClipboard(text)
   }
 }
 
