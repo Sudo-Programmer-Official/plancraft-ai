@@ -3,24 +3,23 @@
   <main
     class="px-2 py-4 sm:px-4 md:px-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"
   >
-    <GuestBanner :isGuest="authStore.guest" @login="redirectToLogin" /> 
+    <GuestBanner :isGuest="authStore.guest" @login="redirectToLogin" />
 
     <!-- Daily Card -->
-   <!-- Daily Card -->
+    <!-- Daily Card -->
+  <!-- Daily Card -->
 <div class="bg-gray-900/80 rounded-xl p-4 sm:p-6 shadow-lg">
-<div class="flex justify-between items-center mb-3">
-  <h3 class="font-semibold">📅 Daily Tasks</h3>
-  <button
-    @click="openPlanner"
-    class="flex items-center text-xs px-3 py-1 rounded-lg font-medium
-           bg-gradient-to-r from-pink-500 to-indigo-600 
-           hover:from-pink-600 hover:to-indigo-700 
-           text-white shadow-md transition"
-  >
-    <span class="mr-1 text-yellow-300 animate-pulse">➕</span>
-    Plan My Day
-  </button>
-</div>
+  <div class="flex justify-between items-center mb-3">
+    <h3 class="font-semibold">📅 Daily Tasks</h3>
+    <button
+      @click="openPlanner"
+      class="flex items-center text-xs px-3 py-1 rounded-lg font-medium bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 text-white shadow-md transition"
+    >
+      <span class="mr-1 text-yellow-300 animate-pulse">➕</span>
+      Plan My Day
+    </button>
+  </div>
+
   <ul
     v-if="sortedDaily.length"
     class="space-y-2 text-sm max-h-64 overflow-y-auto pr-2 custom-scroll"
@@ -36,25 +35,41 @@
         </span>
         <small class="text-gray-400">{{ task.date }}</small>
       </div>
-      <button
-        @click="toggleComplete(task)"
-        class="text-xs px-2 py-1 rounded"
-        :class="task.completed ? 'bg-green-600' : 'bg-red-600'"
-      >
-        {{ task.completed ? 'Done' : 'Pending' }}
-      </button>
+
+      <div class="flex items-center gap-2">
+        <!-- Edit button -->
+        <button
+          @click.stop="openDialog(task)"
+          class="text-gray-400 hover:text-indigo-400 mr-4"
+          title="Edit Task"
+        >
+          ✏️
+        </button>
+
+        <!-- Toggle complete -->
+        <button
+          @click="toggleComplete(task)"
+          class="text-xs px-2 py-1 rounded"
+          :class="task.completed ? 'bg-green-600' : 'bg-red-600'"
+        >
+          {{ task.completed ? 'Done' : 'Pending' }}
+        </button>
+      </div>
     </li>
   </ul>
 
   <p v-else class="text-gray-400 text-sm">No tasks today.</p>
 
-  <!-- Dialog -->
-<TaskPlannerDialog
-  :open="showPlanner"
-  :date="selectedDate"
-  @close="showPlanner = false"
-  @saved="reloadDaily"
-/>
+  <!-- Task Planner Dialog -->
+  <TaskPlannerDialog
+    v-if="showPlanner"
+    :open="showPlanner"
+    :date="selectedDate"
+    :task="selectedTask"
+    :edit-mode="!!selectedTask"
+    @close="closePlanner"
+    @saved="handleSave"
+  />
 </div>
 
     <!-- Weekly Card -->
@@ -80,9 +95,7 @@
     </div>
 
     <!-- Monthly Card -->
-    <div
-      class="bg-gray-900/80 rounded-xl p-4 sm:p-6 shadow-lg hover:shadow-pink-500/40 transition"
-    >
+    <div class="bg-gray-900/80 rounded-xl p-4 sm:p-6 shadow-lg hover:shadow-pink-500/40 transition">
       <h3 class="font-semibold mb-3">🌙 Monthly Goals</h3>
       <p class="text-sm text-gray-400">
         {{ doneMonthly }}/{{ monthlyTasks.length }} completed this month
@@ -99,9 +112,7 @@
     <div
       class="bg-gray-900/80 rounded-xl p-4 sm:p-6 shadow-lg hover:shadow-green-500/40 transition col-span-1 sm:col-span-2 lg:col-span-3"
     >
-      <h3 class="font-semibold text-lg mb-4 flex items-center gap-2">
-        🤖 AI Insights
-      </h3>
+      <h3 class="font-semibold text-lg mb-4 flex items-center gap-2">🤖 AI Insights</h3>
 
       <div v-if="aiSummary" class="text-sm space-y-4">
         <!-- Progress Overview -->
@@ -138,10 +149,7 @@
         </div>
 
         <!-- Weekly Warning -->
-        <div
-          v-if="aiSummary.weeklyWarning"
-          class="bg-red-900/30 p-3 rounded border border-red-600"
-        >
+        <div v-if="aiSummary.weeklyWarning" class="bg-red-900/30 p-3 rounded border border-red-600">
           <p><strong>⚠ Weekly Warning:</strong> {{ aiSummary.weeklyWarning }}</p>
         </div>
       </div>
@@ -162,8 +170,9 @@ import GuestBanner from '@/components/GuestBanner.vue'
 import { useAuthStore } from '@/stores/authStore'
 import TaskPlannerDialog from '@/components/TaskPlannerDialog.vue'
 import { useTasks } from '@/composables/useTasks'
-
+import { addTaskToFirebase, updateTaskInFirebase } from '@/services/firebaseService'
 const { tasks, toggleComplete: toggleFromComposable, loadTasks } = useTasks()
+
 const authStore = useAuthStore()
 
 const aiSummary = ref(null)
@@ -172,14 +181,53 @@ const weeklyTasks = ref([])
 const monthlyTasks = ref([])
 const showPlanner = ref(false)
 
+const selectedTask = ref(null)
+
+function openPlanner() {
+  selectedTask.value = null
+  showPlanner.value = true
+}
+
+function openDialog(task) {
+  selectedTask.value = task
+  showPlanner.value = true
+}
+
+function closePlanner() {
+  showPlanner.value = false
+  selectedTask.value = null
+}
+
+const reloadDaily = async () => {
+  await loadTasks()
+  dailyTasks.value = tasks.value.filter((t) => t.date === toYMD(today))
+}
 
 const today = new Date()
-const selectedDate = ref(today)
+// const selectedDate = ref(today)
+const selectedDate = toLocalDateKey(today)
 
 // Helpers
 function toYMD(date) {
   if (typeof date === 'string') return date
   return toLocalDateKey(date)
+}
+
+async function handleSave(payload) {
+  // Same pattern as TaskBoard
+  if (Array.isArray(payload)) {
+    await loadTasks()
+    return reloadDaily()
+  }
+
+  if (payload.id) {
+    await updateTaskInFirebase(payload)   // 🔹 persist edit
+  } else {
+    await addTaskToFirebase(payload)      // 🔹 persist new
+  }
+
+  await reloadDaily()   // refresh local dailyTasks
+  closePlanner()
 }
 function ymdRange(start, end) {
   const days = []
@@ -191,13 +239,13 @@ function ymdRange(start, end) {
   return days
 }
 
-const openPlanner = () => {
-  showPlanner.value = true
-}
-const reloadDaily = async () => {
-  await loadTasks()
-  dailyTasks.value = tasks.value.filter(t => t.date === toYMD(today))
-}
+// const openPlanner = () => {
+//   showPlanner.value = true
+// }
+// const reloadDaily = async () => {
+//   await loadTasks()
+//   dailyTasks.value = tasks.value.filter((t) => t.date === toYMD(today))
+// }
 
 // Date ranges
 const startOfWeek = new Date(today)
@@ -226,14 +274,15 @@ onMounted(() => {
 
     if (unsubscribe.value) unsubscribe.value()
     unsubscribe.value = onSnapshot(tasksQuery, (snapshot) => {
-        const userTasks = snapshot.docs.map((docSnap) => {
-          const data = docSnap.data()
-          return {
-            id: docSnap.id,
-            ...data,
-            date: typeof data.date === 'string' ? data.date : toYMD(data.date?.toDate?.() || data.date),
-          }
-        })
+      const userTasks = snapshot.docs.map((docSnap) => {
+        const data = docSnap.data()
+        return {
+          id: docSnap.id,
+          ...data,
+          date:
+            typeof data.date === 'string' ? data.date : toYMD(data.date?.toDate?.() || data.date),
+        }
+      })
 
       dailyTasks.value = userTasks.filter((t) => t.date === toYMD(today))
 
@@ -300,10 +349,10 @@ const sortedDaily = computed(() =>
   [...dailyTasks.value].sort((a, b) => {
     // First: incomplete tasks before completed
     if (a.completed !== b.completed) return a.completed - b.completed
-    
+
     // Then: newest first by createdAt
     return (b.createdAt || 0) - (a.createdAt || 0)
-  })
+  }),
 )
 
 const doneWeekly = computed(() => weeklyTasks.value.filter((t) => t.completed).length)
