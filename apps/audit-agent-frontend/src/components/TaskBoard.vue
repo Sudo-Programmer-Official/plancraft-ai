@@ -85,6 +85,7 @@
 <TaskPlannerDialog
   v-if="showPlanner"
   :open="showPlanner"
+  :edit-mode="!!selectedTask"
   :date="today"
   :task="selectedTask"
   @saved="handleSave"
@@ -123,11 +124,16 @@ function closePlanner() {
 //   closePlanner()
 // }
 
-async function handleSave(task) {
-  if (task.id) {
-    await updateTaskInFirebase(task)
+async function handleSave(payload) {
+  // If generator emitted an array, tasks are already created
+  if (Array.isArray(payload)) {
+    await loadTasks()
+    return closePlanner()
+  }
+  if (payload.id) {
+    await updateTaskInFirebase(payload)
   } else {
-    await addTaskToFirebase(task)
+    await addTaskToFirebase(payload)
   }
   await loadTasks()
   closePlanner()
@@ -136,6 +142,7 @@ async function handleSave(task) {
 // onMounted(loadTasks)
 
 function openDialog(task = null) {
+  //TODO: edit mode flag if needed
   selectedTask.value = task
   showDialog.value = true
   showPlanner.value = true

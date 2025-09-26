@@ -61,9 +61,13 @@
     </div>
 
     <!-- Footer -->
-    <template #footer>
+    <template v-if="props.editMode" #footer>
       <el-button @click="closeDialog" plain>Cancel</el-button>
-      <el-button type="primary" @click="save">
+      <el-button type="primary" @click="save"  class="w-full sm:w-auto px-4 py-2 rounded-lg text-white font-medium shadow-md
+         bg-gradient-to-r from-emerald-700 via-teal-800 to-cyan-700
+         hover:from-emerald-800 hover:via-teal-900 hover:to-cyan-800
+         transition-all duration-300
+         [text-shadow:_0_1px_2px_rgba(0,0,0,0.6)]" >
         {{ props.task ? "Update Task" : "Save Task" }}
       </el-button>
     </template>
@@ -82,7 +86,8 @@ import { toLocalDateKey, parseLocalDateKey } from '@/utils/dateHelper'
 const props = defineProps({
   open: Boolean,
   date: { type: [String, Date], default: () => toLocalDateKey(new Date()) },
-  task: Object // if provided, we’re in edit mode
+  task: Object, // if provided, we’re in edit mode
+  editMode: { type: Boolean, default: false } // show save/cancel buttons
 })
 const emit = defineEmits(['close', 'saved'])
 
