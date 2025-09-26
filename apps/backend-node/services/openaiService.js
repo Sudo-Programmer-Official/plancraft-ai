@@ -406,3 +406,39 @@ Rules:
 
   return parsed;
 }
+
+// ✨ Journal Focus Summarizer
+export async function summarizeJournalFocus(entries) {
+  // Normalize input: accept array of strings or single string
+  let parts = []
+  if (Array.isArray(entries)) {
+    parts = entries
+  } else if (typeof entries === 'string') {
+    parts = [entries]
+  } else if (entries && Array.isArray(entries.entries)) {
+    parts = entries.entries
+  }
+
+  const MAX_ENTRIES = Number(process.env.JOURNAL_FOCUS_MAX_ENTRIES || 5)
+  const MAX_CHARS_PER = Number(process.env.JOURNAL_FOCUS_MAX_CHARS || 1200)
+
+  const cleaned = parts
+    .map((s) => String(s ?? '').trim())
+    .filter(Boolean)
+    .slice(0, MAX_ENTRIES)
+    .map((s) => s.slice(0, MAX_CHARS_PER))
+
+  if (!cleaned.length) return ''
+
+  const combined = cleaned.join('\n\n')
+
+  const prompt = `You are a thoughtful assistant. Given these recent journal reflections:\n"""${combined}"""\n\nSummarize the main focus or theme in 10 words or less.\nReturn only the focus text without quotes.`
+
+  const focus = await chatWithFallback({
+    messages: [{ role: 'user', content: prompt }],
+    temperature: 0.5,
+  })
+
+  // Clean up response
+  return focus.replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim()
+}

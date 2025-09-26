@@ -1,6 +1,6 @@
 // routes/ai.js
 import express from "express";
-import { enhanceJournalEntry, summarizeTasks, splitTasks } from "../services/openaiService.js";
+import { enhanceJournalEntry, summarizeTasks, splitTasks, summarizeJournalFocus } from "../services/openaiService.js";
 import OpenAI from "openai";
 import dotenv from "dotenv";
 
@@ -42,6 +42,40 @@ router.post("/journal/enhance", async (req, res) => {
   }
 });
 
+// Summarize journal focus
+// router.post("/journal/summarize-focus", async (req, res) => {
+//   try {
+//     const { entries } = req.body;
+//     if (!Array.isArray(entries) || entries.length === 0) {
+//       return res.status(400).json({ error: "Entries should be a non-empty array" });
+//     }
+
+//     const focus = await summarizeJournalFocus(entries);
+//     res.json({ focus });
+//   } catch (err) {
+//     console.error("❌ Journal Summarize Focus Error:", err);
+//     res.status(500).json({ error: "Failed to summarize journal focus" });
+//   }
+// });
+// routes/ai.js
+router.post("/journal/summarize-focus", async (req, res) => {
+  try {
+    const { entries } = req.body;
+
+    if (!Array.isArray(entries) || entries.length === 0) {
+      return res.status(400).json({ error: "Entries should be a non-empty array" });
+    }
+
+    // Join the reflections into one block of text
+    const combined = entries[0].join("\n");
+
+    const focus = await summarizeJournalFocus(combined);
+    res.json({ focus });
+  } catch (err) {
+    console.error("❌ Journal Summarize Focus Error:", err);
+    res.status(500).json({ error: "Failed to summarize journal focus" });
+  }
+});
 // Summarize tasks
 router.post("/tasks/summarize", async (req, res) => {
   try {

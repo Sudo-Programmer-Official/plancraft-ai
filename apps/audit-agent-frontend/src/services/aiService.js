@@ -80,3 +80,31 @@ export async function generateTasksFromText(text) {
     throw new Error("Failed to generate tasks. Please try again later.");
   }
 }
+
+/** ✨ Summarize journal focus */
+/** ✨ Summarize journal focus */
+// export async function summarizeJournalFocus(entries) {
+//   try {
+//     const res = await api.post("/journal/summarize-focus", { entries });
+//     return safeGet(res, "focus", "");
+//   } catch (err) {
+//     console.error("❌ Journal Focus API Error:", err?.response?.data || err.message);
+//     throw new Error("Failed to summarize journal focus. Please try again later.");
+//   }
+// }
+export async function summarizeJournalFocus(entries) {
+  try {
+    const res = await api.post("/journal/summarize-focus", { entries });
+    return safeGet(res, "focus", "");
+  } catch (err) {
+    const status = err?.response?.status;
+    const body = err?.response?.data || err.message;
+    if (status === 404) {
+      // Backend not deployed with this route yet — fail soft with empty focus
+      console.warn("⚠ Journal Focus endpoint missing (404). Returning empty focus.");
+      return "";
+    }
+    console.error("❌ Journal Focus API Error:", body);
+    throw new Error("Failed to summarize journal focus. Please try again later.");
+  }
+}

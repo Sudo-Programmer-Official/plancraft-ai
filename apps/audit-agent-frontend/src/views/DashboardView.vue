@@ -120,37 +120,52 @@
     </div>
 
     <!-- Journal Snapshot Card -->
-    <div
-      class="bg-gray-900/80 rounded-xl p-4 sm:p-6 shadow-lg hover:shadow-indigo-500/40 transition"
+    <!-- Journal Snapshot Card -->
+<div
+  class="bg-gray-900/80 rounded-xl p-4 sm:p-6 shadow-lg hover:shadow-indigo-500/40 transition"
+>
+  <div class="flex justify-between items-center mb-3">
+    <h3 class="font-semibold">📖 Journal Snapshot</h3>
+    <router-link
+      to="/journal"
+      class="flex items-center text-xs px-3 py-1 rounded-lg font-medium bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 text-white shadow-md transition"
     >
-      <div class="flex justify-between items-center mb-3">
-        <h3 class="font-semibold">📖 Journal Snapshot</h3>
-        <router-link
-          to="/journal"
-          class="flex items-center text-xs px-3 py-1 rounded-lg font-medium bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 text-white shadow-md transition"
-        >
-          Go to Journal →
-        </router-link>
-      </div>
-      <div v-if="journalLogs.length" class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm sm:text-base">
-        <!-- Streak -->
-        <div class="p-3 rounded-xl bg-slate-900/40 text-center">
-          <p class="text-2xl">🔥</p>
-          <p class="font-medium">{{ journalStreak }}-day streak</p>
-        </div>
-        <!-- Last Mood -->
-        <div class="p-3 rounded-xl bg-slate-900/40 text-center">
-          <p class="text-2xl">{{ journalLogs[0].mood?.emoji || "📝" }}</p>
-          <p class="font-medium">Last Mood</p>
-        </div>
-        <!-- Total -->
-        <div class="p-3 rounded-xl bg-slate-900/40 text-center">
-          <p class="text-2xl">📒</p>
-          <p class="font-medium">{{ journalLogs.length }} reflections</p>
-        </div>
-      </div>
-      <p v-else class="text-gray-400 text-sm">No reflections yet. Start journaling today!</p>
+      Go to Journal →
+    </router-link>
+  </div>
+
+  <div v-if="journalLogs.length" class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm sm:text-base">
+    <!-- Streak -->
+    <div class="p-3 rounded-xl bg-slate-900/40 text-center">
+      <p class="text-2xl">🔥</p>
+      <p class="font-medium">{{ journalStreak }}-day streak</p>
     </div>
+
+    <!-- Last Mood -->
+    <div class="p-3 rounded-xl bg-slate-900/40 text-center">
+      <p class="text-2xl">{{ journalLogs[0].mood?.emoji || "📝" }}</p>
+      <p class="font-medium">Last Mood</p>
+    </div>
+
+    <!-- Total -->
+    <div class="p-3 rounded-xl bg-slate-900/40 text-center">
+      <p class="text-2xl">📒</p>
+      <p class="font-medium">{{ journalLogs.length }} reflections</p>
+    </div>
+  </div>
+
+  <!-- 🔹 Journal Focus -->
+  <div
+    v-if="journalFocus"
+    class="mt-4 bg-indigo-900/40 p-3 rounded border border-indigo-600"
+  >
+    <p class="text-sm">
+      <strong>🎯 Journal Focus:</strong> {{ journalFocus }}
+    </p>
+  </div>
+
+  <p v-else class="text-gray-400 text-sm">No reflections yet. Start journaling today!</p>
+</div>
 
 
     <!-- AI Insights Card -->
@@ -217,6 +232,7 @@ import TaskPlannerDialog from '@/components/TaskPlannerDialog.vue'
 import { useTasks } from '@/composables/useTasks'
 import { addTaskToFirebase, updateTaskInFirebase, fetchEntries } from '@/services/firebaseService'
 const { tasks, toggleComplete: toggleFromComposable, loadTasks } = useTasks()
+import { summarizeJournalFocus } from '@/services/aiService'  // new import
 
 const authStore = useAuthStore()
 
@@ -231,9 +247,11 @@ const dailyList = ref(null)
 
 /* ----------------- JOURNAL STATE ----------------- */
 const journalLogs = ref([])
+const journalFocus = ref('')
 
 const journalStreak = computed(() => {
   if (!journalLogs.value.length) return 0
+  
   const dates = journalLogs.value
     .map((l) => l.date)
     .filter(Boolean)
@@ -251,8 +269,21 @@ const journalStreak = computed(() => {
 })
 
 /* ----------------- JOURNAL LOAD ----------------- */
+// onMounted(async () => {
+//   journalLogs.value = await fetchEntries()
+// })
+
 onMounted(async () => {
   journalLogs.value = await fetchEntries()
+  if (journalLogs.value.length) {
+  try {
+    // Use latest 3 reflections for context
+    const latest = journalLogs.value.slice(0, 3).map(l => l.text);
+    journalFocus.value = await summarizeJournalFocus(latest);
+  } catch (err) {
+    console.error('❌ Journal focus generation failed:', err);
+  }
+}
 })
 
 
