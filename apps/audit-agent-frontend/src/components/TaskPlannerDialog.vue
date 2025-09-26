@@ -258,3 +258,173 @@ function closeDialog() {
   emit('close')
 }
 </script>
+
+<style scoped>
+/* Dialog title readable on dark gradient */
+:deep(.el-dialog__header .el-dialog__title) {
+  color: #ffffff !important;
+}
+
+/* Dark-theme friendly date input */
+:deep(.el-date-editor .el-input__wrapper) {
+  background-color: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  box-shadow: none !important;
+}
+
+:deep(.el-input__inner) {
+  color: #ffffff !important;
+}
+
+:deep(.el-input__inner::placeholder) {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+</style>
+
+<style lang="scss">
+/* Dialog background */
+.task-planner-dialog .el-dialog {
+  background: linear-gradient(145deg, #1e1b4b, #312e81, #4c1d95);
+  color: #e2e8f0;
+  border-radius: 1rem;
+  padding: 1rem;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+
+  
+}
+
+
+
+/* Title */
+.task-planner-dialog .el-dialog__header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: #f8fafc;
+  font-weight: 600;
+  .el-dialog__title {
+    color: #f1f5f9 !important;
+  }
+}
+
+/* Inputs */
+.task-planner-dialog .el-input__inner,
+.task-planner-dialog .el-textarea__inner {
+  background-color: rgba(255, 255, 255, 0.1);  /* semi-transparent */
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.task-planner-dialog .el-input__inner::placeholder,
+.task-planner-dialog .el-textarea__inner::placeholder {
+  color: #cbd5e1;  /* light slate */
+}
+
+/* Voice + Generate buttons aligned */
+.task-planner-dialog .el-button {
+  font-weight: 500;
+  border-radius: 0.5rem;
+}
+.task-planner-dialog .el-button--success {
+  background: #22c55e; /* green-500 */
+  border: none;
+}
+.task-planner-dialog .el-button--success:hover {
+  background: #16a34a; /* green-600 */
+}
+.task-planner-dialog .el-button--default {
+  background: transparent;
+  color: #94a3b8;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Footer */
+.task-planner-dialog .el-dialog__footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 1rem;
+}
+/* TaskPlannerDialog.vue or global theme file */
+
+/* Date picker dropdown (popper) */
+.task-planner-dialog .el-picker-panel {
+  background: linear-gradient(135deg, #1e1b4b, #312e81, #4c1d95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.75rem !important;
+  color: #f1f5f9 !important; /* slate-100 */
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+}
+
+/* Calendar header (year/month nav) */
+.task-planner-dialog .el-date-picker__header,
+.task-planner-dialog .el-picker-panel__icon-btn {
+  color: #f8fafc !important;
+}
+
+/* Weekday labels */
+.task-planner-dialog .el-date-table th {
+  color: #cbd5e1 !important; /* slate-300 */
+}
+
+/* Days */
+.task-planner-dialog .el-date-table td {
+  color: #e2e8f0 !important; /* slate-200 */
+  border-radius: 0.5rem;
+  transition: background 0.2s ease;
+}
+
+/* Hovered day */
+.task-planner-dialog .el-date-table td:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Selected day */
+// .task-planner-dialog .el-date-table td.current {
+//   background: #6366f1 !important; /* indigo-500 */
+//   color: white !important;
+// }
+
+/* Today’s day */
+// .task-planner-dialog .el-date-table td.today {
+//   border: 1px solid #38bdf8 !important; /* cyan-400 */
+// }
+/* === Date Picker Popup (Global Override) === */
+.el-picker-panel {
+  background: linear-gradient(145deg, #1e1b4b, #312e81, #4c1d95) !important;
+  border-radius: 0.75rem !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #f1f5f9 !important; /* slate-100 */
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* Header (year/month nav + arrows) */
+.el-picker-panel__icon-btn,
+.el-date-picker__header,
+.el-date-picker__header-label {
+  color: #f8fafc !important;
+}
+
+/* Weekday labels */
+.el-date-table th {
+  color: #cbd5e1 !important; /* slate-300 */
+}
+
+/* Normal days */
+.el-date-table td {
+  color: #e2e8f0 !important; /* slate-200 */
+  border-radius: 0.5rem !important;
+  transition: background 0.2s ease;
+}
+
+/* Hover effect */
+.el-date-table td:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Selected day */
+.el-date-table td.current {
+  background: #6366f1 !important; /* indigo-500 */
+  color: white !important;
+}
+
+/* Today highlight */
+// .el-date-table td.today {
+//   border: 1px solid #38bdf8 !important; /* cyan-400 */
+// }
+</style>
