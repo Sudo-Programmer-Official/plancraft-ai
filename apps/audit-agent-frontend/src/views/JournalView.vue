@@ -24,7 +24,7 @@
 
     <main class="max-w-4xl mx-auto grid gap-8 animate-slide-up">
       <!-- Mood Tracker -->
-      <section
+      <!-- <section
         class="bg-white/10 backdrop-blur-md p-5 sm:p-6 rounded-2xl shadow-md border border-white/10"
       >
         <h2 class="text-lg sm:text-xl font-semibold mb-4">How are you feeling?</h2>
@@ -39,6 +39,31 @@
             <span class="text-2xl sm:text-3xl">{{ mood.emoji }}</span>
             <p class="text-xs sm:text-sm text-indigo-200 mt-1">{{ mood.label }}</p>
           </button>
+        </div>
+      </section> -->
+        <!-- Journal Snapshot (Bottom) -->
+      <section
+        v-if="logs.length"
+        class="bg-white/10 backdrop-blur-md p-5 sm:p-6 rounded-2xl shadow-md border border-white/10"
+      >
+        <h2 class="text-lg sm:text-xl font-semibold mb-4">📊 Your Progress</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm sm:text-base mb-4">
+          <div class="p-3 rounded-xl bg-slate-900/40 text-center">
+            <p class="text-2xl">🔥</p>
+            <p class="font-medium">{{ streak }}-day streak</p>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-900/40 text-center">
+            <p class="text-2xl">{{ logs[0].mood?.emoji || "📝" }}</p>
+            <p class="font-medium">Last Mood</p>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-900/40 text-center">
+            <p class="text-2xl">📖</p>
+            <p class="font-medium">{{ logs.length }} reflections</p>
+          </div>
+        </div>
+        <!-- Friendly Focus -->
+        <div class="bg-indigo-900/30 p-3 rounded border border-indigo-600 text-sm text-indigo-200">
+          <p><strong>🧭 Focus:</strong> {{ journalFocus }}</p>
         </div>
       </section>
 
@@ -111,6 +136,13 @@
               <span class="text-xl">{{ log.mood?.emoji }}</span>
             </div>
             <p class="text-indigo-200 leading-relaxed">{{ log.text }}</p>
+             <!-- Copy button -->
+      <button
+        @click="copyToClipboard(log.text)"
+        class="mt-2 text-xs px-3 py-1 rounded-lg border border-indigo-500 bg-indigo-900/40 hover:bg-indigo-700 text-indigo-200 transition"
+      >
+        📋 Copy
+      </button>
           </li>
         </ul>
       </section>
@@ -154,6 +186,7 @@ import { enhanceJournal } from '@/services/aiService'
 import GuestBanner from '@/components/GuestBanner.vue'
 import { useAuthStore } from '@/stores/authStore'
 import { toLocalDateKey } from '@/utils/dateHelper'
+import { ElNotification } from 'element-plus'
 
 const authStore = useAuthStore()
 
@@ -194,6 +227,20 @@ function selectMood(mood) {
 }
 function handleTranscript(text) {
   entryText.value = text
+}
+function copyToClipboard(text) {
+  if (!text) return
+  ElNotification({
+    title: 'Copied to Clipboard',
+    message: 'Your reflection has been copied! ✨',
+    type: 'success',
+    duration: 2000,
+  })
+  navigator.clipboard.writeText(text)
+  // Alternative with alert fallback
+  navigator.clipboard.writeText(text).catch(() => {
+    alert('Failed to copy. Please copy manually.')
+  });
 }
 
 async function saveEntry() {
