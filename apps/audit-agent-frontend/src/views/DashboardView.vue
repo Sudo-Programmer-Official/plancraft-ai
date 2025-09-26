@@ -22,6 +22,7 @@
 
   <ul
     v-if="sortedDaily.length"
+    ref="dailyList"
     class="space-y-2 text-sm max-h-64 overflow-y-auto pr-2 custom-scroll"
   >
     <li
@@ -160,7 +161,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watchEffect } from 'vue'
+import { ref, nextTick, computed, onMounted, onUnmounted, watchEffect } from 'vue'
 import { collection, onSnapshot, updateDoc, doc, query, where } from 'firebase/firestore'
 import { db, auth } from '@/firebase/init'
 import { onAuthStateChanged } from 'firebase/auth'
@@ -182,6 +183,8 @@ const monthlyTasks = ref([])
 const showPlanner = ref(false)
 
 const selectedTask = ref(null)
+const dailyList = ref(null)
+
 
 function openPlanner() {
   selectedTask.value = null
@@ -226,8 +229,18 @@ async function handleSave(payload) {
     await addTaskToFirebase(payload)      // 🔹 persist new
   }
 
+  
+
   await reloadDaily()   // refresh local dailyTasks
   closePlanner()
+   // 🔹 scroll to top after tasks reload
+  await nextTick()
+  scrollDailyTop()
+}
+function scrollDailyTop() {
+  if (dailyList.value) {
+    dailyList.value.scrollTop = 0
+  }
 }
 function ymdRange(start, end) {
   const days = []

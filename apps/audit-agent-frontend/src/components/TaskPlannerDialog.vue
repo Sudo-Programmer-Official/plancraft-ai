@@ -98,7 +98,7 @@
     </div>
 
     <!-- Footer -->
-    <template v-if="props.editMode" #footer>
+    <!-- <template v-if="props.editMode" #footer>
       <el-button @click="closeDialog" plain>Cancel</el-button>
       <el-button
         type="primary"
@@ -110,7 +110,28 @@
       >
         {{ props.task ? "Update Task" : "Save Task" }}
       </el-button>
-    </template>
+    </template> -->
+    <!-- Footer -->
+<template v-if="props.editMode" #footer>
+  <div class="flex flex-col sm:flex-row gap-3 w-full">
+    <el-button
+      @click="closeDialog"
+      class="flex-1 px-4 py-2 rounded-lg font-medium border border-gray-500 text-gray-300 hover:bg-gray-700"
+    >
+      Cancel
+    </el-button>
+    <el-button
+      type="primary"
+      @click="save"
+      class="flex-1 px-4 ml-0-custom py-2 rounded-lg text-white font-medium shadow-md
+        bg-gradient-to-r from-emerald-700 via-teal-800 to-cyan-700
+        hover:from-emerald-800 hover:via-teal-900 hover:to-cyan-800
+        transition-all duration-300 [text-shadow:_0_1px_2px_rgba(0,0,0,0.6)]"
+    >
+      {{ props.task ? "Update Task" : "Save Task" }}
+    </el-button>
+  </div>
+</template>
   </el-dialog>
 </template>
 
@@ -233,7 +254,9 @@ function closeDialog() {
 :deep(.el-dialog__header .el-dialog__title) {
   color: #ffffff !important;
 }
-
+.ml-0-custom {
+  margin-left: 0 !important;
+}
 /* Dark-theme friendly date input */
 :deep(.el-date-editor .el-input__wrapper) {
   background-color: transparent !important;
