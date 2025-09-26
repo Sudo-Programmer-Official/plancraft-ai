@@ -71,6 +71,16 @@
     @close="closePlanner"
     @saved="handleSave"
   />
+
+  <!-- Focus (mirrors AI Insights focus) -->
+  <div
+    v-if="aiSummary && aiSummary.focus"
+    class="mt-4 bg-indigo-900/40 p-3 rounded border border-indigo-600"
+  >
+    <p class="text-sm">
+      <strong>🎯 Focus:</strong> {{ aiSummary.focus }}
+    </p>
+  </div>
 </div>
 
     <!-- Weekly Card -->
@@ -108,6 +118,40 @@
         ></div>
       </div>
     </div>
+
+    <!-- Journal Snapshot Card -->
+    <div
+      class="bg-gray-900/80 rounded-xl p-4 sm:p-6 shadow-lg hover:shadow-indigo-500/40 transition"
+    >
+      <div class="flex justify-between items-center mb-3">
+        <h3 class="font-semibold">📖 Journal Snapshot</h3>
+        <router-link
+          to="/journal"
+          class="flex items-center text-xs px-3 py-1 rounded-lg font-medium bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 text-white shadow-md transition"
+        >
+          Go to Journal →
+        </router-link>
+      </div>
+      <div v-if="journalLogs.length" class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm sm:text-base">
+        <!-- Streak -->
+        <div class="p-3 rounded-xl bg-slate-900/40 text-center">
+          <p class="text-2xl">🔥</p>
+          <p class="font-medium">{{ journalStreak }}-day streak</p>
+        </div>
+        <!-- Last Mood -->
+        <div class="p-3 rounded-xl bg-slate-900/40 text-center">
+          <p class="text-2xl">{{ journalLogs[0].mood?.emoji || "📝" }}</p>
+          <p class="font-medium">Last Mood</p>
+        </div>
+        <!-- Total -->
+        <div class="p-3 rounded-xl bg-slate-900/40 text-center">
+          <p class="text-2xl">📒</p>
+          <p class="font-medium">{{ journalLogs.length }} reflections</p>
+        </div>
+      </div>
+      <p v-else class="text-gray-400 text-sm">No reflections yet. Start journaling today!</p>
+    </div>
+
 
     <!-- AI Insights Card -->
     <div
@@ -171,7 +215,7 @@ import GuestBanner from '@/components/GuestBanner.vue'
 import { useAuthStore } from '@/stores/authStore'
 import TaskPlannerDialog from '@/components/TaskPlannerDialog.vue'
 import { useTasks } from '@/composables/useTasks'
-import { addTaskToFirebase, updateTaskInFirebase } from '@/services/firebaseService'
+import { addTaskToFirebase, updateTaskInFirebase, fetchEntries } from '@/services/firebaseService'
 const { tasks, toggleComplete: toggleFromComposable, loadTasks } = useTasks()
 
 const authStore = useAuthStore()
@@ -184,6 +228,32 @@ const showPlanner = ref(false)
 
 const selectedTask = ref(null)
 const dailyList = ref(null)
+
+/* ----------------- JOURNAL STATE ----------------- */
+const journalLogs = ref([])
+
+const journalStreak = computed(() => {
+  if (!journalLogs.value.length) return 0
+  const dates = journalLogs.value
+    .map((l) => l.date)
+    .filter(Boolean)
+    .sort((a, b) => new Date(b) - new Date(a))
+
+  let count = 1
+  for (let i = 1; i < dates.length; i++) {
+    const prev = new Date(dates[i - 1])
+    const curr = new Date(dates[i])
+    const diff = (prev - curr) / (1000 * 60 * 60 * 24)
+    if (diff === 1) count++
+    else break
+  }
+  return count
+})
+
+/* ----------------- JOURNAL LOAD ----------------- */
+onMounted(async () => {
+  journalLogs.value = await fetchEntries()
+})
 
 
 function openPlanner() {
