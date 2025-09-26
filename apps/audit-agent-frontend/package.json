@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/generate-sitemap.js",
+    "build:ssg": "vite-ssg build src/main-ssg.js",
     "preview": "vite preview",
     "lint": "eslint . --fix",
     "format": "prettier --write src/",
@@ -55,6 +56,7 @@
     "prettier": "3.5.3",
     "sharp": "^0.34.4",
     "vite": "^6.2.4",
+    "vite-ssg": "^0.24.1",
     "vite-plugin-pwa": "^1.0.3",
     "vite-plugin-vue-devtools": "^7.7.2"
   }

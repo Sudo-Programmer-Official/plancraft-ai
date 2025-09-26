@@ -212,6 +212,9 @@ const router = createRouter({
     { path: '/privacy', component: PrivacyPolicy },
     { path: '/terms', component: Terms },
     { path: '/contact', component: Contact },
+    // Blog (public)
+    { path: '/blog', name: 'blog-index', component: () => import('@/views/BlogIndex.vue') },
+    { path: '/blog/:slug', name: 'blog-post', component: () => import('@/views/BlogView.vue'), props: true },
     {
       path: '/',
       component: AppLayout,
@@ -235,7 +238,8 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to, from, next) => {
-  if (!to.meta.requiresAuth) return next()
+  // Skip auth guard for public routes or during SSG prerender
+  if (!to.meta.requiresAuth || import.meta.env.SSR) return next()
   const user = await getCurrentUser()
   if (!user) return next({ path: '/login', query: { redirect: to.fullPath } })
   next()

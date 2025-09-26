@@ -146,6 +146,8 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { useHead } from '@vueuse/head'
+import { useRoute } from 'vue-router'
 import { saveEntryToFirebase, fetchEntries } from '@/services/firebaseService'
 import { useVoiceRecorder } from '@/composables/useVoiceRecorder'
 import { enhanceJournal } from '@/services/aiService'
@@ -154,6 +156,21 @@ import { useAuthStore } from '@/stores/authStore'
 import { toLocalDateKey } from '@/utils/dateHelper'
 
 const authStore = useAuthStore()
+
+// SEO
+const SITE_URL = import.meta.env.VITE_SITE_URL || 'https://plancraftai.com'
+const route = useRoute()
+useHead({
+  title: 'Journal – Reflect with Voice and AI | PlanCraftAI',
+  meta: [
+    { name: 'description', content: 'Voice journaling with gentle AI enhancements, mood tracking, and insights.' },
+    { name: 'keywords', content: 'journaling insights app, voice journal, mood tracker' },
+    { property: 'og:title', content: 'Journal – PlanCraftAI' },
+    { property: 'og:description', content: 'Write, breathe, and reflect with supportive AI.' },
+    { property: 'og:type', content: 'website' }
+  ],
+  link: [{ rel: 'canonical', href: `${SITE_URL}${route.path}` }]
+})
 
 const moods = [
   { emoji: '😊', label: 'Happy' },

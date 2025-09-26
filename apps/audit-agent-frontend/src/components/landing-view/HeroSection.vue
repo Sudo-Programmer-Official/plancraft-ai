@@ -93,9 +93,7 @@
 
 <script setup>
 import heroImage from '@/assets/images/hero-bg-image.png'
-import { View } from '@element-plus/icons-vue'
-import { defineComponent } from 'vue'
-import logo from '@/assets/images/logo.svg'
+import logo from '@/assets/images/logo.png'
 // import { Upload } from '@element-plus/icons-vue'
 import { useQuoteStore } from '@/stores/quoteStore'
 import { ref } from 'vue'

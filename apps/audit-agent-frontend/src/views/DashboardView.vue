@@ -73,14 +73,14 @@
   />
 
   <!-- Focus (mirrors AI Insights focus) -->
-  <div
+  <!-- <div
     v-if="aiSummary && aiSummary.focus"
     class="mt-4 bg-indigo-900/40 p-3 rounded border border-indigo-600"
   >
     <p class="text-sm">
       <strong>🎯 Focus:</strong> {{ aiSummary.focus }}
     </p>
-  </div>
+  </div> -->
 </div>
 
     <!-- Weekly Card -->
@@ -221,6 +221,8 @@
 
 <script setup>
 import { ref, nextTick, computed, onMounted, onUnmounted, watchEffect } from 'vue'
+import { useHead } from '@vueuse/head'
+import { useRoute } from 'vue-router'
 import { collection, onSnapshot, updateDoc, doc, query, where } from 'firebase/firestore'
 import { db, auth } from '@/firebase/init'
 import { onAuthStateChanged } from 'firebase/auth'
@@ -235,6 +237,21 @@ const { tasks, toggleComplete: toggleFromComposable, loadTasks } = useTasks()
 import { summarizeJournalFocus } from '@/services/aiService'  // new import
 
 const authStore = useAuthStore()
+
+// SEO: head tags
+const SITE_URL = import.meta.env.VITE_SITE_URL || 'https://plancraftai.com'
+const route = useRoute()
+useHead({
+  title: 'Daily Planner Dashboard – Organize Tasks | PlanCraftAI',
+  meta: [
+    { name: 'description', content: 'Plan your day, track progress, and reflect with AI insights.' },
+    { name: 'keywords', content: 'daily planner, AI insights, journaling insights app, task organizer' },
+    { property: 'og:title', content: 'PlanCraftAI – Dashboard' },
+    { property: 'og:description', content: 'Stay organized with smart tasks, journaling, and daily focus.' },
+    { property: 'og:type', content: 'website' }
+  ],
+  link: [{ rel: 'canonical', href: `${SITE_URL}${route.path}` }]
+})
 
 const aiSummary = ref(null)
 const dailyTasks = ref([])
