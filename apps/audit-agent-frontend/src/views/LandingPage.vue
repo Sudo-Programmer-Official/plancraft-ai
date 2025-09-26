@@ -307,6 +307,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
+import { useHead } from '@vueuse/head'
 
 function continueAsGuest() {
   const authStore = useAuthStore()
@@ -316,6 +317,36 @@ function continueAsGuest() {
 }
 
 const router = useRouter()
+
+// SEO + JSON-LD
+const SITE_URL = import.meta.env.VITE_SITE_URL || 'https://plancraftai.com'
+useHead({
+  title: 'PlanCraftAI – Peaceful Productivity with Voice Journaling and AI',
+  meta: [
+    { name: 'description', content: 'Plan your day, journal with your voice, and get AI insights for calm, focused productivity.' },
+    { name: 'keywords', content: 'voice task planner, journaling insights app, habit tracking with AI, daily planner' },
+    { property: 'og:title', content: 'PlanCraftAI – Peaceful Productivity' },
+    { property: 'og:description', content: 'Pause, plan, and reflect with a gentle, AI-assisted planner.' },
+    { property: 'og:type', content: 'website' },
+    { property: 'og:url', content: SITE_URL }
+  ],
+  link: [{ rel: 'canonical', href: SITE_URL }],
+  script: [
+    {
+      type: 'application/ld+json',
+      children: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'WebApplication',
+        name: 'PlanCraftAI',
+        url: SITE_URL,
+        applicationCategory: 'ProductivityApplication',
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+        operatingSystem: 'Web',
+        description: 'Plan, journal, and reflect with a gentle, AI-assisted daily flow.'
+      })
+    }
+  ]
+})
 
 const stars = ref(null)
 onMounted(() => {

@@ -18,6 +18,8 @@
 <script setup>
 import draggable from "vuedraggable"
 import { ref, onMounted } from "vue"
+import { useHead } from '@vueuse/head'
+import { useRoute } from 'vue-router'
 import { fetchTasks, addTaskToFirebase, updateTaskInFirebase } from "@/services/firebaseService"
 import MorningSection from "@/components/MorningSection.vue"
 import TaskBoard from "@/components/TaskBoard.vue"
@@ -27,6 +29,21 @@ import GuestBanner from "@/components/GuestBanner.vue"
 const tasks = ref([])
 import { useAuthStore } from '@/stores/authStore'
 const authStore = useAuthStore()
+
+// SEO
+const SITE_URL = import.meta.env.VITE_SITE_URL || 'https://plancraftai.com'
+const route = useRoute()
+useHead({
+  title: 'Daily Tasks – Plan Your Day with AI | PlanCraftAI',
+  meta: [
+    { name: 'description', content: 'Plan, prioritize, and complete your daily tasks with AI assistance.' },
+    { name: 'keywords', content: 'daily planner, voice task planner, AI task planning' },
+    { property: 'og:title', content: 'Daily Tasks – PlanCraftAI' },
+    { property: 'og:description', content: 'Organize your day with smart insights and journaling.' },
+    { property: 'og:type', content: 'website' }
+  ],
+  link: [{ rel: 'canonical', href: `${SITE_URL}${route.path}` }]
+})
 
 onMounted(async () => {
   tasks.value = await fetchTasks()
