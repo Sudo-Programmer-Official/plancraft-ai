@@ -24,7 +24,7 @@
 
     <main class="max-w-4xl mx-auto grid gap-8 animate-slide-up">
       <!-- Mood Tracker -->
-      <!-- <section
+      <section
         class="bg-white/10 backdrop-blur-md p-5 sm:p-6 rounded-2xl shadow-md border border-white/10"
       >
         <h2 class="text-lg sm:text-xl font-semibold mb-4">How are you feeling?</h2>
@@ -40,7 +40,7 @@
             <p class="text-xs sm:text-sm text-indigo-200 mt-1">{{ mood.label }}</p>
           </button>
         </div>
-      </section> -->
+      </section>
         <!-- Journal Snapshot (Bottom) -->
       <section
         v-if="logs.length"
@@ -148,7 +148,7 @@
       </section>
 
       <!-- Journal Snapshot (Bottom) -->
-      <section
+      <!-- <section
         v-if="logs.length"
         class="bg-white/10 backdrop-blur-md p-5 sm:p-6 rounded-2xl shadow-md border border-white/10"
       >
@@ -167,11 +167,10 @@
             <p class="font-medium">{{ logs.length }} reflections</p>
           </div>
         </div>
-        <!-- Friendly Focus -->
         <div class="bg-indigo-900/30 p-3 rounded border border-indigo-600 text-sm text-indigo-200">
           <p><strong>🧭 Focus:</strong> {{ journalFocus }}</p>
         </div>
-      </section>
+      </section> -->
     </main>
   </div>
 </template>
