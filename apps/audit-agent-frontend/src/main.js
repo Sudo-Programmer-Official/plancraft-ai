@@ -151,6 +151,7 @@ import VoiceRecorder from '@/components/VoiceRecorder.vue'
 import { createHead } from '@vueuse/head'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import { initAnalytics, bindRouter } from '@/services/analytics'
+import 'driver.js/dist/driver.css'
 
 
 // ✅ Firebase init

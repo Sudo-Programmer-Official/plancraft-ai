@@ -8,7 +8,7 @@
     <!-- ====== DAILY + QUICK LINKS ====== -->
     <div class="col-span-1 sm:col-span-2 lg:col-span-2 space-y-4">
       <!-- Daily Card -->
-      <div v-if="showDaily" class="bg-gray-900/80 rounded-xl p-4 sm:p-6 shadow-lg">
+      <div v-if="showDaily" class="daily-card bg-gray-900/80 rounded-xl p-4 sm:p-6 shadow-lg">
         <div class="flex justify-between items-center mb-3">
           <h3 class="font-semibold">📅 Daily Tasks</h3>
           <button
@@ -70,13 +70,13 @@
       </div>
 
       <!-- Quick Links Card -->
-      <QuickLinksCard v-if="showQuickLinks" class="col-span-1 sm:col-span-2 lg:col-span-3" />
+      <QuickLinksCard v-if="showQuickLinks" class="quick-links-card col-span-1 sm:col-span-2 lg:col-span-3" />
     </div>
 
     <!-- ====== WEEKLY + MONTHLY ====== -->
     <div class="col-span-1 sm:col-span-2 lg:col-span-1 space-y-4">
       <!-- Weekly Card -->
-      <div v-if="showWeekly" class="bg-gray-900/80 rounded-xl p-4 sm:p-6 shadow-lg">
+      <div v-if="showWeekly" class="weekly-card bg-gray-900/80 rounded-xl p-4 sm:p-6 shadow-lg">
         <div class="flex justify-between items-center mb-3">
           <h3 class="font-semibold">📆 Weekly Overview</h3>
           <router-link
@@ -104,7 +104,7 @@
       </div>
 
       <!-- Monthly Card -->
-      <div v-if="showMonthly" class="bg-gray-900/80 rounded-xl p-4 sm:p-6 shadow-lg">
+      <div v-if="showMonthly" class="monthly-card bg-gray-900/80 rounded-xl p-4 sm:p-6 shadow-lg">
         <div class="flex justify-between items-center mb-3">
           <h3 class="font-semibold">🌙 Monthly Goals</h3>
           <router-link
@@ -127,7 +127,7 @@
     </div>
 
     <!-- ====== JOURNAL ====== -->
-    <div v-if="showJournal" class="col-span-1 sm:col-span-2 lg:col-span-3">
+    <div v-if="showJournal" class="journal-card col-span-1 sm:col-span-2 lg:col-span-3">
       <div class="bg-gray-900/80 rounded-xl p-4 sm:p-6 shadow-lg">
         <div class="flex justify-between items-center mb-3">
           <h3 class="font-semibold">📖 Journal Snapshot</h3>
@@ -159,7 +159,7 @@
     <!-- ====== AI INSIGHTS ====== -->
     <div
       v-if="showAIInsights"
-      class="bg-gray-900/80 rounded-xl p-4 sm:p-6 shadow-lg col-span-1 sm:col-span-2 lg:col-span-3"
+      class="ai-card bg-gray-900/80 rounded-xl p-4 sm:p-6 shadow-lg col-span-1 sm:col-span-2 lg:col-span-3"
     >
       <h3 class="font-semibold text-lg mb-4 flex items-center gap-2">🤖 AI Insights</h3>
       <div v-if="aiSummary" class="text-sm space-y-4">
@@ -206,6 +206,8 @@ import TaskPlannerDialog from '@/components/TaskPlannerDialog.vue'
 import { useTasks } from '@/composables/useTasks'
 import { addTaskToFirebase, updateTaskInFirebase, fetchEntries } from '@/services/firebaseService'
 import QuickLinksCard from '@/components/QuickLinksCard.vue'
+import { driver } from 'driver.js'
+import 'driver.js/dist/driver.css'
 
 const authStore = useAuthStore()
 
@@ -248,6 +250,74 @@ const journalStreak = computed(() => {
 
 onMounted(async () => {
   journalLogs.value = await fetchEntries()
+})
+
+function startTour() {
+  const tour = driver({
+    animate: true,
+    showProgress: true,
+    steps: [
+      {
+        element: '.daily-card',
+        popover: {
+          title: '📅 Daily Tasks',
+          description: 'Plan and track your tasks for today here.',
+          position: 'bottom'
+        }
+      },
+      {
+        element: '.quick-links-card',
+        popover: {
+          title: '🔗 Quick Links',
+          description: 'Save your frequently used websites or tools here.',
+          position: 'bottom'
+        }
+      },
+      {
+        element: '.weekly-card',
+        popover: {
+          title: '📆 Weekly Overview',
+          description: 'See what you’ve completed this week and upcoming tasks.',
+          position: 'left'
+        }
+      },
+      {
+        element: '.monthly-card',
+        popover: {
+          title: '🌙 Monthly Goals',
+          description: 'Track your long-term goals and progress here.',
+          position: 'left'
+        }
+      },
+      {
+        element: '.journal-card',
+        popover: {
+          title: '📖 Journal Snapshot',
+          description: 'Reflect daily and track your mood & streaks.',
+          position: 'top'
+        }
+      },
+      {
+        element: '.ai-card',
+        popover: {
+          title: '🤖 AI Insights',
+          description: 'AI analyzes your tasks and provides smart suggestions.',
+          position: 'top'
+        }
+      }
+    ]
+  })
+  tour.drive()
+}
+
+onMounted(() => {
+  const hasSeenTour = localStorage.getItem('seenTour')
+  if (!hasSeenTour) {
+    setTimeout(() => {
+      startTour()
+      localStorage.setItem('seenTour', 'true')
+    }, 800) // wait for DOM render
+  }
 })
 
 function openPlanner() {

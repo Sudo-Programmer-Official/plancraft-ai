@@ -1,43 +1,53 @@
 <template>
-  <div class="flex min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 text-white">
+  <div
+    class="flex min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 text-white"
+  >
     <!-- Sidebar (desktop only) -->
     <aside
       class="hidden md:flex flex-col h-screen transition-all duration-300 bg-gray-950/70 backdrop-blur-xl"
       :class="sidebarOpen ? 'w-64' : 'w-20'"
     >
-    <div class="flex items-center justify-between p-4 border-b border-gray-700">
-      <h1 v-if="sidebarOpen" class="text-lg font-bold">🌙 PlanCraftAI</h1>
-      <button
-        @click="sidebarOpen = !sidebarOpen"
-        class="p-2 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 transition-colors"
-        aria-label="Toggle sidebar"
-      >
-        <svg
-          v-if="sidebarOpen"
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-5 w-5 text-indigo-300"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
+      <div class="flex items-center justify-between p-4 border-b border-gray-700">
+        <h1 v-if="sidebarOpen" class="text-lg font-bold">🌙 PlanCraftAI</h1>
+        <button
+          @click="sidebarOpen = !sidebarOpen"
+          class="p-2 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 transition-colors"
+          aria-label="Toggle sidebar"
         >
-          <!-- Left Arrow -->
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M15 19l-7-7 7-7" />
-        </svg>
-        <svg
-          v-else
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-5 w-5 text-indigo-300"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <!-- Right Arrow -->
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M9 5l7 7-7 7" />
-        </svg>
-      </button>
-    </div>
+          <svg
+            v-if="sidebarOpen"
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5 text-indigo-300"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <!-- Left Arrow -->
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M15 19l-7-7 7-7"
+            />
+          </svg>
+          <svg
+            v-else
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5 text-indigo-300"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <!-- Right Arrow -->
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M9 5l7 7-7 7"
+            />
+          </svg>
+        </button>
+      </div>
 
       <!-- Nav links -->
       <nav class="flex-1 mt-4 space-y-2 overflow-y-auto">
@@ -54,13 +64,28 @@
       </nav>
 
       <!-- Logout at bottom -->
-      <div class="p-4 border-t border-gray-700">
+      <!-- Sidebar Footer -->
+      <div class="mt-auto flex flex-col gap-2 items-center pb-4">
+        <!-- Show Tour -->
         <button
-          v-if="authStore.isLoggedIn"
-          @click="handleLogout"
-          class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg w-full text-sm"
+          @click="startTour"
+          class="flex items-center justify-center w-full px-3 py-2 rounded-lg text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition"
+          :class="{ 'px-2': collapsed, 'px-3': !collapsed }"
+          title="Show Tour"
         >
-          Logout
+          <span v-if="!collapsed">Show Tour</span>
+          <span v-else>❔</span>
+        </button>
+
+        <!-- Logout -->
+        <button
+          @click="logout"
+          class="flex items-center justify-center w-full px-3 py-2 rounded-lg text-xs font-medium bg-red-600 text-white hover:bg-red-700 transition"
+          :class="{ 'px-2': collapsed, 'px-3': !collapsed }"
+          title="Logout"
+        >
+          <span v-if="!collapsed">Logout</span>
+          <span v-else>🚪</span>
         </button>
       </div>
     </aside>
@@ -76,9 +101,7 @@
           <!-- Header -->
           <div class="flex justify-between items-center mb-6">
             <h1 class="text-lg font-bold">🌙 PlanCraftAI</h1>
-            <button @click="mobileMenu = false" class="p-2 rounded hover:bg-gray-800">
-              ✖️
-            </button>
+            <button @click="mobileMenu = false" class="p-2 rounded hover:bg-gray-800">✖️</button>
           </div>
 
           <!-- Navigation -->
@@ -95,13 +118,28 @@
           </nav>
 
           <!-- Logout -->
-          <button
+          <!-- <button
             v-if="authStore.isLoggedIn"
             @click="handleLogout"
             class="mt-6 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg w-full"
           >
             Logout
-          </button>
+          </button> -->
+          <div class="p-4 border-t border-gray-800 space-y-2">
+            <button
+              @click="startTour"
+              class="w-full text-xs px-3 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700"
+            >
+              ❓ Show Tour
+            </button>
+            <button
+              v-if="authStore.isLoggedIn"
+              @click="logout"
+              class="w-full text-xs px-3 py-2 rounded bg-red-600 text-white hover:bg-red-700"
+            >
+              Logout
+            </button>
+          </div>
         </div>
       </aside>
     </transition>
@@ -115,23 +153,31 @@
         <div class="flex items-center gap-3">
           <!-- Hamburger (mobile only) -->
           <button class="md:hidden p-2 hover:bg-gray-800 rounded" @click="mobileMenu = !mobileMenu">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
+            <svg
+              class="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
           <h2 class="text-2xl font-semibold capitalize">{{ $route.name }}</h2>
-         <span class="text-gray-400 text-sm mt-1 sm:mt-0">
-    {{ new Date().toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric'
-    }) }}
-  </span>
+          <span class="text-gray-400 text-sm mt-1 sm:mt-0">
+            {{
+              new Date().toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+              })
+            }}
+          </span>
         </div>
 
         <!-- Right Section -->
         <div class="flex items-center gap-4">
-         <span v-if="authStore.isLoggedIn" class="text-sm text-gray-300">
-            {{ authStore.user?.displayName?.split(' ')[0] || "Guest" }}
+          <span v-if="authStore.isLoggedIn" class="text-sm text-gray-300">
+            {{ authStore.user?.displayName?.split(' ')[0] || 'Guest' }}
           </span>
           <button
             v-if="authStore.isLoggedIn"
@@ -186,27 +232,130 @@
 </template>
 
 <script setup>
-import { ref } from "vue"
-import { useRouter } from "vue-router"
-import { useAuthStore } from "@/stores/authStore"
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/authStore'
+import { driver } from 'driver.js'
+import 'driver.js/dist/driver.css'
 
-const sidebarOpen = ref(true)   // desktop toggle
-const mobileMenu = ref(false)   // mobile drawer toggle
+const sidebarOpen = ref(true) // desktop toggle
+const mobileMenu = ref(false) // mobile drawer toggle
 
 const router = useRouter()
 const authStore = useAuthStore()
 
 const tabs = [
-  { name: "Dashboard", icon: "🏠", path: "/dashboard" },
-  { name: "Daily", icon: "📅", path: "/daily" },
-  { name: "Weekly", icon: "📆", path: "/weekly" },
-  { name: "Monthly", icon: "🌙", path: "/monthly" },
-  { name: "Journal", icon: "📝", path: "/journal" },
+  { name: 'Dashboard', icon: '🏠', path: '/dashboard' },
+  { name: 'Daily', icon: '📅', path: '/daily' },
+  { name: 'Weekly', icon: '📆', path: '/weekly' },
+  { name: 'Monthly', icon: '🌙', path: '/monthly' },
+  { name: 'Journal', icon: '📝', path: '/journal' },
 ]
 
 async function handleLogout() {
   await authStore.logout()
-  router.push("/login")
+  router.push('/login')
+}
+
+onMounted(() => {
+  const seenTour = localStorage.getItem('seenDashboardTour')
+
+  if (!seenTour) {
+    startTour()
+    localStorage.setItem('seenDashboardTour', 'true')
+  }
+})
+
+function startTour() {
+  // close mobile menu if open
+  mobileMenu.value = false
+  const tour = driver({
+    animate: true,
+    opacity: 0.75,
+    padding: 8,
+    allowClose: true,
+    doneBtnText: 'Finish',
+    closeBtnText: '×',
+    nextBtnText: 'Next →',
+    prevBtnText: '← Back',
+    showProgress: true,
+    steps: [
+      {
+        element: '.daily-card',
+        popover: {
+          title: '📅 Daily Tasks',
+          description: 'Plan and track your tasks for today here.',
+          position: 'bottom',
+        },
+      },
+      {
+        element: '.quick-links-card',
+        popover: {
+          title: '🔗 Quick Links',
+          description: 'Save your frequently used websites or tools here.',
+          position: 'bottom',
+        },
+      },
+      {
+        element: '.weekly-card',
+        popover: {
+          title: '📆 Weekly Overview',
+          description: 'See what you’ve completed this week and upcoming tasks.',
+          position: 'left',
+        },
+      },
+      {
+        element: '.monthly-card',
+        popover: {
+          title: '🌙 Monthly Goals',
+          description: 'Track your long-term goals and progress here.',
+          position: 'left',
+        },
+      },
+      {
+        element: '.journal-card',
+        popover: {
+          title: '📖 Journal Snapshot',
+          description: 'Reflect daily and track your mood & streaks.',
+          position: 'top',
+        },
+      },
+      {
+        element: '.ai-card',
+        popover: {
+          title: '🤖 AI Insights',
+          description: 'AI analyzes your tasks and provides smart suggestions.',
+          position: 'top',
+        },
+      },
+      {
+        element: '.sidebar',
+        popover: {
+          title: '📂 Navigation',
+          description: 'Use the sidebar to navigate between different sections.',
+          position: 'right',
+        },
+      },
+      // {
+      //   element: 'header',
+      //   popover: {
+      //     title: '👤 User Profile',
+      //     description: 'Access your profile and logout from here.',
+      //     position: 'left'
+      //   }
+      // },
+      // {
+      //   element: '.footer',
+      //   popover: {
+      //     title: '❓ Help & Support',
+      //     description: 'Find links to privacy, terms, and contact information here.',
+      //     position: 'top'
+      //   }
+      // }
+    ],
+  })
+
+  tour.drive()
 }
 </script>
 
