@@ -232,8 +232,7 @@ const router = createRouter({
     },
 
     { path: '/privacy-policy', component: () => import('@/views/PrivacyPolicy.vue') },
-    { path: '/terms', component: () => import('@/views/TermsOfService.vue') },
-    { path: '/contact', component: () => import('@/views/ContactForm.vue') },
+    // Note: '/terms' and '/contact' already declared above; avoid duplicates
   ]
 })
 

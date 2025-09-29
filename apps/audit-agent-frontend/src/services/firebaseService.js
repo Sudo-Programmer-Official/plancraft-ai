@@ -147,7 +147,6 @@
 // }
 
 import {
-  getFirestore,
   collection,
   addDoc,
   getDocs,
@@ -159,12 +158,8 @@ import {
   orderBy,
   serverTimestamp,
 } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
-import firebaseApp from "@/firebase/init";
 import { toLocalDateKey } from "@/utils/dateHelper";
-
-const db = getFirestore(firebaseApp);
-const auth = getAuth(firebaseApp);
+import { db, auth } from '@/firebase/init'
 
 const tasksRef = collection(db, "tasks");
 const journalRef = collection(db, "journalEntries");
@@ -335,4 +330,32 @@ export async function fetchEntries() {
 
   const snapshot = await getDocs(q);
   return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+/** 🔗 Link Management
+ */
+
+export async function addLink({ title, url, tags=[], pinned=false, color='indigo', icon='🔗' }) {
+  const user = auth.currentUser; if (!user) throw new Error('Not signed in')
+  const payload = {
+    userId: user.uid, title, url, tags, pinned, color, icon,
+    order: Date.now(), createdAt: Date.now(), lastUsedAt: 0
+  }
+  const ref = await addDoc(collection(db, 'links'), payload)
+  return { id: ref.id, ...payload }
+}
+
+export async function getLinks() {
+  const user = auth.currentUser; if (!user) return []
+  const q = query(collection(db, 'links'), where('userId', '==', user.uid))
+  const snap = await getDocs(q)
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+}
+
+export async function updateLink(id, patch) {
+  await updateDoc(doc(db, 'links', id), patch)
+}
+
+export async function deleteLink(id) {
+  await deleteDoc(doc(db, 'links', id))
 }
