@@ -79,7 +79,7 @@
 
         <!-- Logout -->
         <button
-          @click="logout"
+          @click="handleLogout"
           class="flex items-center justify-center w-full px-3 py-2 rounded-lg text-xs font-medium bg-red-600 text-white hover:bg-red-700 transition"
           :class="{ 'px-2': collapsed, 'px-3': !collapsed }"
           title="Logout"
@@ -134,7 +134,7 @@
             </button>
             <button
               v-if="authStore.isLoggedIn"
-              @click="logout"
+              @click="handleLogout"
               class="w-full text-xs px-3 py-2 rounded bg-red-600 text-white hover:bg-red-700"
             >
               Logout
