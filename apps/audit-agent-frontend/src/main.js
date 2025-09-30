@@ -152,6 +152,7 @@ import { createHead } from '@vueuse/head'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import { initAnalytics, bindRouter } from '@/services/analytics'
 import 'driver.js/dist/driver.css'
+import { handleAuthError } from '@/services/firebaseService'
 
 
 // ✅ Firebase init
@@ -181,6 +182,14 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
   app.component(key, component)
 }
 app.component('VoiceRecorder', VoiceRecorder)
+
+app.config.errorHandler = (err, vm, info) => {
+  console.error('Global error handler:', err, info)
+  if (err.message.includes("auth")) {
+    handleAuthError(err)
+  }
+  console.error("Unhandled error:", err)
+}
 
 // Analytics (Google gtag)
 // router.afterEach((to) => {

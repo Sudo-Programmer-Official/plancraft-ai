@@ -158,11 +158,70 @@ import {
   orderBy,
   serverTimestamp,
 } from "firebase/firestore";
+import { signOut } from 'firebase/auth'
+import { ElMessageBox } from 'element-plus'
 import { toLocalDateKey } from "@/utils/dateHelper";
 import { db, auth } from '@/firebase/init'
 
 const tasksRef = collection(db, "tasks");
 const journalRef = collection(db, "journalEntries");
+
+/**
+ * Global auth-expiry handler for Firestore/auth errors.
+ * Shows a blocking alert prompting user to reload and sign in again.
+ */
+export function handleAuthError(error) {
+  const code = error?.code
+  const message = String(error?.message || '')
+
+  const isAuthRelated = (
+    code === 'permission-denied' ||
+    code === 'unauthenticated' ||
+    code === 'auth/id-token-expired' ||
+    code === 'auth/user-disabled' ||
+    /token|auth|unauthori(s|z)ed|permission/i.test(message)
+  )
+
+  if (!isAuthRelated) return
+
+  try {
+    ElMessageBox.alert(
+      'Your session has expired. Please log in again to continue.',
+      'Session Expired',
+      {
+        confirmButtonText: 'Reload & Login',
+        type: 'warning',
+        callback: () => {
+          try {
+            signOut(auth).finally(() => {
+              window.location.reload()
+            })
+          } catch {
+            window.location.reload()
+          }
+        },
+      },
+    )
+  } catch {
+    // If UI libs not ready, fallback to hard reload
+    try { signOut(auth) } catch {
+      // ignore
+    }
+    window.location.reload()
+  }
+}
+
+/**
+ * Wrap a Firestore action and surface auth errors globally.
+ */
+async function safeAction(promise) {
+  try {
+    return await promise
+  } catch (err) {
+    handleAuthError(err)
+    throw err
+  }
+}
 
 /**
  * 🗓 Fetch only today’s tasks for logged-in user
@@ -183,7 +242,7 @@ export async function fetchTasksForToday() {
     orderBy("order", "asc")
   );
 
-  const snapshot = await getDocs(q);
+  const snapshot = await safeAction(getDocs(q));
   return snapshot.docs.map((d) => {
     const data = d.data();
     return {
@@ -206,7 +265,7 @@ export async function fetchTasksByDate(dateStr) {
     where('date', '==', dateStr),
     orderBy('order', 'asc'),
   )
-  const snap = await getDocs(qy)
+  const snap = await safeAction(getDocs(qy))
   return snap.docs.map(d => {
     const data = d.data()
     return { id: d.id, ...data, date: typeof data.date === 'string' ? data.date : toLocalDateKey(data.date) }
@@ -227,7 +286,7 @@ export async function fetchTasksBetween(startYMD, endYMD) {
     orderBy('date', 'asc'),
     orderBy('order', 'asc'),
   )
-  const snap = await getDocs(qy)
+  const snap = await safeAction(getDocs(qy))
   return snap.docs.map(d => {
     const data = d.data()
     return { id: d.id, ...data, date: typeof data.date === 'string' ? data.date : toLocalDateKey(data.date) }
@@ -242,7 +301,10 @@ export async function fetchTasksBetween(startYMD, endYMD) {
  */
   export async function addTaskToFirebase(task) {
   const user = auth.currentUser;
-  if (!user) throw new Error("User not logged in");
+  if (!user) {
+    handleAuthError({ code: 'unauthenticated', message: 'User not logged in' })
+    throw new Error("User not logged in");
+  }
 
   // Prepare safe payload
     const payload = {
@@ -259,7 +321,7 @@ export async function fetchTasksBetween(startYMD, endYMD) {
       createdAt: serverTimestamp(),
     };
 
-  const docRef = await addDoc(tasksRef, payload);
+  const docRef = await safeAction(addDoc(tasksRef, payload));
 
   // Return task with Firestore's doc ID
   return { id: docRef.id, ...payload };
@@ -286,10 +348,10 @@ export async function updateTaskInFirebase(task) {
   if (!task.id) throw new Error("Task missing Firestore ID")
   const { id, createdAt, ...updates } = task
   const docRef = doc(db, "tasks", id)
-  await updateDoc(docRef, {
+  await safeAction(updateDoc(docRef, {
     ...updates,
     updatedAt: serverTimestamp(),
-  })
+  }))
 }
 
 /**
@@ -298,7 +360,7 @@ export async function updateTaskInFirebase(task) {
 export async function deleteTaskFromFirebase(taskId) {
   if (!taskId) throw new Error("Task ID required");
   const docRef = doc(db, "tasks", taskId);
-  await deleteDoc(docRef);
+  await safeAction(deleteDoc(docRef));
 }
 
 /**
@@ -306,13 +368,16 @@ export async function deleteTaskFromFirebase(taskId) {
  */
 export async function saveEntryToFirebase(entry) {
   const user = auth.currentUser;
-  if (!user) throw new Error("User not logged in");
+  if (!user) {
+    handleAuthError({ code: 'unauthenticated', message: 'User not logged in' })
+    throw new Error("User not logged in");
+  }
 
-  await addDoc(journalRef, {
+  await safeAction(addDoc(journalRef, {
     ...entry,
     userId: user.uid,
     createdAt: serverTimestamp(),
-  });
+  }));
 }
 
 /**
@@ -328,7 +393,7 @@ export async function fetchEntries() {
     orderBy("createdAt", "desc")
   );
 
-  const snapshot = await getDocs(q);
+  const snapshot = await safeAction(getDocs(q));
   return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
@@ -336,26 +401,30 @@ export async function fetchEntries() {
  */
 
 export async function addLink({ title, url, tags=[], pinned=false, color='indigo', icon='🔗' }) {
-  const user = auth.currentUser; if (!user) throw new Error('Not signed in')
+  const user = auth.currentUser;
+  if (!user) {
+    handleAuthError({ code: 'unauthenticated', message: 'Not signed in' })
+    throw new Error('Not signed in')
+  }
   const payload = {
     userId: user.uid, title, url, tags, pinned, color, icon,
     order: Date.now(), createdAt: Date.now(), lastUsedAt: 0
   }
-  const ref = await addDoc(collection(db, 'links'), payload)
+  const ref = await safeAction(addDoc(collection(db, 'links'), payload))
   return { id: ref.id, ...payload }
 }
 
 export async function getLinks() {
   const user = auth.currentUser; if (!user) return []
   const q = query(collection(db, 'links'), where('userId', '==', user.uid))
-  const snap = await getDocs(q)
+  const snap = await safeAction(getDocs(q))
   return snap.docs.map(d => ({ id: d.id, ...d.data() }))
 }
 
 export async function updateLink(id, patch) {
-  await updateDoc(doc(db, 'links', id), patch)
+  await safeAction(updateDoc(doc(db, 'links', id), patch))
 }
 
 export async function deleteLink(id) {
-  await deleteDoc(doc(db, 'links', id))
+  await safeAction(deleteDoc(doc(db, 'links', id)))
 }
