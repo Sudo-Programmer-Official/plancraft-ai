@@ -68,6 +68,7 @@ const router = createRouter({
     },
 
     { path: '/privacy-policy', component: () => import('@/views/PrivacyPolicy.vue') },
+    { path: '/data-deletion', name: 'data-deletion', component: () => import('@/views/DataDeletion.vue') },
     // Note: '/terms' and '/contact' already declared above; avoid duplicates
   ]
 })

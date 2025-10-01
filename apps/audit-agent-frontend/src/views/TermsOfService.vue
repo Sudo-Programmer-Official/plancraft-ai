@@ -1,7 +1,5 @@
 <template>
-  <div
-    class="min-h-screen bg-gradient-to-b from-indigo-900 via-purple-900 to-slate-950 text-slate-100"
-  >
+  <div class="min-h-screen bg-gradient-to-b from-indigo-900 via-purple-900 to-slate-950 text-slate-100">
     <router-link
       to="/dashboard"
       class="absolute top-6 left-6 z-20 flex items-center gap-2 cursor-pointer"
@@ -15,9 +13,12 @@
         PlanCraftAI
       </span>
     </router-link>
+
     <div class="max-w-4xl mx-auto py-16 px-6">
       <div class="max-w-4xl mx-auto px-6 py-12 text-gray-200">
         <h1 class="text-3xl font-bold mb-6">📜 Terms & Conditions</h1>
+        <p class="mb-4 text-sm text-gray-400">Last updated: October 1, 2025</p>
+
         <p class="mb-6">
           Welcome to <strong>PlanCraftAI</strong>. By using our application, you agree to the
           following terms. Please read them carefully.
@@ -48,8 +49,9 @@
             <p>
               We respect your privacy. Guest data is temporary and not saved. Logged-in users’ data
               is securely stored. For more details, please review our
-              <router-link to="/privacy" class="text-blue-400 underline">Privacy Policy</router-link
-              >.
+              <router-link to="/privacy" class="text-blue-400 underline">Privacy Policy</router-link>.
+              If you wish to delete your data, please visit our
+              <router-link to="/data-deletion" class="text-blue-400 underline">Data Deletion page</router-link>.
             </p>
           </section>
 
@@ -64,16 +66,26 @@
 
           <!-- Section 5 -->
           <section>
-            <h2 class="text-xl font-semibold mb-2">5. Limitation of Liability</h2>
+            <h2 class="text-xl font-semibold mb-2">5. Payments & Subscriptions</h2>
+            <p>
+              If you choose a paid plan, payments are securely processed via
+              <strong>Stripe</strong>. We do not store your card details. Subscription renewals,
+              billing cycles, and cancellations are governed by Stripe’s policies.
+            </p>
+          </section>
+
+          <!-- Section 6 -->
+          <section>
+            <h2 class="text-xl font-semibold mb-2">6. Limitation of Liability</h2>
             <p>
               PlanCraftAI is provided “as is.” We are not liable for indirect, incidental, or
               consequential damages that may result from using our service.
             </p>
           </section>
 
-          <!-- Section 6 -->
+          <!-- Section 7 -->
           <section>
-            <h2 class="text-xl font-semibold mb-2">6. Changes to Terms</h2>
+            <h2 class="text-xl font-semibold mb-2">7. Changes to Terms</h2>
             <p>
               We may update these Terms from time to time. Continued use of the service means you
               accept the revised Terms.
@@ -86,8 +98,8 @@
           <p>
             If you have questions about these Terms, contact us at
             <a href="mailto:support@plancraftai.com" class="text-blue-400 underline">
-              support@plancraftai.com </a
-            >.
+              support@plancraftai.com
+            </a>.
           </p>
         </div>
       </div>
