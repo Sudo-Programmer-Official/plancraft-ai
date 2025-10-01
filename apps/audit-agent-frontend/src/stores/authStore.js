@@ -1,10 +1,6 @@
 // src/stores/authStore.js
 import { defineStore } from "pinia";
-import {
-  signInAsGuest,
-  signInWithGoogle,
-  signOutUser,
-} from "@/services/authService";
+import { signInAsGuest, signInWithGoogle, signOutUser, signInWithEmail, registerWithEmail, sendResetEmail, fetchUserProfile } from "@/services/authService";
 import { getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence } from "firebase/auth";
 import firebaseApp from "@/firebase/init";
 import { identifyUser, trackEvent } from '@/services/analytics'
@@ -39,36 +35,45 @@ export const useAuthStore = defineStore("authStore", {
       // Attach Firebase auth listener
       onAuthStateChanged(auth, async (user) => {
         if (user) {
+          const profile = await fetchUserProfile(user.uid)
           this.user = {
             uid: user.uid,
             displayName: user.displayName,
             email: user.email,
             photoURL: user.photoURL,
-          };
-          this.token = await user.getIdToken();
+            role: profile?.role || 'user',
+          }
+          this.token = await user.getIdToken()
           identifyUser(this.user)
 
-          localStorage.setItem("user", JSON.stringify(this.user));
-          localStorage.setItem("token", this.token);
+          localStorage.setItem("user", JSON.stringify(this.user))
+          localStorage.setItem("token", this.token)
         } else {
-          this.user = null;
-          this.token = null;
-          localStorage.removeItem("user");
-          localStorage.removeItem("token");
+          this.user = null
+          this.token = null
+          localStorage.removeItem("user")
+          localStorage.removeItem("token")
         }
-        this.loading = false;
-      });
+        this.loading = false
+      })
     },
 
     async loginAsGuest() {
       this.loading = true;
       try {
         const user = await signInAsGuest();
-        this.user = user;
+        const profile = await fetchUserProfile(user.uid)
+        this.user = {
+          uid: user.uid,
+          displayName: user.displayName,
+          email: user.email,
+          photoURL: user.photoURL,
+          role: profile?.role || 'user',
+        }
         this.guest = true;
         this.token = await user.getIdToken();
-        localStorage.setItem("user", JSON.stringify(this.user));
-        localStorage.setItem("token", this.token);
+        localStorage.setItem("user", JSON.stringify(this.user))
+        localStorage.setItem("token", this.token)
       } finally {
         this.loading = false;
       }
@@ -78,14 +83,67 @@ export const useAuthStore = defineStore("authStore", {
       this.loading = true;
       try {
         const user = await signInWithGoogle();
-        this.user = user;
+        const profile = await fetchUserProfile(user.uid)
+        this.user = {
+          uid: user.uid,
+          displayName: user.displayName,
+          email: user.email,
+          photoURL: user.photoURL,
+          role: profile?.role || 'user',
+        }
         this.guest = false;
         this.token = await user.getIdToken();
-        localStorage.setItem("user", JSON.stringify(this.user));
-        localStorage.setItem("token", this.token);
+        localStorage.setItem("user", JSON.stringify(this.user))
+        localStorage.setItem("token", this.token)
       } finally {
         this.loading = false;
       }
+    },
+
+    async loginWithEmail(email, password) {
+      this.loading = true
+      try {
+        const user = await signInWithEmail(email, password)
+        const profile = await fetchUserProfile(user.uid)
+        this.user = {
+          uid: user.uid,
+          displayName: user.displayName,
+          email: user.email,
+          photoURL: user.photoURL,
+          role: profile?.role || 'user',
+        }
+        this.guest = false
+        this.token = await user.getIdToken()
+        localStorage.setItem('user', JSON.stringify(this.user))
+        localStorage.setItem('token', this.token)
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async registerEmail(email, password) {
+      this.loading = true
+      try {
+        const user = await registerWithEmail(email, password)
+        const profile = await fetchUserProfile(user.uid)
+        this.user = {
+          uid: user.uid,
+          displayName: user.displayName,
+          email: user.email,
+          photoURL: user.photoURL,
+          role: profile?.role || 'user',
+        }
+        this.guest = false
+        this.token = await user.getIdToken()
+        localStorage.setItem('user', JSON.stringify(this.user))
+        localStorage.setItem('token', this.token)
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async resetPassword(email) {
+      await sendResetEmail(email)
     },
 
     async logout() {

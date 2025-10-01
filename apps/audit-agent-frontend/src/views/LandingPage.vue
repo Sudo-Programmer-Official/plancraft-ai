@@ -104,6 +104,13 @@
           >
             🌿 Continue as Guest
           </el-button>
+          <RouterLink
+            to="/subscription"
+            class="inline-flex items-center justify-center px-5 py-3 rounded-xl bg-black/20 text-white font-semibold hover:bg-black/30 transition"
+            aria-label="See premium plans"
+          >
+            ⭐ See Premium
+          </RouterLink>
         
         </div>
           <el-button id="installBtn" size="large" type="success" style="display: none">

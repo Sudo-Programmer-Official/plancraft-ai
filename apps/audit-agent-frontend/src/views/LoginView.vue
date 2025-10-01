@@ -29,6 +29,28 @@
           Continue as Guest
         </button>
         
+        <!-- Email Login -->
+        <div class="pt-2 text-left">
+          <button
+            class="text-indigo-300 text-sm hover:text-indigo-200"
+            @click="showEmail = !showEmail"
+          >
+            {{ showEmail ? 'Hide' : 'Prefer email? Sign in with email' }}
+          </button>
+          <div v-if="showEmail" class="mt-3 space-y-3">
+            <input v-model="email" type="email" placeholder="Email" class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-400" />
+            <input v-model="password" type="password" placeholder="Password" class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-400" />
+            <div class="flex items-center justify-between text-sm">
+              <button @click="onLoginEmail" :disabled="authStore.loading" class="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 transition">
+                Sign In
+              </button>
+              <button @click="onRegister" :disabled="authStore.loading" class="px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition">
+                Create account
+              </button>
+            </div>
+            <button @click="onReset" class="text-xs text-indigo-300 hover:text-indigo-200">Forgot password?</button>
+          </div>
+        </div>
       </div>
 
       <p v-if="authStore.loading" class="text-sm text-gray-400 mt-6">✨ Preparing your space...</p>
@@ -53,6 +75,39 @@ async function loginGoogle() {
 async function loginGuest() {
   await authStore.loginAsGuest()
   if (authStore.user) router.push("/dashboard")
+}
+
+// Email auth
+const showEmail = ref(false)
+const email = ref('')
+const password = ref('')
+
+async function onLoginEmail() {
+  try {
+    await authStore.loginWithEmail(email.value, password.value)
+    if (authStore.user) router.push('/dashboard')
+  } catch (e) {
+    alert('Login failed. Please check your credentials.')
+  }
+}
+
+async function onRegister() {
+  try {
+    await authStore.registerEmail(email.value, password.value)
+    if (authStore.user) router.push('/dashboard')
+  } catch (e) {
+    alert('Sign up failed. Try a different email.')
+  }
+}
+
+async function onReset() {
+  if (!email.value) return alert('Enter your email above to reset')
+  try {
+    await authStore.resetPassword(email.value)
+    alert('Password reset email sent. Check your inbox.')
+  } catch (e) {
+    alert('Failed to send reset email.')
+  }
 }
 
 // --- Star animation ---

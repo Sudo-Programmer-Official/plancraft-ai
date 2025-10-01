@@ -216,10 +216,10 @@
           </button>
           <button
             v-else
-            @click="router.push('/subscription')"
-            class="bg-purple-700 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-white shadow hover:bg-purple-800 transition text-sm sm:text-base"
+            disabled
+            class="bg-purple-700 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-white text-sm sm:text-base font-semibold cursor-default"
           >
-            ⭐ Premium – {{ subscription.remainingDays }}d left
+            🌟 Premium ({{ subscription.remainingDays }}d left)
           </button>
 
           <!-- User Avatar -->

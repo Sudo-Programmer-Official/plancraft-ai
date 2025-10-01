@@ -1,0 +1,31 @@
+// src/services/stripeService.js
+import api from '@/services/api'
+
+export async function createCheckoutSession(plan, userId) {
+  try {
+    const successUrl = window.location.origin + '/subscription?status=success'
+    const cancelUrl = window.location.origin + '/subscription?status=cancel'
+    const res = await api.post('/create-checkout-session', {
+      plan,
+      userId,
+      successUrl,
+      cancelUrl,
+    })
+    const url = res?.data?.url
+    if (!url) throw new Error('No checkout URL returned')
+    return url
+  } catch (err) {
+    console.error('Stripe error:', err?.response?.data || err?.message)
+    throw new Error('Payment service temporarily unavailable')
+  }
+}
+
+export async function getSubscriptionStatus(userId) {
+  try {
+    const res = await api.get('/subscription/status', { params: { userId } })
+    return res?.data || { plan: 'free', remainingDays: 0 }
+  } catch (err) {
+    console.error('Subscription status error:', err?.response?.data || err?.message)
+    return { plan: 'free', remainingDays: 0 }
+  }
+}

@@ -3,6 +3,11 @@ import cors from "cors";
 import dotenv from "dotenv";
 import aiRoutes from "./routes/aiRoutes.js";
 import transcribeRoutes from "./routes/transcribeRoutes.js";
+import subscriptionRoutes from "./routes/subscriptionRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
+import stripeRoutes from "./routes/stripeRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
+import { stripeWebhookHandler } from "./routes/stripeRoutes.js";
 
 dotenv.config();
 
@@ -35,6 +40,10 @@ app.use(
   })
 );
 
+// Stripe webhook must receive the raw body for signature verification
+app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), stripeWebhookHandler);
+
+// JSON parser for other routes
 app.use(express.json());
 
 // ✅ Health check route
@@ -52,6 +61,10 @@ app.get("/health", (req, res) => res.status(200).send("OK"));
 // Routes
 app.use("/api/ai", aiRoutes);
 app.use("/api", transcribeRoutes); // exposes POST /api/transcribe
+app.use("/api", subscriptionRoutes);
+app.use("/api", notificationRoutes);
+app.use("/api", stripeRoutes);
+app.use("/api/admin", adminRoutes);
 
 const PORT = 4000;
 app.listen(PORT, () => {
