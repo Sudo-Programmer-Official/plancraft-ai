@@ -60,21 +60,22 @@
 
 <script setup>
 import { ref, onMounted } from "vue"
-import { useRouter } from "vue-router"
+import { useRouter, useRoute } from "vue-router"
 import { useAuthStore } from "@/stores/authStore"
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 const starsCanvas = ref(null)
 
 async function loginGoogle() {
   await authStore.loginWithGoogle()
-  if (authStore.user) router.push("/dashboard")
+  if (authStore.user) redirectAfterLogin()
 }
 
 async function loginGuest() {
   await authStore.loginAsGuest()
-  if (authStore.user) router.push("/dashboard")
+  if (authStore.user) redirectAfterLogin()
 }
 
 // Email auth
@@ -85,7 +86,7 @@ const password = ref('')
 async function onLoginEmail() {
   try {
     await authStore.loginWithEmail(email.value, password.value)
-    if (authStore.user) router.push('/dashboard')
+    if (authStore.user) redirectAfterLogin()
   } catch (e) {
     alert('Login failed. Please check your credentials.')
   }
@@ -94,7 +95,7 @@ async function onLoginEmail() {
 async function onRegister() {
   try {
     await authStore.registerEmail(email.value, password.value)
-    if (authStore.user) router.push('/dashboard')
+    if (authStore.user) redirectAfterLogin()
   } catch (e) {
     alert('Sign up failed. Try a different email.')
   }
@@ -108,6 +109,22 @@ async function onReset() {
   } catch (e) {
     alert('Failed to send reset email.')
   }
+}
+
+function redirectAfterLogin() {
+  try {
+    // Priority 1: stored intent
+    const stored = localStorage.getItem('postLoginRedirect')
+    if (stored) {
+      localStorage.removeItem('postLoginRedirect')
+      return router.push(stored)
+    }
+  } catch {}
+  // Priority 2: redirect query from guard
+  const q = route?.query?.redirect
+  if (typeof q === 'string' && q.length) return router.push(q)
+  // Default: dashboard
+  router.push('/dashboard')
 }
 
 // --- Star animation ---

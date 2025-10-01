@@ -15,9 +15,8 @@ router.post('/create-checkout-session', async (req, res) => {
   try {
     const { userId, plan, successUrl, cancelUrl } = req.body || {}
 
-    if (!userId || !plan) {
-      return res.status(400).json({ error: 'Missing userId or plan' })
-    }
+    if (!userId) return res.status(400).json({ error: 'User must be logged in to upgrade' })
+    if (!plan) return res.status(400).json({ error: 'Missing plan' })
 
     // Dynamically resolve plan → Stripe Price ID
     const priceId = process.env[`STRIPE_${String(plan).toUpperCase()}_PRICE_ID`] || process.env.STRIPE_MONTHLY_PRICE_ID

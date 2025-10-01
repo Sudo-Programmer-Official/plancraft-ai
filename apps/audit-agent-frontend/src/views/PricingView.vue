@@ -55,16 +55,23 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { createCheckoutSession } from '@/services/stripeService'
 import { trackEvent } from '@/services/analytics'
 
 const authStore = useAuthStore()
+const router = useRouter()
 const loading = ref(false)
 const monthlyPriceId = import.meta.env.VITE_STRIPE_MONTHLY_PRICE_ID || 'price_monthly_default'
 
 async function onUpgrade() {
   try {
+    // Ensure signed in before starting checkout
+    if (!authStore.user) {
+      try { localStorage.setItem('postLoginRedirect', '/subscription?upgrade=1') } catch {}
+      return router.push('/login')
+    }
     loading.value = true
     trackEvent('upgrade_started')
     const url = await createCheckoutSession('monthly', authStore.user?.uid)
