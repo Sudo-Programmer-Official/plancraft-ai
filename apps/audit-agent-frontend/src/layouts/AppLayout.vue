@@ -7,7 +7,7 @@
       class="hidden md:flex flex-col h-screen transition-all duration-300 bg-gray-950/70 backdrop-blur-xl"
       :class="sidebarOpen ? 'w-64' : 'w-20'"
     >
-      <div class="flex items-center justify-between p-4 border-b border-gray-700">
+      <div class="flex-shrink-0 flex items-center justify-between p-4 border-b border-gray-700">
         <h1 v-if="sidebarOpen" class="text-lg font-bold">🌙 PlanCraftAI</h1>
         <button
           @click="sidebarOpen = !sidebarOpen"
@@ -63,30 +63,36 @@
         </RouterLink>
       </nav>
 
-      <!-- Logout at bottom -->
-      <!-- Sidebar Footer -->
-      <div class="mt-auto flex flex-col gap-2 items-center pb-4">
-        <!-- Show Tour -->
-        <button
-          @click="startTour"
-          class="flex items-center justify-center w-full px-3 py-2 rounded-lg text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition"
-          :class="{ 'px-2': collapsed, 'px-3': !collapsed }"
-          title="Show Tour"
-        >
-          <span v-if="!collapsed">Show Tour</span>
-          <span v-else>❔</span>
-        </button>
-
-        <!-- Logout -->
-        <button
-          @click="handleLogout"
-          class="flex items-center justify-center w-full px-3 py-2 rounded-lg text-xs font-medium bg-red-600 text-white hover:bg-red-700 transition"
-          :class="{ 'px-2': collapsed, 'px-3': !collapsed }"
-          title="Logout"
-        >
-          <span v-if="!collapsed">Logout</span>
-          <span v-else>🚪</span>
-        </button>
+      <!-- Sidebar Footer: segmented actions -->
+      <div class="flex-shrink-0 mt-auto pb-4 px-3">
+        <div class="grid gap-1 bg-gray-900/60 border border-gray-800 rounded-lg p-1" :class="[authStore.user?.role==='admin' ? 'grid-cols-5' : 'grid-cols-4']">
+          <button
+            @click="startTour"
+            class="text-xs py-2 rounded-md hover:bg-gray-800 transition"
+            title="Show Tour"
+          >❔</button>
+          <RouterLink
+            to="/settings"
+            class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
+            title="Settings"
+          >⚙️</RouterLink>
+          <RouterLink
+            v-if="authStore.user?.role==='admin'"
+            to="/admin"
+            class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
+            title="Admin Panel"
+          >🛠</RouterLink>
+          <RouterLink
+            to="/help"
+            class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
+            title="Help"
+          >💬</RouterLink>
+          <button
+            @click="handleLogout"
+            class="text-xs py-2 rounded-md hover:bg-gray-800 transition"
+            title="Logout"
+          >🚪</button>
+        </div>
       </div>
     </aside>
 
@@ -125,20 +131,27 @@
           >
             Logout
           </button> -->
-          <div class="p-4 border-t border-gray-800 space-y-2">
-            <button
-              @click="startTour"
-              class="w-full text-xs px-3 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700"
-            >
-              ❓ Show Tour
-            </button>
-            <button
-              v-if="authStore.isLoggedIn"
-              @click="handleLogout"
-              class="w-full text-xs px-3 py-2 rounded bg-red-600 text-white hover:bg-red-700"
-            >
-              Logout
-            </button>
+          <div class="p-4 border-t border-gray-800">
+            <!-- Grouped card: Settings | Tour | Logout -->
+            <div class="grid grid-cols-3 gap-1 bg-gray-900/60 border border-gray-800 rounded-lg p-1">
+              <RouterLink
+                to="/settings"
+                @click="mobileMenu = false"
+                class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
+                title="Settings"
+              >⚙️</RouterLink>
+              <button
+                @click="startTour"
+                class="text-xs py-2 rounded-md hover:bg-gray-800 transition"
+                title="Show Tour"
+              >❔</button>
+              <button
+                v-if="authStore.isLoggedIn"
+                @click="handleLogout"
+                class="text-xs py-2 rounded-md hover:bg-gray-800 transition"
+                title="Logout"
+              >🚪</button>
+            </div>
           </div>
         </div>
       </aside>
@@ -164,34 +177,61 @@
             </svg>
           </button>
           <h2 class="text-2xl font-semibold capitalize">{{ $route.name }}</h2>
-          <span class="text-gray-400 text-sm mt-1 sm:mt-0">
-            {{
-              new Date().toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-              })
-            }}
-          </span>
         </div>
 
         <!-- Right Section -->
-        <div class="flex items-center gap-4">
-          <span v-if="authStore.isLoggedIn" class="text-sm text-gray-300">
-            {{ authStore.user?.displayName?.split(' ')[0] || 'Guest' }}
-          </span>
+        <div class="flex items-center gap-2 sm:gap-4">
+          <!-- Notification Bell -->
+          <div class="relative" ref="dropdownEl">
+            <button
+              @click="toggleNotifications"
+              class="relative bg-gray-800 hover:bg-gray-700 p-2 rounded-full transition"
+              aria-label="Notifications"
+              ref="bellEl"
+            >
+              🔔
+              <span
+                v-if="unreadCount > 0"
+                class="absolute -top-1 -right-1 bg-red-600 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full"
+              >
+                {{ unreadCount }}
+              </span>
+            </button>
+
+            <NotificationDropdown
+              v-if="showNotifications"
+              :items="notifications"
+              :error="notificationsError"
+              @markAllRead="markAllRead"
+            />
+          </div>
+
+          <!-- Upgrade Button / Premium Status -->
           <button
-            v-if="authStore.isLoggedIn"
-            @click="handleLogout"
-            class="hidden md:inline bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg text-sm"
+            v-if="subscription.plan === 'free'"
+            @click="router.push('/subscription')"
+            class="bg-gradient-to-r from-purple-500 to-pink-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-white shadow-lg animate-pulse hover:from-purple-600 hover:to-pink-700 transition text-sm sm:text-base"
           >
-            Logout
+            🚀 Upgrade
           </button>
+          <button
+            v-else
+            @click="router.push('/subscription')"
+            class="bg-purple-700 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-white shadow hover:bg-purple-800 transition text-sm sm:text-base"
+          >
+            ⭐ Premium – {{ subscription.remainingDays }}d left
+          </button>
+
+          <!-- User Avatar -->
           <img
             v-if="authStore.isLoggedIn"
             :src="authStore.user?.photoURL || 'https://i.pravatar.cc/40'"
+            class="rounded-full w-10 h-10 cursor-pointer"
             alt="avatar"
-            class="rounded-full w-10 h-10"
+            @click="router.push('/settings')"
           />
+
+          <!-- Logout removed from header per guidelines -->
         </div>
       </header>
 
@@ -199,50 +239,69 @@
       <main class="p-6 flex-1 overflow-y-auto">
         <RouterView />
       </main>
+      <!-- Compact sticky footer -->
+      <footer class="py-3 text-center text-xs sm:text-sm text-indigo-300 bg-slate-950/95 border-t border-gray-800">
+        <div class="max-w-7xl mx-auto px-4 flex items-center justify-center sm:justify-between gap-3">
+          <div class="hidden sm:flex items-center gap-2">
+            <img src="/logo.png" alt="PlanCraftAI" class="w-6 h-6" />
+            <span class="opacity-80">PlanCraftAI</span>
+          </div>
+          <div class="flex items-center gap-4">
+            <RouterLink to="/privacy-policy" class="hover:underline">Privacy</RouterLink>
+            <RouterLink to="/terms" class="hover:underline">Terms</RouterLink>
+            <RouterLink to="/contact" class="hover:underline">Contact</RouterLink>
+            <a href="mailto:careers@plancraftai.com" class="hover:underline hidden sm:inline">Careers</a>
+          </div>
+        </div>
+      </footer>
     </div>
   </div>
-  <footer class="py-8 text-center text-sm text-indigo-300 bg-slate-950" data-aos="fade-in">
-    <div class="max-w-7xl mx-auto px-6">
-      <img
-        src="/logo.png"
-        alt="PlanCraftAI Logo"
-        class="mx-auto mb-6 w-16 h-16 sm:w-20 sm:h-20 drop-shadow-lg"
-      />
-      <p class="flex flex-col sm:flex-row justify-center items-center gap-2">
-        <span>
-          Built with <span aria-hidden="true">❤</span> by
-          <a
-            href="https://www.linkedin.com/in/fullstuffdeveloper/"
-            target="_blank"
-            rel="noopener"
-            class="underline hover:text-indigo-400"
-          >
-            Abhishek
-          </a>
-        </span>
-        <span>• <strong>PlanCraftAI</strong></span>
-      </p>
-      <div class="mt-3 space-x-4">
-        <RouterLink to="/privacy-policy" class="hover:underline">Privacy</RouterLink>
-        <RouterLink to="/terms" class="hover:underline">Terms</RouterLink>
-        <RouterLink to="/contact" class="hover:underline">Contact</RouterLink>
-      </div>
-    </div>
-  </footer>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { driver } from 'driver.js'
 import 'driver.js/dist/driver.css'
+import { watchNotificationsPublic } from '@/services/firebaseService'
+import NotificationDropdown from '@/components/NotificationDropdown.vue'
+import { useSubscriptionStore } from '@/stores/subscriptionStore'
 
 const sidebarOpen = ref(true) // desktop toggle
 const mobileMenu = ref(false) // mobile drawer toggle
 
 const router = useRouter()
 const authStore = useAuthStore()
+
+// Subscription state via store
+const subStore = useSubscriptionStore()
+const subscription = subStore.subscription
+
+// Notifications
+const showNotifications = ref(false)
+const notifications = ref([])
+const notificationsError = ref(false)
+const unreadCount = ref(0)
+let unwatchNotes = null
+const dropdownEl = ref(null)
+const bellEl = ref(null)
+
+function toggleNotifications() {
+  showNotifications.value = !showNotifications.value
+}
+
+function onDocumentClick(e) {
+  if (!showNotifications.value) return
+  const target = e.target
+  const withinDropdown = dropdownEl.value?.contains?.(target)
+  const withinBell = bellEl.value?.contains?.(target)
+  if (!withinDropdown && !withinBell) showNotifications.value = false
+}
+
+function markAllRead() {
+  unreadCount.value = 0
+}
 
 const tabs = [
   { name: 'Dashboard', icon: '🏠', path: '/dashboard' },
@@ -264,6 +323,23 @@ onMounted(() => {
     startTour()
     localStorage.setItem('seenDashboardTour', 'true')
   }
+  // Live notifications (public announcements via Firestore)
+  try {
+    unwatchNotes = watchNotificationsPublic((list) => {
+      notifications.value = Array.isArray(list) ? list : []
+      unreadCount.value = notifications.value.length
+    })
+  } catch (e) {
+    console.warn('Failed to subscribe notifications', e?.message || e)
+    notificationsError.value = true
+  }
+  if (authStore.user?.uid) subStore.fetchStatus(authStore.user.uid)
+  document.addEventListener('click', onDocumentClick)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', onDocumentClick)
+  if (unwatchNotes) unwatchNotes()
 })
 
 function startTour() {
