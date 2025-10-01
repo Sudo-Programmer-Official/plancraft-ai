@@ -47,6 +47,8 @@ temp/
 *.tmp
 *.temp
 
+/apps/backend-node/firebase-service-account.json
+
 # VS Code settings
 *.code-workspace
 
@@ -70,3 +72,4 @@ __pycache__/
 # node_modules/
 # apps/*/node_modules/
 # shared/*/node_modules/
+
