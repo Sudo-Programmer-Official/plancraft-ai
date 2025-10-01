@@ -81,6 +81,7 @@ import subscriptionRoutes from "./routes/subscriptionRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import stripeRoutes from "./routes/stripeRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
+import integrationsRoutes from "./routes/integrationsRoutes.js";
 import settingsRoutes from "./routes/settingsRoutes.js";
 import { stripeWebhookHandler } from "./routes/stripeWebhook.js";  // ✅ now from separate file
 
@@ -137,6 +138,7 @@ app.use("/api", notificationRoutes);
 app.use("/api", stripeRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api", settingsRoutes);
+app.use("/api", integrationsRoutes);
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {

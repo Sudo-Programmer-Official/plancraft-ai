@@ -51,8 +51,12 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           <button
             v-for="i in integrations"
-            :key="i.name"
-            class="flex flex-col items-center justify-center p-4 rounded-lg bg-slate-900/50 hover:bg-slate-800 transition"
+            :key="i.key"
+            @click="i.selected = !i.selected"
+            :class="[
+              'flex flex-col items-center justify-center p-4 rounded-lg transition',
+              i.selected ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-900/50 hover:bg-slate-800'
+            ]"
           >
             <span class="text-2xl mb-2">{{ i.icon }}</span>
             <span class="text-sm">{{ i.name }}</span>
@@ -95,6 +99,16 @@
           </button>
         </div>
       </section>
+      <!-- Save Button -->
+      <div class="flex justify-end mt-6">
+        <el-button
+          type="primary"
+          class="px-6 py-2 rounded-lg shadow-md bg-gradient-to-r from-indigo-600 to-purple-600"
+          @click="saveSettings"
+        >
+          💾 Save Settings
+        </el-button>
+      </div>
     </main>
   </div>
 </template>
@@ -123,11 +137,13 @@ onMounted(async () => {
     if (authStore.user) {
       const res = await apiGetPrefs(authStore.user.uid)
       const n = res?.notifications || {}
+      const ints = res?.integrations || {}
       prefs.email = !!n.email
       prefs.pwa = !!n.push
       prefs.whatsapp = !!n.whatsapp
       prefs.discord = !!n.discord
       prefs.calls = !!n.calls
+      integrations.forEach(i => { i.selected = !!ints[i.key] })
     }
   } catch (e) {
     console.warn('Failed to load preferences', e)
@@ -136,14 +152,14 @@ onMounted(async () => {
 
 // Optional: auto-save debounce can be added later. For now, use Save button.
 
-// Dummy integrations list
-const integrations = [
-  { name: "Google Calendar", icon: "📆" },
-  { name: "Slack", icon: "💬" },
-  { name: "Discord", icon: "🎮" },
-  { name: "WhatsApp", icon: "📱" },
-  { name: "Outlook", icon: "📧" },
-]
+// Integrations toggle list (selected state persisted)
+const integrations = reactive([
+  { key: 'googleCalendar', name: 'Google Calendar', icon: '📆', selected: false },
+  { key: 'slack', name: 'Slack', icon: '💬', selected: false },
+  { key: 'discord', name: 'Discord', icon: '🎮', selected: false },
+  { key: 'whatsapp', name: 'WhatsApp', icon: '📱', selected: false },
+  { key: 'outlook', name: 'Outlook', icon: '📧', selected: false },
+])
 
 function handleLogout() {
   authStore.logout()
@@ -165,7 +181,10 @@ async function saveSettings() {
         discord: !!prefs.discord,
         calls: !!prefs.calls,
       },
-      integrations: {},
+      integrations: integrations.reduce((acc, i) => {
+        acc[i.key] = !!i.selected
+        return acc
+      }, {}),
     }
     await apiUpdatePrefs(authStore.user?.uid, payload)
     console.log("Settings saved:", prefs)
