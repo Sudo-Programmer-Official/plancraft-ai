@@ -43,6 +43,13 @@ export async function stripeWebhookHandler(req, res) {
           ? await stripe.subscriptions.retrieve(session.subscription)
           : null
 
+        // Ensure subscription carries uid for future invoice events
+        if (sub?.id) {
+          try { await stripe.subscriptions.update(sub.id, { metadata: { userId: uid } }) } catch (e) {
+            console.warn('Failed to set subscription metadata userId:', e?.message || e)
+          }
+        }
+
         await db.collection("users").doc(uid).set(
           {
             role: "premium",
@@ -92,8 +99,15 @@ export async function stripeWebhookHandler(req, res) {
        */
       case "customer.subscription.deleted":
       case "invoice.payment_failed": {
-        const subscription = event.data.object
-        const uid = subscription?.metadata?.userId
+        const payload = event.data.object
+        const subId = payload?.id || payload?.subscription
+        let uid = payload?.metadata?.userId
+        if (!uid && subId) {
+          try {
+            const sub = await stripe.subscriptions.retrieve(subId)
+            uid = sub?.metadata?.userId
+          } catch {}
+        }
         if (!uid) break
 
         console.log(`⚠️ Downgrading user ${uid} → free`)

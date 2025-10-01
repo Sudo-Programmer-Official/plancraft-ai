@@ -51,6 +51,11 @@
       ❌ Checkout canceled. You can try again anytime.
     </p>
   </div>
+  <ErrorDialog
+    v-model="errorVisible"
+    title="Payment Service Unavailable"
+    message="❌ We couldn't reach the payment service. Please try again later."
+  />
 </template>
 
 <script setup>
@@ -59,11 +64,13 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { createCheckoutSession } from '@/services/stripeService'
 import { trackEvent } from '@/services/analytics'
+import ErrorDialog from '@/components/ErrorDialog.vue'
 
 const authStore = useAuthStore()
 const router = useRouter()
 const loading = ref(false)
 const monthlyPriceId = import.meta.env.VITE_STRIPE_MONTHLY_PRICE_ID || 'price_monthly_default'
+const errorVisible = ref(false)
 
 async function onUpgrade() {
   try {
@@ -78,7 +85,7 @@ async function onUpgrade() {
     window.location.href = url
   } catch (e) {
     loading.value = false
-    alert('❌ Payment service unavailable. Please try again later.')
+    errorVisible.value = true
   }
 }
 

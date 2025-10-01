@@ -1,4 +1,5 @@
 import express from 'express'
+import { db } from '../services/firebaseAdmin.js'
 
 const router = express.Router()
 
@@ -6,17 +7,21 @@ const router = express.Router()
 router.get('/subscription/status', async (req, res) => {
   try {
     const userId = String(req.query.userId || '')
-    // Simple demo: mark some users as premium via env list
-    const premiumIds = (process.env.FAKE_PREMIUM_USER_IDS || '')
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean)
-
-    const isPremium = premiumIds.includes(userId)
-    return res.json({
-      plan: isPremium ? 'premium' : 'free',
-      remainingDays: isPremium ? 27 : 0,
-    })
+    if (!userId) return res.json({ plan: 'free', remainingDays: 0 })
+    const snap = await db.collection('users').doc(userId).get()
+    const data = snap.exists ? snap.data() : {}
+    const sub = data?.subscription || {}
+    const status = String(sub.status || '').toLowerCase()
+    const plan = status === 'active' ? (sub.plan || 'premium') : 'free'
+    let remainingDays = 0
+    try {
+      const end = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null
+      if (end) {
+        const diffMs = end.getTime() - Date.now()
+        remainingDays = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)))
+      }
+    } catch {}
+    return res.json({ plan, remainingDays })
   } catch (err) {
     console.error('subscription/status error', err)
     res.status(200).json({ plan: 'free', remainingDays: 0 })
@@ -42,4 +47,3 @@ router.post('/subscription/checkout', async (req, res) => {
 })
 
 export default router
-

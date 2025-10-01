@@ -100,13 +100,11 @@
 </template>
 
 <script setup>
-import { reactive, onMounted, watch } from "vue"
+import { reactive, onMounted } from "vue"
 import { useAuthStore } from "@/stores/authStore"
 import { useRouter } from "vue-router"
-import { doc, getDoc, setDoc } from "firebase/firestore"
-import { db } from "@/firebase/init"
 import { ElMessage } from "element-plus"
-import { savePreferences } from "@/services/firebaseService"
+import { getPreferences as apiGetPrefs, updatePreferences as apiUpdatePrefs } from "@/services/settingsService"
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -121,24 +119,22 @@ const prefs = reactive({
 })
 
 onMounted(async () => {
-  if (authStore.user) {
-    const ref = doc(db, "preferences", authStore.user.uid)
-    const snap = await getDoc(ref)
-    if (snap.exists()) {
-      Object.assign(prefs, snap.data())
+  try {
+    if (authStore.user) {
+      const res = await apiGetPrefs(authStore.user.uid)
+      const n = res?.notifications || {}
+      prefs.email = !!n.email
+      prefs.pwa = !!n.push
+      prefs.whatsapp = !!n.whatsapp
+      prefs.discord = !!n.discord
+      prefs.calls = !!n.calls
     }
+  } catch (e) {
+    console.warn('Failed to load preferences', e)
   }
 })
 
-watch(
-  prefs,
-  async () => {
-    if (authStore.user) {
-      await setDoc(doc(db, "preferences", authStore.user.uid), prefs, { merge: true })
-    }
-  },
-  { deep: true }
-)
+// Optional: auto-save debounce can be added later. For now, use Save button.
 
 // Dummy integrations list
 const integrations = [
@@ -161,7 +157,17 @@ function upgradePlan() {
 // Updated saveSettings function with user feedback
 async function saveSettings() {
   try {
-    await savePreferences(authStore.user?.uid, prefs)
+    const payload = {
+      notifications: {
+        email: !!prefs.email,
+        push: !!prefs.pwa,
+        whatsapp: !!prefs.whatsapp,
+        discord: !!prefs.discord,
+        calls: !!prefs.calls,
+      },
+      integrations: {},
+    }
+    await apiUpdatePrefs(authStore.user?.uid, payload)
     console.log("Settings saved:", prefs)
     ElMessage.success("✅ Settings saved successfully!")
   } catch (error) {
