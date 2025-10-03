@@ -40,6 +40,41 @@
             <span>Phone Calls / SMS</span>
           </label>
         </div>
+
+        <!-- Delivery endpoints (appear when enabled) -->
+        <!-- WhatsApp phone -->
+        <div v-if="prefs.whatsapp" class="mt-4">
+          <label class="block text-sm text-slate-300 mb-1">WhatsApp Phone Number</label>
+          <el-input
+            v-model="integrationEndpoints.whatsapp.phone"
+            placeholder="+1 234 567 8901"
+            clearable
+            class="w-full"
+          />
+          <small class="text-slate-400">Format: +12135551234 (E.164)</small>
+        </div>
+
+        <!-- SMS phone -->
+        <div v-if="prefs.calls" class="mt-4">
+          <label class="block text-sm text-slate-300 mb-1">Phone Number (for SMS)</label>
+          <el-input
+            v-model="integrationEndpoints.sms.phone"
+            placeholder="+1 234 567 8901"
+            clearable
+            class="w-full"
+          />
+        </div>
+
+        <!-- Discord webhook -->
+        <div v-if="prefs.discord" class="mt-4">
+          <label class="block text-sm text-slate-300 mb-1">Discord Webhook URL</label>
+          <el-input
+            v-model="integrationEndpoints.discord.webhook"
+            placeholder="https://discord.com/api/webhooks/..."
+            clearable
+            class="w-full"
+          />
+        </div>
       </section>
 
       <!-- Integrations -->
@@ -50,7 +85,7 @@
         </p>
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           <button
-            v-for="i in integrations"
+            v-for="i in integrationOptions"
             :key="i.key"
             @click="i.selected = !i.selected"
             :class="[
@@ -114,11 +149,11 @@
 </template>
 
 <script setup>
-import { reactive, onMounted } from "vue"
+import { reactive, ref, onMounted } from "vue"
 import { useAuthStore } from "@/stores/authStore"
 import { useRouter } from "vue-router"
 import { ElMessage } from "element-plus"
-import { getPreferences as apiGetPrefs, updatePreferences as apiUpdatePrefs } from "@/services/settingsService"
+import { getPreferences as apiGetPrefs, updatePreferences as apiUpdatePrefs, getIntegrations, updateIntegrations } from "@/services/settingsService"
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -143,7 +178,17 @@ onMounted(async () => {
       prefs.whatsapp = !!n.whatsapp
       prefs.discord = !!n.discord
       prefs.calls = !!n.calls
-      integrations.forEach(i => { i.selected = !!ints[i.key] })
+
+      integrationOptions.forEach(i => { i.selected = !!ints[i.key] })
+
+      const resInts = await getIntegrations(authStore.user.uid)
+      integrationEndpoints.value = {
+        whatsapp: { phone: resInts?.whatsapp?.phone || '' },
+        sms: { phone: resInts?.sms?.phone || '' },
+        discord: { webhook: resInts?.discord?.webhook || '' },
+        slack: { userId: resInts?.slack?.userId || '', token: resInts?.slack?.token || '' },
+        email: resInts?.email || authStore.user.email || ''
+      }
     }
   } catch (e) {
     console.warn('Failed to load preferences', e)
@@ -153,13 +198,22 @@ onMounted(async () => {
 // Optional: auto-save debounce can be added later. For now, use Save button.
 
 // Integrations toggle list (selected state persisted)
-const integrations = reactive([
+const integrationOptions = reactive([
   { key: 'googleCalendar', name: 'Google Calendar', icon: '📆', selected: false },
   { key: 'slack', name: 'Slack', icon: '💬', selected: false },
   { key: 'discord', name: 'Discord', icon: '🎮', selected: false },
   { key: 'whatsapp', name: 'WhatsApp', icon: '📱', selected: false },
   { key: 'outlook', name: 'Outlook', icon: '📧', selected: false },
 ])
+
+// Delivery endpoints (per-channel identifiers)
+const integrationEndpoints = ref({
+  whatsapp: { phone: '' },
+  sms: { phone: '' },
+  discord: { webhook: '' },
+  slack: { userId: '', token: '' },
+  email: ''
+})
 
 function handleLogout() {
   authStore.logout()
@@ -173,21 +227,21 @@ function upgradePlan() {
 // Updated saveSettings function with user feedback
 async function saveSettings() {
   try {
-    const payload = {
-      notifications: {
-        email: !!prefs.email,
-        push: !!prefs.pwa,
-        whatsapp: !!prefs.whatsapp,
-        discord: !!prefs.discord,
-        calls: !!prefs.calls,
-      },
-      integrations: integrations.reduce((acc, i) => {
-        acc[i.key] = !!i.selected
-        return acc
-      }, {}),
+    const notifications = {
+      email: !!prefs.email,
+      push: !!prefs.pwa,
+      whatsapp: !!prefs.whatsapp,
+      discord: !!prefs.discord,
+      calls: !!prefs.calls,
     }
-    await apiUpdatePrefs(authStore.user?.uid, payload)
-    console.log("Settings saved:", prefs)
+    const toggles = integrationOptions.reduce((acc, i) => {
+      acc[i.key] = !!i.selected
+      return acc
+    }, {})
+
+    await apiUpdatePrefs(authStore.user?.uid, { notifications, integrations: toggles })
+    await updateIntegrations(authStore.user?.uid, integrationEndpoints.value)
+    console.log("Settings saved:", { notifications, integrationToggles: toggles, integrationEndpoints: integrationEndpoints.value })
     ElMessage.success("✅ Settings saved successfully!")
   } catch (error) {
     console.error("Failed to save settings:", error)

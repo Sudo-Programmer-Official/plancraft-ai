@@ -54,5 +54,98 @@ router.get('/settings/preferences', async (req, res) => {
   }
 })
 
-export default router
+// export default at end of file after route registrations
 
+// POST /api/settings/updateIntegrations
+router.post('/settings/updateIntegrations', async (req, res) => {
+  try {
+    const { userId, integrations } = req.body || {}
+    console.log('[Settings API] updateIntegrations body', {
+      hasUserId: !!userId,
+      keys: integrations && typeof integrations === 'object' ? Object.keys(integrations) : null,
+      whatsappPhone: integrations?.whatsapp?.phone ? String(integrations.whatsapp.phone).slice(0, 6) + '…' : null,
+    })
+
+    if (!userId) return res.status(400).json({ error: 'Missing userId' })
+    if (!integrations || typeof integrations !== 'object') {
+      return res.status(400).json({ error: 'Missing or invalid integrations object' })
+    }
+
+    // Normalize + validate
+    const toStr = (v) => (typeof v === 'string' ? v : v == null ? '' : String(v))
+    const trimUndef = (v) => (toStr(v).trim() || undefined)
+    const e164 = /^\+?[0-9]{8,15}$/
+    const errs = []
+
+    const wPhone = trimUndef(integrations?.whatsapp?.phone)
+    if (wPhone && !e164.test(wPhone)) errs.push('whatsapp.phone must be E.164, e.g. +12135551234')
+
+    const sPhone = trimUndef(integrations?.sms?.phone)
+    if (sPhone && !e164.test(sPhone)) errs.push('sms.phone must be E.164, e.g. +12135551234')
+
+    const dHook = trimUndef(integrations?.discord?.webhook)
+    if (dHook && !/^https:\/\/discord\.com\/api\/webhooks\//.test(dHook)) errs.push('discord.webhook must start with https://discord.com/api/webhooks/')
+
+    if (errs.length) return res.status(400).json({ error: 'Invalid fields', details: errs })
+
+    // Build object and prune undefined deeply to satisfy Firestore
+    const safe = {
+      whatsapp: { phone: wPhone },
+      sms: { phone: sPhone },
+      discord: { webhook: dHook },
+      slack: {
+        userId: trimUndef(integrations?.slack?.userId),
+        token: trimUndef(integrations?.slack?.token),
+      },
+      email: trimUndef(integrations?.email),
+    }
+
+    const pruneUndefinedDeep = (obj) => {
+      if (obj == null) return obj
+      if (Array.isArray(obj)) {
+        const arr = obj.map(pruneUndefinedDeep).filter((v) => v !== undefined)
+        return arr
+      }
+      if (typeof obj === 'object') {
+        const out = {}
+        for (const [k, v] of Object.entries(obj)) {
+          const pv = pruneUndefinedDeep(v)
+          if (pv === undefined) continue
+          if (typeof pv === 'object' && pv !== null && !Array.isArray(pv) && Object.keys(pv).length === 0) continue
+          out[k] = pv
+        }
+        return out
+      }
+      return obj
+    }
+
+    const payload = pruneUndefinedDeep({ integrations: safe, updatedAt: new Date() })
+
+    await db.collection('users').doc(String(userId)).set(
+      payload,
+      { merge: true }
+    )
+
+    res.json({ success: true })
+  } catch (err) {
+    console.error('❌ updateIntegrations error:', err)
+    res.status(500).json({ error: err?.message || 'Failed to update integrations' })
+  }
+})
+
+// GET /api/settings/integrations?userId=...
+router.get('/settings/integrations', async (req, res) => {
+  try {
+    const { userId } = req.query || {}
+    console.log('[Settings API] getIntegrations query', { hasUserId: !!userId })
+    if (!userId) return res.status(400).json({ error: 'Missing userId' })
+    const snap = await db.collection('users').doc(String(userId)).get()
+    const data = snap.exists ? snap.data() : {}
+    res.json({ integrations: data?.integrations || {} })
+  } catch (err) {
+    console.error('❌ getIntegrations error:', err)
+    res.status(500).json({ error: 'Failed to fetch integrations' })
+  }
+})
+
+export default router
