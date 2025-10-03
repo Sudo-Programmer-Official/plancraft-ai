@@ -11,6 +11,13 @@ const upload = multer({ storage: multer.memoryStorage() })
 router.post("/text", async (req, res) => {
   try {
     const { userId, text, channels, taskId, scheduledTime } = req.body || {}
+    console.log("[Reminder API] /reminders/text", {
+      userId,
+      taskId,
+      channels,
+      scheduledTime,
+      now: new Date().toISOString(),
+    })
     if (!userId || !text) return res.status(400).json({ success: false, error: "Missing userId or text" })
     const reminder = await handleTextReminder(text, userId, channels, { taskId, scheduledTime })
     res.json({ success: true, reminder })

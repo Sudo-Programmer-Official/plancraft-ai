@@ -23,6 +23,7 @@ export async function initScheduler() {
     snap.forEach((doc) => {
       const data = doc.data()
       if (data?.sentAt) return
+      if (data?.status && String(data.status).toLowerCase() !== 'scheduled') return
       const reminder = { id: doc.id, ...data }
       queueReminder(reminder)
       console.log(`[Scheduler] Queued reminder on boot id=${doc.id} taskId=${data?.taskId || 'n/a'} at=${(data?.scheduledTime?.toDate ? data.scheduledTime.toDate() : data.scheduledTime)?.toISOString?.() || data?.scheduledTime}`)

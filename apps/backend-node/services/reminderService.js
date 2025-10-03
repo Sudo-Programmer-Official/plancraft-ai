@@ -65,7 +65,14 @@ export async function createReminderFromText(userText, userId, channels = ["what
     taskId: options?.taskId || null,
   }
 
+  console.log('[Reminder API] Persisting reminder', {
+    userId: reminder.userId,
+    taskId: reminder.taskId,
+    when: reminder.scheduledTime?.toISOString?.(),
+    channels: reminder.channels,
+  })
   const ref = await db.collection("reminders").add(reminder)
+  console.log('[Reminder API] Stored reminder docId=', ref.id)
   await queueReminder({ id: ref.id, ...reminder })
 
   try {
@@ -83,18 +90,28 @@ export async function sendReminder(reminder) {
   const task = String(reminder?.task || "")
   const opts = { to: reminder?.to }
   try {
+    console.log('[Scheduler] Executing reminder', {
+      id: reminder?.id,
+      userId,
+      task,
+      channels,
+      ts: new Date().toISOString(),
+    })
     if (channels.includes("whatsapp")) {
-      try { await sendWhatsApp(userId, `⏰ Reminder: ${task}`, opts) } catch (e) {
+      try {
+        const r = await sendWhatsApp(userId, `⏰ Reminder: ${task}`, opts)
+        console.log('[Delivery] WhatsApp ok', { userId, id: reminder?.id, result: r })
+      } catch (e) {
         console.error("WhatsApp send failed:", e?.message || e)
       }
     }
     if (channels.includes("email")) {
-      try { await sendEmail(userId, task) } catch (e) {
+      try { const r = await sendEmail(userId, task); console.log('[Delivery] Email ok', { userId, id: reminder?.id, result: r }) } catch (e) {
         console.error("Email send failed:", e?.message || e)
       }
     }
     if (channels.includes("pwa")) {
-      try { await sendPWA(userId, task) } catch (e) {
+      try { const r = await sendPWA(userId, task); console.log('[Delivery] PWA ok', { userId, id: reminder?.id, result: r }) } catch (e) {
         console.error("PWA send failed:", e?.message || e)
       }
     }
@@ -120,7 +137,7 @@ export function queueReminder(rem) {
         console.error("sendReminder error:", e?.message || e)
       }
     }
-    if (delay <= 0) return fire()
+    if (delay <= 0) { console.log('[Scheduler] Firing overdue reminder immediately', { id, at: ts.toISOString() }); return fire() }
     setTimeout(fire, Math.min(delay, 0x7fffffff))
   } catch (e) {
     console.error("queueReminder error:", e)
