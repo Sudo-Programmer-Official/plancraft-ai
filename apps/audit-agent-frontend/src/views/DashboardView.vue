@@ -84,7 +84,7 @@
           :task="selectedTask"
           :edit-mode="!!selectedTask"
           @close="closePlanner"
-          @saved="handleSave"
+          @saved="handleSaveAndSchedule"
         />
       </div>
 
@@ -478,6 +478,35 @@ const doneMonthly = computed(() => monthlyTasks.value.filter((t) => t.completed)
 async function toggleComplete(task) {
   task.completed = !task.completed
   await updateDoc(doc(db, 'tasks', task.id), { completed: task.completed })
+}
+
+// === Reminder scheduling on save (mirror TaskBoard) ===
+function buildLocalIso(ymd, hhmm) {
+  try { return new Date(`${ymd}T${hhmm}`).toISOString() } catch { return new Date().toISOString() }
+}
+
+async function handleSaveAndSchedule(payload) {
+  // Delegate to existing save flow (adds/updates task and may set payload.id)
+  await handleSave(payload)
+  try {
+    const uid = authStore?.user?.uid
+    const taskId = payload?.id
+    if (!uid || !taskId) return
+    if (payload?.reminderTime) {
+      const iso = buildLocalIso(payload.date, payload.reminderTime)
+      await api.post('/reminders/text', {
+        userId: uid,
+        taskId,
+        text: payload.title,
+        scheduledTime: iso,
+        channels: ['whatsapp','pwa'],
+      })
+    } else {
+      await api.post('/reminders/cancel', { userId: uid, taskId })
+    }
+  } catch (e) {
+    console.warn('Reminder sync (dashboard) failed:', e?.response?.data || e?.message)
+  }
 }
 
 // === Reminder badges (Daily list) ===
