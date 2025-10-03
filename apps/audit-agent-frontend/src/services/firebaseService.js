@@ -175,6 +175,7 @@ export async function fetchTasksBetween(startYMD, endYMD) {
       order: task.order ?? 0,
       userId: user.uid,
       createdAt: serverTimestamp(),
+      
     };
 
   const docRef = await safeAction(addDoc(tasksRef, payload));

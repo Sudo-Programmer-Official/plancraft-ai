@@ -233,7 +233,8 @@ async function generateTasks() {
         completed: false,
         date: toLocalDateKey(parseLocalDateKey(selectedDate.value)),
         order: tasks.value.length + i,
-        logs: []
+        logs: [],
+        reminderTime: reminderTime.value || null
       }
       await addTaskToFirebase(newTask)
     }
@@ -246,15 +247,16 @@ async function generateTasks() {
   } finally {
     loading.value = false
     input.value = ''
+    reminderTime.value = ''
   }
 }
 
 function save() {
   if (props.task) {
-    emit("saved", { ...props.task, title: input.value, details: details.value, link: link.value, date: selectedDate.value })
+    emit("saved", { ...props.task, title: input.value, details: details.value, link: link.value, date: selectedDate.value, reminderTime: reminderTime.value || null })
     ElNotification({ title: 'Success', message: 'Task updated successfully', type: 'success', duration: 2000 })
   } else {
-    emit("saved", { title: input.value, details: details.value, link: link.value, date: selectedDate.value })
+    emit("saved", { title: input.value, details: details.value, link: link.value, date: selectedDate.value, reminderTime: reminderTime.value || null })
     ElNotification({ title: 'Success', message: 'Task saved successfully', type: 'success', duration: 2000 })
   }
   closeDialog()
