@@ -84,6 +84,8 @@ import adminRoutes from "./routes/adminRoutes.js";
 import integrationsRoutes from "./routes/integrationsRoutes.js";
 import settingsRoutes from "./routes/settingsRoutes.js";
 import { stripeWebhookHandler } from "./routes/stripeWebhook.js";  // ✅ now from separate file
+import reminderRoutes from "./routes/reminderRoutes.js";
+import { initScheduler } from "./services/scheduler.js";
 
 dotenv.config();
 
@@ -139,8 +141,14 @@ app.use("/api", stripeRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api", settingsRoutes);
 app.use("/api", integrationsRoutes);
+app.use("/api/reminders", reminderRoutes);
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`🚀 Server ready at http://localhost:${PORT}`);
 });
+
+// Boot scheduler after app starts
+initScheduler().catch((err) => {
+  console.error('❌ Failed to init scheduler', err)
+})
