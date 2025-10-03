@@ -1,7 +1,12 @@
 import express from 'express'
+import Stripe from 'stripe'
 import { db } from '../services/firebaseAdmin.js'
 
 const router = express.Router()
+
+// Optional Stripe client (dev-friendly if missing)
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY
+const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2022-11-15' }) : null
 
 // GET /api/subscription/status?userId=123
 router.get('/subscription/status', async (req, res) => {
@@ -47,3 +52,48 @@ router.post('/subscription/checkout', async (req, res) => {
 })
 
 export default router
+
+// POST /api/subscription/cancel
+router.post('/subscription/cancel', async (req, res) => {
+  try {
+    const { userId } = req.body || {}
+    if (!userId) return res.status(400).json({ error: 'Missing userId' })
+
+    const snap = await db.collection('users').doc(String(userId)).get()
+    if (!snap.exists) return res.status(404).json({ error: 'User not found' })
+    const data = snap.data() || {}
+    const subId = data?.subscription?.stripeSubId || data?.subscription?.id
+
+    if (!subId) return res.status(400).json({ error: 'No active subscription found' })
+
+    // If Stripe configured, cancel in Stripe (immediate)
+    let result = { id: subId, status: 'canceled', source: 'local' }
+    if (stripe) {
+      try {
+        result = await stripe.subscriptions.del(subId)
+      } catch (err) {
+        console.error('❌ Stripe cancel failed:', err?.message || err)
+        return res.status(500).json({ error: 'Stripe cancel failed' })
+      }
+    }
+
+    // Update Firestore immediately; webhook will also sync in real env
+    await db.collection('users').doc(String(userId)).set(
+      {
+        role: 'free',
+        subscription: {
+          ...(data.subscription || {}),
+          status: 'canceled',
+          plan: 'free',
+        },
+        updatedAt: new Date(),
+      },
+      { merge: true }
+    )
+
+    return res.json({ status: 'canceled', subscription: result })
+  } catch (err) {
+    console.error('Cancel error:', err)
+    res.status(500).json({ error: 'Failed to cancel subscription' })
+  }
+})

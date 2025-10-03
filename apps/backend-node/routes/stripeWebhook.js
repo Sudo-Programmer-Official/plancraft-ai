@@ -56,6 +56,7 @@ export async function stripeWebhookHandler(req, res) {
             subscription: {
               status: "active",
               stripeSubId: sub?.id || session.subscription,
+              customerId: session?.customer || sub?.customer || null,
               currentPeriodEnd: sub?.current_period_end
                 ? new Date(sub.current_period_end * 1000)
                 : null,
@@ -76,12 +77,13 @@ export async function stripeWebhookHandler(req, res) {
         // Optional: refresh subscription info in Firestore
         if (invoice.subscription && invoice.customer) {
           const sub = await stripe.subscriptions.retrieve(invoice.subscription)
-          const uid = sub?.metadata?.userId
+          let uid = sub?.metadata?.userId
           if (uid) {
             await db.collection("users").doc(uid).set(
               {
                 subscription: {
                   status: "active",
+                  customerId: sub?.customer || invoice.customer,
                   currentPeriodEnd: sub?.current_period_end
                     ? new Date(sub.current_period_end * 1000)
                     : null,
@@ -89,6 +91,22 @@ export async function stripeWebhookHandler(req, res) {
               },
               { merge: true }
             )
+          } else {
+            // Fallback: try match by stored customerId
+            const qs = await db.collection('users')
+              .where('subscription.customerId', '==', String(invoice.customer))
+              .get()
+            for (const doc of qs.docs) {
+              await doc.ref.set({
+                subscription: {
+                  status: 'active',
+                  customerId: sub?.customer || invoice.customer,
+                  currentPeriodEnd: sub?.current_period_end
+                    ? new Date(sub.current_period_end * 1000)
+                    : null,
+                },
+              }, { merge: true })
+            }
           }
         }
         break
@@ -108,7 +126,22 @@ export async function stripeWebhookHandler(req, res) {
             uid = sub?.metadata?.userId
           } catch {}
         }
-        if (!uid) break
+        if (!uid) {
+          // Fallback: locate by stored customerId
+          const customer = payload?.customer
+          if (customer) {
+            const qs = await db.collection('users')
+              .where('subscription.customerId', '==', String(customer))
+              .get()
+            for (const doc of qs.docs) {
+              await doc.ref.set({
+                role: 'free',
+                subscription: { status: 'canceled', plan: 'free' },
+              }, { merge: true })
+            }
+          }
+          break
+        }
 
         console.log(`⚠️ Downgrading user ${uid} → free`)
 

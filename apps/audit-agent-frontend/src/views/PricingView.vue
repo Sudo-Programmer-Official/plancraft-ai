@@ -33,7 +33,19 @@
         <li>✅ Priority Support</li>
       </ul>
       <p class="text-2xl font-bold mb-4">$5 / month</p>
+      <div v-if="sub.plan === 'premium'" class="space-y-2">
+        <button
+          :disabled="cancelLoading"
+          @click="onCancel"
+          class="w-full py-2 rounded-lg bg-black/20 text-white font-semibold hover:bg-black/30 transition disabled:opacity-60 text-sm sm:text-base"
+        >
+          <span v-if="cancelLoading">Canceling…</span>
+          <span v-else>Cancel Subscription</span>
+        </button>
+        <p class="text-sm text-white/80">You're currently on Premium.</p>
+      </div>
       <button
+        v-else
         :disabled="loading"
         @click="onUpgrade"
         class="w-full py-2 rounded-lg bg-black/20 text-white font-semibold hover:bg-black/30 transition disabled:opacity-60 text-sm sm:text-base"
@@ -53,8 +65,8 @@
   </div>
   <ErrorDialog
     v-model="errorVisible"
-    title="Payment Service Unavailable"
-    message="❌ We couldn't reach the payment service. Please try again later."
+    title="Action Failed"
+    message="❌ We couldn't complete that action. Please try again later."
   />
 </template>
 
@@ -62,15 +74,20 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
-import { createCheckoutSession } from '@/services/stripeService'
+import { createCheckoutSession, cancelSubscription } from '@/services/stripeService'
 import { trackEvent } from '@/services/analytics'
 import ErrorDialog from '@/components/ErrorDialog.vue'
+import { useSubscriptionStore } from '@/stores/subscriptionStore'
 
 const authStore = useAuthStore()
 const router = useRouter()
 const loading = ref(false)
 const monthlyPriceId = import.meta.env.VITE_STRIPE_MONTHLY_PRICE_ID || 'price_monthly_default'
 const errorVisible = ref(false)
+const cancelLoading = ref(false)
+
+const subStore = useSubscriptionStore()
+const sub = subStore.subscription
 
 async function onUpgrade() {
   try {
@@ -93,5 +110,20 @@ onMounted(() => {
   if (window?.location?.search?.includes('status=success')) {
     trackEvent('upgrade_success')
   }
+  if (authStore?.user?.uid) subStore.fetchStatus(authStore.user.uid)
 })
+
+async function onCancel() {
+  try {
+    if (!authStore.user) return router.push('/login')
+    cancelLoading.value = true
+    await cancelSubscription(authStore.user.uid)
+    await subStore.fetchStatus(authStore.user.uid)
+  } catch (e) {
+    console.error(e)
+    errorVisible.value = true
+  } finally {
+    cancelLoading.value = false
+  }
+}
 </script>

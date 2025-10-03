@@ -29,3 +29,13 @@ export async function getSubscriptionStatus(userId) {
     return { plan: 'free', remainingDays: 0 }
   }
 }
+
+export async function cancelSubscription(userId) {
+  try {
+    const res = await api.post('/subscription/cancel', { userId })
+    return res?.data || { status: 'canceled' }
+  } catch (err) {
+    console.error('Cancel subscription error:', err?.response?.data || err?.message)
+    throw err
+  }
+}
