@@ -52,6 +52,7 @@ export async function stripeWebhookHandler(req, res) {
 
         await db.collection("users").doc(uid).set(
           {
+            plan: "premium",
             role: "premium",
             subscription: {
               status: "active",
@@ -60,7 +61,8 @@ export async function stripeWebhookHandler(req, res) {
               currentPeriodEnd: sub?.current_period_end
                 ? new Date(sub.current_period_end * 1000)
                 : null,
-              plan: session?.metadata?.plan || "monthly",
+              plan: "premium",
+              billingInterval: session?.metadata?.plan || "monthly",
             },
           },
           { merge: true }
@@ -81,8 +83,10 @@ export async function stripeWebhookHandler(req, res) {
           if (uid) {
             await db.collection("users").doc(uid).set(
               {
+                plan: "premium",
                 subscription: {
                   status: "active",
+                  plan: "premium",
                   customerId: sub?.customer || invoice.customer,
                   currentPeriodEnd: sub?.current_period_end
                     ? new Date(sub.current_period_end * 1000)
@@ -98,8 +102,10 @@ export async function stripeWebhookHandler(req, res) {
               .get()
             for (const doc of qs.docs) {
               await doc.ref.set({
+                plan: 'premium',
                 subscription: {
                   status: 'active',
+                  plan: 'premium',
                   customerId: sub?.customer || invoice.customer,
                   currentPeriodEnd: sub?.current_period_end
                     ? new Date(sub.current_period_end * 1000)
@@ -135,6 +141,7 @@ export async function stripeWebhookHandler(req, res) {
               .get()
             for (const doc of qs.docs) {
               await doc.ref.set({
+                plan: 'free',
                 role: 'free',
                 subscription: { status: 'canceled', plan: 'free' },
               }, { merge: true })
@@ -147,6 +154,7 @@ export async function stripeWebhookHandler(req, res) {
 
         await db.collection("users").doc(uid).set(
           {
+            plan: 'free',
             role: "free",
             subscription: {
               status: "canceled",

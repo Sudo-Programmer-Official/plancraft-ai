@@ -17,7 +17,8 @@ router.get('/subscription/status', async (req, res) => {
     const data = snap.exists ? snap.data() : {}
     const sub = data?.subscription || {}
     const status = String(sub.status || '').toLowerCase()
-    const plan = status === 'active' ? (sub.plan || 'premium') : 'free'
+    // Normalize: any active subscription counts as premium for UI gating
+    const plan = status === 'active' ? 'premium' : 'free'
     let remainingDays = 0
     try {
       const end = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null
@@ -80,6 +81,7 @@ router.post('/subscription/cancel', async (req, res) => {
     // Update Firestore immediately; webhook will also sync in real env
     await db.collection('users').doc(String(userId)).set(
       {
+        plan: 'free',
         role: 'free',
         subscription: {
           ...(data.subscription || {}),
