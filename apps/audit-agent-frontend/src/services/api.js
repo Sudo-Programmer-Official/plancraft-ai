@@ -1,5 +1,6 @@
 // src/services/api.js
 import axios from 'axios'
+import { auth } from '@/firebase/init'
 
 // Base API points to Vite proxy '/api' in dev
 const BASE = (import.meta.env.VITE_API_BASE_ROOT || '/api').replace(/\/+$/, '')
@@ -13,18 +14,27 @@ const api = axios.create({
   withCredentials: false,
 })
 
-// Attach auth token if present
-api.interceptors.request.use((config) => {
+// Attach fresh auth token if present
+api.interceptors.request.use(async (config) => {
   try {
-    const token = localStorage.getItem('token')
-    if (token) config.headers.Authorization = `Bearer ${token}`
-    // Pass role for simple admin gating on backend (dev-friendly)
-    const userStr = localStorage.getItem('user')
-    if (userStr) {
-      const u = JSON.parse(userStr)
-      if (u?.role) config.headers['x-user-role'] = u.role
-      if (u?.email) config.headers['x-user-email'] = u.email
-      if (u?.uid) config.headers['x-user-id'] = u.uid
+    const user = auth?.currentUser
+    if (user) {
+      const token = await user.getIdToken() // Firebase auto-refreshes as needed
+      if (token) config.headers.Authorization = `Bearer ${token}`
+      // Optional pass-through user context
+      if (user.email) config.headers['x-user-email'] = user.email
+      if (user.uid) config.headers['x-user-id'] = user.uid
+    } else {
+      // fallback to cached token if any
+      const token = localStorage.getItem('token')
+      if (token) config.headers.Authorization = `Bearer ${token}`
+      const userStr = localStorage.getItem('user')
+      if (userStr) {
+        const u = JSON.parse(userStr)
+        if (u?.email) config.headers['x-user-email'] = u.email
+        if (u?.uid) config.headers['x-user-id'] = u.uid
+        if (u?.role) config.headers['x-user-role'] = u.role
+      }
     }
   } catch {}
   return config

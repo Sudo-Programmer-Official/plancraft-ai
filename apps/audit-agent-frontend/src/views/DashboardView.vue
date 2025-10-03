@@ -1,6 +1,9 @@
 <!-- src/views/DashboardView.vue -->
 <template>
-  <main
+  <div v-if="checkingAuth" class="px-4 py-8 text-center text-gray-400">
+    Checking session…
+  </div>
+  <main v-else
     class="px-2 py-4 sm:px-4 md:px-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"
   >
     <GuestBanner :isGuest="authStore.guest" @login="redirectToLogin" />
@@ -38,6 +41,22 @@
             </div>
 
             <div class="flex items-center gap-2">
+              <button
+                v-if="reminderActiveByTask[task.id]"
+                @click.stop="onReminderClick(task)"
+                class="text-yellow-400 hover:opacity-80"
+                title="Reminder active — click to manage"
+              >
+                🔔
+              </button>
+              <button
+                v-else
+                @click.stop="openDialog(task)"
+                class="text-gray-500 hover:text-gray-300"
+                title="No reminder — click to add"
+              >
+                🔔
+              </button>
               <button
                 @click.stop="openDialog(task)"
                 class="text-gray-400 hover:text-indigo-400 mr-4"
@@ -192,7 +211,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick, watchEffect } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watchEffect, watch } from 'vue'
 import { useHead } from '@vueuse/head'
 import { useRoute } from 'vue-router'
 import { collection, onSnapshot, updateDoc, doc, query, where } from 'firebase/firestore'
@@ -460,6 +479,61 @@ async function toggleComplete(task) {
   task.completed = !task.completed
   await updateDoc(doc(db, 'tasks', task.id), { completed: task.completed })
 }
+
+// === Reminder badges (Daily list) ===
+import { getReminderStatus } from '@/services/reminderService'
+import api from '@/services/api'
+// import { onAuthStateChanged } from 'firebase/auth'
+// import { auth } from '@/firebase/init'
+
+const reminderActiveByTask = ref({})
+const checkingAuth = ref(true)
+
+async function refreshReminderBadges(list) {
+  try {
+    const uid = authStore?.user?.uid
+    if (!uid) { reminderActiveByTask.value = {}; return }
+    const arr = Array.isArray(list) ? list : []
+    const results = await Promise.all(
+      arr.map(async (t) => {
+        try {
+          const r = await getReminderStatus(uid, t.id)
+          return [t.id, !!r?.hasActive]
+        } catch {
+          return [t.id, false]
+        }
+      })
+    )
+    const map = {}
+    for (const [id, flag] of results) map[id] = flag
+    reminderActiveByTask.value = map
+  } catch (e) {
+    console.warn('refreshReminderBadges failed', e)
+  }
+}
+
+watch(() => sortedDaily.value.map(t => t.id).join(','), () => {
+  refreshReminderBadges(sortedDaily.value)
+}, { immediate: true })
+
+async function onReminderClick(task) {
+  try {
+    const uid = authStore?.user?.uid
+    if (!uid || !task?.id) return
+    const choice = window.prompt('Reminder active. Type "cancel" to cancel, or leave empty to dismiss:')
+    if (choice && choice.toLowerCase() === 'cancel') {
+      await api.post('/reminders/cancel', { userId: uid, taskId: task.id })
+      await refreshReminderBadges(sortedDaily.value)
+    }
+  } catch (e) {
+    console.warn('Reminder manage failed', e?.response?.data || e?.message)
+  }
+}
+
+// Resolve auth state before rendering
+onMounted(() => {
+  try { onAuthStateChanged(auth, () => { checkingAuth.value = false }) } catch { checkingAuth.value = false }
+})
 </script>
 
 <style scoped>

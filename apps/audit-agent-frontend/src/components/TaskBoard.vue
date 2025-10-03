@@ -69,6 +69,14 @@
                     >
                       🔔
                     </button>
+                    <button
+                      v-else
+                      @click.stop="openDialog(task)"
+                      class="text-slate-400 text-sm hover:text-slate-200"
+                      title="No reminder — click to add"
+                    >
+                      🔔
+                    </button>
                     <!-- Expand toggle -->
                     <!-- <button
                     @click="toggleExpand(task.id)"

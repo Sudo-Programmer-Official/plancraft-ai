@@ -1,7 +1,7 @@
 // src/stores/authStore.js
 import { defineStore } from "pinia";
 import { signInAsGuest, signInWithGoogle, signOutUser, signInWithEmail, registerWithEmail, sendResetEmail, fetchUserProfile } from "@/services/authService";
-import { getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence } from "firebase/auth";
+import { getAuth, onAuthStateChanged, onIdTokenChanged, setPersistence, browserLocalPersistence } from "firebase/auth";
 import firebaseApp from "@/firebase/init";
 import { identifyUser, trackEvent } from '@/services/analytics'
 
@@ -32,29 +32,48 @@ export const useAuthStore = defineStore("authStore", {
         }
       }
 
-      // Attach Firebase auth listener
+      // Attach Firebase auth listeners
       onAuthStateChanged(auth, async (user) => {
-        if (user) {
-          const profile = await fetchUserProfile(user.uid)
-          this.user = {
-            uid: user.uid,
-            displayName: user.displayName,
-            email: user.email,
-            photoURL: user.photoURL,
-            role: profile?.role || 'user',
-          }
-          this.token = await user.getIdToken()
-          identifyUser(this.user)
-
-          localStorage.setItem("user", JSON.stringify(this.user))
-          localStorage.setItem("token", this.token)
-        } else {
+        // This fires on initial mount and sign-in/out. Keep it lightweight; token refresh handled below.
+        if (!user) {
           this.user = null
           this.token = null
           localStorage.removeItem("user")
           localStorage.removeItem("token")
         }
         this.loading = false
+      })
+
+      // Keep ID token fresh to avoid 401 loops
+      onIdTokenChanged(auth, async (user) => {
+        try {
+          if (user) {
+            const token = await user.getIdToken(true) // force refresh when Firebase deems necessary
+            const profile = await fetchUserProfile(user.uid)
+            this.user = {
+              uid: user.uid,
+              displayName: user.displayName,
+              email: user.email,
+              photoURL: user.photoURL,
+              role: profile?.role || 'user',
+            }
+            this.token = token
+            identifyUser(this.user)
+            localStorage.setItem('user', JSON.stringify(this.user))
+            localStorage.setItem('token', this.token)
+          } else {
+            this.user = null
+            this.token = null
+            localStorage.removeItem('user')
+            localStorage.removeItem('token')
+          }
+        } catch (e) {
+          // On error, clear potentially stale creds
+          this.user = null
+          this.token = null
+          localStorage.removeItem('user')
+          localStorage.removeItem('token')
+        }
       })
     },
 
