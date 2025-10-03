@@ -38,6 +38,18 @@
       class="mb-5"
     />
 
+    <!-- Reminder Time (optional) -->
+    <div class="mb-5">
+      <label class="block text-sm text-slate-300 mb-1">Reminder Time (optional)</label>
+      <el-time-picker
+        v-model="reminderTime"
+        placeholder="HH:mm"
+        format="HH:mm"
+        value-format="HH:mm"
+        class="w-full"
+      />
+    </div>
+
     <!-- Details + Link (only in edit mode) -->
     <div v-if="props.task" class="mb-5 space-y-3">
       <div>
@@ -135,6 +147,8 @@
   </el-dialog>
 </template>
 
+
+
 <script setup>
 import { ref, computed, watch, onBeforeUnmount, onMounted } from 'vue'
 import { ElNotification } from 'element-plus'
@@ -153,6 +167,7 @@ const props = defineProps({
 const emit = defineEmits(['close', 'saved'])
 
 const { tasks } = useTasks()
+const reminderTime = ref(props.task ? props.task.reminderTime || '' : '')
 
 const internalOpen = ref(props.open)
 const input = ref('')
@@ -173,11 +188,13 @@ watch(() => props.task, (task) => {
     details.value = task.details || ""
     link.value = task.link || ""
     selectedDate.value = task.date
+    reminderTime.value = task.reminderTime || ""
   } else {
     input.value = ""
     details.value = ""
     link.value = ""
     selectedDate.value = props.date || ""
+    reminderTime.value = ""
   }
 }, { immediate: true })
 

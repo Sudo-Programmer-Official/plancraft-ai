@@ -193,16 +193,44 @@ function closePlanner() {
   selectedTask.value = null
 }
 
+function buildLocalIso(ymd, hhmm) {
+  try { return new Date(`${ymd}T${hhmm}`).toISOString() } catch { return new Date().toISOString() }
+}
+
 async function handleSave(payload) {
   if (Array.isArray(payload)) {
     await loadTasks()
     return closePlanner()
   }
+  let savedId = payload.id
   if (payload.id) {
     await updateTaskInFirebase(payload)
   } else {
-    await addTaskToFirebase(payload)
+    const saved = await addTaskToFirebase(payload)
+    savedId = saved?.id || savedId
   }
+
+  // Sync reminder after task is saved and we have an id
+  try {
+    const uid = authStore?.user?.uid
+    if (uid && savedId) {
+      if (payload?.reminderTime) {
+        const iso = buildLocalIso(payload.date, payload.reminderTime)
+        await api.post('/reminders/text', {
+          userId: uid,
+          taskId: savedId,
+          text: payload.title,
+          scheduledTime: iso,
+          channels: ['whatsapp','pwa'],
+        })
+      } else {
+        await api.post('/reminders/cancel', { userId: uid, taskId: savedId })
+      }
+    }
+  } catch (e) {
+    console.warn('Reminder sync (board) failed:', e?.response?.data || e?.message)
+  }
+
   await loadTasks()
   closePlanner()
 }

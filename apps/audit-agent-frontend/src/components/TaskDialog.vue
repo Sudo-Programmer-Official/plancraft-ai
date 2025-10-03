@@ -37,6 +37,13 @@
           type="date"
           class="w-full p-3 border rounded"
         />
+        <!-- Reminder Time (optional) -->
+        <input
+          v-model="form.reminderTime"
+          type="time"
+          class="w-full p-3 border rounded"
+          placeholder="Reminder time (optional)"
+        />
       </div>
 
       <!-- Actions -->
@@ -61,6 +68,7 @@ import { addTaskToFirebase, updateTaskInFirebase } from "@/services/firebaseServ
 import { useVoiceRecorder } from "@/composables/useVoiceRecorder"
 import api from "@/services/api"
 import { useAuthStore } from "@/stores/authStore"
+import { getReminderStatus } from "@/services/reminderService"
 
 const props = defineProps({
   task: { type: Object, default: null }
@@ -74,6 +82,7 @@ const form = ref({
   title: "",
   details: "",
   date: today,
+  reminderTime: "",
   completed: false,
   logs: [],
 })
@@ -86,14 +95,16 @@ watch(
   () => props.task,
   (t) => {
     if (t) {
-      form.value = { ...t }
+      form.value = { ...t, reminderTime: t.reminderTime || "" }
       initialDate = t.date || null
+      prefillReminderTime(t).catch(() => {})
     } else {
       form.value = {
         id: null,
         title: "",
         details: "",
         date: today,
+        reminderTime: "",
         completed: false,
         logs: [],
       }
@@ -125,23 +136,19 @@ async function save() {
 
   try {
     const uid = authStore?.user?.uid
-    const hasDate = !!form.value.date
     if (uid && form.value.id) {
-      if (hasDate) {
-        // Schedule/update reminder using natural language text + date hint
-        const text = `${form.value.title} on ${form.value.date}`
+      const hasTime = !!form.value.reminderTime
+      if (hasTime) {
+        const iso = buildLocalIso(form.value.date, form.value.reminderTime)
         await api.post('/reminders/text', {
           userId: uid,
           taskId: form.value.id,
-          text,
+          text: form.value.title,
+          scheduledTime: iso,
           channels: ['whatsapp','pwa'],
         })
-      } else if (!hasDate && initialDate) {
-        // Date removed → cancel any pending reminders for this task
-        await api.post('/reminders/cancel', {
-          userId: uid,
-          taskId: form.value.id,
-        })
+      } else if (!hasTime) {
+        await api.post('/reminders/cancel', { userId: uid, taskId: form.value.id })
       }
     }
   } catch (e) {
@@ -150,5 +157,42 @@ async function save() {
 
   emit("saved")
   emit("close")
+}
+
+function buildLocalIso(ymd, hhmm) {
+  try {
+    const d = new Date(`${ymd}T${hhmm}`)
+    return d.toISOString()
+  } catch { return new Date().toISOString() }
+}
+
+async function prefillReminderTime(task) {
+  try {
+    const uid = authStore?.user?.uid
+    if (!uid || !task?.id) return
+    const r = await getReminderStatus(uid, task.id)
+    if (r?.hasActive && r.items?.length) {
+      const st = r.items[0]?.scheduledTime
+      const dt = coerceToDate(st)
+      if (dt) {
+        const hh = String(dt.getHours()).padStart(2, '0')
+        const mm = String(dt.getMinutes()).padStart(2, '0')
+        form.value.reminderTime = `${hh}:${mm}`
+      }
+    }
+  } catch {}
+}
+
+function coerceToDate(val) {
+  try {
+    if (!val) return null
+    if (typeof val === 'string') return new Date(val)
+    if (val && typeof val === 'object') {
+      if (typeof val.toDate === 'function') return val.toDate()
+      if (typeof val.seconds === 'number') return new Date(val.seconds * 1000)
+      if (typeof val._seconds === 'number') return new Date(val._seconds * 1000)
+    }
+  } catch {}
+  return null
 }
 </script>

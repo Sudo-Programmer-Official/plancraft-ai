@@ -13,20 +13,35 @@ export async function createReminderFromText(userText, userId, channels = ["what
 
   // 1) Ask GPT to extract a task and time
   let parsed = null
-  try {
-    const gpt = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: "Extract a single reminder from the user's text. Return strict JSON with keys: task (string) and time (ISO8601)." },
-        { role: "user", content: `Reminder request: "${text}"` },
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.2,
-    })
-    const content = gpt?.choices?.[0]?.message?.content || "{}"
-    parsed = JSON.parse(content)
-  } catch (e) {
-    console.warn("parse via GPT failed; falling back", e?.message || e)
+  let when = null
+
+  // If caller provided a concrete scheduledTime, prefer it and skip GPT
+  if (options?.scheduledTime) {
+    try {
+      when = new Date(options.scheduledTime)
+      if (!(when instanceof Date) || isNaN(when.getTime())) throw new Error('invalid scheduledTime')
+      parsed = { task: text, time: when.toISOString() }
+    } catch (e) {
+      console.warn('scheduledTime invalid; falling back to GPT parse', e?.message || e)
+    }
+  }
+
+  if (!parsed) {
+    try {
+      const gpt = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: "Extract a single reminder from the user's text. Return strict JSON with keys: task (string) and time (ISO8601)." },
+          { role: "user", content: `Reminder request: "${text}"` },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.2,
+      })
+      const content = gpt?.choices?.[0]?.message?.content || "{}"
+      parsed = JSON.parse(content)
+    } catch (e) {
+      console.warn("parse via GPT failed; falling back", e?.message || e)
+    }
   }
 
   // 2) Fallback heuristics
@@ -34,7 +49,7 @@ export async function createReminderFromText(userText, userId, channels = ["what
     parsed = { task: text, time: new Date(Date.now() + 60 * 60 * 1000).toISOString() } // +1h
   }
 
-  const when = new Date(parsed.time)
+  when = when || new Date(parsed.time)
   if (!(when instanceof Date) || isNaN(when.getTime())) {
     throw new Error("Parsed time invalid")
   }
