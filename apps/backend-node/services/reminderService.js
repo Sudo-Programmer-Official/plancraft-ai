@@ -6,7 +6,7 @@ import { sendPWA } from "./integrations/pwaProvider.js"
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
-export async function createReminderFromText(userText, userId, channels = ["whatsapp"]) {
+export async function createReminderFromText(userText, userId, channels = ["whatsapp"], options = {}) {
   if (!userId) throw new Error("Missing userId")
   const text = String(userText || '').trim()
   if (!text) throw new Error("Empty reminder text")
@@ -47,6 +47,7 @@ export async function createReminderFromText(userText, userId, channels = ["what
     createdAt: new Date(),
     status: "scheduled",
     sentAt: null,
+    taskId: options?.taskId || null,
   }
 
   const ref = await db.collection("reminders").add(reminder)
@@ -98,6 +99,7 @@ export function queueReminder(rem) {
     const ts = when instanceof Date ? when : new Date(when)
     const delay = ts.getTime() - Date.now()
     if (!Number.isFinite(delay)) return
+    console.log(`[Scheduler] Queued reminder id=${id} taskId=${rem?.taskId || 'n/a'} at=${ts.toISOString()}`)
     const fire = async () => {
       try { await sendReminder({ ...rem, id }) } catch (e) {
         console.error("sendReminder error:", e?.message || e)

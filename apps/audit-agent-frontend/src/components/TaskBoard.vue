@@ -61,6 +61,14 @@
                   </span>
                   <div class="flex items-center gap-2">
                     <span class="text-xs text-slate-400">{{ task.date }}</span>
+                    <button
+                      v-if="reminderActiveByTask[task.id]"
+                      @click.stop="onReminderClick(task)"
+                      class="text-yellow-400 text-sm hover:opacity-80"
+                      title="Reminder active — click to manage"
+                    >
+                      🔔
+                    </button>
                     <!-- Expand toggle -->
                     <!-- <button
                     @click="toggleExpand(task.id)"
@@ -142,11 +150,14 @@
 
 <script setup>
 import draggable from 'vuedraggable'
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useTasks } from '@/composables/useTasks'
 import { addTaskToFirebase, updateTaskInFirebase } from '@/services/firebaseService'
 import TaskPlannerDialog from './TaskPlannerDialog.vue'
 import { toLocalDateKey } from '@/utils/dateHelper'
+import { useAuthStore } from '@/stores/authStore'
+import { getReminderStatus } from '@/services/reminderService'
+import api from '@/services/api'
 
 const { tasks, loadTasks, toggleComplete, deleteTask, persistOrder } = useTasks()
 
@@ -156,6 +167,10 @@ const today = toLocalDateKey(new Date())
 
 // Track expanded task IDs
 const expanded = ref(new Set())
+
+// Reminder badges map: { [taskId]: true }
+const reminderActiveByTask = ref({})
+const authStore = useAuthStore()
 
 function toggleExpand(id) {
   if (expanded.value.has(id)) expanded.value.delete(id)
@@ -190,6 +205,50 @@ function openDialog(task = null) {
 }
 
 onMounted(loadTasks)
+
+// Refresh reminder badges whenever tasks list changes (ids/dates) or user changes
+async function refreshReminderBadges() {
+  try {
+    const uid = authStore?.user?.uid
+    if (!uid) { reminderActiveByTask.value = {}; return }
+    const arr = Array.isArray(tasks.value) ? tasks.value : []
+    const results = await Promise.all(
+      arr.map(async (t) => {
+        try {
+          const r = await getReminderStatus(uid, t.id)
+          return [t.id, !!r?.hasActive]
+        } catch {
+          return [t.id, false]
+        }
+      })
+    )
+    const map = {}
+    for (const [id, flag] of results) map[id] = flag
+    reminderActiveByTask.value = map
+  } catch (e) {
+    console.warn('refreshReminderBadges failed', e)
+  }
+}
+
+watch(
+  () => ({ ids: (tasks.value || []).map(t => t.id).join(','), dates: (tasks.value || []).map(t => t.date).join(',') }),
+  () => { refreshReminderBadges() },
+  { immediate: true }
+)
+
+async function onReminderClick(task) {
+  try {
+    const uid = authStore?.user?.uid
+    if (!uid || !task?.id) return
+    const choice = window.prompt('Reminder active. Type "cancel" to cancel, or leave empty to dismiss:')
+    if (choice && choice.toLowerCase() === 'cancel') {
+      await api.post('/reminders/cancel', { userId: uid, taskId: task.id })
+      await refreshReminderBadges()
+    }
+  } catch (e) {
+    console.warn('Reminder manage failed', e?.response?.data || e?.message)
+  }
+}
 </script>
 
 <style scoped>

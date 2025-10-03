@@ -59,6 +59,8 @@
 import { ref, watch } from "vue"
 import { addTaskToFirebase, updateTaskInFirebase } from "@/services/firebaseService"
 import { useVoiceRecorder } from "@/composables/useVoiceRecorder"
+import api from "@/services/api"
+import { useAuthStore } from "@/stores/authStore"
 
 const props = defineProps({
   task: { type: Object, default: null }
@@ -76,12 +78,16 @@ const form = ref({
   logs: [],
 })
 
+const authStore = useAuthStore()
+let initialDate = null
+
 // Watch for incoming task (edit mode)
 watch(
   () => props.task,
   (t) => {
     if (t) {
       form.value = { ...t }
+      initialDate = t.date || null
     } else {
       form.value = {
         id: null,
@@ -91,6 +97,7 @@ watch(
         completed: false,
         logs: [],
       }
+      initialDate = form.value.date
     }
   },
   { immediate: true }
@@ -114,6 +121,31 @@ async function save() {
   } else {
     const saved = await addTaskToFirebase(form.value)
     form.value.id = saved.id // assign Firestore doc id
+  }
+
+  try {
+    const uid = authStore?.user?.uid
+    const hasDate = !!form.value.date
+    if (uid && form.value.id) {
+      if (hasDate) {
+        // Schedule/update reminder using natural language text + date hint
+        const text = `${form.value.title} on ${form.value.date}`
+        await api.post('/reminders/text', {
+          userId: uid,
+          taskId: form.value.id,
+          text,
+          channels: ['whatsapp','pwa'],
+        })
+      } else if (!hasDate && initialDate) {
+        // Date removed → cancel any pending reminders for this task
+        await api.post('/reminders/cancel', {
+          userId: uid,
+          taskId: form.value.id,
+        })
+      }
+    }
+  } catch (e) {
+    console.warn('Reminder sync failed:', e?.response?.data || e?.message)
   }
 
   emit("saved")

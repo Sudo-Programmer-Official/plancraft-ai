@@ -25,6 +25,7 @@ export async function initScheduler() {
       if (data?.sentAt) return
       const reminder = { id: doc.id, ...data }
       queueReminder(reminder)
+      console.log(`[Scheduler] Queued reminder on boot id=${doc.id} taskId=${data?.taskId || 'n/a'} at=${(data?.scheduledTime?.toDate ? data.scheduledTime.toDate() : data.scheduledTime)?.toISOString?.() || data?.scheduledTime}`)
       count++
     })
     console.log(`📅 Loaded ${count} reminders into scheduler`)
