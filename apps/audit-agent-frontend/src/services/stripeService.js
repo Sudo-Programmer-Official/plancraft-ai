@@ -15,8 +15,9 @@ export async function createCheckoutSession(plan, userId) {
     if (!url) throw new Error('No checkout URL returned')
     return url
   } catch (err) {
-    console.error('Stripe error:', err?.response?.data || err?.message)
-    throw new Error('Payment service temporarily unavailable')
+    const serverMsg = err?.response?.data?.error
+    console.error('Stripe error:', serverMsg || err?.message)
+    throw new Error(serverMsg || 'Payment service temporarily unavailable')
   }
 }
 

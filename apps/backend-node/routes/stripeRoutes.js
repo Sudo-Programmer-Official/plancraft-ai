@@ -19,16 +19,29 @@ router.post('/create-checkout-session', async (req, res) => {
     if (!userId) return res.status(400).json({ error: 'User must be logged in to upgrade' })
     if (!plan) return res.status(400).json({ error: 'Missing plan' })
 
-    // Dynamically resolve plan → Stripe Price ID
-    // const priceId = process.env[`STRIPE_${String(plan).toUpperCase()}_PRICE_ID`] || process.env.STRIPE_MONTHLY_PRICE_ID
-    const priceIdKey = `STRIPE_${String(plan).toUpperCase()}_PRICE_ID`
+    // Dynamically resolve plan → Stripe Price ID (with aliases)
+    const planKey = String(plan || 'monthly').toLowerCase()
+    const aliasMap = {
+      pro: 'MONTHLY',
+      premium: 'MONTHLY',
+      monthly: 'MONTHLY',
+      year: 'YEARLY',
+      yearly: 'YEARLY',
+      annual: 'YEARLY',
+    }
+    const envSuffix = aliasMap[planKey] || 'MONTHLY'
+    const priceIdKey = `STRIPE_${envSuffix}_PRICE_ID`
     const priceId = process.env[priceIdKey] || process.env.STRIPE_MONTHLY_PRICE_ID
 
     console.log(`Looking up Stripe price with key: ${priceIdKey}, resolved: ${priceId}`)
     console.log(`Creating checkout session for user ${userId}, plan: ${plan}, priceId: ${priceId}`)
     if (!priceId) {
-      console.error(`❌ No price ID configured for plan: ${plan}`)
-      return res.status(400).json({ error: `No price ID configured for plan: ${plan}` })
+      console.error(`❌ No price ID configured. Expected env ${priceIdKey} or STRIPE_MONTHLY_PRICE_ID`)
+      return res.status(400).json({ error: `No price ID configured. Set ${priceIdKey} or STRIPE_MONTHLY_PRICE_ID` })
+    }
+    if (!/^price_/.test(String(priceId))) {
+      console.error('❌ Invalid Stripe price format. Must start with price_')
+      return res.status(400).json({ error: 'Invalid Stripe price ID. It should start with "price_"' })
     }
 
     // If Stripe not configured, fall back to static URL (dev/demo)
@@ -44,14 +57,16 @@ router.post('/create-checkout-session', async (req, res) => {
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: successUrl || process.env.STRIPE_SUCCESS_URL,
       cancel_url: cancelUrl || process.env.STRIPE_CANCEL_URL,
-      metadata: { userId, plan },
+      metadata: { userId, plan: planKey },
     })
 
     console.log(`✅ Checkout session created for user ${userId}, plan: ${plan}`)
     res.json({ url: session.url })
   } catch (err) {
-    console.error('❌ Stripe checkout error:', err)
-    res.status(500).json({ error: 'Failed to create checkout session' })
+    const msg = err?.raw?.message || err?.message || 'Failed to create checkout session'
+    console.error('❌ Stripe checkout error:', msg)
+    const status = err?.statusCode || 500
+    res.status(status).json({ error: msg })
   }
 })
 
