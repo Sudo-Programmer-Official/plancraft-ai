@@ -93,14 +93,22 @@ dotenv.config();
 
 const app = express();
 
-// Allow list of origins
+// Allow list of origins (extendable via CORS_ORIGINS env, comma-separated)
 const allowedOrigins = [
   "https://plancraftai.com",
+  "https://www.plancraftai.com",
   "https://audit-agent-66451.web.app",
   "https://audit-agent-66451.firebaseapp.com",
+  "https://audit-agent.onrender.com",
   "http://localhost:5173",
   "http://127.0.0.1:5173",
-];
+]
+  .concat(
+    (process.env.CORS_ORIGINS || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+  )
 
 // CORS setup
 app.use(
