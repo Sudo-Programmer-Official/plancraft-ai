@@ -10,9 +10,21 @@
       </p>
     </header>
 
-    <main class="max-w-4xl mx-auto space-y-10">
+    <main class="max-w-4xl mx-auto space-y-10 px-1">
+      <!-- Plan status and usage -->
+      <section class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10 max-w-md mx-auto sm:max-w-none">
+        <h2 class="text-lg sm:text-xl font-semibold mb-2">🌟 Subscription</h2>
+        <p class="text-sm text-indigo-200">Current plan: <strong>{{ (authStore.user?.plan || 'free').toUpperCase() }}</strong></p>
+        <p class="text-sm text-gray-300 mt-2">
+          Daily AI limit: <span :class="(authStore.user?.plan||'free')==='premium' ? 'text-green-300' : 'text-yellow-300'">{{ aiRemaining }}</span> left today
+        </p>
+        <div class="mt-3">
+          <button @click="upgradePlan" class="bg-gradient-to-r from-purple-500 to-pink-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-white shadow-lg hover:from-purple-600 hover:to-pink-700 transition text-sm sm:text-base">🚀 Upgrade</button>
+          <el-button size="small" plain @click="planOpen=true" class="ml-2">View Plan Details</el-button>
+        </div>
+      </section>
       <!-- Notification Preferences -->
-      <section class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10">
+      <section class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10 max-w-md mx-auto sm:max-w-none">
         <h2 class="text-lg sm:text-xl font-semibold mb-4">🔔 Notification Preferences</h2>
         <p class="text-sm text-indigo-200 mb-4">
           Choose how you’d like to be reminded about tasks, reflections, and insights.
@@ -24,16 +36,18 @@
             <span>Email Notifications</span>
           </label>
           <label class="flex items-center gap-3">
-            <input type="checkbox" v-model="prefs.pwa" class="accent-indigo-500" />
+            <input type="checkbox" v-model="prefs.pwa" class="accent-indigo-500" :disabled="!canPwa" />
             <span>Push Notifications (PWA)</span>
           </label>
+          <small v-if="!canPwa" class="pl-7 text-xs text-indigo-200/80">Available for Pro users only</small>
           <div v-if="prefs.pwa" class="pl-7 mt-2">
             <el-button size="small" @click="enablePush" class="bg-slate-800 hover:bg-slate-700">Enable Browser Push</el-button>
           </div>
           <label class="flex items-center gap-3">
-            <input type="checkbox" v-model="prefs.whatsapp" class="accent-indigo-500" />
+            <input type="checkbox" v-model="prefs.whatsapp" class="accent-indigo-500" :disabled="!canWhatsapp" />
             <span>WhatsApp Alerts</span>
           </label>
+          <small v-if="!canWhatsapp" class="pl-7 text-xs text-indigo-200/80">Available for Pro users only</small>
           <label class="flex items-center gap-3">
             <input type="checkbox" v-model="prefs.discord" class="accent-indigo-500" />
             <span>Discord Channel</span>
@@ -81,7 +95,7 @@
       </section>
 
       <!-- Integrations -->
-      <section class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10">
+      <section class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10 max-w-md mx-auto sm:max-w-none">
         <h2 class="text-lg sm:text-xl font-semibold mb-4">🔗 Integrations</h2>
         <p class="text-sm text-indigo-200 mb-4">
           Connect your favorite platforms to sync tasks and reminders.
@@ -103,7 +117,7 @@
       </section>
 
       <!-- Account -->
-      <section class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10">
+      <section class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10 max-w-md mx-auto sm:max-w-none">
         <h2 class="text-lg sm:text-xl font-semibold mb-4">👤 Account</h2>
         <div class="flex items-center gap-4 mb-4">
           <img
@@ -116,12 +130,12 @@
             <p class="text-sm text-indigo-300">{{ authStore.user?.email }}</p>
           </div>
         </div>
-        <div class="flex gap-2 sm:gap-3">
+        <div class="flex flex-col sm:flex-row gap-3 justify-center items-center w-full">
           <button
-            class="px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base rounded-lg bg-indigo-600 hover:bg-indigo-700 transition"
+            class="bg-gradient-to-r from-purple-500 to-pink-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-white shadow-lg hover:from-purple-600 hover:to-pink-700 transition text-sm sm:text-base"
             @click="upgradePlan"
           >
-            🚀 Upgrade Plan
+            🚀 Upgrade
           </button>
           <RouterLink
             to="/help"
@@ -138,7 +152,7 @@
         </div>
       </section>
       <!-- Save Button -->
-      <div class="flex justify-end mt-6">
+      <div class="flex justify-center mt-6">
         <el-button
           type="primary"
           class="px-6 py-2 rounded-lg shadow-md bg-gradient-to-r from-indigo-600 to-purple-600"
@@ -152,15 +166,19 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted } from "vue"
+import { reactive, ref, onMounted, computed } from "vue"
 import { useAuthStore } from "@/stores/authStore"
 import { useRouter } from "vue-router"
 import { ElMessage } from "element-plus"
 import { getPreferences as apiGetPrefs, updatePreferences as apiUpdatePrefs, getIntegrations, updateIntegrations } from "@/services/settingsService"
 import { subscribeUserToPush } from "@/services/pwaService"
+import { useSubscriptionStore } from "@/stores/subscriptionStore"
+import { isFeatureAllowed, getRemainingAI } from "@/services/planService"
+import PlanSummaryModal from "@/components/PlanSummaryModal.vue"
 
 const authStore = useAuthStore()
 const router = useRouter()
+const subStore = useSubscriptionStore()
 
 // Notification preferences state
 const prefs = reactive({
@@ -263,6 +281,12 @@ async function enablePush() {
     ElMessage.error(`❌ Enable push failed: ${e?.message || e}`)
   }
 }
+
+// Plan gates
+const canWhatsapp = computed(() => isFeatureAllowed({ plan: subStore.subscription.plan }, 'whatsapp'))
+const canPwa = computed(() => isFeatureAllowed({ plan: subStore.subscription.plan }, 'pwa'))
+const aiRemaining = computed(() => getRemainingAI(authStore.user || {}))
+const planOpen = ref(false)
 </script>
 
 <style scoped>
@@ -270,3 +294,6 @@ section h2 {
   color: #f8fafc;
 }
 </style>
+
+<!-- Plan modal mount -->
+<PlanSummaryModal :open="planOpen" @close="planOpen=false" />

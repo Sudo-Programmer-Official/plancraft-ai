@@ -3,6 +3,7 @@ import multer from "multer"
 import { handleTextReminder } from "../services/textHandler.js"
 import { db } from "../services/firebaseAdmin.js"
 import { handleVoiceCommand } from "../services/voiceHandler.js"
+import { checkUserPlan, checkUserPlanUsage } from "../services/planService.js"
 
 const router = express.Router()
 const upload = multer({ storage: multer.memoryStorage() })
@@ -19,6 +20,13 @@ router.post("/text", async (req, res) => {
       now: new Date().toISOString(),
     })
     if (!userId || !text) return res.status(400).json({ success: false, error: "Missing userId or text" })
+    // Plan enforcement and usage increment for reminders
+    try {
+      const ok = await checkUserPlanUsage(userId, 'reminder')
+      if (!ok?.ok) {
+        return res.status(403).json({ success: false, error: 'Daily reminder limit reached. Upgrade to Pro.' })
+      }
+    } catch {}
     // If caller ties to a task, require an explicit scheduledTime to avoid ambiguous scheduling
     if (taskId && !scheduledTime) {
       console.warn('[Reminder API] Rejecting task-bound reminder without scheduledTime', { userId, taskId })

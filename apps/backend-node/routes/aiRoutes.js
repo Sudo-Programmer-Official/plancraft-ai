@@ -1,6 +1,7 @@
 // routes/ai.js
 import express from "express";
 import { enhanceJournalEntry, summarizeTasks, splitTasks, extractReminderTime } from "../services/openaiService.js";
+import { checkUserPlanUsage } from "../services/planService.js";
 import OpenAI from "openai";
 import dotenv from "dotenv";
 
@@ -275,6 +276,16 @@ router.post('/split-tasks', async (req, res) => {
     if (!text || typeof text !== 'string') {
       return res.status(400).json({ error: "'text' is required" })
     }
+    // Plan enforcement and usage increment
+    try {
+      const userId = req.headers['x-user-id'] || req.user?.id
+      if (userId) {
+        const ok = await checkUserPlanUsage(String(userId), 'ai')
+        if (!ok?.ok) {
+          return res.status(403).json({ error: 'Daily AI limit reached. Upgrade to Pro to continue.' })
+        }
+      }
+    } catch {}
     const result = await splitTasks(text, { maxItems, context })
     if (!result || !Array.isArray(result.tasks)) {
       return res.status(502).json({ error: 'Upstream returned unexpected format.' })

@@ -76,6 +76,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 
 import aiRoutes from "./routes/aiRoutes.js";
+import usageRoutes from "./routes/usageRoutes.js";
 import transcribeRoutes from "./routes/transcribeRoutes.js";
 import subscriptionRoutes from "./routes/subscriptionRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
@@ -135,6 +136,7 @@ app.get("/health", (req, res) => res.status(200).send("OK"));
 
 // Feature routes
 app.use("/api/ai", aiRoutes);
+app.use("/api/usage", usageRoutes);
 app.use("/api", transcribeRoutes);
 app.use("/api", subscriptionRoutes);
 app.use("/api", notificationRoutes);

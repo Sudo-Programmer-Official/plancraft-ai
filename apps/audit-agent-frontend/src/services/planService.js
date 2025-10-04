@@ -1,0 +1,69 @@
+// src/services/planService.js
+
+export const PLANS = {
+  FREE: {
+    name: 'Free',
+    limits: {
+      tasksPerDay: 5,
+      remindersPerDay: 3,
+      aiGenerations: 10,
+    },
+    features: {
+      email: true,
+      whatsapp: false,
+      pwa: false,
+      aiSplit: true,
+      priorityScheduling: false,
+    },
+  },
+  PREMIUM: {
+    name: 'Pro',
+    limits: {
+      tasksPerDay: Infinity,
+      remindersPerDay: Infinity,
+      aiGenerations: Infinity,
+    },
+    features: {
+      email: true,
+      whatsapp: true,
+      pwa: true,
+      aiSplit: true,
+      priorityScheduling: true,
+    },
+  },
+}
+
+function resolvePlanKey(userOrPlan) {
+  const planStr = typeof userOrPlan === 'string' ? userOrPlan : (userOrPlan?.plan || userOrPlan?.subscription?.plan)
+  return String(planStr || '').toLowerCase() === 'premium' ? 'PREMIUM' : 'FREE'
+}
+
+export function getPlanFeatures(userOrPlan) {
+  const key = resolvePlanKey(userOrPlan)
+  return PLANS[key]
+}
+
+export function isFeatureAllowed(userOrPlan, featureKey) {
+  const plan = getPlanFeatures(userOrPlan)
+  return !!plan?.features?.[featureKey]
+}
+
+// Fetch usage snapshot for UI
+export async function getUsageStatus(uid) {
+  try {
+    const res = await api.get('/usage/status', { params: { uid } })
+    return res?.data || { today: { aiGenerations: 0, reminders: 0 } }
+  } catch {
+    return { today: { aiGenerations: 0, reminders: 0 } }
+  }
+}
+
+export function getRemainingAI(user) {
+  const key = resolvePlanKey(user)
+  if (key === 'PREMIUM') return '∞'
+  const used = Number(user?.usage?.today?.aiGenerations || 0)
+  const limit = Number(PLANS.FREE.limits.aiGenerations)
+  const remaining = Math.max(0, (Number.isFinite(limit) ? limit : 0) - used)
+  return remaining
+}
+import api from '@/services/api'

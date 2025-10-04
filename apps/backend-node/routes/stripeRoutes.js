@@ -1,6 +1,7 @@
 // apps/backend-node/routes/stripeRoutes.js
 import express from 'express'
 import Stripe from 'stripe'
+import { db } from '../services/firebaseAdmin.js'
 
 const router = express.Router()
 
@@ -70,13 +71,25 @@ export async function stripeWebhookHandler(req, res) {
       case 'checkout.session.completed': {
         const session = event.data.object
         console.log('✅ Webhook completed for userId:', session?.metadata?.userId, 'plan:', session?.metadata?.plan)
-        // TODO: write subscription active state to DB keyed by metadata.userId
+        try {
+          const userId = String(session?.metadata?.userId || '')
+          const plan = (session?.metadata?.plan || 'premium').toLowerCase() === 'premium' ? 'premium' : 'premium'
+          if (userId) {
+            await db.collection('users').doc(userId).set({ plan, subscription: { status: 'active', sessionId: session.id } }, { merge: true })
+          }
+        } catch (e) { console.warn('Failed to persist plan on webhook:', e?.message || e) }
         break
       }
       case 'customer.subscription.deleted':
       case 'invoice.payment_failed':
         console.log('⚠️ Subscription ended or payment failed:', event.type)
-        // TODO: mark user plan as free/expired
+        try {
+          const sub = event.data.object
+          const userId = String(sub?.metadata?.userId || '')
+          if (userId) {
+            await db.collection('users').doc(userId).set({ plan: 'free', subscription: { status: 'canceled' } }, { merge: true })
+          }
+        } catch (e) { console.warn('Failed to downgrade plan on webhook:', e?.message || e) }
         break
       default:
         console.log('ℹ️ Stripe event:', event.type)

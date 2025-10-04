@@ -41,3 +41,20 @@ api.interceptors.request.use(async (config) => {
 })
 
 export default api
+
+// Global 403 upgrade banner trigger
+api.interceptors.response.use(
+  (res) => res,
+  (error) => {
+    try {
+      const status = error?.response?.status
+      const msg = (error?.response?.data?.error || '').toString().toLowerCase()
+      const isLimit = status === 403 && /limit|upgrade/.test(msg)
+      if (isLimit && typeof window !== 'undefined') {
+        const detail = { source: 'api', path: error?.config?.url, message: error?.response?.data?.error }
+        window.dispatchEvent(new CustomEvent('upgrade-required', { detail }))
+      }
+    } catch {}
+    return Promise.reject(error)
+  }
+)

@@ -4,6 +4,10 @@ import { signInAsGuest, signInWithGoogle, signOutUser, signInWithEmail, register
 import { getAuth, onAuthStateChanged, onIdTokenChanged, setPersistence, browserLocalPersistence } from "firebase/auth";
 import firebaseApp from "@/firebase/init";
 import { identifyUser, trackEvent } from '@/services/analytics'
+import { getSubscriptionStatus } from '@/services/stripeService'
+import { getUsageStatus } from '@/services/planService'
+import { doc, updateDoc } from 'firebase/firestore'
+import { db } from '@/firebase/init'
 
 
 const auth = getAuth(firebaseApp);
@@ -18,6 +22,19 @@ export const useAuthStore = defineStore("authStore", {
   }),
 
   actions: {
+    async refreshPlan() {
+      try {
+        if (!this.user?.uid) return
+        const [status, usage] = await Promise.all([
+          getSubscriptionStatus(this.user.uid),
+          getUsageStatus(this.user.uid),
+        ])
+        const plan = (status?.plan || 'free').toLowerCase()
+        // Attach plan and usage to local user object for convenience
+        this.user = { ...(this.user || {}), plan, usage }
+        try { await updateDoc(doc(db, 'users', this.user.uid), { plan }) } catch {}
+      } catch {}
+    },
     async init() {
       // Restore from localStorage (optional fallback)
       const savedUser = localStorage.getItem("user");
@@ -61,6 +78,8 @@ export const useAuthStore = defineStore("authStore", {
             identifyUser(this.user)
             localStorage.setItem('user', JSON.stringify(this.user))
             localStorage.setItem('token', this.token)
+            // Refresh plan status in background
+            this.refreshPlan().catch(() => {})
           } else {
             this.user = null
             this.token = null

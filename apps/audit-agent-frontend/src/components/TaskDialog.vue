@@ -64,6 +64,7 @@
 
 <script setup>
 import { ref, watch } from "vue"
+import { ElNotification } from 'element-plus'
 import { addTaskToFirebase, updateTaskInFirebase } from "@/services/firebaseService"
 import { useVoiceRecorder } from "@/composables/useVoiceRecorder"
 import api from "@/services/api"
@@ -159,7 +160,14 @@ async function save() {
       }
     }
   } catch (e) {
-    console.warn('Reminder sync failed:', e?.response?.data || e?.message)
+    const status = e?.response?.status
+    if (status === 403) {
+      const msg = e?.response?.data?.error || 'Daily reminder limit reached. Upgrade to Pro to continue.'
+      ElNotification({ title: 'Upgrade Required', message: msg, type: 'warning', duration: 3500 })
+      try { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('upgrade-required', { detail: { source: 'reminder' } })) } catch {}
+    } else {
+      console.warn('Reminder sync failed:', e?.response?.data || e?.message)
+    }
   }
 
   emit("saved")

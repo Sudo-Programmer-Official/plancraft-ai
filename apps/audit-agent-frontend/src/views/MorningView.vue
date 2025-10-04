@@ -40,6 +40,7 @@
 
 <script setup>
 import { ref } from "vue"
+import { ElNotification } from 'element-plus'
 import { addTaskToFirebase } from "@/services/firebaseService"
 import { generateTasksFromText } from "@/services/aiService"
 
@@ -47,8 +48,20 @@ const planText = ref("")
 const aiTasks = ref([])
 
 async function generateTasks() {
-  const { tasks } = await generateTasksFromText(planText.value)
-  aiTasks.value = tasks.map(t => ({ title: t }))
+  try {
+    const { tasks } = await generateTasksFromText(planText.value)
+    aiTasks.value = tasks.map(t => ({ title: t }))
+  } catch (err) {
+    const status = err?.response?.status
+    if (status === 403) {
+      const msg = err?.response?.data?.error || 'Daily AI limit reached. Upgrade to Pro to continue.'
+      ElNotification({ title: 'Upgrade Required', message: msg, type: 'warning', duration: 3500 })
+      try { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('upgrade-required', { detail: { source: 'morning-view' } })) } catch {}
+    } else {
+      console.error('AI generation failed:', err)
+      ElNotification({ title: 'Error', message: 'Failed to generate tasks. Please try again later.', type: 'error', duration: 3000 })
+    }
+  }
 }
 
 async function saveTask(task) {

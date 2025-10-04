@@ -97,7 +97,7 @@
           type="success"
           @click="generateTasks"
           :loading="loading"
-          :disabled="!input.trim()"
+          :disabled="!input.trim() || !isFeatureAllowed({ plan: subStore.subscription.plan }, 'aiSplit')"
           class="w-full sm:w-auto px-4 py-2 rounded-lg text-white font-medium shadow-md
             bg-gradient-to-r from-emerald-700 via-teal-800 to-cyan-700
             hover:from-emerald-800 hover:via-teal-900 hover:to-cyan-800
@@ -106,6 +106,9 @@
           <template v-if="transcribing">⌛ Transcribing…</template>
           <template v-else>{{ loading ? '⏳ Generating...' : '➕ Generate Tasks' }}</template>
         </el-button>
+        <p v-if="!isFeatureAllowed({ plan: subStore.subscription.plan }, 'aiSplit')" class="mt-2 text-xs text-red-300">
+          Upgrade to Pro to use AI task generation 💎
+        </p>
       </div>
     </div>
 
@@ -160,6 +163,8 @@ import { getPreferences as getUserPreferences } from '@/services/settingsService
 import { scheduleReminder } from '@/services/reminderService'
 import { useTasks } from '@/composables/useTasks'
 import { toLocalDateKey, parseLocalDateKey } from '@/utils/dateHelper'
+import { useSubscriptionStore } from '@/stores/subscriptionStore'
+import { isFeatureAllowed } from '@/services/planService'
 
 const props = defineProps({
   open: Boolean,
@@ -171,6 +176,7 @@ const emit = defineEmits(['close', 'saved'])
 
 const { tasks } = useTasks()
 const reminderTime = ref(props.task ? props.task.reminderTime || '' : '')
+const subStore = useSubscriptionStore()
 
 const internalOpen = ref(props.open)
 const input = ref('')
@@ -274,8 +280,15 @@ async function generateTasks() {
     emit('saved', items)
     closeDialog()
   } catch (err) {
-    console.error(err)
-    ElNotification({ title: 'Error', message: 'Task generation failed. Please try again.', type: 'error', duration: 3000 })
+    const status = err?.response?.status
+    if (status === 403) {
+      const msg = err?.response?.data?.error || 'Daily AI limit reached. Upgrade to Pro to continue.'
+      ElNotification({ title: 'Upgrade Required', message: msg, type: 'warning', duration: 3500 })
+      try { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('upgrade-required', { detail: { source: 'ai-split' } })) } catch {}
+    } else {
+      console.error(err)
+      ElNotification({ title: 'Error', message: 'Task generation failed. Please try again.', type: 'error', duration: 3000 })
+    }
   } finally {
     loading.value = false
     input.value = ''

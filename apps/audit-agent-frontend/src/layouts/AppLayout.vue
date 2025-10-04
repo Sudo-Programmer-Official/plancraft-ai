@@ -2,6 +2,17 @@
   <div
     class="flex min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 text-white"
   >
+    <!-- Global upgrade banner -->
+    <div v-if="showUpgrade" class="fixed top-0 left-0 right-0 z-50">
+      <div class="bg-yellow-500/20 backdrop-blur-md border-b border-yellow-400/40 text-yellow-200 px-4 py-2 flex items-center justify-between">
+        <span>You're on Free plan. Upgrade to unlock unlimited AI and reminders.</span>
+        <div class="flex items-center gap-3">
+          <RouterLink to="/subscription" class="px-3 py-1 rounded bg-yellow-500 text-black hover:bg-yellow-400">Upgrade</RouterLink>
+          <button @click="planOpen=true" class="px-3 py-1 rounded border border-yellow-300/60 hover:bg-yellow-400/10">View plan</button>
+          <button @click="showUpgrade=false" class="px-2 py-1 hover:bg-yellow-400/20 rounded">Dismiss</button>
+        </div>
+      </div>
+    </div>
     <!-- Sidebar (desktop only) -->
     <aside
       class="hidden md:flex flex-col h-screen transition-all duration-300 bg-gray-950/70 backdrop-blur-xl"
@@ -176,7 +187,7 @@
               <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <h2 class="text-2xl font-semibold capitalize">{{ $route.name }}</h2>
+          <h2 class="text-lg sm:text-2xl font-semibold capitalize truncate max-w-[50vw]">{{ $route.name }}</h2>
         </div>
 
         <!-- Right Section -->
@@ -254,6 +265,7 @@
           </div>
         </div>
       </footer>
+      <PlanSummaryModal :open="planOpen" @close="planOpen=false" />
     </div>
   </div>
 </template>
@@ -267,9 +279,12 @@ import 'driver.js/dist/driver.css'
 import { watchNotificationsPublic } from '@/services/firebaseService'
 import NotificationDropdown from '@/components/NotificationDropdown.vue'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
+import PlanSummaryModal from '@/components/PlanSummaryModal.vue'
 
 const sidebarOpen = ref(true) // desktop toggle
 const mobileMenu = ref(false) // mobile drawer toggle
+const showUpgrade = ref(false)
+const planOpen = ref(false)
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -334,12 +349,18 @@ onMounted(() => {
     notificationsError.value = true
   }
   if (authStore.user?.uid) subStore.fetchStatus(authStore.user.uid)
+  // Upgrade banner events
+  try {
+    const handler = () => { showUpgrade.value = true }
+    window.addEventListener('upgrade-required', handler)
+  } catch {}
   document.addEventListener('click', onDocumentClick)
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', onDocumentClick)
   if (unwatchNotes) unwatchNotes()
+  try { window.removeEventListener('upgrade-required', () => {}) } catch {}
 })
 
 function startTour() {
