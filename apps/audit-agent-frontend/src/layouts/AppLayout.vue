@@ -172,9 +172,9 @@
     <div class="flex-1 flex flex-col w-full h-screen">
       <!-- Header -->
       <header
-        class="sticky top-0 z-10 bg-gray-950/60 backdrop-blur-xl border-b border-gray-800 p-4 flex justify-between items-center"
+        class="sticky top-0 z-10 bg-gray-950/60 backdrop-blur-xl border-b border-gray-800 p-4 flex justify-between items-center w-full"
       >
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3 min-w-0 flex-1">
           <!-- Hamburger (mobile only) -->
           <button class="md:hidden p-2 hover:bg-gray-800 rounded" @click="mobileMenu = !mobileMenu">
             <svg
@@ -191,31 +191,34 @@
         </div>
 
         <!-- Right Section -->
-        <div class="flex items-center gap-2 sm:gap-4">
+        <div class="flex items-center gap-2 sm:gap-4 flex-shrink-0">
           <!-- Notification Bell -->
-          <div class="relative" ref="dropdownEl">
-            <button
-              @click="toggleNotifications"
-              class="relative bg-gray-800 hover:bg-gray-700 p-2 rounded-full transition"
-              aria-label="Notifications"
-              ref="bellEl"
-            >
-              🔔
-              <span
-                v-if="unreadCount > 0"
-                class="absolute -top-1 -right-1 bg-red-600 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full"
-              >
-                {{ unreadCount }}
-              </span>
-            </button>
+        <!-- Right Section -->
+  <!-- Notification Bell Wrapper -->
+  <div class="relative flex justify-end w-full sm:static sm:w-auto" ref="dropdownEl">
+    <button
+      @click="toggleNotifications"
+      class="relative bg-gray-800 hover:bg-gray-700 p-2 rounded-full transition min-w-[40px]"
+      aria-label="Notifications"
+      ref="bellEl"
+    >
+      🔔
+      <span
+        v-if="unreadCount > 0"
+        class="absolute -top-1 -right-1 bg-red-600 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full"
+      >
+        {{ unreadCount }}
+      </span>
+    </button>
 
-            <NotificationDropdown
-              v-if="showNotifications"
-              :items="notifications"
-              :error="notificationsError"
-              @markAllRead="markAllRead"
-            />
-          </div>
+    <!-- Notification Dropdown -->
+    <NotificationDropdown
+      v-if="showNotifications"
+      :items="notifications"
+      :error="notificationsError"
+      @markAllRead="markAllRead"
+    />
+</div>
 
           <!-- Upgrade Button / Premium Status -->
           <button

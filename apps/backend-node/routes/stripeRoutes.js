@@ -20,7 +20,11 @@ router.post('/create-checkout-session', async (req, res) => {
     if (!plan) return res.status(400).json({ error: 'Missing plan' })
 
     // Dynamically resolve plan → Stripe Price ID
-    const priceId = process.env[`STRIPE_${String(plan).toUpperCase()}_PRICE_ID`] || process.env.STRIPE_MONTHLY_PRICE_ID
+    // const priceId = process.env[`STRIPE_${String(plan).toUpperCase()}_PRICE_ID`] || process.env.STRIPE_MONTHLY_PRICE_ID
+    const priceIdKey = `STRIPE_${String(plan).toUpperCase()}_PRICE_ID`
+    const priceId = process.env[priceIdKey] || process.env.STRIPE_MONTHLY_PRICE_ID
+
+    console.log(`Looking up Stripe price with key: ${priceIdKey}, resolved: ${priceId}`)
     console.log(`Creating checkout session for user ${userId}, plan: ${plan}, priceId: ${priceId}`)
     if (!priceId) {
       console.error(`❌ No price ID configured for plan: ${plan}`)
