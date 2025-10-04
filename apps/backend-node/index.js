@@ -145,6 +145,8 @@ app.get("/health", (req, res) => res.status(200).send("OK"));
 
 // Feature routes
 app.use("/api/ai", aiRoutes);
+// Back-compat: allow calling AI endpoints under /api as well
+app.use("/api", aiRoutes);
 app.use("/api/usage", usageRoutes);
 app.use("/api", transcribeRoutes);
 app.use("/api", subscriptionRoutes);
