@@ -166,6 +166,7 @@ import { toLocalDateKey } from '@/utils/dateHelper'
 import { useAuthStore } from '@/stores/authStore'
 import { getReminderStatus } from '@/services/reminderService'
 import api from '@/services/api'
+import { getPreferences as getUserPreferences } from '@/services/settingsService'
 
 const { tasks, loadTasks, toggleComplete, deleteTask, persistOrder } = useTasks()
 
@@ -178,6 +179,7 @@ const expanded = ref(new Set())
 
 // Reminder badges map: { [taskId]: true }
 const reminderActiveByTask = ref({})
+const userPrefs = ref({ notifications: {}, integrations: {} })
 const authStore = useAuthStore()
 
 function toggleExpand(id) {
@@ -216,13 +218,23 @@ async function handleSave(payload) {
     if (uid && savedId) {
       if (payload?.reminderTime) {
         const iso = buildLocalIso(payload.date, payload.reminderTime)
-        await api.post('/reminders/text', {
-          userId: uid,
-          taskId: savedId,
-          text: payload.title,
-          scheduledTime: iso,
-          channels: ['whatsapp','pwa'],
-        })
+        // Build channels dynamically from saved preferences
+        const n = userPrefs.value?.notifications || {}
+        const activeChannels = []
+        if (n.whatsapp) activeChannels.push('whatsapp')
+        if (n.pwa || n.push) activeChannels.push('pwa')
+        if (n.email) activeChannels.push('email')
+        if (!activeChannels.length) {
+          console.warn('No notification channels enabled; skipping reminder schedule')
+        } else {
+          await api.post('/reminders/text', {
+            userId: uid,
+            taskId: savedId,
+            text: payload.title,
+            scheduledTime: iso,
+            channels: activeChannels,
+          })
+        }
       } else {
         await api.post('/reminders/cancel', { userId: uid, taskId: savedId })
       }
@@ -241,6 +253,19 @@ function openDialog(task = null) {
 }
 
 onMounted(loadTasks)
+
+// Load user preferences for dynamic reminder channels
+onMounted(async () => {
+  try {
+    const uid = authStore?.user?.uid
+    if (uid) {
+      const res = await getUserPreferences(uid)
+      userPrefs.value = res || { notifications: {}, integrations: {} }
+    }
+  } catch (e) {
+    console.warn('Failed to load user prefs in TaskBoard:', e)
+  }
+})
 
 // Refresh reminder badges whenever tasks list changes (ids/dates) or user changes
 async function refreshReminderBadges() {

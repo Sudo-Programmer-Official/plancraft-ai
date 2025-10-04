@@ -227,6 +227,12 @@ import { addTaskToFirebase, updateTaskInFirebase, fetchEntries } from '@/service
 import QuickLinksCard from '@/components/QuickLinksCard.vue'
 import { driver } from 'driver.js'
 import 'driver.js/dist/driver.css'
+// === Reminder badges (Daily list) ===
+import { getReminderStatus } from '@/services/reminderService'
+import api from '@/services/api'
+import { getPreferences as getUserPreferences } from '@/services/settingsService'
+// import { onAuthStateChanged } from 'firebase/auth'
+// import { auth } from '@/firebase/init'
 
 const authStore = useAuthStore()
 
@@ -248,6 +254,12 @@ const showPlanner = ref(false)
 const selectedTask = ref(null)
 const dailyList = ref(null)
 const journalLogs = ref([])
+
+
+
+const reminderActiveByTask = ref({})
+const checkingAuth = ref(true)
+const userPrefs = ref({ notifications: {}, integrations: {} })
 
 const journalStreak = computed(() => {
   if (!journalLogs.value.length) return 0
@@ -494,12 +506,21 @@ async function handleSaveAndSchedule(payload) {
     if (!uid || !taskId) return
     if (payload?.reminderTime) {
       const iso = buildLocalIso(payload.date, payload.reminderTime)
+      const n = userPrefs.value?.notifications || {}
+      const activeChannels = []
+      if (n.whatsapp) activeChannels.push('whatsapp')
+      if (n.pwa || n.push) activeChannels.push('pwa')
+      if (n.email) activeChannels.push('email')
+      if (!activeChannels.length) {
+        console.warn('No notification channels enabled; skipping reminder schedule')
+        return
+      }
       await api.post('/reminders/text', {
         userId: uid,
         taskId,
         text: payload.title,
         scheduledTime: iso,
-        channels: ['whatsapp','pwa'],
+        channels: activeChannels,
       })
     } else {
       await api.post('/reminders/cancel', { userId: uid, taskId })
@@ -508,15 +529,6 @@ async function handleSaveAndSchedule(payload) {
     console.warn('Reminder sync (dashboard) failed:', e?.response?.data || e?.message)
   }
 }
-
-// === Reminder badges (Daily list) ===
-import { getReminderStatus } from '@/services/reminderService'
-import api from '@/services/api'
-// import { onAuthStateChanged } from 'firebase/auth'
-// import { auth } from '@/firebase/init'
-
-const reminderActiveByTask = ref({})
-const checkingAuth = ref(true)
 
 async function refreshReminderBadges(list) {
   try {
@@ -562,6 +574,14 @@ async function onReminderClick(task) {
 // Resolve auth state before rendering
 onMounted(() => {
   try { onAuthStateChanged(auth, () => { checkingAuth.value = false }) } catch { checkingAuth.value = false }
+  try {
+    const uid = authStore?.user?.uid
+    if (uid) {
+      getUserPreferences(uid)
+        .then((res) => { userPrefs.value = res || { notifications: {}, integrations: {} } })
+        .catch((e) => console.warn('Failed to load user prefs:', e))
+    }
+  } catch {}
 })
 </script>
 
