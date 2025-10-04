@@ -27,6 +27,7 @@ export async function stripeWebhookHandler(req, res) {
   }
 
   try {
+    console.log('[Stripe] Webhook event received:', event.type)
     switch (event.type) {
       /**
        * User completed checkout
@@ -34,7 +35,10 @@ export async function stripeWebhookHandler(req, res) {
       case "checkout.session.completed": {
         const session = event.data.object
         const uid = session?.metadata?.userId
-        if (!uid) break
+        if (!uid) {
+          console.warn('[Stripe] checkout.session.completed missing metadata.userId')
+          break
+        }
 
         console.log(`✅ Subscription success for uid=${uid}`)
 
@@ -67,6 +71,7 @@ export async function stripeWebhookHandler(req, res) {
           },
           { merge: true }
         )
+        console.log(`[Stripe] Premium plan activated for user ${uid}`)
         break
       }
 
@@ -114,6 +119,39 @@ export async function stripeWebhookHandler(req, res) {
               }, { merge: true })
             }
           }
+        }
+        break
+      }
+
+      /**
+       * Created/Updated subscription: ensure user is premium and store metadata
+       */
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated': {
+        const sub = event.data.object
+        try {
+          // Make sure userId is in metadata for future mapping
+          const uid = sub?.metadata?.userId
+          if (sub?.id && !uid) {
+            console.warn('[Stripe] subscription missing metadata.userId; unable to map user')
+            break
+          }
+          if (uid) {
+            await db.collection('users').doc(uid).set({
+              plan: 'premium',
+              role: 'premium',
+              subscription: {
+                status: sub?.status === 'active' || sub?.status === 'trialing' ? 'active' : 'past_due',
+                stripeSubId: sub?.id,
+                customerId: sub?.customer || null,
+                currentPeriodEnd: sub?.current_period_end ? new Date(sub.current_period_end * 1000) : null,
+                plan: 'premium',
+              },
+            }, { merge: true })
+            console.log(`[Stripe] Synced subscription ${sub?.id} for user ${uid}`)
+          }
+        } catch (e) {
+          console.error('Failed to sync subscription:', e?.message || e)
         }
         break
       }

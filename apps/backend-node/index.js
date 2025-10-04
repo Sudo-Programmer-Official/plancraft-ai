@@ -171,6 +171,10 @@ app.post(
   stripeWebhookHandler
 );
 
+app.get('/api/stripe/webhook-health', (req, res) => {
+  res.send({ ok: true, message: 'Stripe Webhook endpoint active ✅' })
+})
+
 // JSON parser for all other routes
 app.use(express.json());
 

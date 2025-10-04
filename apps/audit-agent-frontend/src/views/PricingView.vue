@@ -107,10 +107,26 @@ async function onUpgrade() {
 }
 
 onMounted(() => {
-  if (window?.location?.search?.includes('status=success')) {
+  const isSuccess = window?.location?.search?.includes('status=success')
+  if (isSuccess) {
     trackEvent('upgrade_success')
+    // Refresh plan + usage after redirect (webhook may take a moment)
+    try { authStore.refreshPlan?.() } catch {}
+    // Poll subscription status briefly to reflect changes
+    const uid = authStore?.user?.uid
+    if (uid) {
+      let attempts = 0
+      const timer = setInterval(async () => {
+        attempts++
+        await subStore.fetchStatus(uid)
+        if (subStore.subscription.plan === 'premium' || attempts >= 6) {
+          clearInterval(timer)
+        }
+      }, 2000)
+    }
+  } else if (authStore?.user?.uid) {
+    subStore.fetchStatus(authStore.user.uid)
   }
-  if (authStore?.user?.uid) subStore.fetchStatus(authStore.user.uid)
 })
 
 async function onCancel() {
