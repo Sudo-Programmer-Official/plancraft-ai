@@ -98,6 +98,7 @@ const allowedOrigins = [
   "https://plancraftai.com",
   "https://www.plancraftai.com",
   "https://audit-agent-66451.web.app",
+  "https://api.plancraftai.com", 
   "https://audit-agent-66451.firebaseapp.com",
   "https://audit-agent.onrender.com",
   "http://localhost:5173",
