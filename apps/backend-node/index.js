@@ -112,22 +112,57 @@ const allowedOrigins = [
   )
 
 // CORS setup
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      const allowAny = process.env.ALLOW_DEV_ANY_ORIGIN === "1";
-      const isDevVite = !!origin && /:5173$/.test(origin);
-      if (!origin || allowAny || allowedOrigins.includes(origin) || isDevVite) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
-  })
-);
+const corsOptions = {
+  origin: function (origin, callback) {
+    const allowAny = process.env.ALLOW_DEV_ANY_ORIGIN === "1";
+    const isDevVite = !!origin && /:5173$/.test(origin);
+    if (!origin || allowAny || allowedOrigins.includes(origin) || isDevVite) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+  // Allow custom headers used by the frontend interceptor
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "x-user-email",
+    "x-user-id",
+    "x-user-role",
+    "x-requested-with",
+  ],
+  credentials: true,
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
+}
+
+app.use(cors(corsOptions))
+// Ensure preflight is handled for any path
+app.options("*", cors(corsOptions))
+
+// Extra safety: reflect requested headers for preflight to avoid header-name casing issues
+function isAllowedOrigin(origin) {
+  const allowAny = process.env.ALLOW_DEV_ANY_ORIGIN === "1"
+  const isDevVite = !!origin && /:5173$/.test(origin)
+  return !origin || allowAny || allowedOrigins.includes(origin) || isDevVite
+}
+
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    const origin = req.headers.origin
+    if (isAllowedOrigin(origin)) {
+      res.header('Access-Control-Allow-Origin', origin || '*')
+      res.header('Vary', 'Origin')
+      res.header('Access-Control-Allow-Credentials', 'true')
+      res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS,PATCH')
+      const reqHeaders = req.headers['access-control-request-headers']
+      res.header('Access-Control-Allow-Headers', reqHeaders || 'Content-Type, Authorization, X-User-Email, X-User-Id, X-User-Role, X-Requested-With')
+      return res.sendStatus(204)
+    }
+  }
+  next()
+})
 
 // ✅ Stripe webhook must come BEFORE express.json()
 app.post(
