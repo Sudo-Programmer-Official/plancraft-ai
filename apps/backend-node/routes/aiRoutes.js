@@ -13,6 +13,7 @@ const router = express.Router();
 const allowedOrigins = [
   "https://plancraftai.com",
   "http://localhost:5173", // dev
+  "https://api.plancraftai.com", 
   "https://audit-agent-66451.web.app", // prod
   "https://audit-agent-66451.firebaseapp.com", // prod
 ];
