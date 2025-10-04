@@ -1,6 +1,7 @@
 // apps/backend-node/routes/stripeWebhook.js
 import Stripe from "stripe"
 import { db } from "../services/firebaseAdmin.js"
+import { sendEmail, sendEmailDirect } from "../services/integrations/emailProvider.js"
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY
 const stripe = STRIPE_SECRET_KEY
@@ -68,6 +69,8 @@ export async function stripeWebhookHandler(req, res) {
               plan: "premium",
               billingInterval: session?.metadata?.plan || "monthly",
             },
+            planStartedAt: sub?.current_period_start ? new Date(sub.current_period_start * 1000) : new Date(),
+            planExpiresAt: sub?.current_period_end ? new Date(sub.current_period_end * 1000) : null,
           },
           { merge: true }
         )
@@ -141,12 +144,14 @@ export async function stripeWebhookHandler(req, res) {
               plan: 'premium',
               role: 'premium',
               subscription: {
-                status: sub?.status === 'active' || sub?.status === 'trialing' ? 'active' : 'past_due',
+                status: sub?.status === 'active' || sub?.status === 'trialing' ? 'active' : (sub?.cancel_at_period_end ? 'active' : 'past_due'),
                 stripeSubId: sub?.id,
                 customerId: sub?.customer || null,
                 currentPeriodEnd: sub?.current_period_end ? new Date(sub.current_period_end * 1000) : null,
                 plan: 'premium',
               },
+              planStartedAt: sub?.current_period_start ? new Date(sub.current_period_start * 1000) : new Date(),
+              planExpiresAt: sub?.current_period_end ? new Date(sub.current_period_end * 1000) : null,
             }, { merge: true })
             console.log(`[Stripe] Synced subscription ${sub?.id} for user ${uid}`)
           }
@@ -201,6 +206,26 @@ export async function stripeWebhookHandler(req, res) {
           },
           { merge: true }
         )
+        // Send confirmation emails (customer + admin)
+        try {
+          const userSnap = await db.collection('users').doc(uid).get()
+          const userData = userSnap.exists ? userSnap.data() : {}
+          const userEmail = userData?.email || userData?.integrations?.email || session?.customer_details?.email || ''
+          const planName = (session?.metadata?.plan || 'monthly').toUpperCase()
+          await sendEmail(uid,
+            `Thanks for upgrading to PlanCraftAI Premium! Your ${planName} plan is now active.\n\nWhat you get:\n• Unlimited AI Insights\n• Smart Reminders across channels\n• WhatsApp & Calendar integrations\n\nNext steps: Open your dashboard and personalize Settings.`,
+            '🎉 Welcome to PlanCraftAI Premium!')
+          const adminTo = process.env.ADMIN_EMAIL || 'admin@plancraftai.com'
+          await sendEmailDirect(adminTo,
+            `💸 New Premium Subscription — ${userEmail || uid}`,
+            `<h2>New Subscription</h2>
+             <p><strong>User:</strong> ${userEmail || uid}</p>
+             <p><strong>Stripe Customer:</strong> ${session?.customer || sub?.customer || ''}</p>
+             <p><strong>Plan:</strong> ${planName}</p>
+             <p><strong>When:</strong> ${new Date().toISOString()}</p>`)
+        } catch (e) {
+          console.warn('[Stripe] subscription emails failed:', e?.message || e)
+        }
         break
       }
 

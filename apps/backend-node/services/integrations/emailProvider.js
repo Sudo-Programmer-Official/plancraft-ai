@@ -51,3 +51,23 @@ export async function sendEmail(userId, message, subject = "PlanCraftAI Reminder
     return { ok: false, error: err?.message || "Unknown error" }
   }
 }
+
+// Send an email directly to a specific address (bypasses user profile lookup)
+export async function sendEmailDirect(to, subject, html, text = '') {
+  if (!API_KEY) return { ok: false, error: 'SENDGRID_API_KEY missing' }
+  try {
+    const msg = {
+      to: String(to).trim(),
+      from: String(FROM_EMAIL),
+      subject,
+      text: text || html?.replace(/<[^>]+>/g, ' '),
+      html: html || `<div style="font-family:sans-serif;font-size:15px;">${text}</div>`,
+    }
+    const [response] = await sgMail.send(msg)
+    console.log(`[Email] Sent direct to ${to} (${response.statusCode})`)
+    return { ok: true, status: response.statusCode }
+  } catch (err) {
+    console.error('[Email] Direct send failed:', err?.response?.body || err?.message)
+    return { ok: false, error: err?.message || 'Unknown error' }
+  }
+}

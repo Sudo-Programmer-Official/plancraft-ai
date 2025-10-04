@@ -35,7 +35,19 @@ async function getDailyUsage(userId) {
 export async function checkUserPlan(userId) {
   const snap = await db.collection('users').doc(String(userId)).get()
   const data = snap.exists ? snap.data() : {}
-  const key = resolvePlanKey(data?.plan)
+  // Determine effective plan from subscription status and expiry
+  let key = resolvePlanKey(data?.plan)
+  try {
+    const sub = data?.subscription || {}
+    const status = String(sub.status || '').toLowerCase()
+    const end = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null
+    const notExpired = !end || end.getTime() > Date.now()
+    if ((status === 'active' || status === 'trialing') && notExpired) {
+      key = 'PREMIUM'
+    } else if (status === 'canceled' || status === 'past_due' || (end && end.getTime() <= Date.now())) {
+      key = 'FREE'
+    }
+  } catch {}
   const limits = PLANS[key].limits
   const usage = await getDailyUsage(userId)
   return { key, name: PLANS[key].name, limits, usage }
