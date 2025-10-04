@@ -3,7 +3,23 @@ import axios from 'axios'
 import { auth } from '@/firebase/init'
 
 // Base API points to Vite proxy '/api' in dev
-const BASE = (import.meta.env.VITE_API_BASE_ROOT || '/api').replace(/\/+$/, '')
+// Prefer VITE_API_BASE_ROOT; if missing but VITE_API_BASE_URL is set (e.g. to /api/ai),
+// derive the generic API root by stripping path to '/api'.
+function deriveApiRoot() {
+  const root = import.meta.env.VITE_API_BASE_ROOT
+  if (root && typeof root === 'string') return root
+  const alt = import.meta.env.VITE_API_BASE_URL
+  if (alt && typeof alt === 'string') {
+    try {
+      const u = new URL(alt)
+      return `${u.origin}/api`
+    } catch {
+      // If relative, fall back
+    }
+  }
+  return '/api'
+}
+const BASE = deriveApiRoot().replace(/\/+$/, '')
 
 const api = axios.create({
   baseURL: BASE,
