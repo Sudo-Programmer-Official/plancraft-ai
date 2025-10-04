@@ -1,0 +1,66 @@
+import express from 'express'
+import { db } from '../services/firebaseAdmin.js'
+import { send as sendWhatsApp } from '../services/integrations/whatsappProvider.js'
+import { sendPWA } from '../services/integrations/pwaProvider.js'
+import { sendEmail } from '../services/integrations/emailProvider.js'
+
+const router = express.Router()
+
+// POST /api/test/notify
+// Body: { userId: string, message?: string, channels?: string[] }
+// If channels not provided, derives from users/{uid}.preferences.notifications
+router.post('/test/notify', async (req, res) => {
+  try {
+    const { userId, message, channels } = req.body || {}
+    if (!userId) return res.status(400).json({ error: 'Missing userId' })
+
+    let useChannels = Array.isArray(channels) ? channels.map(String) : null
+    if (!useChannels || useChannels.length === 0) {
+      const snap = await db.collection('users').doc(String(userId)).get()
+      const data = snap.exists ? snap.data() : {}
+      const n = data?.preferences?.notifications || {}
+      useChannels = []
+      if (n.whatsapp) useChannels.push('whatsapp')
+      if (n.email) useChannels.push('email')
+      if (n.pwa || n.push) useChannels.push('pwa')
+    }
+
+    if (useChannels.length === 0) {
+      return res.status(400).json({ error: 'No channels enabled; pass channels or enable in preferences' })
+    }
+
+    const text = String(message || '🔔 Test reminder from PlanCraftAI')
+    const results = {}
+
+    for (const ch of useChannels) {
+      try {
+        switch (ch) {
+          case 'whatsapp': {
+            results.whatsapp = await sendWhatsApp(userId, text)
+            break
+          }
+          case 'email': {
+            results.email = await sendEmail(userId, text)
+            break
+          }
+          case 'pwa': {
+            results.pwa = await sendPWA(userId, text)
+            break
+          }
+          default:
+            results[ch] = { ok: false, error: 'unsupported channel' }
+        }
+      } catch (e) {
+        results[ch] = { ok: false, error: e?.message || String(e) }
+      }
+    }
+
+    res.json({ ok: true, channels: useChannels, results })
+  } catch (err) {
+    console.error('[TestNotify] error:', err)
+    res.status(500).json({ error: 'server error' })
+  }
+})
+
+export default router
+

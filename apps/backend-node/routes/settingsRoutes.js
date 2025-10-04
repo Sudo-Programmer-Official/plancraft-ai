@@ -88,6 +88,19 @@ router.post('/settings/updateIntegrations', async (req, res) => {
 
     if (errs.length) return res.status(400).json({ error: 'Invalid fields', details: errs })
 
+    // PWA subscriptions: array of { endpoint, keys: { p256dh, auth } }
+    const pwaSubs = Array.isArray(integrations?.pwa?.subscriptions)
+      ? integrations.pwa.subscriptions
+          .map((s) => ({
+            endpoint: trimUndef(s?.endpoint),
+            keys:
+              s?.keys && typeof s.keys === 'object'
+                ? { p256dh: trimUndef(s.keys.p256dh), auth: trimUndef(s.keys.auth) }
+                : undefined,
+          }))
+          .filter((s) => s.endpoint && s.keys?.p256dh && s.keys?.auth)
+      : undefined
+
     // Build object and prune undefined deeply to satisfy Firestore
     const safe = {
       whatsapp: { phone: wPhone },
@@ -98,6 +111,7 @@ router.post('/settings/updateIntegrations', async (req, res) => {
         token: trimUndef(integrations?.slack?.token),
       },
       email: trimUndef(integrations?.email),
+      pwa: pwaSubs ? { subscriptions: pwaSubs } : undefined,
     }
 
     const pruneUndefinedDeep = (obj) => {

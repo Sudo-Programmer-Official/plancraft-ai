@@ -21,6 +21,7 @@ export default defineConfig({
       includeAssets: ['favicon.ico', 'robots.txt', 'apple-touch-icon.png'],
       strategies: 'generateSW',
       workbox: {
+        importScripts: ['sw-push.js'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB
       },
       manifest: {

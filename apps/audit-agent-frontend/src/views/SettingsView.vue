@@ -27,6 +27,9 @@
             <input type="checkbox" v-model="prefs.pwa" class="accent-indigo-500" />
             <span>Push Notifications (PWA)</span>
           </label>
+          <div v-if="prefs.pwa" class="pl-7 mt-2">
+            <el-button size="small" @click="enablePush" class="bg-slate-800 hover:bg-slate-700">Enable Browser Push</el-button>
+          </div>
           <label class="flex items-center gap-3">
             <input type="checkbox" v-model="prefs.whatsapp" class="accent-indigo-500" />
             <span>WhatsApp Alerts</span>
@@ -154,6 +157,7 @@ import { useAuthStore } from "@/stores/authStore"
 import { useRouter } from "vue-router"
 import { ElMessage } from "element-plus"
 import { getPreferences as apiGetPrefs, updatePreferences as apiUpdatePrefs, getIntegrations, updateIntegrations } from "@/services/settingsService"
+import { subscribeUserToPush } from "@/services/pwaService"
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -246,6 +250,17 @@ async function saveSettings() {
   } catch (error) {
     console.error("Failed to save settings:", error)
     ElMessage.error("❌ Failed to save settings. Please try again.")
+  }
+}
+
+async function enablePush() {
+  try {
+    if (!authStore.user?.uid) throw new Error('Not signed in')
+    await subscribeUserToPush(authStore.user.uid)
+    ElMessage.success('🔔 Push notifications enabled')
+  } catch (e) {
+    console.warn('Enable push failed:', e)
+    ElMessage.error(`❌ Enable push failed: ${e?.message || e}`)
   }
 }
 </script>

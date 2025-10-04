@@ -85,6 +85,7 @@ import integrationsRoutes from "./routes/integrationsRoutes.js";
 import settingsRoutes from "./routes/settingsRoutes.js";
 import { stripeWebhookHandler } from "./routes/stripeWebhook.js";  // ✅ now from separate file
 import reminderRoutes from "./routes/reminderRoutes.js";
+import testRoutes from "./routes/testRoutes.js";
 import { initScheduler } from "./services/scheduler.js";
 
 dotenv.config();
@@ -142,6 +143,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api", settingsRoutes);
 app.use("/api", integrationsRoutes);
 app.use("/api/reminders", reminderRoutes);
+app.use("/api", testRoutes);
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
