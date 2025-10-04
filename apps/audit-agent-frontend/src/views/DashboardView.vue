@@ -228,7 +228,7 @@ import QuickLinksCard from '@/components/QuickLinksCard.vue'
 import { driver } from 'driver.js'
 import 'driver.js/dist/driver.css'
 // === Reminder badges (Daily list) ===
-import { getReminderStatus } from '@/services/reminderService'
+import { getReminderStatus, scheduleReminder } from '@/services/reminderService'
 import api from '@/services/api'
 import { getPreferences as getUserPreferences } from '@/services/settingsService'
 // import { onAuthStateChanged } from 'firebase/auth'
@@ -506,22 +506,8 @@ async function handleSaveAndSchedule(payload) {
     if (!uid || !taskId) return
     if (payload?.reminderTime) {
       const iso = buildLocalIso(payload.date, payload.reminderTime)
-      const n = userPrefs.value?.notifications || {}
-      const activeChannels = []
-      if (n.whatsapp) activeChannels.push('whatsapp')
-      if (n.pwa || n.push) activeChannels.push('pwa')
-      if (n.email) activeChannels.push('email')
-      if (!activeChannels.length) {
-        console.warn('No notification channels enabled; skipping reminder schedule')
-        return
-      }
-      await api.post('/reminders/text', {
-        userId: uid,
-        taskId,
-        text: payload.title,
-        scheduledTime: iso,
-        channels: activeChannels,
-      })
+      const prefs = userPrefs.value?.notifications || {}
+      await scheduleReminder(uid, taskId, payload.title, iso, prefs)
     } else {
       await api.post('/reminders/cancel', { userId: uid, taskId })
     }

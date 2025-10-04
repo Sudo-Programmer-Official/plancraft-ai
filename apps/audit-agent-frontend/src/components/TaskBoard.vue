@@ -164,7 +164,7 @@ import { addTaskToFirebase, updateTaskInFirebase } from '@/services/firebaseServ
 import TaskPlannerDialog from './TaskPlannerDialog.vue'
 import { toLocalDateKey } from '@/utils/dateHelper'
 import { useAuthStore } from '@/stores/authStore'
-import { getReminderStatus } from '@/services/reminderService'
+import { getReminderStatus, scheduleReminder } from '@/services/reminderService'
 import api from '@/services/api'
 import { getPreferences as getUserPreferences } from '@/services/settingsService'
 
@@ -218,23 +218,8 @@ async function handleSave(payload) {
     if (uid && savedId) {
       if (payload?.reminderTime) {
         const iso = buildLocalIso(payload.date, payload.reminderTime)
-        // Build channels dynamically from saved preferences
-        const n = userPrefs.value?.notifications || {}
-        const activeChannels = []
-        if (n.whatsapp) activeChannels.push('whatsapp')
-        if (n.pwa || n.push) activeChannels.push('pwa')
-        if (n.email) activeChannels.push('email')
-        if (!activeChannels.length) {
-          console.warn('No notification channels enabled; skipping reminder schedule')
-        } else {
-          await api.post('/reminders/text', {
-            userId: uid,
-            taskId: savedId,
-            text: payload.title,
-            scheduledTime: iso,
-            channels: activeChannels,
-          })
-        }
+        const prefs = userPrefs.value?.notifications || {}
+        await scheduleReminder(uid, savedId, payload.title, iso, prefs)
       } else {
         await api.post('/reminders/cancel', { userId: uid, taskId: savedId })
       }

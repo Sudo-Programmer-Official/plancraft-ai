@@ -1,6 +1,6 @@
 // routes/ai.js
 import express from "express";
-import { enhanceJournalEntry, summarizeTasks, splitTasks } from "../services/openaiService.js";
+import { enhanceJournalEntry, summarizeTasks, splitTasks, extractReminderTime } from "../services/openaiService.js";
 import OpenAI from "openai";
 import dotenv from "dotenv";
 
@@ -289,10 +289,28 @@ router.post('/split-tasks', async (req, res) => {
         context: typeof t.context === 'string' ? t.context : 'planning',
         priority: Number.isFinite(t.priority) ? t.priority : Math.min(i + 1, 3),
       }))
-    res.json({ tasks })
+    // Attempt time extraction from the same input (non-fatal)
+    let reminderTime = null
+    try { reminderTime = await extractReminderTime(text, { nowISO: new Date().toISOString() }) } catch {}
+    res.json({ tasks, reminderTime })
   } catch (error) {
     console.error('❌ Split Tasks API Error:', error)
     res.status(500).json({ error: 'Failed to generate tasks' })
+  }
+})
+
+// POST /api/ai/extract-time
+router.post('/extract-time', async (req, res) => {
+  try {
+    const { text, now } = req.body || {}
+    if (!text || typeof text !== 'string') {
+      return res.status(400).json({ error: "'text' is required" })
+    }
+    const iso = await extractReminderTime(text, { nowISO: now })
+    res.json({ reminderTime: iso || null })
+  } catch (error) {
+    console.error('❌ Extract Time API Error:', error)
+    res.status(500).json({ error: 'Failed to extract reminder time' })
   }
 })
 

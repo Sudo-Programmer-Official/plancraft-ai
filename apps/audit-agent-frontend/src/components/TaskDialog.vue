@@ -68,7 +68,8 @@ import { addTaskToFirebase, updateTaskInFirebase } from "@/services/firebaseServ
 import { useVoiceRecorder } from "@/composables/useVoiceRecorder"
 import api from "@/services/api"
 import { useAuthStore } from "@/stores/authStore"
-import { getReminderStatus } from "@/services/reminderService"
+import { getReminderStatus, scheduleReminder } from "@/services/reminderService"
+import { getPreferences as getUserPreferences } from "@/services/settingsService"
 
 const props = defineProps({
   task: { type: Object, default: null }
@@ -88,6 +89,17 @@ const form = ref({
 })
 
 const authStore = useAuthStore()
+const userPrefs = ref({ notifications: {}, integrations: {} })
+import { onMounted } from 'vue'
+onMounted(async () => {
+  try {
+    const uid = authStore?.user?.uid
+    if (uid) {
+      const res = await getUserPreferences(uid)
+      userPrefs.value = res || { notifications: {}, integrations: {} }
+    }
+  } catch {}
+})
 let initialDate = null
 
 // Watch for incoming task (edit mode)
@@ -140,13 +152,8 @@ async function save() {
       const hasTime = !!form.value.reminderTime
       if (hasTime) {
         const iso = buildLocalIso(form.value.date, form.value.reminderTime)
-        await api.post('/reminders/text', {
-          userId: uid,
-          taskId: form.value.id,
-          text: form.value.title,
-          scheduledTime: iso,
-          channels: ['whatsapp','pwa'],
-        })
+        const prefs = userPrefs.value?.notifications || {}
+        await scheduleReminder(uid, form.value.id, form.value.title, iso, prefs)
       } else if (!hasTime) {
         await api.post('/reminders/cancel', { userId: uid, taskId: form.value.id })
       }

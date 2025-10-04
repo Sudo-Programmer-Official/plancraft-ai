@@ -19,6 +19,11 @@ router.post("/text", async (req, res) => {
       now: new Date().toISOString(),
     })
     if (!userId || !text) return res.status(400).json({ success: false, error: "Missing userId or text" })
+    // If caller ties to a task, require an explicit scheduledTime to avoid ambiguous scheduling
+    if (taskId && !scheduledTime) {
+      console.warn('[Reminder API] Rejecting task-bound reminder without scheduledTime', { userId, taskId })
+      return res.status(400).json({ success: false, error: 'Missing scheduledTime for task-bound reminder' })
+    }
     const reminder = await handleTextReminder(text, userId, channels, { taskId, scheduledTime })
     res.json({ success: true, reminder })
   } catch (e) {

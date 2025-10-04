@@ -56,8 +56,8 @@ async function generateTasks() {
   if (!planningInput.value.trim()) return
 
   try {
-    const items = await generateTasksFromText(planningInput.value)
-    for (const [i, t] of items.entries()) {
+    const { tasks: generated } = await generateTasksFromText(planningInput.value)
+    for (const [i, t] of generated.entries()) {
       const newTask = {
         title: t,
         details: '',

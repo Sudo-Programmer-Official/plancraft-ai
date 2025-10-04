@@ -47,7 +47,8 @@ const planText = ref("")
 const aiTasks = ref([])
 
 async function generateTasks() {
-  aiTasks.value = await generateTasksFromText(planText.value)
+  const { tasks } = await generateTasksFromText(planText.value)
+  aiTasks.value = tasks.map(t => ({ title: t }))
 }
 
 async function saveTask(task) {

@@ -406,3 +406,45 @@ Rules:
 
   return parsed;
 }
+
+// ✨ Extract reminder time from natural language text
+export async function extractReminderTime(input, { nowISO } = {}) {
+  const now = typeof nowISO === 'string' && nowISO ? nowISO : new Date().toISOString()
+  const system = {
+    role: 'system',
+    content: 'You convert natural language time expressions into an absolute ISO 8601 timestamp.'
+  }
+  const user = {
+    role: 'user',
+    content: `Current time (ISO): ${now}\n\nText: "${input}"\n\nReturn ONLY valid JSON with one field:\n{ "reminderTime": "<ISO timestamp>" | null }\n\nRules:\n- If the text has no time reference, return null.\n- If time is relative (e.g., in 10 minutes), compute absolute time using the provided current time.\n- Use minutes precision.\n- Do not include explanations.`
+  }
+
+  const content = await chatWithFallback({
+    messages: [system, user],
+    temperature: 0.1,
+  })
+
+  let cleaned = content.trim()
+  cleaned = cleaned.replace(/^```json\s*/i, '').replace(/```$/i, '').trim()
+  // try to extract first JSON object
+  if (!cleaned.startsWith('{')) {
+    const match = cleaned.match(/\{[\s\S]*\}/)
+    if (match) cleaned = match[0]
+  }
+  try {
+    const parsed = JSON.parse(cleaned)
+    const rt = parsed?.reminderTime
+    if (!rt) return null
+    const d = new Date(rt)
+    if (d instanceof Date && !isNaN(d.getTime())) return d.toISOString()
+  } catch (e) {
+    // fall through
+  }
+  // Fallback: try naive ISO-like match
+  const m = cleaned.match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?/)
+  if (m) {
+    const d = new Date(m[0])
+    if (!isNaN(d.getTime())) return d.toISOString()
+  }
+  return null
+}

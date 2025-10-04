@@ -70,13 +70,28 @@ export async function generateTasksFromText(text) {
   try {
     const res = await api.post("/split-tasks", { text });
     const raw = res?.data?.tasks ?? []
+    const reminderTime = res?.data?.reminderTime ?? null
     // Normalize: accept array of strings or array of objects with title
     const tasks = Array.isArray(raw)
       ? raw.map((t) => (typeof t === 'string' ? t : (t?.title ?? ''))).filter(Boolean)
       : []
-    return tasks
+    return { tasks, reminderTime }
   } catch (err) {
     console.error("❌ Generate Tasks API Error:", err?.response?.data || err.message);
     throw new Error("Failed to generate tasks. Please try again later.");
+  }
+}
+
+/**
+ * ✨ Extract reminder time (ISO) from freeform text
+ */
+export async function extractReminderTime(text) {
+  try {
+    const res = await api.post("/extract-time", { text });
+    const iso = res?.data?.reminderTime
+    return typeof iso === 'string' && iso ? iso : null
+  } catch (err) {
+    console.error("❌ Extract Time API Error:", err?.response?.data || err.message);
+    return null
   }
 }

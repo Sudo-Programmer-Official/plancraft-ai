@@ -155,6 +155,9 @@ import { ElNotification } from 'element-plus'
 import VoiceRecorder from '@/components/VoiceRecorder.vue'
 import { generateTasksFromText } from '@/services/aiService'
 import { addTaskToFirebase } from '@/services/firebaseService'
+import { useAuthStore } from '@/stores/authStore'
+import { getPreferences as getUserPreferences } from '@/services/settingsService'
+import { scheduleReminder } from '@/services/reminderService'
 import { useTasks } from '@/composables/useTasks'
 import { toLocalDateKey, parseLocalDateKey } from '@/utils/dateHelper'
 
@@ -220,11 +223,31 @@ const displayLink = computed(() =>
   link.value.replace(/^https?:\/\//, "").slice(0, 40) + (link.value.length > 40 ? "…" : "")
 )
 
+const authStore = useAuthStore()
+const userPrefs = ref({ notifications: {}, integrations: {} })
+
+onMounted(async () => {
+  try {
+    const uid = authStore?.user?.uid
+    if (uid) {
+      const res = await getUserPreferences(uid)
+      userPrefs.value = res || { notifications: {}, integrations: {} }
+    }
+  } catch {}
+})
+
+function buildLocalIso(ymd, hhmm) {
+  try { return new Date(`${ymd}T${hhmm}`).toISOString() } catch { return new Date().toISOString() }
+}
+
 async function generateTasks() {
   if (!input.value.trim()) return
   loading.value = true
   try {
-    const items = await generateTasksFromText(input.value)
+    const { tasks: items, reminderTime: aiIso } = await generateTasksFromText(input.value)
+    const manualIso = reminderTime.value ? buildLocalIso(toLocalDateKey(parseLocalDateKey(selectedDate.value)), reminderTime.value) : null
+    const effectiveIso = manualIso || aiIso
+
     for (const [i, t] of items.entries()) {
       const newTask = {
         title: t,
@@ -234,9 +257,18 @@ async function generateTasks() {
         date: toLocalDateKey(parseLocalDateKey(selectedDate.value)),
         order: tasks.value.length + i,
         logs: [],
-        reminderTime: reminderTime.value || null
+        reminderTime: reminderTime.value || (aiIso ? new Date(aiIso).toISOString().slice(11,16) : null)
       }
-      await addTaskToFirebase(newTask)
+      const saved = await addTaskToFirebase(newTask)
+      try {
+        const uid = authStore?.user?.uid
+        if (uid && saved?.id && effectiveIso) {
+          const prefs = userPrefs.value?.notifications || {}
+          await scheduleReminder(uid, saved.id, newTask.title, effectiveIso, prefs)
+        }
+      } catch (e) {
+        console.warn('AI-split reminder schedule failed:', e?.response?.data || e?.message)
+      }
     }
     ElNotification({ title: 'Success', message: `${items.length} task${items.length > 1 ? 's' : ''} generated`, type: 'success', duration: 2500 })
     emit('saved', items)
