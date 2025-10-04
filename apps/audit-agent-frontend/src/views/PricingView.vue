@@ -33,7 +33,7 @@
         <li>✅ Priority Support</li>
       </ul>
       <p class="text-2xl font-bold mb-4">$5 / month</p>
-      <div v-if="sub.plan === 'premium'" class="space-y-2">
+      <div v-if="isPremium" class="space-y-2">
         <button
           :disabled="cancelLoading"
           @click="onCancel"
@@ -71,7 +71,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { createCheckoutSession, cancelSubscription } from '@/services/stripeService'
@@ -88,6 +88,7 @@ const cancelLoading = ref(false)
 
 const subStore = useSubscriptionStore()
 const sub = subStore.subscription
+const isPremium = computed(() => (sub.value?.plan || sub.plan) === 'premium' || (authStore.user?.plan === 'premium'))
 
 async function onUpgrade() {
   try {
@@ -128,6 +129,9 @@ onMounted(() => {
     subStore.fetchStatus(authStore.user.uid)
   }
 })
+
+// When user logs in or plan changes, keep subscription snapshot fresh
+watch(() => authStore.user?.uid, (uid) => { if (uid) subStore.fetchStatus(uid) })
 
 async function onCancel() {
   try {
