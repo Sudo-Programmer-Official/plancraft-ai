@@ -2,14 +2,22 @@
   <section class="bg-gray-900/80 rounded-xl p-4 sm:p-6 shadow-lg">
     <div class="flex items-center justify-between mb-3">
       <h3 class="font-semibold">🔗 Quick Links</h3>
-      <el-button
+      <!-- <el-button
         size="small"
         type="primary"
         class="bg-gradient-to-r from-pink-500 to-indigo-600 border-0 shadow-md hover:from-pink-600 hover:to-indigo-700 rounded-full"
         @click="open = true"
       >
         + Add
-      </el-button>
+      </el-button> -->
+      <button
+  @click="open = true"
+  class="text-sm px-4 py-1 rounded-full font-semibold text-white shadow-md
+         bg-gradient-to-r from-pink-500 to-indigo-600
+         hover:from-pink-600 hover:to-indigo-700 transition"
+>
+  + Add
+</button>
     </div>
 
     <!-- Links grid -->

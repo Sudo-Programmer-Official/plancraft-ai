@@ -167,6 +167,8 @@
       </div>
     </main>
   </div>
+  <!-- Plan modal mount -->
+<PlanSummaryModal :open="planOpen" @close="planOpen=false" />
 </template>
 
 <script setup>
@@ -303,8 +305,8 @@ async function enablePush() {
 
 // Plan gates
 // Use unified premium flag to control gates for a consistent UX
-const canWhatsapp = computed(() => isPremium)
-const canPwa = computed(() => isPremium)
+const canWhatsapp = computed(() => !!isPremium.value)
+const canPwa = computed(() => !!isPremium.value)
 const aiRemaining = computed(() => getRemainingAI(authStore.user || {}))
 const planOpen = ref(false)
 
@@ -325,5 +327,4 @@ section h2 {
 }
 </style>
 
-<!-- Plan modal mount -->
-<PlanSummaryModal :open="planOpen" @close="planOpen=false" />
+

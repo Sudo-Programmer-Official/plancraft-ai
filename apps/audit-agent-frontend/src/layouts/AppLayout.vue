@@ -220,21 +220,22 @@
     />
 </div>
 
-          <!-- Upgrade Button / Premium Status -->
-          <button
-            v-if="subscription.plan === 'free'"
-            @click="router.push('/subscription')"
-            class="bg-gradient-to-r from-purple-500 to-pink-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-white shadow-lg animate-pulse hover:from-purple-600 hover:to-pink-700 transition text-sm sm:text-base"
-          >
-            🚀 Upgrade
-          </button>
-          <button
-            v-else
-            disabled
-            class="bg-purple-700 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-white text-sm sm:text-base font-semibold cursor-default"
-          >
-            🌟 Premium ({{ subscription.remainingDays }}d left)
-          </button>
+          <!-- Upgrade Button / Pro Badge -->
+          <div class="flex items-center gap-2 whitespace-nowrap">
+            <template v-if="isPremium">
+              <el-tooltip content="You're on the Premium Plan!" placement="bottom">
+                <span class="bg-gradient-to-r from-purple-700 to-pink-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-sm">🧠 Pro</span>
+              </el-tooltip>
+            </template>
+            <template v-else>
+              <RouterLink
+                to="/subscription"
+                class="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-sm hover:from-purple-600 hover:to-pink-700 transition"
+              >
+                🚀 Upgrade
+              </RouterLink>
+            </template>
+          </div>
 
           <!-- User Avatar -->
           <img
@@ -282,6 +283,7 @@ import 'driver.js/dist/driver.css'
 import { watchNotificationsPublic } from '@/services/firebaseService'
 import NotificationDropdown from '@/components/NotificationDropdown.vue'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
+import { useIsPremium } from '@/composables/useIsPremium'
 import PlanSummaryModal from '@/components/PlanSummaryModal.vue'
 
 const sidebarOpen = ref(true) // desktop toggle
@@ -295,6 +297,7 @@ const authStore = useAuthStore()
 // Subscription state via store
 const subStore = useSubscriptionStore()
 const subscription = subStore.subscription
+const { isPremium } = useIsPremium()
 
 // Notifications
 const showNotifications = ref(false)
