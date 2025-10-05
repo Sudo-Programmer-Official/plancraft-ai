@@ -224,7 +224,13 @@
           <div class="flex items-center gap-2 whitespace-nowrap">
             <template v-if="isPremium">
               <el-tooltip content="You're on the Premium Plan!" placement="bottom">
-                <span class="bg-gradient-to-r from-purple-700 to-pink-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-sm">🧠 Pro</span>
+                 <RouterLink
+                to="/subscription"
+                class="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-sm hover:from-purple-600 hover:to-pink-700 transition"
+              >
+               🧠 Pro
+              </RouterLink>
+                <!-- <span class="bg-gradient-to-r from-purple-700 to-pink-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-sm">🧠 Pro</span> -->
               </el-tooltip>
             </template>
             <template v-else>

@@ -38,6 +38,10 @@ export async function send(userId, message, options = {}) {
   console.log('[WhatsApp] response status', resp.status)
   if (!resp.ok) {
     const err = await safeJson(resp)
+    // Token expired / invalid
+    if (resp.status === 401 && err?.error?.code === 190) {
+      console.warn('[WhatsApp] Access token expired or invalid. Refresh META_WHATSAPP_TOKEN.', err?.error)
+    }
     throw new Error(`WhatsApp send failed: ${resp.status} ${JSON.stringify(err)}`)
   }
   const body = await safeJson(resp)

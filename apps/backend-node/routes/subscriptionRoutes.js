@@ -66,34 +66,69 @@ router.post('/subscription/cancel', async (req, res) => {
     const subId = data?.subscription?.stripeSubId || data?.subscription?.id
 
     if (!subId) return res.status(400).json({ error: 'No active subscription found' })
+    console.log('[Canceling Stripe Sub]', { subId, userId })
+    if (typeof subId !== 'string' || !subId.startsWith('sub_')) {
+      console.warn('[Cancel] Invalid subscription id format', { subId, userId })
+      return res.status(400).json({ error: 'Invalid subscription ID format' })
+    }
 
-    // If Stripe configured, cancel in Stripe (immediate)
+    // If Stripe configured, prefer graceful cancel then fallback to immediate
     let result = { id: subId, status: 'canceled', source: 'local' }
     if (stripe) {
       try {
-        result = await stripe.subscriptions.del(subId)
+        // Schedule cancel at period end
+        try {
+          const updated = await stripe.subscriptions.update(subId, { cancel_at_period_end: true })
+          result = {
+            id: updated.id,
+            status: updated.status,
+            cancel_at_period_end: updated.cancel_at_period_end,
+            current_period_end: updated.current_period_end,
+            source: 'stripe.update'
+          }
+        } catch (e1) {
+          console.warn('⚠️ Stripe schedule cancel failed; attempting immediate cancel', {
+            message: e1?.message,
+            type: e1?.type,
+            code: e1?.code,
+            requestId: e1?.requestId,
+          })
+          // Immediate cancel (Stripe v12+: cancel; fallback to del for older SDKs)
+          const canceled = await (stripe.subscriptions.cancel
+            ? stripe.subscriptions.cancel(subId)
+            : stripe.subscriptions.del(subId))
+          result = { id: canceled.id, status: canceled.status, source: 'stripe.cancel' }
+        }
       } catch (err) {
-        console.error('❌ Stripe cancel failed:', err?.message || err)
-        return res.status(500).json({ error: 'Stripe cancel failed' })
+        console.error('❌ Stripe cancel failed:', {
+          message: err?.message,
+          type: err?.type,
+          code: err?.code,
+          param: err?.param,
+          requestId: err?.requestId,
+          stack: err?.stack,
+          subId,
+          userId,
+        })
+        return res.status(500).json({ error: 'Stripe cancel failed', details: err?.message })
       }
     }
 
-    // Update Firestore immediately; webhook will also sync in real env
-    await db.collection('users').doc(String(userId)).set(
-      {
-        plan: 'free',
-        role: 'free',
-        subscription: {
-          ...(data.subscription || {}),
-          status: 'canceled',
-          plan: 'free',
-        },
-        updatedAt: new Date(),
-      },
-      { merge: true }
-    )
+    // Update Firestore: keep active until period end if scheduled; otherwise mark free
+    const payload = { subscription: { ...(data.subscription || {}) }, updatedAt: new Date() }
+    if (result.cancel_at_period_end) {
+      payload.subscription.status = 'active'
+      payload.subscription.cancelAtPeriodEnd = true
+      payload.subscription.currentPeriodEnd = result.current_period_end
+    } else if (result.status === 'canceled') {
+      payload.subscription.status = 'canceled'
+      payload.subscription.plan = 'free'
+      payload['plan'] = 'free'
+      payload['role'] = 'free'
+    }
+    await db.collection('users').doc(String(userId)).set(payload, { merge: true })
 
-    return res.json({ status: 'canceled', subscription: result })
+    return res.json({ status: payload.subscription.status, subscription: result })
   } catch (err) {
     console.error('Cancel error:', err)
     res.status(500).json({ error: 'Failed to cancel subscription' })
