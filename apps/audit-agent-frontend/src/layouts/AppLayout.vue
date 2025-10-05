@@ -3,13 +3,37 @@
     class="flex min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 text-white"
   >
     <!-- Global upgrade banner -->
-    <div v-if="showUpgrade" class="fixed top-0 left-0 right-0 z-50">
-      <div class="bg-yellow-500/20 backdrop-blur-md border-b border-yellow-400/40 text-yellow-200 px-4 py-2 flex items-center justify-between">
-        <span>You're on Free plan. Upgrade to unlock unlimited AI and reminders.</span>
-        <div class="flex items-center gap-3">
-          <RouterLink to="/subscription" class="px-3 py-1 rounded bg-yellow-500 text-black hover:bg-yellow-400">Upgrade</RouterLink>
-          <button @click="planOpen=true" class="px-3 py-1 rounded border border-yellow-300/60 hover:bg-yellow-400/10">View plan</button>
-          <button @click="showUpgrade=false" class="px-2 py-1 hover:bg-yellow-400/20 rounded">Dismiss</button>
+    <!-- Global Upgrade Banner -->
+    <div v-if="showUpgrade" class="fixed top-0 left-0 right-0 z-50 px-3 sm:px-6">
+      <div
+        class="bg-gradient-to-r from-fuchsia-600/40 via-purple-600/40 to-indigo-600/40 backdrop-blur-xl border border-fuchsia-400/30 text-white rounded-b-xl shadow-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 py-2 sm:py-3 px-3 sm:px-5 animate-fade-in"
+      >
+        <span class="text-sm sm:text-base font-medium text-center sm:text-left">
+          🚀 You're on the <span class="text-fuchsia-300 font-semibold">Free Plan</span>. Upgrade to
+          unlock unlimited AI and reminders.
+        </span>
+
+        <div class="flex flex-wrap items-center justify-center gap-2">
+          <RouterLink
+            to="/subscription"
+            class="bg-gradient-to-r from-fuchsia-500 via-purple-500 to-indigo-500 text-white font-semibold text-sm px-3 py-1.5 rounded-lg hover:scale-105 transition-transform shadow-md"
+          >
+            Upgrade
+          </RouterLink>
+
+          <button
+            @click="planOpen = true"
+            class="border border-fuchsia-300/60 text-fuchsia-200 text-sm px-3 py-1.5 rounded-lg hover:bg-fuchsia-500/10 hover:text-white transition-colors"
+          >
+            View Plan
+          </button>
+
+          <button
+            @click="showUpgrade = false"
+            class="text-sm text-gray-300 px-2 py-1 hover:text-white hover:bg-fuchsia-400/20 rounded-lg transition-colors"
+          >
+            Dismiss
+          </button>
         </div>
       </div>
     </div>
@@ -76,33 +100,43 @@
 
       <!-- Sidebar Footer: segmented actions -->
       <div class="flex-shrink-0 mt-auto pb-4 px-3">
-        <div class="grid gap-1 bg-gray-900/60 border border-gray-800 rounded-lg p-1" :class="[authStore.user?.role==='admin' ? 'grid-cols-5' : 'grid-cols-4']">
+        <div
+          class="grid gap-1 bg-gray-900/60 border border-gray-800 rounded-lg p-1"
+          :class="[authStore.user?.role === 'admin' ? 'grid-cols-5' : 'grid-cols-4']"
+        >
           <button
             @click="startTour"
             class="text-xs py-2 rounded-md hover:bg-gray-800 transition"
             title="Show Tour"
-          >❔</button>
+          >
+            ❔
+          </button>
           <RouterLink
             to="/settings"
             class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
             title="Settings"
-          >⚙️</RouterLink>
+            >⚙️</RouterLink
+          >
           <RouterLink
-            v-if="authStore.user?.role==='admin'"
+            v-if="authStore.user?.role === 'admin'"
             to="/admin"
             class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
             title="Admin Panel"
-          >🛠</RouterLink>
+            >🛠</RouterLink
+          >
           <RouterLink
             to="/help"
             class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
             title="Help"
-          >💬</RouterLink>
+            >💬</RouterLink
+          >
           <button
             @click="handleLogout"
             class="text-xs py-2 rounded-md hover:bg-gray-800 transition"
             title="Logout"
-          >🚪</button>
+          >
+            🚪
+          </button>
         </div>
       </div>
     </aside>
@@ -144,24 +178,31 @@
           </button> -->
           <div class="p-4 border-t border-gray-800">
             <!-- Grouped card: Settings | Tour | Logout -->
-            <div class="grid grid-cols-3 gap-1 bg-gray-900/60 border border-gray-800 rounded-lg p-1">
+            <div
+              class="grid grid-cols-3 gap-1 bg-gray-900/60 border border-gray-800 rounded-lg p-1"
+            >
               <RouterLink
                 to="/settings"
                 @click="mobileMenu = false"
                 class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
                 title="Settings"
-              >⚙️</RouterLink>
+                >⚙️</RouterLink
+              >
               <button
                 @click="startTour"
                 class="text-xs py-2 rounded-md hover:bg-gray-800 transition"
                 title="Show Tour"
-              >❔</button>
+              >
+                ❔
+              </button>
               <button
                 v-if="authStore.isLoggedIn"
                 @click="handleLogout"
                 class="text-xs py-2 rounded-md hover:bg-gray-800 transition"
                 title="Logout"
-              >🚪</button>
+              >
+                🚪
+              </button>
             </div>
           </div>
         </div>
@@ -187,49 +228,51 @@
               <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <h2 class="text-lg sm:text-2xl font-semibold capitalize truncate max-w-[50vw]">{{ $route.name }}</h2>
+          <h2 class="text-lg sm:text-2xl font-semibold capitalize truncate max-w-[50vw]">
+            {{ $route.name }}
+          </h2>
         </div>
 
         <!-- Right Section -->
         <div class="flex items-center gap-2 sm:gap-4 flex-shrink-0">
           <!-- Notification Bell -->
-        <!-- Right Section -->
-  <!-- Notification Bell Wrapper -->
-  <div class="relative flex justify-end w-full sm:static sm:w-auto" ref="dropdownEl">
-    <button
-      @click="toggleNotifications"
-      class="relative bg-gray-800 hover:bg-gray-700 p-2 rounded-full transition min-w-[40px]"
-      aria-label="Notifications"
-      ref="bellEl"
-    >
-      🔔
-      <span
-        v-if="unreadCount > 0"
-        class="absolute -top-1 -right-1 bg-red-600 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full"
-      >
-        {{ unreadCount }}
-      </span>
-    </button>
+          <!-- Right Section -->
+          <!-- Notification Bell Wrapper -->
+          <div class="relative flex justify-end w-full sm:static sm:w-auto" ref="dropdownEl">
+            <button
+              @click="toggleNotifications"
+              class="relative bg-gray-800 hover:bg-gray-700 p-2 rounded-full transition min-w-[40px]"
+              aria-label="Notifications"
+              ref="bellEl"
+            >
+              🔔
+              <span
+                v-if="unreadCount > 0"
+                class="absolute -top-1 -right-1 bg-red-600 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full"
+              >
+                {{ unreadCount }}
+              </span>
+            </button>
 
-    <!-- Notification Dropdown -->
-    <NotificationDropdown
-      v-if="showNotifications"
-      :items="notifications"
-      :error="notificationsError"
-      @markAllRead="markAllRead"
-    />
-</div>
+            <!-- Notification Dropdown -->
+            <NotificationDropdown
+              v-if="showNotifications"
+              :items="notifications"
+              :error="notificationsError"
+              @markAllRead="markAllRead"
+            />
+          </div>
 
           <!-- Upgrade Button / Pro Badge -->
           <div class="flex items-center gap-2 whitespace-nowrap">
             <template v-if="isPremium">
               <el-tooltip content="You're on the Premium Plan!" placement="bottom">
-                 <RouterLink
-                to="/subscription"
-                class="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-sm hover:from-purple-600 hover:to-pink-700 transition"
-              >
-               🧠 Pro
-              </RouterLink>
+                <RouterLink
+                  to="/subscription"
+                  class="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-sm hover:from-purple-600 hover:to-pink-700 transition"
+                >
+                  🧠 Pro
+                </RouterLink>
                 <!-- <span class="bg-gradient-to-r from-purple-700 to-pink-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-sm">🧠 Pro</span> -->
               </el-tooltip>
             </template>
@@ -261,8 +304,12 @@
         <RouterView />
       </main>
       <!-- Compact sticky footer -->
-      <footer class="py-3 text-center text-xs sm:text-sm text-indigo-300 bg-slate-950/95 border-t border-gray-800">
-        <div class="max-w-7xl mx-auto px-4 flex items-center justify-center sm:justify-between gap-3">
+      <footer
+        class="py-3 text-center text-xs sm:text-sm text-indigo-300 bg-slate-950/95 border-t border-gray-800"
+      >
+        <div
+          class="max-w-7xl mx-auto px-4 flex items-center justify-center sm:justify-between gap-3"
+        >
           <div class="hidden sm:flex items-center gap-2">
             <img src="/logo.png" alt="PlanCraftAI" class="w-6 h-6" />
             <span class="opacity-80">PlanCraftAI</span>
@@ -271,11 +318,13 @@
             <RouterLink to="/privacy-policy" class="hover:underline">Privacy</RouterLink>
             <RouterLink to="/terms" class="hover:underline">Terms</RouterLink>
             <RouterLink to="/contact" class="hover:underline">Contact</RouterLink>
-            <a href="mailto:careers@plancraftai.com" class="hover:underline hidden sm:inline">Careers</a>
+            <a href="mailto:careers@plancraftai.com" class="hover:underline hidden sm:inline"
+              >Careers</a
+            >
           </div>
         </div>
       </footer>
-      <PlanSummaryModal :open="planOpen" @close="planOpen=false" />
+      <PlanSummaryModal :open="planOpen" @close="planOpen = false" />
     </div>
   </div>
 </template>
@@ -363,7 +412,9 @@ onMounted(() => {
   if (authStore.user?.uid) subStore.fetchStatus(authStore.user.uid)
   // Upgrade banner events
   try {
-    const handler = () => { showUpgrade.value = true }
+    const handler = () => {
+      showUpgrade.value = true
+    }
     window.addEventListener('upgrade-required', handler)
   } catch {}
   document.addEventListener('click', onDocumentClick)
@@ -372,7 +423,9 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('click', onDocumentClick)
   if (unwatchNotes) unwatchNotes()
-  try { window.removeEventListener('upgrade-required', () => {}) } catch {}
+  try {
+    window.removeEventListener('upgrade-required', () => {})
+  } catch {}
 })
 
 function startTour() {

@@ -1,3 +1,20 @@
 User-agent: *
+
+# Allow key marketing pages
 Allow: /
-Sitemap: https://www.prompt2quote.com/sitemap.xml
+Allow: /pricing
+Allow: /about
+Allow: /contact
+Allow: /privacy
+
+# Disallow private/app pages
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /tasks
+Disallow: /app
+Disallow: /profile
+Disallow: /admin
+
+# Point crawlers to the sitemap
+Sitemap: https://plancraftai.com/sitemap.xml
+
