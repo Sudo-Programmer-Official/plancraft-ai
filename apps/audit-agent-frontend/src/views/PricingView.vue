@@ -32,7 +32,7 @@
         <li>✅ Calendar & WhatsApp integration</li>
         <li>✅ Priority Support</li>
       </ul>
-      <p class="text-2xl font-bold mb-4">$5 / month</p>
+      <p class="text-2xl font-bold mb-4">$2 / month</p>
       <div v-if="isPremium" class="space-y-2">
         <button
           :disabled="cancelLoading"
