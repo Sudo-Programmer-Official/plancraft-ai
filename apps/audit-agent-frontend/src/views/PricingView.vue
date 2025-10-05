@@ -73,6 +73,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/authStore'
 import { createCheckoutSession, cancelSubscription } from '@/services/stripeService'
 import { trackEvent } from '@/services/analytics'
@@ -143,9 +144,24 @@ onMounted(() => {
 async function onCancel() {
   try {
     if (!authStore.user) return router.push('/login')
+    // Confirm cancellation with the user
+    try {
+      await ElMessageBox.confirm(
+        'Are you sure you want to cancel your subscription?',
+        'Cancel Subscription',
+        {
+          confirmButtonText: 'Yes, cancel it',
+          cancelButtonText: 'No, keep it',
+          type: 'warning',
+        }
+      )
+    } catch {
+      return // user canceled dialog
+    }
     cancelLoading.value = true
     await cancelSubscription(authStore.user.uid)
     await subStore.fetchStatus(authStore.user.uid)
+    ElMessage.success("Subscription canceled. You’ll remain Premium until the period ends.")
   } catch (e) {
     console.error(e)
     errorVisible.value = true
