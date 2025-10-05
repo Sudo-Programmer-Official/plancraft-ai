@@ -33,7 +33,7 @@
         <li>✅ Priority Support</li>
       </ul>
       <p class="text-2xl font-bold mb-4">$5 / month</p>
-      <div v-if="sub.plan === 'premium'" class="space-y-2">
+      <div v-if="isPremium" class="space-y-2">
         <button
           :disabled="cancelLoading"
           @click="onCancel"
@@ -71,7 +71,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { createCheckoutSession, cancelSubscription } from '@/services/stripeService'
@@ -88,6 +88,16 @@ const cancelLoading = ref(false)
 
 const subStore = useSubscriptionStore()
 const sub = subStore.subscription
+const isPremium = computed(() => {
+  try {
+    const planFromStore = sub?.plan ?? sub?.value?.plan
+    const planFromUser = authStore?.user?.plan
+    const roleFromUser = authStore?.user?.role
+    return [planFromStore, planFromUser, roleFromUser]
+      .map(v => String(v || '').toLowerCase())
+      .includes('premium')
+  } catch { return false }
+})
 
 async function onUpgrade() {
   try {
@@ -111,6 +121,7 @@ onMounted(() => {
   if (isSuccess) {
     trackEvent('upgrade_success')
     // Refresh plan + usage after redirect (webhook may take a moment)
+    try { authStore.refreshUser?.() } catch {}
     try { authStore.refreshPlan?.() } catch {}
     // Poll subscription status briefly to reflect changes
     const uid = authStore?.user?.uid

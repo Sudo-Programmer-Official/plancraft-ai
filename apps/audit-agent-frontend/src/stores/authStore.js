@@ -22,6 +22,22 @@ export const useAuthStore = defineStore("authStore", {
   }),
 
   actions: {
+    async refreshUser() {
+      try {
+        if (!this.user?.uid) return
+        const profile = await fetchUserProfile(this.user.uid)
+        // Merge fresh profile fields; preserve existing auth fields
+        this.user = {
+          ...(this.user || {}),
+          ...profile,
+          // Ensure plan/role are updated from profile if present
+          plan: (profile && profile.plan) ? profile.plan : this.user?.plan,
+          role: (profile && profile.role) ? profile.role : this.user?.role,
+        }
+      } catch (e) {
+        // no-op; keep existing user
+      }
+    },
     async refreshPlan() {
       try {
         if (!this.user?.uid) return

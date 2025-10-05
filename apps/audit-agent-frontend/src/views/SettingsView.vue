@@ -14,12 +14,15 @@
       <!-- Plan status and usage -->
       <section class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10 max-w-md mx-auto sm:max-w-none">
         <h2 class="text-lg sm:text-xl font-semibold mb-2">🌟 Subscription</h2>
-        <p class="text-sm text-indigo-200">Current plan: <strong>{{ (authStore.user?.plan || 'free').toUpperCase() }}</strong></p>
+        <p class="text-sm text-indigo-200">Current plan: <strong>{{ currentPlanLabel.toUpperCase() }}</strong></p>
         <p class="text-sm text-gray-300 mt-2">
-          Daily AI limit: <span :class="(authStore.user?.plan||'free')==='premium' ? 'text-green-300' : 'text-yellow-300'">{{ aiRemaining }}</span> left today
+          Daily AI limit: <span :class="isPremium ? 'text-green-300' : 'text-yellow-300'">{{ aiRemaining }}</span> left today
+        </p>
+        <p v-if="isPremium && subStore.subscription?.remainingDays > 0" class="text-sm text-indigo-300 mt-1">
+          ⏳ Ends on: {{ premiumEndsOn }}
         </p>
         <div class="mt-3">
-          <button @click="upgradePlan" class="bg-gradient-to-r from-purple-500 to-pink-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-white shadow-lg hover:from-purple-600 hover:to-pink-700 transition text-sm sm:text-base">🚀 Upgrade</button>
+          <button v-if="!isPremium" @click="upgradePlan" class="bg-gradient-to-r from-purple-500 to-pink-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-white shadow-lg hover:from-purple-600 hover:to-pink-700 transition text-sm sm:text-base">🚀 Upgrade</button>
           <el-button size="small" plain @click="planOpen=true" class="ml-2">View Plan Details</el-button>
         </div>
       </section>
@@ -132,6 +135,7 @@
         </div>
         <div class="flex flex-col sm:flex-row gap-3 justify-center items-center w-full">
           <button
+            v-if="!isPremium"
             class="bg-gradient-to-r from-purple-500 to-pink-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-white shadow-lg hover:from-purple-600 hover:to-pink-700 transition text-sm sm:text-base"
             @click="upgradePlan"
           >
@@ -175,10 +179,12 @@ import { subscribeUserToPush } from "@/services/pwaService"
 import { useSubscriptionStore } from "@/stores/subscriptionStore"
 import { isFeatureAllowed, getRemainingAI } from "@/services/planService"
 import PlanSummaryModal from "@/components/PlanSummaryModal.vue"
+import { useIsPremium } from "@/composables/useIsPremium"
 
 const authStore = useAuthStore()
 const router = useRouter()
 const subStore = useSubscriptionStore()
+const { refresh: refreshPremium } = useIsPremium()
 
 // Notification preferences state
 const prefs = reactive({
@@ -189,8 +195,21 @@ const prefs = reactive({
   calls: false,
 })
 
+const isPremium = computed(() => {
+  try {
+    const planFromStore = subStore?.plan ?? subStore?.value?.plan
+    const planFromUser = authStore?.user?.plan
+    const roleFromUser = authStore?.user?.role
+    return [planFromStore, planFromUser, roleFromUser]
+      .map(v => String(v || '').toLowerCase())
+      .includes('premium')
+  } catch { return false }
+})
+
 onMounted(async () => {
   try {
+    // Ensure latest subscription state on entry
+    try { await refreshPremium() } catch {}
     if (authStore.user) {
       const res = await apiGetPrefs(authStore.user.uid)
       const n = res?.notifications || {}
@@ -283,10 +302,21 @@ async function enablePush() {
 }
 
 // Plan gates
-const canWhatsapp = computed(() => isFeatureAllowed({ plan: subStore.subscription.plan }, 'whatsapp'))
-const canPwa = computed(() => isFeatureAllowed({ plan: subStore.subscription.plan }, 'pwa'))
+// Use unified premium flag to control gates for a consistent UX
+const canWhatsapp = computed(() => isPremium)
+const canPwa = computed(() => isPremium)
 const aiRemaining = computed(() => getRemainingAI(authStore.user || {}))
 const planOpen = ref(false)
+
+const currentPlanLabel = computed(() => (isPremium.value ? 'premium' : 'free'))
+
+// Approximate end date using remainingDays provided by subscription store
+const premiumEndsOn = computed(() => {
+  const days = Number(subStore.subscription?.remainingDays || 0)
+  if (!days || !isPremium.value) return ''
+  const dt = new Date(Date.now() + days * 24 * 60 * 60 * 1000)
+  return dt.toLocaleDateString()
+})
 </script>
 
 <style scoped>

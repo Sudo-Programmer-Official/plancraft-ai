@@ -427,21 +427,26 @@ onMounted(() => {
     }
     const tasksQuery = query(collection(db, 'tasks'), where('userId', '==', user.uid))
     if (unsubscribe.value) unsubscribe.value()
-    unsubscribe.value = onSnapshot(tasksQuery, (snapshot) => {
-      const userTasks = snapshot.docs.map((docSnap) => {
-        const data = docSnap.data()
-        return {
-          id: docSnap.id,
-          ...data,
-          date: typeof data.date === 'string' ? data.date : toYMD(data.date?.toDate?.() || data.date),
-        }
+    try {
+      unsubscribe.value = onSnapshot(tasksQuery, (snapshot) => {
+        const userTasks = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data()
+          return {
+            id: docSnap.id,
+            ...data,
+            date: typeof data.date === 'string' ? data.date : toYMD(data.date?.toDate?.() || data.date),
+          }
+        })
+        dailyTasks.value = userTasks.filter((t) => t.date === toYMD(today))
+        const weekDays = ymdRange(startOfWeek, endOfWeek)
+        weeklyTasks.value = userTasks.filter((t) => weekDays.includes(t.date))
+        const monthDays = ymdRange(startOfMonth, endOfMonth)
+        monthlyTasks.value = userTasks.filter((t) => monthDays.includes(t.date))
       })
-      dailyTasks.value = userTasks.filter((t) => t.date === toYMD(today))
-      const weekDays = ymdRange(startOfWeek, endOfWeek)
-      weeklyTasks.value = userTasks.filter((t) => weekDays.includes(t.date))
-      const monthDays = ymdRange(startOfMonth, endOfMonth)
-      monthlyTasks.value = userTasks.filter((t) => monthDays.includes(t.date))
-    })
+    } catch (e) {
+      console.warn('Live tasks listener failed; falling back to one-time load', e?.message || e)
+      loadTasks().catch(() => {})
+    }
   })
 })
 
