@@ -141,26 +141,59 @@ onMounted(() => {
   }
 })
 
+// async function onCancel() {
+//   try {
+//     if (!authStore.user) return router.push('/login')
+//     // Confirm cancellation with the user
+//     try {
+//       await ElMessageBox.confirm(
+//         'Are you sure you want to cancel your subscription?',
+//         'Cancel Subscription',
+//         {
+//           confirmButtonText: 'Yes, cancel it',
+//           cancelButtonText: 'No, keep it',
+//           type: 'warning',
+//         }
+//       )
+//     } catch {
+//       return // user canceled dialog
+//     }
+//     cancelLoading.value = true
+//     await cancelSubscription(authStore.user.uid)
+//     await subStore.fetchStatus(authStore.user.uid)
+//     ElMessage.success("Subscription canceled. You’ll remain Premium until the period ends.")
+//   } catch (e) {
+//     console.error(e)
+//     errorVisible.value = true
+//   } finally {
+//     cancelLoading.value = false
+//   }
+// }
 async function onCancel() {
   try {
     if (!authStore.user) return router.push('/login')
-    // Confirm cancellation with the user
-    try {
-      await ElMessageBox.confirm(
-        'Are you sure you want to cancel your subscription?',
-        'Cancel Subscription',
-        {
-          confirmButtonText: 'Yes, cancel it',
-          cancelButtonText: 'No, keep it',
-          type: 'warning',
-        }
-      )
-    } catch {
-      return // user canceled dialog
-    }
+
+    await ElMessageBox.confirm(
+      'Are you sure you want to cancel your subscription?',
+      'Cancel Subscription',
+      {
+        confirmButtonText: 'Yes, cancel it',
+        cancelButtonText: 'No, keep it',
+        type: 'warning',
+      }
+    )
+
     cancelLoading.value = true
+
+    // 🚀 Cancel on backend
     await cancelSubscription(authStore.user.uid)
-    await subStore.fetchStatus(authStore.user.uid)
+
+    // ✅ Refresh both authStore and subStore
+    await Promise.all([
+      authStore.refreshUser?.(),
+      subStore.fetchStatus(authStore.user.uid),
+    ])
+
     ElMessage.success("Subscription canceled. You’ll remain Premium until the period ends.")
   } catch (e) {
     console.error(e)
