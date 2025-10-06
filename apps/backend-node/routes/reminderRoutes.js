@@ -4,6 +4,12 @@ import { handleTextReminder } from "../services/textHandler.js"
 import { db } from "../services/firebaseAdmin.js"
 import { handleVoiceCommand } from "../services/voiceHandler.js"
 import { checkUserPlan, checkUserPlanUsage } from "../services/planService.js"
+import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc.js'
+import timezone from 'dayjs/plugin/timezone.js'
+
+dayjs.extend(utc)
+dayjs.extend(timezone)
 
 const router = express.Router()
 const upload = multer({ storage: multer.memoryStorage() })
@@ -11,12 +17,13 @@ const upload = multer({ storage: multer.memoryStorage() })
 // POST /api/reminders/text
 router.post("/text", async (req, res) => {
   try {
-    const { userId, text, channels, taskId, scheduledTime } = req.body || {}
+    const { userId, text, channels, taskId, scheduledTime, timezone: tz } = req.body || {}
     console.log("[Reminder API] /reminders/text", {
       userId,
       taskId,
       channels,
       scheduledTime,
+      timezone: tz,
       now: new Date().toISOString(),
     })
     if (!userId || !text) return res.status(400).json({ success: false, error: "Missing userId or text" })
@@ -32,7 +39,19 @@ router.post("/text", async (req, res) => {
       console.warn('[Reminder API] Rejecting task-bound reminder without scheduledTime', { userId, taskId })
       return res.status(400).json({ success: false, error: 'Missing scheduledTime for task-bound reminder' })
     }
-    const reminder = await handleTextReminder(text, userId, channels, { taskId, scheduledTime })
+    const reminder = await handleTextReminder(text, userId, channels, { taskId, scheduledTime, timezone: tz })
+
+    // Optional mirror to tasks/{taskId}.reminderTime so UI reflects immediately
+    try {
+      if (taskId && scheduledTime) {
+        const tzStr = tz || 'UTC'
+        const hhmm = dayjs.utc(scheduledTime).tz(tzStr).format('HH:mm')
+        await db.collection('tasks').doc(String(taskId)).set({ reminderTime: hhmm, updatedAt: new Date() }, { merge: true })
+      }
+    } catch (merr) {
+      console.warn('[Reminder API] Mirror reminderTime failed', merr?.message || merr)
+    }
+
     res.json({ success: true, reminder })
   } catch (e) {
     console.error("/reminders/text error:", e)

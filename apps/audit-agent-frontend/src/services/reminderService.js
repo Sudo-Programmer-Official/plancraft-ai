@@ -1,5 +1,12 @@
 // src/services/reminderService.js
 import api from '@/services/api'
+import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc'
+import timezone from 'dayjs/plugin/timezone'
+import { updateTaskInFirebase } from '@/services/firebaseService'
+
+dayjs.extend(utc)
+dayjs.extend(timezone)
 
 export async function getReminderStatus(userId, taskId) {
   try {
@@ -43,10 +50,20 @@ export async function scheduleReminder(userId, taskId, text, reminderTime, prefs
       text,
       scheduledTime: toIso(reminderTime),
       channels,
+      timezone: dayjs.tz.guess(),
     }
 
     const res = await api.post('/reminders/text', payload)
     console.log('[Reminder] scheduled', payload)
+
+    // Mirror reminder HH:mm to the task so UI reflects immediately
+    try {
+      const localHHMM = dayjs.utc(payload.scheduledTime).tz(payload.timezone).format('HH:mm')
+      await updateTaskInFirebase({ id: taskId, reminderTime: localHHMM })
+    } catch (e) {
+      console.warn('[Reminder] Failed to mirror reminderTime to task', e?.message || e)
+    }
+
     return res?.data || { ok: true }
   } catch (err) {
     console.error('[Reminder] schedule failed:', err?.message || err)

@@ -160,7 +160,7 @@ import { generateTasksFromText } from '@/services/aiService'
 import { addTaskToFirebase } from '@/services/firebaseService'
 import { useAuthStore } from '@/stores/authStore'
 import { getPreferences as getUserPreferences } from '@/services/settingsService'
-import { scheduleReminder } from '@/services/reminderService'
+import { scheduleReminder, getReminderStatus } from '@/services/reminderService'
 import { useTasks } from '@/composables/useTasks'
 import { toLocalDateKey, parseLocalDateKey } from '@/utils/dateHelper'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
@@ -198,6 +198,8 @@ watch(() => props.task, (task) => {
     link.value = task.link || ""
     selectedDate.value = task.date
     reminderTime.value = task.reminderTime || ""
+    // If reminderTime missing but task exists, try to prefill from reminder status
+    tryPrefillReminder(task)
   } else {
     input.value = ""
     details.value = ""
@@ -240,7 +242,32 @@ onMounted(async () => {
       userPrefs.value = res || { notifications: {}, integrations: {} }
     }
   } catch {}
+  // Attempt prefill when opening in edit mode
+  if (props.task) tryPrefillReminder(props.task)
 })
+
+function tryPrefillReminder(task) {
+  try {
+    if (!task?.id || reminderTime.value) return
+    const uid = authStore?.user?.uid
+    if (!uid) return
+    // Query reminder status and set HH:mm from first scheduled item
+    getReminderStatus(uid, task.id).then((r) => {
+      const items = Array.isArray(r?.items) ? r.items : []
+      const active = items.find(it => String(it?.status).toLowerCase() === 'scheduled') || items[0]
+      const st = active?.scheduledTime
+      if (!st) return
+      try {
+        const d = (st && st.toDate) ? st.toDate() : new Date(st)
+        if (d && !isNaN(d.getTime())) {
+          const hh = String(d.getHours()).padStart(2, '0')
+          const mm = String(d.getMinutes()).padStart(2, '0')
+          reminderTime.value = `${hh}:${mm}`
+        }
+      } catch {}
+    }).catch(() => {})
+  } catch {}
+}
 
 function buildLocalIso(ymd, hhmm) {
   try { return new Date(`${ymd}T${hhmm}`).toISOString() } catch { return new Date().toISOString() }
