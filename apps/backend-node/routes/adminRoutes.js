@@ -29,7 +29,29 @@ router.post('/notifications', requireAdmin, (req, res) => {
 // Admin: Users
 router.get('/users', requireAdmin, async (req, res) => {
   try {
-    const snap = await db.collection('users').limit(500).get()
+    const limit = Math.max(1, Math.min(100, parseInt(String(req.query.limit || '25'), 10)))
+    const last = req.query.last ? String(req.query.last) : null
+    const role = req.query.role ? String(req.query.role) : null
+    const plan = req.query.plan ? String(req.query.plan) : null
+
+    let ref = db.collection('users')
+    if (role) ref = ref.where('role', '==', role)
+    if (plan) ref = ref.where('plan', '==', plan)
+
+    // Prefer createdAt ordering; fallback to email if field/index missing
+    try {
+      ref = ref.orderBy('createdAt', 'desc')
+    } catch (e) {
+      ref = ref.orderBy('email')
+    }
+
+    if (last) {
+      // Use document snapshot for startAfter
+      const lastDoc = await db.collection('users').doc(last).get()
+      if (lastDoc.exists) ref = ref.startAfter(lastDoc)
+    }
+
+    const snap = await ref.limit(limit).get()
     const users = snap.docs.map((doc) => {
       const data = doc.data() || {}
       return {
@@ -38,11 +60,16 @@ router.get('/users', requireAdmin, async (req, res) => {
         email: data.email || '',
         role: data.role || 'user',
         plan: (data.plan || 'free'),
+        guest: !!data.guest,
+        createdAt: data.createdAt || null,
       }
     })
-    return res.json(users)
+    const lastVisible = snap.docs.length ? snap.docs[snap.docs.length - 1].id : null
+    return res.json({ users, nextPage: lastVisible, limit })
   } catch (e) {
-    return res.json(dataStore.users)
+    console.error('Admin users fetch failed', e)
+    // Fallback to demo data in dev
+    return res.json({ users: dataStore.users, nextPage: null, limit: 25 })
   }
 })
 
