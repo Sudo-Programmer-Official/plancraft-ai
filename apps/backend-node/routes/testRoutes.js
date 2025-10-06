@@ -64,3 +64,27 @@ router.post('/test/notify', async (req, res) => {
 
 export default router
 
+// Lightweight WhatsApp config + recipient diagnostic (no send)
+// GET /api/test/whatsapp/check?userId=uid
+router.get('/test/whatsapp/check', async (req, res) => {
+  try {
+    const userId = String(req.query.userId || '')
+    if (!userId) return res.status(400).json({ ok: false, error: 'Missing userId' })
+
+    const token = !!(process.env.META_WHATSAPP_TOKEN || process.env.WHATSAPP_TOKEN)
+    const phoneId = !!(process.env.META_WHATSAPP_PHONE_ID || process.env.WHATSAPP_PHONE_NUMBER_ID)
+    const snap = await db.collection('users').doc(userId).get()
+    const data = snap.exists ? (snap.data() || {}) : {}
+    const to = data?.integrations?.whatsapp?.phone || null
+    const prefs = data?.preferences?.notifications || {}
+    const enabled = !!prefs?.whatsapp
+
+    return res.json({
+      ok: true,
+      config: { hasToken: token, hasPhoneId: phoneId },
+      user: { hasPhone: !!to, phone: to ? String(to).slice(0, 6) + '…' : null, notificationsWhatsapp: enabled },
+    })
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e?.message || 'server error' })
+  }
+})

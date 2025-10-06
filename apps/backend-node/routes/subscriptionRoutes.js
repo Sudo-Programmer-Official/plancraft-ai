@@ -136,10 +136,15 @@
 // })
 
 import express from 'express'
+import pushRoutes from './pushRoutes.js'
 import Stripe from 'stripe'
 import { db } from '../services/firebaseAdmin.js'
 
 const router = express.Router()
+
+// Mount push subscription routes under /push so
+// app.use('/api', router) yields /api/push/* endpoints.
+router.use('/push', pushRoutes)
 
 // Optional Stripe client (dev-friendly if missing)
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY

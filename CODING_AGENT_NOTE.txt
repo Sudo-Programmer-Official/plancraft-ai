@@ -1,0 +1,2 @@
+Temporary note: shell ls/rg failing due to ~/.bash_profile export error.
+Proceeding with targeted patches per user request.

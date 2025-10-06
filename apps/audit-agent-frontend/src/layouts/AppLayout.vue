@@ -1,4 +1,5 @@
 <template>
+  <NotificationBanner :user-id="currentUserId" />
   <div
     class="flex min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 text-white"
   >
@@ -311,7 +312,7 @@
           class="max-w-7xl mx-auto px-4 flex items-center justify-center sm:justify-between gap-3"
         >
           <div class="hidden sm:flex items-center gap-2">
-            <img src="../../public/logo-bg-remove.png" alt="PlanCraftAI" class="w-6 h-6" />
+            <img src="/logo-bg-remove.png" alt="PlanCraftAI" class="w-6 h-6" />
             <span class="opacity-80">PlanCraftAI</span>
           </div>
           <div class="flex items-center gap-4">
@@ -330,7 +331,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted } from 'vue'
+import { hasSubscription, registerPushSubscription } from '@/services/pushService'
+import NotificationBanner from '@/components/NotificationBanner.vue'
+import { onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { driver } from 'driver.js'
@@ -340,6 +344,39 @@ import NotificationDropdown from '@/components/NotificationDropdown.vue'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useIsPremium } from '@/composables/useIsPremium'
 import PlanSummaryModal from '@/components/PlanSummaryModal.vue'
+
+const currentUserId = ref(null)
+
+function deriveUidFromStorage() {
+  try {
+    const direct = localStorage.getItem('uid')
+    if (direct) return direct
+    const userRaw = localStorage.getItem('user') || localStorage.getItem('auth') || localStorage.getItem('authUser')
+    if (userRaw) {
+      const obj = JSON.parse(userRaw)
+      if (obj && (obj.uid || obj.id)) return obj.uid || obj.id
+    }
+  } catch (_) {}
+  return null
+}
+
+onMounted(() => {
+  currentUserId.value = deriveUidFromStorage()
+  window.addEventListener('storage', () => {
+    currentUserId.value = deriveUidFromStorage()
+  })
+  // Optional auto-registration if permission already granted
+  setTimeout(async () => {
+    try {
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        const uid = currentUserId.value
+        if (uid && !(await hasSubscription())) {
+          await registerPushSubscription(String(uid))
+        }
+      }
+    } catch (_) {}
+  }, 0)
+})
 
 const sidebarOpen = ref(true) // desktop toggle
 const mobileMenu = ref(false) // mobile drawer toggle
