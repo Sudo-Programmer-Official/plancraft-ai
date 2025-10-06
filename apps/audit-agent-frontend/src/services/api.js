@@ -40,6 +40,14 @@ api.interceptors.request.use(async (config) => {
       // Optional pass-through user context
       if (user.email) config.headers['x-user-email'] = user.email
       if (user.uid) config.headers['x-user-id'] = user.uid
+      // Try to include role from cached profile (authStore persists it)
+      try {
+        const userStr = localStorage.getItem('user')
+        if (userStr) {
+          const u = JSON.parse(userStr)
+          if (u?.role) config.headers['x-user-role'] = u.role
+        }
+      } catch {}
     } else {
       // fallback to cached token if any
       const token = localStorage.getItem('token')
