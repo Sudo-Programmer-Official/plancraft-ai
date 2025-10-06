@@ -165,6 +165,12 @@ import { useTasks } from '@/composables/useTasks'
 import { toLocalDateKey, parseLocalDateKey } from '@/utils/dateHelper'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { isFeatureAllowed } from '@/services/planService'
+import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc'
+import timezone from 'dayjs/plugin/timezone'
+
+dayjs.extend(utc)
+dayjs.extend(timezone)
 
 const props = defineProps({
   open: Boolean,
@@ -258,12 +264,18 @@ function tryPrefillReminder(task) {
       const st = active?.scheduledTime
       if (!st) return
       try {
-        const d = (st && st.toDate) ? st.toDate() : new Date(st)
-        if (d && !isNaN(d.getTime())) {
-          const hh = String(d.getHours()).padStart(2, '0')
-          const mm = String(d.getMinutes()).padStart(2, '0')
-          reminderTime.value = `${hh}:${mm}`
+        // Normalize to local time from UTC and format as HH:mm
+        let iso
+        if (st && typeof st.toDate === 'function') {
+          const d = st.toDate()
+          iso = d && d.toISOString ? d.toISOString() : String(d)
+        } else if (st instanceof Date) {
+          iso = st.toISOString()
+        } else {
+          iso = String(st)
         }
+        const local = dayjs.utc(iso).local()
+        reminderTime.value = local.format('HH:mm')
       } catch {}
     }).catch(() => {})
   } catch {}
