@@ -121,7 +121,10 @@ async function onUpgrade() {
 
     if (!authStore.user?.uid || isGuest) {
       // Store post-login redirect intent
-      localStorage.setItem('postLoginRedirect', '/subscription?upgrade=1')
+      try {
+        localStorage.setItem('postLoginRedirect', '/subscription?upgrade=1')
+        localStorage.setItem('upgradeAfterLogin', '1')
+      } catch {}
 
       // Themed info message (aligned with PlanCraftAI UI tone)
       ElNotification({
@@ -156,6 +159,7 @@ onMounted(() => {
   const isSuccess = qs.includes('status=success')
   const isCancel = qs.includes('status=cancel')
   const isReactivated = qs.includes('reactivated=1')
+  const wantsUpgrade = (new URLSearchParams(qs).get('upgrade') === '1') || localStorage.getItem('upgradeAfterLogin') === '1'
   if (isSuccess) {
     trackEvent('upgrade_success')
     try { ElNotification({ title: '🎉 Payment successful', message: 'Premium is now active!', type: 'success', duration: 2600, offset: 80 }) } catch {}
@@ -183,6 +187,13 @@ onMounted(() => {
   if (isCancel) {
     try { ElNotification({ title: 'Checkout canceled', message: 'You can try again anytime.', type: 'info', duration: 2200, offset: 80 }) } catch {}
   }
+  // Auto-continue to checkout after login if user intended to upgrade
+  try {
+    if (wantsUpgrade && authStore?.user?.uid && !isPremium.value) {
+      localStorage.removeItem('upgradeAfterLogin')
+      onUpgrade()
+    }
+  } catch {}
 })
 
 // async function onCancel() {

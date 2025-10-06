@@ -155,7 +155,8 @@ router.get('/subscription/status', async (req, res) => {
     const sub = data?.subscription || {}
     const rawStatus = String(sub.status || '').toLowerCase()
     const status = rawStatus || 'free'
-    const plan = status === 'active' || status === 'trialing' || status === 'past_due' ? 'premium' : 'free'
+    // Treat 'canceled' (scheduled at period end) as premium until end date
+    const plan = (status === 'active' || status === 'trialing' || status === 'past_due' || status === 'canceled') ? 'premium' : 'free'
 
     let remainingDays = 0
     let cancelAt = sub?.cancelAt || null
