@@ -3,6 +3,33 @@ import { db } from "./firebaseAdmin.js"
 import { send as sendWhatsApp } from "./integrations/whatsappProvider.js"
 import { sendEmail } from "./integrations/emailProvider.js"
 import { sendPWA } from "./integrations/pwaProvider.js"
+import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc.js'
+import timezone from 'dayjs/plugin/timezone.js'
+
+dayjs.extend(utc)
+dayjs.extend(timezone)
+
+function toUtcIso(input, tz) {
+  try {
+    const s = String(input)
+    // If string has explicit timezone (Z or +/-), respect it
+    const hasZone = /Z$|[+-]\d{2}:?\d{2}$/.test(s)
+    if (hasZone) return dayjs(s).utc().toISOString()
+    if (tz) return dayjs.tz(s, tz).utc().toISOString()
+    return dayjs(s).utc().toISOString()
+  } catch {
+    try { return new Date(input).toISOString() } catch { return new Date().toISOString() }
+  }
+}
+
+async function getUserTimezone(userId) {
+  try {
+    const snap = await db.collection('users').doc(String(userId)).get()
+    const data = snap.exists ? (snap.data() || {}) : {}
+    return data?.timezone || null
+  } catch { return null }
+}
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -15,12 +42,17 @@ export async function createReminderFromText(userText, userId, channels = ["what
   let parsed = null
   let when = null
 
+  // Determine timezone preference
+  const tzFromUser = await getUserTimezone(userId)
+  const tz = options?.timezone || tzFromUser || process.env.DEFAULT_TIMEZONE || 'America/Chicago'
+
   // If caller provided a concrete scheduledTime, prefer it and skip GPT
   if (options?.scheduledTime) {
     try {
-      when = new Date(options.scheduledTime)
+      const utcIso = toUtcIso(options.scheduledTime, tz)
+      when = new Date(utcIso)
       if (!(when instanceof Date) || isNaN(when.getTime())) throw new Error('invalid scheduledTime')
-      parsed = { task: text, time: when.toISOString() }
+      parsed = { task: text, time: utcIso }
     } catch (e) {
       console.warn('scheduledTime invalid; falling back to GPT parse', e?.message || e)
     }
@@ -49,20 +81,28 @@ export async function createReminderFromText(userText, userId, channels = ["what
     parsed = { task: text, time: new Date(Date.now() + 60 * 60 * 1000).toISOString() } // +1h
   }
 
-  when = when || new Date(parsed.time)
+  if (!when) {
+    try {
+      const utcIso = toUtcIso(parsed.time, tz)
+      when = new Date(utcIso)
+    } catch {
+      when = new Date(parsed.time)
+    }
+  }
   if (!(when instanceof Date) || isNaN(when.getTime())) {
     throw new Error("Parsed time invalid")
   }
 
   const reminder = {
     task: String(parsed.task || text),
-    scheduledTime: when,
+    scheduledTime: when, // UTC Date
     userId: String(userId),
     channels: Array.isArray(channels) && channels.length ? channels : ["whatsapp"],
     createdAt: new Date(),
     status: "scheduled",
     sentAt: null,
     taskId: options?.taskId || null,
+    timezone: tz,
   }
 
   console.log('[Reminder API] Persisting reminder', {
@@ -76,7 +116,8 @@ export async function createReminderFromText(userText, userId, channels = ["what
   await queueReminder({ id: ref.id, ...reminder })
 
   try {
-    await sendWhatsApp(userId, `✅ Reminder set: "${reminder.task}" at ${when.toLocaleString()}`)
+    const formattedLocal = dayjs.utc(when.toISOString()).tz(tz).format('MMMM D, YYYY, h:mm A')
+    await sendWhatsApp(userId, `✅ Reminder set: "${reminder.task}" at ${formattedLocal}`)
   } catch (e) {
     console.warn("Could not send confirmation via WhatsApp:", e?.message || e)
   }
@@ -90,12 +131,17 @@ export async function sendReminder(reminder) {
   const task = String(reminder?.task || "")
   const opts = { to: reminder?.to }
   try {
+    const tz = reminder?.timezone || 'UTC'
+    const utcIso = (reminder?.scheduledTime instanceof Date) ? reminder.scheduledTime.toISOString() : String(reminder?.scheduledTime || '')
+    const localFmt = utcIso ? dayjs.utc(utcIso).tz(tz).format('YYYY-MM-DD HH:mm') : null
     console.log('[Scheduler] Executing reminder', {
       id: reminder?.id,
       userId,
       task,
       channels,
       ts: new Date().toISOString(),
+      fireAtUTC: utcIso,
+      fireAtLocal: localFmt ? `${localFmt} (${tz})` : null,
     })
     if (channels.includes("whatsapp")) {
       try {

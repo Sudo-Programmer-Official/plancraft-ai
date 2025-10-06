@@ -154,19 +154,24 @@ router.get('/subscription/status', async (req, res) => {
     const data = snap.exists ? snap.data() : {}
     const sub = data?.subscription || {}
     const status = String(sub.status || '').toLowerCase()
-    const plan = status === 'active' ? 'premium' : 'free'
+    // Derive plan and normalized status
+    let normalizedStatus = status
+    if (sub.cancelAtPeriodEnd === true) normalizedStatus = 'canceled'
+    const plan = normalizedStatus === 'active' || normalizedStatus === 'trialing' || normalizedStatus === 'past_due' ? 'premium' : 'free'
     let remainingDays = 0
+    let cancelAt = null
     try {
       const end = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null
       if (end) {
         const diffMs = end.getTime() - Date.now()
         remainingDays = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)))
+        if (sub.cancelAtPeriodEnd === true) cancelAt = end
       }
     } catch {}
-    return res.json({ plan, remainingDays })
+    return res.json({ plan, status: normalizedStatus || 'free', cancelAt, remainingDays })
   } catch (err) {
     console.error('subscription/status error', err)
-    res.status(200).json({ plan: 'free', remainingDays: 0 })
+    res.status(200).json({ plan: 'free', status: 'free', remainingDays: 0 })
   }
 })
 
@@ -270,6 +275,55 @@ router.post('/subscription/cancel', async (req, res) => {
   } catch (err) {
     console.error('Cancel error:', err)
     res.status(500).json({ error: 'Failed to cancel subscription' })
+  }
+})
+
+// POST /api/subscription/reactivate
+router.post('/subscription/reactivate', async (req, res) => {
+  try {
+    const body = req.body || {}
+    const incomingUid = body.uid || body.userId
+    const userId = incomingUid ? String(incomingUid) : ''
+    if (!userId) return res.status(400).json({ error: 'Missing uid' })
+
+    if (!stripe) return res.status(500).json({ error: 'Stripe not configured' })
+
+    // Resolve customer ID from Firestore or create if missing
+    let customerId
+    let email, name
+    try {
+      const snap = await db.collection('users').doc(userId).get()
+      const data = snap.exists ? (snap.data() || {}) : {}
+      customerId = data?.subscription?.customerId || data?.stripeCustomerId || null
+      email = data?.email
+      name = data?.name
+      if (!customerId) {
+        const cust = await stripe.customers.create({ email, name, metadata: { userId } })
+        customerId = cust.id
+        await db.collection('users').doc(userId).set({ subscription: { ...(data.subscription || {}), customerId }, stripeCustomerId: customerId }, { merge: true })
+      }
+    } catch {}
+
+    // Price ID mapping (reuse monthly)
+    const priceId = process.env.STRIPE_MONTHLY_PRICE_ID
+    if (!priceId || !/^price_/.test(String(priceId))) return res.status(400).json({ error: 'Invalid Stripe price ID' })
+
+    const successUrl = body.successUrl || `${process.env.FRONTEND_URL || ''}/subscription?reactivated=1`
+    const cancelUrl = body.cancelUrl || `${process.env.FRONTEND_URL || ''}/subscription?canceled=1`
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      payment_method_types: ['card'],
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      customer: customerId || undefined,
+      metadata: { userId, plan: 'monthly', intent: 'reactivate' },
+    })
+    return res.json({ url: session.url })
+  } catch (err) {
+    console.error('subscription/reactivate error', err)
+    res.status(500).json({ error: 'Reactivation initialization failed' })
   }
 })
 

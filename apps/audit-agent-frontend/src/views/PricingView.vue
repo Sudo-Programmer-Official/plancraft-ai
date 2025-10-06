@@ -1,4 +1,23 @@
 <template>
+  <!-- Canceled banner: show remaining premium period -->
+  <div
+    v-if="planStatus === 'canceled' && cancelAtDate"
+    class="max-w-5xl mx-auto px-4 sm:px-6 mt-6"
+  >
+    <div class="flex items-start gap-3 rounded-xl border border-yellow-400/30 bg-yellow-500/10 text-yellow-100 px-4 py-3 shadow-sm">
+      <span>⚠️</span>
+      <div class="text-sm">
+        <div class="font-medium">
+          Premium until {{ cancelAtDate.format('MMM D, YYYY') }}
+          <span v-if="daysLeft">
+            ({{ daysLeft }} day{{ daysLeft === 1 ? '' : 's' }} left)
+          </span>
+        </div>
+        <div class="opacity-90">You can keep using Premium features until your period ends, or reactivate anytime.</div>
+      </div>
+    </div>
+  </div>
+
   <div class="max-w-5xl mx-auto py-12 sm:py-16 px-4 sm:px-6 grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
     <!-- Free Plan -->
     <div class="bg-gray-900 rounded-2xl shadow-lg p-8 border border-gray-700">
@@ -33,26 +52,46 @@
         <li>✅ Priority Support</li>
       </ul>
       <p class="text-2xl font-bold mb-4">$2 / month</p>
-      <div v-if="isPremium" class="space-y-2">
+      <template v-if="isPremium && planStatus === 'active'">
+        <div class="space-y-2">
+          <button
+            :disabled="cancelLoading"
+            @click="onCancel"
+            class="w-full py-2 rounded-lg bg-black/20 text-white font-semibold hover:bg-black/30 transition disabled:opacity-60 text-sm sm:text-base"
+          >
+            <span v-if="cancelLoading">Canceling…</span>
+            <span v-else>Cancel Subscription</span>
+          </button>
+          <p class="text-sm text-white/80">You're currently on Premium.</p>
+        </div>
+      </template>
+      <template v-else-if="isPremium && planStatus === 'canceled'">
+        <div class="space-y-2">
+          <button
+            :disabled="loading"
+            @click="onReactivate"
+            class="w-full py-2 rounded-lg bg-black/20 text-white font-semibold hover:bg-black/30 transition disabled:opacity-60 text-sm sm:text-base"
+          >
+            <span v-if="loading">Opening…</span>
+            <span v-else>Upgrade Again</span>
+          </button>
+          <p class="text-sm text-white/90">
+            Premium active until
+            <strong>{{ cancelAtDate ? cancelAtDate.format('MMM D, YYYY') : '' }}</strong>
+            <span v-if="daysLeft">({{ daysLeft }} day{{ daysLeft === 1 ? '' : 's' }} left)</span>
+          </p>
+        </div>
+      </template>
+      <template v-else>
         <button
-          :disabled="cancelLoading"
-          @click="onCancel"
+          :disabled="loading"
+          @click="onUpgrade"
           class="w-full py-2 rounded-lg bg-black/20 text-white font-semibold hover:bg-black/30 transition disabled:opacity-60 text-sm sm:text-base"
         >
-          <span v-if="cancelLoading">Canceling…</span>
-          <span v-else>Cancel Subscription</span>
+          <span v-if="loading">Redirecting…</span>
+          <span v-else>Upgrade Now</span>
         </button>
-        <p class="text-sm text-white/80">You're currently on Premium.</p>
-      </div>
-      <button
-        v-else
-        :disabled="loading"
-        @click="onUpgrade"
-        class="w-full py-2 rounded-lg bg-black/20 text-white font-semibold hover:bg-black/30 transition disabled:opacity-60 text-sm sm:text-base"
-      >
-        <span v-if="loading">Redirecting…</span>
-        <span v-else>Upgrade Now</span>
-      </button>
+      </template>
     </div>
   </div>
   <div class="text-center text-sm mt-6">
@@ -75,10 +114,11 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/authStore'
-import { createCheckoutSession, cancelSubscription } from '@/services/stripeService'
+import { createCheckoutSession, cancelSubscription, reactivateSubscription } from '@/services/stripeService'
 import { trackEvent } from '@/services/analytics'
 import ErrorDialog from '@/components/ErrorDialog.vue'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
+import dayjs from 'dayjs'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -100,6 +140,10 @@ const isPremium = computed(() => {
   } catch { return false }
 })
 
+const planStatus = computed(() => String(subStore.subscription?.status || (isPremium.value ? 'active' : 'free')).toLowerCase())
+const cancelAtDate = computed(() => subStore.subscription?.cancelAt ? dayjs(subStore.subscription.cancelAt) : null)
+const daysLeft = computed(() => cancelAtDate.value ? Math.max(0, cancelAtDate.value.diff(dayjs(), 'day')) : 0)
+
 async function onUpgrade() {
   try {
     // Ensure signed in before starting checkout
@@ -110,6 +154,22 @@ async function onUpgrade() {
     loading.value = true
     trackEvent('upgrade_started')
     const url = await createCheckoutSession('monthly', authStore.user?.uid)
+    window.location.href = url
+  } catch (e) {
+    loading.value = false
+    errorVisible.value = true
+  }
+}
+
+async function onReactivate() {
+  try {
+    if (!authStore.user) {
+      try { localStorage.setItem('postLoginRedirect', '/subscription?upgrade=1') } catch {}
+      return router.push('/login')
+    }
+    loading.value = true
+    trackEvent('reactivate_started')
+    const url = await reactivateSubscription(authStore.user?.uid)
     window.location.href = url
   } catch (e) {
     loading.value = false
@@ -138,6 +198,9 @@ onMounted(() => {
     }
   } else if (authStore?.user?.uid) {
     subStore.fetchStatus(authStore.user.uid)
+  }
+  if (window?.location?.search?.includes('reactivated=1')) {
+    ElMessage.success('Subscription reactivated. Welcome back to Premium!')
   }
 })
 

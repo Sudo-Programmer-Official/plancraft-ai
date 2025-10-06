@@ -40,3 +40,18 @@ export async function cancelSubscription(userId) {
     throw err
   }
 }
+
+export async function reactivateSubscription(userId) {
+  try {
+    const successUrl = window.location.origin + '/subscription?reactivated=1'
+    const cancelUrl = window.location.origin + '/subscription?reactivate=cancel'
+    const res = await api.post('/subscription/reactivate', { uid: userId, successUrl, cancelUrl })
+    const url = res?.data?.url
+    if (!url) throw new Error('No checkout URL returned')
+    return url
+  } catch (err) {
+    const serverMsg = err?.response?.data?.error
+    console.error('Stripe reactivate error:', serverMsg || err?.message)
+    throw new Error(serverMsg || 'Payment service temporarily unavailable')
+  }
+}

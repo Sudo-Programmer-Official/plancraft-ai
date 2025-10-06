@@ -8,6 +8,12 @@ import { getSubscriptionStatus } from '@/services/stripeService'
 import { getUsageStatus } from '@/services/planService'
 import { doc, updateDoc } from 'firebase/firestore'
 import { db } from '@/firebase/init'
+import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc'
+import timezone from 'dayjs/plugin/timezone'
+
+dayjs.extend(utc)
+dayjs.extend(timezone)
 
 
 const auth = getAuth(firebaseApp);
@@ -89,18 +95,23 @@ export const useAuthStore = defineStore("authStore", {
               email: user.email,
               photoURL: user.photoURL,
               role: profile?.role || 'user',
+              timezone: profile?.timezone || dayjs.tz.guess(),
             }
+            this.guest = user?.isAnonymous === true
             this.token = token
             identifyUser(this.user)
             localStorage.setItem('user', JSON.stringify(this.user))
             localStorage.setItem('token', this.token)
             // Refresh plan status in background
             this.refreshPlan().catch(() => {})
+            // Persist timezone hint for backend formatting/scheduler
+            try { await updateDoc(doc(db, 'users', this.user.uid), { timezone: this.user.timezone }) } catch {}
           } else {
             this.user = null
             this.token = null
             localStorage.removeItem('user')
             localStorage.removeItem('token')
+            this.guest = false
           }
         } catch (e) {
           // On error, clear potentially stale creds
@@ -108,6 +119,7 @@ export const useAuthStore = defineStore("authStore", {
           this.token = null
           localStorage.removeItem('user')
           localStorage.removeItem('token')
+          this.guest = false
         }
       })
     },

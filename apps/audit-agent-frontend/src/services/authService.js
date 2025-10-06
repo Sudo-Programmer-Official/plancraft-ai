@@ -26,6 +26,10 @@ export async function signInAsGuest() {
 
 export async function signInWithGoogle() {
   const provider = new GoogleAuthProvider();
+    // Force showing account chooser every time
+  provider.setCustomParameters({
+    prompt: 'select_account'
+  })
   const result = await signInWithPopup(auth, provider);
   const user = result.user;
   await setDoc(doc(db, "users", user.uid), {

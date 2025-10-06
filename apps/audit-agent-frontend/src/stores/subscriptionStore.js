@@ -5,7 +5,7 @@ import { getSubscriptionStatus } from '@/services/stripeService'
 import { useAuthStore } from '@/stores/authStore'
 
 export const useSubscriptionStore = defineStore('subscription', () => {
-  const subscription = ref({ plan: 'free', remainingDays: 0 })
+  const subscription = ref({ plan: 'free', status: 'free', cancelAt: null, remainingDays: 0 })
   const loading = ref(false)
   const error = ref(null)
 
@@ -17,12 +17,14 @@ export const useSubscriptionStore = defineStore('subscription', () => {
       const data = await getSubscriptionStatus(userId)
       subscription.value = {
         plan: data.plan || 'free',
+        status: data.status || (data.plan === 'premium' ? 'active' : 'free'),
+        cancelAt: data.cancelAt ? new Date(data.cancelAt) : null,
         remainingDays: Number(data.remainingDays || 0),
       }
     } catch (e) {
       console.warn('subscription status failed', e)
       error.value = e
-      subscription.value = { plan: 'free', remainingDays: 0 }
+      subscription.value = { plan: 'free', status: 'free', cancelAt: null, remainingDays: 0 }
     } finally {
       loading.value = false
     }

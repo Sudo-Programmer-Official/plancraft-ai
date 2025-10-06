@@ -137,17 +137,27 @@ export async function stripeWebhookHandler(req, res) {
             break
           }
           if (uid) {
-            await db.collection('users').doc(uid).set({
+            const base = {
               plan: 'premium',
               role: 'premium',
               subscription: {
-                status: sub?.status === 'active' || sub?.status === 'trialing' ? 'active' : 'past_due',
                 stripeSubId: sub?.id,
                 customerId: sub?.customer || null,
                 currentPeriodEnd: sub?.current_period_end ? new Date(sub.current_period_end * 1000) : null,
                 plan: 'premium',
               },
-            }, { merge: true })
+            }
+            // Respect cancel_at_period_end: treat as canceled but premium until end
+            if (sub?.cancel_at_period_end) {
+              base.subscription.status = 'canceled'
+              base.subscription.cancelAtPeriodEnd = true
+              base.subscription.cancelAt = sub?.current_period_end ? new Date(sub.current_period_end * 1000) : null
+            } else {
+              base.subscription.status = (sub?.status === 'active' || sub?.status === 'trialing') ? 'active' : 'past_due'
+              base.subscription.cancelAtPeriodEnd = false
+              base.subscription.cancelAt = null
+            }
+            await db.collection('users').doc(uid).set(base, { merge: true })
             console.log(`[Stripe] Synced subscription ${sub?.id} for user ${uid}`)
           }
         } catch (e) {

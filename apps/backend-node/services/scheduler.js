@@ -1,5 +1,11 @@
 import { db } from "./firebaseAdmin.js"
 import { queueReminder } from "./reminderService.js"
+import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc.js'
+import timezone from 'dayjs/plugin/timezone.js'
+
+dayjs.extend(utc)
+dayjs.extend(timezone)
 
 export async function initScheduler() {
   try {
@@ -26,7 +32,11 @@ export async function initScheduler() {
       if (data?.status && String(data.status).toLowerCase() !== 'scheduled') return
       const reminder = { id: doc.id, ...data }
       queueReminder(reminder)
-      console.log(`[Scheduler] Queued reminder on boot id=${doc.id} taskId=${data?.taskId || 'n/a'} at=${(data?.scheduledTime?.toDate ? data.scheduledTime.toDate() : data.scheduledTime)?.toISOString?.() || data?.scheduledTime}`)
+      const ts = (data?.scheduledTime?.toDate ? data.scheduledTime.toDate() : data.scheduledTime)
+      const utcIso = ts?.toISOString?.() || String(ts)
+      const tz = data?.timezone || 'UTC'
+      const localFmt = dayjs.utc(utcIso).tz(tz).format('YYYY-MM-DD HH:mm')
+      console.log(`[Scheduler] Queued reminder on boot id=${doc.id} taskId=${data?.taskId || 'n/a'} UTC=${utcIso} Local(${tz})=${localFmt}`)
       count++
     })
     console.log(`📅 Loaded ${count} reminders into scheduler`)
