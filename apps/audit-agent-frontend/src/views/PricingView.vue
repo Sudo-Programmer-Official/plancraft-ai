@@ -56,12 +56,8 @@
     </div>
   </div>
   <div class="text-center text-sm mt-6">
-    <p v-if="$route.query.status === 'success'" class="text-green-400">
-      ✅ Payment complete. Premium is now active! 🎉
-    </p>
-    <p v-else-if="$route.query.status === 'cancel'" class="text-red-400">
-      ❌ Checkout canceled. You can try again anytime.
-    </p>
+    <p v-if="$route.query.status === 'success'" class="text-green-400">✅ Payment complete. Premium is now active! 🎉</p>
+    <p v-else-if="$route.query.status === 'cancel'" class="text-red-400">❌ Checkout canceled. You can try again anytime.</p>
   </div>
   <ErrorDialog
     v-model="errorVisible"
@@ -73,7 +69,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import { useAuthStore } from '@/stores/authStore'
 import { createCheckoutSession, cancelSubscription } from '@/services/stripeService'
 import { trackEvent } from '@/services/analytics'
@@ -118,9 +114,13 @@ async function onUpgrade() {
 }
 
 onMounted(() => {
-  const isSuccess = window?.location?.search?.includes('status=success')
+  const qs = window?.location?.search || ''
+  const isSuccess = qs.includes('status=success')
+  const isCancel = qs.includes('status=cancel')
+  const isReactivated = qs.includes('reactivated=1')
   if (isSuccess) {
     trackEvent('upgrade_success')
+    try { ElNotification({ title: '🎉 Payment successful', message: 'Premium is now active!', type: 'success', duration: 2600, offset: 80 }) } catch {}
     // Refresh plan + usage after redirect (webhook may take a moment)
     try { authStore.refreshUser?.() } catch {}
     try { authStore.refreshPlan?.() } catch {}
@@ -138,6 +138,12 @@ onMounted(() => {
     }
   } else if (authStore?.user?.uid) {
     subStore.fetchStatus(authStore.user.uid)
+  }
+  if (isReactivated) {
+    try { ElNotification({ title: '🎉 Reactivated', message: 'Welcome back to Premium!', type: 'success', duration: 2400, offset: 80 }) } catch {}
+  }
+  if (isCancel) {
+    try { ElNotification({ title: 'Checkout canceled', message: 'You can try again anytime.', type: 'info', duration: 2200, offset: 80 }) } catch {}
   }
 })
 

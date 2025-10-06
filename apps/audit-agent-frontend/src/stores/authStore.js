@@ -8,6 +8,7 @@ import { getSubscriptionStatus } from '@/services/stripeService'
 import { getUsageStatus } from '@/services/planService'
 import { doc, updateDoc } from 'firebase/firestore'
 import { db } from '@/firebase/init'
+import { ElNotification } from 'element-plus'
 
 
 const auth = getAuth(firebaseApp);
@@ -22,6 +23,23 @@ export const useAuthStore = defineStore("authStore", {
   }),
 
   actions: {
+    resetAuth() {
+      this.user = null
+      this.token = null
+      this.guest = false
+      this.loading = false
+      try {
+        localStorage.removeItem('user')
+        localStorage.removeItem('token')
+        localStorage.removeItem('authStore')
+      } catch {}
+      try {
+        // Lazily import to avoid circular dependency at module load
+        import('@/stores/subscriptionStore').then(mod => {
+          try { mod.useSubscriptionStore().reset() } catch {}
+        })
+      } catch {}
+    },
     async refreshUser() {
       try {
         if (!this.user?.uid) return
@@ -52,28 +70,16 @@ export const useAuthStore = defineStore("authStore", {
       } catch {}
     },
     async init() {
-      // Restore from localStorage (optional fallback)
-      const savedUser = localStorage.getItem("user");
-      const savedToken = localStorage.getItem("token");
-      if (savedUser && savedToken) {
-        try {
-          this.user = JSON.parse(savedUser);
-          this.token = savedToken;
-        } catch {
-          localStorage.removeItem("user");
-          localStorage.removeItem("token");
-        }
+      // If Firebase has no current user at app start, ensure we don't show stale cached state
+      const fbUser = auth.currentUser
+      if (!fbUser) {
+        this.resetAuth()
       }
 
       // Attach Firebase auth listeners
       onAuthStateChanged(auth, async (user) => {
         // This fires on initial mount and sign-in/out. Keep it lightweight; token refresh handled below.
-        if (!user) {
-          this.user = null
-          this.token = null
-          localStorage.removeItem("user")
-          localStorage.removeItem("token")
-        }
+        if (!user) this.resetAuth()
         this.loading = false
       })
 
@@ -97,17 +103,11 @@ export const useAuthStore = defineStore("authStore", {
             // Refresh plan status in background
             this.refreshPlan().catch(() => {})
           } else {
-            this.user = null
-            this.token = null
-            localStorage.removeItem('user')
-            localStorage.removeItem('token')
+            this.resetAuth()
           }
         } catch (e) {
           // On error, clear potentially stale creds
-          this.user = null
-          this.token = null
-          localStorage.removeItem('user')
-          localStorage.removeItem('token')
+          this.resetAuth()
         }
       })
     },
@@ -128,6 +128,15 @@ export const useAuthStore = defineStore("authStore", {
         this.token = await user.getIdToken();
         localStorage.setItem("user", JSON.stringify(this.user))
         localStorage.setItem("token", this.token)
+        try {
+          ElNotification({
+            title: 'Welcome ✨',
+            message: 'Using guest mode. You can upgrade anytime.',
+            type: 'success',
+            duration: 2200,
+            offset: 80,
+          })
+        } catch {}
       } finally {
         this.loading = false;
       }
@@ -149,6 +158,15 @@ export const useAuthStore = defineStore("authStore", {
         this.token = await user.getIdToken();
         localStorage.setItem("user", JSON.stringify(this.user))
         localStorage.setItem("token", this.token)
+        try {
+          ElNotification({
+            title: 'Welcome back ✨',
+            message: `Signed in as ${this.user.displayName || this.user.email || 'User'}`,
+            type: 'success',
+            duration: 2500,
+            offset: 80,
+          })
+        } catch {}
       } finally {
         this.loading = false;
       }
@@ -170,6 +188,15 @@ export const useAuthStore = defineStore("authStore", {
         this.token = await user.getIdToken()
         localStorage.setItem('user', JSON.stringify(this.user))
         localStorage.setItem('token', this.token)
+        try {
+          ElNotification({
+            title: 'Signed in ✨',
+            message: `Welcome ${this.user.displayName || this.user.email || ''}`,
+            type: 'success',
+            duration: 2400,
+            offset: 80,
+          })
+        } catch {}
       } finally {
         this.loading = false
       }
@@ -191,6 +218,15 @@ export const useAuthStore = defineStore("authStore", {
         this.token = await user.getIdToken()
         localStorage.setItem('user', JSON.stringify(this.user))
         localStorage.setItem('token', this.token)
+        try {
+          ElNotification({
+            title: 'Account created 🎉',
+            message: `Hi ${this.user.email || 'there'}!`,
+            type: 'success',
+            duration: 2600,
+            offset: 80,
+          })
+        } catch {}
       } finally {
         this.loading = false
       }
@@ -201,13 +237,25 @@ export const useAuthStore = defineStore("authStore", {
     },
 
     async logout() {
-      await signOutUser();
-      try { trackEvent('Logout') } catch {}
-      this.user = null;
-      this.guest = false;
-      this.token = null;
-      localStorage.removeItem("user");
-      localStorage.removeItem("token");
+      try {
+        await signOutUser();
+      } catch (e) {
+        console.warn('Sign-out failed:', e)
+      } finally {
+        try {
+          ElNotification({
+            title: 'Signed out 👋',
+            message: 'You have successfully logged out.',
+            type: 'info',
+            duration: 1600,
+            offset: 80,
+          })
+        } catch {}
+        try { trackEvent('Logout') } catch {}
+        this.resetAuth()
+        // Small delay to allow toast render, then hard redirect
+        setTimeout(() => { try { window.location.href = '/login' } catch {} }, 350)
+      }
     },
   },
 

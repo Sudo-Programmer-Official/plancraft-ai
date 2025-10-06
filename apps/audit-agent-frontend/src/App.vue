@@ -32,13 +32,32 @@ const examplePrompt = buildPrompt('Build an AI app for food delivery')
 </style> -->
 
 <template>
-  <RouterView />
+  <div v-if="authStore.loading" class="flex items-center justify-center h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 text-white">
+    <div class="text-center animate-pulse">
+      <div class="text-2xl">🌙 PlanCraftAI</div>
+      <p class="text-sm opacity-80 mt-2">Restoring your session...</p>
+    </div>
+  </div>
+  <transition name="page-fade" mode="out-in" v-else>
+    <RouterView />
+  </transition>
   <InstallPrompt />
 
 </template>
 
 <script setup>
 import InstallPrompt from "@/components/InstallPrompt.vue"
+import { useAuthStore } from '@/stores/authStore'
 
-// Minimal app shell
+const authStore = useAuthStore()
 </script>
+
+<style>
+.page-fade-enter-active, .page-fade-leave-active {
+  transition: opacity 0.4s ease, filter 0.4s ease;
+}
+.page-fade-enter-from, .page-fade-leave-to {
+  opacity: 0;
+  filter: blur(3px);
+}
+</style>
