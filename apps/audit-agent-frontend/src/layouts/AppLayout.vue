@@ -311,7 +311,7 @@
           class="max-w-7xl mx-auto px-4 flex items-center justify-center sm:justify-between gap-3"
         >
           <div class="hidden sm:flex items-center gap-2">
-            <img src="/logo.png" alt="PlanCraftAI" class="w-6 h-6" />
+            <img src="../../public/logo-bg-remove.png" alt="PlanCraftAI" class="w-6 h-6" />
             <span class="opacity-80">PlanCraftAI</span>
           </div>
           <div class="flex items-center gap-4">
