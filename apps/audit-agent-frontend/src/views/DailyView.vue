@@ -63,7 +63,7 @@ async function addTask() {
     logs: []
   }
   const saved = await addTaskToFirebase(newTask)
-  tasks.value.push(saved)
+  tasks.value = [saved, ...tasks.value.filter(t => t.id !== saved.id)]
 }
 
 async function toggleComplete(task) {

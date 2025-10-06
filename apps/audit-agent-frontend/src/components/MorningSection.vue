@@ -67,7 +67,8 @@ async function generateTasks() {
         logs: [],
       }
       const saved = await addTaskToFirebase(newTask)
-      tasks.value.push(saved)
+      // Avoid duplicates by id; newest to front
+      tasks.value = [saved, ...tasks.value.filter(t => t.id !== saved.id)]
     }
   } catch (err) {
     console.error('Task generation failed:', err)

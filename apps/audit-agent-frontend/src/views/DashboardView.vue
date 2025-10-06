@@ -460,8 +460,10 @@ async function redirectToLogin() {
 
 async function fetchAISummary() {
   try {
-    const allTasks = [...dailyTasks.value, ...weeklyTasks.value, ...monthlyTasks.value]
-    const compacted = allTasks.map(t => ({
+    // Merge across ranges but avoid duplicates (today ∈ week ∈ month)
+    const all = [...dailyTasks.value, ...weeklyTasks.value, ...monthlyTasks.value]
+    const unique = Array.from(new Map(all.map(t => [t.id, t])).values())
+    const compacted = unique.map(t => ({
       id: t.id,
       title: t.title,
       completed: !!t.completed,

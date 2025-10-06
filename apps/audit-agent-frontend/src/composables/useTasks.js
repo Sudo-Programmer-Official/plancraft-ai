@@ -21,16 +21,21 @@ export function useTasks() {
   /**
    * 🔄 Load tasks from Firestore for today (and current user)
    */
+  function uniqueById(list) {
+    return Array.from(new Map((Array.isArray(list) ? list : []).map(t => [t.id, t])).values())
+  }
+
   async function loadTasks() {
     let raw = await fetchTasksForToday()
 
     // Ensure newest first + incomplete before complete
-    tasks.value = raw.sort((a, b) => {
+    tasks.value = uniqueById(raw).sort((a, b) => {
       if (a.completed !== b.completed) {
         return a.completed - b.completed // incomplete first
       }
       return (b.createdAt || 0) - (a.createdAt || 0) // newest first
     })
+    try { if (import.meta.env.DEV) console.log('[useTasks] loadTasks ids:', tasks.value.map(t => t.id)) } catch {}
 
     initialized = true
   }
@@ -41,12 +46,13 @@ export function useTasks() {
   async function loadTasksForDate(dateStr) {
     let raw = await fetchTasksByDate(dateStr)
 
-    tasks.value = raw.sort((a, b) => {
+    tasks.value = uniqueById(raw).sort((a, b) => {
       if (a.completed !== b.completed) {
         return a.completed - b.completed
       }
       return (b.createdAt || 0) - (a.createdAt || 0)
     })
+    try { if (import.meta.env.DEV) console.log('[useTasks] loadTasksForDate ids:', tasks.value.map(t => t.id)) } catch {}
 
     initialized = true
   }
@@ -55,7 +61,7 @@ export function useTasks() {
    * Load tasks for a date range inclusive (YYYY-MM-DD)
    */
   async function loadTasksForRange(startYMD, endYMD) {
-    tasks.value = await fetchTasksBetween(startYMD, endYMD)
+    tasks.value = uniqueById(await fetchTasksBetween(startYMD, endYMD))
 
     // add sorting if needed
     tasks.value.sort((a, b) => {
@@ -64,6 +70,7 @@ export function useTasks() {
       }
       return (b.createdAt || 0) - (a.createdAt || 0) // newest first
     })
+    try { if (import.meta.env.DEV) console.log('[useTasks] loadTasksForRange ids:', tasks.value.map(t => t.id)) } catch {}
 
     initialized = true
   }
@@ -86,7 +93,9 @@ export function useTasks() {
     const task = { ...baseTask, ...(newTask || {}) }
 
     const saved = await addTaskToFirebase(task)
-    tasks.value.unshift(saved)
+    // Replace by id if exists; then put newest first
+    tasks.value = [saved, ...tasks.value.filter(t => t.id !== saved.id)]
+    try { if (import.meta.env.DEV) console.log('[useTasks] addTask ids:', tasks.value.map(t => t.id)) } catch {}
     try {
       trackEvent('Task Created', {
         source: newTask?.source || 'journal',
