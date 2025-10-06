@@ -149,24 +149,29 @@ const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY, { apiVersion: '
 router.get('/subscription/status', async (req, res) => {
   try {
     const userId = String(req.query.userId || '')
-    if (!userId) return res.json({ plan: 'free', remainingDays: 0 })
+    if (!userId) return res.json({ plan: 'free', status: 'free', remainingDays: 0 })
     const snap = await db.collection('users').doc(userId).get()
     const data = snap.exists ? snap.data() : {}
     const sub = data?.subscription || {}
-    const status = String(sub.status || '').toLowerCase()
-    const plan = status === 'active' ? 'premium' : 'free'
+    const rawStatus = String(sub.status || '').toLowerCase()
+    const status = rawStatus || 'free'
+    const plan = status === 'active' || status === 'trialing' || status === 'past_due' ? 'premium' : 'free'
+
     let remainingDays = 0
+    let cancelAt = sub?.cancelAt || null
     try {
       const end = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null
       if (end) {
         const diffMs = end.getTime() - Date.now()
         remainingDays = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)))
+        // If cancelAt not explicitly set but a period end exists and cancel is scheduled, reflect it
+        if (sub?.cancelAtPeriodEnd && !cancelAt) cancelAt = end
       }
     } catch {}
-    return res.json({ plan, remainingDays })
+    return res.json({ plan, status, cancelAt, remainingDays })
   } catch (err) {
     console.error('subscription/status error', err)
-    res.status(200).json({ plan: 'free', remainingDays: 0 })
+    res.status(200).json({ plan: 'free', status: 'free', remainingDays: 0 })
   }
 })
 
@@ -257,7 +262,9 @@ router.post('/subscription/cancel', async (req, res) => {
     if (result.cancel_at_period_end) {
       payload.subscription.status = 'active'
       payload.subscription.cancelAtPeriodEnd = true
-      payload.subscription.currentPeriodEnd = result.current_period_end
+      // Stripe returns seconds epoch; convert to Date
+      payload.subscription.currentPeriodEnd = result.current_period_end ? new Date(result.current_period_end * 1000) : null
+      payload.subscription.cancelAt = payload.subscription.currentPeriodEnd
     } else if (result.status === 'canceled') {
       payload.subscription.status = 'canceled'
       payload.subscription.plan = 'free'

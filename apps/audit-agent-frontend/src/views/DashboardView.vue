@@ -8,6 +8,24 @@
   >
     <GuestBanner :isGuest="authStore.guest" @login="redirectToLogin" />
 
+    <!-- Reactivate instantly banner (during cancel period) -->
+    <div
+      v-if="reactivateEligible"
+      class="col-span-1 sm:col-span-2 lg:col-span-3 px-3 py-2 rounded-xl border border-yellow-400/30 bg-yellow-500/10 text-yellow-100 flex items-start gap-3"
+    >
+      <span>🔁</span>
+      <div class="text-sm">
+        <div class="font-medium">
+          Premium until {{ cancelAtFmt }}
+          <span v-if="daysLeft > 0">({{ daysLeft }} day{{ daysLeft === 1 ? '' : 's' }} left)</span>
+        </div>
+        <div class="opacity-90">Reactivate instantly to keep all premium features.</div>
+      </div>
+      <div class="ml-auto">
+        <button @click="onReactivate" class="px-3 py-1.5 rounded-lg bg-black/20 hover:bg-black/30 text-yellow-50 text-sm">Reactivate</button>
+      </div>
+    </div>
+
     <!-- ====== DAILY + QUICK LINKS ====== -->
     <div class="col-span-1 sm:col-span-2 lg:col-span-2 space-y-4">
       <!-- Daily Card -->
@@ -227,6 +245,9 @@ import { addTaskToFirebase, updateTaskInFirebase, fetchEntries } from '@/service
 import QuickLinksCard from '@/components/QuickLinksCard.vue'
 import { driver } from 'driver.js'
 import 'driver.js/dist/driver.css'
+import { useSubscriptionStore } from '@/stores/subscriptionStore'
+import { reactivateSubscription } from '@/services/stripeService'
+import dayjs from 'dayjs'
 // === Reminder badges (Daily list) ===
 import { getReminderStatus, scheduleReminder } from '@/services/reminderService'
 import api from '@/services/api'
@@ -235,6 +256,13 @@ import { getPreferences as getUserPreferences } from '@/services/settingsService
 // import { auth } from '@/firebase/init'
 
 const authStore = useAuthStore()
+const subStore = useSubscriptionStore()
+const reactivateEligible = computed(() => String(subStore.subscription?.status || '').toLowerCase() === 'canceled' && !!subStore.subscription?.cancelAt)
+const daysLeft = computed(() => {
+  const d = subStore.subscription?.cancelAt
+  return d ? Math.max(0, dayjs(d).diff(dayjs(), 'day')) : 0
+})
+const cancelAtFmt = computed(() => subStore.subscription?.cancelAt ? dayjs(subStore.subscription.cancelAt).format('MMM D, YYYY') : '')
 
 // UI Toggles (customizable dashboard)
 const showDaily = ref(true)
@@ -456,6 +484,17 @@ onUnmounted(() => {
 
 async function redirectToLogin() {
   window.location.href = '/login?redirect=/dashboard'
+}
+
+async function onReactivate() {
+  try {
+    const uid = authStore?.user?.uid
+    if (!uid) return redirectToLogin()
+    const url = await reactivateSubscription(uid)
+    window.location.href = url
+  } catch (e) {
+    console.error('Reactivate failed', e)
+  }
 }
 
 async function fetchAISummary() {

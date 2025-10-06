@@ -96,18 +96,56 @@ const isPremium = computed(() => {
   } catch { return false }
 })
 
+// async function onUpgrade() {
+//   try {
+//     // Ensure signed in with a non-guest account before starting checkout
+//     const isGuest = authStore.isGuest === true || authStore.guest === true || authStore.user?.mode === 'guest'
+//     if (!authStore.user?.uid || isGuest) {
+//       try { localStorage.setItem('postLoginRedirect', '/subscription?upgrade=1') } catch {}
+//       try { ElMessage.info('Please sign in to upgrade your plan.') } catch {}
+//       return router.push('/login')
+//     }
+//     loading.value = true
+//     trackEvent('upgrade_started')
+//     const url = await createCheckoutSession('monthly', authStore.user?.uid)
+//     window.location.href = url
+//   } catch (e) {
+//     loading.value = false
+//     errorVisible.value = true
+//   }
+// }
 async function onUpgrade() {
   try {
-    // Ensure signed in before starting checkout
-    if (!authStore.user) {
-      try { localStorage.setItem('postLoginRedirect', '/subscription?upgrade=1') } catch {}
+    // Check guest or missing auth
+    const isGuest = authStore.isGuest === true || authStore.guest === true || authStore.user?.mode === 'guest'
+
+    if (!authStore.user?.uid || isGuest) {
+      // Store post-login redirect intent
+      localStorage.setItem('postLoginRedirect', '/subscription?upgrade=1')
+
+      // Themed info message (aligned with PlanCraftAI UI tone)
+      ElNotification({
+        title: '🚀 Upgrade to Premium',
+        message: 'Please sign in first to continue your upgrade ✨',
+        type: 'info',
+        duration: 2800,
+        offset: 80,
+        position: 'top-right',
+        customClass: 'glass-toast',
+      })
+
+      // Navigate to login page
       return router.push('/login')
     }
+
+    // Proceed with checkout
     loading.value = true
     trackEvent('upgrade_started')
     const url = await createCheckoutSession('monthly', authStore.user?.uid)
     window.location.href = url
+
   } catch (e) {
+    console.error('Upgrade error:', e)
     loading.value = false
     errorVisible.value = true
   }
@@ -209,3 +247,13 @@ async function onCancel() {
   }
 }
 </script>
+
+<style scoped>
+.el-notification.glass-toast {
+  background: rgba(30, 15, 60, 0.75);
+  border: 1px solid rgba(138, 92, 246, 0.25);
+  backdrop-filter: blur(12px);
+  color: #e5d4ff;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+</style>
