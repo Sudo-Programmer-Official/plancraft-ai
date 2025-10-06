@@ -262,7 +262,6 @@ router.post('/subscription/cancel', async (req, res) => {
       payload.subscription.status = 'canceled'
       payload.subscription.plan = 'free'
       payload['plan'] = 'free'
-      payload['role'] = 'free'
     }
     await db.collection('users').doc(String(userId)).set(payload, { merge: true })
 

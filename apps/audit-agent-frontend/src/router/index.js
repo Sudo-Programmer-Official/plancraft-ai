@@ -79,7 +79,8 @@ router.beforeEach(async (to, from, next) => {
   const user = await getCurrentUser()
   if (!user) return next({ path: '/login', query: { redirect: to.fullPath } })
   // Admin guard
-  if (to.meta.requiresAdmin) {
+  const wantsAdmin = to.meta.requiresAdmin || to.path.startsWith('/admin')
+  if (wantsAdmin) {
     const authStore = useAuthStore()
     if (authStore?.user?.role !== 'admin') {
       return next({ path: '/dashboard' })

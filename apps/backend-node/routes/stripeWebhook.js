@@ -57,7 +57,6 @@ export async function stripeWebhookHandler(req, res) {
         await db.collection("users").doc(uid).set(
           {
             plan: "premium",
-            role: "premium",
             subscription: {
               status: "active",
               stripeSubId: sub?.id || session.subscription,
@@ -139,7 +138,6 @@ export async function stripeWebhookHandler(req, res) {
           if (uid) {
             await db.collection('users').doc(uid).set({
               plan: 'premium',
-              role: 'premium',
               subscription: {
                 status: sub?.status === 'active' || sub?.status === 'trialing' ? 'active' : 'past_due',
                 stripeSubId: sub?.id,
@@ -180,7 +178,6 @@ export async function stripeWebhookHandler(req, res) {
             for (const doc of qs.docs) {
               await doc.ref.set({
                 plan: 'free',
-                role: 'free',
                 subscription: { status: 'canceled', plan: 'free' },
               }, { merge: true })
             }
@@ -193,7 +190,6 @@ export async function stripeWebhookHandler(req, res) {
         await db.collection("users").doc(uid).set(
           {
             plan: 'free',
-            role: "free",
             subscription: {
               status: "canceled",
               plan: "free",
