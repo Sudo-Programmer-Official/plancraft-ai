@@ -14,12 +14,12 @@
         </span>
 
         <div class="flex flex-wrap items-center justify-center gap-2">
-          <RouterLink
-            to="/subscription"
+          <button
+            @click="goToUpgrade('banner')"
             class="bg-gradient-to-r from-fuchsia-500 via-purple-500 to-indigo-500 text-white font-semibold text-sm px-3 py-1.5 rounded-lg hover:scale-105 transition-transform shadow-md"
           >
             Upgrade
-          </RouterLink>
+          </button>
 
           <button
             @click="planOpen = true"
@@ -277,12 +277,12 @@
               </el-tooltip>
             </template>
             <template v-else>
-              <RouterLink
-                to="/subscription"
+              <button
+                @click="goToUpgrade('header')"
                 class="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-sm hover:from-purple-600 hover:to-pink-700 transition"
               >
                 🚀 Upgrade
-              </RouterLink>
+              </button>
             </template>
           </div>
 
@@ -327,6 +327,7 @@
       <PlanSummaryModal :open="planOpen" @close="planOpen = false" />
     </div>
   </div>
+  <LoginPromptModal />
 </template>
 
 <script setup>
@@ -340,10 +341,18 @@ import NotificationDropdown from '@/components/NotificationDropdown.vue'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useIsPremium } from '@/composables/useIsPremium'
 import PlanSummaryModal from '@/components/PlanSummaryModal.vue'
+import LoginPromptModal from '@/components/LoginPromptModal.vue'
+import { redirectToUpgradeIntent } from '@/services/upgradeIntent'
 
 const sidebarOpen = ref(true) // desktop toggle
 const mobileMenu = ref(false) // mobile drawer toggle
 const showUpgrade = ref(false)
+const showLoginPrompt = ref(false)
+const showLoginPromptOnce = localStorage.getItem('showLoginPromptOnce') === '1'
+if (showLoginPromptOnce) {
+  showLoginPrompt.value = true
+  localStorage.removeItem('showLoginPromptOnce')
+}
 const planOpen = ref(false)
 
 const router = useRouter()
@@ -391,6 +400,11 @@ async function handleLogout() {
   await authStore.logout()
   router.push('/login')
 }
+onMounted(() => {
+  window.addEventListener('login-required', () => {
+    showLoginPrompt.value = true
+  })
+})
 
 onMounted(() => {
   const seenTour = localStorage.getItem('seenDashboardTour')
@@ -518,6 +532,21 @@ function startTour() {
   })
 
   tour.drive()
+}
+
+function goToUpgrade(source = 'header') {
+  try {
+    const user = authStore?.user
+    if (!user?.uid || authStore.isGuest) {
+      redirectToUpgradeIntent(source)
+      return router.push('/login')
+    }
+    router.push('/subscription?upgrade=1')
+  } catch {
+    router.push('/subscription')
+  } finally {
+    showUpgrade.value = false
+  }
 }
 </script>
 

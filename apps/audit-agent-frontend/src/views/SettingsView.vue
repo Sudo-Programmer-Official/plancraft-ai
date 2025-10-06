@@ -179,6 +179,7 @@ import { ElMessage } from "element-plus"
 import { getPreferences as apiGetPrefs, updatePreferences as apiUpdatePrefs, getIntegrations, updateIntegrations } from "@/services/settingsService"
 import { subscribeUserToPush } from "@/services/pwaService"
 import { useSubscriptionStore } from "@/stores/subscriptionStore"
+import { redirectToUpgradeIntent } from '@/services/upgradeIntent'
 import { isFeatureAllowed, getRemainingAI } from "@/services/planService"
 import PlanSummaryModal from "@/components/PlanSummaryModal.vue"
 import { useIsPremium } from "@/composables/useIsPremium"
@@ -264,7 +265,14 @@ function handleLogout() {
 }
 
 function upgradePlan() {
-  router.push("/subscription") // redirect to subscription/pricing
+  try {
+    const user = authStore?.user
+    if (!user?.uid || authStore.isGuest) {
+      redirectToUpgradeIntent('settings')
+      return router.push('/login')
+    }
+  } catch {}
+  router.push('/subscription')
 }
 
 // Updated saveSettings function with user feedback
@@ -326,5 +334,4 @@ section h2 {
   color: #f8fafc;
 }
 </style>
-
 

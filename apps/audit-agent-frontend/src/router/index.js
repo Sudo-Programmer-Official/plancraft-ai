@@ -29,6 +29,8 @@ const router = createRouter({
   routes: [
     { path: '/', name: 'landing', component: LandingPage },
     { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue') },
+    // Public subscription landing (noindex)
+    // { path: '/subscription', name: 'subscription', component: () => import('@/views/PricingView.vue'), meta: { robots: 'noindex, nofollow' } },
     { path: '/privacy', component: PrivacyPolicy },
     { path: '/terms', component: Terms },
     { path: '/contact', component: Contact },
@@ -61,8 +63,8 @@ const router = createRouter({
         { path: 'planner', name: 'planner', component: () => import('@/views/PlannerView.vue') },
         { path: 'timeline', name: 'timeline', component: () => import('@/views/TimelineView.vue') },
         { path: 'settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },
-        { path: 'pricing', name: 'pricing', component: () => import('@/views/PricingView.vue') },
         { path: 'subscription', name: 'subscription', component: () => import('@/views/PricingView.vue') },
+        { path: 'pricing', name: 'pricing', component: () => import('@/views/PricingView.vue') },
         { path: 'help', name: 'help', component: () => import('@/views/HelpView.vue') },
       ]
     },
@@ -86,6 +88,21 @@ router.beforeEach(async (to, from, next) => {
     }
   }
   next()
+})
+
+// Apply per-route robots meta for crawlers
+router.afterEach((to) => {
+  try {
+    const content = (to.meta && to.meta.robots) || 'index, follow'
+    if (typeof document === 'undefined') return
+    let tag = document.querySelector('meta[name="robots"]')
+    if (!tag) {
+      tag = document.createElement('meta')
+      tag.setAttribute('name', 'robots')
+      document.head.appendChild(tag)
+    }
+    tag.setAttribute('content', String(content))
+  } catch {}
 })
 
 // router.afterEach((to) => {

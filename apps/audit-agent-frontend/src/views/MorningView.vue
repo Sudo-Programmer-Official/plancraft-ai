@@ -42,6 +42,7 @@
 import { ref } from "vue"
 import { ElNotification } from 'element-plus'
 import { addTaskToFirebase } from "@/services/firebaseService"
+import { redirectToUpgradeIntent } from '@/services/upgradeIntent'
 import { generateTasksFromText } from "@/services/aiService"
 
 const planText = ref("")
@@ -56,7 +57,10 @@ async function generateTasks() {
     if (status === 403) {
       const msg = err?.response?.data?.error || 'Daily AI limit reached. Upgrade to Pro to continue.'
       ElNotification({ title: 'Upgrade Required', message: msg, type: 'warning', duration: 3500 })
-      try { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('upgrade-required', { detail: { source: 'morning-view' } })) } catch {}
+      try {
+        redirectToUpgradeIntent('morning-view')
+        if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('upgrade-required', { detail: { source: 'morning-view' } }))
+      } catch {}
     } else {
       console.error('AI generation failed:', err)
       ElNotification({ title: 'Error', message: 'Failed to generate tasks. Please try again later.', type: 'error', duration: 3000 })

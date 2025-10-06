@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "nodemon index.js",
     "start": "node index.js",
-    "postinstall": "rm -rf node_modules/pdf-parse/test"
+    "postinstall": "rm -rf node_modules/pdf-parse/test",
+    "stripe:webhook": "bash scripts/stripe-webhook-dev.sh",
+    "stripe:test": "bash scripts/stripe-test-events.sh"
   },
   "dependencies": {
     "@sendgrid/mail": "^8.1.6",

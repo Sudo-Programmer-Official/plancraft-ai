@@ -14,9 +14,13 @@ const stripe = STRIPE_SECRET_KEY
 // POST /api/create-checkout-session
 router.post('/create-checkout-session', async (req, res) => {
   try {
-    const { userId, plan, successUrl, cancelUrl } = req.body || {}
+    // Accept either uid or userId from clients
+    const body = req.body || {}
+    const incomingUid = body.uid || body.userId
+    const userId = incomingUid ? String(incomingUid) : ''
+    const { plan, successUrl, cancelUrl } = body
 
-    if (!userId) return res.status(400).json({ error: 'User must be logged in to upgrade' })
+    if (!userId) return res.status(403).json({ error: 'Login required before subscribing.' })
     if (!plan) return res.status(400).json({ error: 'Missing plan' })
 
     // Dynamically resolve plan → Stripe Price ID (with aliases)
@@ -50,6 +54,42 @@ router.post('/create-checkout-session', async (req, res) => {
       return res.json({ url })
     }
 
+    // Link or create a Stripe customer for this uid for cleaner billing lifecycle
+    let customerId
+    try {
+      const snap = await db.collection('users').doc(userId).get()
+      const data = snap.exists ? (snap.data() || {}) : {}
+      // Block guest/anonymous accounts from purchasing
+      if (String(data?.mode || '').toLowerCase() === 'guest') {
+        return res.status(403).json({ error: 'Login required before subscribing.' })
+      }
+      customerId = data?.subscription?.customerId || data?.stripeCustomerId || null
+      // Create customer if missing
+      if (!customerId) {
+        const email = data?.email || undefined
+        const name = data?.name || undefined
+        const customer = await stripe.customers.create({
+          email,
+          name,
+          metadata: { userId },
+          description: `PlanCraftAI customer for uid ${userId}`,
+        })
+        customerId = customer.id
+        // Persist for future mapping
+        const payload = {
+          subscription: {
+            ...(data.subscription || {}),
+            customerId,
+          },
+          stripeCustomerId: customerId,
+          updatedAt: new Date(),
+        }
+        await db.collection('users').doc(userId).set(payload, { merge: true })
+      }
+    } catch (e) {
+      console.warn('⚠️ Failed to link Stripe customer; proceeding without explicit customer', e?.message || e)
+    }
+
     // Create Checkout Session
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
@@ -57,6 +97,7 @@ router.post('/create-checkout-session', async (req, res) => {
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: successUrl || process.env.STRIPE_SUCCESS_URL,
       cancel_url: cancelUrl || process.env.STRIPE_CANCEL_URL,
+      customer: customerId || undefined,
       metadata: { userId, plan: planKey },
     })
 

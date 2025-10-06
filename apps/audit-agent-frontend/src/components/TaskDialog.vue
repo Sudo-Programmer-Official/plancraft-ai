@@ -70,6 +70,7 @@ import { useVoiceRecorder } from "@/composables/useVoiceRecorder"
 import api from "@/services/api"
 import { useAuthStore } from "@/stores/authStore"
 import { getReminderStatus, scheduleReminder } from "@/services/reminderService"
+import { redirectToUpgradeIntent } from '@/services/upgradeIntent'
 import { getPreferences as getUserPreferences } from "@/services/settingsService"
 
 const props = defineProps({
@@ -164,7 +165,10 @@ async function save() {
     if (status === 403) {
       const msg = e?.response?.data?.error || 'Daily reminder limit reached. Upgrade to Pro to continue.'
       ElNotification({ title: 'Upgrade Required', message: msg, type: 'warning', duration: 3500 })
-      try { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('upgrade-required', { detail: { source: 'reminder' } })) } catch {}
+      try {
+        redirectToUpgradeIntent('reminder')
+        if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('upgrade-required', { detail: { source: 'reminder' } }))
+      } catch {}
     } else {
       console.warn('Reminder sync failed:', e?.response?.data || e?.message)
     }

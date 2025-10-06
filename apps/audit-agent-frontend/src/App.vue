@@ -33,12 +33,14 @@ const examplePrompt = buildPrompt('Build an AI app for food delivery')
 
 <template>
   <RouterView />
+  <LoginPromptModal />
   <InstallPrompt />
 
 </template>
 
 <script setup>
 import InstallPrompt from "@/components/InstallPrompt.vue"
+import LoginPromptModal from "@/components/LoginPromptModal.vue"
 
 // Minimal app shell
 </script>

@@ -7,7 +7,8 @@ export async function createCheckoutSession(plan, userId) {
     const cancelUrl = window.location.origin + '/subscription?status=cancel'
     const res = await api.post('/create-checkout-session', {
       plan,
-      userId,
+      userId, // back-compat
+      uid: userId,
       successUrl,
       cancelUrl,
     })

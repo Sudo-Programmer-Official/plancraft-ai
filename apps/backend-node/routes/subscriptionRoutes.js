@@ -173,10 +173,19 @@ router.get('/subscription/status', async (req, res) => {
 // POST /api/subscription/checkout
 router.post('/subscription/checkout', async (req, res) => {
   try {
-    const { userId, priceId, successUrl, cancelUrl } = req.body || {}
-    if (!userId || !priceId) {
-      return res.status(400).json({ error: 'Missing userId or priceId' })
-    }
+    const body = req.body || {}
+    const incomingUid = body.uid || body.userId
+    const userId = incomingUid ? String(incomingUid) : ''
+    const { priceId, successUrl, cancelUrl } = body
+    if (!userId) return res.status(403).json({ error: 'Login required before subscribing.' })
+    try {
+      const snap = await db.collection('users').doc(userId).get()
+      const data = snap.exists ? (snap.data() || {}) : {}
+      if (String(data?.mode || '').toLowerCase() === 'guest') {
+        return res.status(403).json({ error: 'Login required before subscribing.' })
+      }
+    } catch {}
+    if (!priceId) return res.status(400).json({ error: 'Missing priceId' })
 
     if (!stripe) {
       return res.status(500).json({ error: 'Stripe not configured' })

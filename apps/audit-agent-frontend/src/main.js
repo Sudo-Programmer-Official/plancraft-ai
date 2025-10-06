@@ -204,5 +204,21 @@ bindRouter(router)
 const authStore = useAuthStore()
 authStore.init()
 
+// Global login-required handler: persist intent and show modal (App.vue)
+try {
+  if (typeof window !== 'undefined') {
+    window.addEventListener('login-required', (e) => {
+      try {
+        const feature = e?.detail?.feature
+        const suffix = feature ? `&feature=${encodeURIComponent(feature)}` : ''
+        localStorage.setItem('postLoginRedirect', `/subscription?upgrade=1${suffix}`)
+        // Fallback flag in case modal mounted after event
+        localStorage.setItem('showLoginPromptOnce', '1')
+      } catch {}
+      // Let LoginPromptModal handle UI; avoid hard redirect here for smoother UX
+    })
+  }
+} catch {}
+
 // Mount app
 app.mount('#app')

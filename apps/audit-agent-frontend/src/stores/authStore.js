@@ -90,6 +90,8 @@ export const useAuthStore = defineStore("authStore", {
               photoURL: user.photoURL,
               role: profile?.role || 'user',
             }
+            // Keep accurate guest state across reloads
+            this.guest = user?.isAnonymous === true
             this.token = token
             identifyUser(this.user)
             localStorage.setItem('user', JSON.stringify(this.user))
@@ -101,6 +103,7 @@ export const useAuthStore = defineStore("authStore", {
             this.token = null
             localStorage.removeItem('user')
             localStorage.removeItem('token')
+            this.guest = false
           }
         } catch (e) {
           // On error, clear potentially stale creds
@@ -108,6 +111,7 @@ export const useAuthStore = defineStore("authStore", {
           this.token = null
           localStorage.removeItem('user')
           localStorage.removeItem('token')
+          this.guest = false
         }
       })
     },

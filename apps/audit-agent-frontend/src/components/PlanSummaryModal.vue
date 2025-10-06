@@ -12,13 +12,13 @@
       </div>
 
       <div class="pt-2">
-        <router-link
+        <button
           v-if="planKey !== 'PREMIUM'"
-          to="/subscription"
+          @click="upgradeFromModal"
           class="inline-block px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition font-medium"
         >
           🚀 Upgrade to Pro
-        </router-link>
+        </button>
         <span
           v-else
           class="inline-block px-4 py-2 rounded-full bg-gradient-to-r from-purple-600 to-pink-500 text-white font-semibold text-sm shadow-sm"
@@ -33,6 +33,8 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useAuthStore } from '@/stores/authStore'
+import { useRouter } from 'vue-router'
+import { redirectToUpgradeIntent } from '@/services/upgradeIntent'
 import { PLANS } from '@/services/planService'
 
 const props = defineProps({ open: { type: Boolean, default: false } })
@@ -58,9 +60,25 @@ const limits = computed(() => ({
 function onClose() {
   emit('close')
 }
+
+const router = useRouter()
+function upgradeFromModal() {
+  try {
+    const user = authStore?.user
+    if (!user?.uid || authStore.isGuest) {
+      redirectToUpgradeIntent('plan-summary')
+      emit('close')
+      return router.push('/login')
+    }
+    emit('close')
+    router.push('/subscription?upgrade=1')
+  } catch {
+    emit('close')
+    router.push('/subscription')
+  }
+}
 </script>
 
 <style scoped>
 
 </style>
-
