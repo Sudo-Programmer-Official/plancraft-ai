@@ -148,40 +148,50 @@
  * PlanCraftAI — End-to-End Reminder Orchestration
  */
 
-import OpenAI from "openai"
-import dayjs from "dayjs"
-import utc from "dayjs/plugin/utc.js"
-import timezone from "dayjs/plugin/timezone.js"
-import { db } from "./firebaseAdmin.js"
-import { send as sendWhatsApp } from "./integrations/whatsappProvider.js"
-import { sendEmail } from "./integrations/emailProvider.js"
-import { sendPWA } from "./integrations/pwaProvider.js"
+import OpenAI from "openai";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc.js";
+import timezone from "dayjs/plugin/timezone.js";
+import { db } from "./firebaseAdmin.js";
+import { send as sendWhatsApp } from "./integrations/whatsappProvider.js";
+import { sendEmail } from "./integrations/emailProvider.js";
+import { sendPWA } from "./integrations/pwaProvider.js";
+import { formatLocalTime } from "../utils/timezone.js";
 
-dayjs.extend(utc)
-dayjs.extend(timezone)
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // ---------------------------------------------
 // 1️⃣ CREATE REMINDER (Parse + Store + Queue)
 // ---------------------------------------------
-export async function createReminderFromText(userText, userId, channels = ["whatsapp"], options = {}) {
-  if (!userId) throw new Error("Missing userId")
+export async function createReminderFromText(
+  userText,
+  userId,
+  channels = ["whatsapp"],
+  options = {}
+) {
+  if (!userId) throw new Error("Missing userId");
 
-  const text = String(userText || '').trim()
-  if (!text) throw new Error("Empty reminder text")
+  const text = String(userText || "").trim();
+  if (!text) throw new Error("Empty reminder text");
 
-  let parsed = null
-  let when = null
+  let parsed = null;
+  let when = null;
 
   // Prefer concrete scheduledTime if provided
   if (options?.scheduledTime) {
     try {
-      when = new Date(options.scheduledTime)
-      if (!(when instanceof Date) || isNaN(when.getTime())) throw new Error('Invalid scheduledTime')
-      parsed = { task: text, time: when.toISOString() }
+      when = new Date(options.scheduledTime);
+      if (!(when instanceof Date) || isNaN(when.getTime()))
+        throw new Error("Invalid scheduledTime");
+      parsed = { task: text, time: when.toISOString() };
     } catch (e) {
-      console.warn('[Reminder] Invalid scheduledTime, falling back to GPT:', e?.message)
+      console.warn(
+        "[Reminder] Invalid scheduledTime, falling back to GPT:",
+        e?.message
+      );
     }
   }
 
@@ -193,124 +203,224 @@ export async function createReminderFromText(userText, userId, channels = ["what
         messages: [
           {
             role: "system",
-            content: "Extract a reminder from text. Return JSON: { task: string, time: ISO8601 string }"
+            content:
+              "Extract a reminder from text. Return JSON: { task: string, time: ISO8601 string }",
           },
-          { role: "user", content: `Reminder request: "${text}"` }
+          { role: "user", content: `Reminder request: "${text}"` },
         ],
         response_format: { type: "json_object" },
-        temperature: 0.2
-      })
-      const content = gpt?.choices?.[0]?.message?.content || "{}"
-      parsed = JSON.parse(content)
+        temperature: 0.2,
+      });
+      const content = gpt?.choices?.[0]?.message?.content || "{}";
+      parsed = JSON.parse(content);
     } catch (e) {
-      console.warn("[Reminder] GPT parse failed; fallback:", e?.message)
+      console.warn("[Reminder] GPT parse failed; fallback:", e?.message);
     }
   }
 
   // Fallback heuristic (+1h if GPT parse fails)
   if (!parsed || !parsed.task || !parsed.time) {
-    parsed = { task: text, time: new Date(Date.now() + 60 * 60 * 1000).toISOString() }
+    parsed = {
+      task: text,
+      time: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    };
   }
 
-  when = when || new Date(parsed.time)
+  when = when || new Date(parsed.time);
   if (!(when instanceof Date) || isNaN(when.getTime())) {
-    throw new Error("Parsed time invalid")
+    throw new Error("Parsed time invalid");
   }
 
   const reminder = {
     task: parsed.task,
     scheduledTime: when,
     userId: String(userId),
-    channels: Array.isArray(channels) && channels.length ? channels : ["whatsapp"],
+    channels:
+      Array.isArray(channels) && channels.length ? channels : ["whatsapp"],
     createdAt: new Date(),
     status: "scheduled",
     sentAt: null,
-    taskId: options?.taskId || null
-  }
+    taskId: options?.taskId || null,
+  };
 
-  console.log('[Reminder] Persisting reminder', {
+  console.log("[Reminder] Persisting reminder", {
     userId: reminder.userId,
     taskId: reminder.taskId,
     when: reminder.scheduledTime?.toISOString?.(),
-    channels: reminder.channels
-  })
+    channels: reminder.channels,
+  });
 
-  const ref = await db.collection("reminders").add(reminder)
-  console.log('[Reminder] Stored docId =', ref.id)
+  const ref = await db.collection("reminders").add(reminder);
+  console.log("[Reminder] Stored docId =", ref.id);
 
-  await queueReminder({ id: ref.id, ...reminder })
+  await queueReminder({ id: ref.id, ...reminder });
 
   // ✅ Confirmation via WhatsApp template
+  // try {
+  //   await sendWhatsApp(userId, {
+  //     template: "reminder_notification",
+  //     headerVars: ["⏰"],
+  //     bodyVars: [reminder.task, formatLocalTime(when)],
+  //   });
+  // } catch (e) {
+  //   console.warn("[Reminder] WhatsApp confirmation failed:", e?.message);
+  // }
+  // ✅ Confirmation via WhatsApp (template + fallback)
   try {
+    // Try sending via approved template first
     await sendWhatsApp(userId, {
       template: "reminder_notification",
       headerVars: ["⏰"],
       bodyVars: [reminder.task, formatLocalTime(when)],
-    })
+    });
+
+    console.log("[Reminder] WhatsApp confirmation sent via template");
   } catch (e) {
-    console.warn("[Reminder] WhatsApp confirmation failed:", e?.message)
+    const msg = e?.message || "";
+    const isTemplateMissing =
+      msg.includes("132001") ||
+      msg.includes("Template name does not exist") ||
+      msg.includes("404");
+
+    if (isTemplateMissing) {
+      // 🔁 Fallback: send plain-text version if template missing or not approved
+      console.warn(
+        "[Reminder] WhatsApp template missing — falling back to text mode"
+      );
+      try {
+        await sendWhatsApp(
+          userId,
+          `✅ Reminder set: "${reminder.task}" at ${formatLocalTime(when)}`
+        );
+        console.log("[Reminder] WhatsApp confirmation sent via text fallback");
+      } catch (fallbackErr) {
+        console.error(
+          "[Reminder] WhatsApp fallback failed:",
+          fallbackErr?.message
+        );
+      }
+    } else {
+      console.error("[Reminder] WhatsApp confirmation failed:", msg);
+    }
   }
 
-  return { id: ref.id, ...reminder }
+  return { id: ref.id, ...reminder };
 }
 
 // ---------------------------------------------
 // 2️⃣ SEND REMINDER (Triggered by Scheduler)
 // ---------------------------------------------
 export async function sendReminder(reminder) {
-  const channels = Array.isArray(reminder?.channels) ? reminder.channels : []
-  const userId = String(reminder?.userId || "")
-  const task = String(reminder?.task || "")
-  const when = reminder?.scheduledTime ? formatLocalTime(reminder.scheduledTime) : "soon"
+  const channels = Array.isArray(reminder?.channels) ? reminder.channels : [];
+  const userId = String(reminder?.userId || "");
+  const task = String(reminder?.task || "");
+  const when = reminder?.scheduledTime
+    ? formatLocalTime(reminder.scheduledTime)
+    : "soon";
 
-  console.log('[Scheduler] Executing reminder', {
+  console.log("[Scheduler] Executing reminder", {
     id: reminder?.id,
     userId,
     task,
     when,
     channels,
-    ts: new Date().toISOString()
-  })
+    ts: new Date().toISOString(),
+  });
 
   try {
     // WhatsApp — use template message
+    // if (channels.includes("whatsapp")) {
+    //   try {
+    //     const r = await sendWhatsApp(userId, {
+    //       template: "reminder_notification",
+    //       headerVars: ["⏰"],
+    //       bodyVars: [task, when],
+    //     })
+    //     console.log('[Delivery] WhatsApp ok', { userId, id: reminder?.id, result: r })
+    //   } catch (e) {
+    //     console.error("[Delivery] WhatsApp send failed:", e?.message)
+    //   }
+    // }
     if (channels.includes("whatsapp")) {
       try {
+        // Try sending via approved Meta template
         const r = await sendWhatsApp(userId, {
           template: "reminder_notification",
           headerVars: ["⏰"],
           bodyVars: [task, when],
-        })
-        console.log('[Delivery] WhatsApp ok', { userId, id: reminder?.id, result: r })
+        });
+        console.log("[Delivery] WhatsApp ok (template)", {
+          userId,
+          id: reminder?.id,
+          result: r,
+        });
       } catch (e) {
-        console.error("[Delivery] WhatsApp send failed:", e?.message)
+        const msg = e?.message || "";
+        const isTemplateMissing =
+          msg.includes("132001") ||
+          msg.includes("Template name does not exist") ||
+          msg.includes("404");
+
+        if (isTemplateMissing) {
+          // 🔁 Fallback to plain text message if template not found
+          console.warn(
+            "[WhatsApp] Template missing, falling back to text mode:",
+            msg
+          );
+          try {
+            const r2 = await sendWhatsApp(
+              userId,
+              `⏰ Reminder: ${task} (${when})`
+            );
+            console.log("[Delivery] WhatsApp ok (fallback)", {
+              userId,
+              id: reminder?.id,
+              result: r2,
+            });
+          } catch (fallbackErr) {
+            console.error(
+              "[Delivery] WhatsApp fallback failed:",
+              fallbackErr?.message
+            );
+          }
+        } else {
+          console.error("[Delivery] WhatsApp send failed (other error):", msg);
+        }
       }
     }
 
     // Email fallback
     if (channels.includes("email")) {
       try {
-        const r = await sendEmail(userId, task)
-        console.log('[Delivery] Email ok', { userId, id: reminder?.id, result: r })
+        const r = await sendEmail(userId, task);
+        console.log("[Delivery] Email ok", {
+          userId,
+          id: reminder?.id,
+          result: r,
+        });
       } catch (e) {
-        console.error("[Delivery] Email send failed:", e?.message)
+        console.error("[Delivery] Email send failed:", e?.message);
       }
     }
 
     // PWA fallback
     if (channels.includes("pwa")) {
       try {
-        const r = await sendPWA(userId, task)
-        console.log('[Delivery] PWA ok', { userId, id: reminder?.id, result: r })
+        const r = await sendPWA(userId, task);
+        console.log("[Delivery] PWA ok", {
+          userId,
+          id: reminder?.id,
+          result: r,
+        });
       } catch (e) {
-        console.error("[Delivery] PWA send failed:", e?.message)
+        console.error("[Delivery] PWA send failed:", e?.message);
       }
     }
-
   } finally {
-    await db.collection("reminders")
+    await db
+      .collection("reminders")
       .doc(String(reminder.id || reminder._id || ""))
-      .set({ sentAt: new Date(), status: "sent" }, { merge: true })
+      .set({ sentAt: new Date(), status: "sent" }, { merge: true });
   }
 }
 
@@ -319,39 +429,47 @@ export async function sendReminder(reminder) {
 // ---------------------------------------------
 export function queueReminder(rem) {
   try {
-    const id = String(rem?.id || rem?._id || "")
-    const when = rem?.scheduledTime || rem?.time
-    const ts = when instanceof Date ? when : new Date(when)
-    const delay = ts.getTime() - Date.now()
+    const id = String(rem?.id || rem?._id || "");
+    const when = rem?.scheduledTime || rem?.time;
+    const ts = when instanceof Date ? when : new Date(when);
+    const delay = ts.getTime() - Date.now();
 
-    if (!Number.isFinite(delay)) return
+    if (!Number.isFinite(delay)) return;
 
-    console.log(`[Scheduler] Queued reminder id=${id} taskId=${rem?.taskId || 'n/a'} at=${ts.toISOString()}`)
+    console.log(
+      `[Scheduler] Queued reminder id=${id} taskId=${rem?.taskId || "n/a"} at=${ts.toISOString()}`
+    );
 
     const fire = async () => {
-      try { await sendReminder({ ...rem, id }) }
-      catch (e) { console.error("sendReminder error:", e?.message) }
-    }
+      try {
+        await sendReminder({ ...rem, id });
+      } catch (e) {
+        console.error("sendReminder error:", e?.message);
+      }
+    };
 
     if (delay <= 0) {
-      console.log('[Scheduler] Firing overdue reminder immediately', { id, at: ts.toISOString() })
-      return fire()
+      console.log("[Scheduler] Firing overdue reminder immediately", {
+        id,
+        at: ts.toISOString(),
+      });
+      return fire();
     }
 
-    setTimeout(fire, Math.min(delay, 0x7fffffff))
+    setTimeout(fire, Math.min(delay, 0x7fffffff));
   } catch (e) {
-    console.error("queueReminder error:", e)
+    console.error("queueReminder error:", e);
   }
 }
 
 // ---------------------------------------------
 // 4️⃣ HELPER — LOCAL TIME FORMATTER
 // ---------------------------------------------
-function formatLocalTime(date) {
-  try {
-    const d = dayjs(date).tz("America/Chicago") // default fallback
-    return d.format("hh:mm A")
-  } catch {
-    return new Date(date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-  }
-}
+// function formatLocalTime(date) {
+//   try {
+//     const d = dayjs(date).tz("America/Chicago") // default fallback
+//     return d.format("hh:mm A")
+//   } catch {
+//     return new Date(date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+//   }
+// }
