@@ -163,11 +163,14 @@ import { getPreferences as getUserPreferences } from '@/services/settingsService
 import { scheduleReminder, getReminderStatus } from '@/services/reminderService'
 import { useTasks } from '@/composables/useTasks'
 import { toLocalDateKey, parseLocalDateKey } from '@/utils/dateHelper'
+import { normalizeParsedDateTime } from '@/utils/dateParser'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { isFeatureAllowed } from '@/services/planService'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
+import { toLocal } from '@/utils/timezone'  // add this at top if not imported
+
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -252,37 +255,226 @@ onMounted(async () => {
   if (props.task) tryPrefillReminder(props.task)
 })
 
+// function tryPrefillReminder(task) {
+//   try {
+//     if (!task?.id || reminderTime.value) return
+//     const uid = authStore?.user?.uid
+//     if (!uid) return
+//     // Query reminder status and set HH:mm from first scheduled item
+//     getReminderStatus(uid, task.id).then((r) => {
+//       const items = Array.isArray(r?.items) ? r.items : []
+//       const active = items.find(it => String(it?.status).toLowerCase() === 'scheduled') || items[0]
+//       const st = active?.scheduledTime
+//       if (!st) return
+//       try {
+//         // Normalize to local time from UTC and format as HH:mm
+//         let iso
+//         if (st && typeof st.toDate === 'function') {
+//           const d = st.toDate()
+//           iso = d && d.toISOString ? d.toISOString() : String(d)
+//         } else if (st instanceof Date) {
+//           iso = st.toISOString()
+//         } else {
+//           iso = String(st)
+//         }
+//         const local = dayjs.utc(iso).local()
+//         reminderTime.value = local.format('HH:mm')
+//       } catch {}
+//     }).catch(() => {})
+//   } catch {}
+// }
+// function tryPrefillReminder(task) {
+//   try {
+//     if (!task?.id || reminderTime.value) return
+//     const uid = authStore?.user?.uid
+//     if (!uid) return
+
+//     getReminderStatus(uid, task.id).then((r) => {
+//       const items = Array.isArray(r?.items) ? r.items : []
+//       const active = items.find(it => String(it?.status).toLowerCase() === 'scheduled') || items[0]
+//       const st = active?.scheduledTime
+//       if (!st) return
+
+//       let iso
+//       if (st && typeof st.toDate === 'function') iso = st.toDate().toISOString()
+//       else if (st instanceof Date) iso = st.toISOString()
+//       else iso = String(st)
+
+//       // ✅ FIX: Convert UTC → user timezone correctly
+//       const userTz = task?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
+//       const local = dayjs.utc(iso).tz(userTz)
+//       reminderTime.value = local.format('HH:mm')
+//     }).catch(() => {})
+//   } catch {}
+// }
+// function tryPrefillReminder(task) {
+//   try {
+//     if (!task?.id || reminderTime.value) return
+//     const uid = authStore?.user?.uid
+//     if (!uid) return
+
+//     const before = reminderTime.value || ''
+//     getReminderStatus(uid, task.id).then((r) => {
+//       const items = Array.isArray(r?.items) ? r.items : []
+//       if (!items.length) return
+
+//       // Prefer active scheduled reminders; choose the most recently created/scheduled
+//       const toJSDate = (v) => {
+//         try {
+//           if (!v) return null
+//           if (typeof v === 'string') return new Date(v)
+//           if (v instanceof Date) return v
+//           if (typeof v.toDate === 'function') return v.toDate()
+//           if (typeof v.seconds === 'number') return new Date(v.seconds * 1000)
+//           if (typeof v._seconds === 'number') return new Date(v._seconds * 1000)
+//         } catch {}
+//         return null
+//       }
+//       const scheduled = items.filter(it => String(it?.status).toLowerCase() === 'scheduled' && !it?.sentAt)
+//       const pool = scheduled.length ? scheduled : items
+//       pool.sort((a, b) => {
+//         const ad = toJSDate(a.createdAt) || toJSDate(a.scheduledTime) || new Date(0)
+//         const bd = toJSDate(b.createdAt) || toJSDate(b.scheduledTime) || new Date(0)
+//         return bd - ad
+//       })
+//       const st = pool[0]?.scheduledTime
+//       if (!st) return
+
+//       let iso
+//       if (st && typeof st.toDate === 'function') iso = st.toDate().toISOString()
+//       else if (st instanceof Date) iso = st.toISOString()
+//       else iso = String(st)
+
+//       // If user typed since request started, do not overwrite
+//       if (before && before !== (reminderTime.value || '')) return
+//       if (reminderTime.value) return
+
+//       const userTz = task?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
+//       const local = (dayjs.utc && dayjs.utc(iso).tz) ? dayjs.utc(iso).tz(userTz) : dayjs.utc(iso).local()
+//       reminderTime.value = local.format('HH:mm')
+//     }).catch(() => {})
+//   } catch {}
+// }
+// function tryPrefillReminder(task) {
+//   try {
+//     if (!task?.id || reminderTime.value) return
+//     const uid = authStore?.user?.uid
+//     if (!uid) return
+
+//     const before = reminderTime.value || ''
+//     getReminderStatus(uid, task.id).then((r) => {
+//       const items = Array.isArray(r?.items) ? r.items : []
+//       if (!items.length) return
+
+//       // Prefer active scheduled reminders; choose the most recently created/scheduled
+//       const toJSDate = (v) => {
+//         try {
+//           if (!v) return null
+//           if (typeof v === 'string') return new Date(v)
+//           if (v instanceof Date) return v
+//           if (typeof v.toDate === 'function') return v.toDate()
+//           if (typeof v.seconds === 'number') return new Date(v.seconds * 1000)
+//           if (typeof v._seconds === 'number') return new Date(v._seconds * 1000)
+//         } catch {}
+//         return null
+//       }
+
+//       const scheduled = items.filter(
+//         it => String(it?.status).toLowerCase() === 'scheduled' && !it?.sentAt
+//       )
+//       const pool = scheduled.length ? scheduled : items
+//       pool.sort((a, b) => {
+//         const ad = toJSDate(a.createdAt) || toJSDate(a.scheduledTime) || new Date(0)
+//         const bd = toJSDate(b.createdAt) || toJSDate(b.scheduledTime) || new Date(0)
+//         return bd - ad
+//       })
+
+//       const st = pool[0]?.scheduledTime
+//       if (!st) return
+
+//       let iso
+//       if (st && typeof st.toDate === 'function') iso = st.toDate().toISOString()
+//       else if (st instanceof Date) iso = st.toISOString()
+//       else iso = String(st)
+
+//       // If user typed since request started, do not overwrite
+//       if (before && before !== (reminderTime.value || '')) return
+//       if (reminderTime.value) return
+
+//       // ✅ FIX: Always convert from UTC → user timezone safely
+//       const userTz = task?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
+//       const local = dayjs.tz(dayjs.utc(iso), userTz)
+//       reminderTime.value = local.format('HH:mm')
+//     }).catch(() => {})
+//   } catch {}
+// }
+
 function tryPrefillReminder(task) {
   try {
     if (!task?.id || reminderTime.value) return
     const uid = authStore?.user?.uid
     if (!uid) return
-    // Query reminder status and set HH:mm from first scheduled item
-    getReminderStatus(uid, task.id).then((r) => {
-      const items = Array.isArray(r?.items) ? r.items : []
-      const active = items.find(it => String(it?.status).toLowerCase() === 'scheduled') || items[0]
-      const st = active?.scheduledTime
-      if (!st) return
-      try {
-        // Normalize to local time from UTC and format as HH:mm
-        let iso
-        if (st && typeof st.toDate === 'function') {
-          const d = st.toDate()
-          iso = d && d.toISOString ? d.toISOString() : String(d)
-        } else if (st instanceof Date) {
-          iso = st.toISOString()
-        } else {
-          iso = String(st)
+
+    const before = reminderTime.value || ''
+    getReminderStatus(uid, task.id)
+      .then((r) => {
+        const items = Array.isArray(r?.items) ? r.items : []
+        if (!items.length) return
+
+        // Prefer active scheduled reminders; choose the most recently created/scheduled
+        const toJSDate = (v) => {
+          try {
+            if (!v) return null
+            if (typeof v === 'string') return new Date(v)
+            if (v instanceof Date) return v
+            if (typeof v.toDate === 'function') return v.toDate()
+            if (typeof v.seconds === 'number') return new Date(v.seconds * 1000)
+            if (typeof v._seconds === 'number') return new Date(v._seconds * 1000)
+          } catch {}
+          return null
         }
-        const local = dayjs.utc(iso).local()
+
+        const scheduled = items.filter(
+          (it) => String(it?.status).toLowerCase() === 'scheduled' && !it?.sentAt
+        )
+        const pool = scheduled.length ? scheduled : items
+        pool.sort((a, b) => {
+          const ad = toJSDate(a.createdAt) || toJSDate(a.scheduledTime) || new Date(0)
+          const bd = toJSDate(b.createdAt) || toJSDate(b.scheduledTime) || new Date(0)
+          return bd - ad
+        })
+
+        const st = pool[0]?.scheduledTime
+        if (!st) return
+
+        let iso
+        if (st && typeof st.toDate === 'function') iso = st.toDate().toISOString()
+        else if (st instanceof Date) iso = st.toISOString()
+        else iso = String(st)
+
+        // If user typed since request started, do not overwrite
+        if (before && before !== (reminderTime.value || '')) return
+        if (reminderTime.value) return
+
+        // ✅ Always convert from UTC → user's local time correctly
+        // Default timezone set globally in main.js; .tz() uses it automatically
+        const local = dayjs.utc(iso).tz()
         reminderTime.value = local.format('HH:mm')
-      } catch {}
-    }).catch(() => {})
+      })
+      .catch(() => {})
   } catch {}
 }
 
 function buildLocalIso(ymd, hhmm) {
-  try { return new Date(`${ymd}T${hhmm}`).toISOString() } catch { return new Date().toISOString() }
+  try {
+    const [y, m, d] = String(ymd || '').split('-').map((n) => parseInt(n, 10))
+    const [hh, mm] = String(hhmm || '00:00').split(':').map((n) => parseInt(n, 10))
+    if (!y || !m || !d) throw new Error('invalid date parts')
+    const local = new Date(y, (m - 1), d, (hh || 0), (mm || 0), 0, 0)
+    return local.toISOString()
+  } catch {
+    return new Date().toISOString()
+  }
 }
 
 async function generateTasks() {
@@ -290,6 +482,12 @@ async function generateTasks() {
   loading.value = true
   try {
     const { tasks: items, reminderTime: aiIso } = await generateTasksFromText(input.value)
+    // If AI provided a parsed reminder datetime (UTC ISO), sync date picker + time
+    if (aiIso) {
+      const { date, time } = normalizeParsedDateTime(aiIso)
+      if (date && selectedDate.value !== date) selectedDate.value = date
+      if (time && reminderTime.value !== time) reminderTime.value = time
+    }
     const manualIso = reminderTime.value ? buildLocalIso(toLocalDateKey(parseLocalDateKey(selectedDate.value)), reminderTime.value) : null
     const effectiveIso = manualIso || aiIso
 
@@ -302,7 +500,7 @@ async function generateTasks() {
         date: toLocalDateKey(parseLocalDateKey(selectedDate.value)),
         order: tasks.value.length + i,
         logs: [],
-        reminderTime: reminderTime.value || (aiIso ? new Date(aiIso).toISOString().slice(11,16) : null)
+        reminderTime: reminderTime.value || (aiIso ? dayjs.utc(aiIso).tz().format('HH:mm') : null)
       }
       const saved = await addTaskToFirebase(newTask)
       try {
