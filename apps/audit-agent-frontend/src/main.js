@@ -155,6 +155,18 @@ import { initAnalytics, bindRouter } from '@/services/analytics'
 import 'driver.js/dist/driver.css'
 import { handleAuthError } from '@/services/firebaseService'
 
+// Day.js timezone defaults
+import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc'
+import timezone from 'dayjs/plugin/timezone'
+dayjs.extend(utc)
+dayjs.extend(timezone)
+try {
+  const guessed = dayjs.tz.guess()
+  dayjs.tz.setDefault(guessed)
+  console.log('[TimeZone] Default set to:', guessed)
+} catch {}
+
 
 // ✅ Firebase init
 import '@/firebase/init'

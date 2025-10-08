@@ -1,5 +1,6 @@
 // src/services/reminderService.js
 import api from '@/services/api'
+import { toUTC } from '@/utils/timezone'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
@@ -37,6 +38,10 @@ export async function scheduleReminder(userId, taskId, text, reminderTime, prefs
     ].filter(Boolean)
 
     const toIso = (val) => {
+      // Prefer robust tz-aware conversion when given plain local strings
+      const tz = dayjs.tz.guess()
+      const candidate = toUTC(val, tz)
+      if (candidate) return candidate
       try {
         const d = new Date(val)
         if (d instanceof Date && !isNaN(d.getTime())) return d.toISOString()

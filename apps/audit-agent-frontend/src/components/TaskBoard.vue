@@ -196,7 +196,15 @@ function closePlanner() {
 }
 
 function buildLocalIso(ymd, hhmm) {
-  try { return new Date(`${ymd}T${hhmm}`).toISOString() } catch { return new Date().toISOString() }
+  try {
+    const [y, m, d] = String(ymd || '').split('-').map((n) => parseInt(n, 10))
+    const [hh, mm] = String(hhmm || '00:00').split(':').map((n) => parseInt(n, 10))
+    if (!y || !m || !d) throw new Error('invalid date parts')
+    const local = new Date(y, (m - 1), d, (hh || 0), (mm || 0), 0, 0)
+    return local.toISOString()
+  } catch {
+    return new Date().toISOString()
+  }
 }
 
 async function handleSave(payload) {

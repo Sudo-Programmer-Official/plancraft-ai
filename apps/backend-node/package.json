@@ -9,6 +9,7 @@
     "postinstall": "rm -rf node_modules/pdf-parse/test"
   },
   "dependencies": {
+    "chrono-node": "^2.7.6",
     "@sendgrid/mail": "^8.1.6",
     "axios": "^1.9.0",
     "cors": "^2.8.5",

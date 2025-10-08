@@ -176,25 +176,55 @@ async function save() {
 
 function buildLocalIso(ymd, hhmm) {
   try {
-    const d = new Date(`${ymd}T${hhmm}`)
-    return d.toISOString()
-  } catch { return new Date().toISOString() }
+    const [y, m, d] = String(ymd || '').split('-').map((n) => parseInt(n, 10))
+    const [hh, mm] = String(hhmm || '00:00').split(':').map((n) => parseInt(n, 10))
+    if (!y || !m || !d) throw new Error('invalid date parts')
+    const local = new Date(y, (m - 1), d, (hh || 0), (mm || 0), 0, 0) // Local time
+    return local.toISOString() // Normalize to UTC for backend
+  } catch {
+    return new Date().toISOString()
+  }
 }
 
 async function prefillReminderTime(task) {
   try {
     const uid = authStore?.user?.uid
     if (!uid || !task?.id) return
+    const before = form.value.reminderTime || ''
     const r = await getReminderStatus(uid, task.id)
-    if (r?.hasActive && r.items?.length) {
-      const st = r.items[0]?.scheduledTime
-      const dt = coerceToDate(st)
-      if (dt) {
-        const hh = String(dt.getHours()).padStart(2, '0')
-        const mm = String(dt.getMinutes()).padStart(2, '0')
-        form.value.reminderTime = `${hh}:${mm}`
-      }
+    const items = Array.isArray(r?.items) ? r.items : []
+    if (!items.length) return
+
+    // Prefer active scheduled reminders; pick the most recently created or scheduled
+    const toJSDate = (v) => {
+      try {
+        if (!v) return null
+        if (typeof v === 'string') return new Date(v)
+        if (v instanceof Date) return v
+        if (typeof v.toDate === 'function') return v.toDate()
+        if (typeof v.seconds === 'number') return new Date(v.seconds * 1000)
+        if (typeof v._seconds === 'number') return new Date(v._seconds * 1000)
+      } catch {}
+      return null
     }
+    const scheduled = items.filter(it => String(it?.status).toLowerCase() === 'scheduled' && !it?.sentAt)
+    const pool = scheduled.length ? scheduled : items
+    pool.sort((a, b) => {
+      const ad = toJSDate(a.createdAt) || toJSDate(a.scheduledTime) || new Date(0)
+      const bd = toJSDate(b.createdAt) || toJSDate(b.scheduledTime) || new Date(0)
+      return bd - ad // most recent first
+    })
+    const st = pool[0]?.scheduledTime
+    const dt = toJSDate(st)
+    if (!dt) return
+
+    // Only apply if user hasn't typed since request started
+    if (before && before !== (form.value.reminderTime || '')) return
+    if (form.value.reminderTime) return
+
+    const hh = String(dt.getHours()).padStart(2, '0')
+    const mm = String(dt.getMinutes()).padStart(2, '0')
+    form.value.reminderTime = `${hh}:${mm}`
   } catch {}
 }
 

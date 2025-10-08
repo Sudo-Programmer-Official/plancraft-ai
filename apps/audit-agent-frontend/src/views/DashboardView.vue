@@ -248,6 +248,11 @@ import 'driver.js/dist/driver.css'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { reactivateSubscription } from '@/services/stripeService'
 import dayjs from 'dayjs'
+import { toUTC } from '@/utils/timezone'
+import utc from 'dayjs/plugin/utc'
+import timezone from 'dayjs/plugin/timezone'
+dayjs.extend(utc)
+dayjs.extend(timezone)
 // === Reminder badges (Daily list) ===
 import { getReminderStatus, scheduleReminder } from '@/services/reminderService'
 import api from '@/services/api'
@@ -539,8 +544,35 @@ async function toggleComplete(task) {
 }
 
 // === Reminder scheduling on save (mirror TaskBoard) ===
+// function buildLocalIso(ymd, hhmm) {
+//   try {
+//     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+//     const dateStr = `${ymd} ${hhmm || '00:00'}`
+//     return toUTC(dateStr, tz) || new Date().toISOString()
+//   } catch {
+//     return new Date().toISOString()
+//   }
+// }
+
+
 function buildLocalIso(ymd, hhmm) {
-  try { return new Date(`${ymd}T${hhmm}`).toISOString() } catch { return new Date().toISOString() }
+  try {
+    const [y, m, d] = String(ymd || '').split('-').map(n => parseInt(n, 10))
+    const [hh, mm] = String(hhmm || '00:00').split(':').map(n => parseInt(n, 10))
+    if (!y || !m || !d) throw new Error('invalid date parts')
+
+    // 🕐 Detect user’s timezone
+    // ✅ Convert local → UTC using default timezone (set in main.js)
+    const utcIso = dayjs
+      .tz(`${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')} ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`)
+      .utc()
+      .toISOString()
+
+    return utcIso
+  } catch (err) {
+    console.warn('buildLocalIso failed:', err)
+    return new Date().toISOString()
+  }
 }
 
 async function handleSaveAndSchedule(payload) {

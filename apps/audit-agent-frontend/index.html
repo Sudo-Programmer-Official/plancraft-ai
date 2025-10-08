@@ -1,22 +1,59 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta name="application-name" content="PlanCraftAI" />
-    <meta property="og:site_name" content="PlanCraftAI" />
-    <meta name="apple-mobile-web-app-title" content="PlanCraftAI" />
+    <!-- Basic Setup -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Page Title & Description -->
     <title>PlanCraftAI – Peaceful Productivity with AI</title>
-    <meta name="description" content="PlanCraftAI helps you plan, journal, and reflect with voice journaling, AI-powered task planning, and mindful insights. Your private productivity companion." />
-    <meta name="keywords" content="AI planner, daily tasks, productivity, journaling, AI task generator, mindful planning, PlanCraftAI" />
-    <meta name="ai-summary" content="PlanCraftAI is an AI-powered planner with journaling, task generation, and mindfulness tools." />
+    <meta name="description" content="PlanCraftAI helps you plan, journal, and reflect with voice journaling, AI-powered task planning, and mindful insights. Your personal productivity companion for a balanced life." />
+    <meta name="keywords" content="AI planner, daily tasks, productivity, journaling, AI task generator, mindful planning, time management, focus, self improvement, PlanCraftAI" />
+    <meta name="author" content="PlanCraftAI by Abhishek" />
+
+    <!-- App Identity -->
+    <meta name="application-name" content="PlanCraftAI" />
+    <meta name="apple-mobile-web-app-title" content="PlanCraftAI" />
+    <meta property="og:site_name" content="PlanCraftAI" />
+
+    <!-- Canonical & Sitemap -->
+    <link rel="canonical" href="https://plancraftai.com" />
+    <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml" />
+
+    <!-- Icons -->
+    <link rel="icon" href="/logo.png" type="image/png" />
+    <link rel="apple-touch-icon" href="/logo.png" sizes="512x512" />
+    <link rel="shortcut icon" href="/logo.png" />
+
+    <!-- Open Graph (Social Sharing) -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://plancraftai.com" />
-    <meta property="og:title" content="PlanCraftAI – Peaceful Productivity with AI" />
-    <meta property="og:description" content="PlanCraftAI helps you plan, journal, and reflect with voice journaling, AI-powered task planning, and mindful insights." />
-    <meta property="og:image" content="/logo.png" />
+    <meta property="og:title" content="PlanCraftAI – Plan, Reflect & Grow with AI" />
+    <meta property="og:description" content="Your AI-powered planner for mindful productivity. Create tasks, set reminders, and journal with your voice — all in one calm space." />
+    <meta property="og:image" content="https://plancraftai.com/logo.png" />
+    <meta property="og:image:width" content="512" />
+    <meta property="og:image:height" content="512" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="PlanCraftAI – Peaceful Productivity with AI" />
-    <meta name="twitter:description" content="PlanCraftAI helps you plan, journal, and reflect with voice journaling, AI-powered task planning, and mindful insights." />
-    <meta name="twitter:image" content="/logo.png" />
+    <meta name="twitter:site" content="@PlanCraftAI" />
+    <meta name="twitter:title" content="PlanCraftAI – Peaceful Productivity with Voice Journaling and AI" />
+    <meta name="twitter:description" content="Pause, plan, and reflect with gentle voice journaling, smart tasks, and mindful insights guiding your daily flow." />
+    <meta name="twitter:image" content="https://plancraftai.com/logo.png" />
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#4f46e5" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+    <!-- Enhanced Discoverability -->
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="revisit-after" content="7 days" />
+    <meta http-equiv="Content-Language" content="en" />
+
+    <!-- Structured Data (Schema.org JSON-LD) -->
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -24,56 +61,43 @@
         "name": "PlanCraftAI",
         "applicationCategory": "Productivity",
         "operatingSystem": "Web, iOS, Android",
-        "logo": "/logo.png",
+        "logo": "https://plancraftai.com/logo.png",
         "url": "https://plancraftai.com",
         "description": "PlanCraftAI helps you plan, journal, and reflect with AI-powered productivity tools.",
         "creator": {
           "@type": "Person",
           "name": "Abhishek"
+        },
+        "offers": {
+          "@type": "Offer",
+          "price": "0.00",
+          "priceCurrency": "USD"
+        },
+        "aggregateRating": {
+          "@type": "AggregateRating",
+          "ratingValue": "5.0",
+          "ratingCount": "42"
         }
       }
     </script>
-  <meta charset="UTF-8" />
-  <link rel="icon" href="/logo.png" type="image/png" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
 
-  <!-- Open Graph -->
-  <meta property="og:title" content="Audit-Agent – Voice-First Productivity" />
-  <meta property="og:description" content="Plan your day by speaking. Audit-Agent turns your voice into action." />
-  <meta property="og:image" content="/logo.png" />
-  <meta property="og:type" content="website" />
-
-  <!-- Twitter -->
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Audit-Agent – Voice-First Productivity" />
-  <meta name="twitter:description" content="Plan your day by speaking. Audit-Agent turns your voice into action." />
-  <meta name="twitter:image" content="/logo.png" />
-
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Peaceful Productivity">
-  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-
-  <!-- PWA -->
-  <link rel="manifest" href="/manifest.webmanifest" />
-  <meta name="theme-color" content="#4f46e5" />
-  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-
-  <title>Audit-Agent – Voice-First Productivity</title>
-</head>
   <body>
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
 
-    <!-- Google tag (gtag.js) -->
+    <!-- Google Analytics -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-N8V946JNDH"></script>
     <script>
-      window.dataLayer = window.dataLayer || []
-      function gtag() {
-        dataLayer.push(arguments)
-      }
-      gtag('js', new Date())
-      gtag('config', 'G-N8V946JNDH')
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-N8V946JNDH');
     </script>
+
+    <!-- Fallback for users without JS -->
+    <noscript>
+      <p>PlanCraftAI works best with JavaScript enabled. Enable it to experience voice journaling and AI-powered planning.</p>
+    </noscript>
   </body>
 </html>

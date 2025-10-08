@@ -157,6 +157,7 @@ import { send as sendWhatsApp } from "./integrations/whatsappProvider.js";
 import { sendEmail } from "./integrations/emailProvider.js";
 import { sendPWA } from "./integrations/pwaProvider.js";
 import { formatLocalTime } from "../utils/timezone.js";
+import { extractTime } from "../utils/timeParser.js";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -193,6 +194,14 @@ export async function createReminderFromText(
         e?.message
       );
     }
+  }
+
+  // Quick natural-time parse before GPT to improve latency and reliability
+  if (!parsed) {
+    try {
+      const localTime = extractTime(text)
+      if (localTime) parsed = { task: text, time: localTime }
+    } catch {}
   }
 
   // GPT-assisted parsing if not provided
@@ -241,6 +250,7 @@ export async function createReminderFromText(
     status: "scheduled",
     sentAt: null,
     taskId: options?.taskId || null,
+    timezone: options?.timezone || null,
   };
 
   console.log("[Reminder] Persisting reminder", {
@@ -271,7 +281,7 @@ export async function createReminderFromText(
     await sendWhatsApp(userId, {
       template: "reminder_notification",
       headerVars: ["⏰"],
-      bodyVars: [reminder.task, formatLocalTime(when)],
+      bodyVars: [reminder.task, formatLocalTime(when, reminder.timezone || undefined)],
     });
 
     console.log("[Reminder] WhatsApp confirmation sent via template");
@@ -290,7 +300,7 @@ export async function createReminderFromText(
       try {
         await sendWhatsApp(
           userId,
-          `✅ Reminder set: "${reminder.task}" at ${formatLocalTime(when)}`
+          `✅ Reminder set: "${reminder.task}" at ${formatLocalTime(when, reminder.timezone || undefined)}`
         );
         console.log("[Reminder] WhatsApp confirmation sent via text fallback");
       } catch (fallbackErr) {
@@ -315,7 +325,7 @@ export async function sendReminder(reminder) {
   const userId = String(reminder?.userId || "");
   const task = String(reminder?.task || "");
   const when = reminder?.scheduledTime
-    ? formatLocalTime(reminder.scheduledTime)
+    ? formatLocalTime(reminder.scheduledTime, reminder?.timezone || undefined)
     : "soon";
 
   console.log("[Scheduler] Executing reminder", {
@@ -345,8 +355,7 @@ export async function sendReminder(reminder) {
       try {
         // Try sending via approved Meta template
         const r = await sendWhatsApp(userId, {
-          template: "reminder_notification",
-          headerVars: ["⏰"],
+          language: { code: "en" },
           bodyVars: [task, when],
         });
         console.log("[Delivery] WhatsApp ok (template)", {

@@ -73,4 +73,8 @@ export default defineConfig({
       '/api': 'http://localhost:4000',
     },
   },
+  build: {
+    outDir: 'dist',
+    copyPublicDir: true, // ✅ this ensures /public contents (logo.png, sitemap.xml, etc.) are included
+  }
 })
