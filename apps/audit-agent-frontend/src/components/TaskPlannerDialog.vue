@@ -467,11 +467,20 @@ function tryPrefillReminder(task) {
 
 function buildLocalIso(ymd, hhmm) {
   try {
-    const [y, m, d] = String(ymd || '').split('-').map((n) => parseInt(n, 10))
-    const [hh, mm] = String(hhmm || '00:00').split(':').map((n) => parseInt(n, 10))
+    const [y, m, d] = String(ymd || '').split('-').map(Number)
+    const [hh, mm] = String(hhmm || '00:00').split(':').map(Number)
     if (!y || !m || !d) throw new Error('invalid date parts')
-    const local = new Date(y, (m - 1), d, (hh || 0), (mm || 0), 0, 0)
-    return local.toISOString()
+
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+    const yStr = String(y).padStart(4, '0')
+    const mStr = String(m).padStart(2, '0')
+    const dStr = String(d).padStart(2, '0')
+    const hhStr = String(hh || 0).padStart(2, '0')
+    const mmStr = String(mm || 0).padStart(2, '0')
+
+    // Interpret as wall-clock time in user's TZ, then convert to UTC ISO
+    const local = dayjs.tz(`${yStr}-${mStr}-${dStr} ${hhStr}:${mmStr}`, tz, true)
+    return local.utc().toISOString()
   } catch {
     return new Date().toISOString()
   }
@@ -500,7 +509,7 @@ async function generateTasks() {
         date: toLocalDateKey(parseLocalDateKey(selectedDate.value)),
         order: tasks.value.length + i,
         logs: [],
-        reminderTime: reminderTime.value || (aiIso ? dayjs.utc(aiIso).tz().format('HH:mm') : null)
+        reminderTime: reminderTime.value || (aiIso ? dayjs.utc(aiIso).tz(Intl.DateTimeFormat().resolvedOptions().timeZone).format('HH:mm') : null)
       }
       const saved = await addTaskToFirebase(newTask)
       try {
