@@ -456,9 +456,9 @@ function tryPrefillReminder(task) {
         if (before && before !== (reminderTime.value || '')) return
         if (reminderTime.value) return
 
-        // ✅ Always convert from UTC → user's local time correctly
-        // Default timezone set globally in main.js; .tz() uses it automatically
-        const local = dayjs.utc(iso).tz()
+        // Always convert from UTC → user's local time correctly, using explicit tz
+        const userTz = task?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
+        const local = dayjs.utc(iso).tz(userTz)
         reminderTime.value = local.format('HH:mm')
       })
       .catch(() => {})
@@ -495,7 +495,11 @@ async function generateTasks() {
     if (aiIso) {
       const { date, time } = normalizeParsedDateTime(aiIso)
       if (date && selectedDate.value !== date) selectedDate.value = date
-      if (time && reminderTime.value !== time) reminderTime.value = time
+      // if (time && reminderTime.value !== time) reminderTime.value = time
+      // Removed double timezone shift: trust aiIso directly as UTC
+    }
+    if (aiIso && !reminderTime.value) {
+      reminderTime.value = null  // DO NOT display auto time in UI
     }
     const manualIso = reminderTime.value ? buildLocalIso(toLocalDateKey(parseLocalDateKey(selectedDate.value)), reminderTime.value) : null
     const effectiveIso = manualIso || aiIso
@@ -509,7 +513,7 @@ async function generateTasks() {
         date: toLocalDateKey(parseLocalDateKey(selectedDate.value)),
         order: tasks.value.length + i,
         logs: [],
-        reminderTime: reminderTime.value || (aiIso ? dayjs.utc(aiIso).tz(Intl.DateTimeFormat().resolvedOptions().timeZone).format('HH:mm') : null)
+        reminderTime: reminderTime.value || null
       }
       const saved = await addTaskToFirebase(newTask)
       try {

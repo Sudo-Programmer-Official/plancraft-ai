@@ -561,14 +561,14 @@ function buildLocalIso(ymd, hhmm) {
     const [hh, mm] = String(hhmm || '00:00').split(':').map(n => parseInt(n, 10))
     if (!y || !m || !d) throw new Error('invalid date parts')
 
-    // 🕐 Detect user’s timezone
-    // ✅ Convert local → UTC using default timezone (set in main.js)
-    const utcIso = dayjs
-      .tz(`${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')} ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`)
-      .utc()
-      .toISOString()
-
-    return utcIso
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+    const yStr = String(y).padStart(4, '0')
+    const mStr = String(m).padStart(2, '0')
+    const dStr = String(d).padStart(2, '0')
+    const hhStr = String(hh || 0).padStart(2, '0')
+    const mmStr = String(mm || 0).padStart(2, '0')
+    const local = dayjs.tz(`${yStr}-${mStr}-${dStr} ${hhStr}:${mmStr}`, tz, true)
+    return local.utc().toISOString()
   } catch (err) {
     console.warn('buildLocalIso failed:', err)
     return new Date().toISOString()

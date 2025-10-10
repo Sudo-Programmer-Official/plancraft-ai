@@ -5,10 +5,12 @@
       <span v-if="loading" class="text-gray-400 text-base animate-pulse">Loading...</span>
     </h2>
 
+    <!-- Empty state -->
     <div v-if="!loading && reminders.length === 0" class="text-gray-400">
       No active reminders 🎉
     </div>
 
+    <!-- Reminders list -->
     <template v-else>
       <template v-for="(group, date) in groupedReminders" :key="date">
         <h3 class="text-xl font-semibold mt-8 mb-3 border-b border-slate-700 pb-1">
@@ -61,76 +63,93 @@ import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { collection, query, where, onSnapshot } from 'firebase/firestore'
 import { db, auth } from '@/firebase/init'
 import api from '@/services/api'
-import dayjs from 'dayjs'
-import utc from 'dayjs/plugin/utc'
-import timezone from 'dayjs/plugin/timezone'
-import relativeTime from 'dayjs/plugin/relativeTime'
 import _ from 'lodash'
+import {
+  toJsDate,
+  toLocalDayGroup,
+  formatDualTime,
+  formatRelative,
+} from '@/utils/timeUtils'
 
-dayjs.extend(utc)
-dayjs.extend(timezone)
-dayjs.extend(relativeTime)
-
+// ----------------------------------------------------
+// State
+// ----------------------------------------------------
 const reminders = ref([])
 const loading = ref(true)
 let unbind = null
 
-function toJsDate(v) {
-  try {
-    if (!v) return null
-    if (typeof v === 'string') return new Date(v)
-    if (v instanceof Date) return v
-    if (typeof v.toDate === 'function') return v.toDate()
-    if (typeof v.seconds === 'number') return new Date(v.seconds * 1000)
-    if (typeof v._seconds === 'number') return new Date(v._seconds * 1000)
-  } catch {}
-  return null
-}
-
-function formatDualTime(iso) {
-  const d = toJsDate(iso)
-  if (!d) return ''
-  const local = dayjs.utc(d).tz(dayjs.tz.guess())
-  const utcTime = dayjs.utc(d)
-  return `${local.format('ddd, MMM D • h:mm A')} (Your Time) • ${utcTime.format('HH:mm')} UTC`
-}
-
-function formatRelative(iso) {
-  const d = toJsDate(iso)
-  if (!d) return ''
-  return dayjs(d).fromNow()
-}
-
-const groupedReminders = computed(() => {
-  const sorted = _.sortBy(reminders.value, r => toJsDate(r.scheduledTime))
-  const groups = _.groupBy(sorted, r => {
-    const date = dayjs.utc(toJsDate(r.scheduledTime)).tz(dayjs.tz.guess())
-    if (date.isSame(dayjs(), 'day')) return 'Today'
-    if (date.isSame(dayjs().add(1, 'day'), 'day')) return 'Tomorrow'
-    return date.format('dddd, MMM D')
-  })
-  return groups
-})
-
+// ----------------------------------------------------
+// Live Firestore watcher
+// ----------------------------------------------------
 function watchReminders() {
   const uid = auth?.currentUser?.uid || localStorage.getItem('uid')
-  if (!uid) { loading.value = false; return }
+  if (!uid) {
+    loading.value = false
+    return
+  }
 
   const q = query(collection(db, 'reminders'), where('userId', '==', uid))
-  unbind = onSnapshot(q, (snap) => {
-    const now = Date.now()
-    const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-    const upcoming = rows
-      .filter(r => String(r?.status || '').toLowerCase() === 'scheduled' && !r?.sentAt)
-      .filter(r => {
-        const dt = toJsDate(r?.scheduledTime)
-        return dt ? dt.getTime() >= now - 60 * 1000 : false
-      })
-    reminders.value = upcoming
-    loading.value = false
-  }, () => { loading.value = false })
+
+  unbind = onSnapshot(
+    q,
+    (snap) => {
+      const now = Date.now()
+      const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+
+      // ✅ only future scheduled reminders
+      const upcoming = rows
+        .filter(
+          (r) =>
+            String(r?.status || '').toLowerCase() === 'scheduled' && !r?.sentAt
+        )
+        .filter((r) => {
+          const dt = toJsDate(r?.scheduledTime)
+          return dt ? dt.getTime() >= now - 60 * 1000 : false
+        })
+
+      reminders.value = upcoming
+      loading.value = false
+
+      // Optional debug log
+      const DEBUG_TZ = true
+      if (DEBUG_TZ) {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+        console.log('[RemindersOverview] tz:', tz, 'timestamp:', Date.now())
+        console.log(
+          '[RemindersOverview]',
+          upcoming.map((r) => ({
+            task: r.task,
+            utc: r.scheduledTime,
+            localGroup: toLocalDayGroup(r.scheduledTime),
+            display: formatDualTime(r.scheduledTime),
+          }))
+        )
+      }
+    },
+    () => {
+      loading.value = false
+    }
+  )
 }
 
+onMounted(watchReminders)
+onUnmounted(() => {
+  if (unbind) unbind()
+})
+
+// ----------------------------------------------------
+// Grouped & Sorted View
+// ----------------------------------------------------
+const groupedReminders = computed(() => {
+  const sorted = _.sortBy(reminders.value, (r) =>
+    toJsDate(r.scheduledTime)
+  )
+  return _.groupBy(sorted, (r) => toLocalDayGroup(r.scheduledTime))
+})
+
+// ----------------------------------------------------
+// Actions
+// ----------------------------------------------------
 async function onCancel(r) {
   try {
     const uid = auth?.currentUser?.uid || localStorage.getItem('uid')
@@ -162,16 +181,15 @@ async function onSnooze(r) {
     console.warn('Snooze failed', e?.response?.data || e?.message)
   }
 }
-
-onMounted(watchReminders)
-onUnmounted(() => { if (unbind) unbind() })
 </script>
 
 <style scoped>
-.fade-enter-active, .fade-leave-active {
+.fade-enter-active,
+.fade-leave-active {
   transition: all 0.3s ease;
 }
-.fade-enter-from, .fade-leave-to {
+.fade-enter-from,
+.fade-leave-to {
   opacity: 0;
   transform: translateY(10px);
 }
