@@ -50,15 +50,20 @@ export function getUserTimezone() {
   }
 }
 
+// export function formatLocalTime(date, tz) {
+//   try {
+//     if (typeof dayjs !== 'undefined' && dayjs.tz) {
+//       return dayjs(date).tz(tz || getUserTimezone()).format('hh:mm A')
+//     }
+//   } catch (_) {}
+//   try {
+//     return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+//   } catch (_) {
+//     return String(date)
+//   }
+// }
 export function formatLocalTime(date, tz) {
-  try {
-    if (typeof dayjs !== 'undefined' && dayjs.tz) {
-      return dayjs(date).tz(tz || getUserTimezone()).format('hh:mm A')
-    }
-  } catch (_) {}
-  try {
-    return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  } catch (_) {
-    return String(date)
-  }
+  const zone = tz || (dayjs.tz?.guess?.() || 'UTC')
+  return dayjs(date).tz(zone).format('hh:mm A')
 }
+

@@ -41,12 +41,20 @@ export function toLocalDayGroup(iso) {
 // ------------------------------
 // Display: Dual Format
 // ------------------------------
+// export function formatDualTime(iso) {
+//   const d = toJsDate(iso)
+//   if (!d) return ''
+//   const utc = dayjs.utc(d)
+//   const local = utc.tz(tz)
+//   return `${local.format('ddd, MMM D • h:mm A')} (Your Time) • ${utc.format('HH:mm')} UTC`
+// }
 export function formatDualTime(iso) {
   const d = toJsDate(iso)
   if (!d) return ''
-  const utc = dayjs.utc(d)
-  const local = utc.tz(tz)
-  return `${local.format('ddd, MMM D • h:mm A')} (Your Time) • ${utc.format('HH:mm')} UTC`
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const utcTime = dayjs.utc(d)
+  const local = utcTime.clone().tz(zone)
+  return `${local.format('ddd, MMM D • h:mm A')} (Your Time) • ${utcTime.format('HH:mm')} UTC`
 }
 
 export function formatRelative(iso) {

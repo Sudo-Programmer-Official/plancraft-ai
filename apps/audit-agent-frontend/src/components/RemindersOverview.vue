@@ -62,6 +62,11 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { collection, query, where, onSnapshot } from 'firebase/firestore'
 import { db, auth } from '@/firebase/init'
+import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc'
+import timezone from 'dayjs/plugin/timezone'
+dayjs.extend(utc)
+dayjs.extend(timezone)
 import api from '@/services/api'
 import _ from 'lodash'
 import {
@@ -140,13 +145,24 @@ onUnmounted(() => {
 // ----------------------------------------------------
 // Grouped & Sorted View
 // ----------------------------------------------------
+// const groupedReminders = computed(() => {
+//   const sorted = _.sortBy(reminders.value, (r) =>
+//     toJsDate(r.scheduledTime)
+//   )
+//   return _.groupBy(sorted, (r) => toLocalDayGroup(r.scheduledTime))
+// })
 const groupedReminders = computed(() => {
-  const sorted = _.sortBy(reminders.value, (r) =>
-    toJsDate(r.scheduledTime)
-  )
-  return _.groupBy(sorted, (r) => toLocalDayGroup(r.scheduledTime))
-})
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const nowLocal = dayjs().tz(zone)
+  const sorted = _.sortBy(reminders.value, r => toJsDate(r.scheduledTime))
 
+  return _.groupBy(sorted, r => {
+    const date = dayjs.utc(toJsDate(r.scheduledTime)).tz(zone)
+    if (date.isSame(nowLocal, 'day')) return 'Today'
+    if (date.isSame(nowLocal.add(1, 'day'), 'day')) return 'Tomorrow'
+    return date.format('dddd, MMM D')
+  })
+})
 // ----------------------------------------------------
 // Actions
 // ----------------------------------------------------

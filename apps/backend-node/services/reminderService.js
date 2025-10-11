@@ -114,19 +114,36 @@ export async function createReminderFromText(
     parsed = { task: text, time: new Date(Date.now() + 60 * 60 * 1000).toISOString() };
   }
 
-  // Normalize to UTC for storage. If time came from AI, treat it as user's local wall‑clock.
+  // Normalize to UTC for storage with intent heuristic:
+  // - If AI parsed it AND user did not mention an explicit timezone (UTC, PST, etc.),
+  //   interpret as local wall-clock in user's tz (more intuitive for natural phrases).
+  // - If AI parsed and user explicitly mentions a tz, honor the provided zone.
+  // - If manual/heuristics parsed, treat as local wall-clock.
   if (!when) {
-    const tz = options?.timezone || "UTC";
-    const whenUtcIso = parsedByAi
+    // const tz = options?.timezone || (dayjs.tz && dayjs.tz.guess && dayjs.tz.guess()) || "UTC";
+    // const userIntentLocal = !/(^|\b)(utc|gmt|zulu|pst|pdt|mst|mdt|cst|cdt|est|edt|ist|cet|eet|pt|ct|et)($|\b)/i.test(text);
+    // const whenUtcIso = parsedByAi
+    //   ? (userIntentLocal
+    //       ? isoAsLocalWallToUtc(parsed.time, tz)
+    //       : (ensureUtcIso(parsed.time, tz) || new Date(parsed.time).toISOString()))
+    //   : isoAsLocalWallToUtc(parsed.time, tz);
+    // when = new Date(whenUtcIso);
+    const tz = options?.timezone || dayjs.tz?.guess?.() || 'UTC'
+const userIntentLocal = !/(^|\b)(utc|gmt|zulu|pst|pdt|mst|mdt|cst|cdt|est|edt|ist|cet|eet|pt|ct|et)($|\b)/i.test(text)
+const whenUtcIso = parsedByAi
+  ? (userIntentLocal
       ? isoAsLocalWallToUtc(parsed.time, tz)
-      : ensureUtcIso(parsed.time, tz) || new Date(parsed.time).toISOString();
-    when = new Date(whenUtcIso);
+      : ensureUtcIso(parsed.time, tz))
+  : isoAsLocalWallToUtc(parsed.time, tz)
+
+when = new Date(whenUtcIso)
+reminder.timezone = tz
   }
   if (!(when instanceof Date) || isNaN(when.getTime())) {
     throw new Error("Parsed time invalid");
   }
 
-  const tzForUser = options?.timezone || null;
+  const tzForUser = options?.timezone || ((dayjs.tz && dayjs.tz.guess && dayjs.tz.guess()) || null);
   const reminder = {
     task: String(parsed.task || text),
     scheduledTime: when,
@@ -145,6 +162,11 @@ export async function createReminderFromText(
     when: reminder.scheduledTime?.toISOString?.(),
     channels: reminder.channels,
   });
+  console.log('[Reminder] Local check:',
+  reminder.timezone,
+  formatLocalTime(when, reminder.timezone || undefined),
+  'UTC=', when.toISOString()
+)
   const ref = await db.collection("reminders").add(reminder);
   console.log("[Reminder] Stored docId =", ref.id);
   await queueReminder({ id: ref.id, ...reminder });
@@ -262,4 +284,3 @@ export function queueReminder(rem) {
     console.error("queueReminder error:", e);
   }
 }
-

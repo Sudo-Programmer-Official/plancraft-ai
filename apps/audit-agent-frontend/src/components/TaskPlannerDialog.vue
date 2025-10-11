@@ -167,6 +167,11 @@ import { normalizeParsedDateTime } from '@/utils/dateParser'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { isFeatureAllowed } from '@/services/planService'
 import dayjs from 'dayjs'
+import {
+  aiIsoToLocalWall,
+  ensureUtcIso,
+  getUserTz
+} from '@/utils/timeUtils'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
 import { toLocal } from '@/utils/timezone'  // add this at top if not imported
@@ -492,17 +497,30 @@ async function generateTasks() {
   try {
     const { tasks: items, reminderTime: aiIso } = await generateTasksFromText(input.value)
     // If AI provided a parsed reminder datetime (UTC ISO), sync date picker + time
+    // if (aiIso) {
+    //   const { date, time } = normalizeParsedDateTime(aiIso)
+    //   if (date && selectedDate.value !== date) selectedDate.value = date
+    //   // if (time && reminderTime.value !== time) reminderTime.value = time
+    //   // Removed double timezone shift: trust aiIso directly as UTC
+    // }
     if (aiIso) {
-      const { date, time } = normalizeParsedDateTime(aiIso)
-      if (date && selectedDate.value !== date) selectedDate.value = date
-      // if (time && reminderTime.value !== time) reminderTime.value = time
-      // Removed double timezone shift: trust aiIso directly as UTC
-    }
+      const tz = getUserTz()
+      const local = aiIsoToLocalWall(aiIso, tz)
+      if (local) {
+        selectedDate.value = local.format('YYYY-MM-DD')
+        reminderTime.value = local.format('HH:mm')
+      }
+  }
     if (aiIso && !reminderTime.value) {
       reminderTime.value = null  // DO NOT display auto time in UI
     }
-    const manualIso = reminderTime.value ? buildLocalIso(toLocalDateKey(parseLocalDateKey(selectedDate.value)), reminderTime.value) : null
-    const effectiveIso = manualIso || aiIso
+    // const manualIso = reminderTime.value ? buildLocalIso(toLocalDateKey(parseLocalDateKey(selectedDate.value)), reminderTime.value) : null
+    // const effectiveIso = manualIso || aiIso
+    const tz = getUserTz()
+    const manualIso = reminderTime.value
+      ? buildLocalIso(toLocalDateKey(parseLocalDateKey(selectedDate.value)), reminderTime.value)
+      : null
+    const effectiveUtcIso = ensureUtcIso(manualIso || aiIso, tz)
 
     for (const [i, t] of items.entries()) {
       const newTask = {
@@ -518,9 +536,14 @@ async function generateTasks() {
       const saved = await addTaskToFirebase(newTask)
       try {
         const uid = authStore?.user?.uid
-        if (uid && saved?.id && effectiveIso) {
+        // const effectiveIso = effectiveUtcIso  // Use UTC ISO for scheduling
+        if (uid && saved?.id && effectiveUtcIso) {
           const prefs = userPrefs.value?.notifications || {}
-          await scheduleReminder(uid, saved.id, newTask.title, effectiveIso, prefs)
+          // await scheduleReminder(uid, saved.id, newTask.title, effectiveIso, prefs)
+          await scheduleReminder(uid, saved.id, newTask.title, effectiveUtcIso, {
+            ...prefs,
+            timezone: tz
+          })
         }
       } catch (e) {
         console.warn('AI-split reminder schedule failed:', e?.response?.data || e?.message)

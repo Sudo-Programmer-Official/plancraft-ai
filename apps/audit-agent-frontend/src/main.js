@@ -154,9 +154,10 @@ import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import { initAnalytics, bindRouter } from '@/services/analytics'
 import 'driver.js/dist/driver.css'
 import { handleAuthError } from '@/services/firebaseService'
+import { dayjs } from '@/utils/timeInit'
 
 // Day.js timezone defaults
-import dayjs from 'dayjs'
+// import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
 dayjs.extend(utc)
@@ -219,3 +220,10 @@ authStore.init()
 
 // Mount app
 app.mount('#app')
+
+console.log('[TZ Test]', {
+  guessed: dayjs.tz.guess(),
+  nowLocal: dayjs().format(),
+  nowUTC: dayjs.utc().format(),
+  offsetMin: dayjs().utcOffset()
+})
