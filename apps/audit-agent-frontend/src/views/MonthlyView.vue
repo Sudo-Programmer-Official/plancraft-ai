@@ -1,6 +1,6 @@
 <template>
   <!-- Added: Standardized Add Task header -->
-  <div class="flex items-center justify-between mb-4">
+  <!-- <div class="flex items-center justify-between mb-4">
     <button
       @click="openPlanner"
       class="flex items-center gap-2 
@@ -13,7 +13,7 @@
       <span class="text-base sm:text-lg">➕</span>
       <span>Add Task</span>
     </button>
-  </div>
+  </div> -->
   <div class="min-h-screen bg-gradient-to-b from-indigo-900 via-blue-900 to-blue-800 px-6 py-10 text-white">
     <!-- Header -->
     <header class="text-center mb-8">

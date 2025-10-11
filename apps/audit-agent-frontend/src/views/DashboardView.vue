@@ -8,6 +8,15 @@
   >
     <GuestBanner :isGuest="authStore.guest" @login="redirectToLogin" />
 
+    <!-- Free plan usage banner -->
+    <div
+      v-if="usage.plan === 'free'"
+      class="col-span-1 sm:col-span-2 lg:col-span-3 px-3 py-2 rounded-xl border border-indigo-500/30 bg-indigo-500/10 text-indigo-100 flex items-center justify-between"
+    >
+      <span class="text-sm">You’ve used {{ usage.used }}/{{ usage.limit }} reminders today.</span>
+      <button @click="goToUpgrade" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs">Upgrade for unlimited 🚀</button>
+    </div>
+
     <!-- Reactivate instantly banner (during cancel period) -->
     <div
       v-if="reactivateEligible"
@@ -231,7 +240,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watchEffect, watch } from 'vue'
 import { useHead } from '@vueuse/head'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { collection, onSnapshot, updateDoc, doc, query, where } from 'firebase/firestore'
 import { db, auth } from '@/firebase/init'
 import { onAuthStateChanged } from 'firebase/auth'
@@ -257,10 +266,12 @@ dayjs.extend(timezone)
 import { getReminderStatus, scheduleReminder } from '@/services/reminderService'
 import api from '@/services/api'
 import { getPreferences as getUserPreferences } from '@/services/settingsService'
+import { ElMessage } from 'element-plus'
 // import { onAuthStateChanged } from 'firebase/auth'
 // import { auth } from '@/firebase/init'
 
 const authStore = useAuthStore()
+const routerNav = useRouter()
 const subStore = useSubscriptionStore()
 const reactivateEligible = computed(() => String(subStore.subscription?.status || '').toLowerCase() === 'canceled' && !!subStore.subscription?.cancelAt)
 const daysLeft = computed(() => {
@@ -276,6 +287,18 @@ const showWeekly = ref(true)
 const showMonthly = ref(true)
 const showJournal = ref(true)
 const showAIInsights = ref(true)
+
+// Usage meter (free plan)
+const usage = ref({ used: 0, limit: 0, plan: '' })
+async function fetchUsage() {
+  try {
+    const uid = auth?.currentUser?.uid || localStorage.getItem('uid')
+    if (!uid) return
+    const { data } = await api.get('/reminders/usage', { params: { userId: uid } })
+    if (data?.success) usage.value = { used: data.used || 0, limit: data.limit || 0, plan: data.plan || '' }
+  } catch {}
+}
+function goToUpgrade() { try { routerNav.push('/pricing') } catch {} }
 
 /* -------------- Tasks + Journal State -------------- */
 const { tasks, toggleComplete: toggleFromComposable, loadTasks } = useTasks()
@@ -585,7 +608,31 @@ async function handleSaveAndSchedule(payload) {
     if (payload?.reminderTime) {
       const iso = buildLocalIso(payload.date, payload.reminderTime)
       const prefs = userPrefs.value?.notifications || {}
-      await scheduleReminder(uid, taskId, payload.title, iso, prefs)
+      // Prefer direct API call to catch soft warnings via response headers
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+      try {
+        const resp = await api.post('/reminders/text', {
+          userId: uid,
+          text: payload.title,
+          scheduledTime: iso,
+          taskId,
+          channels: Array.isArray(prefs?.channels) ? prefs.channels : undefined,
+          timezone: tz,
+        })
+        // Soft warning header when free limit reached but allowed once
+        const warn = resp?.headers?.['x-plan-warning'] || resp?.headers?.['X-Plan-Warning']
+        if (warn) ElMessage({ message: warn, type: 'warning', duration: 5000 })
+        // Refresh usage banner
+        try { await fetchUsage() } catch {}
+      } catch (err) {
+        // Fallback to existing helper and show upgrade message on hard cap
+        await scheduleReminder(uid, taskId, payload.title, iso, prefs)
+        const status = err?.response?.status
+        if (status === 403) {
+          const msg = err?.response?.data?.error || 'Daily reminder limit reached. Upgrade to Pro for unlimited reminders.'
+          ElMessage({ message: msg, type: 'warning', duration: 6000 })
+        }
+      }
     } else {
       await api.post('/reminders/cancel', { userId: uid, taskId })
     }
@@ -646,6 +693,17 @@ onMounted(() => {
         .catch((e) => console.warn('Failed to load user prefs:', e))
     }
   } catch {}
+})
+
+// Fetch usage meter on mount
+onMounted(fetchUsage)
+
+// Listen for global usage refresh events (e.g., from TaskPlannerDialog)
+onMounted(() => {
+  try { window.addEventListener('usage-refresh', fetchUsage) } catch {}
+})
+onUnmounted(() => {
+  try { window.removeEventListener('usage-refresh', fetchUsage) } catch {}
 })
 </script>
 

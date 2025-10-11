@@ -141,11 +141,12 @@ export async function createReminderFromText(
   }
 
   const tzForUser = options?.timezone || null;
+  const defaultChannels = ["whatsapp", "pwa", "email"]
   const reminder = {
     task: String(parsed.task || text),
     scheduledTime: when,
     userId: String(userId),
-    channels: Array.isArray(channels) && channels.length ? channels : ["whatsapp"],
+    channels: Array.isArray(channels) && channels.length ? channels : defaultChannels,
     createdAt: new Date(),
     status: "scheduled",
     sentAt: null,

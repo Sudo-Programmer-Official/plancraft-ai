@@ -1,6 +1,6 @@
 <template>
   <!-- Added: Standardized Add Task header and Monthly link -->
-  <div class="flex items-center justify-between mb-4">
+  <!-- <div class="flex items-center justify-between mb-4">
     <button
       @click="openPlanner"
       class="flex items-center gap-2 
@@ -20,7 +20,7 @@
     >
       📆 View Monthly
     </RouterLink>
-  </div>
+  </div> -->
   <div class="min-h-screen bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900 text-white overflow-x-hidden">
     <!-- Page Container -->
     <div class="max-w-4xl mx-auto px-4 sm:px-6 py-10 w-full">

@@ -3,7 +3,7 @@ import multer from "multer"
 import { handleTextReminder } from "../services/textHandler.js"
 import { db } from "../services/firebaseAdmin.js"
 import { handleVoiceCommand } from "../services/voiceHandler.js"
-import { checkUserPlan, checkUserPlanUsage } from "../services/planService.js"
+import { planUsageMiddleware, getUsageToday } from "../services/planService.js"
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc.js'
 import timezone from 'dayjs/plugin/timezone.js'
@@ -13,6 +13,9 @@ dayjs.extend(timezone)
 
 const router = express.Router()
 const upload = multer({ storage: multer.memoryStorage() })
+
+// Enforce free/pro usage policy for reminder creation (soft warning via header)
+router.use('/text', planUsageMiddleware)
 
 // POST /api/reminders/text
 router.post("/text", async (req, res) => {
@@ -27,19 +30,23 @@ router.post("/text", async (req, res) => {
       now: new Date().toISOString(),
     })
     if (!userId || !text) return res.status(400).json({ success: false, error: "Missing userId or text" })
-    // Plan enforcement and usage increment for reminders
-    try {
-      const ok = await checkUserPlanUsage(userId, 'reminder')
-      if (!ok?.ok) {
-        return res.status(403).json({ success: false, error: 'Daily reminder limit reached. Upgrade to Pro.' })
-      }
-    } catch {}
     // If caller ties to a task, require an explicit scheduledTime to avoid ambiguous scheduling
     if (taskId && !scheduledTime) {
       console.warn('[Reminder API] Rejecting task-bound reminder without scheduledTime', { userId, taskId })
       return res.status(400).json({ success: false, error: 'Missing scheduledTime for task-bound reminder' })
     }
-    const reminder = await handleTextReminder(text, userId, channels, { taskId, scheduledTime, timezone: tz })
+    // Resolve channels precedence: request body -> user preference -> default (all)
+    let channelsToUse = channels
+    try {
+      if (!Array.isArray(channelsToUse) || !channelsToUse.length) {
+        const u = await db.collection('users').doc(String(userId)).get()
+        const prefs = u.exists ? (u.data()?.notifications || {}) : {}
+        const prefChannels = Array.isArray(prefs.channels) ? prefs.channels : null
+        channelsToUse = prefChannels && prefChannels.length ? prefChannels : ['whatsapp','pwa','email']
+      }
+    } catch {}
+
+    const reminder = await handleTextReminder(text, userId, channelsToUse, { taskId, scheduledTime, timezone: tz })
 
     // Optional mirror to tasks/{taskId}.reminderTime so UI reflects immediately
     try {
@@ -114,6 +121,19 @@ router.get('/', async (req, res) => {
     res.json({ success: true, items, hasActive })
   } catch (err) {
     console.error('❌ reminders list error', err)
+    res.status(500).json({ success: false, error: err?.message || 'Server error' })
+  }
+})
+
+// GET /api/reminders/usage?userId=...
+router.get('/usage', async (req, res) => {
+  try {
+    const { userId } = req.query || {}
+    if (!userId) return res.status(400).json({ success: false, error: 'Missing userId' })
+    const usage = await getUsageToday(String(userId), 'reminder')
+    res.json({ success: true, ...usage })
+  } catch (err) {
+    console.error('❌ reminders usage error', err)
     res.status(500).json({ success: false, error: err?.message || 'Server error' })
   }
 })

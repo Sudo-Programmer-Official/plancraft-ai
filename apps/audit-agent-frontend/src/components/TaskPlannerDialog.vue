@@ -154,7 +154,8 @@
 
 <script setup>
 import { ref, computed, watch, onBeforeUnmount, onMounted } from 'vue'
-import { ElNotification } from 'element-plus'
+import { ElNotification, ElMessage } from 'element-plus'
+import api from '@/services/api'
 import VoiceRecorder from '@/components/VoiceRecorder.vue'
 import { generateTasksFromText } from '@/services/aiService'
 import { addTaskToFirebase } from '@/services/firebaseService'
@@ -520,7 +521,29 @@ async function generateTasks() {
         const uid = authStore?.user?.uid
         if (uid && saved?.id && effectiveIso) {
           const prefs = userPrefs.value?.notifications || {}
-          await scheduleReminder(uid, saved.id, newTask.title, effectiveIso, prefs)
+          const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+          try {
+            const resp = await api.post('/reminders/text', {
+              userId: uid,
+              text: newTask.title,
+              scheduledTime: effectiveIso,
+              taskId: saved.id,
+              channels: Array.isArray(prefs?.channels) ? prefs.channels : undefined,
+              timezone: tz,
+            })
+            const warn = resp?.headers?.['x-plan-warning'] || resp?.headers?.['X-Plan-Warning']
+            if (warn) ElMessage({ message: warn, type: 'warning', duration: 5000 })
+            // Notify dashboards/overviews to refresh usage meters
+            try { window.dispatchEvent(new CustomEvent('usage-refresh')) } catch {}
+          } catch (err) {
+            await scheduleReminder(uid, saved.id, newTask.title, effectiveIso, prefs)
+            if (err?.response?.status === 403) {
+              const msg = err?.response?.data?.error || 'Daily reminder limit reached. Upgrade to Pro for unlimited reminders.'
+              ElMessage({ message: msg, type: 'warning', duration: 6000 })
+            }
+            // Still emit refresh to keep UI in sync after fallback
+            try { window.dispatchEvent(new CustomEvent('usage-refresh')) } catch {}
+          }
         }
       } catch (e) {
         console.warn('AI-split reminder schedule failed:', e?.response?.data || e?.message)

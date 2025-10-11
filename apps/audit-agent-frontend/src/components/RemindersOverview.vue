@@ -28,6 +28,12 @@
       </div>
     </div>
 
+    <!-- Usage meter and Upgrade CTA for free plan -->
+    <div v-if="usage.plan === 'free'" class="mb-6 flex items-center justify-between bg-slate-800/60 border border-slate-700 rounded-lg p-3">
+      <span class="text-sm text-gray-300">You’ve used {{ usage.used }}/{{ usage.limit }} reminders today.</span>
+      <button @click="goToUpgrade" class="px-3 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 rounded-md text-white">Upgrade for unlimited 🚀</button>
+    </div>
+
     <!-- Empty state -->
     <div v-if="!loading && reminders.length === 0" class="text-gray-400 text-center mt-10">
       No active reminders 🎉
@@ -89,24 +95,41 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { collection, query, where, onSnapshot } from 'firebase/firestore'
 import { db, auth } from '@/firebase/init'
 import api from '@/services/api'
+import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc'
+import timezone from 'dayjs/plugin/timezone'
+import relativeTime from 'dayjs/plugin/relativeTime'
 import _ from 'lodash'
-import { toJsDate, toLocalDayGroup, formatDualTime, formatRelative } from '@/utils/timeUtils'
 
-// ----------------------------------------------------
-// State
-// ----------------------------------------------------
+// Time setup
+dayjs.extend(utc)
+dayjs.extend(timezone)
+dayjs.extend(relativeTime)
+
+const router = useRouter()
 const reminders = ref([])
 const loading = ref(true)
 const selectedGroup = ref(null)
 const groupRefs = new Map()
 let unbind = null
 
-// ----------------------------------------------------
-// Scroll to specific group
-// ----------------------------------------------------
+const usage = ref({ used: 0, limit: 0, plan: '' })
+
+async function fetchUsage() {
+  try {
+    const uid = auth?.currentUser?.uid || localStorage.getItem('uid')
+    if (!uid) return
+    const { data } = await api.get('/reminders/usage', { params: { userId: uid } })
+    if (data?.success) usage.value = { used: data.used || 0, limit: data.limit || 0, plan: data.plan || '' }
+  } catch {}
+}
+
+function goToUpgrade() { try { router.push('/pricing') } catch {} }
+
 function setGroupRef(date) {
   return (el) => {
     if (el) groupRefs.set(date, el)
@@ -120,59 +143,72 @@ async function scrollToGroup(date) {
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
-// ----------------------------------------------------
-// Live Firestore watcher
-// ----------------------------------------------------
-function watchReminders() {
-  const uid = auth?.currentUser?.uid || localStorage.getItem('uid')
-  if (!uid) {
-    loading.value = false
-    return
-  }
-
-  const q = query(collection(db, 'reminders'), where('userId', '==', uid))
-
-  unbind = onSnapshot(
-    q,
-    (snap) => {
-      const now = Date.now()
-      const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
-      const upcoming = rows
-        .filter((r) => String(r?.status || '').toLowerCase() === 'scheduled' && !r?.sentAt)
-        .filter((r) => {
-          const dt = toJsDate(r?.scheduledTime)
-          return dt ? dt.getTime() >= now - 60 * 1000 : false
-        })
-
-      reminders.value = upcoming
-      loading.value = false
-      selectedGroup.value ||= Object.keys(groupedReminders.value)[0] || null
-    },
-    () => (loading.value = false),
-  )
+function toJsDate(v) {
+  try {
+    if (!v) return null
+    if (typeof v === 'string') return new Date(v)
+    if (v instanceof Date) return v
+    if (typeof v.toDate === 'function') return v.toDate()
+    if (typeof v.seconds === 'number') return new Date(v.seconds * 1000)
+    if (typeof v._seconds === 'number') return new Date(v._seconds * 1000)
+  } catch {}
+  return null
 }
 
-onMounted(watchReminders)
-onUnmounted(() => unbind && unbind())
+function formatDualTime(iso) {
+  const d = toJsDate(iso)
+  if (!d) return ''
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const utcTime = dayjs.utc(d)
+  const local = utcTime.clone().tz(zone)
+  return `${local.format('ddd, MMM D • h:mm A')} (Your Time) • ${utcTime.format('HH:mm')} UTC`
+}
 
-// ----------------------------------------------------
-// Grouped & Sorted View
-// ----------------------------------------------------
+function formatRelative(iso) {
+  const d = toJsDate(iso)
+  if (!d) return ''
+  return dayjs(d).fromNow()
+}
+
 const groupedReminders = computed(() => {
-  const sorted = _.sortBy(reminders.value, (r) => toJsDate(r.scheduledTime))
-  return _.groupBy(sorted, (r) => toLocalDayGroup(r.scheduledTime))
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const sorted = _.sortBy(reminders.value, r => {
+    const d = toJsDate(r.scheduledTime)
+    return d ? d.getTime() : 0
+  })
+  return _.groupBy(sorted, r => {
+    const date = dayjs.utc(toJsDate(r.scheduledTime)).tz(zone)
+    if (date.isSame(dayjs(), 'day')) return 'Today'
+    if (date.isSame(dayjs().add(1, 'day'), 'day')) return 'Tomorrow'
+    return date.format('dddd, MMM D')
+  })
 })
 
-// ----------------------------------------------------
-// Actions
-// ----------------------------------------------------
+function watchReminders() {
+  const uid = auth?.currentUser?.uid || localStorage.getItem('uid')
+  if (!uid) { loading.value = false; return }
+  const q = query(collection(db, 'reminders'), where('userId', '==', uid))
+  unbind = onSnapshot(q, (snap) => {
+    const now = Date.now()
+    const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    const upcoming = rows
+      .filter(r => String(r?.status || '').toLowerCase() === 'scheduled' && !r?.sentAt)
+      .filter(r => {
+        const dt = toJsDate(r?.scheduledTime)
+        return dt ? dt.getTime() >= now - 60 * 1000 : false
+      })
+    reminders.value = upcoming
+    loading.value = false
+    selectedGroup.value ||= Object.keys(groupedReminders.value)[0] || null
+    fetchUsage()
+  }, () => { loading.value = false })
+}
+
 async function onCancel(r) {
   try {
     const uid = auth?.currentUser?.uid || localStorage.getItem('uid')
     if (!uid) return
-    if (r?.taskId) {
-      await api.post('/reminders/cancel', { userId: uid, taskId: r.taskId })
-    }
+    if (r?.taskId) await api.post('/reminders/cancel', { userId: uid, taskId: r.taskId })
   } catch (e) {
     console.warn('Cancel failed', e?.response?.data || e?.message)
   }
@@ -197,25 +233,14 @@ async function onSnooze(r) {
     console.warn('Snooze failed', e?.response?.data || e?.message)
   }
 }
+
+onMounted(() => { watchReminders(); fetchUsage() })
+onUnmounted(() => { if (unbind) unbind() })
 </script>
 
 <style scoped>
-.fade-enter-active,
-.fade-leave-active {
-  transition: all 0.3s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-  transform: translateY(10px);
-}
-
-/* Hide horizontal scrollbar for chip container */
-.hide-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-.hide-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
+.fade-enter-active, .fade-leave-active { transition: all 0.3s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(10px); }
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+.hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 </style>
