@@ -1,77 +1,49 @@
-<!-- src/views/JournalView.vue -->
 <template>
-  <div
-    class="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-900 px-4 sm:px-6 py-8 text-white"
-  >
+  <div class="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-900 px-4 sm:px-6 py-8 text-white">
     <guest-banner :isGuest="authStore.guest" @login="redirectToLogin" />
 
     <!-- Header -->
     <header class="text-center mb-12">
-      <h1 class="text-3xl sm:text-4xl font-bold mb-2 animate-fade-in">
-        Today's Reflections
-      </h1>
-      <p class="text-base sm:text-lg text-indigo-200 animate-fade-in-delay">
-        Write, breathe, and let go — your personal sanctuary awaits.
-      </p>
-      <!-- Daily Quote -->
-      <blockquote
-        class="mt-4 text-indigo-300 italic text-sm sm:text-base max-w-2xl mx-auto"
-      >
-        “Every reflection you record is a mirror — showing who you are today,
-        guiding who you can become tomorrow.”
-      </blockquote>
+      <h1 class="text-4xl font-bold mb-2 animate-fade-in">Today's Reflections</h1>
+      <p class="text-indigo-200">Write, breathe, and let go — your personal sanctuary awaits.</p>
     </header>
 
-    <main class="max-w-4xl mx-auto grid gap-8 animate-slide-up">
-      <!-- Mood Tracker -->
-      <section
-        class="bg-white/10 backdrop-blur-md p-5 sm:p-6 rounded-2xl shadow-md border border-white/10"
+    <!-- 🔹 Mood Filter Chips -->
+    <div class="flex justify-center gap-3 mb-8 flex-wrap">
+      <button
+        v-for="f in filters"
+        :key="f.key"
+        @click="selectedFilter = f.key"
+        class="px-4 py-2 rounded-full border border-indigo-600 text-sm transition"
+        :class="selectedFilter === f.key
+          ? 'bg-indigo-700 text-white'
+          : 'bg-indigo-900/40 text-indigo-300 hover:bg-indigo-800'"
       >
-        <h2 class="text-lg sm:text-xl font-semibold mb-4">How are you feeling?</h2>
-        <div class="grid grid-cols-5 gap-3">
+        {{ f.label }}
+      </button>
+    </div>
+
+    <main class="max-w-4xl mx-auto grid gap-8 animate-slide-up">
+      <!-- 🔸 Mood Tracker -->
+      <section class="bg-white/10 backdrop-blur-md p-6 rounded-2xl shadow-md border border-white/10">
+        <h2 class="text-xl font-semibold mb-4">How are you feeling?</h2>
+        <!-- <div class="grid grid-cols-5 gap-3">
           <button
             v-for="mood in moods"
             :key="mood.emoji"
             @click="selectMood(mood)"
-            class="p-3 sm:p-4 rounded-xl border border-white/20 hover:bg-indigo-600/30 transition flex flex-col items-center"
+            class="p-4 rounded-xl border border-white/20 hover:bg-indigo-600/30 transition flex flex-col items-center"
             :class="{ 'bg-indigo-700/40': selectedMood?.emoji === mood.emoji }"
           >
-            <span class="text-2xl sm:text-3xl">{{ mood.emoji }}</span>
-            <p class="text-xs sm:text-sm text-indigo-200 mt-1">{{ mood.label }}</p>
+            <span class="text-3xl">{{ mood.emoji }}</span>
+            <p class="text-sm text-indigo-200 mt-1">{{ mood.label }}</p>
           </button>
-        </div>
-      </section>
-        <!-- Journal Snapshot (Bottom) -->
-      <section
-        v-if="logs.length"
-        class="bg-white/10 backdrop-blur-md p-5 sm:p-6 rounded-2xl shadow-md border border-white/10"
-      >
-        <h2 class="text-lg sm:text-xl font-semibold mb-4">📊 Your Progress</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm sm:text-base mb-4">
-          <div class="p-3 rounded-xl bg-slate-900/40 text-center">
-            <p class="text-2xl">🔥</p>
-            <p class="font-medium">{{ streak }}-day streak</p>
-          </div>
-          <div class="p-3 rounded-xl bg-slate-900/40 text-center">
-            <p class="text-2xl">{{ logs[0].mood?.emoji || "📝" }}</p>
-            <p class="font-medium">Last Mood</p>
-          </div>
-          <div class="p-3 rounded-xl bg-slate-900/40 text-center">
-            <p class="text-2xl">📖</p>
-            <p class="font-medium">{{ logs.length }} reflections</p>
-          </div>
-        </div>
-        <!-- Friendly Focus -->
-        <div class="bg-indigo-900/30 p-3 rounded border border-indigo-600 text-sm text-indigo-200">
-          <p><strong>🧭 Focus:</strong> {{ journalFocus }}</p>
-        </div>
+        </div> -->
       </section>
 
-      <!-- Voice Journal -->
-      <section
-        class="bg-white/10 backdrop-blur-md p-5 sm:p-6 rounded-2xl shadow-md border border-white/10"
-      >
-        <h2 class="text-lg sm:text-xl font-semibold mb-4">Voice Journal</h2>
+      <!-- 🔹 Voice Journal -->
+      <section class="bg-white/10 backdrop-blur-md p-6 rounded-2xl shadow-md border border-white/10">
+        <h2 class="text-xl font-semibold mb-4">Voice Journal</h2>
         <div class="flex flex-col gap-4">
           <textarea
             v-model="entryText"
@@ -85,11 +57,7 @@
             <el-button
               type="primary"
               @click="saveEntry"
-              class="w-full sm:w-auto px-4 py-2 rounded-lg text-white font-medium shadow-md
-                     bg-gradient-to-r from-emerald-700 via-teal-800 to-cyan-700
-                     hover:from-emerald-800 hover:via-teal-900 hover:to-cyan-800
-                     transition-all duration-300
-                     [text-shadow:_0_1px_2px_rgba(0,0,0,0.6)]"
+              class="w-full sm:w-auto px-6 py-2 rounded-lg font-medium bg-gradient-to-r from-emerald-600 via-teal-700 to-cyan-700 hover:from-emerald-700 hover:to-cyan-800 transition-all duration-300"
             >
               Save Entry
             </el-button>
@@ -101,20 +69,22 @@
         </div>
       </section>
 
-      <!-- Previous Logs -->
+      <!-- 🔹 Previous Logs with Smooth Scrolling -->
       <section
-        v-if="logs.length"
-        class="bg-white/10 backdrop-blur-md p-5 sm:p-6 rounded-2xl shadow-md border border-white/10"
-        ref="logsSection"
+        v-if="filteredLogs.length"
+        class="bg-white/10 backdrop-blur-md p-6 rounded-2xl shadow-md border border-white/10"
       >
-        <h2 class="text-lg sm:text-xl font-semibold mb-4">Previous Entries</h2>
-        <ul class="space-y-4 max-h-80 overflow-y-auto pr-1">
+        <h2 class="text-xl font-semibold mb-4 flex justify-between items-center">
+          <span>Previous Entries</span>
+          <span class="text-sm text-indigo-400">({{ filteredLogs.length }})</span>
+        </h2>
+
+        <ul class="space-y-4 max-h-[500px] overflow-y-auto pr-1">
           <li
-            v-for="log in logs"
+            v-for="log in filteredLogs"
             :key="log.id"
-            class="border border-white/10 p-4 rounded-xl text-sm sm:text-base text-indigo-200 bg-slate-900/40 hover:bg-indigo-700/30 transition relative"
+            class="border border-white/10 p-4 rounded-xl text-indigo-200 bg-slate-900/40 hover:bg-indigo-700/30 transition relative"
           >
-            <!-- Mood flower decoration -->
             <div class="absolute -top-2 -right-2 text-xl opacity-70">
               <span v-if="log.mood?.label === 'Happy'">🌸</span>
               <span v-else-if="log.mood?.label === 'Calm'">🌿</span>
@@ -124,92 +94,44 @@
             </div>
 
             <div class="flex items-center justify-between mb-2">
-              <span class="font-medium text-indigo-100 text-xs sm:text-sm">
-                {{
-                  new Date(log.timestamp).toLocaleDateString(undefined, {
-                    weekday: 'short',
-                    month: 'short',
-                    day: 'numeric',
-                  })
-                }}
+              <span class="text-xs text-indigo-300">
+                {{ new Date(log.timestamp).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) }}
               </span>
               <span class="text-xl">{{ log.mood?.emoji }}</span>
             </div>
-            <p class="text-indigo-200 leading-relaxed">{{ log.text }}</p>
-             <!-- Copy button -->
-      <button
-        @click="copyToClipboard(log.text)"
-        class="mt-2 text-xs px-3 py-1 rounded-lg border border-indigo-500 bg-indigo-900/40 hover:bg-indigo-700 text-indigo-200 transition"
-      >
-        📋 Copy
-      </button>
-      <button
-  @click="shareEntry(log.text)"
-  class="mt-2 ml-2 text-xs px-3 py-1 rounded-lg border border-green-500 bg-green-900/40 hover:bg-green-700 text-green-200 transition"
->
-  🔗 Share
-</button>
+            <p class="leading-relaxed">{{ log.text }}</p>
+
+            <!-- Buttons -->
+            <div class="flex gap-2 mt-3">
+              <button
+                @click="copyToClipboard(log.text)"
+                class="text-xs px-3 py-1 rounded-lg border border-indigo-500 bg-indigo-900/40 hover:bg-indigo-700 text-indigo-200 transition"
+              >
+                📋 Copy
+              </button>
+              <button
+                @click="shareEntry(log.text)"
+                class="text-xs px-3 py-1 rounded-lg border border-green-500 bg-green-900/40 hover:bg-green-700 text-green-200 transition"
+              >
+                🔗 Share
+              </button>
+            </div>
           </li>
         </ul>
       </section>
-
-      <!-- Journal Snapshot (Bottom) -->
-      <!-- <section
-        v-if="logs.length"
-        class="bg-white/10 backdrop-blur-md p-5 sm:p-6 rounded-2xl shadow-md border border-white/10"
-      >
-        <h2 class="text-lg sm:text-xl font-semibold mb-4">📊 Your Progress</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm sm:text-base mb-4">
-          <div class="p-3 rounded-xl bg-slate-900/40 text-center">
-            <p class="text-2xl">🔥</p>
-            <p class="font-medium">{{ streak }}-day streak</p>
-          </div>
-          <div class="p-3 rounded-xl bg-slate-900/40 text-center">
-            <p class="text-2xl">{{ logs[0].mood?.emoji || "📝" }}</p>
-            <p class="font-medium">Last Mood</p>
-          </div>
-          <div class="p-3 rounded-xl bg-slate-900/40 text-center">
-            <p class="text-2xl">📖</p>
-            <p class="font-medium">{{ logs.length }} reflections</p>
-          </div>
-        </div>
-        <div class="bg-indigo-900/30 p-3 rounded border border-indigo-600 text-sm text-indigo-200">
-          <p><strong>🧭 Focus:</strong> {{ journalFocus }}</p>
-        </div>
-      </section> -->
     </main>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { useHead } from '@vueuse/head'
-import { useRoute } from 'vue-router'
-import { saveEntryToFirebase, fetchEntries } from '@/services/firebaseService'
-import { useVoiceRecorder } from '@/composables/useVoiceRecorder'
-import { enhanceJournal } from '@/services/aiService'
-import GuestBanner from '@/components/GuestBanner.vue'
 import { useAuthStore } from '@/stores/authStore'
-import { toLocalDateKey } from '@/utils/dateHelper'
+import { fetchEntries, saveEntryToFirebase } from '@/services/firebaseService'
+import { enhanceJournal } from '@/services/aiService'
+import VoiceRecorder from '@/components/VoiceRecorder.vue'
 import { ElNotification } from 'element-plus'
 
 const authStore = useAuthStore()
-
-// SEO
-const SITE_URL = import.meta.env.VITE_SITE_URL || 'https://plancraftai.com'
-const route = useRoute()
-useHead({
-  title: 'Journal – Reflect with Voice and AI | PlanCraftAI',
-  meta: [
-    { name: 'description', content: 'Voice journaling with gentle AI enhancements, mood tracking, and insights.' },
-    { name: 'keywords', content: 'journaling insights app, voice journal, mood tracker' },
-    { property: 'og:title', content: 'Journal – PlanCraftAI' },
-    { property: 'og:description', content: 'Write, breathe, and reflect with supportive AI.' },
-    { property: 'og:type', content: 'website' }
-  ],
-  link: [{ rel: 'canonical', href: `${SITE_URL}${route.path}` }]
-})
-
 const moods = [
   { emoji: '😊', label: 'Happy' },
   { emoji: '😌', label: 'Calm' },
@@ -218,116 +140,82 @@ const moods = [
   { emoji: '😐', label: 'Neutral' },
 ]
 
-const selectedMood = ref(null)
 const entryText = ref('')
 const enhancedText = ref('')
 const logs = ref([])
+const selectedMood = ref(null)
+const selectedFilter = ref('today')
 
-const { startRecording, stopRecording } = useVoiceRecorder((raw) => {
-  entryText.value = raw
-})
-
-function selectMood(mood) {
-  selectedMood.value = mood
-}
-function handleTranscript(text) {
-  entryText.value = text
-}
-function copyToClipboard(text) {
-  if (!text) return
-  ElNotification({
-    title: 'Copied to Clipboard',
-    message: 'Your reflection has been copied! ✨',
-    type: 'success',
-    duration: 2000,
-  })
-  navigator.clipboard.writeText(text)
-  // Alternative with alert fallback
-  navigator.clipboard.writeText(text).catch(() => {
-    alert('Failed to copy. Please copy manually.')
-  });
-}
-
-async function saveEntry() {
-  if (!entryText.value.trim() && !selectedMood.value) return
-
-  try {
-    const enhanced = await enhanceJournal(entryText.value)
-    enhancedText.value = enhanced
-
-    const now = new Date()
-    const entry = {
-      id: crypto.randomUUID?.() || Date.now(),
-      date: toLocalDateKey(now),
-      mood: selectedMood.value,
-      text: enhanced,
-      rawText: entryText.value,
-      timestamp: now.getTime(),
-    }
-
-    await saveEntryToFirebase(entry)
-    logs.value.unshift(entry)
-
-    entryText.value = ''
-    selectedMood.value = null
-    enhancedText.value = ''
-  } catch (err) {
-    console.error('Enhance failed:', err)
-  }
-}
-function shareEntry(text) {
-  if (navigator.share) {
-    navigator.share({
-      title: "My Reflection 🌱",
-      text,
-    }).catch(err => console.log("Share canceled", err))
-  } else {
-    copyToClipboard(text)
-  }
-}
+const filters = [
+  { key: 'today', label: 'Today' },
+  { key: 'week', label: 'This Week' },
+  { key: 'month', label: 'This Month' },
+  { key: 'all', label: 'All Time' },
+]
 
 onMounted(async () => {
   logs.value = await fetchEntries()
 })
 
-/* 🔥 Streak Calculation */
-const streak = computed(() => {
-  if (!logs.value.length) return 0
-  const dates = logs.value
-    .map((l) => l.date)
-    .filter(Boolean)
-    .sort((a, b) => new Date(b) - new Date(a))
+// Filtered logs by timeframe
+const filteredLogs = computed(() => {
+  const now = new Date()
+  const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()))
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
-  let count = 1
-  for (let i = 1; i < dates.length; i++) {
-    const prev = new Date(dates[i - 1])
-    const curr = new Date(dates[i])
-    const diff = (prev - curr) / (1000 * 60 * 60 * 24)
-    if (diff === 1) count++
-    else break
-  }
-  return count
+  return logs.value.filter((l) => {
+    const t = new Date(l.timestamp)
+    if (selectedFilter.value === 'today') return t.toDateString() === new Date().toDateString()
+    if (selectedFilter.value === 'week') return t >= startOfWeek
+    if (selectedFilter.value === 'month') return t >= startOfMonth
+    return true
+  })
 })
 
-/* 🧭 Friendly Focus (rule-based) */
-const journalFocus = computed(() => {
-  if (!logs.value.length) return "Start journaling today — even one line makes a difference 🌱."
+function selectMood(mood) {
+  selectedMood.value = mood
+}
 
-  const moods = logs.value.slice(0, 5).map(l => l.mood?.label)
-  const moodCounts = moods.reduce((acc, m) => {
-    if (m) acc[m] = (acc[m] || 0) + 1
-    return acc
-  }, {})
+function handleTranscript(t) {
+  entryText.value = t
+}
 
-  if ((moodCounts["Sad"] || 0) + (moodCounts["Frustrated"] || 0) > 2) {
-    return "You've had some heavy days 💜. Try to note one small positive thing today."
+async function saveEntry() {
+  if (!entryText.value.trim()) return
+  const enhanced = await enhanceJournal(entryText.value)
+  const entry = {
+    id: crypto.randomUUID?.() || Date.now(),
+    text: enhanced,
+    mood: selectedMood.value,
+    timestamp: Date.now(),
   }
-  if ((moodCounts["Happy"] || 0) + (moodCounts["Calm"] || 0) > 2) {
-    return "Your energy is great 🌸. Keep nurturing what’s working for you."
-  }
-  if (streak.value >= 3) {
-    return "Amazing streak 🔥! Your reflections are shaping a stronger, calmer you."
-  }
-  return "Take a moment today 🧘 — even a short reflection keeps the habit alive."
-})
+  await saveEntryToFirebase(entry)
+  logs.value.unshift(entry)
+  entryText.value = ''
+  selectedMood.value = null
+  enhancedText.value = ''
+  ElNotification({ title: 'Saved', message: 'Your reflection was saved 💫', type: 'success' })
+}
+
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text)
+  ElNotification({ title: 'Copied', message: 'Copied to clipboard!', type: 'info' })
+}
+
+function shareEntry(text) {
+  if (navigator.share) navigator.share({ title: 'My Reflection', text })
+  else copyToClipboard(text)
+}
 </script>
+
+<style scoped>
+.fade-enter-active,
+.fade-leave-active {
+  transition: all 0.3s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+}
+</style>

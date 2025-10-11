@@ -1,0 +1,26 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="200"
+  height="200"
+  viewBox="0 0 200 200"
+  fill="none"
+>
+  <rect width="200" height="200" rx="20" fill="#6C63FF" />
+  <circle cx="100" cy="100" r="60" fill="white" />
+  <path
+    d="M70 90a10 10 0 1 1 20 0M110 90a10 10 0 1 1 20 0M70 120c10 10 50 10 60 0"
+    stroke="#6C63FF"
+    stroke-width="5"
+    stroke-linecap="round"
+  />
+  <text
+    x="100"
+    y="185"
+    text-anchor="middle"
+    font-family="Inter, sans-serif"
+    font-size="16"
+    fill="white"
+  >
+    Stay Positive 💫
+  </text>
+</svg>

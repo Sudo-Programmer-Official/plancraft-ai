@@ -36,8 +36,8 @@
             @click="openPlanner"
             class="flex items-center text-xs px-3 py-1 rounded-lg font-medium bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 text-white shadow-md transition"
           >
-            <span class="mr-1 text-yellow-300 animate-pulse">➕</span>
-            Plan My Day
+            <span class="mr-1 text-yellow-300 animate-pulse">+</span>
+            New Task
           </button>
         </div>
 
