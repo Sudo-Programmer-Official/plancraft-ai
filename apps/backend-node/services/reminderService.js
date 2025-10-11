@@ -52,6 +52,20 @@ function isoAsLocalWallToUtc(isoLike, tzOpt) {
   }
 }
 
+// Choose a single token for template variable {{1}}.
+// Never combine title + name (e.g., "King Abhishek").
+// Prefer name when available, else a friendly title, else "there".
+function getSalutationToken(opts = {}) {
+  try {
+    const name = String(opts?.displayName || opts?.name || '').trim()
+    if (name) return name
+    const gender = String(opts?.gender || '').toLowerCase()
+    if (gender === 'male') return 'King'
+    if (gender === 'female') return 'Queen'
+  } catch {}
+  return 'there'
+}
+
 // ---------------------------------------------
 // 1️⃣ CREATE REMINDER (Parse + Store + Queue)
 // ---------------------------------------------
@@ -151,7 +165,7 @@ export async function createReminderFromText(
 
   // Confirmation via WhatsApp (template + fallback)
   try {
-    const who = options?.displayName || options?.name || "there";
+    const who = getSalutationToken(options);
     await sendWhatsApp(userId, {
       template: "reminder_notification_2",
       // Template expects exactly 3 body params: {{1}} name, {{2}} task, {{3}} local time
@@ -193,7 +207,7 @@ export async function sendReminder(reminder) {
     if (channels.includes("whatsapp")) {
       try {
         // Send via approved Meta template matching parameter count
-        const who = reminder?.displayName || "there";
+        const who = getSalutationToken(reminder);
         const r = await sendWhatsApp(userId, {
           template: "reminder_notification_2",
           bodyVars: [who, task, when],
@@ -262,4 +276,3 @@ export function queueReminder(rem) {
     console.error("queueReminder error:", e);
   }
 }
-

@@ -5,21 +5,18 @@ import timezone from 'dayjs/plugin/timezone.js'
 dayjs.extend(utc)
 dayjs.extend(timezone)
 
-// Format any date using the user's timezone. Fallback to Intl if tzdb missing
-export function formatLocalTime(date, tz = 'America/Chicago', fmt = 'hh:mm A') {
+export function formatLocalTime(date, tz) {
   try {
-    if (!date) return ''
-    return dayjs(date).tz(tz).format(fmt)
+    const zone = tz || (dayjs.tz && dayjs.tz.guess && dayjs.tz.guess()) || 'UTC'
+    // Include both date and time for clarity in templates
+    return dayjs(date).tz(zone).format('ddd, MMM D • hh:mm A')
   } catch {
     try {
-      return new Intl.DateTimeFormat('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true,
-        timeZone: tz
-      }).format(new Date(date))
-    } catch {
-      return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    }
+      return new Date(date).toLocaleString([], {
+        weekday: 'short', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      })
+    } catch { return '' }
   }
 }
+
