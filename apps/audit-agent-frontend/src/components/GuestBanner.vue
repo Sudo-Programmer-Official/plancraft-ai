@@ -28,7 +28,7 @@
     </div>
 </template>
 
-<script setup>
+<!-- <script setup>
 import { ref } from 'vue'
 
 const props = defineProps({
@@ -36,4 +36,32 @@ const props = defineProps({
 })
 
 const dismissed = ref(false)
+</script> -->
+<script setup>
+import { onMounted } from 'vue'
+import { useGoogleLogin } from '@/composables/useGoogleLogin'
+import { useAuthStore } from '@/stores/authStore'
+
+const { login, handleRedirect } = useGoogleLogin()
+const authStore = useAuthStore()
+
+async function onGoogleLogin() {
+  try {
+    const user = await login()
+    if (user && authStore?.setUser) authStore.setUser(user)
+  } catch (e) {
+    console.error('[GuestBanner] Google login error', e)
+  }
+}
+
+onMounted(async () => {
+  try {
+    const user = await handleRedirect()
+    if (user && authStore?.setUser) authStore.setUser(user)
+  } catch (e) {
+    console.warn('[GuestBanner] Redirect handling error', e?.message || e)
+  }
+})
 </script>
+
+<!-- Attach this handler to your Google button: @click="onGoogleLogin" -->

@@ -219,3 +219,21 @@ authStore.init()
 
 // Mount app
 app.mount('#app')
+// Persist sessionStorage in PWA (iOS/Safari standalone can lose it)
+try {
+  const isStandalone = window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone
+  if (isStandalone) {
+    if (!sessionStorage.length && localStorage.getItem('sessionBackup')) {
+      const backup = JSON.parse(localStorage.getItem('sessionBackup') || '{}')
+      Object.keys(backup).forEach(k => sessionStorage.setItem(k, backup[k]))
+    }
+    window.addEventListener('beforeunload', () => {
+      const dump = {}
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i)
+        dump[key] = sessionStorage.getItem(key)
+      }
+      localStorage.setItem('sessionBackup', JSON.stringify(dump))
+    })
+  }
+} catch {}
