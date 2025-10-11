@@ -1,7 +1,6 @@
 // src/stores/authStore.js
 import { defineStore } from "pinia";
 import { signInAsGuest, signInWithGoogle, signOutUser, signInWithEmail, registerWithEmail, sendResetEmail, fetchUserProfile } from "@/services/authService";
-import { getAuth, onAuthStateChanged, onIdTokenChanged, setPersistence, browserLocalPersistence } from "firebase/auth";
 import firebaseApp from "@/firebase/init";
 import { identifyUser, trackEvent } from '@/services/analytics'
 import { getSubscriptionStatus } from '@/services/stripeService'
@@ -9,8 +8,7 @@ import { getUsageStatus } from '@/services/planService'
 import { doc, updateDoc } from 'firebase/firestore'
 import { db } from '@/firebase/init'
 import { ElNotification } from 'element-plus'
-
-
+import { getAuth, onAuthStateChanged, onIdTokenChanged, getRedirectResult, setPersistence, browserLocalPersistence } from "firebase/auth";
 const auth = getAuth(firebaseApp);
 setPersistence(auth, browserLocalPersistence);
 
@@ -18,7 +16,7 @@ export const useAuthStore = defineStore("authStore", {
   state: () => ({
     user: null,
     token: null,
-    loading: true, // start in loading mode until init runs
+    loading: true,
     guest: false
   }),
 
@@ -34,28 +32,43 @@ export const useAuthStore = defineStore("authStore", {
         localStorage.removeItem('authStore')
       } catch {}
       try {
-        // Lazily import to avoid circular dependency at module load
         import('@/stores/subscriptionStore').then(mod => {
           try { mod.useSubscriptionStore().reset() } catch {}
         })
       } catch {}
     },
+  async checkRedirectResult() {
+  try {
+    const auth = getAuth()
+    const result = await getRedirectResult(auth)
+
+    if (result?.user) {
+      this.user = result.user
+      this.profile = await fetchUserProfile(result.user.uid)
+      console.log('[Redirect] Logged in user:', result.user.email)
+    } else {
+      console.log('[Redirect] No redirect result found.')
+    }
+  } catch (err) {
+    console.warn('[Redirect] Failed to get redirect result:', err.message)
+  } finally {
+    this.loading = false  // ✅ Make sure to release loading UI
+  }
+}
+
     async refreshUser() {
       try {
         if (!this.user?.uid) return
         const profile = await fetchUserProfile(this.user.uid)
-        // Merge fresh profile fields; preserve existing auth fields
         this.user = {
           ...(this.user || {}),
           ...profile,
-          // Ensure plan/role are updated from profile if present
           plan: (profile && profile.plan) ? profile.plan : this.user?.plan,
           role: (profile && profile.role) ? profile.role : this.user?.role,
         }
-      } catch (e) {
-        // no-op; keep existing user
-      }
+      } catch {}
     },
+
     async refreshPlan() {
       try {
         if (!this.user?.uid) return
@@ -64,30 +77,26 @@ export const useAuthStore = defineStore("authStore", {
           getUsageStatus(this.user.uid),
         ])
         const plan = (status?.plan || 'free').toLowerCase()
-        // Attach plan and usage to local user object for convenience
         this.user = { ...(this.user || {}), plan, usage }
         try { await updateDoc(doc(db, 'users', this.user.uid), { plan }) } catch {}
       } catch {}
     },
+
     async init() {
-      // If Firebase has no current user at app start, ensure we don't show stale cached state
       const fbUser = auth.currentUser
       if (!fbUser) {
         this.resetAuth()
       }
 
-      // Attach Firebase auth listeners
       onAuthStateChanged(auth, async (user) => {
-        // This fires on initial mount and sign-in/out. Keep it lightweight; token refresh handled below.
         if (!user) this.resetAuth()
         this.loading = false
       })
 
-      // Keep ID token fresh to avoid 401 loops
       onIdTokenChanged(auth, async (user) => {
         try {
           if (user) {
-            const token = await user.getIdToken(true) // force refresh when Firebase deems necessary
+            const token = await user.getIdToken(true)
             const profile = await fetchUserProfile(user.uid)
             this.user = {
               uid: user.uid,
@@ -100,13 +109,11 @@ export const useAuthStore = defineStore("authStore", {
             identifyUser(this.user)
             localStorage.setItem('user', JSON.stringify(this.user))
             localStorage.setItem('token', this.token)
-            // Refresh plan status in background
             this.refreshPlan().catch(() => {})
           } else {
             this.resetAuth()
           }
-        } catch (e) {
-          // On error, clear potentially stale creds
+        } catch {
           this.resetAuth()
         }
       })
@@ -253,7 +260,6 @@ export const useAuthStore = defineStore("authStore", {
         } catch {}
         try { trackEvent('Logout') } catch {}
         this.resetAuth()
-        // Small delay to allow toast render, then hard redirect
         setTimeout(() => { try { window.location.href = '/login' } catch {} }, 350)
       }
     },

@@ -3,6 +3,7 @@ import {
   getAuth,
   signInAnonymously,
   signInWithPopup,
+  signInWithRedirect,
   GoogleAuthProvider,
   signOut,
   signInWithEmailAndPassword,
@@ -26,15 +27,28 @@ export async function signInAsGuest() {
 
 export async function signInWithGoogle() {
   const provider = new GoogleAuthProvider();
-  const result = await signInWithPopup(auth, provider);
-  const user = result.user;
-  await setDoc(doc(db, "users", user.uid), {
-    email: user.email,
-    name: user.displayName,
-    mode: "google",
-    createdAt: Date.now(),
-  }, { merge: true });
-  return user;
+  try {
+    const result = await signInWithPopup(auth, provider);
+    const user = result.user;
+    await setDoc(
+      doc(db, "users", user.uid),
+      {
+        email: user.email,
+        name: user.displayName,
+        mode: "google",
+        createdAt: Date.now(),
+      },
+      { merge: true }
+    );
+    return user;
+  } catch (err) {
+    if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
+      console.warn('Popup blocked or closed, falling back to redirect...')
+      await signInWithRedirect(auth, provider)
+    } else {
+      throw err
+    }
+  }
 }
 
 export async function signOutUser() {
