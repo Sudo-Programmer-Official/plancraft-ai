@@ -60,6 +60,17 @@ api.interceptors.request.use(async (config) => {
         if (u?.role) config.headers['x-user-role'] = u.role
       }
     }
+    // 🕒 Include user timezone (handles mobile/PWA drift)
+    try {
+      let tz = localStorage.getItem('user_timezone')
+      if (!tz || tz === 'UTC') {
+        tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+        localStorage.setItem('user_timezone', tz)
+      }
+      config.headers['x-user-tz'] = tz
+    } catch {
+      config.headers['x-user-tz'] = 'UTC'
+    }
   } catch {}
   return config
 })
@@ -75,10 +86,14 @@ api.interceptors.response.use(
       const msg = (error?.response?.data?.error || '').toString().toLowerCase()
       const isLimit = status === 403 && /limit|upgrade/.test(msg)
       if (isLimit && typeof window !== 'undefined') {
-        const detail = { source: 'api', path: error?.config?.url, message: error?.response?.data?.error }
+        const detail = {
+          source: 'api',
+          path: error?.config?.url,
+          message: error?.response?.data?.error,
+        }
         window.dispatchEvent(new CustomEvent('upgrade-required', { detail }))
       }
     } catch {}
     return Promise.reject(error)
-  }
+  },
 )

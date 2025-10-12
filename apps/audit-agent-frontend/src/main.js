@@ -23,10 +23,21 @@ import timezone from 'dayjs/plugin/timezone'
 dayjs.extend(utc)
 dayjs.extend(timezone)
 try {
-  const guessed = dayjs.tz.guess()
+  let guessed = dayjs.tz.guess()
+  // 🧠 Fallback to system Intl if dayjs returns UTC (PWA edge case)
+  if (guessed === 'UTC') {
+    const intlGuess = Intl.DateTimeFormat().resolvedOptions().timeZone
+    if (intlGuess && intlGuess !== 'UTC') guessed = intlGuess
+  }
+
+  // 🧩 Persist timezone in localStorage for consistent reuse
+  localStorage.setItem('user_timezone', guessed)
   dayjs.tz.setDefault(guessed)
   console.log('[TimeZone] Default set to:', guessed)
-} catch {}
+} catch (err) {
+  console.warn('[TimeZone] Fallback to UTC:', err)
+  dayjs.tz.setDefault('UTC')
+}
 
 // ✅ Firebase init
 import '@/firebase/init'
