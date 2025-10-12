@@ -1,11 +1,12 @@
 {
-  "name": "quote",
+  "name": "audit-agent-frontend",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --mode development",
     "build": "vite build --mode production && node scripts/generate-sitemap.js",
+    "build:dev": "vite build --mode development && node -r dotenv/config scripts/generate-sitemap.js",
     "build:ssg": "vite-ssg build src/main-ssg.js",
     "preview": "vite preview",
     "deploy": "npm run build && firebase deploy",
@@ -52,6 +53,7 @@
     "@vitejs/plugin-vue": "^5.2.3",
     "@vue/eslint-config-prettier": "^10.2.0",
     "autoprefixer": "^10.4.21",
+    "dotenv": "^17.2.3",
     "eslint": "^9.22.0",
     "eslint-plugin-vue": "~10.0.0",
     "firebase-admin": "^13.5.0",

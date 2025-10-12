@@ -12,6 +12,9 @@ import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import https from "https";
 import process from "process";
+import dotenv from "dotenv"
+dotenv.config({ path: ".env.production" }) // choose your env file
+
 
 // 🧩 Firebase SDK (for dynamic blog URLs)
 import { initializeApp } from "firebase/app";
@@ -29,6 +32,17 @@ if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
   });
+}
+
+console.log("🚨 Using API Base URL:", process.env.VITE_API_BASE_URL)
+const apiUrl = process.env.VITE_API_BASE_URL
+if (apiUrl === "undefined") {
+  console.error("❌ Missing VITE_API_BASE_URL! Check .env or .env.production.")
+  process.exit(1)
+}
+if (process.env.VITE_API_BASE_URL.includes("localhost")) {
+  console.error("❌ ABORT: Localhost URL detected! Switch to production env.")
+  process.exit(1)
 }
 
 const db = admin.firestore();
