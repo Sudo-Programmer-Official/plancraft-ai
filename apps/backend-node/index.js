@@ -132,6 +132,7 @@ const corsOptions = {
     "x-user-email",
     "x-user-id",
     "x-user-role",
+    "x-user-tz",
     "x-requested-with",
   ],
   credentials: true,
@@ -159,7 +160,7 @@ app.use((req, res, next) => {
       res.header('Access-Control-Allow-Credentials', 'true')
       res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS,PATCH')
       const reqHeaders = req.headers['access-control-request-headers']
-      res.header('Access-Control-Allow-Headers', reqHeaders || 'Content-Type, Authorization, X-User-Email, X-User-Id, X-User-Role, X-Requested-With')
+      res.header('Access-Control-Allow-Headers', reqHeaders || 'Content-Type, Authorization, X-User-Email, X-User-Id, X-User-Role, X-User-Tz, X-Requested-With')
       return res.sendStatus(204)
     }
   }

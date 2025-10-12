@@ -273,7 +273,8 @@ router.post("/tasks/summarize", async (req, res) => {
 // });
 router.post('/split-tasks', async (req, res) => {
   try {
-    const { text, maxItems = 6, context = '', timezone: tz } = req.body || {}
+    const { text, maxItems = 6, context = '' } = req.body || {}
+    const tz = (req.body && req.body.timezone) || req.headers['x-user-tz'] || 'UTC'
     if (!text || typeof text !== 'string') {
       return res.status(400).json({ error: "'text' is required" })
     }
@@ -314,7 +315,8 @@ router.post('/split-tasks', async (req, res) => {
 // POST /api/ai/extract-time
 router.post('/extract-time', async (req, res) => {
   try {
-    const { text, now, timezone: tz } = req.body || {}
+    const { text, now } = req.body || {}
+    const tz = (req.body && req.body.timezone) || req.headers['x-user-tz'] || 'UTC'
     if (!text || typeof text !== 'string') {
       return res.status(400).json({ error: "'text' is required" })
     }

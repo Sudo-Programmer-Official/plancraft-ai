@@ -20,7 +20,8 @@ router.use('/text', planUsageMiddleware)
 // POST /api/reminders/text
 router.post("/text", async (req, res) => {
   try {
-    const { userId, text, channels, taskId, scheduledTime, timezone: tz } = req.body || {}
+    const { userId, text, channels, taskId, scheduledTime } = req.body || {}
+    const tz = (req.body && req.body.timezone) || req.headers['x-user-tz'] || 'UTC'
     console.log("[Reminder API] /reminders/text", {
       userId,
       taskId,
