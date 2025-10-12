@@ -10,7 +10,6 @@
       background: #f9fafb;
       color: #111827;
       display: flex;
-      flex-direction: column;
       justify-content: center;
       align-items: center;
       height: 100vh;
@@ -19,10 +18,10 @@
       padding: 1.5rem;
     }
     .card {
-      background: white;
+      background: #fff;
       padding: 2rem;
       border-radius: 1rem;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.08);
       max-width: 400px;
     }
     button {
@@ -31,7 +30,7 @@
       border: none;
       border-radius: 0.5rem;
       background: #4f46e5;
-      color: white;
+      color: #fff;
       font-size: 0.9rem;
       cursor: pointer;
     }
@@ -46,7 +45,7 @@
   <div class="card">
     <h2>🌿 Open in Your Browser</h2>
     <p>
-      It looks like you’re inside the Instagram app.  
+      It looks like you’re inside the Instagram app.<br>
       To continue securely with Google Sign-In, please open this page in
       <strong>Safari</strong> or <strong>Chrome</strong>.
     </p>
@@ -59,14 +58,26 @@
   <script>
     const copyBtn = document.getElementById('copyBtn')
     const status = document.getElementById('status')
+    const homepage = 'https://plancraftai.com'
+
+    // ✅ 1. Copy link support
     copyBtn.addEventListener('click', async () => {
       try {
-        await navigator.clipboard.writeText(window.location.href)
-        status.textContent = '✅ Link copied! Open it in your default browser.'
+        await navigator.clipboard.writeText(homepage)
+        status.textContent = '✅ Link copied! Open it in Safari or Chrome.'
       } catch {
-        status.textContent = '⚠️ Copy not supported — long-press and copy manually.'
+        status.textContent = '⚠️ Long-press and copy manually.'
       }
     })
+
+    // ✅ 2. Detect if user is still in an in-app browser
+    const ua = navigator.userAgent.toLowerCase()
+    const isInApp = /(instagram|fbav|facebook|line|wechat|micromessenger|pinterest|snapchat|tiktok)/i.test(ua)
+
+    // ✅ 3. If not in in-app browser → auto redirect to homepage
+    if (!isInApp) {
+      window.location.replace(homepage)
+    }
   </script>
 </body>
 </html>
