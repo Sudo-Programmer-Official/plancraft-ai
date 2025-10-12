@@ -70,9 +70,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { getBlogBySlug } from '@/services/blogService'
+import { useHead } from '@vueuse/head' // if using VueUse (recommended)
 
 const route = useRoute()
 const post = ref(null)
@@ -86,7 +87,37 @@ onMounted(async () => {
     loading.value = false
   }
 })
-
+watchEffect(() => {
+  if (post.value) {
+    useHead({
+      title: `${post.value.title} | PlanCraftAI Blog`,
+      meta: [
+        {
+          name: 'description',
+          content: post.value.summary || 'Explore AI productivity insights and planning stories with PlanCraftAI.',
+        },
+        {
+          property: 'og:title',
+          content: post.value.title,
+        },
+        {
+          property: 'og:description',
+          content: post.value.summary,
+        },
+        {
+          property: 'og:image',
+          content: post.value.coverImage || '/default-blog-cover.png',
+        },
+        {
+          property: 'og:url',
+          content: `https://plancraftai.com/blog/${post.value.slug}`,
+        },
+        { name: 'twitter:card', content: 'summary_large_image' },
+        { rel: 'canonical', href: `https://plancraftai.com/blog/${post.value.slug}` },
+      ],
+    })
+  }
+})
 function formatDate(val) {
   try {
     if (val?.toDate) return val.toDate().toLocaleDateString()
