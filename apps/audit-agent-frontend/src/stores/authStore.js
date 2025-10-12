@@ -173,20 +173,44 @@ export const useAuthStore = defineStore('authStore', {
         const provider = new GoogleAuthProvider()
         provider.setCustomParameters({ prompt: 'select_account' })
 
+        // if (isInAppBrowser()) {
+        //   console.warn('In-app browser detected — showing warning modal')
+        //   // Dynamically mount the modal to DOM
+        //   const container = document.createElement('div')
+        //   document.body.appendChild(container)
+
+        //   const { createApp } = await import('vue')
+        //   const InAppBrowserWarning = (await import('@/components/InAppBrowserWarning.vue')).default
+
+        //   const app = createApp(InAppBrowserWarning, {
+        //     onContinue: async () => {
+        //       try {
+        //         app.unmount()
+        //         document.body.removeChild(container)
+        //         await signInWithRedirect(auth, provider)
+        //       } catch (e) {
+        //         console.error('Redirect failed:', e)
+        //       }
+        //     },
+        //   })
+        //   app.mount(container)
+
+        //   return // Wait until modal resolves
+        // }
         if (isInAppBrowser()) {
-          console.warn('In-app browser detected — showing warning modal')
-          // Dynamically mount the modal to DOM
+          console.warn('In-app browser detected — showing helper modal')
           const container = document.createElement('div')
           document.body.appendChild(container)
 
           const { createApp } = await import('vue')
-          const InAppBrowserWarning = (await import('@/components/InAppBrowserWarning.vue')).default
+          const InAppBrowserHelper = (await import('@/components/InAppBrowserHelper.vue')).default
 
-          const app = createApp(InAppBrowserWarning, {
+          const app = createApp(InAppBrowserHelper, {
+            redirectUrl: window.location.href,
             onContinue: async () => {
+              app.unmount()
+              document.body.removeChild(container)
               try {
-                app.unmount()
-                document.body.removeChild(container)
                 await signInWithRedirect(auth, provider)
               } catch (e) {
                 console.error('Redirect failed:', e)
@@ -194,8 +218,7 @@ export const useAuthStore = defineStore('authStore', {
             },
           })
           app.mount(container)
-
-          return // Wait until modal resolves
+          return
         }
 
         // Default desktop popup login

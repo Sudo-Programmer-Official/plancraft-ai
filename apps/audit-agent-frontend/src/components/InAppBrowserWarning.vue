@@ -1,115 +1,99 @@
-<!-- src/components/InAppBrowserWarning.vue -->
 <template>
   <div
     v-if="visible"
-    class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm"
-    @keydown.esc.prevent="close"
+    class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm"
   >
     <div
       role="dialog"
       aria-modal="true"
-      aria-labelledby="iabw-title"
-      aria-describedby="iabw-desc"
-      class="bg-white text-gray-900 rounded-xl shadow-2xl max-w-sm w-[90%] p-6 text-center space-y-4 outline-none"
+      aria-labelledby="iabh-title"
+      aria-describedby="iabh-desc"
+      class="bg-white dark:bg-[#1f1f1f] text-gray-800 dark:text-gray-200 rounded-2xl shadow-2xl max-w-sm w-[90%] p-6 text-center space-y-5 outline-none"
       tabindex="0"
-      @keyup.enter.prevent="continueFlow"
-      @click.self.stop
     >
-      <div class="text-3xl">⚠️</div>
-      <h2 id="iabw-title" class="text-lg font-semibold">In-App Browser Detected</h2>
-      <p id="iabw-desc" class="text-sm text-gray-600">
-        Please open this page in <strong>Safari</strong> or <strong>Chrome</strong> for a secure sign-in experience.
-        In-app browsers (e.g. LinkedIn, Instagram) can block Google login.
+      <div class="text-4xl">🌿</div>
+      <h2 id="iabh-title" class="text-xl font-semibold">Open in your browser</h2>
+      <p id="iabh-desc" class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+        For the best and most secure sign-in experience, please open this page in
+        <strong>Safari</strong> or <strong>Chrome</strong>.  
+        Some in-app browsers (like LinkedIn or Instagram) don’t fully support Google login.
       </p>
 
-      <!-- Optional hint to open in default browser -->
-      <div class="text-[12px] text-gray-500">
-        Tip: Tap the <strong>•••</strong> menu and choose <em>Open in Browser</em>.
+      <div class="text-xs text-gray-500">
+        Tip: Tap the <strong>•••</strong> menu → <em>Open in Browser</em>.
       </div>
 
-      <div class="flex justify-center gap-3 pt-3">
+      <div class="flex flex-col items-center gap-3 pt-2">
+        <button
+          type="button"
+          @click="copyLink"
+          class="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm w-full transition-all"
+        >
+          <span v-if="!copied">📋 Copy link</span>
+          <span v-else>✅ Link copied!</span>
+        </button>
+
         <button
           type="button"
           @click="continueFlow"
-          class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm"
+          class="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 px-4 py-2 rounded-lg text-sm w-full"
         >
           Continue Anyway
         </button>
+
         <button
           type="button"
           @click="close"
-          class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm"
+          class="text-gray-400 text-xs underline mt-1"
         >
-          Cancel
+          Close
         </button>
       </div>
 
-      <div v-if="autoSeconds > 0" class="text-[11px] text-gray-500 pt-1">
-        Continuing automatically in {{ countdown }}s…
+      <div v-if="copied" class="text-[11px] text-gray-400 pt-2">
+        You can now paste this link in Safari or Chrome to continue.
       </div>
     </div>
-
-    <!-- click outside closes (so users aren’t trapped) -->
-    <div class="absolute inset-0" @click="close" />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watchEffect } from 'vue'
+import { ref } from 'vue'
 
 const props = defineProps({
   onContinue: { type: Function, default: null },
-  /** Auto-continue after N seconds. Set 0 to disable */
-  autoSeconds: { type: Number, default: 5 }
+  redirectUrl: { type: String, default: window.location.href }
 })
 
 const visible = ref(true)
-const countdown = ref(props.autoSeconds)
-let timer = null
-let tick = null
+const copied = ref(false)
+
+function copyLink() {
+  try {
+    navigator.clipboard.writeText(props.redirectUrl)
+    copied.value = true
+    setTimeout(() => {
+      copied.value = false
+    }, 2500)
+  } catch (e) {
+    alert('Copy failed — please long-press and copy manually.')
+  }
+}
 
 function continueFlow() {
-  if (typeof props.onContinue === 'function') {
-    props.onContinue()
-  }
+  if (typeof props.onContinue === 'function') props.onContinue()
   visible.value = false
-  clearTimers()
 }
 
 function close() {
   visible.value = false
-  clearTimers()
 }
-
-function clearTimers() {
-  if (timer) clearTimeout(timer)
-  if (tick) clearInterval(tick)
-  timer = null
-  tick = null
-}
-
-onMounted(() => {
-  // focus the dialog for keyboard accessibility
-  queueMicrotask(() => {
-    const el = document.querySelector('[role="dialog"]')
-    el?.focus?.()
-  })
-
-  if (props.autoSeconds > 0) {
-    timer = setTimeout(continueFlow, props.autoSeconds * 1000)
-    tick = setInterval(() => {
-      if (countdown.value > 0) countdown.value -= 1
-    }, 1000)
-  }
-})
-
-onBeforeUnmount(clearTimers)
-
-// If the component is hidden externally, stop timers
-watchEffect(() => { if (!visible.value) clearTimers() })
 </script>
 
 <style scoped>
-@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
-[role="dialog"] { animation: fadeIn 0.25s ease-in; }
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+[role="dialog"] { animation: fadeIn 0.3s ease-in-out; }
 </style>
