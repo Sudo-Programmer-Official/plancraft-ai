@@ -173,6 +173,7 @@ import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
 import { toLocal } from '@/utils/timezone'  // add this at top if not imported
+import { toUtcIso, toLocalHHMM, getUserTimezone } from '@/utils/time'
 
 
 dayjs.extend(utc)
@@ -475,20 +476,8 @@ function tryPrefillReminder(task) {
 
 function buildLocalIso(ymd, hhmm) {
   try {
-    const [y, m, d] = String(ymd || '').split('-').map(Number)
-    const [hh, mm] = String(hhmm || '00:00').split(':').map(Number)
-    if (!y || !m || !d) throw new Error('invalid date parts')
-
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
-    const yStr = String(y).padStart(4, '0')
-    const mStr = String(m).padStart(2, '0')
-    const dStr = String(d).padStart(2, '0')
-    const hhStr = String(hh || 0).padStart(2, '0')
-    const mmStr = String(mm || 0).padStart(2, '0')
-
-    // Interpret as wall-clock time in user's TZ, then convert to UTC ISO
-    const local = dayjs.tz(`${yStr}-${mStr}-${dStr} ${hhStr}:${mmStr}`, tz, true)
-    return local.utc().toISOString()
+    const tz = getUserTimezone()
+    return toUtcIso(String(ymd || ''), String(hhmm || '00:00'), tz)
   } catch {
     return new Date().toISOString()
   }

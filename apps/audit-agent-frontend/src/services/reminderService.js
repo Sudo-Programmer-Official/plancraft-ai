@@ -3,6 +3,7 @@ import { updateTaskInFirebase } from '@/services/firebaseService'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
+import { toLocalHHMM } from '@/utils/time'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -69,7 +70,7 @@ export async function scheduleReminder(userId, taskId, text, scheduledTime, pref
 
     // ✅ Mirror reminderTime (HH:mm local) back to task for UI
     try {
-      const localHHMM = dayjs.utc(scheduledTime).tz(tz).format('HH:mm')
+      const localHHMM = toLocalHHMM(scheduledTime, tz)
       await updateTaskInFirebase({ id: taskId, reminderTime: localHHMM })
     } catch (e) {
       console.warn('[Reminder] Failed to mirror reminderTime to task', e?.message || e)

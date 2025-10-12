@@ -67,7 +67,7 @@ router.post("/text", async (req, res) => {
 })
 
 // POST /api/reminders/voice (multipart/form-data; field name 'audio')
-router.post("/voice", upload.single("audio"), async (req, res) => {
+router.post("/voice", upload.single("audio"), planUsageMiddleware, async (req, res) => {
   try {
     const { userId } = req.body || {}
     const file = req.file

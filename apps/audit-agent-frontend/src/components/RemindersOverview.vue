@@ -104,6 +104,7 @@ import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import _ from 'lodash'
+import { toJsDate as toJsDateUtil } from '@/utils/time'
 
 // Time setup
 dayjs.extend(utc)
@@ -169,17 +170,7 @@ async function scrollToGroup(date) {
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
-function toJsDate(v) {
-  try {
-    if (!v) return null
-    if (typeof v === 'string') return new Date(v)
-    if (v instanceof Date) return v
-    if (typeof v.toDate === 'function') return v.toDate()
-    if (typeof v.seconds === 'number') return new Date(v.seconds * 1000)
-    if (typeof v._seconds === 'number') return new Date(v._seconds * 1000)
-  } catch {}
-  return null
-}
+function toJsDate(v) { try { return toJsDateUtil(v) } catch { return null } }
 
 function formatDualTime(iso) {
   const d = toJsDate(iso)
