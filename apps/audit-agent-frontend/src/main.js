@@ -79,6 +79,13 @@ try {
   console.warn('Redirect login check failed:', err)
 }
 
+// Early Instagram/Facebook/TikTok browser check
+const ua = navigator.userAgent.toLowerCase()
+const isInApp = /(instagram|fbav|facebook|line|wechat|micromessenger|pinterest|snapchat|tiktok)/i.test(ua)
+if (isInApp) {
+  window.location.href = '/inapp-fallback.html'
+}
+
 // Mount app
 app.mount('#app')
 
