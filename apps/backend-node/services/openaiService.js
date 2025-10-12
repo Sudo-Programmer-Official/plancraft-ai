@@ -1,9 +1,14 @@
 // services/openaiService.js
 import OpenAI from "openai";
 import dotenv from "dotenv";
+import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc.js'
+import timezone from 'dayjs/plugin/timezone.js'
 dotenv.config();
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+dayjs.extend(utc)
+dayjs.extend(timezone)
 
 // Centralized helper with model fallbacks and friendlier errors
 const DEFAULT_MODEL = process.env.OPENAI_MODEL || "gpt-3.5-turbo";
@@ -408,15 +413,22 @@ Rules:
 }
 
 // ✨ Extract reminder time from natural language text
-export async function extractReminderTime(input, { nowISO } = {}) {
+export async function extractReminderTime(input, { nowISO, timezone: tzOpt } = {}) {
   const now = typeof nowISO === 'string' && nowISO ? nowISO : new Date().toISOString()
+  const tz = typeof tzOpt === 'string' && tzOpt ? tzOpt : 'UTC'
+
   const system = {
     role: 'system',
-    content: 'You convert natural language time expressions into an absolute ISO 8601 timestamp.'
+    content: [
+      'You convert natural language time expressions into an absolute ISO 8601 UTC timestamp.',
+      'Assume all times are in the user\'s local timezone when not explicitly specified.',
+      'Always compute the correct calendar date (e.g., for "tomorrow"), using the provided timezone.',
+      'Return only JSON.'
+    ].join(' ')
   }
   const user = {
     role: 'user',
-    content: `Current time (ISO): ${now}\n\nText: "${input}"\n\nReturn ONLY valid JSON with one field:\n{ "reminderTime": "<ISO timestamp>" | null }\n\nRules:\n- If the text has no time reference, return null.\n- If time is relative (e.g., in 10 minutes), compute absolute time using the provided current time.\n- Use minutes precision.\n- Do not include explanations.`
+    content: `Current time (ISO): ${now}\nUser timezone (IANA): ${tz}\n\nText: "${input}"\n\nReturn ONLY valid JSON with exactly this shape:\n{ "reminderTime": "<UTC ISO 8601 with Z>" | null }\n\nRules:\n- If the text has no time reference, return null.\n- If time is relative (e.g., in 10 minutes), compute absolute time using the provided current time and timezone.\n- Output MUST be a UTC timestamp with 'Z' suffix.\n- Do not include explanations.`
   }
 
   const content = await chatWithFallback({
@@ -426,25 +438,51 @@ export async function extractReminderTime(input, { nowISO } = {}) {
 
   let cleaned = content.trim()
   cleaned = cleaned.replace(/^```json\s*/i, '').replace(/```$/i, '').trim()
-  // try to extract first JSON object
   if (!cleaned.startsWith('{')) {
     const match = cleaned.match(/\{[\s\S]*\}/)
     if (match) cleaned = match[0]
   }
+
+  // Normalize model output into reliable UTC ISO using the provided timezone when needed
+  const normalizeToUtcIso = (val) => {
+    try {
+      const s = String(val || '')
+      if (!s) return null
+      const hasZone = /[zZ]|[+-]\d\d:?\d\d$/.test(s)
+      if (hasZone) {
+        const d = new Date(s)
+        return isNaN(d.getTime()) ? null : d.toISOString()
+      }
+      // Interpret as local wall time in tz
+      const m = s.match(/^(\d{4}-\d{2}-\d{2})[T\s](\d{2}):(\d{2})(?::(\d{2}))?/)
+      if (m) {
+        const date = m[1]
+        const hh = m[2]
+        const mm = m[3]
+        const ss = m[4] || '00'
+        return dayjs.tz(`${date} ${hh}:${mm}:${ss}`, tz, true).utc().toISOString()
+      }
+      return dayjs.tz(s, tz, true).utc().toISOString()
+    } catch {
+      try { return new Date(val).toISOString() } catch { return null }
+    }
+  }
+
   try {
     const parsed = JSON.parse(cleaned)
     const rt = parsed?.reminderTime
     if (!rt) return null
-    const d = new Date(rt)
-    if (d instanceof Date && !isNaN(d.getTime())) return d.toISOString()
-  } catch (e) {
+    const iso = normalizeToUtcIso(rt)
+    if (iso) return iso
+  } catch {
     // fall through
   }
+
   // Fallback: try naive ISO-like match
   const m = cleaned.match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?/)
   if (m) {
-    const d = new Date(m[0])
-    if (!isNaN(d.getTime())) return d.toISOString()
+    const iso = normalizeToUtcIso(m[0])
+    if (iso) return iso
   }
   return null
 }

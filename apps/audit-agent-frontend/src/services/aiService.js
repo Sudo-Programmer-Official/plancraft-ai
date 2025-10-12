@@ -68,7 +68,8 @@ export async function summarizeTasks(tasks) {
  */
 export async function generateTasksFromText(text) {
   try {
-    const res = await api.post("/split-tasks", { text });
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+    const res = await api.post("/split-tasks", { text, timezone: tz });
     const raw = res?.data?.tasks ?? []
     const reminderTime = res?.data?.reminderTime ?? null
     // Normalize: accept array of strings or array of objects with title
@@ -87,7 +88,8 @@ export async function generateTasksFromText(text) {
  */
 export async function extractReminderTime(text) {
   try {
-    const res = await api.post("/extract-time", { text });
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+    const res = await api.post("/extract-time", { text, timezone: tz });
     const iso = res?.data?.reminderTime
     return typeof iso === 'string' && iso ? iso : null
   } catch (err) {

@@ -273,7 +273,7 @@ router.post("/tasks/summarize", async (req, res) => {
 // });
 router.post('/split-tasks', async (req, res) => {
   try {
-    const { text, maxItems = 6, context = '' } = req.body || {}
+    const { text, maxItems = 6, context = '', timezone: tz } = req.body || {}
     if (!text || typeof text !== 'string') {
       return res.status(400).json({ error: "'text' is required" })
     }
@@ -303,7 +303,7 @@ router.post('/split-tasks', async (req, res) => {
       }))
     // Attempt time extraction from the same input (non-fatal)
     let reminderTime = null
-    try { reminderTime = await extractReminderTime(text, { nowISO: new Date().toISOString() }) } catch {}
+    try { reminderTime = await extractReminderTime(text, { nowISO: new Date().toISOString(), timezone: tz }) } catch {}
     res.json({ tasks, reminderTime })
   } catch (error) {
     console.error('❌ Split Tasks API Error:', error)
@@ -314,11 +314,11 @@ router.post('/split-tasks', async (req, res) => {
 // POST /api/ai/extract-time
 router.post('/extract-time', async (req, res) => {
   try {
-    const { text, now } = req.body || {}
+    const { text, now, timezone: tz } = req.body || {}
     if (!text || typeof text !== 'string') {
       return res.status(400).json({ error: "'text' is required" })
     }
-    const iso = await extractReminderTime(text, { nowISO: now })
+    const iso = await extractReminderTime(text, { nowISO: now, timezone: tz })
     res.json({ reminderTime: iso || null })
   } catch (error) {
     console.error('❌ Extract Time API Error:', error)
