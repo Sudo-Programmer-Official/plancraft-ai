@@ -48,6 +48,7 @@ temp/
 *.temp
 
 /apps/backend-node/firebase-service-account.json
+/apps/audit-agent-frontend/scripts/firebase-service-account.json
 
 # VS Code settings
 *.code-workspace
