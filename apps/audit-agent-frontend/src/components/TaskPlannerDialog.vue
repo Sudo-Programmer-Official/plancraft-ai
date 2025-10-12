@@ -20,6 +20,7 @@
       <label class="block text-sm text-slate-300 mb-1">Select Date</label>
       <el-date-picker
         v-model="selectedDate"
+        :disabled="props.readonly || props.lockDate"
         type="date"
         placeholder="Pick a day"
         format="YYYY-MM-DD"
@@ -44,6 +45,7 @@
       <el-time-picker
         v-model="reminderTime"
         placeholder="HH:mm"
+        :disabled="props.readonly || props.disableReminder"
         format="HH:mm"
         value-format="HH:mm"
         class="w-full"
@@ -104,7 +106,7 @@
             transition-all duration-300"
         >
           <template v-if="transcribing">⌛ Transcribing…</template>
-          <template v-else>{{ loading ? '⏳ Generating...' : '➕ Generate Tasks' }}</template>
+          <template v-else>{{ loading ? '⏳ Generating...' : '+ Generate Tasks' }}</template>
         </el-button>
         <p v-if="!isFeatureAllowed({ plan: subStore.subscription.plan }, 'aiSplit')" class="mt-2 text-xs text-red-300">
           Upgrade to Pro to use AI task generation 💎
@@ -180,7 +182,12 @@ const props = defineProps({
   open: Boolean,
   date: { type: [String, Date], default: () => toLocalDateKey(new Date()) },
   task: Object,
-  editMode: { type: Boolean, default: false }
+  editMode: { type: Boolean, default: false },
+  readonly: { type: Boolean, default: false },
+  // Optional: lock date input when reusing in Weekly/Monthly
+  lockDate: { type: Boolean, default: false },
+  // Optional: disable reminder edits when reusing in Weekly/Monthly
+  disableReminder: { type: Boolean, default: false }
 })
 const emit = defineEmits(['close', 'saved'])
 
@@ -571,7 +578,11 @@ async function generateTasks() {
 
 function save() {
   if (props.task) {
-    emit("saved", { ...props.task, title: input.value, details: details.value, link: link.value, date: selectedDate.value, reminderTime: reminderTime.value || null })
+    const dateToSave = props.lockDate && props?.task?.date ? props.task.date : selectedDate.value
+    const reminderToSave = props.disableReminder && typeof props?.task?.reminderTime !== 'undefined'
+      ? (props.task.reminderTime ?? null)
+      : (reminderTime.value || null)
+    emit("saved", { ...props.task, title: input.value, details: details.value, link: link.value, date: dateToSave, reminderTime: reminderToSave })
     ElNotification({ title: 'Success', message: 'Task updated successfully', type: 'success', duration: 2000 })
   } else {
     emit("saved", { title: input.value, details: details.value, link: link.value, date: selectedDate.value, reminderTime: reminderTime.value || null })
@@ -807,3 +818,19 @@ function closeDialog() {
   border-color: #6366f1 !important; /* indigo highlight */
 }
 </style>
+// Enforce read-only behavior when asked to lock date or disable reminders
+watch(selectedDate, (val) => {
+  try {
+    if (props.lockDate && props?.task?.date && val !== props.task.date) {
+      selectedDate.value = props.task.date
+    }
+  } catch {}
+})
+
+watch(reminderTime, (val) => {
+  try {
+    if (props.disableReminder && typeof props?.task?.reminderTime !== 'undefined' && val !== props.task.reminderTime) {
+      reminderTime.value = props.task.reminderTime || ''
+    }
+  } catch {}
+})

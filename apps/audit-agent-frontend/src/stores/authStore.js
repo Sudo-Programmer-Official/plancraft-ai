@@ -19,7 +19,8 @@ export const useAuthStore = defineStore("authStore", {
     user: null,
     token: null,
     loading: true, // start in loading mode until init runs
-    guest: false
+    guest: false,
+    usage: { used: 0, limit: 0, plan: '' }
   }),
 
   actions: {
@@ -202,6 +203,15 @@ export const useAuthStore = defineStore("authStore", {
       }
     },
 
+  //  async  fetchUsage() {
+  //     try {
+  //       const uid = auth?.currentUser?.uid || localStorage.getItem('uid')
+  //       if (!uid) return
+  //       const { data } = await api.get('/reminders/usage', { params: { userId: uid } })
+  //       if (data?.success) usage.value = { used: data.used || 0, limit: data.limit || 0, plan: data.plan || '' }
+  //     } catch {}
+  //   },
+
     async registerEmail(email, password) {
       this.loading = true
       try {
@@ -250,8 +260,12 @@ export const useAuthStore = defineStore("authStore", {
             duration: 1600,
             offset: 80,
           })
-        } catch {}
-        try { trackEvent('Logout') } catch {}
+        } catch {
+          // no-op
+        }
+        try { trackEvent('Logout') } catch {
+          // no-op
+        }
         this.resetAuth()
         // Small delay to allow toast render, then hard redirect
         setTimeout(() => { try { window.location.href = '/login' } catch {} }, 350)
@@ -264,3 +278,7 @@ export const useAuthStore = defineStore("authStore", {
     isGuest: (state) => state.guest === true
   },
 });
+// Shim: some views import a named `userPrefs` from this module.
+// To avoid import errors, expose a benign placeholder.
+// Real user preferences are fetched via settingsService in views.
+export const userPrefs = undefined;

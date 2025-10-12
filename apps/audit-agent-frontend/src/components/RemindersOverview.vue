@@ -236,6 +236,10 @@ async function onSnooze(r) {
 
 onMounted(() => { watchReminders(); fetchUsage() })
 onUnmounted(() => { if (unbind) unbind() })
+
+// Refresh usage meter when other parts of app schedule reminders
+onMounted(() => { try { window.addEventListener('usage-refresh', fetchUsage) } catch {} })
+onUnmounted(() => { try { window.removeEventListener('usage-refresh', fetchUsage) } catch {} })
 </script>
 
 <style scoped>
