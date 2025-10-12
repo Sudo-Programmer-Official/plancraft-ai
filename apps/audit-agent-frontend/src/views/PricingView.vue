@@ -75,6 +75,7 @@ import { createCheckoutSession, cancelSubscription } from '@/services/stripeServ
 import { trackEvent } from '@/services/analytics'
 import ErrorDialog from '@/components/ErrorDialog.vue'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
+import { useIsPremium } from '@/composables/useIsPremium'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -85,16 +86,7 @@ const cancelLoading = ref(false)
 
 const subStore = useSubscriptionStore()
 const sub = subStore.subscription
-const isPremium = computed(() => {
-  try {
-    const planFromStore = sub?.plan ?? sub?.value?.plan
-    const planFromUser = authStore?.user?.plan
-    const roleFromUser = authStore?.user?.role
-    return [planFromStore, planFromUser, roleFromUser]
-      .map(v => String(v || '').toLowerCase())
-      .includes('premium')
-  } catch { return false }
-})
+const { isPremium } = useIsPremium()
 
 // async function onUpgrade() {
 //   try {

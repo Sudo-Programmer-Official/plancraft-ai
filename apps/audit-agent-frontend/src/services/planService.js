@@ -34,6 +34,13 @@ export const PLANS = {
 }
 
 function resolvePlanKey(userOrPlan) {
+  // Treat admins as premium for feature gating
+  try {
+    if (typeof userOrPlan === 'object' && userOrPlan) {
+      const role = String(userOrPlan.role || '').toLowerCase()
+      if (role === 'admin' || role === 'superadmin') return 'PREMIUM'
+    }
+  } catch {}
   const planStr = typeof userOrPlan === 'string' ? userOrPlan : (userOrPlan?.plan || userOrPlan?.subscription?.plan)
   return String(planStr || '').toLowerCase() === 'premium' ? 'PREMIUM' : 'FREE'
 }

@@ -99,7 +99,7 @@
           type="success"
           @click="generateTasks"
           :loading="loading"
-          :disabled="!input.trim() || !isFeatureAllowed({ plan: subStore.subscription.plan }, 'aiSplit')"
+          :disabled="!input.trim() || !isFeatureAllowed({ plan: subStore.subscription.plan, role: authStore?.user?.role }, 'aiSplit')"
           class="w-full sm:w-auto px-4 py-2 rounded-lg text-white font-medium shadow-md
             bg-gradient-to-r from-emerald-700 via-teal-800 to-cyan-700
             hover:from-emerald-800 hover:via-teal-900 hover:to-cyan-800
@@ -108,7 +108,7 @@
           <template v-if="transcribing">⌛ Transcribing…</template>
           <template v-else>{{ loading ? '⏳ Generating...' : '+ Generate Tasks' }}</template>
         </el-button>
-        <p v-if="!isFeatureAllowed({ plan: subStore.subscription.plan }, 'aiSplit')" class="mt-2 text-xs text-red-300">
+        <p v-if="!isFeatureAllowed({ plan: subStore.subscription.plan, role: authStore?.user?.role }, 'aiSplit')" class="mt-2 text-xs text-red-300">
           Upgrade to Pro to use AI task generation 💎
         </p>
       </div>

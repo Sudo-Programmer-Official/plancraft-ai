@@ -17,10 +17,15 @@ export function useIsPremium() {
     }
   })
 
+  const isAdmin = computed(() => {
+    const role = String(authStore?.user?.role || '').toLowerCase()
+    return role === 'admin' || role === 'superadmin'
+  })
+
   const isPremium = computed(() => {
     const storePremium = String(planFromStore.value || '').toLowerCase() === 'premium'
     const userPremium = String(authStore?.user?.plan || '').toLowerCase() === 'premium'
-    return storePremium || userPremium
+    return storePremium || userPremium || isAdmin.value
   })
 
   async function refresh() {
@@ -34,6 +39,5 @@ export function useIsPremium() {
   onMounted(() => { refresh() })
   watch(() => authStore.user?.uid, (uid) => { if (uid) refresh() })
 
-  return { isPremium, refresh }
+  return { isPremium, isAdmin, refresh }
 }
-

@@ -87,6 +87,24 @@ router.patch('/users/:id', requireAdmin, async (req, res) => {
   }
 })
 
+// Admin: Update a user's plan (free|premium)
+router.post('/users/updatePlan', requireAdmin, async (req, res) => {
+  try {
+    const { id, plan } = req.body || {}
+    const userId = String(id || '')
+    const p = String(plan || '').toLowerCase()
+    if (!userId) return res.status(400).json({ error: 'Missing id' })
+    if (!['free', 'premium'].includes(p)) return res.status(400).json({ error: 'Invalid plan' })
+
+    await db.collection('users').doc(userId).set({ plan: p, updatedAt: new Date() }, { merge: true })
+    const snap = await db.collection('users').doc(userId).get()
+    const data = snap.exists ? (snap.data() || {}) : {}
+    return res.json({ id: userId, name: data.name || '', email: data.email || '', role: data.role || 'user', plan: data.plan || p })
+  } catch (e) {
+    return res.status(500).json({ error: 'Failed to update plan' })
+  }
+})
+
 // Admin: Payments
 router.get('/payments', requireAdmin, async (req, res) => {
   try {

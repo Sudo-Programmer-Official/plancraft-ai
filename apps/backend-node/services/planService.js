@@ -79,13 +79,15 @@ export async function checkUserPlan(userId) {
 // }
 
 // Internal helper to fetch a user's plan. Defaults to 'free' when missing.
-async function _getUserPlan(userId) {
+async function _getUserPlanRole(userId) {
   try {
     const snap = await db.collection('users').doc(String(userId)).get()
-    const plan = snap.exists ? (snap.data()?.plan || 'free') : 'free'
-    return String(plan || 'free').toLowerCase()
+    const data = snap.exists ? (snap.data() || {}) : {}
+    const plan = String((data.plan || 'free')).toLowerCase()
+    const role = String((data.role || '')).toLowerCase()
+    return { plan, role }
   } catch {
-    return 'free'
+    return { plan: 'free', role: '' }
   }
 }
 
@@ -94,7 +96,7 @@ export async function checkUserPlanUsage(userId, feature) {
   const uid = String(userId || '')
   if (!uid) return { ok: false, used: 0, limit: 0 }
 
-  const plan = await _getUserPlan(uid)
+  const { plan, role } = await _getUserPlanRole(uid)
   const todayKey = dayjs().format('YYYY-MM-DD')
   const docId = `${uid}_${todayKey}`
   const docRef = db.collection('usage').doc(docId)
@@ -103,9 +105,9 @@ export async function checkUserPlanUsage(userId, feature) {
 
   const key = String(feature || 'reminder')
   const used = Number(data[key] || 0)
-  // Premium users have effectively unlimited usage; free users limited per day
-  // Align free plan daily limit to 3 to match frontend constants
-  const limit = plan === 'premium' ? 9999 : 3
+  // Premium or admin users: effectively unlimited usage; free users limited per day
+  const isAdmin = role === 'admin' || role === 'superadmin'
+  const limit = (plan === 'premium' || isAdmin) ? 9999 : 3
 
   // Under limit: increment and allow
   if (used < limit) {
@@ -145,12 +147,13 @@ export async function getUsageToday(userId, feature = 'reminder') {
   const uid = String(userId || '')
   if (!uid) return { used: 0, limit: 0, plan: 'free', date: dayjs().format('YYYY-MM-DD') }
 
-  const plan = await _getUserPlan(uid)
+  const { plan, role } = await _getUserPlanRole(uid)
   const todayKey = dayjs().format('YYYY-MM-DD')
   const docId = `${uid}_${todayKey}`
   const snap = await db.collection('usage').doc(docId).get()
   const data = snap.exists ? (snap.data() || {}) : {}
   const used = Number(data[String(feature)] || 0)
-  const limit = plan === 'premium' ? 9999 : 3
+  const isAdmin = role === 'admin' || role === 'superadmin'
+  const limit = (plan === 'premium' || isAdmin) ? 9999 : 3
   return { used, limit, plan, date: todayKey }
 }

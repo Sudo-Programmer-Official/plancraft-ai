@@ -32,9 +32,24 @@
             <td class="px-3 py-2">{{ u.name || '-' }}</td>
             <td class="px-3 py-2">{{ u.email || '-' }}</td>
             <td class="px-3 py-2">{{ u.role }}</td>
-            <td class="px-3 py-2">{{ u.plan || 'free' }}</td>
             <td class="px-3 py-2">
-              <button @click="toggleRole(u)" class="px-3 py-1 rounded bg-gray-800 hover:bg-gray-700">Toggle Role</button>
+              <select
+                :disabled="updatingPlanId === u.id"
+                :value="u.plan || 'free'"
+                @change="(e) => onChangePlan(u, e.target.value)"
+                class="rounded bg-gray-800 px-2 py-1 text-white text-xs border border-gray-700"
+              >
+                <option value="free">free</option>
+                <option value="premium">premium</option>
+              </select>
+            </td>
+            <td class="px-3 py-2">
+              <button
+                @click="toggleRole(u)"
+                class="px-3 py-1 rounded bg-gray-800 hover:bg-gray-700"
+              >
+                Toggle Role
+              </button>
             </td>
           </tr>
         </tbody>
@@ -59,6 +74,7 @@ const prevStack = ref([])
 const currentCursor = ref(null)
 const filterRole = ref('')
 const filterPlan = ref('')
+const updatingPlanId = ref(null)
 
 async function fetchUsers(cursor = null) {
   loading.value = true
@@ -104,6 +120,19 @@ async function toggleRole(u) {
     await fetchUsers(currentCursor.value)
   } catch (e) {
     ElMessage.error('Failed to update role')
+  }
+}
+
+async function onChangePlan(u, newPlan) {
+  try {
+    updatingPlanId.value = u.id
+    await api.post('/admin/users/updatePlan', { id: u.id, plan: newPlan })
+    ElMessage.success('Plan updated')
+    await fetchUsers(currentCursor.value)
+  } catch (e) {
+    ElMessage.error('Failed to update plan')
+  } finally {
+    updatingPlanId.value = null
   }
 }
 
