@@ -1,5 +1,7 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-900 px-4 sm:px-6 py-8 text-white">
+  <div
+    class="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-900 px-4 sm:px-6 py-8 text-white"
+  >
     <guest-banner :isGuest="authStore.guest" @login="redirectToLogin" />
 
     <!-- Header -->
@@ -8,41 +10,63 @@
       <p class="text-indigo-200">Write, breathe, and let go — your personal sanctuary awaits.</p>
     </header>
 
-    <!-- 🔹 Mood Filter Chips -->
-    <div class="flex justify-center gap-3 mb-8 flex-wrap">
-      <button
-        v-for="f in filters"
-        :key="f.key"
-        @click="selectedFilter = f.key"
-        class="px-4 py-2 rounded-full border border-indigo-600 text-sm transition"
-        :class="selectedFilter === f.key
-          ? 'bg-indigo-700 text-white'
-          : 'bg-indigo-900/40 text-indigo-300 hover:bg-indigo-800'"
-      >
-        {{ f.label }}
-      </button>
-    </div>
+    <!-- 🔹 Mood Filter Chips (Moved Below Tracker) -->
 
     <main class="max-w-4xl mx-auto grid gap-8 animate-slide-up">
       <!-- 🔸 Mood Tracker -->
-      <section class="bg-white/10 backdrop-blur-md p-6 rounded-2xl shadow-md border border-white/10">
-        <h2 class="text-xl font-semibold mb-4">How are you feeling?</h2>
-        <!-- <div class="grid grid-cols-5 gap-3">
-          <button
-            v-for="mood in moods"
-            :key="mood.emoji"
-            @click="selectMood(mood)"
-            class="p-4 rounded-xl border border-white/20 hover:bg-indigo-600/30 transition flex flex-col items-center"
-            :class="{ 'bg-indigo-700/40': selectedMood?.emoji === mood.emoji }"
-          >
-            <span class="text-3xl">{{ mood.emoji }}</span>
-            <p class="text-sm text-indigo-200 mt-1">{{ mood.label }}</p>
-          </button>
-        </div> -->
+      <section
+        class="relative overflow-hidden rounded-2xl shadow-md border border-white/10"
+        style="
+          background-image: url('/images/journal-breathe-bg.png');
+          background-size: cover;
+          background-position: center;
+        "
+      >
+        <!-- Overlay -->
+        <div class="absolute inset-0 bg-indigo-900/70 backdrop-blur-sm"></div>
+
+        <!-- Content -->
+        <div class="relative p-6 text-white z-10">
+          <h2 class="text-2xl font-semibold mb-2">A moment for yourself 💜</h2>
+          <p class="text-indigo-200 mb-4">Tap a mood or just breathe for a while.</p>
+
+          <!-- Mood emojis -->
+          <div class="grid grid-cols-5 gap-3">
+            <button
+              v-for="mood in moods"
+              :key="mood.emoji"
+              @click="selectMood(mood)"
+              class="p-4 rounded-xl border border-white/20 hover:bg-indigo-600/30 transition flex flex-col items-center"
+              :class="{ 'bg-indigo-700/40': selectedMood?.emoji === mood.emoji }"
+            >
+              <span class="text-3xl">{{ mood.emoji }}</span>
+              <!-- <p class="text-sm text-indigo-200 mt-1">{{ mood.label }}</p> -->
+            </button>
+          </div>
+        </div>
       </section>
 
+      <!-- 🔹 Mood Filter Chips (Now below mood section) -->
+      <div class="flex justify-center gap-3 -mt-4 mb-4 flex-wrap">
+        <button
+          v-for="f in filters"
+          :key="f.key"
+          @click="selectedFilter = f.key"
+          class="px-4 py-2 rounded-full border border-indigo-600 text-sm transition"
+          :class="
+            selectedFilter === f.key
+              ? 'bg-indigo-700 text-white'
+              : 'bg-indigo-900/40 text-indigo-300 hover:bg-indigo-800'
+          "
+        >
+          {{ f.label }}
+        </button>
+      </div>
+
       <!-- 🔹 Voice Journal -->
-      <section class="bg-white/10 backdrop-blur-md p-6 rounded-2xl shadow-md border border-white/10">
+      <section
+        class="bg-white/10 backdrop-blur-md p-6 rounded-2xl shadow-md border border-white/10"
+      >
         <h2 class="text-xl font-semibold mb-4">Voice Journal</h2>
         <div class="flex flex-col gap-4">
           <textarea
@@ -95,7 +119,13 @@
 
             <div class="flex items-center justify-between mb-2">
               <span class="text-xs text-indigo-300">
-                {{ new Date(log.timestamp).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) }}
+                {{
+                  new Date(log.timestamp).toLocaleDateString(undefined, {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                  })
+                }}
               </span>
               <span class="text-xl">{{ log.mood?.emoji }}</span>
             </div>
@@ -123,6 +153,8 @@
   </div>
 </template>
 
+
+
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useAuthStore } from '@/stores/authStore'
@@ -133,11 +165,11 @@ import { ElNotification } from 'element-plus'
 
 const authStore = useAuthStore()
 const moods = [
-  { emoji: '😊', label: 'Happy' },
-  { emoji: '😌', label: 'Calm' },
-  { emoji: '😢', label: 'Sad' },
-  { emoji: '😠', label: 'Frustrated' },
-  { emoji: '😐', label: 'Neutral' },
+  { emoji: '🌸', label: 'Happy' },
+  { emoji: '🌿', label: 'Calm' },
+  { emoji: '🌧', label: 'Sad' },
+  { emoji: '⚡', label: 'Frustrated' },
+  { emoji: '🌟', label: 'Neutral' },
 ]
 
 const entryText = ref('')
@@ -207,6 +239,18 @@ function shareEntry(text) {
   else copyToClipboard(text)
 }
 </script>
+
+<style scoped>
+.fade-enter-active,
+.fade-leave-active {
+  transition: all 0.3s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+}
+</style>
 
 <style scoped>
 .fade-enter-active,

@@ -8,23 +8,33 @@
       </h2>
 
       <!-- Date Navigation Chips -->
-      <div
-        v-if="Object.keys(groupedReminders).length > 1"
-        class="flex gap-2 overflow-x-auto hide-scrollbar py-1 px-2 sm:px-0"
-      >
-        <button
-          v-for="(group, date) in groupedReminders"
-          :key="date"
-          @click="scrollToGroup(date)"
-          :class="[
-            'px-4 py-1 text-sm rounded-full whitespace-nowrap transition-all duration-200',
-            selectedGroup === date
-              ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/30'
-              : 'bg-slate-700 hover:bg-slate-600 text-gray-300',
-          ]"
+      <div class="flex items-center gap-4">
+        <!-- Date Picker -->
+        <input
+          type="date"
+          v-model="customDate"
+          class="bg-slate-700 text-white rounded px-2 py-1 text-sm border border-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          @change="scrollToCustomDate"
+        />
+
+        <div
+          v-if="Object.keys(groupedReminders).length > 1"
+          class="flex gap-2 overflow-x-auto hide-scrollbar py-1 px-2 sm:px-0"
         >
-          {{ date }}
-        </button>
+          <button
+            v-for="(group, date) in groupedReminders"
+            :key="date"
+            @click="scrollToGroup(date)"
+            :class="[
+              'px-4 py-1 text-sm rounded-full whitespace-nowrap transition-all duration-200',
+              selectedGroup === date
+                ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/30'
+                : 'bg-slate-700 hover:bg-slate-600 text-gray-300',
+            ]"
+          >
+            {{ date }}
+          </button>
+        </div>
       </div>
     </div>
 
@@ -47,42 +57,27 @@
         :ref="setGroupRef(date)"
         class="scroll-mt-20"
       >
-        <!-- Group Title -->
         <h3 class="text-xl font-semibold mt-10 mb-3 border-b border-slate-700 pb-1">
           {{ date }}
         </h3>
 
-        <!-- Cards -->
         <TransitionGroup name="fade" tag="div" class="space-y-4">
           <div
             v-for="r in group"
             :key="r.id"
             class="max-w-4xl mx-auto p-5 rounded-2xl bg-slate-800/70 border border-slate-700 shadow-md hover:shadow-indigo-500/20 transition-all flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3"
           >
-            <!-- Text Section -->
             <div class="flex flex-col flex-1">
               <div class="font-medium text-lg">{{ r.task || r.text || 'Reminder' }}</div>
-              <div class="text-sm text-gray-300 mt-1">
-                🕒 {{ formatDualTime(r.scheduledTime) }}
-              </div>
-              <div class="text-xs text-gray-500">
-                {{ formatRelative(r.scheduledTime) }} •
-                Channels: {{ (r.channels || []).join(', ') || '—' }}
-              </div>
+              <div class="text-sm text-gray-300 mt-1">🕒 {{ formatDualTime(r.scheduledTime) }}</div>
+              <div class="text-xs text-gray-500">{{ formatRelative(r.scheduledTime) }} • Channels: {{ (r.channels || []).join(', ') || '—' }}</div>
             </div>
 
-            <!-- Buttons -->
             <div class="flex gap-3 justify-end sm:justify-center shrink-0">
-              <button
-                @click="onSnooze(r)"
-                class="px-3 py-1 text-xs bg-yellow-500/20 hover:bg-yellow-500/40 border border-yellow-500 rounded-lg text-yellow-300 w-[90px] text-center"
-              >
+              <button @click="onSnooze(r)" class="px-3 py-1 text-xs bg-yellow-500/20 hover:bg-yellow-500/40 border border-yellow-500 rounded-lg text-yellow-300 w-[90px] text-center">
                 Snooze
               </button>
-              <button
-                @click="onCancel(r)"
-                class="px-3 py-1 text-xs bg-red-500/20 hover:bg-red-500/40 border border-red-500 rounded-lg text-red-300 w-[90px] text-center"
-              >
+              <button @click="onCancel(r)" class="px-3 py-1 text-xs bg-red-500/20 hover:bg-red-500/40 border border-red-500 rounded-lg text-red-300 w-[90px] text-center">
                 Cancel
               </button>
             </div>
@@ -92,6 +87,11 @@
     </template>
   </div>
 </template>
+
+<!-- <script setup>
+// existing imports...
+
+</script> -->
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
@@ -118,7 +118,33 @@ const groupRefs = new Map()
 let unbind = null
 
 const usage = ref({ used: 0, limit: 0, plan: '' })
+const customDate = ref(dayjs().format('YYYY-MM-DD'))
 
+// async function scrollToCustomDate() {
+//   const selected = customDate.value
+//   const keys = Object.keys(groupedReminders.value)
+//   const match = keys.find(k => dayjs(k).format('YYYY-MM-DD') === selected)
+//   if (match) scrollToGroup(match)
+//   else selectedGroup.value = null
+// }
+async function scrollToCustomDate() {
+  const selected = dayjs(customDate.value).format('YYYY-MM-DD')
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+
+  for (const [groupLabel, reminders] of Object.entries(groupedReminders.value)) {
+    const firstReminder = reminders?.[0]
+    if (!firstReminder) continue
+    const jsDate = toJsDate(firstReminder.scheduledTime)
+    const localDate = dayjs.utc(jsDate).tz(zone).format('YYYY-MM-DD')
+
+    if (localDate === selected) {
+      scrollToGroup(groupLabel)
+      return
+    }
+  }
+
+  selectedGroup.value = null
+}
 async function fetchUsage() {
   try {
     const uid = auth?.currentUser?.uid || localStorage.getItem('uid')
