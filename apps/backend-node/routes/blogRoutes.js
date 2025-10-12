@@ -44,5 +44,32 @@ router.post('/:id/image', async (req, res) => {
   }
 })
 
+// POST /api/blogs/:id/enhance
+router.post('/:id/enhance', async (req, res) => {
+  try {
+    const { field, value } = req.body
+    if (!field) return res.status(400).json({ success: false, error: 'Field missing' })
+    const snap = await db.collection('blogs').doc(req.params.id).get()
+    if (!snap.exists) return res.status(404).json({ success: false, error: 'Blog not found' })
+    const blog = snap.data()
+
+    const prompt = `Improve the following ${field} for a blog about "${blog.title}":
+    ${value || '(empty)'}.
+    Return only the improved ${field}, without any commentary.`
+
+    const openai = new (await import('openai')).default({ apiKey: process.env.OPENAI_API_KEY })
+    const resp = await openai.chat.completions.create({
+      model: 'gpt-3.5-turbo',
+      messages: [{ role: 'user', content: prompt }],
+    })
+    const enhanced = resp.choices?.[0]?.message?.content?.trim()
+    await db.collection('blogs').doc(req.params.id).set({ [field]: enhanced, updated_at: new Date() }, { merge: true })
+    res.json({ success: true, enhanced })
+  } catch (e) {
+    console.error('Enhancement error:', e)
+    res.status(500).json({ success: false, error: e?.message || 'Enhancement failed' })
+  }
+})
+
 export default router
 

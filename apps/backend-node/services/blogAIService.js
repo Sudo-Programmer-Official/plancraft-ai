@@ -1,4 +1,6 @@
 import OpenAI from 'openai'
+import dotenv from "dotenv";
+dotenv.config();
 import { db } from './firebaseAdmin.js'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -9,7 +11,7 @@ Suggest a blog idea around productivity, planning, journaling, or voice-based wo
 Return strict JSON with keys: title, summary, tags (array).`
 
   const res = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: 'gpt-3.5-turbo',
     temperature: 0.7,
     response_format: { type: 'json_object' },
     messages: [{ role: 'user', content: prompt }]
@@ -49,7 +51,7 @@ Sections:
 Return Markdown only.`
 
   const res = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: 'gpt-3.5-turbo',
     temperature: 0.8,
     messages: [{ role: 'user', content: prompt }]
   })
@@ -57,12 +59,40 @@ Return Markdown only.`
   return res.choices?.[0]?.message?.content?.trim() || ''
 }
 
-export async function generateBlogImage(title) {
-  const image = await openai.images.generate({
-    model: 'dall-e-3',
-    prompt: `Stylized, minimal productivity-themed illustration for blog titled "${title}" — pastel, modern UI feel`,
-    size: '1024x1024'
-  })
-  return image.data?.[0]?.url || ''
-}
+// export async function generateBlogImage(title) {
+//   const prompt = `
+// Create a soft, calming illustration in the visual style of the PlanCraftAI app
+// (theme: deep indigo gradients, productivity, mindfulness, and focus).
+// Include abstract icons that reflect journaling, planning, or creativity.
+// Aspect ratio 16:9, minimal text, consistent with a calm professional tone.
+// Title: "${blog.title || 'PlanCraftAI Blog'}"
+// `
+//   const image = await openai.images.generate({
+//     model: 'dall-e-3',
+//     prompt: prompt.trim(),
+//     size: '1024x1024'
+//   })
+//   return image.data?.[0]?.url || ''
+// }
+export async function generateBlogImage(title = "PlanCraftAI Blog") {
+  try {
+    const prompt = `
+Create a soft, calming illustration in the visual style of the PlanCraftAI app.
+Theme: deep indigo gradients, productivity, mindfulness, and focus.
+Include abstract icons that reflect journaling, planning, or creativity.
+Aspect ratio 16:9, minimal text, consistent with a calm professional tone.
+Title: "${title}"
+`;
 
+    const image = await openai.images.generate({
+      model: "dall-e-3",
+      prompt: prompt.trim(),
+      size: "1024x1024"
+    });
+
+    return image.data?.[0]?.url || "";
+  } catch (err) {
+    console.error("❌ generateBlogImage error:", err);
+    throw new Error(err?.message || "Failed to generate image");
+  }
+}

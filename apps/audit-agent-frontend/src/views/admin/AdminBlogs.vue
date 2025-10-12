@@ -1,63 +1,290 @@
 <template>
-  <div class="min-h-screen bg-slate-900 text-white p-6 grid grid-cols-1 md:grid-cols-5 gap-6">
-    <div class="md:col-span-5 flex items-center justify-between mb-4">
-      <h1 class="text-2xl font-bold">Admin • Blogs</h1>
-      <router-link to="/dashboard" class="text-sm px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700">← Back to App</router-link>
-    </div>
-    <div class="md:col-span-2">
-      <div class="flex items-center justify-between mb-3">
-        <h2 class="text-xl font-semibold">Posts</h2>
-        <div class="flex items-center gap-2">
-          <el-button size="small" @click="genIdea">Generate Idea</el-button>
-          <el-button size="small" type="primary" @click="newDraft">New Draft</el-button>
-        </div>
+  <div
+    class="min-h-screen bg-gradient-to-br from-[#1e1b4b] via-[#312e81] to-[#4c1d95] text-slate-100 px-6 md:px-10 py-8 font-inter relative overflow-hidden"
+  >
+    <!-- Subtle gradient overlay -->
+    <div
+      class="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_30%_20%,rgba(167,139,250,0.4),transparent_60%),radial-gradient(circle_at_80%_80%,rgba(79,70,229,0.4),transparent_60%)] pointer-events-none"
+    ></div>
+
+    <!-- Header -->
+    <header
+      class="relative flex items-center justify-between mb-10 border-b border-white/10 pb-5"
+    >
+      <div class="flex items-center gap-3">
+        <span
+          class="text-3xl md:text-4xl bg-gradient-to-r from-indigo-400 to-fuchsia-400 bg-clip-text text-transparent"
+          >🧠 Admin • Blogs</span
+        >
       </div>
-      <div class="space-y-2">
-        <div v-for="b in blogs" :key="b.id" @click="select(b)" class="p-3 rounded bg-slate-800 border border-slate-700 hover:border-indigo-500 cursor-pointer">
-          <div class="font-medium">{{ b.title }}</div>
-          <div class="text-xs text-gray-400">{{ b.published ? 'Published' : 'Draft' }} • {{ b.slug }}</div>
+
+      <router-link
+        to="/dashboard"
+        class="px-5 py-2 rounded-lg text-sm font-medium bg-white/10 hover:bg-white/20 border border-white/20 backdrop-blur-sm transition"
+      >
+        ← Back to App
+      </router-link>
+    </header>
+
+    <!-- Grid: Editor + Preview -->
+    <div
+      class="relative grid md:grid-cols-2 gap-10 md:gap-8 transition-all duration-300"
+    >
+      <!-- === Editor Section === -->
+      <section
+        class="bg-white/5 border border-white/10 rounded-2xl p-6 md:p-8 backdrop-blur-xl shadow-2xl space-y-6 transition hover:border-indigo-400/40 hover:bg-white/10"
+      >
+        <!-- Top controls -->
+        <div class="flex items-center justify-between mb-4">
+          <h2
+            class="text-2xl font-semibold flex items-center gap-2 text-indigo-200"
+          >
+            ✍️ Editor
+          </h2>
+          <el-button
+            size="small"
+            plain
+            class="!border-indigo-400/30 !text-indigo-300 hover:!bg-indigo-500/10"
+            @click="genIdea"
+          >
+            💡 Generate Idea
+          </el-button>
         </div>
-      </div>
-    </div>
-    <div class="md:col-span-3">
-      <h2 class="text-xl font-semibold mb-3">Editor</h2>
-      <div v-if="active" class="space-y-3">
-        <el-input v-model="form.title" placeholder="Title" />
-        <el-input v-model="form.summary" type="textarea" :rows="3" placeholder="Summary" />
-        <el-input v-model="tags" placeholder="Tags (comma separated)" />
-        <el-input v-model="form.coverImage" placeholder="Cover Image URL (optional)" />
-        <el-input v-model="form.content" type="textarea" :rows="12" placeholder="Content (HTML/Markdown)" />
-        <div class="flex flex-wrap gap-2">
-          <el-button @click="saveDraft" type="primary">Save Draft</el-button>
-          <el-button @click="publish" type="success">Publish</el-button>
-          <el-button @click="remove" type="danger" plain>Delete</el-button>
-          <el-button @click="genContent" plain>🧠 Generate Content</el-button>
-          <el-button @click="genImage" plain>🎨 Generate Image</el-button>
+
+        <!-- Title -->
+        <div>
+          <label class="text-sm text-slate-300 mb-1 block">Title</label>
+          <el-input
+            v-model="form.title"
+            placeholder="Enter blog title"
+            class="rounded-lg"
+          >
+            <template #append>
+              <el-button
+                text
+                @click="enhanceField('title')"
+                class="text-indigo-400 hover:text-indigo-300"
+              >
+                ✨
+              </el-button>
+            </template>
+          </el-input>
         </div>
-      </div>
-      <div v-else class="text-gray-400">Select a post or create a new draft.</div>
+
+        <!-- Summary -->
+        <div>
+          <label class="text-sm text-slate-300 mb-1 block">Summary</label>
+          <button
+            class="text-indigo-400 hover:text-indigo-300"
+            @click="enhanceField('summary')"
+          >
+            ✨
+          </button>
+          <el-input
+            v-model="form.summary"
+            type="textarea"
+            :rows="3"
+            placeholder="Write a short summary..."
+          >
+            <template #append>
+              <el-button
+                text
+                @click="enhanceField('summary')"
+                class="text-indigo-400 hover:text-indigo-300"
+              >
+                ✨
+              </el-button>
+            </template>
+          </el-input>
+        </div>
+
+        <!-- Tags -->
+        <div>
+          <label class="text-sm text-slate-300 mb-1 block">Tags</label>
+          <el-input
+            v-model="tags"
+            placeholder="Tags (comma separated)"
+          >
+            <template #append>
+              <el-button
+                text
+                @click="enhanceField('tags')"
+                class="text-indigo-400 hover:text-indigo-300"
+              >
+                ✨
+              </el-button>
+            </template>
+          </el-input>
+        </div>
+
+        <!-- Cover Image -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-sm text-slate-300">Cover Image</label>
+            <el-button
+              size="small"
+              text
+              class="!text-indigo-300 hover:!text-indigo-200"
+              @click="genImage"
+              :loading="imgLoading"
+            >
+              🎨 Generate
+            </el-button>
+          </div>
+          <el-input
+            v-model="form.coverImage"
+            placeholder="Image URL"
+            class="rounded-lg"
+          />
+          <transition name="fade">
+            <img
+              v-if="form.coverImage"
+              :src="form.coverImage"
+              alt="cover preview"
+              class="w-full h-48 object-cover rounded-xl mt-4 border border-white/10 shadow-md"
+            />
+          </transition>
+        </div>
+
+        <!-- Content -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-sm text-slate-300">Content</label>
+            <el-button
+              size="small"
+              text
+              class="!text-indigo-300 hover:!text-indigo-200"
+              @click="enhanceField('content')"
+              :loading="aiLoading"
+            >
+              🧠 Write
+            </el-button>
+          </div>
+          <el-input
+            v-model="form.content"
+            type="textarea"
+            :rows="12"
+            placeholder="Write your content in Markdown or HTML..."
+          />
+        </div>
+
+        <!-- Actions -->
+        <div
+          class="flex flex-wrap gap-3 justify-end border-t border-white/10 pt-4 mt-4"
+        >
+          <el-button
+            @click="saveDraft"
+            type="primary"
+            :loading="saving"
+            class="!px-5 !py-2"
+          >
+            💾 Save Draft
+          </el-button>
+          <el-button
+            @click="publish"
+            type="success"
+            plain
+            class="!px-5 !py-2"
+          >
+            🚀 Publish
+          </el-button>
+          <el-button
+            @click="remove"
+            type="danger"
+            plain
+            class="!px-5 !py-2"
+          >
+            🗑 Delete
+          </el-button>
+        </div>
+
+        <p
+          v-if="autosaved"
+          class="text-xs text-indigo-300 mt-3 italic animate-pulse"
+        >
+          ✓ Auto-saved at {{ new Date().toLocaleTimeString() }}
+        </p>
+      </section>
+
+      <!-- === Live Preview Section === -->
+      <aside
+        class="bg-white/5 border border-white/10 rounded-2xl p-6 md:p-8 backdrop-blur-xl shadow-2xl transition hover:border-indigo-400/40 hover:bg-white/10"
+      >
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-2xl font-semibold text-indigo-200 flex items-center gap-2">
+            👀 Preview
+          </h2>
+        </div>
+
+        <div
+          v-if="!form.title && !form.content"
+          class="text-slate-400 italic text-sm"
+        >
+          Start typing to see a live preview...
+        </div>
+
+        <div
+          v-else
+          class="prose prose-invert max-w-none leading-relaxed space-y-3"
+        >
+          <img
+            v-if="form.coverImage"
+            :src="form.coverImage"
+            class="w-full h-56 object-cover rounded-xl mb-4 shadow-md"
+          />
+          <h1
+            class="text-3xl font-semibold mb-2 text-white tracking-tight leading-snug"
+          >
+            {{ form.title }}
+          </h1>
+          <p class="text-indigo-100/90 mb-3 text-sm leading-relaxed">
+            {{ form.summary }}
+          </p>
+          <div v-html="renderedMarkdown" class="text-slate-200"></div>
+        </div>
+      </aside>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import MarkdownIt from 'markdown-it'
 import { useBlogs } from '@/composables/useBlogs'
 import { createBlog, updateBlog, deleteBlog, publishBlog } from '@/services/blogService'
 import api from '@/services/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
+const md = new MarkdownIt({ html: true, linkify: true })
 const { blogs, loading, fetchBlogs } = useBlogs(false)
 const active = ref(null)
-const form = ref({ title: '', summary: '', content: '', tags: [], coverImage: '', author: '' })
+const saving = ref(false)
+const aiLoading = ref(false)
+const imgLoading = ref(false)
+const autosaved = ref(false)
+
+const form = ref({
+  title: '',
+  summary: '',
+  content: '',
+  tags: [],
+  coverImage: '',
+  author: ''
+})
+
+// Render markdown preview live
+const renderedMarkdown = computed(() => md.render(form.value.content || ''))
+
 const tags = computed({
   get: () => (Array.isArray(form.value.tags) ? form.value.tags.join(', ') : ''),
-  set: (v) => { form.value.tags = String(v || '').split(',').map(s => s.trim()).filter(Boolean) }
+  set: (v) => {
+    form.value.tags = String(v || '').split(',').map(s => s.trim()).filter(Boolean)
+  }
 })
 
 function select(b) {
   active.value = b
-  form.value = { title: b.title || '', summary: b.summary || '', content: b.content || '', tags: b.tags || [], coverImage: b.coverImage || '', author: b.author || '' }
+  form.value = { ...b }
 }
 
 function newDraft() {
@@ -65,8 +292,90 @@ function newDraft() {
   form.value = { title: '', summary: '', content: '', tags: [], coverImage: '', author: '' }
 }
 
+async function ensureId() {
+  if (active.value?.id) return active.value.id
+  if (!form.value.title) throw new Error('Enter a title first')
+  const created = await createBlog({ ...form.value, published: false })
+  active.value = created
+  await fetchBlogs()
+  return created.id
+}
+
+// async function enhanceField(field) {
+//   try {
+//     const id = await ensureId()
+//     aiLoading.value = true
+//     const resp = await api.post(`/blogs/${id}/enhance`, { field, value: form.value[field] })
+//     if (resp?.data?.success && resp?.data?.enhanced) {
+//       form.value[field] = resp.data.enhanced
+//       ElMessage.success(`✨ ${field} enhanced`)
+//     } else throw new Error(resp?.data?.error || 'Enhancement failed')
+//   } catch (e) {
+//     ElMessage.error(e?.message || 'AI enhancement failed')
+//   } finally {
+//     aiLoading.value = false
+//   }
+// }
+async function enhanceField(field) {
+  try {
+    const id = await ensureId()
+    aiLoading.value = true
+    const resp = await api.post(`/blogs/${id}/enhance`, { field, value: form.value[field] })
+    if (resp?.data?.success && resp?.data?.enhanced) {
+      form.value[field] = resp.data.enhanced
+      ElMessage({
+        message: `✨ ${field[0].toUpperCase() + field.slice(1)} enhanced!`,
+        type: 'success',
+        duration: 2000,
+      })
+      // mini animation pulse
+      const el = document.querySelector(`[data-field='${field}']`)
+      if (el) {
+        el.classList.add('animate-pulse-once')
+        setTimeout(() => el.classList.remove('animate-pulse-once'), 700)
+      }
+    } else throw new Error(resp?.data?.error || 'Enhancement failed')
+  } catch (e) {
+    ElMessage.error(e?.message || 'AI enhancement failed')
+  } finally {
+    aiLoading.value = false
+  }
+}
+
+async function genIdea() {
+  try {
+    const resp = await api.post('/blogs/idea')
+    if (resp?.data?.success && resp?.data?.draft) {
+      const d = resp.data.draft
+      ElMessage.success('Idea created')
+      await fetchBlogs()
+      active.value = d
+      form.value = { ...d }
+    } else throw new Error(resp?.data?.error || 'Failed')
+  } catch (e) {
+    ElMessage.error(e?.message || 'Idea generation failed')
+  }
+}
+
+async function genImage() {
+  imgLoading.value = true
+  try {
+    const id = await ensureId()
+    const resp = await api.post(`/blogs/${id}/image`)
+    if (resp?.data?.success) {
+      form.value.coverImage = resp.data.coverImage
+      ElMessage.success('Image generated')
+    } else throw new Error(resp?.data?.error || 'Failed')
+  } catch (e) {
+    ElMessage.error(e?.message || 'Image generation failed')
+  } finally {
+    imgLoading.value = false
+  }
+}
+
 async function saveDraft() {
   try {
+    saving.value = true
     if (!form.value.title) return ElMessage.warning('Title required')
     if (!active.value?.id) {
       const created = await createBlog({ ...form.value, published: false })
@@ -76,8 +385,13 @@ async function saveDraft() {
       await updateBlog(active.value.id, { ...form.value, published: false })
       ElMessage.success('Draft saved')
     }
+    autosaved.value = true
     await fetchBlogs()
-  } catch (e) { ElMessage.error(e?.message || 'Save failed') }
+  } catch (e) {
+    ElMessage.error(e?.message || 'Save failed')
+  } finally {
+    saving.value = false
+  }
 }
 
 async function publish() {
@@ -91,7 +405,9 @@ async function publish() {
     }
     ElMessage.success('Published')
     await fetchBlogs()
-  } catch (e) { ElMessage.error(e?.message || 'Publish failed') }
+  } catch (e) {
+    ElMessage.error(e?.message || 'Publish failed')
+  }
 }
 
 async function remove() {
@@ -106,69 +422,140 @@ async function remove() {
 }
 
 onMounted(fetchBlogs)
-
-async function ensureId() {
-  if (active.value?.id) return active.value.id
-  if (!form.value.title) throw new Error('Enter a title first')
-  const created = await createBlog({ ...form.value, published: false })
-  active.value = created
-  await fetchBlogs()
-  return created.id
-}
-
-async function genContent() {
-  try {
-    const id = await ensureId()
-    const resp = await api.post(`/blogs/${id}/content`)
-    if (resp?.data?.success) {
-      form.value.content = resp.data.content || form.value.content
-      ElMessage.success('Generated content')
-      await fetchBlogs()
-    } else {
-      throw new Error(resp?.data?.error || 'Failed')
-    }
-  } catch (e) { ElMessage.error(e?.message || 'Generation failed') }
-}
-
-async function genImage() {
-  try {
-    const id = await ensureId()
-    const resp = await api.post(`/blogs/${id}/image`)
-    if (resp?.data?.success) {
-      form.value.coverImage = resp.data.coverImage || form.value.coverImage
-      ElMessage.success('Generated image')
-      await fetchBlogs()
-    } else {
-      throw new Error(resp?.data?.error || 'Failed')
-    }
-  } catch (e) { ElMessage.error(e?.message || 'Image generation failed') }
-}
-
-async function genIdea() {
-  try {
-    const resp = await api.post('/blogs/idea')
-    if (resp?.data?.success && resp?.data?.draft) {
-      const d = resp.data.draft
-      ElMessage.success('Idea created')
-      await fetchBlogs()
-      // Select newly created draft for editing
-      active.value = d
-      form.value = {
-        title: d.title || '',
-        summary: d.summary || '',
-        content: d.content || '',
-        tags: Array.isArray(d.tags) ? d.tags : [],
-        coverImage: d.coverImage || '',
-        author: d.author || ''
-      }
-    } else {
-      throw new Error(resp?.data?.error || 'Failed')
-    }
-  } catch (e) {
-    ElMessage.error(e?.message || 'Idea generation failed')
-  }
-}
 </script>
 
 <style scoped>
+/* === PlanCraftAI Unified Theme (inspired by TaskPlannerDialog) === */
+
+:root {
+  --bg-gradient: linear-gradient(145deg, #1e1b4b, #312e81, #4c1d95);
+  --text-light: #e2e8f0;
+  --text-muted: #94a3b8;
+  --border-faint: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.2);
+  --surface-dark: rgba(255, 255, 255, 0.06);
+  --surface-hover: rgba(255, 255, 255, 0.1);
+  --indigo-accent: #6366f1;
+  --emerald-accent: linear-gradient(to right, #059669, #10b981, #06b6d4);
+}
+
+/* Background + Layout */
+.min-h-screen {
+  background: var(--bg-gradient);
+  color: var(--text-light);
+}
+
+/* Card & Panels */
+.bg-slate-800,
+.bg-slate-800\/70 {
+  background-color: var(--surface-dark) !important;
+  border: 1px solid var(--border-faint) !important;
+  backdrop-filter: blur(10px);
+  border-radius: 0.75rem;
+  transition: all 0.3s ease;
+}
+
+.bg-slate-800:hover {
+  background-color: var(--surface-hover) !important;
+  transform: translateY(-2px);
+  border-color: var(--border-strong) !important;
+}
+
+/* Headings */
+h1, h2 {
+  color: #f8fafc;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+}
+
+/* Text Contrast */
+.text-gray-400,
+.text-gray-600 {
+  color: var(--text-muted) !important;
+}
+
+/* Buttons */
+.el-button--primary {
+  background: var(--emerald-accent) !important;
+  border: none !important;
+  color: #fff !important;
+  font-weight: 500;
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.25);
+}
+.el-button--primary:hover {
+  background: linear-gradient(to right, #047857, #059669, #0ea5e9) !important;
+}
+
+.el-button.is-plain {
+  background-color: transparent !important;
+  border: 1px solid var(--border-strong) !important;
+  color: #cbd5e1 !important;
+}
+.el-button.is-plain:hover {
+  background-color: var(--surface-hover) !important;
+}
+
+/* Blog List Cards */
+.border-slate-700 {
+  border-color: var(--border-faint) !important;
+}
+.border-indigo-500 {
+  border-color: var(--indigo-accent) !important;
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
+}
+.font-medium {
+  color: #f1f5f9;
+}
+
+/* Inputs inside editor */
+:deep(.el-input__wrapper),
+:deep(.el-textarea__inner) {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid var(--border-strong) !important;
+  color: var(--text-light) !important;
+  border-radius: 0.5rem !important;
+  box-shadow: none !important;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+:deep(.el-input__wrapper:hover),
+:deep(.el-input__wrapper.is-focus) {
+  border-color: var(--indigo-accent) !important;
+  background-color: rgba(255, 255, 255, 0.12) !important;
+}
+:deep(.el-input__inner::placeholder),
+:deep(.el-textarea__inner::placeholder) {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Scrollbar */
+.custom-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scroll::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.4);
+  border-radius: 4px;
+}
+.custom-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(129, 140, 248, 0.6);
+}
+
+/* Animations */
+.shadow-md {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4), 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* Subtle pulse for auto-save text */
+.animate-pulse {
+  color: #93c5fd;
+}
+
+/* Utility adjustments */
+.custom-scroll {
+  padding-right: 4px;
+}
+:deep(.el-input__inner),
+:deep(.el-textarea__inner) {
+  color: #ffffff !important;
+  caret-color: #ffffff !important;
+}
 </style>
