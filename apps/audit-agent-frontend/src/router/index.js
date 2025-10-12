@@ -37,11 +37,12 @@ const router = createRouter({
       component: AdminLayout,
       meta: { requiresAuth: true, requiresAdmin: true },
       children: [
-        { path: '', name: 'AdminDashboard', component: () => import('@/views/admin/AdminDashboard.vue') },
-        { path: 'features', name: 'AdminFeatures', component: () => import('@/views/admin/AdminFeatures.vue') },
-        { path: 'notifications', name: 'AdminNotifications', component: () => import('@/views/admin/AdminNotifications.vue') },
-        { path: 'users', name: 'AdminUsers', component: () => import('@/views/admin/AdminUsers.vue') },
-        { path: 'payments', name: 'AdminPayments', component: () => import('@/views/admin/AdminPayments.vue') },
+        { path: '', name: 'AdminDashboard', component: () => import('@/views/admin/AdminDashboard.vue'), meta: { index: '1' } },
+        { path: 'features', name: 'AdminFeatures', component: () => import('@/views/admin/AdminFeatures.vue'), meta: { index: '2' } },
+        { path: 'notifications', name: 'AdminNotifications', component: () => import('@/views/admin/AdminNotifications.vue'), meta: { index: '3' } },
+        { path: 'users', name: 'AdminUsers', component: () => import('@/views/admin/AdminUsers.vue'), meta: { index: '4' } },
+        { path: 'payments', name: 'AdminPayments', component: () => import('@/views/admin/AdminPayments.vue'), meta: { index: '5' } },
+        { path: 'blogs', name: 'AdminBlogs', component: () => import('@/views/admin/AdminBlogs.vue'), meta: { index: '6' } },
       ]
     },
     // Blog (public)

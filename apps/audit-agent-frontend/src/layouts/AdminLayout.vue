@@ -1,3 +1,6 @@
+// ✅ This is the updated AdminLayout.vue that includes all the blog routes from the devtoolkit version
+// ✅ Replaces previous layout, keeping PlanCraftAI's sidebar, logout, and structure
+
 <template>
   <div class="flex min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 text-white">
     <!-- Sidebar -->
@@ -9,6 +12,8 @@
         <RouterLink class="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-800" to="/admin/notifications">🔔 <span>Notifications</span></RouterLink>
         <RouterLink class="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-800" to="/admin/users">👤 <span>Users</span></RouterLink>
         <RouterLink class="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-800" to="/admin/payments">💳 <span>Payments</span></RouterLink>
+        <RouterLink class="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-800" to="/admin/blogs">📝 <span>Blogs</span></RouterLink>
+        <RouterLink class="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-800" to="/admin/settings">⚙️ <span>Settings</span></RouterLink>
       </nav>
       <div class="p-3 border-t border-gray-800 text-xs text-gray-400">PlanCraftAI</div>
     </aside>
@@ -30,6 +35,8 @@
           <RouterLink class="block px-3 py-2 rounded hover:bg-gray-800" to="/admin/notifications" @click="mobileOpen=false">Notifications</RouterLink>
           <RouterLink class="block px-3 py-2 rounded hover:bg-gray-800" to="/admin/users" @click="mobileOpen=false">Users</RouterLink>
           <RouterLink class="block px-3 py-2 rounded hover:bg-gray-800" to="/admin/payments" @click="mobileOpen=false">Payments</RouterLink>
+          <RouterLink class="block px-3 py-2 rounded hover:bg-gray-800" to="/admin/blogs" @click="mobileOpen=false">Blogs</RouterLink>
+          <RouterLink class="block px-3 py-2 rounded hover:bg-gray-800" to="/admin/settings" @click="mobileOpen=false">Settings</RouterLink>
         </div>
       </aside>
     </transition>

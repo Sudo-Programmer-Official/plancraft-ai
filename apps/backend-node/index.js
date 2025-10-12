@@ -89,6 +89,7 @@ import reminderRoutes from "./routes/reminderRoutes.js";
 import testRoutes from "./routes/testRoutes.js";
 import parseRemindersRoutes from "./routes/parseReminders.js";
 import { initScheduler } from "./services/scheduler.js";
+import blogRoutes from "./routes/blogRoutes.js";
 
 dotenv.config();
 
@@ -198,6 +199,7 @@ app.use("/api", integrationsRoutes);
 app.use("/api/reminders", reminderRoutes);
 app.use("/api", parseRemindersRoutes);
 app.use("/api", testRoutes);
+app.use("/api/blogs", blogRoutes);
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
