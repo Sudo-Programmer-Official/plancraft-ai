@@ -2,12 +2,13 @@
   <el-dialog
     v-model="visible"
     :width="420"
-    class="plancraft-dialog text-white rounded-2xl"
+    class="plancraft-dialog"
   >
-    <div class="bg-gradient-to-br from-slate-900/95 via-purple-900/90 to-indigo-900/90 p-6 rounded-2xl shadow-lg border border-violet-700/40">
-      <h2 class="text-2xl font-semibold mb-3 flex items-center gap-2">
+    <div class="p-6 rounded-2xl bg-gradient-to-br from-slate-950 via-purple-950/90 to-indigo-900/90 border border-violet-700/40 shadow-2xl text-white">
+      <h2 class="text-2xl font-bold mb-3 flex items-center gap-2 text-white drop-shadow-[0_0_4px_rgba(255,255,255,0.3)]">
         <span>🔔</span> Stay on track!
       </h2>
+
       <p class="text-slate-300 mb-6 text-sm leading-relaxed">
         Set up your notification channels so you never miss a reminder.
       </p>
@@ -42,21 +43,34 @@ const visible = ref(props.modelValue)
 
 watch(() => props.modelValue, (v) => { visible.value = v })
 watch(visible, (v) => emit('update:modelValue', v))
-
-function close() {
-  visible.value = false
-}
+function close() { visible.value = false }
 </script>
 
 <style scoped>
-.plancraft-dialog ::v-deep(.el-dialog__header) {
-  display: none; /* hide white header */
+/* Hide the default Element background and shadow */
+.plancraft-dialog ::v-deep(.el-dialog) {
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 1rem !important;
 }
+
+.plancraft-dialog ::v-deep(.el-overlay-dialog) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.plancraft-dialog ::v-deep(.el-dialog__header) {
+  display: none;
+}
+
 .plancraft-dialog ::v-deep(.el-dialog__body) {
   padding: 0 !important;
   background: transparent !important;
 }
+
 .plancraft-dialog {
-  backdrop-filter: blur(16px);
+  backdrop-filter: blur(18px);
 }
 </style>
