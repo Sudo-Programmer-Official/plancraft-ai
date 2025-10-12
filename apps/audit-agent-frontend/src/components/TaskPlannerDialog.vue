@@ -150,6 +150,8 @@
   </div>
 </template>
   </el-dialog>
+  <!-- Local notification setup prompt -->
+  <NotificationPrompt v-model="notifPromptOpen" />
 </template>
 
 
@@ -169,6 +171,8 @@ import { toLocalDateKey, parseLocalDateKey } from '@/utils/dateHelper'
 import { normalizeParsedDateTime } from '@/utils/dateParser'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { isFeatureAllowed } from '@/services/planService'
+import { hasNotificationSetup } from '@/utils/notificationCheck'
+import NotificationPrompt from '@/components/NotificationPrompt.vue'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
@@ -203,6 +207,8 @@ const link = ref('')
 const selectedDate = ref(typeof props.date === 'string' ? props.date : toLocalDateKey(props.date))
 const loading = ref(false)
 const transcribing = ref(false)
+const notifPromptOpen = ref(false)
+const suppressAutoClose = ref(false)
 
 const screenWidth = ref(window.innerWidth)
 onMounted(() => window.addEventListener("resize", () => screenWidth.value = window.innerWidth))
@@ -262,6 +268,37 @@ onMounted(async () => {
   } catch {}
   // Attempt prefill when opening in edit mode
   if (props.task) tryPrefillReminder(props.task)
+})
+
+// Enforce read-only/locked states for date and reminder when reused across views
+watch(selectedDate, (val) => {
+  try {
+    if (props.lockDate && props?.task?.date && val !== props.task.date) {
+      selectedDate.value = props.task.date
+    }
+  } catch {}
+})
+
+watch(reminderTime, (val) => {
+  try {
+    if (
+      props.disableReminder &&
+      typeof props?.task?.reminderTime !== 'undefined' &&
+      val !== (props.task.reminderTime || '')
+    ) {
+      reminderTime.value = props.task.reminderTime || ''
+    }
+  } catch {}
+})
+
+// Close planner once prompt dismissed (if we deferred auto-close)
+watch(notifPromptOpen, (open) => {
+  try {
+    if (!open && suppressAutoClose.value) {
+      suppressAutoClose.value = false
+      setTimeout(() => closeDialog(), 50)
+    }
+  } catch {}
 })
 
 // function tryPrefillReminder(task) {
@@ -517,6 +554,11 @@ async function generateTasks() {
         const uid = authStore?.user?.uid
         if (uid && saved?.id && effectiveIso) {
           const prefs = userPrefs.value?.notifications || {}
+          // Gentle prompt if user hasn't configured any channel yet
+          if (!hasNotificationSetup(prefs)) {
+            notifPromptOpen.value = true
+            suppressAutoClose.value = true
+          }
           const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
           try {
             const resp = await api.post('/reminders/text', {
@@ -547,7 +589,7 @@ async function generateTasks() {
     }
     ElNotification({ title: 'Success', message: `${items.length} task${items.length > 1 ? 's' : ''} generated`, type: 'success', duration: 2500 })
     emit('saved', items)
-    closeDialog()
+    if (!notifPromptOpen.value) closeDialog()
   } catch (err) {
     const status = err?.response?.status
     if (status === 403) {
@@ -574,10 +616,20 @@ function save() {
     emit("saved", { ...props.task, title: input.value, details: details.value, link: link.value, date: dateToSave, reminderTime: reminderToSave })
     ElNotification({ title: 'Success', message: 'Task updated successfully', type: 'success', duration: 2000 })
   } else {
+    // Soft prompt if creating with reminder time and no channels configured
+    try {
+      if ((reminderTime.value || '').trim()) {
+        const prefs = userPrefs.value?.notifications || {}
+        if (!hasNotificationSetup(prefs)) {
+          notifPromptOpen.value = true
+          suppressAutoClose.value = true
+        }
+      }
+    } catch {}
     emit("saved", { title: input.value, details: details.value, link: link.value, date: selectedDate.value, reminderTime: reminderTime.value || null })
     ElNotification({ title: 'Success', message: 'Task saved successfully', type: 'success', duration: 2000 })
   }
-  closeDialog()
+  if (!notifPromptOpen.value) closeDialog()
 }
 
 function closeDialog() {
@@ -807,19 +859,3 @@ function closeDialog() {
   border-color: #6366f1 !important; /* indigo highlight */
 }
 </style>
-// Enforce read-only behavior when asked to lock date or disable reminders
-watch(selectedDate, (val) => {
-  try {
-    if (props.lockDate && props?.task?.date && val !== props.task.date) {
-      selectedDate.value = props.task.date
-    }
-  } catch {}
-})
-
-watch(reminderTime, (val) => {
-  try {
-    if (props.disableReminder && typeof props?.task?.reminderTime !== 'undefined' && val !== props.task.reminderTime) {
-      reminderTime.value = props.task.reminderTime || ''
-    }
-  } catch {}
-})

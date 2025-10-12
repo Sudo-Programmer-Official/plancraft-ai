@@ -102,6 +102,7 @@
     @close="showPlanner = false"
     @saved="handleSaveAndSchedule"
   />
+  <NotificationPrompt v-model="notifPromptOpen" />
 </template>
 
 <script setup>
@@ -116,6 +117,8 @@ import { scheduleReminder } from '@/services/reminderService.js'
 import api from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
 import { ElMessage } from 'element-plus'
+import { hasNotificationSetup } from '@/utils/notificationCheck'
+import NotificationPrompt from '@/components/NotificationPrompt.vue'
 const { tasks, toggleComplete, loadTasksForRange } = useTasks()
 const days = [
   { label: 'Mon', value: 0 },
@@ -168,6 +171,7 @@ async function handleSaveAndSchedule(payload) {
     if (payload?.reminderTime) {
       const iso = buildLocalIso(payload.date, payload.reminderTime)
       const prefs = userPrefs.value?.notifications || {}
+      try { if (!hasNotificationSetup(prefs)) notifPromptOpen.value = true } catch {}
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
 
       try {
@@ -279,6 +283,7 @@ async function loadWeek() {
 const showPlanner = ref(false)
 const plannerDate = _toLocalDateKey(new Date())
 const viewingTask = ref(null)
+const notifPromptOpen = ref(false)
 
 function onView(task) {
   viewingTask.value = task

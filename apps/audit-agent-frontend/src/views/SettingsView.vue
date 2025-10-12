@@ -24,7 +24,11 @@
       </section>
 
       <!-- Notification Preferences -->
-      <section class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10 max-w-md mx-auto sm:max-w-none">
+      <section
+        ref="notificationsSection"
+        :class="['bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10 max-w-md mx-auto sm:max-w-none',
+                 highlightNotifications ? 'ring-2 ring-indigo-400' : '']"
+      >
         <h2 class="text-lg sm:text-xl font-semibold mb-4">🔔 Notification Preferences</h2>
         <p class="text-sm text-indigo-200 mb-4">Choose how you’d like to be reminded about tasks, reflections, and insights.</p>
 
@@ -116,7 +120,7 @@
 <script setup>
 import { reactive, ref, onMounted, computed } from "vue"
 import { useAuthStore } from "@/stores/authStore"
-import { useRouter } from "vue-router"
+import { useRouter, useRoute } from "vue-router"
 import { ElMessage } from "element-plus"
 import { getPreferences as apiGetPrefs, updatePreferences as apiUpdatePrefs, getIntegrations, updateIntegrations } from "@/services/settingsService"
 import { subscribeUserToPush } from "@/services/pwaService"
@@ -127,9 +131,12 @@ import { useIsPremium } from "@/composables/useIsPremium"
 
 const authStore = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 const subStore = useSubscriptionStore()
 const { refresh: refreshPremium } = useIsPremium()
 const dirty = ref(false) // tracks unsaved changes
+const notificationsSection = ref(null)
+const highlightNotifications = ref(false)
 
 // Notification preferences state
 const prefs = reactive({
@@ -155,6 +162,17 @@ onMounted(async () => {
   try {
     // Ensure latest subscription state on entry
     try { await refreshPremium() } catch {}
+    // Deep link: /settings?tab=notifications → scroll and highlight
+    try {
+      const tab = String(route?.query?.tab || '').toLowerCase()
+      if (tab === 'notifications') {
+        setTimeout(() => {
+          try { notificationsSection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }) } catch {}
+          highlightNotifications.value = true
+          setTimeout(() => { highlightNotifications.value = false }, 1600)
+        }, 150)
+      }
+    } catch {}
     if (authStore.user) {
       const res = await apiGetPrefs(authStore.user.uid)
       const n = res?.notifications || {}
@@ -285,4 +303,3 @@ section h2 {
   color: #f8fafc;
 }
 </style>
-
