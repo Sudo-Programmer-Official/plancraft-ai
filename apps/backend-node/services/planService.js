@@ -103,7 +103,9 @@ export async function checkUserPlanUsage(userId, feature) {
 
   const key = String(feature || 'reminder')
   const used = Number(data[key] || 0)
-  const limit = plan === 'pro' ? 9999 : 5
+  // Premium users have effectively unlimited usage; free users limited per day
+  // Align free plan daily limit to 3 to match frontend constants
+  const limit = plan === 'premium' ? 9999 : 3
 
   // Under limit: increment and allow
   if (used < limit) {
@@ -149,6 +151,6 @@ export async function getUsageToday(userId, feature = 'reminder') {
   const snap = await db.collection('usage').doc(docId).get()
   const data = snap.exists ? (snap.data() || {}) : {}
   const used = Number(data[String(feature)] || 0)
-  const limit = plan === 'pro' ? 9999 : 5
+  const limit = plan === 'premium' ? 9999 : 3
   return { used, limit, plan, date: todayKey }
 }
