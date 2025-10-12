@@ -20,7 +20,7 @@ const getCurrentUser = () =>
       () => {
         removeListener()
         resolve(null)
-      }
+      },
     )
   })
 
@@ -47,32 +47,57 @@ const router = createRouter({
     },
     // Blog (public)
     { path: '/blog', name: 'blog-index', component: () => import('@/views/BlogIndex.vue') },
-    { path: '/blog/:slug', name: 'blog-post', component: () => import('@/views/BlogView.vue'), props: true },
+    {
+      path: '/blog/:slug',
+      name: 'blog-post',
+      component: () => import('@/views/BlogView.vue'),
+      props: true,
+    },
     {
       path: '/',
       component: AppLayout,
       meta: { requiresAuth: true },
       children: [
-        { path: 'dashboard', name: 'dashboard', component: () => import('@/views/DashboardView.vue') },
+        {
+          path: 'dashboard',
+          name: 'dashboard',
+          component: () => import('@/views/DashboardView.vue'),
+        },
         { path: 'daily', name: 'daily', component: () => import('@/views/DailyView.vue') },
         { path: 'weekly', name: 'weekly', component: () => import('@/views/WeeklyView.vue') },
         { path: 'monthly', name: 'monthly', component: () => import('@/views/MonthlyView.vue') },
         { path: 'journal', name: 'journal', component: () => import('@/views/JournalView.vue') },
-        { path: 'reminders', name: 'reminders', component: () => import('@/components/RemindersOverview.vue') },
+        {
+          path: 'reminders',
+          name: 'reminders',
+          component: () => import('@/components/RemindersOverview.vue'),
+        },
         { path: 'today', name: 'today', component: () => import('@/views/TodayView.vue') },
         { path: 'planner', name: 'planner', component: () => import('@/views/PlannerView.vue') },
         { path: 'timeline', name: 'timeline', component: () => import('@/views/TimelineView.vue') },
         { path: 'settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },
         { path: 'pricing', name: 'pricing', component: () => import('@/views/PricingView.vue') },
-        { path: 'subscription', name: 'subscription', component: () => import('@/views/PricingView.vue') },
+        {
+          path: 'subscription',
+          name: 'subscription',
+          component: () => import('@/views/PricingView.vue'),
+        },
         { path: 'help', name: 'help', component: () => import('@/views/HelpView.vue') },
-      ]
+      ],
     },
-
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'NotFound',
+      redirect: '/',
+    },
     { path: '/privacy-policy', component: () => import('@/views/PrivacyPolicy.vue') },
-    { path: '/data-deletion', name: 'data-deletion', component: () => import('@/views/DataDeletion.vue') },
+    {
+      path: '/data-deletion',
+      name: 'data-deletion',
+      component: () => import('@/views/DataDeletion.vue'),
+    },
     // Note: '/terms' and '/contact' already declared above; avoid duplicates
-  ]
+  ],
 })
 
 router.beforeEach(async (to, from, next) => {
