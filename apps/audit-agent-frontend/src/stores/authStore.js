@@ -203,7 +203,7 @@ export const useAuthStore = defineStore('authStore', {
           document.body.appendChild(container)
 
           const { createApp } = await import('vue')
-          const InAppBrowserHelper = (await import('@/components/InAppBrowserHelper.vue')).default
+          const InAppBrowserHelper = (await import('@/components/InAppBrowserWarning.vue')).default
 
           const app = createApp(InAppBrowserHelper, {
             redirectUrl: window.location.href,
