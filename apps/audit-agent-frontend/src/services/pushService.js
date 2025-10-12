@@ -1,5 +1,6 @@
 // Lightweight PWA push registration utilities
-// Requires env: VITE_VAPID_PUBLIC_KEY, VITE_API_BASE
+// Requires env: VITE_VAPID_PUBLIC_KEY
+import api from '@/services/api'
 
 export function isPushSupported() {
   return (
@@ -68,11 +69,7 @@ export async function registerPushSubscription(userId) {
       createdAt: new Date().toISOString()
     }
 
-    await fetch(`${import.meta.env.VITE_API_BASE}/push/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
+    await api.post('/push/register', payload)
 
     console.log('[PWA] Subscription registered:', payload.endpoint)
     return { ok: true, endpoint: payload.endpoint }
@@ -101,4 +98,3 @@ function urlBase64ToUint8Array(base64String) {
   const rawData = window.atob(base64)
   return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)))
 }
-

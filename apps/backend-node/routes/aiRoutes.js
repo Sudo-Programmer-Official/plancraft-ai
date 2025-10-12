@@ -1,5 +1,6 @@
 // routes/ai.js
 import express from "express";
+import { requireAuth } from "../middleware/auth.js";
 import { enhanceJournalEntry, summarizeTasks, splitTasks, extractReminderTime } from "../services/openaiService.js";
 import { checkUserPlanUsage } from "../services/planService.js";
 import OpenAI from "openai";
@@ -24,11 +25,17 @@ router.use((req, res, next) => {
   if (allowedOrigins.includes(origin)) {
     res.set("Access-Control-Allow-Origin", origin);
   }
-  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.set(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, X-App-Token, X-User-Email, X-User-Id, X-User-Role, X-User-Tz, X-Requested-With"
+  );
   res.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   if (req.method === "OPTIONS") return res.sendStatus(204); // preflight quick exit
   next();
 });
+
+// Require auth for AI endpoints
+router.use(requireAuth)
 
 // Enhance journal
 router.post("/journal/enhance", async (req, res) => {
@@ -280,7 +287,7 @@ router.post('/split-tasks', async (req, res) => {
     }
     // Plan enforcement and usage increment
     try {
-      const userId = req.headers['x-user-id'] || req.user?.id
+      const userId = req.user?.uid || req.headers['x-user-id']
       if (userId) {
         const ok = await checkUserPlanUsage(String(userId), 'ai')
         if (!ok?.ok) {

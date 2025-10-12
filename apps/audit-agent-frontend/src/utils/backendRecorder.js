@@ -1,16 +1,5 @@
 import RecordRTC from "recordrtc"
-
-// ✅ Normalize API_BASE
-let __rawBase =
-  import.meta.env.VITE_TRANSCRIBE_BASE_URL ||
-  import.meta.env.VITE_API_BASE_URL ||
-  "http://localhost:4000/api"
-
-__rawBase = (__rawBase || "").replace(/\/+$/, "")
-if (/\/api\/ai$/i.test(__rawBase)) {
-  __rawBase = __rawBase.replace(/\/api\/ai$/i, "/api")
-}
-const API_BASE = __rawBase
+import api from '@/services/api'
 
 function getExt(mime) {
   if (!mime) return "wav"
@@ -48,8 +37,10 @@ export async function recordAndSendToBackend(
       try {
         const fd = new FormData()
         fd.append("file", blob, `chunk.${ext}`)
-        const res = await fetch(`${API_BASE}/transcribe`, { method: "POST", body: fd })
-        const data = await res.json()
+        const res = await api.post('/transcribe', fd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        const data = res?.data || {}
         if (data?.text) onResult(data.text, false) // partial result
       } catch (err) {
         console.warn("⚠️ Live transcription failed", err)
@@ -68,8 +59,10 @@ export async function recordAndSendToBackend(
           try {
             const fd = new FormData()
             fd.append("file", blob, `speech.${ext}`)
-            const res = await fetch(`${API_BASE}/transcribe`, { method: "POST", body: fd })
-            const data = await res.json()
+            const res = await api.post('/transcribe', fd, {
+              headers: { 'Content-Type': 'multipart/form-data' },
+            })
+            const data = res?.data || {}
             if (data?.text) onResult(data.text, true) // final result
           } catch (err) {
             console.error("❌ Final transcription failed", err)

@@ -1,7 +1,9 @@
 import express from 'express'
 import { db } from '../services/firebaseAdmin.js'
+import { requireAuth, ensureUserMatches } from '../middleware/auth.js'
 
 const router = express.Router()
+router.use(requireAuth, ensureUserMatches)
 
 // POST /api/settings/updatePreferences
 router.post('/settings/updatePreferences', async (req, res) => {

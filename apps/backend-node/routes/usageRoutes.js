@@ -1,14 +1,17 @@
 import express from 'express'
 import { db } from '../services/firebaseAdmin.js'
+import { requireAuth, ensureUserMatches } from '../middleware/auth.js'
 
 const router = express.Router()
+router.use(requireAuth, ensureUserMatches)
 
 // GET /api/usage/status?uid=...
 router.get('/status', async (req, res) => {
   try {
-    const { uid } = req.query || {}
-    if (!uid) return res.status(400).json({ error: 'Missing uid' })
-    const snap = await db.collection('users').doc(String(uid)).get()
+    const { uid, userId } = req.query || {}
+    const finalUid = String(uid || userId || req?.user?.uid || '')
+    if (!finalUid) return res.status(400).json({ error: 'Missing uid' })
+    const snap = await db.collection('users').doc(finalUid).get()
     const data = snap.exists ? snap.data() : {}
     const today = new Date().toISOString().slice(0, 10)
     const todayUsage = data?.usage?.[today] || {}
@@ -22,4 +25,3 @@ router.get('/status', async (req, res) => {
 })
 
 export default router
-

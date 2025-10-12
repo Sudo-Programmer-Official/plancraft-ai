@@ -1,8 +1,10 @@
 import express from 'express'
 import { db } from '../services/firebaseAdmin.js'
 import { generateDailyBlogIdea, generateBlogContent, generateBlogImage } from '../services/blogAIService.js'
+import requireAdmin from '../middleware/requireAdmin.js'
 
 const router = express.Router()
+router.use(requireAdmin)
 
 // POST /api/blogs/idea -> creates a draft idea
 router.post('/idea', async (req, res) => {
@@ -72,4 +74,3 @@ router.post('/:id/enhance', async (req, res) => {
 })
 
 export default router
-

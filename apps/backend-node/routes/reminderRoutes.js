@@ -7,11 +7,14 @@ import { planUsageMiddleware, getUsageToday } from "../services/planService.js"
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc.js'
 import timezone from 'dayjs/plugin/timezone.js'
+import { requireAuth, ensureUserMatches } from "../middleware/auth.js"
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
 
 const router = express.Router()
+// Require auth for all reminder endpoints and ensure userId matches token
+router.use(requireAuth, ensureUserMatches)
 const upload = multer({ storage: multer.memoryStorage() })
 
 // Enforce free/pro usage policy for reminder creation (soft warning via header)

@@ -1,20 +1,14 @@
 import express from 'express'
 import { providers } from '../services/integrations/index.js'
 import { sendNotification } from '../services/notificationService.js'
+import { requireAuth, ensureUserMatches } from '../middleware/auth.js'
 
 const router = express.Router()
-
-// Basic guard: ensure caller header x-user-id matches body userId (to be replaced with verifyIdToken)
-function basicGuard(req, res, next) {
-  const h = (req.headers['x-user-id'] || '').toString()
-  const b = (req.body?.userId || req.query?.userId || '').toString()
-  if (h && b && h !== b) return res.status(403).json({ error: 'Forbidden' })
-  next()
-}
+router.use(requireAuth, ensureUserMatches)
 
 // POST /api/integrations/test
 // { userId, channel: 'whatsapp'|'slack'|'all', message?, to? }
-router.post('/integrations/test', basicGuard, async (req, res) => {
+router.post('/integrations/test', async (req, res) => {
   try {
     const { userId, channel = 'all', message = 'Test from PlanCraftAI', to } = req.body || {}
     if (!userId) return res.status(400).json({ error: 'Missing userId' })
@@ -34,4 +28,3 @@ router.post('/integrations/test', basicGuard, async (req, res) => {
 })
 
 export default router
-

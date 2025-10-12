@@ -27,6 +27,7 @@ import { getUsageStatus } from '@/services/planService'
 import { doc, updateDoc } from 'firebase/firestore'
 import { db } from '@/firebase/init'
 import { ElNotification } from 'element-plus'
+import { clearAppToken } from '@/services/appTokenService'
 
 const auth = getAuth(firebaseApp)
 setPersistence(auth, browserLocalPersistence)
@@ -44,6 +45,7 @@ export const useAuthStore = defineStore('authStore', {
     loading: true,
     guest: false,
     usage: { used: 0, limit: 0, plan: '' },
+    _refreshTimer: null,
   }),
 
   actions: {
@@ -53,10 +55,18 @@ export const useAuthStore = defineStore('authStore', {
       this.guest = false
       this.loading = false
       try {
+        if (this._refreshTimer) {
+          clearInterval(this._refreshTimer)
+          this._refreshTimer = null
+        }
+      } catch {}
+      try {
         localStorage.removeItem('user')
         localStorage.removeItem('token')
         localStorage.removeItem('authStore')
+        localStorage.removeItem('sessionBackup')
       } catch {}
+      try { clearAppToken() } catch {}
       try {
         import('@/stores/subscriptionStore').then((mod) => {
           try {
@@ -97,9 +107,19 @@ export const useAuthStore = defineStore('authStore', {
     },
 
     async init() {
-      const fbUser = auth.currentUser
-      if (!fbUser) {
-        this.resetAuth()
+      // 🧩 Attempt fast bootstrap from local backup (helps iOS PWA)
+      try {
+        const cachedUser = localStorage.getItem('user')
+        const cachedToken = localStorage.getItem('token')
+        if (!auth.currentUser && cachedUser && cachedToken) {
+          this.user = JSON.parse(cachedUser)
+          this.token = cachedToken
+          this.guest = false
+          this.loading = false
+          console.log('[Auth] Restored session from local backup')
+        }
+      } catch (e) {
+        console.warn('[Auth] Failed to restore local session', e)
       }
 
       onAuthStateChanged(auth, async (user) => {
@@ -123,6 +143,12 @@ export const useAuthStore = defineStore('authStore', {
             identifyUser(this.user)
             localStorage.setItem('user', JSON.stringify(this.user))
             localStorage.setItem('token', this.token)
+            try {
+              if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
+                const mod = await import('@/services/appTokenService.js')
+                mod.refreshAppToken().catch(() => {})
+              }
+            } catch {}
             this.refreshPlan().catch(() => {})
           } else {
             this.resetAuth()
@@ -135,6 +161,44 @@ export const useAuthStore = defineStore('authStore', {
       // 🔁 Handle redirect sign-ins (Google fallback flow)
       try {
         await this.checkRedirectResult()
+      } catch {}
+
+      // 🧠 Silent token refresh to keep sessions alive in PWA contexts
+      try {
+        if (this._refreshTimer) clearInterval(this._refreshTimer)
+        this._refreshTimer = setInterval(async () => {
+          const user = auth.currentUser
+          if (user) {
+            try {
+              const token = await user.getIdToken(true)
+              this.token = token
+              localStorage.setItem('token', token)
+              // Optionally refresh long-lived app token if enabled and nearing expiry
+              try {
+                if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
+                  const exp = parseInt(localStorage.getItem('app_token_exp') || '0', 10)
+                  const soon = Date.now() + 24 * 60 * 60 * 1000 // within 24h
+                  if (!exp || exp < soon) {
+                    const mod = await import('@/services/appTokenService.js')
+                    await mod.refreshAppToken().catch(() => {})
+                  }
+                }
+              } catch {}
+            } catch (err) {
+              console.warn('[Auth] Token refresh failed', err)
+            }
+          } else {
+            // Try to nudge a restore from backup when Firebase layer is null
+            try {
+              const cachedUser = localStorage.getItem('user')
+              const cachedToken = localStorage.getItem('token')
+              if (!this.user && cachedUser && cachedToken) {
+                this.user = JSON.parse(cachedUser)
+                this.token = cachedToken
+              }
+            } catch {}
+          }
+        }, 45 * 60 * 1000) // every 45 minutes
       } catch {}
     },
 
@@ -154,6 +218,12 @@ export const useAuthStore = defineStore('authStore', {
         this.token = await user.getIdToken()
         localStorage.setItem('user', JSON.stringify(this.user))
         localStorage.setItem('token', this.token)
+        try {
+          if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
+            const mod = await import('@/services/appTokenService.js')
+            mod.refreshAppToken().catch(() => {})
+          }
+        } catch {}
         ElNotification({
           title: 'Welcome ✨',
           message: 'Using guest mode. You can upgrade anytime.',
@@ -265,6 +335,12 @@ export const useAuthStore = defineStore('authStore', {
           this.token = await user.getIdToken()
           localStorage.setItem('user', JSON.stringify(this.user))
           localStorage.setItem('token', this.token)
+          try {
+            if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
+              const mod = await import('@/services/appTokenService.js')
+              mod.refreshAppToken().catch(() => {})
+            }
+          } catch {}
           ElNotification({
             title: 'Welcome back ✨',
             message: `Signed in as ${this.user.displayName || this.user.email || 'User'}`,
@@ -294,6 +370,12 @@ export const useAuthStore = defineStore('authStore', {
         this.token = await user.getIdToken()
         localStorage.setItem('user', JSON.stringify(this.user))
         localStorage.setItem('token', this.token)
+        try {
+          if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
+            const mod = await import('@/services/appTokenService.js')
+            mod.refreshAppToken().catch(() => {})
+          }
+        } catch {}
         ElNotification({
           title: 'Signed in ✨',
           message: `Welcome ${this.user.displayName || this.user.email || ''}`,
@@ -322,6 +404,12 @@ export const useAuthStore = defineStore('authStore', {
         this.token = await user.getIdToken()
         localStorage.setItem('user', JSON.stringify(this.user))
         localStorage.setItem('token', this.token)
+        try {
+          if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
+            const mod = await import('@/services/appTokenService.js')
+            mod.refreshAppToken().catch(() => {})
+          }
+        } catch {}
         ElNotification({
           title: 'Account created 🎉',
           message: `Hi ${this.user.email || 'there'}!`,

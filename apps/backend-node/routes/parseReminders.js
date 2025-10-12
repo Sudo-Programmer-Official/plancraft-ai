@@ -1,7 +1,9 @@
 import express from "express"
 import OpenAI from "openai"
+import { requireAuth } from "../middleware/auth.js"
 
 const router = express.Router()
+router.use(requireAuth)
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
 // POST /api/parse-reminders
@@ -47,4 +49,3 @@ router.post("/parse-reminders", async (req, res) => {
 })
 
 export default router
-

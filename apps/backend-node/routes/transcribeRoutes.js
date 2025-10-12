@@ -1,6 +1,7 @@
 import express from "express";
 import multer from "multer";
 import OpenAI from "openai";
+import { requireAuth } from "../middleware/auth.js";
 import { toFile } from "openai/uploads";
 
 const allowedOrigins = [
@@ -19,11 +20,16 @@ router.use((req, res, next) => {
   if (allowAny || allowedOrigins.includes(origin) || isDevVite) {
     res.set("Access-Control-Allow-Origin", origin);
   }
-  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.set(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, X-App-Token, X-User-Email, X-User-Id, X-User-Role, X-User-Tz, X-Requested-With"
+  );
   res.set("Access-Control-Allow-Methods", "POST,OPTIONS");
   if (req.method === "OPTIONS") return res.sendStatus(204);
   next();
 });
+
+router.use(requireAuth)
 
 // Store file in memory (don’t write to disk)
 const upload = multer({

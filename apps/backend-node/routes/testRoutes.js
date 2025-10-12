@@ -3,8 +3,10 @@ import { db } from '../services/firebaseAdmin.js'
 import { send as sendWhatsApp } from '../services/integrations/whatsappProvider.js'
 import { sendPWA } from '../services/integrations/pwaProvider.js'
 import { sendEmail } from '../services/integrations/emailProvider.js'
+import { requireAuth, ensureUserMatches } from '../middleware/auth.js'
 
 const router = express.Router()
+router.use(requireAuth, ensureUserMatches)
 
 // POST /api/test/notify
 // Body: { userId: string, message?: string, channels?: string[] }

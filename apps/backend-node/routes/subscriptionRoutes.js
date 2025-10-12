@@ -139,8 +139,10 @@ import express from 'express'
 import pushRoutes from './pushRoutes.js'
 import Stripe from 'stripe'
 import { db } from '../services/firebaseAdmin.js'
+import { requireAuth, ensureUserMatches } from '../middleware/auth.js'
 
 const router = express.Router()
+router.use(requireAuth, ensureUserMatches)
 
 // Mount push subscription routes under /push so
 // app.use('/api', router) yields /api/push/* endpoints.
@@ -153,7 +155,7 @@ const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY, { apiVersion: '
 // GET /api/subscription/status?userId=123
 router.get('/subscription/status', async (req, res) => {
   try {
-    const userId = String(req.query.userId || '')
+    const userId = String(req.query.userId || req?.user?.uid || '')
     if (!userId) return res.json({ plan: 'free', status: 'free', remainingDays: 0 })
     const snap = await db.collection('users').doc(userId).get()
     const data = snap.exists ? snap.data() : {}
@@ -184,7 +186,8 @@ router.get('/subscription/status', async (req, res) => {
 // POST /api/subscription/checkout
 router.post('/subscription/checkout', async (req, res) => {
   try {
-    const { userId, priceId, successUrl, cancelUrl } = req.body || {}
+    const { userId: bodyUserId, priceId, successUrl, cancelUrl } = req.body || {}
+    const userId = String(bodyUserId || req?.user?.uid || '')
     if (!userId || !priceId) {
       return res.status(400).json({ error: 'Missing userId or priceId' })
     }
@@ -212,7 +215,7 @@ router.post('/subscription/checkout', async (req, res) => {
 // POST /api/subscription/cancel
 router.post('/subscription/cancel', async (req, res) => {
   try {
-    const { userId } = req.body || {}
+    const userId = String((req.body && req.body.userId) || req?.user?.uid || '')
     if (!userId) return res.status(400).json({ error: 'Missing userId' })
 
     const snap = await db.collection('users').doc(String(userId)).get()

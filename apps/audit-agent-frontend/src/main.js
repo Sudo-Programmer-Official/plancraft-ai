@@ -53,6 +53,9 @@ registerSW({
   },
 })
 
+// Firebase auth export for quick token refreshes
+import { auth } from '@/firebase/init'
+
 const app = createApp(App)
 
 // Plugins
@@ -100,23 +103,78 @@ if (isInApp) {
 // Mount app
 app.mount('#app')
 
-// 🧩 Persist sessionStorage in iOS/Safari PWA
+// 🧩 Persist session data + auth backup in iOS/Safari PWA
 try {
   const isStandalone =
     window.matchMedia?.('(display-mode: standalone)').matches ||
     window.navigator.standalone
   if (isStandalone) {
-    if (!sessionStorage.length && localStorage.getItem('sessionBackup')) {
-      const backup = JSON.parse(localStorage.getItem('sessionBackup') || '{}')
-      Object.keys(backup).forEach((k) => sessionStorage.setItem(k, backup[k]))
-    }
-    window.addEventListener('beforeunload', () => {
-      const dump = {}
-      for (let i = 0; i < sessionStorage.length; i++) {
-        const key = sessionStorage.key(i)
-        dump[key] = sessionStorage.getItem(key)
+    // Restore any prior session backup
+    try {
+      const raw = localStorage.getItem('sessionBackup') || '{}'
+      const backup = JSON.parse(raw)
+      // Support old shape (plain key-value) and new shape (with session)
+      const sessionData = backup && typeof backup === 'object' && backup.session ? backup.session : backup
+      if (sessionData && !sessionStorage.length) {
+        Object.keys(sessionData).forEach((k) => sessionStorage.setItem(k, sessionData[k]))
       }
-      localStorage.setItem('sessionBackup', JSON.stringify(dump))
+      // Restore auth backup if Firebase layer was cleared
+      if (backup && backup.user && !localStorage.getItem('user')) {
+        localStorage.setItem('user', backup.user)
+      }
+      if (backup && backup.token && !localStorage.getItem('token')) {
+        localStorage.setItem('token', backup.token)
+      }
+    } catch {}
+
+    window.addEventListener('beforeunload', () => {
+      try {
+        const dump = { token: null, user: null, session: {} }
+        dump.token = localStorage.getItem('token')
+        dump.user = localStorage.getItem('user')
+        for (let i = 0; i < sessionStorage.length; i++) {
+          const key = sessionStorage.key(i)
+          dump.session[key] = sessionStorage.getItem(key)
+        }
+        localStorage.setItem('sessionBackup', JSON.stringify(dump))
+      } catch {}
     })
+  }
+} catch {}
+
+// 🔄 Foreground refresh: when tab/app becomes visible, refresh auth
+try {
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState !== 'visible') return
+    try {
+      const user = auth?.currentUser
+      if (user) {
+        const token = await user.getIdToken(true)
+        localStorage.setItem('token', token)
+        try { authStore.token = token } catch {}
+      }
+    } catch (e) {
+      console.warn('[Auth] Foreground token refresh failed', e)
+    }
+
+    // Optionally refresh long-lived app token if feature flag is enabled
+    try {
+      if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
+        const mod = await import('@/services/appTokenService.js')
+        await mod.refreshAppToken().catch(() => {})
+      }
+    } catch {}
+  })
+} catch {}
+
+// Optional startup nudge: delay a bit to ensure Firebase rehydration before first refresh
+try {
+  if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
+    setTimeout(async () => {
+      try {
+        const mod = await import('@/services/appTokenService.js')
+        await mod.refreshAppToken().catch(() => {})
+      } catch {}
+    }, 1800)
   }
 } catch {}

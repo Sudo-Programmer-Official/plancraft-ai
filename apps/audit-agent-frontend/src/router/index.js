@@ -99,16 +99,38 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to, from, next) => {
+  const authStore = useAuthStore()
+
+  // Bonus: If already logged in, skip login page
+  if (to.path === '/login') {
+    try {
+      const cachedUser = localStorage.getItem('user')
+      const cachedToken = localStorage.getItem('token')
+      if (authStore?.user || (cachedUser && cachedToken)) {
+        return next('/dashboard')
+      }
+    } catch {}
+  }
+
   // Skip auth guard for public routes
   if (!to.meta.requiresAuth || import.meta.env.SSR) return next()
 
   const user = await getCurrentUser()
-  if (!user) return next({ path: '/login', query: { redirect: to.fullPath } })
+  if (!user) {
+    // Allow offline fallback if we have cached identity
+    try {
+      const cachedUser = localStorage.getItem('user')
+      const cachedToken = localStorage.getItem('token')
+      if (authStore?.user || (cachedUser && cachedToken)) {
+        return next()
+      }
+    } catch {}
+    return next({ path: '/login', query: { redirect: to.fullPath } })
+  }
 
   // Admin guard
   const wantsAdmin = to.meta.requiresAdmin || to.path.startsWith('/admin')
   if (wantsAdmin) {
-    const authStore = useAuthStore()
     if (authStore?.user?.role !== 'admin') {
       return next({ path: '/dashboard' })
     }

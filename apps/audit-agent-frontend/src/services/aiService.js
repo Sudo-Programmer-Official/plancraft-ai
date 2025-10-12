@@ -1,18 +1,6 @@
 // src/services/aiService.js
-import axios from "axios";
-
-// Normalize base URL (remove trailing slash if present)
-const rawBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api/ai";
-const API_BASE_URL = rawBase.replace(/\/+$/, "");
-
-// Create axios instance with defaults
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 40000, // 20s safety timeout
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
+// Use the shared API client so auth headers (Firebase/X-App-Token) are attached
+import api from '@/services/api'
 
 // 🔹 Utility: safe response unwrap
 function safeGet(res, key, fallback = null) {

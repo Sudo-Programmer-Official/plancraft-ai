@@ -90,6 +90,8 @@ import testRoutes from "./routes/testRoutes.js";
 import parseRemindersRoutes from "./routes/parseReminders.js";
 import { initScheduler } from "./services/scheduler.js";
 import blogRoutes from "./routes/blogRoutes.js";
+import authRoutes from "./routes/authRoutes.js";
+import { attachAuth } from "./middleware/auth.js";
 
 dotenv.config();
 
@@ -134,6 +136,7 @@ const corsOptions = {
     "x-user-role",
     "x-user-tz",
     "x-requested-with",
+    "x-app-token",
   ],
   credentials: true,
   preflightContinue: false,
@@ -160,7 +163,7 @@ app.use((req, res, next) => {
       res.header('Access-Control-Allow-Credentials', 'true')
       res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS,PATCH')
       const reqHeaders = req.headers['access-control-request-headers']
-      res.header('Access-Control-Allow-Headers', reqHeaders || 'Content-Type, Authorization, X-User-Email, X-User-Id, X-User-Role, X-User-Tz, X-Requested-With')
+      res.header('Access-Control-Allow-Headers', reqHeaders || 'Content-Type, Authorization, X-User-Email, X-User-Id, X-User-Role, X-User-Tz, X-Requested-With, X-App-Token')
       return res.sendStatus(204)
     }
   }
@@ -181,6 +184,9 @@ app.get('/api/stripe/webhook-health', (req, res) => {
 // JSON parser for all other routes
 app.use(express.json());
 
+// Attach auth (prefer X-App-Token, fallback to Firebase) for all API routes
+app.use('/api', attachAuth)
+
 // Health checks
 app.get("/", (req, res) => res.send("Backend is live!"));
 app.get("/health", (req, res) => res.status(200).send("OK"));
@@ -198,6 +204,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api", settingsRoutes);
 app.use("/api", integrationsRoutes);
 app.use("/api/reminders", reminderRoutes);
+app.use("/api/auth", authRoutes);
 app.use("/api", parseRemindersRoutes);
 app.use("/api", testRoutes);
 app.use("/api/blogs", blogRoutes);

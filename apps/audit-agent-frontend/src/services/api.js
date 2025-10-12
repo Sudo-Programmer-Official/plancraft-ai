@@ -1,6 +1,7 @@
 // src/services/api.js
 import axios from 'axios'
 import { auth } from '@/firebase/init'
+import { getAppToken } from '@/services/appTokenService'
 
 // Base API points to Vite proxy '/api' in dev
 // Prefer VITE_API_BASE_ROOT; if missing but VITE_API_BASE_URL is set (e.g. to /api/ai),
@@ -60,6 +61,11 @@ api.interceptors.request.use(async (config) => {
         if (u?.role) config.headers['x-user-role'] = u.role
       }
     }
+    // Optional: include long-lived app token for backend feature-flagged verification
+    try {
+      const appTok = getAppToken()
+      if (appTok) config.headers['x-app-token'] = appTok
+    } catch {}
     // 🕒 Include user timezone (handles mobile/PWA drift)
     try {
       let tz = localStorage.getItem('user_timezone')
