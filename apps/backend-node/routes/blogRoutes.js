@@ -1,6 +1,6 @@
 import express from 'express'
 import { db } from '../services/firebaseAdmin.js'
-import { generateDailyBlogIdea, generateBlogContent, generateBlogImage } from '../services/blogAIService.js'
+import { generateDailyBlogIdea, generateBlogContent, generateBlogImage, generateBlogSummary } from '../services/blogAIService.js'
 import requireAdmin from '../middleware/requireAdmin.js'
 
 const router = express.Router()
@@ -23,9 +23,22 @@ router.post('/:id/content', async (req, res) => {
     const snap = await db.collection('blogs').doc(id).get()
     if (!snap.exists) return res.status(404).json({ success: false, error: 'Not found' })
     const blog = snap.data()
-    const content = await generateBlogContent(blog.title, blog.summary)
+
+    // Pull generation preferences from global settings
+    let settings = {}
+    try {
+      const s = await db.collection('settings').doc('global').get()
+      settings = s.exists ? (s.data() || {}) : {}
+    } catch {}
+
+    const out = await generateBlogContent(blog.title, blog.summary, {
+      blogPrompt: settings.blogPrompt,
+      aiModel: settings.aiModel,
+    })
+    const content = typeof out === 'string' ? out : out?.text || ''
+    const model = typeof out === 'object' ? out?.model : undefined
     await db.collection('blogs').doc(id).set({ ...blog, content, updated_at: new Date() }, { merge: true })
-    res.json({ success: true, content })
+    res.json({ success: true, content, model })
   } catch (e) {
     res.status(500).json({ success: false, error: e?.message || 'Failed to generate content' })
   }
@@ -70,6 +83,76 @@ router.post('/:id/enhance', async (req, res) => {
   } catch (e) {
     console.error('Enhancement error:', e)
     res.status(500).json({ success: false, error: e?.message || 'Enhancement failed' })
+  }
+})
+
+// POST /api/blogs/:id/summarize -> generates one-sentence tagline and updates doc
+router.post('/:id/summarize', async (req, res) => {
+  try {
+    const id = String(req.params.id)
+    const snap = await db.collection('blogs').doc(id).get()
+    if (!snap.exists) return res.status(404).json({ success: false, error: 'Not found' })
+    const blog = snap.data() || {}
+    let settings = {}
+    try {
+      const s = await db.collection('settings').doc('global').get()
+      settings = s.exists ? (s.data() || {}) : {}
+    } catch {}
+    const out = await generateBlogSummary(blog.title, blog.content || blog.summary, { aiModel: settings.aiModel })
+    const summary = typeof out === 'string' ? out : out?.text || ''
+    const model = typeof out === 'object' ? out?.model : undefined
+    await db.collection('blogs').doc(id).set({ summary, updated_at: new Date() }, { merge: true })
+    res.json({ success: true, summary, model })
+  } catch (e) {
+    res.status(500).json({ success: false, error: e?.message || 'Failed to generate summary' })
+  }
+})
+
+// POST /api/blogs/:id/publish -> set published true and create announcement
+router.post('/:id/publish', async (req, res) => {
+  try {
+    const id = String(req.params.id)
+    const ref = db.collection('blogs').doc(id)
+    const snap = await ref.get()
+    if (!snap.exists) return res.status(404).json({ success: false, error: 'Not found' })
+
+    const before = snap.data() || {}
+    const alreadyPublished = !!before.published
+
+    const patch = { published: true, updated_at: new Date() }
+    await ref.set(patch, { merge: true })
+
+    // Respect global settings toggle for notifications
+    let allowNotify = true
+    try {
+      const setSnap = await db.collection('settings').doc('global').get()
+      if (setSnap.exists) allowNotify = !!(setSnap.data() || {}).enableNotifications
+    } catch {}
+
+    let announced = false
+    if (!alreadyPublished && allowNotify) {
+      const blog = { ...before, ...patch }
+      const origin = process.env.PUBLIC_WEB_ORIGIN || 'https://plancraftai.com'
+      const link = `${origin.replace(/\/$/, '')}/blog/${blog.slug || id}`
+      try {
+        const now = new Date()
+        await db.collection('notifications').add({
+          type: 'blog',
+          title: blog.title || 'New Blog',
+          link,
+          createdAt: now,
+          date: now,
+        })
+        announced = true
+      } catch (e) {
+        console.warn('Failed to create publish notification', e?.message || e)
+      }
+    }
+
+    return res.json({ success: true, notified: announced })
+  } catch (e) {
+    console.error('Publish error:', e)
+    return res.status(500).json({ success: false, error: e?.message || 'Publish failed' })
   }
 })
 

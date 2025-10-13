@@ -26,6 +26,9 @@
       </router-link>
     </header>
 
+    <!-- Published List -->
+    <AdminBlogList @select="select" />
+
     <!-- Grid: Editor + Preview -->
     <div
       class="relative grid md:grid-cols-2 gap-10 md:gap-8 transition-all duration-300"
@@ -69,17 +72,22 @@
               </el-button>
             </template>
           </el-input>
+          <p v-if="lastModel" class="text-xs text-slate-400 mt-1">Model: {{ lastModel }}</p>
         </div>
 
         <!-- Summary -->
         <div>
-          <label class="text-sm text-slate-300 mb-1 block">Summary</label>
-          <button
-            class="text-indigo-400 hover:text-indigo-300"
-            @click="enhanceField('summary')"
-          >
-            ✨
-          </button>
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-sm text-slate-300">Summary</label>
+            <div class="flex items-center gap-2">
+              <el-button size="small" text class="!text-indigo-300 hover:!text-indigo-200" @click="genSummary" :loading="sumLoading">
+                ⚡ Generate Summary
+              </el-button>
+              <el-tooltip content="Enhance current summary">
+                <el-button size="small" text class="!text-indigo-300 hover:!text-indigo-200" @click="enhanceField('summary')" :loading="aiLoading">✨</el-button>
+              </el-tooltip>
+            </div>
+          </div>
           <el-input
             v-model="form.summary"
             type="textarea"
@@ -150,15 +158,28 @@
         <div>
           <div class="flex items-center justify-between mb-2">
             <label class="text-sm text-slate-300">Content</label>
-            <el-button
-              size="small"
-              text
-              class="!text-indigo-300 hover:!text-indigo-200"
-              @click="enhanceField('content')"
-              :loading="aiLoading"
-            >
-              🧠 Write
-            </el-button>
+            <div class="flex items-center gap-2">
+              <el-tooltip content="Generate full blog from title + summary">
+                <el-button
+                  size="small"
+                  text
+                  class="!text-indigo-300 hover:!text-indigo-200"
+                  @click="writeContent"
+                  :loading="aiLoading"
+                >
+                  🧠 Write
+                </el-button>
+              </el-tooltip>
+              <el-button
+                size="small"
+                text
+                class="!text-indigo-300 hover:!text-indigo-200"
+                @click="enhanceField('content')"
+                :loading="aiLoading"
+              >
+                ✨ Enhance
+              </el-button>
+            </div>
           </div>
           <el-input
             v-model="form.content"
@@ -166,6 +187,7 @@
             :rows="12"
             placeholder="Write your content in Markdown or HTML..."
           />
+          <p v-if="lastModel" class="text-xs text-slate-400 mt-1">Model: {{ lastModel }}</p>
         </div>
 
         <!-- Actions -->
@@ -254,6 +276,7 @@ import { useBlogs } from '@/composables/useBlogs'
 import { createBlog, updateBlog, deleteBlog, publishBlog } from '@/services/blogService'
 import api from '@/services/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import AdminBlogList from '@/components/admin/AdminBlogList.vue'
 
 const md = new MarkdownIt({ html: true, linkify: true })
 const { blogs, loading, fetchBlogs } = useBlogs(false)
@@ -261,7 +284,11 @@ const active = ref(null)
 const saving = ref(false)
 const aiLoading = ref(false)
 const imgLoading = ref(false)
+const sumLoading = ref(false)
 const autosaved = ref(false)
+const autoSaving = ref(false)
+let autoTimer = null
+const lastModel = ref('')
 
 const form = ref({
   title: '',
@@ -323,6 +350,8 @@ async function enhanceField(field) {
     const resp = await api.post(`/blogs/${id}/enhance`, { field, value: form.value[field] })
     if (resp?.data?.success && resp?.data?.enhanced) {
       form.value[field] = resp.data.enhanced
+      // enhance endpoint currently uses gpt-3.5-turbo
+      lastModel.value = 'gpt-3.5-turbo'
       ElMessage({
         message: `✨ ${field[0].toUpperCase() + field.slice(1)} enhanced!`,
         type: 'success',
@@ -342,6 +371,25 @@ async function enhanceField(field) {
   }
 }
 
+async function writeContent() {
+  try {
+    const id = await ensureId()
+    aiLoading.value = true
+    // Persist latest title/summary to guide generation
+    await updateBlog(id, { title: form.value.title, summary: form.value.summary })
+    const resp = await api.post(`/blogs/${id}/content`)
+    if (resp?.data?.success && resp?.data?.content) {
+      form.value.content = resp.data.content
+      lastModel.value = resp?.data?.model || lastModel.value
+      ElMessage.success('Content generated')
+    } else throw new Error(resp?.data?.error || 'Generation failed')
+  } catch (e) {
+    ElMessage.error(e?.message || 'AI write failed')
+  } finally {
+    aiLoading.value = false
+  }
+}
+
 async function genIdea() {
   try {
     const resp = await api.post('/blogs/idea')
@@ -354,6 +402,25 @@ async function genIdea() {
     } else throw new Error(resp?.data?.error || 'Failed')
   } catch (e) {
     ElMessage.error(e?.message || 'Idea generation failed')
+  }
+}
+
+async function genSummary() {
+  try {
+    const id = await ensureId()
+    sumLoading.value = true
+    // persist latest title/content before summarizing
+    await updateBlog(id, { title: form.value.title, content: form.value.content, summary: form.value.summary })
+    const resp = await api.post(`/blogs/${id}/summarize`)
+    if (resp?.data?.success && resp?.data?.summary) {
+      form.value.summary = resp.data.summary
+      lastModel.value = resp?.data?.model || lastModel.value
+      ElMessage.success('Summary generated')
+    } else throw new Error(resp?.data?.error || 'Failed')
+  } catch (e) {
+    ElMessage.error(e?.message || 'Summary generation failed')
+  } finally {
+    sumLoading.value = false
   }
 }
 
@@ -396,13 +463,11 @@ async function saveDraft() {
 
 async function publish() {
   try {
-    if (!active.value?.id) {
-      const created = await createBlog({ ...form.value, published: true })
-      active.value = created
-    } else {
-      await updateBlog(active.value.id, { ...form.value })
-      await publishBlog(active.value.id, true)
-    }
+    // Ensure we have a draft ID and latest fields saved
+    const id = await ensureId()
+    await updateBlog(id, { ...form.value, published: false })
+    // Trigger publish + announcement hook on backend
+    await api.post(`/blogs/${id}/publish`)
     ElMessage.success('Published')
     await fetchBlogs()
   } catch (e) {
@@ -422,6 +487,27 @@ async function remove() {
 }
 
 onMounted(fetchBlogs)
+
+// Debounced auto-save when title/summary change
+watch(
+  () => [form.value.title, form.value.summary],
+  () => {
+    if (autoTimer) clearTimeout(autoTimer)
+    autoTimer = setTimeout(async () => {
+      try {
+        if (!form.value.title) return
+        autoSaving.value = true
+        const id = await ensureId()
+        await updateBlog(id, { title: form.value.title, summary: form.value.summary, published: false })
+        autosaved.value = true
+      } catch (e) {
+        // no-op
+      } finally {
+        autoSaving.value = false
+      }
+    }, 800)
+  }
+)
 </script>
 
 <style scoped>

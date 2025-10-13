@@ -52,7 +52,7 @@
           v-for="b in blogs"
           :key="b.id"
           :to="{ name: 'blog-post', params: { slug: b.slug } }"
-          class="group block rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-indigo-400 p-5 transition-all shadow-lg backdrop-blur-md"
+          class="group block rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-indigo-400/50 hover:shadow-indigo-900/30 p-5 transition-all shadow-lg backdrop-blur-md"
         >
           <!-- Cover -->
           <div class="overflow-hidden rounded-xl mb-4 h-44">
@@ -74,14 +74,14 @@
           <h2 class="text-xl font-semibold mb-1 text-white leading-snug">
             {{ b.title }}
           </h2>
-          <p class="text-sm text-slate-300 line-clamp-3 mb-3">
+          <p class="text-sm text-slate-300 line-clamp-3 leading-relaxed mb-3">
             {{ b.summary }}
           </p>
 
           <!-- Tags -->
-          <div class="flex flex-wrap gap-2">
+          <div v-if="tagsOf(b).length" class="flex flex-wrap gap-2 mt-1">
             <span
-              v-for="t in (b.tags || [])"
+              v-for="t in tagsOf(b).slice(0,3)"
               :key="t"
               class="text-xs bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full"
             >
@@ -150,6 +150,15 @@ const isAdmin = computed(
   () => String(authStore?.user?.role || '').toLowerCase() === 'admin'
 )
 
+function tagsOf(b) {
+  const raw = b?.tags
+  if (Array.isArray(raw)) return raw
+  return String(raw || '')
+    .split(/[,#]+/)
+    .map((t) => t.trim())
+    .filter(Boolean)
+}
+
 function formatDate(val) {
   try {
     if (val?.toDate) return val.toDate().toLocaleDateString()
@@ -174,6 +183,9 @@ async function genIdea() {
 </script>
 
 <style scoped>
+.text-slate-300 {
+  color: #d1d5db !important;
+}
 .line-clamp-3 {
   display: -webkit-box;
   -webkit-line-clamp: 3;

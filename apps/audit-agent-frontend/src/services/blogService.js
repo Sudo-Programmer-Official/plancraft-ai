@@ -63,7 +63,14 @@ export async function getBlogBySlug(slug) {
   const snap = await getDocs(q)
   if (snap.empty) return null
   const d = snap.docs[0]
-  return { id: d.id, ...d.data() }
+  const data = d.data()
+  const normTags = Array.isArray(data?.tags)
+    ? data.tags
+    : String(data?.tags || '')
+        .split(/[,#]+/)
+        .map((t) => t.trim())
+        .filter(Boolean)
+  return { id: d.id, ...data, tags: normTags }
 }
 
 export async function listBlogs(publishedOnly = false) {
@@ -71,6 +78,14 @@ export async function listBlogs(publishedOnly = false) {
     ? query(collection(db, 'blogs'), where('published', '==', true), orderBy('created_at', 'desc'))
     : query(collection(db, 'blogs'), orderBy('created_at', 'desc'))
   const snap = await getDocs(q)
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+  return snap.docs.map((d) => {
+    const data = d.data()
+    const normTags = Array.isArray(data?.tags)
+      ? data.tags
+      : String(data?.tags || '')
+          .split(/[,#]+/)
+          .map((t) => t.trim())
+          .filter(Boolean)
+    return { id: d.id, ...data, tags: normTags }
+  })
 }
-

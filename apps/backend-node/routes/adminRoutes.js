@@ -105,6 +105,54 @@ router.post('/users/updatePlan', requireAdmin, async (req, res) => {
   }
 })
 
+// Admin: Global app settings (Firestore: /settings/global)
+router.get('/settings', requireAdmin, async (req, res) => {
+  try {
+    const snap = await db.collection('settings').doc('global').get()
+    const defaults = {
+      blogPrompt: 'Generate engaging AI productivity content for PlanCraftAI.',
+      aiModel: 'gpt-4o-mini',
+      // Default to disabled to avoid noisy pushes
+      enableNotifications: false,
+      whatsappTemplate: 'blog_update_v1',
+    }
+    const doc = snap.exists ? (snap.data() || {}) : {}
+    const settings = { ...defaults, ...doc }
+    // Attach a non-persistent version hint if present via env
+    const version = process.env.APP_VERSION || process.env.npm_package_version || undefined
+    return res.json({ settings: version ? { ...settings, version } : settings })
+  } catch (e) {
+    console.error('Admin settings fetch failed', e)
+    return res.status(500).json({ error: 'Failed to fetch settings' })
+  }
+})
+
+router.post('/settings', requireAdmin, async (req, res) => {
+  try {
+    const body = req.body || {}
+    // Coerce and sanitize expected fields
+    const toStr = (v) => (typeof v === 'string' ? v : v == null ? '' : String(v))
+    const toBool = (v) => {
+      if (typeof v === 'boolean') return v
+      if (typeof v === 'string') return ['1', 'true', 'yes', 'on'].includes(v.toLowerCase())
+      return !!v
+    }
+
+    const payload = {
+      blogPrompt: toStr(body.blogPrompt).trim() || undefined,
+      aiModel: toStr(body.aiModel).trim() || undefined,
+      enableNotifications: toBool(body.enableNotifications),
+      whatsappTemplate: toStr(body.whatsappTemplate).trim() || undefined,
+      updatedAt: new Date(),
+    }
+    await db.collection('settings').doc('global').set(payload, { merge: true })
+    return res.json({ success: true })
+  } catch (e) {
+    console.error('Admin settings update failed', e)
+    return res.status(500).json({ success: false, error: 'Failed to update settings' })
+  }
+})
+
 // Admin: Payments
 router.get('/payments', requireAdmin, async (req, res) => {
   try {
