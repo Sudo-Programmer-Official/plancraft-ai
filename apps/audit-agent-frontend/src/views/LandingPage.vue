@@ -37,18 +37,6 @@
       </div>
     </section>
 
-    <!-- Why We Built -->
-    <section class="py-20 bg-slate-950/80 text-center">
-      <div class="max-w-3xl mx-auto px-6">
-        <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">Why We Built PlanCraftAI</h2>
-        <p class="text-indigo-200 leading-relaxed text-lg">
-          Modern work is chaotic. Notifications never stop. Plans scatter.
-          We built PlanCraftAI to bring mindfulness back to productivity —
-          a planner that listens, adapts, and keeps you peacefully focused.
-        </p>
-      </div>
-    </section>
-
     <!-- For Teams CTA -->
     <div class="mt-12 flex justify-center">
       <div
@@ -140,64 +128,96 @@
       </div>
     </section>
 
-    <!-- Premium Card -->
-   <!-- Pricing / Plans -->
-<section id="plans" class="py-20 bg-gradient-to-b from-indigo-950/70 via-purple-950/60 to-slate-950/80 text-center">
+     <!-- Why We Built -->
+    <section class="py-20 bg-slate-950/80 text-center">
+      <div class="max-w-3xl mx-auto px-6">
+        <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">Why We Built PlanCraftAI</h2>
+        <p class="text-indigo-200 leading-relaxed text-lg">
+          Modern work is chaotic. Notifications never stop. Plans scatter.
+          We built PlanCraftAI to bring mindfulness back to productivity —
+          a planner that listens, adapts, and keeps you peacefully focused.
+        </p>
+      </div>
+    </section>
+
+  <section
+  id="plans"
+  class="py-24 bg-gradient-to-b from-indigo-950/70 via-purple-950/60 to-slate-950/80 text-center"
+>
   <div class="max-w-6xl mx-auto px-6">
     <h2 class="text-4xl md:text-5xl font-bold text-white mb-4">✨ Choose Your Flow</h2>
-    <p class="text-indigo-200 mb-12 text-lg">Simple plans designed to help you stay mindful and productive.</p>
+    <p class="text-indigo-200 mb-12 text-lg">
+      Simple plans designed to help you stay mindful and productive.
+    </p>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 justify-center">
+    <div
+      class="grid grid-cols-1 md:grid-cols-2 gap-8 justify-center items-stretch max-w-4xl mx-auto"
+    >
       <!-- Free Plan -->
       <div
-        class="relative bg-white/90 dark:bg-white/10 backdrop-blur-xl rounded-2xl shadow-2xl p-8 border border-indigo-200/30 dark:border-indigo-400/20 hover:-translate-y-2 transition-all hover:shadow-indigo-500/40"
+        class="relative flex flex-col justify-between bg-white/10 backdrop-blur-xl rounded-2xl shadow-xl p-8 border border-indigo-400/20 hover:-translate-y-2 transition-all hover:shadow-indigo-500/30"
       >
         <div class="absolute top-0 right-0 bg-indigo-500 text-white text-xs font-semibold px-3 py-1 rounded-bl-lg">
           Free
         </div>
-        <h3 class="text-2xl font-semibold text-slate-800 dark:text-white mb-3">Free Plan</h3>
-        <p class="text-slate-600 dark:text-indigo-200 text-sm mb-6">Perfect for those starting their mindful journey.</p>
-        <ul class="space-y-3 text-left text-sm text-slate-700 dark:text-indigo-200 mb-6">
-          <li>✅ Create & manage tasks</li>
-          <li>✅ Daily journaling prompts</li>
-          <li>✅ Limited AI insights</li>
-          <li>✅ Local reminders</li>
-        </ul>
-        <div class="text-3xl font-bold text-slate-800 dark:text-white mb-4">Free</div>
-        <RouterLink
-          to="/login"
-          class="inline-block px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition shadow-lg shadow-indigo-800/40"
-        >
-          Get Started
-        </RouterLink>
+        <div>
+          <h3 class="text-2xl font-semibold text-white mb-3">🌿 Free Plan</h3>
+          <p class="text-indigo-200 text-sm mb-6">
+            Perfect for those starting their mindful journey.
+          </p>
+          <ul class="space-y-3 text-left text-sm text-indigo-100 mb-6">
+            <li>✅ Create & manage tasks</li>
+            <li>✅ Daily journaling prompts</li>
+            <li>✅ Limited AI insights</li>
+            <li>✅ Local reminders</li>
+          </ul>
+        </div>
+        <div class="mt-auto">
+          <div class="text-3xl font-bold text-white mb-4">Free</div>
+          <RouterLink
+            to="/login"
+            class="inline-block w-full px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition shadow-lg shadow-indigo-800/40"
+          >
+            Get Started
+          </RouterLink>
+        </div>
       </div>
 
       <!-- Premium Plan -->
       <div
-        class="relative bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-600 text-white rounded-2xl shadow-2xl p-8 border border-white/20 hover:-translate-y-2 transition-all hover:shadow-indigo-900/50"
+        class="relative flex flex-col justify-between bg-gradient-to-br from-indigo-500 via-purple-600 to-pink-600 rounded-2xl shadow-xl p-8 border border-white/20 hover:-translate-y-2 transition-all hover:shadow-pink-600/40"
+        style="background: linear-gradient(135deg, #4338ca 0%, #6d28d9 40%, #db2777 100%);"
       >
-        <div class="absolute top-0 right-0 bg-yellow-400 text-black text-xs font-semibold px-3 py-1 rounded-bl-lg">
-          Popular
-        </div>
-        <h3 class="text-2xl font-semibold mb-3">Premium Plan</h3>
-        <p class="text-indigo-100 text-sm mb-6">Unlock the full mindful productivity experience.</p>
-        <ul class="space-y-3 text-left text-sm mb-6">
-          <li>⭐ Unlimited reminders & AI summaries</li>
-          <li>⭐ Voice journaling & insights</li>
-          <li>⭐ Priority support & early access</li>
-          <li>⭐ Sync across all devices</li>
-        </ul>
-        <div class="text-3xl font-bold mb-4">$2<span class="text-sm text-indigo-200">/month</span></div>
-        <RouterLink
-          to="/subscription"
-          class="inline-block px-6 py-3 rounded-xl bg-white text-indigo-700 font-semibold hover:bg-slate-100 transition shadow-md"
+        <div
+          class="absolute top-0 right-0 bg-yellow-400 text-black text-xs font-semibold px-3 py-1 rounded-bl-lg shadow-sm"
         >
-          Go Premium ✨
-        </RouterLink>
+          Most Popular
+        </div>
+        <div>
+          <h3 class="text-2xl font-semibold text-white mb-3">🚀 Premium Plan</h3>
+          <p class="text-indigo-100 text-sm mb-6">
+            Unlock the full mindful productivity experience.
+          </p>
+          <ul class="space-y-3 text-left text-sm mb-6 text-white/95">
+            <li>⭐ Unlimited reminders & AI summaries</li>
+            <li>⭐ Voice journaling & insights</li>
+            <li>⭐ Calendar & WhatsApp integration</li>
+            <li>⭐ Priority support & early access</li>
+          </ul>
+        </div>
+        <div class="mt-auto">
+          <div class="text-3xl font-bold mb-4">$2<span class="text-sm text-indigo-100">/month</span></div>
+          <RouterLink
+            to="/subscription"
+            class="inline-block w-full px-6 py-3 rounded-xl bg-white text-indigo-700 font-semibold hover:bg-slate-100 transition shadow-md"
+          >
+            Go Premium ✨
+          </RouterLink>
+        </div>
       </div>
     </div>
 
-    <!-- Small reassurance note -->
+    <!-- Reassurance note -->
     <p class="mt-10 text-sm text-indigo-300">
       No hidden fees. Cancel anytime from your account settings.
     </p>

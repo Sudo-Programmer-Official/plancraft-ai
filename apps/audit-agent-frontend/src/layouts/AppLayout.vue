@@ -131,13 +131,20 @@
             title="Help"
             >💬</RouterLink
           >
-          <button
-            @click="handleLogout"
-            class="text-xs py-2 rounded-md hover:bg-gray-800 transition"
-            title="Logout"
-          >
-            🚪
-          </button>
+     <button
+  @click="handleLogout"
+  class="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-1.5 rounded-lg 
+         bg-gradient-to-r from-red-600 to-pink-600 text-white shadow-md 
+         hover:shadow-lg hover:from-red-500 hover:to-pink-500 
+         transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98]"
+  title="Logout"
+>
+  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 -ml-[1px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-7.5A2.25 2.25 0 003.75 5.25v13.5A2.25 2.25 0 006 21h7.5a2.25 2.25 0 002.25-2.25V15" />
+    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h12m0 0l-3-3m3 3l-3 3" />
+  </svg>
+  <!-- <span class="tracking-tight translate-x-[-1px]">-></span> -->
+</button>
         </div>
       </div>
     </aside>
