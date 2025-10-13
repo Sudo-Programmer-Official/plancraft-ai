@@ -266,89 +266,132 @@
          shadow-xl border border-indigo-900/40 text-slate-100 transition-all duration-300 hover:shadow-indigo-800/40"
 >
   <!-- Header -->
-  <div class="flex items-center justify-between mb-4">
-    <h3 class="font-semibold text-base flex items-center gap-2">
-      📊 <span class="tracking-wide">Reports Snapshot</span>
-      <el-tooltip placement="top" content="Your weekly & monthly progress summary.">
-        <span class="ml-1 text-[11px] opacity-70 cursor-help align-middle">ⓘ</span>
-      </el-tooltip>
-    </h3>
 
+
+  <!-- Report Content -->
+<!-- Reports Snapshot -->
+<div
+  v-if="latestReport"
+  class="rounded-2xl p-6 sm:p-7 bg-gradient-to-br from-slate-900 via-indigo-950/80 to-purple-950/60
+         border border-indigo-900/40 shadow-lg hover:shadow-indigo-800/30 text-slate-100
+         transition-all duration-300 backdrop-blur-md"
+>
+
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-5 gap-3">
     <div class="flex items-center gap-2">
+      <span class="text-lg sm:text-xl font-semibold flex items-center gap-2">
+        📊 Reports Snapshot
+      </span>
+      <el-tooltip placement="top" content="Your latest summary for the selected period.">
+        <span class="text-[12px] opacity-70 cursor-help align-middle">ⓘ</span>
+      </el-tooltip>
+    </div>
+
+    Action Buttons
+    <div class="flex flex-wrap gap-2 justify-start sm:justify-end">
       <button
         @click="onGenerateWeekly"
         :disabled="generatingWeekly || generatingMonthly"
-        class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-indigo-700
-               hover:from-indigo-500 hover:to-indigo-600 disabled:opacity-50 text-white text-xs font-medium
-               transition-all duration-300 shadow-md hover:shadow-indigo-500/40"
+        class="px-4 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-indigo-700
+               hover:from-indigo-500 hover:to-indigo-600 disabled:opacity-50 text-white
+               text-xs font-medium transition-all duration-300 shadow-md"
       >
         Generate Weekly
       </button>
       <button
         @click="onGenerateMonthly"
         :disabled="generatingWeekly || generatingMonthly"
-        class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-fuchsia-600 to-purple-700
-               hover:from-fuchsia-500 hover:to-purple-600 disabled:opacity-50 text-white text-xs font-medium
-               transition-all duration-300 shadow-md hover:shadow-fuchsia-500/40"
+        class="px-4 py-1.5 rounded-lg bg-gradient-to-r from-fuchsia-600 to-purple-700
+               hover:from-fuchsia-500 hover:to-purple-600 disabled:opacity-50 text-white
+               text-xs font-medium transition-all duration-300 shadow-md"
       >
         Generate Monthly
       </button>
       <router-link
         to="/reports"
-        class="text-indigo-300 hover:text-indigo-100 text-xs font-medium transition-colors duration-300"
+        class="text-indigo-300 hover:text-indigo-100 text-xs font-medium transition"
       >
         Open →
       </router-link>
     </div>
   </div>
 
-  <!-- Report Content -->
-  <div v-if="latestReport" class="text-sm space-y-2">
-    <div class="opacity-80 text-indigo-300">
+  <!-- Report Summary -->
+  <div class="space-y-3 mt-2">
+    <div class="opacity-80 text-indigo-300 text-sm sm:text-base">
       {{ latestReport.period?.toUpperCase?.() || latestReport.period }}
       • {{ latestReport.start }} → {{ latestReport.end }}
     </div>
 
-    <div class="flex items-center gap-2">
-      <span class="text-emerald-400 font-semibold">{{ latestReport.metrics?.totalCompleted || 0 }}</span>
-      <span class="opacity-80">completed</span>
-      <span class="opacity-40">•</span>
-      <span class="text-slate-200">{{ latestReport.metrics?.totalTasks || 0 }}</span>
-      <span class="opacity-70">total</span>
-    </div>
+    <div class="flex flex-wrap items-center gap-3 sm:gap-4 mt-1">
+      <div class="flex items-center gap-1">
+        <span class="text-emerald-400 font-semibold text-base sm:text-lg">
+          {{ latestReport.metrics?.totalCompleted || 0 }}
+        </span>
+        <span class="text-sm opacity-80">completed</span>
+      </div>
 
-    <div class="mt-3">
-      <canvas ref="sparklineCanvas" width="180" height="40" class="w-full h-10 opacity-90"></canvas>
-    </div>
+      <span class="hidden sm:block opacity-40">•</span>
 
-    <div class="mt-3 flex items-center gap-3">
-      <a
-        v-if="latestReport.urls?.html"
-        :href="latestReport.urls.html"
-        target="_blank"
-        class="px-3 py-1 rounded-md bg-indigo-700 hover:bg-indigo-600 text-white text-xs font-medium transition-all duration-300"
-      >
-        View HTML
-      </a>
-      <a
-        v-if="latestReport.urls?.pdf"
-        :href="latestReport.urls.pdf"
-        target="_blank"
-        class="px-3 py-1 rounded-md bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-medium transition-all duration-300"
-      >
-        View PDF
-      </a>
+      <div class="flex items-center gap-1">
+        <span class="text-slate-200 text-base sm:text-lg">
+          {{ latestReport.metrics?.totalTasks || 0 }}
+        </span>
+        <span class="text-sm opacity-70">total</span>
+      </div>
     </div>
   </div>
 
-  <!-- Empty State -->
-  <div v-else class="text-sm text-indigo-300/70 mt-2 italic">
-    No reports yet.
-    <router-link to="/reports" class="text-indigo-400 hover:text-indigo-200 font-medium">
-      Generate one
-    </router-link>
-    to see your insights ✨
+  <!-- Sparkline -->
+  <div class="mt-4 sm:mt-5">
+    <canvas
+      ref="sparklineCanvas"
+      width="180"
+      height="40"
+      class="w-full h-12 opacity-90"
+    ></canvas>
   </div>
+
+  <!-- Links -->
+  <div class="mt-5 flex flex-wrap gap-3">
+    <a
+      v-if="latestReport.urls?.html"
+      :href="latestReport.urls.html"
+      target="_blank"
+      class="px-4 py-2 rounded-lg bg-indigo-700 hover:bg-indigo-600
+             text-white text-xs sm:text-sm font-medium shadow-sm transition"
+    >
+      View HTML
+    </a>
+    <a
+      v-if="latestReport.urls?.pdf"
+      :href="latestReport.urls.pdf"
+      target="_blank"
+      class="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600
+             text-white text-xs sm:text-sm font-medium shadow-sm transition"
+    >
+      View PDF
+    </a>
+  </div>
+</div>
+
+<!-- Empty State -->
+<div
+  v-else
+  class="rounded-2xl p-6 bg-gradient-to-br from-slate-900 via-indigo-950/70 to-purple-950/60
+         text-sm text-indigo-300/80 border border-indigo-900/40 backdrop-blur-md
+         shadow-inner shadow-indigo-950/30 text-center"
+>
+  No reports yet.<br />
+  <router-link
+    to="/reports"
+    class="text-indigo-400 hover:text-indigo-200 font-medium transition-colors"
+  >
+    Generate one
+  </router-link>
+  to see your progress ✨
+</div>
 </div>
   </main>
 </template>

@@ -65,8 +65,9 @@ async function generateAndSendReport(user, period) {
       carryover: '—',
     }
     if (user?.email) {
-      await sendReportEmail(user.email, htmlUrl, pdfUrl, metrics)
-      console.log(`[ReportScheduler] Email sent → user=${user?.id} period=${period}`)
+      const res = await sendReportEmail(user.email, htmlUrl, pdfUrl, metrics)
+      if (res?.success) console.log(`[ReportScheduler] Email sent → user=${user?.id} period=${period}`)
+      else console.log(`[ReportScheduler] Email skipped → user=${user?.id} period=${period} reason=${res?.reason || res?.status || 'unknown'}`)
     }
     console.log(`[ReportScheduler] Done generate → user=${user?.id} period=${period} in ${Date.now() - t0}ms`)
   } catch (e) {

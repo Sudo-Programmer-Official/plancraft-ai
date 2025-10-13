@@ -8,17 +8,25 @@ export function initEmail() {
 export async function sendEmail({ to, subject, html, from }) {
   try {
     const key = process.env.SENDGRID_API_KEY
+    const sender = from || process.env.EMAIL_FROM
     if (!key) {
       console.log('[email] SENDGRID_API_KEY not set; skipping send to', to)
-      return { skipped: true }
+      return { skipped: true, reason: 'no_api_key' }
     }
-    const sender = from || process.env.EMAIL_FROM || 'no-reply@plancraftai.com'
+    if (!sender) {
+      console.log('[email] EMAIL_FROM not set; skipping send to', to, '(set a verified SendGrid sender or domain)')
+      return { skipped: true, reason: 'no_from' }
+    }
     const msg = { to, from: sender, subject: subject || 'PlanCraftAI Report', html: html || '' }
     await sgMail.send(msg)
     return { success: true }
   } catch (e) {
-    console.error('sendEmail failed:', e?.message || e)
-    return { success: false, error: e?.message || String(e) }
+    const status = e?.code || e?.response?.statusCode
+    const details = e?.response?.body?.errors?.map((x) => x?.message).join('; ')
+    const msg = e?.message || details || String(e)
+    const hint = status === 403 ? 'Hint: Verify your SendGrid sender identity or domain and set EMAIL_FROM to that verified address.' : ''
+    console.warn(`sendEmail skipped/failed (status ${status || 'n/a'}): ${msg} ${hint}`)
+    return { success: false, status, error: msg }
   }
 }
 
@@ -26,11 +34,15 @@ export async function sendEmail({ to, subject, html, from }) {
 export async function sendReportEmail(to, htmlUrl, pdfUrl, metrics = {}) {
   try {
     const key = process.env.SENDGRID_API_KEY
+    const sender = process.env.EMAIL_FROM
     if (!key) {
       console.log('[email] SENDGRID_API_KEY not set; skipping sendReportEmail to', to)
-      return { skipped: true }
+      return { skipped: true, reason: 'no_api_key' }
     }
-    const sender = process.env.EMAIL_FROM || 'no-reply@plancraftai.com'
+    if (!sender) {
+      console.log('[email] EMAIL_FROM not set; skipping sendReportEmail to', to, '(set a verified SendGrid sender or domain)')
+      return { skipped: true, reason: 'no_from' }
+    }
     const period = metrics.period || 'weekly'
     const name = metrics.name || 'there'
     const completed = metrics.completed ?? 'N/A'
@@ -59,7 +71,11 @@ export async function sendReportEmail(to, htmlUrl, pdfUrl, metrics = {}) {
     await sgMail.send({ to, from: sender, subject: `Your ${period} PlanCraftAI Report 📊`, html })
     return { success: true }
   } catch (e) {
-    console.error('sendReportEmail failed:', e?.message || e)
-    return { success: false, error: e?.message || String(e) }
+    const status = e?.code || e?.response?.statusCode
+    const details = e?.response?.body?.errors?.map((x) => x?.message).join('; ')
+    const msg = e?.message || details || String(e)
+    const hint = status === 403 ? 'Hint: Verify your SendGrid sender identity or domain and set EMAIL_FROM to that verified address.' : ''
+    console.warn(`sendReportEmail skipped/failed (status ${status || 'n/a'}): ${msg} ${hint}`)
+    return { success: false, status, error: msg }
   }
 }
