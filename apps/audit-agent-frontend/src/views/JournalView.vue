@@ -190,17 +190,42 @@ onMounted(async () => {
 })
 
 // Filtered logs by timeframe
+// const filteredLogs = computed(() => {
+//   const now = new Date()
+//   const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()))
+//   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+
+//   return logs.value.filter((l) => {
+//     const t = new Date(l.timestamp)
+//     if (selectedFilter.value === 'today') return t.toDateString() === new Date().toDateString()
+//     if (selectedFilter.value === 'week') return t >= startOfWeek
+//     if (selectedFilter.value === 'month') return t >= startOfMonth
+//     return true
+//   })
+// })
 const filteredLogs = computed(() => {
   const now = new Date()
-  const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()))
+
+  // 🧭 Correct start of week (Sunday)
+  const startOfWeek = new Date()
+  startOfWeek.setDate(now.getDate() - now.getDay())
+  startOfWeek.setHours(0, 0, 0, 0)
+
+  // 🧭 Start of month
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
   return logs.value.filter((l) => {
     const t = new Date(l.timestamp)
-    if (selectedFilter.value === 'today') return t.toDateString() === new Date().toDateString()
-    if (selectedFilter.value === 'week') return t >= startOfWeek
-    if (selectedFilter.value === 'month') return t >= startOfMonth
-    return true
+    if (selectedFilter.value === 'today')
+      return t.toDateString() === now.toDateString()
+
+    if (selectedFilter.value === 'week')
+      return t >= startOfWeek && t <= now // ensure we include today
+
+    if (selectedFilter.value === 'month')
+      return t >= startOfMonth && t <= now
+
+    return true // 'all'
   })
 })
 

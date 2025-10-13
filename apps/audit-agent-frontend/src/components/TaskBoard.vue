@@ -23,7 +23,7 @@
         @click="openPlanner"
         class="flex-shrink-0 flex items-center gap-2 bg-gradient-to-r from-indigo-500 via-purple-600 to-pink-500 hover:from-indigo-600 hover:via-purple-700 hover:to-pink-600 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg shadow-md text-sm sm:text-base font-medium"
       >
-        <span class="text-base sm:text-lg">➕</span>
+        <span class="text-base sm:text-lg">+</span>
         <span>Add Task</span>
       </button>
     </div>

@@ -88,7 +88,7 @@
             </a>
           </div>
 
-          <div class="bg-gray-800/60 rounded-lg p-6 shadow-md">
+          <!-- <div class="bg-gray-800/60 rounded-lg p-6 shadow-md">
             <h2 class="text-xl font-semibold mb-2">💼 LinkedIn</h2>
             <a
               href="https://www.linkedin.com/in/fullstuffdeveloper/"
@@ -97,7 +97,7 @@
             >
               Abhishek Kumar Jha
             </a>
-          </div>
+          </div> -->
         </div>
       </div>
     </div>
