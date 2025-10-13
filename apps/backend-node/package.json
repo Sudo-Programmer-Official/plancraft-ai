@@ -9,9 +9,9 @@
     "postinstall": "rm -rf node_modules/pdf-parse/test"
   },
   "dependencies": {
-    "chrono-node": "^2.7.6",
     "@sendgrid/mail": "^8.1.6",
     "axios": "^1.9.0",
+    "chrono-node": "^2.7.6",
     "cors": "^2.8.5",
     "dayjs": "^1.11.18",
     "dotenv": "^16.5.0",
@@ -19,9 +19,11 @@
     "firebase-admin": "^13.5.0",
     "mammoth": "^1.9.1",
     "multer": "2.0.2",
+    "node-cron": "^3.0.3",
     "node-fetch": "^3.3.2",
     "openai": "^4.104.0",
     "pdf-parse": "^1.1.1",
+    "puppeteer": "^22.15.0",
     "stripe": "^19.0.0",
     "web-push": "^3.6.6",
     "xlsx": "^0.18.5"

@@ -1,5 +1,7 @@
 import { db } from "./firebaseAdmin.js"
 import { queueReminder } from "./reminderService.js"
+import { initCarryoverJobs } from "./automation/carryoverJobs.js"
+import { initReportScheduler } from "../jobs/reportScheduler.js"
 
 export async function initScheduler() {
   try {
@@ -33,4 +35,7 @@ export async function initScheduler() {
   } catch (e) {
     console.error('initScheduler error:', e)
   }
+  // Boot recurring jobs
+  try { initCarryoverJobs() } catch (e) { console.warn('Carryover jobs init failed', e) }
+  try { initReportScheduler() } catch (e) { console.warn('Report scheduler init failed', e) }
 }

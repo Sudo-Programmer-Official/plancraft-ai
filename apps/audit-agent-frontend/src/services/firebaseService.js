@@ -18,6 +18,7 @@ import { signOut } from 'firebase/auth'
 import { ElMessageBox } from 'element-plus'
 import { toLocalDateKey } from "@/utils/dateHelper";
 import { db, auth } from '@/firebase/init'
+import { updateStreakOnEntry } from '@/services/streakService'
 
 const tasksRef = collection(db, "tasks");
 const journalRef = collection(db, "journalEntries");
@@ -235,6 +236,19 @@ export async function saveEntryToFirebase(entry) {
     userId: user.uid,
     createdAt: serverTimestamp(),
   }));
+
+  // Update streak based on this entry; fire-and-forget but surface confetti via event
+  try {
+    const res = await updateStreakOnEntry(user.uid, entry?.date || new Date())
+    if (res?.streakIncreased) {
+      try {
+        window.dispatchEvent(new CustomEvent('streak-increased', { detail: { count: res.newCount } }))
+      } catch {}
+    }
+  } catch (e) {
+    // Non-fatal; do not block journal save
+    console.warn('Streak update failed:', e?.message || e)
+  }
 }
 
 /**

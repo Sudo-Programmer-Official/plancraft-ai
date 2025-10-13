@@ -431,6 +431,7 @@ const tabs = [
   { name: 'Monthly', icon: '🌙', path: '/monthly' },
   { name: 'Journal', icon: '📝', path: '/journal' },
   { name: 'Reminders', icon: '🔔', path: '/reminders' },
+  { name: 'Reports', icon: '📈', path: '/reports' },
 ]
 
 async function handleLogout() {

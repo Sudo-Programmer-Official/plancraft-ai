@@ -9,6 +9,18 @@
   >
     <GuestBanner :isGuest="authStore.guest" @login="redirectToLogin" />
 
+    <!-- Carryover prompt -->
+    <div
+      v-if="carryoverCount > 0"
+      class="col-span-1 sm:col-span-2 lg:col-span-3 px-3 py-2 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-100 flex items-center justify-between"
+    >
+      <span class="text-sm">You have {{ carryoverCount }} unfinished task{{ carryoverCount===1?'':'s' }} from today. Move {{ Math.min(3, carryoverCount) }} to tomorrow?</span>
+      <div class="flex items-center gap-2">
+        <button @click="applyCarryover(3)" class="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs">Move {{ Math.min(3, carryoverCount) }}</button>
+        <button @click="ignoreCarryover()" class="px-3 py-1.5 rounded-lg bg-black/30 hover:bg-black/40 text-amber-50 text-xs">Ignore</button>
+      </div>
+    </div>
+
     <!-- Free plan usage banner -->
     <div
       v-if="usage.plan === 'free' && !isPremium"
@@ -172,23 +184,32 @@
         </div>
       </div>
     </div>
+    
 
     <!-- ====== JOURNAL ====== -->
     <div v-if="showJournal" class="journal-card col-span-1 sm:col-span-2 lg:col-span-3">
       <div class="bg-gray-900/80 rounded-xl p-4 sm:p-6 shadow-lg">
         <div class="flex justify-between items-center mb-3">
           <h3 class="font-semibold">📖 Journal Snapshot</h3>
-          <router-link
-            to="/journal"
-            class="flex items-center text-xs px-3 py-1 rounded-lg font-medium bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 text-white shadow-md transition"
-          >
-            Go to Journal →
-          </router-link>
+          <div class="flex items-center gap-2">
+            <router-link
+              to="/reports"
+              class="text-indigo-400 hover:text-indigo-200 text-xs"
+            >
+              View Reports →
+            </router-link>
+            <router-link
+              to="/journal"
+              class="flex items-center text-xs px-3 py-1 rounded-lg font-medium bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 text-white shadow-md transition"
+            >
+              Go to Journal →
+            </router-link>
+          </div>
         </div>
         <div v-if="journalLogs.length" class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm sm:text-base">
           <div class="p-3 rounded-xl bg-slate-900/40 text-center">
             <p class="text-2xl">🔥</p>
-            <p class="font-medium">{{ journalStreak }}-day streak</p>
+            <p class="font-medium" :class="{ 'animate-pulse': displayStreak >= 1 }">{{ displayStreak }}-day streak</p>
           </div>
           <div class="p-3 rounded-xl bg-slate-900/40 text-center">
             <p class="text-2xl">{{ journalLogs[0].mood?.emoji || "📝" }}</p>
@@ -208,7 +229,10 @@
       v-if="showAIInsights"
       class="ai-card bg-gray-900/80 rounded-xl p-4 sm:p-6 shadow-lg col-span-1 sm:col-span-2 lg:col-span-3"
     >
-      <h3 class="font-semibold text-lg mb-4 flex items-center gap-2">🤖 AI Insights</h3>
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-semibold text-lg flex items-center gap-2">🤖 AI Insights</h3>
+        <router-link to="/reports" class="text-indigo-400 hover:text-indigo-200 text-sm">View Reports →</router-link>
+      </div>
       <div v-if="aiSummary" class="text-sm space-y-4">
         <div class="flex justify-between items-center">
           <span><strong>✅ Completed:</strong> {{ aiSummary.completedPct }}%</span>
@@ -235,6 +259,97 @@
       </div>
       <p v-else class="text-gray-400">Fetching AI insights…</p>
     </div>
+
+    <!-- ====== REPORTS SNAPSHOT ====== -->
+<div
+  class="rounded-2xl p-5 sm:p-6 bg-gradient-to-br from-slate-900 via-indigo-950/80 to-purple-950/70
+         shadow-xl border border-indigo-900/40 text-slate-100 transition-all duration-300 hover:shadow-indigo-800/40"
+>
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-4">
+    <h3 class="font-semibold text-base flex items-center gap-2">
+      📊 <span class="tracking-wide">Reports Snapshot</span>
+      <el-tooltip placement="top" content="Your weekly & monthly progress summary.">
+        <span class="ml-1 text-[11px] opacity-70 cursor-help align-middle">ⓘ</span>
+      </el-tooltip>
+    </h3>
+
+    <div class="flex items-center gap-2">
+      <button
+        @click="onGenerateWeekly"
+        :disabled="generatingWeekly || generatingMonthly"
+        class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-indigo-700
+               hover:from-indigo-500 hover:to-indigo-600 disabled:opacity-50 text-white text-xs font-medium
+               transition-all duration-300 shadow-md hover:shadow-indigo-500/40"
+      >
+        Generate Weekly
+      </button>
+      <button
+        @click="onGenerateMonthly"
+        :disabled="generatingWeekly || generatingMonthly"
+        class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-fuchsia-600 to-purple-700
+               hover:from-fuchsia-500 hover:to-purple-600 disabled:opacity-50 text-white text-xs font-medium
+               transition-all duration-300 shadow-md hover:shadow-fuchsia-500/40"
+      >
+        Generate Monthly
+      </button>
+      <router-link
+        to="/reports"
+        class="text-indigo-300 hover:text-indigo-100 text-xs font-medium transition-colors duration-300"
+      >
+        Open →
+      </router-link>
+    </div>
+  </div>
+
+  <!-- Report Content -->
+  <div v-if="latestReport" class="text-sm space-y-2">
+    <div class="opacity-80 text-indigo-300">
+      {{ latestReport.period?.toUpperCase?.() || latestReport.period }}
+      • {{ latestReport.start }} → {{ latestReport.end }}
+    </div>
+
+    <div class="flex items-center gap-2">
+      <span class="text-emerald-400 font-semibold">{{ latestReport.metrics?.totalCompleted || 0 }}</span>
+      <span class="opacity-80">completed</span>
+      <span class="opacity-40">•</span>
+      <span class="text-slate-200">{{ latestReport.metrics?.totalTasks || 0 }}</span>
+      <span class="opacity-70">total</span>
+    </div>
+
+    <div class="mt-3">
+      <canvas ref="sparklineCanvas" width="180" height="40" class="w-full h-10 opacity-90"></canvas>
+    </div>
+
+    <div class="mt-3 flex items-center gap-3">
+      <a
+        v-if="latestReport.urls?.html"
+        :href="latestReport.urls.html"
+        target="_blank"
+        class="px-3 py-1 rounded-md bg-indigo-700 hover:bg-indigo-600 text-white text-xs font-medium transition-all duration-300"
+      >
+        View HTML
+      </a>
+      <a
+        v-if="latestReport.urls?.pdf"
+        :href="latestReport.urls.pdf"
+        target="_blank"
+        class="px-3 py-1 rounded-md bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-medium transition-all duration-300"
+      >
+        View PDF
+      </a>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div v-else class="text-sm text-indigo-300/70 mt-2 italic">
+    No reports yet.
+    <router-link to="/reports" class="text-indigo-400 hover:text-indigo-200 font-medium">
+      Generate one
+    </router-link>
+    to see your insights ✨
+  </div>
+</div>
   </main>
 </template>
 
@@ -242,7 +357,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick, watchEffect, watch } from 'vue'
 import { useHead } from '@vueuse/head'
 import { useRoute, useRouter } from 'vue-router'
-import { collection, onSnapshot, updateDoc, doc, query, where } from 'firebase/firestore'
+import { collection, onSnapshot, updateDoc, doc, query, where, serverTimestamp } from 'firebase/firestore'
 import { db, auth } from '@/firebase/init'
 import { onAuthStateChanged } from 'firebase/auth'
 import { toLocalDateKey } from '@/utils/dateHelper'
@@ -267,9 +382,10 @@ dayjs.extend(utc)
 dayjs.extend(timezone)
 // === Reminder badges (Daily list) ===
 import { getReminderStatus, scheduleReminder } from '@/services/reminderService'
+import { listReports, generateReport } from '@/services/reportsService'
 import api from '@/services/api'
 import { getPreferences as getUserPreferences } from '@/services/settingsService'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElNotification } from 'element-plus'
 // import { onAuthStateChanged } from 'firebase/auth'
 // import { auth } from '@/firebase/init'
 
@@ -314,6 +430,11 @@ const showPlanner = ref(false)
 const selectedTask = ref(null)
 const dailyList = ref(null)
 const journalLogs = ref([])
+const carryoverCount = ref(0)
+const latestReport = ref(null)
+const generatingWeekly = ref(false)
+const generatingMonthly = ref(false)
+const sparklineCanvas = ref(null)
 
 const showSetup = ref(false)
 
@@ -341,6 +462,9 @@ const journalStreak = computed(() => {
   return count
 })
 
+const userStreak = ref(0)
+const displayStreak = computed(() => userStreak.value || journalStreak.value || 0)
+
 onMounted(async () => {
   // One-time quick setup gate
   try {
@@ -351,6 +475,112 @@ onMounted(async () => {
     showSetup.value = !seen && (needsTz || needsPerm)
   } catch {}
   journalLogs.value = await fetchEntries()
+  // Fetch latest report (non-blocking)
+  try { const items = await listReports(1); latestReport.value = Array.isArray(items) ? items[0] : null } catch { latestReport.value = null }
+
+  // If it's after 10pm local and no journal entry today, gently nudge
+  try {
+    const now = new Date()
+    const hours = now.getHours()
+    const today = toLocalDateKey(now)
+    const hasToday = Array.isArray(journalLogs.value) && journalLogs.value.some(e => e?.date === today)
+    const nudged = localStorage.getItem('streak_nudge_today') === today
+    if (hours >= 22 && !hasToday && !nudged) {
+      ElNotification({
+        title: 'Keep the streak alive ✨',
+        message: 'Log a quick reflection before midnight to maintain your streak.',
+        type: 'info',
+        duration: 5000,
+        offset: 80,
+      })
+      try { localStorage.setItem('streak_nudge_today', today) } catch {}
+    }
+  } catch {}
+})
+
+async function onGenerateWeekly() {
+  if (generatingWeekly.value) return
+  generatingWeekly.value = true
+  try {
+    await generateReport('weekly', false)
+    ElMessage({ type: 'success', message: 'Weekly report generated', duration: 1500 })
+    try { const items = await listReports(1); latestReport.value = Array.isArray(items) ? items[0] : null } catch {}
+    drawSparkline()
+  } catch (e) {
+    ElMessage({ type: 'error', message: 'Failed to generate report', duration: 2000 })
+  } finally {
+    generatingWeekly.value = false
+  }
+}
+
+async function onGenerateMonthly() {
+  if (generatingMonthly.value) return
+  generatingMonthly.value = true
+  try {
+    await generateReport('monthly', false)
+    ElMessage({ type: 'success', message: 'Monthly report generated', duration: 1500 })
+    try { const items = await listReports(1); latestReport.value = Array.isArray(items) ? items[0] : null } catch {}
+    drawSparkline()
+  } catch (e) {
+    ElMessage({ type: 'error', message: 'Failed to generate report', duration: 2000 })
+  } finally {
+    generatingMonthly.value = false
+  }
+}
+
+function getLast7DaysYMD() {
+  const out = []
+  const d = new Date()
+  for (let i = 6; i >= 0; i--) {
+    const dd = new Date(d)
+    dd.setDate(d.getDate() - i)
+    out.push(toLocalDateKey(dd))
+  }
+  return out
+}
+
+function drawSparkline() {
+  try {
+    const el = sparklineCanvas.value
+    if (!el) return
+    const ctx = el.getContext('2d')
+    const w = el.width
+    const h = el.height
+    ctx.clearRect(0, 0, w, h)
+    const days = getLast7DaysYMD()
+    const all = [...weeklyTasks.value, ...dailyTasks.value]
+    const counts = days.map((ymd) => all.filter(t => t.date === ymd && t.completed).length)
+    const max = Math.max(1, ...counts)
+    const stepX = w / (counts.length - 1)
+    // line path
+    ctx.beginPath()
+    ctx.strokeStyle = '#6366f1'
+    ctx.lineWidth = 2
+    counts.forEach((v, i) => {
+      const x = i * stepX
+      const y = h - (v / max) * (h - 6) - 3
+      if (i === 0) ctx.moveTo(x, y)
+      else ctx.lineTo(x, y)
+    })
+    ctx.stroke()
+    // fill gradient
+    const grad = ctx.createLinearGradient(0, 0, 0, h)
+    grad.addColorStop(0, 'rgba(99,102,241,0.35)')
+    grad.addColorStop(1, 'rgba(99,102,241,0.00)')
+    ctx.lineTo(w, h)
+    ctx.lineTo(0, h)
+    ctx.closePath()
+    ctx.fillStyle = grad
+    ctx.fill()
+  } catch {}
+}
+
+watch(() => weeklyTasks.value.map(t => `${t.date}:${t.completed}`).join(','), () => {
+  drawSparkline()
+})
+
+watch(() => dailyTasks.value.map(t => `${t.date}:${t.completed}`).join(','), () => {
+  drawSparkline()
 })
 
 function startTour() {
@@ -508,6 +738,7 @@ onMounted(() => {
           }
         })
         dailyTasks.value = userTasks.filter((t) => t.date === toYMD(today))
+        try { carryoverCount.value = dailyTasks.value.filter((t) => t.is_carryover === true && t.completed === false).length } catch {}
         const weekDays = ymdRange(startOfWeek, endOfWeek)
         weeklyTasks.value = userTasks.filter((t) => weekDays.includes(t.date))
         const monthDays = ymdRange(startOfMonth, endOfMonth)
@@ -536,6 +767,31 @@ async function onReactivate() {
     window.location.href = url
   } catch (e) {
     console.error('Reactivate failed', e)
+  }
+}
+
+// Carryover actions
+async function applyCarryover(limit = 3) {
+  try {
+    const uid = authStore?.user?.uid
+    if (!uid) return
+    await api.post('/carryover/apply', { userId: uid, limit })
+    await loadTasks()
+    ElMessage({ message: 'Moved to tomorrow ✅', type: 'success', duration: 1600 })
+  } catch (e) {
+    console.warn('applyCarryover failed', e?.response?.data || e?.message)
+  }
+}
+
+async function ignoreCarryover() {
+  try {
+    const uid = authStore?.user?.uid
+    if (!uid) return
+    await api.post('/carryover/ignore', { userId: uid })
+    await loadTasks()
+    ElMessage({ message: 'Marked as overdue', type: 'info', duration: 1600 })
+  } catch (e) {
+    console.warn('ignoreCarryover failed', e?.response?.data || e?.message)
   }
 }
 
@@ -577,7 +833,10 @@ const doneMonthly = computed(() => monthlyTasks.value.filter((t) => t.completed)
 
 async function toggleComplete(task) {
   task.completed = !task.completed
-  await updateDoc(doc(db, 'tasks', task.id), { completed: task.completed })
+  const patch = { completed: task.completed }
+  if (task.completed) patch.completedAt = serverTimestamp()
+  else patch.completedAt = null
+  await updateDoc(doc(db, 'tasks', task.id), patch)
 }
 
 // === Reminder scheduling on save (mirror TaskBoard) ===
@@ -708,6 +967,19 @@ onMounted(() => {
     }
   } catch {}
 })
+
+// Reconcile streak state on login/dashboard
+watch(
+  () => authStore?.user?.uid,
+  async (uid) => {
+    try {
+      if (!uid) { userStreak.value = 0; return }
+      await ensureDailyStreakState(uid)
+      userStreak.value = await getUserStreak(uid)
+    } catch {}
+  },
+  { immediate: true }
+)
 
 // Fetch usage meter on mount
 onMounted(fetchUsage)

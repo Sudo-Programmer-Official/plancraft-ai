@@ -42,14 +42,49 @@ const examplePrompt = buildPrompt('Build an AI app for food delivery')
     <RouterView />
   </transition>
   <InstallPrompt />
+  <ConfettiOverlay v-if="confettiVisible" @done="confettiVisible = false" />
 
 </template>
 
 <script setup>
 import InstallPrompt from "@/components/InstallPrompt.vue"
 import { useAuthStore } from '@/stores/authStore'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
+import ConfettiOverlay from '@/components/ConfettiOverlay.vue'
+import { ElNotification } from 'element-plus'
 
 const authStore = useAuthStore()
+
+const confettiVisible = ref(false)
+
+function triggerConfetti(count) {
+  confettiVisible.value = true
+  try {
+    window.dispatchEvent(new Event('confetti:launch'))
+  } catch {}
+  try {
+    ElNotification({
+      title: 'Streak up! 🔥',
+      message: `You\'re on a ${count}-day streak. Keep going!`,
+      type: 'success',
+      duration: 2600,
+      offset: 80,
+    })
+  } catch {}
+}
+
+let streakHandler = null
+onMounted(() => {
+  streakHandler = (e) => {
+    const count = e?.detail?.count || 1
+    triggerConfetti(count)
+  }
+  window.addEventListener('streak-increased', streakHandler)
+})
+
+onBeforeUnmount(() => {
+  try { if (streakHandler) window.removeEventListener('streak-increased', streakHandler) } catch {}
+})
 </script>
 
 <style>
