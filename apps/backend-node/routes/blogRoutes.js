@@ -142,6 +142,7 @@ router.post('/:id/publish', async (req, res) => {
           link,
           createdAt: now,
           date: now,
+          silent: true, // do not broadcast via PWA/email — admin feed only
         })
         announced = true
       } catch (e) {

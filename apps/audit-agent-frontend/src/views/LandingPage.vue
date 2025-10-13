@@ -1,200 +1,93 @@
 <template>
-  <!-- Brand logo at top-left of hero (landing only) -->
- <!-- <header class="fixed top-0 left-0 w-full z-30 flex items-center bg-transparent px-4 py-3">
-    <RouterLink to="/" class="flex items-center">
-      <img
-        src="/logo-bg-remove.png"
-        alt="PlanCraftAI Logo"
-        class="h-10 w-auto sm:h-12 md:h-14 drop-shadow-lg select-none"
-      />
-      <span class="ml-2 text-lg font-bold text-white hidden sm:inline">PlanCraftAI</span>
-    </RouterLink>
-  </header> -->
-  
-  <!-- AI-friendly content: About + Features (visible, semantic) -->
-  <!-- <section aria-label="About PlanCraftAI" class="max-w-4xl mx-auto mt-24 px-6">
-    <h2 class="text-2xl font-semibold text-slate-100">About PlanCraftAI</h2>
-    <p class="mt-2 text-slate-300">
-      PlanCraftAI helps you plan, journal, and reflect with voice journaling, AI-powered task planning, and mindful insights. Your private productivity companion for peaceful focus.
-    </p>
-  </section>
-  <section aria-label="Key Features" class="max-w-4xl mx-auto mt-8 px-6">
-    <h2 class="text-2xl font-semibold text-slate-100">Key Features</h2>
-    <ul class="mt-2 list-disc pl-6 space-y-1 text-slate-200">
-      <li>Voice Journaling for quick, hands-free capture</li>
-      <li>Smart Planner that generates tasks with AI</li>
-      <li>Mood Reflection and sentiment trends</li>
-      <li>Daily Flow to review, plan, and focus</li>
-    </ul>
-  </section> -->
-  <!-- Brand logo at top of hero -->
-  <!-- <div class="flex flex-col items-center justify-center">
-    <img
-      src="/logo.png"
-      alt="PlanCraftAI Logo"
-      class="mx-auto mb-6 w-24 h-24 drop-shadow-lg"
-    />
-  </div> -->
-  <div
-    class="relative min-h-screen flex flex-col text-gray-800 dark:text-slate-100 overflow-hidden"
-  >
+  <div class="relative min-h-screen flex flex-col text-gray-800 dark:text-slate-100 overflow-hidden">
     <!-- Animated Star Background -->
-    <div
-      class="absolute inset-0 -z-10 bg-gradient-to-b from-indigo-900 via-purple-900 to-slate-950"
-    >
+    <div class="absolute inset-0 -z-10 bg-gradient-to-b from-indigo-900 via-purple-900 to-slate-950">
       <div class="absolute inset-0" ref="stars"></div>
     </div>
 
     <!-- Hero -->
-    <!-- Hero -->
-    <section
-      class="relative py-24 md:py-32 bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 overflow-hidden"
-    >
-<!-- Inside your hero <section> -->
-<div class="absolute top-6 left-6 z-20 flex items-center gap-2">
-  <img
-    src="/logo-bg-remove.png"
-    alt="PlanCraftAI Logo"
-    class="h-10 w-auto sm:h-12 md:h-14 drop-shadow-lg select-none"
-  />
-  <span class="text-lg sm:text-xl md:text-2xl font-bold text-white tracking-tight">
-    PlanCraftAI
-  </span>
-</div>
-      <!-- 🌠 Falling stars background -->
+    <section class="relative py-28 md:py-36 bg-gradient-to-b from-indigo-900 via-purple-900 to-slate-950 overflow-hidden">
+      <div class="absolute top-6 left-6 z-20 flex items-center gap-2">
+        <img src="/logo-bg-remove.png" alt="PlanCraftAI Logo"
+             class="h-10 w-auto sm:h-12 md:h-14 drop-shadow-lg select-none" />
+        <span class="text-lg sm:text-xl md:text-2xl font-bold text-white tracking-tight">PlanCraftAI</span>
+      </div>
+
       <canvas ref="starsCanvas" class="absolute inset-0 w-full h-full z-0"></canvas>
 
-      <!-- Hero Content -->
       <div class="relative z-10 max-w-4xl mx-auto text-center">
-        <h1
-          id="hero-title"
-          class="text-5xl md:text-7xl font-extrabold tracking-tight text-white drop-shadow-lg"
-          data-aos="fade-up"
-        >
+        <h1 id="hero-title" class="text-5xl md:text-7xl font-extrabold tracking-tight text-white drop-shadow-lg"
+            data-aos="fade-up">
           Peaceful Productivity
         </h1>
-        <p
-          class="mt-6 text-lg md:text-2xl text-indigo-100 max-w-2xl mx-auto leading-relaxed"
-          data-aos="fade-up"
-          data-aos-delay="150"
-        >
-          Pause, plan, and reflect — with gentle voice journaling, smart tasks, and mindful insights
-          guiding your daily flow.
+        <p class="mt-6 text-lg md:text-2xl text-indigo-100 max-w-2xl mx-auto leading-relaxed"
+           data-aos="fade-up" data-aos-delay="150">
+          Pause, plan, and reflect — with gentle voice journaling, smart tasks, and mindful insights guiding your day.
         </p>
-        <div
-          class="mt-10 flex flex-col sm:flex-row gap-4 justify-center"
-          data-aos="zoom-in"
-          data-aos-delay="250"
-        >
-          <el-button
-            class="!ml-0"
-            type="primary"
-            size="large"
-            aria-label="Log in to PlanCraftAI"
-            @click="goToLogin"
-          >
-            🚀 Get Started
-          </el-button>
-          <el-button
-            class="!ml-0"
-            size="large"
-            plain
-            aria-label="Continue as guest"
-            @click="continueAsGuest"
-          >
-            🌿 Continue as Guest
-          </el-button>
-          <RouterLink
-            to="/subscription"
-            class="inline-flex items-center justify-center px-5 py-3 rounded-xl bg-black/20 text-white font-semibold hover:bg-black/30 transition"
-            aria-label="See premium plans"
-          >
-            ⭐ See Premium
-          </RouterLink>
-        
+        <div class="mt-10 flex flex-col sm:flex-row gap-4 justify-center" data-aos="zoom-in" data-aos-delay="250">
+          <el-button type="primary" size="large" class="!px-6 !py-3 !rounded-xl font-semibold hover:shadow-indigo-600/40"
+                     @click="goToLogin">🚀 Get Started</el-button>
+          <el-button size="large" plain class="!px-6 !py-3 !rounded-xl font-semibold hover:bg-indigo-500/10"
+                     @click="continueAsGuest">🌿 Continue as Guest</el-button>
         </div>
-          <el-button id="installBtn" size="large" type="success" style="display: none">
-            📲 Install App
-          </el-button>
+        <RouterLink to="/subscription"
+                    class="inline-block mt-6 px-5 py-3 rounded-xl bg-black/20 text-white font-semibold hover:bg-black/30 transition">
+          ⭐ Explore Premium
+        </RouterLink>
       </div>
     </section>
 
-    <!-- Why Use PlanCraftAI -->
-    <!-- Why Use PlanCraftAI -->
-    <section
-      id="features"
-      class="py-20 relative bg-gradient-to-b from-violet-900/30 to-indigo-950/50"
-      aria-labelledby="why-title"
-    >
-      <!-- floating stars background -->
-      <div class="absolute inset-0 -z-10" ref="stars"></div>
+    <!-- Why We Built -->
+    <section class="py-20 bg-slate-950/80 text-center">
+      <div class="max-w-3xl mx-auto px-6">
+        <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">Why We Built PlanCraftAI</h2>
+        <p class="text-indigo-200 leading-relaxed text-lg">
+          Modern work is chaotic. Notifications never stop. Plans scatter.
+          We built PlanCraftAI to bring mindfulness back to productivity —
+          a planner that listens, adapts, and keeps you peacefully focused.
+        </p>
+      </div>
+    </section>
 
+    <!-- For Teams CTA -->
+    <div class="mt-12 flex justify-center">
+      <div
+        class="px-6 py-4 rounded-2xl bg-indigo-500/10 border border-indigo-400/30 text-indigo-200 font-medium text-sm md:text-base shadow-lg backdrop-blur-md">
+        💼 <span class="font-semibold">PlanCraftAI for Teams</span> — Coming Soon 🚧
+      </div>
+    </div>
+
+    <!-- Features -->
+    <section id="features" class="py-20 bg-gradient-to-b from-violet-900/30 to-indigo-950/50 text-center">
       <div class="max-w-7xl mx-auto px-6">
-        <div class="text-center mb-16" data-aos="fade-up">
-          <h2 id="why-title" class="text-4xl md:text-5xl font-extrabold text-white drop-shadow">
-            Why Use PlanCraftAI?
-          </h2>
-          <p class="mt-4 text-indigo-200 max-w-2xl mx-auto text-lg">
-            Designed to be mindful and supportive — not overwhelming.
-          </p>
-        </div>
-
+        <h2 class="text-4xl md:text-5xl font-extrabold text-white drop-shadow mb-4">Why Use PlanCraftAI?</h2>
+        <p class="text-indigo-200 mb-16 text-lg">Designed to be mindful and supportive — not overwhelming.</p>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div
-            v-for="(f, idx) in features"
-            :key="f.title"
-            class="group relative rounded-2xl bg-white/5 backdrop-blur-xl p-8 border border-white/10 shadow-lg transition-all hover:shadow-indigo-500/40 hover:-translate-y-2"
-            data-aos="zoom-in"
-            :data-aos-delay="100 * idx"
-          >
-            <!-- gradient border glow -->
+          <div v-for="(f, idx) in features" :key="f.title"
+               class="group relative rounded-2xl bg-white/5 backdrop-blur-xl p-8 border border-white/10 shadow-lg hover:-translate-y-2 transition-all hover:shadow-indigo-500/40">
             <div
-              class="absolute inset-0 rounded-2xl bg-gradient-to-r from-indigo-500/20 via-purple-500/20 to-pink-500/20 opacity-0 group-hover:opacity-100 blur-xl transition"
-            ></div>
-
-            <!-- Icon -->
-            <div
-              class="relative w-16 h-16 mx-auto flex items-center justify-center rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 text-3xl shadow-md"
-            >
+              class="absolute inset-0 rounded-2xl bg-gradient-to-r from-indigo-500/20 via-purple-500/20 to-pink-500/20 opacity-0 group-hover:opacity-100 blur-xl transition">
+            </div>
+            <div class="relative w-16 h-16 mx-auto flex items-center justify-center rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 text-3xl shadow-md">
               {{ f.emoji }}
             </div>
-
-            <!-- Title -->
-            <h3 class="relative mt-6 text-xl font-semibold text-white tracking-wide">
-              {{ f.title }}
-            </h3>
-
-            <!-- Description -->
-            <p class="relative mt-3 text-indigo-200 text-sm leading-relaxed">
-              {{ f.desc }}
-            </p>
+            <h3 class="relative mt-6 text-xl font-semibold text-white">{{ f.title }}</h3>
+            <p class="relative mt-3 text-indigo-200 text-sm leading-relaxed">{{ f.desc }}</p>
           </div>
         </div>
       </div>
     </section>
 
     <!-- Daily Flow -->
-    <section id="flow" class="py-16 md:py-20 bg-slate-900/60" aria-labelledby="flow-title">
+    <section id="flow" class="py-20 bg-slate-900/60 text-center">
       <div class="max-w-7xl mx-auto px-6">
-        <div class="text-center mb-12" data-aos="fade-up">
-          <h2 id="flow-title" class="text-3xl md:text-4xl font-bold text-white">
-            A Gentle Daily Flow
-          </h2>
-          <p class="mt-3 text-indigo-200">Small, steady steps toward a calmer you.</p>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
-          <div
-            v-for="(s, idx) in steps"
-            :key="s.title"
-            class="relative rounded-xl bg-white/10 backdrop-blur-md shadow p-6 text-center border border-white/10 hover:scale-105 transform transition"
-            data-aos="fade-up"
-            :data-aos-delay="100 * idx"
-          >
+        <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">A Gentle Daily Flow</h2>
+        <p class="text-indigo-200 mb-12">Small, steady steps toward a calmer you.</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div v-for="(s, idx) in steps" :key="s.title"
+               class="rounded-xl bg-white/10 backdrop-blur-md shadow p-6 border border-white/10 hover:scale-105 transition">
             <div class="text-4xl">{{ s.emoji }}</div>
-            <h3 class="mt-4 font-semibold text-lg text-white">
-              {{ s.title }}
-            </h3>
+            <h3 class="mt-4 font-semibold text-lg text-white">{{ s.title }}</h3>
             <p class="mt-1 text-sm text-indigo-200">{{ s.desc }}</p>
           </div>
         </div>
@@ -202,48 +95,21 @@
     </section>
 
     <!-- Testimonials -->
-    <section
-      id="testimonials"
-      class="py-16 md:py-20 bg-slate-950/80"
-      aria-labelledby="testimonials-title"
-    >
+    <section id="testimonials" class="py-20 bg-slate-950/80 text-center">
       <div class="max-w-7xl mx-auto px-6">
-        <div class="text-center mb-12" data-aos="fade-up">
-          <h2 id="testimonials-title" class="text-3xl md:text-4xl font-bold text-white">
-            What People Say
-          </h2>
-          <p class="mt-3 text-indigo-200">
-            Gentle, practical, and surprisingly insightful — every day.
-          </p>
-        </div>
-
+        <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">What People Say</h2>
+        <p class="text-indigo-200 mb-12">Gentle, practical, and surprisingly insightful — every day.</p>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <el-card
-            v-for="(t, idx) in testimonials"
-            :key="idx"
-            class="rounded-2xl border shadow-lg hover:shadow-xl transition-all"
-            :body-style="{ padding: '24px' }"
-            :data-aos-delay="100 * idx"
-            data-aos="fade-up"
-            style="
-              --el-card-bg-color: rgba(2, 6, 23, 0.9); /* slate-950/90 */
-              --el-card-border-color: rgb(51, 65, 85); /* slate-700 */
-              color: #e5e7eb; /* text-slate-200 */
-            "
-          >
+          <el-card v-for="(t, idx) in testimonials" :key="idx"
+                   class="rounded-2xl border shadow-lg hover:shadow-indigo-700/30 transition-all backdrop-blur-lg"
+                   :body-style="{ padding: '24px' }"
+                   style="--el-card-bg-color: rgba(2,6,23,0.9); --el-card-border-color: rgba(99,102,241,0.2);">
             <div class="flex items-start gap-4">
-              <div
-                class="flex items-center justify-center rounded-full w-12 h-12 shrink-0 text-white font-semibold"
-                :style="{ backgroundColor: t.bg }"
-              >
-                {{ t.author.charAt(0) }}
-              </div>
-
+              <img :src="t.avatar" alt="User avatar"
+                   class="w-12 h-12 rounded-full object-cover border border-indigo-400/30" />
               <div>
-                <blockquote class="text-slate-100 leading-relaxed text-base md:text-lg">
-                  “{{ t.quote }}”
-                </blockquote>
-                <div class="mt-2 text-sm text-slate-400">— {{ t.author }}</div>
+                <blockquote class="text-slate-100 leading-relaxed text-base md:text-lg">“{{ t.quote }}”</blockquote>
+                <div class="mt-2 text-sm text-indigo-300 font-medium">— {{ t.author }}</div>
               </div>
             </div>
           </el-card>
@@ -251,64 +117,120 @@
       </div>
     </section>
 
-    <!-- Get Started -->
-    <section
-      id="cta"
-      class="py-16 md:py-20 bg-gradient-to-b from-slate-900/60 to-slate-950/80"
-      aria-labelledby="cta-title"
-    >
-      <div class="max-w-3xl mx-auto px-6 text-center" data-aos="zoom-in">
-        <h2 id="cta-title" class="text-3xl md:text-4xl font-bold text-white">Ready to Begin?</h2>
-        <p class="mt-3 text-indigo-200">
-          Log in to track progress, or explore as a guest to get a feel for it.
-        </p>
+    <!-- Blog Preview -->
+    <section id="latest-blogs" class="py-20 bg-gradient-to-b from-slate-950/60 to-indigo-950/70 text-center">
+      <div class="max-w-7xl mx-auto px-6">
+        <div class="flex items-center justify-between mb-8">
+          <h2 class="text-3xl md:text-4xl font-bold text-white">From the Journal</h2>
+          <RouterLink to="/blog" class="text-indigo-300 hover:text-indigo-200 transition text-sm underline">View all →</RouterLink>
+        </div>
+        <div class="flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scroll-smooth scrollbar-hide justify-center">
+          <article v-for="b in latestBlogs" :key="b.slug || b.id"
+                   class="snap-start flex-shrink-0 w-80 bg-white/5 border border-white/10 rounded-2xl p-5 shadow-lg hover:shadow-indigo-900/40 hover:scale-[1.02] transition-transform">
+            <img :src="b.coverImage || '/default-blog-cover.svg'" :alt="b.title"
+                 class="w-full h-40 object-cover rounded-xl mb-4" />
+            <h3 class="text-lg font-semibold text-white leading-snug">{{ b.title }}</h3>
+            <p class="text-sm text-slate-300 mt-2 line-clamp-3">{{ b.summary || b.excerpt }}</p>
+            <div class="flex items-center justify-between mt-3 text-xs text-slate-400">
+              <span>{{ formatDate(b.created_at || b.createdAt) }}</span>
+              <RouterLink :to="`/blog/${b.slug || b.id}`" class="text-indigo-300 hover:text-indigo-200 underline">Read →</RouterLink>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Premium Card -->
+   <!-- Pricing / Plans -->
+<section id="plans" class="py-20 bg-gradient-to-b from-indigo-950/70 via-purple-950/60 to-slate-950/80 text-center">
+  <div class="max-w-6xl mx-auto px-6">
+    <h2 class="text-4xl md:text-5xl font-bold text-white mb-4">✨ Choose Your Flow</h2>
+    <p class="text-indigo-200 mb-12 text-lg">Simple plans designed to help you stay mindful and productive.</p>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 justify-center">
+      <!-- Free Plan -->
+      <div
+        class="relative bg-white/90 dark:bg-white/10 backdrop-blur-xl rounded-2xl shadow-2xl p-8 border border-indigo-200/30 dark:border-indigo-400/20 hover:-translate-y-2 transition-all hover:shadow-indigo-500/40"
+      >
+        <div class="absolute top-0 right-0 bg-indigo-500 text-white text-xs font-semibold px-3 py-1 rounded-bl-lg">
+          Free
+        </div>
+        <h3 class="text-2xl font-semibold text-slate-800 dark:text-white mb-3">Free Plan</h3>
+        <p class="text-slate-600 dark:text-indigo-200 text-sm mb-6">Perfect for those starting their mindful journey.</p>
+        <ul class="space-y-3 text-left text-sm text-slate-700 dark:text-indigo-200 mb-6">
+          <li>✅ Create & manage tasks</li>
+          <li>✅ Daily journaling prompts</li>
+          <li>✅ Limited AI insights</li>
+          <li>✅ Local reminders</li>
+        </ul>
+        <div class="text-3xl font-bold text-slate-800 dark:text-white mb-4">Free</div>
+        <RouterLink
+          to="/login"
+          class="inline-block px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition shadow-lg shadow-indigo-800/40"
+        >
+          Get Started
+        </RouterLink>
+      </div>
+
+      <!-- Premium Plan -->
+      <div
+        class="relative bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-600 text-white rounded-2xl shadow-2xl p-8 border border-white/20 hover:-translate-y-2 transition-all hover:shadow-indigo-900/50"
+      >
+        <div class="absolute top-0 right-0 bg-yellow-400 text-black text-xs font-semibold px-3 py-1 rounded-bl-lg">
+          Popular
+        </div>
+        <h3 class="text-2xl font-semibold mb-3">Premium Plan</h3>
+        <p class="text-indigo-100 text-sm mb-6">Unlock the full mindful productivity experience.</p>
+        <ul class="space-y-3 text-left text-sm mb-6">
+          <li>⭐ Unlimited reminders & AI summaries</li>
+          <li>⭐ Voice journaling & insights</li>
+          <li>⭐ Priority support & early access</li>
+          <li>⭐ Sync across all devices</li>
+        </ul>
+        <div class="text-3xl font-bold mb-4">$2<span class="text-sm text-indigo-200">/month</span></div>
+        <RouterLink
+          to="/subscription"
+          class="inline-block px-6 py-3 rounded-xl bg-white text-indigo-700 font-semibold hover:bg-slate-100 transition shadow-md"
+        >
+          Go Premium ✨
+        </RouterLink>
+      </div>
+    </div>
+
+    <!-- Small reassurance note -->
+    <p class="mt-10 text-sm text-indigo-300">
+      No hidden fees. Cancel anytime from your account settings.
+    </p>
+  </div>
+</section>
+
+    <!-- CTA -->
+    <section id="cta" class="py-20 bg-gradient-to-b from-slate-900/60 to-slate-950/80 text-center">
+      <div class="max-w-3xl mx-auto px-6" data-aos="zoom-in">
+        <h2 class="text-3xl md:text-4xl font-bold text-white">Ready to Begin?</h2>
+        <p class="mt-3 text-indigo-200">Log in to track progress, or explore as a guest to get a feel for it.</p>
         <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-          <el-button
-            type="primary"
-            size="large"
-            aria-label="Get started by logging in"
-            @click="goToLogin"
-          >
-            🚀 Get Started
-          </el-button>
-          <el-button
-            size="large"
-            plain
-            aria-label="Explore features as guest"
-            @click="continueAsGuest"
-          >
-            🌿 Explore as Guest
-          </el-button>
+          <el-button type="primary" size="large" @click="goToLogin">🚀 Get Started</el-button>
+          <el-button size="large" plain @click="continueAsGuest">🌿 Explore as Guest</el-button>
         </div>
       </div>
     </section>
 
     <!-- Footer -->
-   <footer class="py-8 text-center text-sm text-indigo-300 bg-slate-950" data-aos="fade-in">
-  <div class="max-w-7xl mx-auto px-6">
-    <p class="flex flex-col sm:flex-row justify-center items-center gap-2">
-      <span>
-        Built with <span aria-hidden="true">❤</span> by
-        <a
-          href="https://www.linkedin.com/in/fullstuffdeveloper/"
-          target="_blank"
-          rel="noopener"
-          class="underline hover:text-indigo-400"
-        >
-          Abhishek
-        </a>
-      </span>
-      <span>• <strong>PlanCraftAI</strong></span>
-    </p>
-    <div class="mt-3 space-x-4">
-      <!-- Blog Links  -->
-      <RouterLink to="/blog" class="hover:underline">Blog</RouterLink>
-      <RouterLink to="/privacy-policy" class="hover:underline">Privacy</RouterLink>
-      <RouterLink to="/terms" class="hover:underline">Terms</RouterLink>
-      <RouterLink to="/contact" class="hover:underline">Contact</RouterLink>
-    </div>
-  </div>
-</footer>
+    <footer class="py-8 text-center text-sm text-indigo-300 bg-slate-950 border-t border-indigo-500/10">
+      <div class="max-w-7xl mx-auto px-6">
+        <p class="flex flex-col sm:flex-row justify-center items-center gap-2">
+         <span>© {{ new Date().getFullYear() }} <strong>Sudo Programmer Inc.</strong> — Crafted with care 💜</span>
+          <span>• <strong>PlanCraftAI</strong></span>
+        </p>
+        <div class="mt-3 space-x-4">
+          <RouterLink to="/blog" class="hover:underline">Blog</RouterLink>
+          <RouterLink to="/privacy-policy" class="hover:underline">Privacy</RouterLink>
+          <RouterLink to="/terms" class="hover:underline">Terms</RouterLink>
+          <RouterLink to="/contact" class="hover:underline">Contact</RouterLink>
+        </div>
+      </div>
+    </footer>
   </div>
 </template>
 
@@ -318,168 +240,83 @@ import { useRouter, RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { useHead } from '@vueuse/head'
 
+const router = useRouter()
+function goToLogin() { router.push('/login') }
 function continueAsGuest() {
   const authStore = useAuthStore()
-  authStore.loginAsGuest().then(() => {
-    router.push({ name: 'dashboard' }) // or 'journal' if that’s your main entry
-  })
+  authStore.loginAsGuest().then(() => router.push({ name: 'dashboard' }))
 }
 
-const router = useRouter()
-
-// SEO + JSON-LD
 const SITE_URL = import.meta.env.VITE_SITE_URL || 'https://plancraftai.com'
 useHead({
   title: 'PlanCraftAI – Peaceful Productivity with Voice Journaling and AI',
   meta: [
     { name: 'description', content: 'Plan your day, journal with your voice, and get AI insights for calm, focused productivity.' },
-    { name: 'keywords', content: 'voice task planner, journaling insights app, habit tracking with AI, daily planner' },
     { property: 'og:title', content: 'PlanCraftAI – Peaceful Productivity' },
-    { property: 'og:description', content: 'Pause, plan, and reflect with a gentle, AI-assisted planner.' },
-    { property: 'og:type', content: 'website' },
     { property: 'og:url', content: SITE_URL }
   ],
-  link: [{ rel: 'canonical', href: SITE_URL }],
-  script: [
-    {
-      type: 'application/ld+json',
-      children: JSON.stringify({
-        '@context': 'https://schema.org',
-        '@type': 'WebApplication',
-        name: 'PlanCraftAI',
-        url: SITE_URL,
-        applicationCategory: 'ProductivityApplication',
-        offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-        operatingSystem: 'Web',
-        description: 'Plan, journal, and reflect with a gentle, AI-assisted daily flow.'
-      })
-    }
-  ]
+  link: [{ rel: 'canonical', href: SITE_URL }]
 })
 
 const stars = ref(null)
-onMounted(() => {
-  if (!stars.value) return
-  const count = 80
-  for (let i = 0; i < count; i++) {
-    const star = document.createElement('div')
-    star.className = 'star'
-    star.style.top = `${Math.random() * 100}%`
-    star.style.left = `${Math.random() * 100}%`
-    star.style.animationDuration = `${2 + Math.random() * 3}s`
-    stars.value.appendChild(star)
-  }
-})
-
 const starsCanvas = ref(null)
+const latestBlogs = ref([])
+
+async function loadLatestBlogs() {
+  try {
+    const blogService = await import('@/services/blogService')
+    const svc = blogService.default || blogService
+    const fn = svc.getAllBlogs || svc.listBlogs || svc.fetchBlogs
+    const blogs = fn ? await fn(true) : []
+    latestBlogs.value = (blogs || []).slice(0, 5)
+  } catch (e) { console.error(e) }
+}
+function formatDate(v) { try { return new Date(v).toLocaleDateString() } catch { return '' } }
 
 onMounted(() => {
+  loadLatestBlogs()
   const canvas = starsCanvas.value
   const ctx = canvas.getContext('2d')
-  canvas.width = window.innerWidth
-  canvas.height = window.innerHeight
-
-  const stars = Array.from({ length: 100 }, () => ({
-    x: Math.random() * canvas.width,
-    y: Math.random() * canvas.height,
-    radius: Math.random() * 1.5,
-    speed: Math.random() * 1 + 0.5,
+  canvas.width = window.innerWidth; canvas.height = window.innerHeight
+  const s = Array.from({ length: 100 }, () => ({
+    x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+    r: Math.random() * 1.5, sp: Math.random() * 1 + 0.5
   }))
-
-  function animate() {
+  ;(function animate() {
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     ctx.fillStyle = 'white'
-    stars.forEach((star) => {
-      ctx.beginPath()
-      ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2)
-      ctx.fill()
-      star.y += star.speed
-      if (star.y > canvas.height) {
-        star.y = 0
-        star.x = Math.random() * canvas.width
-      }
-    })
+    s.forEach(st => { ctx.beginPath(); ctx.arc(st.x, st.y, st.r, 0, Math.PI * 2); ctx.fill(); st.y += st.sp; if (st.y > canvas.height) st.y = 0 })
     requestAnimationFrame(animate)
-  }
-
-  animate()
+  })()
 })
 
 const features = [
-  {
-    emoji: '🎙️',
-    title: 'Voice Journaling',
-    desc: 'Speak your thoughts; let AI transcribe and summarize with compassion.',
-  },
-  {
-    emoji: '📅',
-    title: 'Smart Planner',
-    desc: 'Carry forward tasks, set intentions, and stay gently accountable.',
-  },
-  {
-    emoji: '💓',
-    title: 'Mood Reflection',
-    desc: 'Notice trends over time and build emotional awareness.',
-  },
+  { emoji: '🎙️', title: 'Voice Journaling', desc: 'Speak your thoughts; let AI transcribe and summarize with compassion.' },
+  { emoji: '📅', title: 'Smart Planner', desc: 'Carry forward tasks, set intentions, and stay gently accountable.' },
+  { emoji: '💓', title: 'Mood Reflection', desc: 'Notice emotional patterns and stay aware of your well-being.' }
 ]
-
 const steps = [
   { emoji: '🌤️', title: 'Morning Plan', desc: 'Set your focus with clarity and intention.' },
   { emoji: '🎧', title: 'Midday Log', desc: 'Drop a quick voice note to capture progress.' },
-  {
-    emoji: '🌙',
-    title: 'Evening Reflection',
-    desc: 'Wind down with a gentle, thoughtful summary.',
-  },
-  { emoji: '📈', title: 'Growth Stats', desc: 'See patterns emerge and celebrate small wins.' },
+  { emoji: '🌙', title: 'Evening Reflection', desc: 'Wind down with a gentle, thoughtful summary.' },
+  { emoji: '📈', title: 'Growth Stats', desc: 'See patterns emerge and celebrate small wins.' }
 ]
-
 const testimonials = [
-  { quote: 'I feel calmer and more intentional each day.', author: 'A.M.', bg: '#8b5cf6' },
-  { quote: 'The voice journaling fits perfectly into my routine.', author: 'J.K.', bg: '#6366f1' },
-  { quote: 'Small prompts, big impact. Love the daily flow.', author: 'S.R.', bg: '#06b6d4' },
+  { quote: 'PlanCraftAI helped me stay grounded during my startup chaos.', author: 'Ananya M.', avatar: '/avatars/user1.svg' },
+  { quote: 'The calm design makes planning feel like meditation.', author: 'Michael L.', avatar: '/avatars/user2.svg' },
+  { quote: 'I love the voice journaling — it feels personal and effortless.', author: 'Ravi K.', avatar: '/avatars/user3.svg' }
 ]
-
-function goToLogin() {
-  router.push('/login')
-}
-// function continueAsGuest() {
-//   router.push({ name: 'journal', query: { guest: '1' } })
-// }
-
-onMounted(() => {
-  if (!stars.value) return
-  const count = 80
-  for (let i = 0; i < count; i++) {
-    const star = document.createElement('div')
-    star.className = 'star'
-    star.style.top = `${Math.random() * 100}%`
-    star.style.left = `${Math.random() * 100}%`
-    star.style.animationDuration = `${2 + Math.random() * 3}s`
-    stars.value.appendChild(star)
-  }
-})
 </script>
 
 <style scoped>
 .star {
-  position: absolute;
-  width: 2px;
-  height: 2px;
-  background: white;
-  border-radius: 50%;
-  opacity: 0.8;
-  animation: twinkle infinite alternate;
+  position: absolute; width: 2px; height: 2px; background: white;
+  border-radius: 50%; opacity: 0.8; animation: twinkle infinite alternate;
 }
-
-@keyframes twinkle {
-  from {
-    opacity: 0.2;
-    transform: scale(0.8);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1.2);
-  }
+@key frames twinkle {
+  from { opacity: 0.3; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1.2); }
 }
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 </style>

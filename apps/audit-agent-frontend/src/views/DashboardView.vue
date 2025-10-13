@@ -3,6 +3,7 @@
   <div v-if="checkingAuth" class="px-4 py-8 text-center text-gray-400">
     Checking session…
   </div>
+  <SetupPrompt v-if="showSetup" @done="showSetup=false" @close="showSetup=false" />
   <main v-else
     class="px-2 py-4 sm:px-4 md:px-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"
   >
@@ -252,6 +253,7 @@ import TaskPlannerDialog from '@/components/TaskPlannerDialog.vue'
 import { useTasks } from '@/composables/useTasks'
 import { addTaskToFirebase, updateTaskInFirebase, fetchEntries } from '@/services/firebaseService'
 import QuickLinksCard from '@/components/QuickLinksCard.vue'
+import SetupPrompt from '@/components/SetupPrompt.vue'
 import { driver } from 'driver.js'
 import 'driver.js/dist/driver.css'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
@@ -313,6 +315,8 @@ const selectedTask = ref(null)
 const dailyList = ref(null)
 const journalLogs = ref([])
 
+const showSetup = ref(false)
+
 
 
 const reminderActiveByTask = ref({})
@@ -338,6 +342,14 @@ const journalStreak = computed(() => {
 })
 
 onMounted(async () => {
+  // One-time quick setup gate
+  try {
+    const seen = localStorage.getItem('pcai_setup_done') === '1'
+    const tz = localStorage.getItem('user_timezone')
+    const needsTz = !tz || tz === 'UTC'
+    const needsPerm = typeof Notification !== 'undefined' && Notification.permission !== 'granted'
+    showSetup.value = !seen && (needsTz || needsPerm)
+  } catch {}
   journalLogs.value = await fetchEntries()
 })
 
