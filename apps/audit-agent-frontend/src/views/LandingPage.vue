@@ -82,46 +82,46 @@
       </div>
     </section>
 
-    <!-- Testimonials -->
-    <section id="testimonials" class="py-20 bg-slate-950/80 text-center">
+    <!-- Testimonials (premium white cards) -->
+    <section id="testimonials" class="py-20 bg-gradient-to-b from-slate-950/90 via-indigo-950/80 to-purple-950/70 text-center">
       <div class="max-w-7xl mx-auto px-6">
         <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">What People Say</h2>
         <p class="text-indigo-200 mb-12">Gentle, practical, and surprisingly insightful — every day.</p>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <el-card v-for="(t, idx) in testimonials" :key="idx"
-                   class="rounded-2xl border shadow-lg hover:shadow-indigo-700/30 transition-all backdrop-blur-lg"
-                   :body-style="{ padding: '24px' }"
-                   style="--el-card-bg-color: rgba(2,6,23,0.9); --el-card-border-color: rgba(99,102,241,0.2);">
-            <div class="flex items-start gap-4">
-              <img :src="t.avatar" alt="User avatar"
-                   class="w-12 h-12 rounded-full object-cover border border-indigo-400/30" />
-              <div>
-                <blockquote class="text-slate-100 leading-relaxed text-base md:text-lg">“{{ t.quote }}”</blockquote>
-                <div class="mt-2 text-sm text-indigo-300 font-medium">— {{ t.author }}</div>
-              </div>
+          <div
+            v-for="(t, idx) in testimonials"
+            :key="idx"
+            class="relative rounded-2xl bg-gradient-to-br from-white to-slate-50 text-slate-800 p-6 shadow-xl border border-indigo-100 hover:-translate-y-1 transition-all"
+          >
+            <div class="absolute top-3 right-4 text-yellow-400 text-lg">⭐</div>
+            <div class="flex items-center gap-4 mb-4">
+              <img :src="t.avatar || '/default-avatar.svg'" alt="User avatar" class="w-12 h-12 rounded-full object-cover border border-indigo-200" />
+              <div class="font-semibold text-indigo-900">{{ t.author }}</div>
             </div>
-          </el-card>
+            <blockquote class="italic text-slate-700 leading-relaxed">“{{ t.quote }}”</blockquote>
+          </div>
         </div>
       </div>
     </section>
 
     <!-- Blog Preview -->
-    <section id="latest-blogs" class="py-20 bg-gradient-to-b from-slate-950/60 to-indigo-950/70 text-center">
+    <section id="latest-blogs" class="py-20 bg-gradient-to-b from-indigo-950/80 to-slate-950/90 text-center">
       <div class="max-w-7xl mx-auto px-6">
         <div class="flex items-center justify-between mb-8">
           <h2 class="text-3xl md:text-4xl font-bold text-white">From the Journal</h2>
-          <RouterLink to="/blog" class="text-indigo-300 hover:text-indigo-200 transition text-sm underline">View all →</RouterLink>
+          <RouterLink to="/blog" class="text-indigo-300 hover:text-indigo-200 underline text-sm">View all →</RouterLink>
         </div>
         <div class="flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scroll-smooth scrollbar-hide justify-center">
           <article v-for="b in latestBlogs" :key="b.slug || b.id"
-                   class="snap-start flex-shrink-0 w-80 bg-white/5 border border-white/10 rounded-2xl p-5 shadow-lg hover:shadow-indigo-900/40 hover:scale-[1.02] transition-transform">
-            <img :src="b.coverImage || '/default-blog-cover.svg'" :alt="b.title"
-                 class="w-full h-40 object-cover rounded-xl mb-4" />
-            <h3 class="text-lg font-semibold text-white leading-snug">{{ b.title }}</h3>
-            <p class="text-sm text-slate-300 mt-2 line-clamp-3">{{ b.summary || b.excerpt }}</p>
-            <div class="flex items-center justify-between mt-3 text-xs text-slate-400">
-              <span>{{ formatDate(b.created_at || b.createdAt) }}</span>
-              <RouterLink :to="`/blog/${b.slug || b.id}`" class="text-indigo-300 hover:text-indigo-200 underline">Read →</RouterLink>
+                   class="snap-start flex-shrink-0 w-80 rounded-2xl bg-white text-slate-800 border border-slate-200 shadow-lg hover:shadow-xl transition-transform hover:scale-[1.02]">
+            <img :src="b.coverImage || getFallbackImage(b.title)" :alt="b.title" class="w-full h-40 object-cover rounded-t-2xl" />
+            <div class="p-5 text-left">
+              <h3 class="text-lg font-semibold text-slate-900 leading-snug line-clamp-2">{{ b.title }}</h3>
+              <p class="text-sm text-slate-600 mt-2 line-clamp-3">{{ b.summary || b.excerpt }}</p>
+              <div class="flex items-center justify-between mt-3 text-xs text-slate-500">
+                <span>{{ formatDate(b.created_at || b.createdAt) }}</span>
+                <RouterLink :to="`/blog/${b.slug || b.id}`" class="text-indigo-600 hover:text-indigo-500 font-medium">Read →</RouterLink>
+              </div>
             </div>
           </article>
         </div>
@@ -291,7 +291,25 @@ async function loadLatestBlogs() {
     latestBlogs.value = (blogs || []).slice(0, 5)
   } catch (e) { console.error(e) }
 }
-function formatDate(v) { try { return new Date(v).toLocaleDateString() } catch { return '' } }
+function formatDate(date) {
+  try {
+    if (!date) return ''
+    const d = date?.toDate ? date.toDate() : new Date(date)
+    if (isNaN(d)) return ''
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  } catch { return '' }
+}
+
+function getFallbackImage(title = '') {
+  try {
+    const initials = (title?.charAt(0) || 'P').toUpperCase()
+    const colors = ['#6366F1', '#8B5CF6', '#EC4899']
+    const bg = colors[Math.floor(Math.random() * colors.length)]
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&background=${bg.slice(1)}&color=fff&size=512`
+  } catch {
+    return '/default-blog-cover.svg'
+  }
+}
 
 onMounted(() => {
   loadLatestBlogs()

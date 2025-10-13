@@ -51,7 +51,11 @@ router.post('/:id/image', async (req, res) => {
     const snap = await db.collection('blogs').doc(id).get()
     if (!snap.exists) return res.status(404).json({ success: false, error: 'Not found' })
     const blog = snap.data()
-    const url = await generateBlogImage(blog.title)
+    let url = await generateBlogImage(blog.title, blog.slug)
+    // Normalize any accidental ".png.json" (or jpg/jpeg) suffixes
+    if (typeof url === 'string') {
+      url = url.replace(/\.(png|jpg|jpeg)\.json(\b|$)/i, '.$1')
+    }
     await db.collection('blogs').doc(id).set({ coverImage: url, updated_at: new Date() }, { merge: true })
     res.json({ success: true, coverImage: url })
   } catch (e) {

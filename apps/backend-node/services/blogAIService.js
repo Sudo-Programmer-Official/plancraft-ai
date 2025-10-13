@@ -1,7 +1,7 @@
 import OpenAI from 'openai'
 import dotenv from "dotenv";
 dotenv.config();
-import { db } from './firebaseAdmin.js'
+import { db, uploadBufferToStorage } from './firebaseAdmin.js'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -161,7 +161,7 @@ ${safeContent}
 //   })
 //   return image.data?.[0]?.url || ''
 // }
-export async function generateBlogImage(title = "PlanCraftAI Blog") {
+export async function generateBlogImage(title = "PlanCraftAI Blog", slug = "") {
   try {
     const prompt = `
 Create a soft, calming illustration in the visual style of the PlanCraftAI app.
@@ -172,12 +172,28 @@ Title: "${title}"
 `;
 
     const image = await openai.images.generate({
-      model: "dall-e-3",
+      model: process.env.OPENAI_IMAGE_MODEL || "dall-e-3",
       prompt: prompt.trim(),
-      size: "1024x1024"
+      size: "1024x1024",
+      response_format: 'b64_json',
+      n: 1,
     });
 
-    return image.data?.[0]?.url || "";
+    const b64 = image?.data?.[0]?.b64_json
+    if (!b64) {
+      // Fallback to URL if b64 not provided
+      const url = image?.data?.[0]?.url
+      if (url) return url
+      throw new Error('No image returned from OpenAI')
+    }
+    const buffer = Buffer.from(b64, 'base64')
+    const safeSlug = (String(slug || title || 'plancraftai').toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')) || 'post'
+    const filename = `blog_covers/${safeSlug}-${Date.now()}.png`
+    const publicUrl = await uploadBufferToStorage(buffer, filename, 'image/png', true)
+    return publicUrl
   } catch (err) {
     console.error("❌ generateBlogImage error:", err);
     throw new Error(err?.message || "Failed to generate image");
