@@ -4,8 +4,8 @@ export const PLANS = {
   FREE: {
     name: 'Free',
     limits: {
-      tasksPerDay: 5,
-      remindersPerDay: 3,
+      tasksPerDay: 10,
+      remindersPerDay: 10,
       aiGenerations: 10,
     },
     features: {

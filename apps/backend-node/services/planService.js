@@ -5,7 +5,7 @@ import dayjs from 'dayjs'
 export const PLANS = {
   FREE: {
     name: 'Free',
-    limits: { remindersPerDay: 3, tasksPerDay: 5, aiGenerations: 10 },
+    limits: { remindersPerDay: 10, tasksPerDay: 10, aiGenerations: 10 },
   },
   PREMIUM: {
     name: 'Pro',
