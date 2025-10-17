@@ -118,15 +118,22 @@ async function onUpgrade() {
         localStorage.setItem('upgradeAfterLogin', '1')
       } catch {}
 
-      // Themed info message (aligned with PlanCraftAI UI tone)
+      // Themed info message with a direct Sign in link
+      const loginHTML =
+        "Please sign in first to continue your upgrade ✨ " +
+        "<a href='/login' class='underline font-semibold text-white hover:text-fuchsia-100'>Sign in</a>"
+
       ElNotification({
         title: '🚀 Upgrade to Premium',
-        message: 'Please sign in first to continue your upgrade ✨',
+        message: loginHTML,
         type: 'info',
-        duration: 2800,
+        duration: 5000,
         offset: 80,
         position: 'top-right',
         customClass: 'glass-toast',
+        dangerouslyUseHTMLString: true,
+        showClose: true,
+        onClick: () => router.push('/login'),
       })
 
       // Navigate to login page
@@ -258,5 +265,10 @@ async function onCancel() {
   backdrop-filter: blur(12px);
   color: #e5d4ff;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+.el-notification.glass-toast a {
+  color: #fff;
+  text-decoration: underline;
+  font-weight: 600;
 }
 </style>

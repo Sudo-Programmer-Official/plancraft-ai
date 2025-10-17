@@ -108,7 +108,9 @@ router.beforeEach(async (to, from, next) => {
     try {
       const cachedUser = localStorage.getItem('user')
       const cachedToken = localStorage.getItem('token')
-      if (authStore?.user || (cachedUser && cachedToken)) {
+      // Allow guests to access the login page to upgrade/convert
+      const isGuest = !!authStore?.isGuest
+      if (!isGuest && (authStore?.user || (cachedUser && cachedToken))) {
         return next('/dashboard')
       }
     } catch {}

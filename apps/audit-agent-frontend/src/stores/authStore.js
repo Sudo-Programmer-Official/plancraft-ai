@@ -224,13 +224,23 @@ export const useAuthStore = defineStore('authStore', {
             mod.refreshAppToken().catch(() => {})
           }
         } catch {}
-        ElNotification({
-          title: 'Welcome ✨',
-          message: 'Using guest mode. You can upgrade anytime.',
-          type: 'success',
-          duration: 2200,
-          offset: 80,
-        })
+        try {
+          const msg = "You're in guest mode. " +
+            "<a href='/login' class='underline font-semibold text-white'>Sign in now →</a>"
+          ElNotification({
+            title: 'Welcome ✨',
+            message: msg,
+            type: 'success',
+            duration: 6000,
+            offset: 80,
+            dangerouslyUseHTMLString: true,
+            customClass: 'glass-toast',
+            onClick: () => {
+              try { localStorage.setItem('postLoginRedirect', window?.location?.pathname || '/dashboard') } catch {}
+              try { window.location.href = '/login' } catch {}
+            },
+          })
+        } catch {}
       } finally {
         this.loading = false
       }

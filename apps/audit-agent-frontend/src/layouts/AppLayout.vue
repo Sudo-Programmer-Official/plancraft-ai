@@ -29,6 +29,15 @@
             View Plan
           </button>
 
+          <!-- Sign in CTA when guest mode is active -->
+          <button
+            v-if="authStore.isGuest || !authStore.isLoggedIn"
+            @click="handleUpgradeSignIn"
+            class="border border-indigo-300/60 text-indigo-200 text-sm px-3 py-1.5 rounded-lg hover:bg-indigo-500/10 hover:text-white transition-colors"
+          >
+            🔑 Sign in now →
+          </button>
+
           <button
             @click="showUpgrade = false"
             class="text-sm text-gray-300 px-2 py-1 hover:text-white hover:bg-fuchsia-400/20 rounded-lg transition-colors"
@@ -131,20 +140,32 @@
             title="Help"
             >💬</RouterLink
           >
-     <button
-  @click="handleLogout"
-  class="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-1.5 rounded-lg 
-         bg-gradient-to-r from-red-600 to-pink-600 text-white shadow-md 
-         hover:shadow-lg hover:from-red-500 hover:to-pink-500 
-         transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98]"
-  title="Logout"
->
-  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 -ml-[1px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
-    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-7.5A2.25 2.25 0 003.75 5.25v13.5A2.25 2.25 0 006 21h7.5a2.25 2.25 0 002.25-2.25V15" />
-    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h12m0 0l-3-3m3 3l-3 3" />
-  </svg>
-  <!-- <span class="tracking-tight translate-x-[-1px]">-></span> -->
-</button>
+          <!-- Auth action: shows Logout when logged in, Sign in when guest -->
+          <button
+            v-if="authStore.isLoggedIn"
+            @click="handleLogout"
+            class="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-1.5 rounded-lg 
+                   bg-gradient-to-r from-red-600 to-pink-600 text-white shadow-md 
+                   hover:shadow-lg hover:from-red-500 hover:to-pink-500 
+                   transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98]"
+            title="Logout"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 -ml-[1px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-7.5A2.25 2.25 0 003.75 5.25v13.5A2.25 2.25 0 006 21h7.5a2.25 2.25 0 002.25-2.25V15" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h12m0 0l-3-3m3 3l-3 3" />
+            </svg>
+          </button>
+          <RouterLink
+            v-else
+            to="/login"
+            class="flex items-center justify-center text-xs font-semibold px-3.5 py-1.5 rounded-lg 
+                   bg-gradient-to-r from-indigo-600 to-fuchsia-600 text-white shadow-md 
+                   hover:shadow-lg hover:from-indigo-500 hover:to-fuchsia-500 
+                   transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98]"
+            title="Sign in / Sign up"
+          >
+            🔑 Sign in / Sign up
+          </RouterLink>
         </div>
       </div>
     </aside>
@@ -211,6 +232,15 @@
               >
                 🚪
               </button>
+              <RouterLink
+                v-else
+                to="/login"
+                @click="mobileMenu = false"
+                class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
+                title="Sign in / Sign up"
+              >
+                🔑
+              </RouterLink>
             </div>
           </div>
         </div>
@@ -290,6 +320,14 @@
                 class="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-sm hover:from-purple-600 hover:to-pink-700 transition"
               >
                 🚀 Upgrade
+              </RouterLink>
+              <RouterLink
+                v-if="!authStore.isLoggedIn || authStore.isGuest"
+                to="/login"
+                class="border border-indigo-400/60 text-indigo-200 px-3 py-1 rounded-full text-sm font-semibold hover:bg-indigo-600/20 transition"
+                title="Sign in / Sign up"
+              >
+                🔑 Sign in
               </RouterLink>
             </template>
           </div>
@@ -410,6 +448,11 @@ const bellEl = ref(null)
 
 function toggleNotifications() {
   showNotifications.value = !showNotifications.value
+}
+
+function handleUpgradeSignIn() {
+  try { localStorage.setItem('postLoginRedirect', '/subscription?upgrade=1') } catch {}
+  router.push('/login')
 }
 
 function onDocumentClick(e) {

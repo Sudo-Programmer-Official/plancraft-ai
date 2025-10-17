@@ -95,4 +95,18 @@ onBeforeUnmount(() => {
   opacity: 0;
   filter: blur(3px);
 }
+
+/* Global notification glass style for HTML messages */
+.el-notification.glass-toast {
+  background: rgba(30, 15, 60, 0.75);
+  border: 1px solid rgba(138, 92, 246, 0.25);
+  backdrop-filter: blur(12px);
+  color: #e5d4ff;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+.el-notification.glass-toast a {
+  color: #fff;
+  text-decoration: underline;
+  font-weight: 600;
+}
 </style>
