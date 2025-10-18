@@ -15,6 +15,7 @@
         <router-link
           v-if="planKey !== 'PREMIUM'"
           to="/subscription"
+          @click="track"
           class="inline-block px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition font-medium"
         >
           🚀 Upgrade to Pro
@@ -32,6 +33,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { trackLinkedInConversion } from '@/utils/ads'
 import { useAuthStore } from '@/stores/authStore'
 import { PLANS } from '@/services/planService'
 
@@ -58,9 +60,12 @@ const limits = computed(() => ({
 function onClose() {
   emit('close')
 }
+
+function track() {
+  try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_UPGRADE_CLICK) } catch {}
+}
 </script>
 
 <style scoped>
 
 </style>
-

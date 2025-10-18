@@ -88,6 +88,7 @@ import { trackEvent } from '@/services/analytics'
 import ErrorDialog from '@/components/ErrorDialog.vue'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useIsPremium } from '@/composables/useIsPremium'
+import { trackLinkedInConversion } from '@/utils/ads'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -126,6 +127,7 @@ async function onUpgrade() {
     const isGuest = authStore.isGuest === true || authStore.guest === true || authStore.user?.mode === 'guest'
 
     if (!authStore.user?.uid || isGuest) {
+      try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_UPGRADE_CLICK) } catch {}
       // Store post-login redirect intent
       try {
         localStorage.setItem('postLoginRedirect', '/subscription?upgrade=1')
@@ -150,6 +152,7 @@ async function onUpgrade() {
     // Proceed with checkout
     loading.value = true
     trackEvent('upgrade_started')
+    try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_UPGRADE_CLICK) } catch {}
     const url = await createCheckoutSession('monthly', authStore.user?.uid)
     window.location.href = url
 

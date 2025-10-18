@@ -119,6 +119,7 @@ import relativeTime from 'dayjs/plugin/relativeTime'
 import _ from 'lodash'
 import { toJsDate as toJsDateUtil } from '@/utils/time'
 import { useAuthFlags } from '@/composables/useAuthFlags'
+import { trackLinkedInConversion } from '@/utils/ads'
 
 // Time setup
 dayjs.extend(utc)
@@ -170,7 +171,10 @@ async function fetchUsage() {
   } catch {}
 }
 
-function goToUpgrade() { try { router.push('/pricing') } catch {} }
+function goToUpgrade() {
+  try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_UPGRADE_CLICK) } catch {}
+  try { router.push('/pricing') } catch {}
+}
 
 function setGroupRef(date) {
   return (el) => {

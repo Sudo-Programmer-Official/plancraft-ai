@@ -18,6 +18,7 @@
           <RouterLink
             v-if="!isGuest"
             to="/subscription"
+            @click="trackUpgradeClick"
             class="bg-gradient-to-r from-fuchsia-500 via-purple-500 to-indigo-500 text-white font-semibold text-sm px-3 py-1.5 rounded-lg hover:scale-105 transition-transform shadow-md"
           >
             Upgrade
@@ -369,6 +370,7 @@ import NotificationDropdown from '@/components/NotificationDropdown.vue'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useAuthFlags } from '@/composables/useAuthFlags'
 import PlanSummaryModal from '@/components/PlanSummaryModal.vue'
+import { trackLinkedInConversion } from '@/utils/ads'
 const currentUserId = ref(null)
 
 function deriveUidFromStorage() {
@@ -456,8 +458,12 @@ async function handleLogout() {
 }
 
 function goToLogin() {
-  console.log('Guest user - redirecting to login')
-  router.push({ path: '/login' })
+  try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_SIGNIN_CLICK) } catch {}
+  try { router.push({ path: '/login' }) } catch {}
+}
+
+function trackUpgradeClick() {
+  try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_UPGRADE_CLICK) } catch {}
 }
 
 onMounted(() => {

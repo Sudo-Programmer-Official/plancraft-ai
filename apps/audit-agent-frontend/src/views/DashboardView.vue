@@ -434,6 +434,7 @@ import { toUTC } from '@/utils/timezone'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
 import { useAuthFlags } from '@/composables/useAuthFlags'
+import { trackLinkedInConversion } from '@/utils/ads'
 dayjs.extend(utc)
 dayjs.extend(timezone)
 // === Reminder badges (Daily list) ===
@@ -475,6 +476,7 @@ async function fetchUsage() {
   } catch {}
 }
 function goToUpgrade() {
+  try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_UPGRADE_CLICK) } catch {}
   try {
     if (isGuest.value) return routerNav.push('/login')
     routerNav.push('/pricing')

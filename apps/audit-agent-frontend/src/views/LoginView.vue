@@ -68,7 +68,9 @@ const route = useRoute()
 const authStore = useAuthStore()
 const starsCanvas = ref(null)
 
+import { trackLinkedInConversion } from '@/utils/ads'
 async function loginGoogle() {
+  try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_SIGNIN_CLICK) } catch {}
   await authStore.loginWithGoogle()
   if (authStore.user) redirectAfterLogin()
 }
@@ -85,6 +87,7 @@ const password = ref('')
 
 async function onLoginEmail() {
   try {
+    try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_SIGNIN_CLICK) } catch {}
     await authStore.loginWithEmail(email.value, password.value)
     if (authStore.user) redirectAfterLogin()
   } catch (e) {
@@ -94,6 +97,7 @@ async function onLoginEmail() {
 
 async function onRegister() {
   try {
+    try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_SIGNIN_CLICK) } catch {}
     await authStore.registerEmail(email.value, password.value)
     if (authStore.user) redirectAfterLogin()
   } catch (e) {

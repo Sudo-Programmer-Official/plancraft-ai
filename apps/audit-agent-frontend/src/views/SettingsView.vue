@@ -128,6 +128,7 @@ import { useSubscriptionStore } from "@/stores/subscriptionStore"
 import { isFeatureAllowed, getRemainingAI } from "@/services/planService"
 import PlanSummaryModal from "@/components/PlanSummaryModal.vue"
 import { useIsPremium } from "@/composables/useIsPremium"
+import { trackLinkedInConversion } from '@/utils/ads'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -235,6 +236,7 @@ function handleLogout() {
 }
 
 function upgradePlan() {
+  try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_UPGRADE_CLICK) } catch {}
   router.push("/subscription") // redirect to subscription/pricing
 }
 
