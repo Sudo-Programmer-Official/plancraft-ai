@@ -103,15 +103,13 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
 
-  // Bonus: If already logged in, skip login page
+  // If navigating to login: only redirect away when fully signed-in (not guest)
   if (to.path === '/login') {
     try {
-      const cachedUser = localStorage.getItem('user')
-      const cachedToken = localStorage.getItem('token')
-      if (authStore?.user || (cachedUser && cachedToken)) {
-        return next('/dashboard')
-      }
+      const isGuest = authStore?.isGuest === true || authStore?.guest === true || authStore?.user?.mode === 'guest'
+      if (authStore?.user && !isGuest) return next('/dashboard')
     } catch {}
+    return next()
   }
 
   // Skip auth guard for public routes

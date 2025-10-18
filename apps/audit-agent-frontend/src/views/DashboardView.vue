@@ -27,7 +27,20 @@
       class="col-span-1 sm:col-span-2 lg:col-span-3 px-3 py-2 rounded-xl border border-indigo-500/30 bg-indigo-500/10 text-indigo-100 flex items-center justify-between"
     >
       <span class="text-sm">You’ve used {{ usage.used }}/{{ usage.limit }} reminders today.</span>
-      <button @click="goToUpgrade" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs">Upgrade for unlimited 🚀</button>
+      <button
+        v-if="!isGuest"
+        @click="goToUpgrade"
+        class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
+      >
+        Upgrade for unlimited 🚀
+      </button>
+      <RouterLink
+        v-else
+        to="/login"
+        class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
+      >
+        🔑 Sign in
+      </RouterLink>
     </div>
 
     <!-- Reactivate instantly banner (during cancel period) -->
@@ -420,7 +433,7 @@ import dayjs from 'dayjs'
 import { toUTC } from '@/utils/timezone'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
-import { useIsPremium } from '@/composables/useIsPremium'
+import { useAuthFlags } from '@/composables/useAuthFlags'
 dayjs.extend(utc)
 dayjs.extend(timezone)
 // === Reminder badges (Daily list) ===
@@ -433,7 +446,7 @@ import { ElMessage, ElNotification } from 'element-plus'
 // import { auth } from '@/firebase/init'
 
 const authStore = useAuthStore()
-const { isPremium } = useIsPremium()
+const { isPremium, isGuest, isFreeUser } = useAuthFlags()
 const routerNav = useRouter()
 const subStore = useSubscriptionStore()
 const reactivateEligible = computed(() => String(subStore.subscription?.status || '').toLowerCase() === 'canceled' && !!subStore.subscription?.cancelAt)
@@ -461,7 +474,12 @@ async function fetchUsage() {
     if (data?.success) usage.value = { used: data.used || 0, limit: data.limit || 0, plan: data.plan || '' }
   } catch {}
 }
-function goToUpgrade() { try { routerNav.push('/pricing') } catch {} }
+function goToUpgrade() {
+  try {
+    if (isGuest.value) return routerNav.push('/login')
+    routerNav.push('/pricing')
+  } catch {}
+}
 
 /* -------------- Tasks + Journal State -------------- */
 const { tasks, toggleComplete: toggleFromComposable, loadTasks } = useTasks()

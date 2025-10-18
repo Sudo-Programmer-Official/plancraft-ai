@@ -16,10 +16,18 @@
 
         <div class="flex flex-wrap items-center justify-center gap-2">
           <RouterLink
+            v-if="!isGuest"
             to="/subscription"
             class="bg-gradient-to-r from-fuchsia-500 via-purple-500 to-indigo-500 text-white font-semibold text-sm px-3 py-1.5 rounded-lg hover:scale-105 transition-transform shadow-md"
           >
             Upgrade
+          </RouterLink>
+          <RouterLink
+            v-else
+            to="/login"
+            class="bg-gradient-to-r from-indigo-500 via-sky-500 to-blue-600 text-white font-semibold text-sm px-3 py-1.5 rounded-lg hover:scale-105 transition-transform shadow-md"
+          >
+            Sign in
           </RouterLink>
 
           <button
@@ -131,20 +139,21 @@
             title="Help"
             >💬</RouterLink
           >
-     <button
-  @click="handleLogout"
-  class="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-1.5 rounded-lg 
-         bg-gradient-to-r from-red-600 to-pink-600 text-white shadow-md 
-         hover:shadow-lg hover:from-red-500 hover:to-pink-500 
-         transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98]"
-  title="Logout"
->
-  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 -ml-[1px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
-    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-7.5A2.25 2.25 0 003.75 5.25v13.5A2.25 2.25 0 006 21h7.5a2.25 2.25 0 002.25-2.25V15" />
-    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h12m0 0l-3-3m3 3l-3 3" />
-  </svg>
-  <!-- <span class="tracking-tight translate-x-[-1px]">-></span> -->
-</button>
+          <button
+            v-if="!isGuest"
+            @click="handleLogout"
+            class="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-1.5 rounded-lg 
+                   bg-gradient-to-r from-red-600 to-pink-600 text-white shadow-md 
+                   hover:shadow-lg hover:from-red-500 hover:to-pink-500 
+                   transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98]"
+            title="Logout"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 -ml-[1px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-7.5A2.25 2.25 0 003.75 5.25v13.5A2.25 2.25 0 006 21h7.5a2.25 2.25 0 002.25-2.25V15" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h12m0 0l-3-3m3 3l-3 3" />
+            </svg>
+          </button>
+          
         </div>
       </div>
     </aside>
@@ -286,11 +295,19 @@
             </template>
             <template v-else>
               <RouterLink
+                v-if="!isGuest"
                 to="/subscription"
                 class="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-sm hover:from-purple-600 hover:to-pink-700 transition"
               >
                 🚀 Upgrade
               </RouterLink>
+              <button
+                v-else
+                @click="goToLogin"
+                class="bg-gradient-to-r from-indigo-600 to-blue-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-sm hover:from-indigo-500 hover:to-blue-500 transition animate-pulse-slow"
+              >
+                🔑 Sign in
+              </button>
             </template>
           </div>
 
@@ -350,9 +367,8 @@ import 'driver.js/dist/driver.css'
 import { watchNotificationsPublic } from '@/services/firebaseService'
 import NotificationDropdown from '@/components/NotificationDropdown.vue'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
-import { useIsPremium } from '@/composables/useIsPremium'
+import { useAuthFlags } from '@/composables/useAuthFlags'
 import PlanSummaryModal from '@/components/PlanSummaryModal.vue'
-
 const currentUserId = ref(null)
 
 function deriveUidFromStorage() {
@@ -397,7 +413,7 @@ const authStore = useAuthStore()
 // Subscription state via store
 const subStore = useSubscriptionStore()
 const subscription = subStore.subscription
-const { isPremium } = useIsPremium()
+const { isPremium, isGuest, isFreeUser } = useAuthFlags()
 
 // Notifications
 const showNotifications = ref(false)
@@ -437,6 +453,11 @@ const tabs = [
 async function handleLogout() {
   await authStore.logout()
   router.push('/login')
+}
+
+function goToLogin() {
+  console.log('Guest user - redirecting to login')
+  router.push({ path: '/login' })
 }
 
 onMounted(() => {
@@ -576,5 +597,13 @@ function startTour() {
 .slide-enter-from,
 .slide-leave-to {
   transform: translateX(-100%);
+}
+/* Subtle pulse for guest sign-in CTA */
+@keyframes pulseSlow {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.02); }
+}
+.animate-pulse-slow {
+  animation: pulseSlow 2s ease-in-out infinite;
 }
 </style>

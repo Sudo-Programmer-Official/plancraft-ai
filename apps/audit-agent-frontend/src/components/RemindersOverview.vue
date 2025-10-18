@@ -38,10 +38,23 @@
       </div>
     </div>
 
-    <!-- Usage meter and Upgrade CTA for free plan (hide for premium/admin) -->
+    <!-- Usage meter: Sign in for guests, Upgrade for signed-in free users -->
     <div v-if="usage.plan === 'free' && !isPremium" class="mb-6 flex items-center justify-between bg-slate-800/60 border border-slate-700 rounded-lg p-3">
       <span class="text-sm text-gray-300">You’ve used {{ usage.used }}/{{ usage.limit }} reminders today.</span>
-      <button @click="goToUpgrade" class="px-3 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 rounded-md text-white">Upgrade for unlimited 🚀</button>
+      <button
+        v-if="!isGuest"
+        @click="goToUpgrade"
+        class="px-3 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 rounded-md text-white"
+      >
+        Upgrade for unlimited 🚀
+      </button>
+      <RouterLink
+        v-else
+        to="/login"
+        class="px-3 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 rounded-md text-white"
+      >
+        🔑 Sign in
+      </RouterLink>
     </div>
 
     <!-- Empty state -->
@@ -105,7 +118,7 @@ import timezone from 'dayjs/plugin/timezone'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import _ from 'lodash'
 import { toJsDate as toJsDateUtil } from '@/utils/time'
-import { useIsPremium } from '@/composables/useIsPremium'
+import { useAuthFlags } from '@/composables/useAuthFlags'
 
 // Time setup
 dayjs.extend(utc)
@@ -120,7 +133,7 @@ const groupRefs = new Map()
 let unbind = null
 
 const usage = ref({ used: 0, limit: 0, plan: '' })
-const { isPremium } = useIsPremium()
+const { isPremium, isGuest, isFreeUser } = useAuthFlags()
 const customDate = ref(dayjs().format('YYYY-MM-DD'))
 
 // async function scrollToCustomDate() {
