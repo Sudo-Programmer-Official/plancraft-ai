@@ -11,6 +11,7 @@ import { db } from "./firebaseAdmin.js";
 import { send as sendWhatsApp } from "./integrations/whatsappProvider.js";
 import { sendEmail } from "./integrations/emailProvider.js";
 import { sendPWA } from "./integrations/pwaProvider.js";
+import { sendSMSForUser, makeCallForUser } from "./twilioService.js";
 import { formatLocalTime } from "../utils/timezone.js";
 import { extractTime } from "../utils/timeParser.js";
 
@@ -141,12 +142,39 @@ export async function createReminderFromText(
   }
 
   const tzForUser = options?.timezone || null;
+
+  // Resolve channels: provided list, else user preferences, else sane default
+  let chosenChannels = Array.isArray(channels) && channels.length ? channels.slice() : null
+  if (!chosenChannels || !chosenChannels.length) {
+    try {
+      const doc = await db.collection('users').doc(String(userId)).get()
+      const data = doc.exists ? (doc.data() || {}) : {}
+      const root = data?.notifications || {}
+      const nested = data?.preferences?.notifications || {}
+      const prefChannels = Array.isArray(nested.channels)
+        ? nested.channels
+        : Array.isArray(root.channels)
+          ? root.channels
+          : null
+      const prefDerived = [
+        (nested.email ?? root.email) && 'email',
+        ((nested.push ?? root.push) || (nested.pwa ?? root.pwa)) && 'pwa',
+        (nested.whatsapp ?? root.whatsapp) && 'whatsapp',
+        (nested.sms ?? root.sms) && 'sms',
+        (nested.voice_call ?? root.voice_call) && 'voice_call',
+      ].filter(Boolean)
+      const merged = new Set([...(prefChannels || prefDerived)])
+      chosenChannels = Array.from(merged)
+    } catch {
+      chosenChannels = null
+    }
+  }
   const defaultChannels = ["whatsapp", "pwa", "email"]
   const reminder = {
     task: String(parsed.task || text),
     scheduledTime: when,
     userId: String(userId),
-    channels: Array.isArray(channels) && channels.length ? channels : defaultChannels,
+    channels: Array.isArray(chosenChannels) && chosenChannels.length ? chosenChannels : defaultChannels,
     createdAt: new Date(),
     status: "scheduled",
     sentAt: null,
@@ -203,6 +231,7 @@ export async function sendReminder(reminder) {
   const when = reminder?.scheduledTime ? formatLocalTime(reminder.scheduledTime, reminder?.timezone || undefined) : "soon";
 
   console.log("[Scheduler] Executing reminder", { id: reminder?.id, userId, task, when, channels, ts: new Date().toISOString() });
+  try { console.log('[Reminder] Channels:', channels) } catch {}
 
   try {
     if (channels.includes("whatsapp")) {
@@ -247,6 +276,24 @@ export async function sendReminder(reminder) {
         console.log("[Delivery] PWA ok", { userId, id: reminder?.id, result: r });
       } catch (e) {
         console.error("[Delivery] PWA send failed:", e?.message);
+      }
+    }
+
+    if (channels.includes("sms")) {
+      try {
+        const sid = await sendSMSForUser(userId, `⏰ Reminder: ${task} (${when})`);
+        console.log("[Delivery] SMS ok", { userId, id: reminder?.id, sid });
+      } catch (e) {
+        console.error("[Delivery] SMS send failed:", e?.message || e);
+      }
+    }
+
+    if (channels.includes("voice_call")) {
+      try {
+        const sid = await makeCallForUser(userId, `Reminder: ${task}. Scheduled for ${when}.`);
+        console.log("[Delivery] Voice call ok", { userId, id: reminder?.id, sid });
+      } catch (e) {
+        console.error("[Delivery] Voice call failed:", e?.message || e);
       }
     }
   } finally {

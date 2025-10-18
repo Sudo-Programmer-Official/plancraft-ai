@@ -39,15 +39,29 @@ router.post("/text", async (req, res) => {
       console.warn('[Reminder API] Rejecting task-bound reminder without scheduledTime', { userId, taskId })
       return res.status(400).json({ success: false, error: 'Missing scheduledTime for task-bound reminder' })
     }
-    // Resolve channels precedence: request body -> user preference -> default (all)
-    let channelsToUse = channels
+    // Resolve channels precedence: request body ∪ user preference
+    let channelsToUse = Array.isArray(channels) ? [...channels] : []
     try {
-      if (!Array.isArray(channelsToUse) || !channelsToUse.length) {
-        const u = await db.collection('users').doc(String(userId)).get()
-        const prefs = u.exists ? (u.data()?.notifications || {}) : {}
-        const prefChannels = Array.isArray(prefs.channels) ? prefs.channels : null
-        channelsToUse = prefChannels && prefChannels.length ? prefChannels : ['whatsapp','pwa','email']
-      }
+      const u = await db.collection('users').doc(String(userId)).get()
+      const data = u.exists ? (u.data() || {}) : {}
+      const rootPrefs = data?.notifications || {}
+      const nestedPrefs = data?.preferences?.notifications || {}
+      const prefChannels = Array.isArray(rootPrefs.channels)
+        ? rootPrefs.channels
+        : Array.isArray(nestedPrefs.channels)
+          ? nestedPrefs.channels
+          : null
+
+      const prefDerived = [
+        (nestedPrefs.email ?? rootPrefs.email) && 'email',
+        ((nestedPrefs.push ?? rootPrefs.push) || (nestedPrefs.pwa ?? rootPrefs.pwa)) && 'pwa',
+        (nestedPrefs.whatsapp ?? rootPrefs.whatsapp) && 'whatsapp',
+        (nestedPrefs.sms ?? rootPrefs.sms) && 'sms',
+        (nestedPrefs.voice_call ?? rootPrefs.voice_call) && 'voice_call',
+      ].filter(Boolean)
+
+      const merged = new Set([...(channelsToUse || []), ...(prefChannels || prefDerived)])
+      channelsToUse = Array.from(merged)
     } catch {}
 
     const reminder = await handleTextReminder(text, userId, channelsToUse, { taskId, scheduledTime, timezone: tz })

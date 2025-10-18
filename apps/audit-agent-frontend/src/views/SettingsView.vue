@@ -49,12 +49,16 @@
             <span>WhatsApp Alerts</span>
           </label>
           <label class="flex items-center gap-3">
-            <input type="checkbox" v-model="prefs.discord" class="accent-indigo-500" disabled />
-            <span>Discord Channel (coming soon)</span>
+            <input type="checkbox" v-model="prefs.sms" class="accent-indigo-500" @change="dirty = true" />
+            <span>SMS</span>
           </label>
           <label class="flex items-center gap-3">
-            <input type="checkbox" v-model="prefs.calls" class="accent-indigo-500" @change="dirty = true" />
-            <span>Phone Calls / SMS</span>
+            <input type="checkbox" v-model="prefs.voice_call" class="accent-indigo-500" @change="dirty = true" />
+            <span>Voice Call</span>
+          </label>
+          <label class="flex items-center gap-3">
+            <input type="checkbox" v-model="prefs.discord" class="accent-indigo-500" disabled />
+            <span>Discord Channel (coming soon)</span>
           </label>
         </div>
 
@@ -65,9 +69,13 @@
           <small class="text-slate-400">Format: +12135551234 (E.164)</small>
         </div>
 
-        <div v-if="prefs.calls" class="mt-4">
+        <div v-if="prefs.sms || prefs.voice_call" class="mt-4">
           <label class="block text-sm text-slate-300 mb-1">Phone Number (for SMS)</label>
           <el-input v-model="integrationEndpoints.sms.phone" placeholder="+1 234 567 8901" clearable class="w-full" @input="dirty = true" />
+          <p v-if="effectiveTwilioPhone" class="text-xs text-slate-400 mt-1">
+            💬 SMS and voice calls will be sent to {{ effectiveTwilioPhone }}.
+            <span class="text-slate-400">You can update this under <strong>Integrations → Phone</strong>.</span>
+          </p>
         </div>
 
         <div v-if="prefs.discord" class="mt-4">
@@ -144,8 +152,10 @@ const prefs = reactive({
   email: true,
   pwa: true,
   whatsapp: true,
+  sms: false,
+  voice_call: false,
   discord: false,
-  calls: false,
+  calls: false, // legacy toggle, derived below
 })
 
 const isPremium = computed(() => {
@@ -185,14 +195,21 @@ onMounted(async () => {
         prefs.email = set.has('email') || !!n.email || true
         prefs.pwa = set.has('pwa') || !!n.push || true
         prefs.whatsapp = set.has('whatsapp') || !!n.whatsapp || true
+        prefs.sms = set.has('sms') || !!n.sms || false
+        prefs.voice_call = set.has('voice_call') || !!n.voice_call || false
       } else {
         // default to all if not specified
         prefs.email = n.email !== undefined ? !!n.email : true
         prefs.pwa = n.push !== undefined ? !!n.push : true
         prefs.whatsapp = n.whatsapp !== undefined ? !!n.whatsapp : true
+        prefs.sms = !!n.sms
+        prefs.voice_call = !!n.voice_call
       }
       prefs.discord = !!n.discord
-      prefs.calls = !!n.calls
+      // derive legacy calls flag for UI blocks that reference it
+      prefs.calls = !!(n.calls || prefs.sms || prefs.voice_call)
+
+      notifPhones.value = { sms: n.phone_sms || '', voice: n.phone_voice || '' }
 
       integrationOptions.forEach(i => { i.selected = !!ints[i.key] })
 
@@ -230,6 +247,19 @@ const integrationEndpoints = ref({
   email: ''
 })
 
+// Derived phone used by Twilio (mirrors backend resolution order)
+const notifPhones = ref({ sms: '', voice: '' })
+const effectiveTwilioPhone = computed(() => {
+  try {
+    const smsPref = (notifPhones.value?.sms || '').trim()
+    const voicePref = (notifPhones.value?.voice || '').trim()
+    const smsInt = (integrationEndpoints.value?.sms?.phone || '').trim()
+    const waInt = (integrationEndpoints.value?.whatsapp?.phone || '').trim()
+    const userPhone = (authStore?.user?.phone || '').trim()
+    return smsPref || voicePref || smsInt || waInt || userPhone || ''
+  } catch { return '' }
+})
+
 function handleLogout() {
   authStore.logout()
   router.push("/login")
@@ -243,16 +273,26 @@ function upgradePlan() {
 // Updated saveSettings function with user feedback
 async function saveSettings() {
   try {
+    // Normalize phone before persisting
+    try {
+      const cc = guessCountryFromLocale()
+      const raw = integrationEndpoints.value?.sms?.phone
+      const norm = normalizePhone(raw, cc)
+      if (norm) integrationEndpoints.value.sms.phone = norm
+    } catch {}
     const channels = []
     if (prefs.email) channels.push('email')
     if (prefs.pwa) channels.push('pwa')
     if (prefs.whatsapp) channels.push('whatsapp')
+    if (prefs.sms) channels.push('sms')
+    if (prefs.voice_call) channels.push('voice_call')
     const notifications = {
       email: !!prefs.email,
       push: !!prefs.pwa,
       whatsapp: !!prefs.whatsapp,
       discord: !!prefs.discord,
-      calls: !!prefs.calls,
+      // keep legacy aggregated flag for backward-compat
+      calls: !!(prefs.calls || prefs.sms || prefs.voice_call),
       channels,
     }
     const toggles = integrationOptions.reduce((acc, i) => {
@@ -305,3 +345,4 @@ section h2 {
   color: #f8fafc;
 }
 </style>
+import { normalizePhone, guessCountryFromLocale } from '@/utils/phoneUtils'

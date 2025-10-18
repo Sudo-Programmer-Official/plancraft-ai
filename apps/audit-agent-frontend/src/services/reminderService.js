@@ -48,12 +48,14 @@ export async function scheduleReminder(userId, taskId, text, scheduledTime, pref
     }
 
     const tz = dayjs.tz.guess()
-    const p = prefs || {}
-    const channels = [
-      p.whatsapp && 'whatsapp',
-      (p.pwa || p.push) && 'pwa',
-      p.email && 'email',
-    ].filter(Boolean)
+  const p = prefs || {}
+  const channels = [
+    p.whatsapp && 'whatsapp',
+    (p.pwa || p.push) && 'pwa',
+    p.email && 'email',
+    p.sms && 'sms',
+    p.voice_call && 'voice_call',
+  ].filter(Boolean)
 
     // ✅ We assume scheduledTime is already UTC ISO (correct!)
     const payload = {

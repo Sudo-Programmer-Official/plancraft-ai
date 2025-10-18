@@ -1,6 +1,7 @@
 import express from 'express'
 import { db } from '../services/firebaseAdmin.js'
 import { requireAuth, ensureUserMatches } from '../middleware/auth.js'
+import { normalizePhone, guessCountry } from '../utils/phone.js'
 
 const router = express.Router()
 router.use(requireAuth, ensureUserMatches)
@@ -11,6 +12,12 @@ router.post('/settings/updatePreferences', async (req, res) => {
     const { userId, preferences } = req.body || {}
     if (!userId) return res.status(400).json({ error: 'Missing userId' })
 
+    // Normalize channels list if supplied
+    const allowed = ['email','pwa','whatsapp','sms','voice_call']
+    const inChannels = Array.isArray(preferences?.notifications?.channels)
+      ? preferences.notifications.channels.filter(c => allowed.includes(String(c)))
+      : undefined
+
     await db.collection('users').doc(userId).set(
       {
         preferences: {
@@ -20,6 +27,11 @@ router.post('/settings/updatePreferences', async (req, res) => {
             whatsapp: !!preferences?.notifications?.whatsapp,
             discord: !!preferences?.notifications?.discord,
             calls: !!preferences?.notifications?.calls,
+            // new granular flags
+            sms: !!preferences?.notifications?.sms,
+            voice_call: !!preferences?.notifications?.voice_call,
+            // persist channels array when provided
+            ...(inChannels ? { channels: inChannels } : {}),
           },
           integrations: {
             googleCalendar: !!preferences?.integrations?.googleCalendar,
@@ -79,11 +91,15 @@ router.post('/settings/updateIntegrations', async (req, res) => {
     const e164 = /^\+?[0-9]{8,15}$/
     const errs = []
 
-    const wPhone = trimUndef(integrations?.whatsapp?.phone)
-    if (wPhone && !e164.test(wPhone)) errs.push('whatsapp.phone must be E.164, e.g. +12135551234')
-
-    const sPhone = trimUndef(integrations?.sms?.phone)
-    if (sPhone && !e164.test(sPhone)) errs.push('sms.phone must be E.164, e.g. +12135551234')
+    const userCountry = guessCountry(req)
+    let wPhoneInput = trimUndef(integrations?.whatsapp?.phone)
+    let sPhoneInput = trimUndef(integrations?.sms?.phone)
+    const wPhoneNorm = wPhoneInput ? normalizePhone(wPhoneInput, userCountry) : undefined
+    const sPhoneNorm = sPhoneInput ? normalizePhone(sPhoneInput, userCountry) : undefined
+    const wPhone = wPhoneNorm
+    const sPhone = sPhoneNorm
+    if (wPhone && !e164.test(wPhone)) errs.push('whatsapp.phone invalid; please enter a valid number')
+    if (sPhone && !e164.test(sPhone)) errs.push('sms.phone invalid; please enter a valid number')
 
     const dHook = trimUndef(integrations?.discord?.webhook)
     if (dHook && !/^https:\/\/discord\.com\/api\/webhooks\//.test(dHook)) errs.push('discord.webhook must start with https://discord.com/api/webhooks/')
@@ -135,7 +151,17 @@ router.post('/settings/updateIntegrations', async (req, res) => {
       return obj
     }
 
-    const payload = pruneUndefinedDeep({ integrations: safe, updatedAt: new Date() })
+    // Mirror phone to preferences.notifications for backend phone resolution
+    const notifPhones = {
+      phone_sms: sPhone || undefined,
+      phone_voice: (trimUndef(integrations?.voice?.phone) || sPhone || wPhone) ? normalizePhone(trimUndef(integrations?.voice?.phone) || sPhone || wPhone, userCountry) : undefined,
+    }
+
+    const payload = pruneUndefinedDeep({
+      integrations: safe,
+      preferences: { notifications: notifPhones },
+      updatedAt: new Date(),
+    })
 
     await db.collection('users').doc(String(userId)).set(
       payload,

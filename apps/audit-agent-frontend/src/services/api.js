@@ -77,6 +77,14 @@ api.interceptors.request.use(async (config) => {
     } catch {
       config.headers['x-user-tz'] = 'UTC'
     }
+    // 🌍 Include user country (best-effort from locale)
+    try {
+      const lang = (navigator.language || 'en-US').toUpperCase()
+      const cc = (lang.split('-')[1] || 'US').toUpperCase()
+      config.headers['x-user-country'] = cc
+    } catch {
+      config.headers['x-user-country'] = 'US'
+    }
   } catch {}
   return config
 })

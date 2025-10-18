@@ -561,12 +561,19 @@ async function generateTasks() {
           }
           const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
           try {
+            const chans = [
+              prefs?.whatsapp && 'whatsapp',
+              (prefs?.pwa || prefs?.push) && 'pwa',
+              prefs?.email && 'email',
+              prefs?.sms && 'sms',
+              prefs?.voice_call && 'voice_call',
+            ].filter(Boolean)
             const resp = await api.post('/reminders/text', {
               userId: uid,
               text: newTask.title,
               scheduledTime: effectiveIso,
               taskId: saved.id,
-              channels: Array.isArray(prefs?.channels) ? prefs.channels : undefined,
+              channels: chans.length ? chans : undefined,
               timezone: tz,
             })
             const warn = resp?.headers?.['x-plan-warning'] || resp?.headers?.['X-Plan-Warning']

@@ -94,6 +94,7 @@ import { initScheduler } from "./services/scheduler.js";
 import blogRoutes from "./routes/blogRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import { attachAuth } from "./middleware/auth.js";
+import twilioRoutes from "./routes/twilioRoutes.js";
 
 dotenv.config();
 
@@ -137,6 +138,7 @@ const corsOptions = {
     "x-user-id",
     "x-user-role",
     "x-user-tz",
+    "x-user-country",
     "x-requested-with",
     "x-app-token",
   ],
@@ -165,7 +167,7 @@ app.use((req, res, next) => {
       res.header('Access-Control-Allow-Credentials', 'true')
       res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS,PATCH')
       const reqHeaders = req.headers['access-control-request-headers']
-      res.header('Access-Control-Allow-Headers', reqHeaders || 'Content-Type, Authorization, X-User-Email, X-User-Id, X-User-Role, X-User-Tz, X-Requested-With, X-App-Token')
+      res.header('Access-Control-Allow-Headers', reqHeaders || 'Content-Type, Authorization, X-User-Email, X-User-Id, X-User-Role, X-User-Tz, X-User-Country, X-Requested-With, X-App-Token')
       return res.sendStatus(204)
     }
   }
@@ -212,6 +214,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api", parseRemindersRoutes);
 app.use("/api", testRoutes);
 app.use("/api/blogs", blogRoutes);
+app.use("/api/twilio", twilioRoutes);
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
