@@ -19,12 +19,13 @@ import {
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
+  signInWithPhoneNumber,
 } from 'firebase/auth'
 import firebaseApp from '@/firebase/init'
 import { identifyUser, trackEvent } from '@/services/analytics'
 import { getSubscriptionStatus } from '@/services/stripeService'
 import { getUsageStatus } from '@/services/planService'
-import { doc, updateDoc } from 'firebase/firestore'
+import { doc, updateDoc, setDoc } from 'firebase/firestore'
 import { db } from '@/firebase/init'
 import { ElNotification } from 'element-plus'
 import { clearAppToken } from '@/services/appTokenService'
@@ -351,6 +352,72 @@ export const useAuthStore = defineStore('authStore', {
         }
       } catch (err) {
         console.warn('Redirect sign-in restore failed:', err)
+      }
+    },
+
+    // 📱 Phone OTP: send code
+    async sendPhoneOtp(phone, recaptchaVerifier) {
+      if (!phone) throw new Error('Missing phone number')
+      if (!recaptchaVerifier) throw new Error('Missing reCAPTCHA verifier')
+      // Use Firebase auth directly for OTP
+      return await signInWithPhoneNumber(auth, phone, recaptchaVerifier)
+    },
+
+    // 📱 Phone OTP: confirm code and finalize login
+    async confirmPhoneOtp(confirmationResult, otp) {
+      if (!confirmationResult) throw new Error('Missing confirmation result')
+      if (!otp) throw new Error('Missing OTP code')
+      this.loading = true
+      try {
+        const result = await confirmationResult.confirm(otp)
+        const user = result?.user
+        if (!user?.uid) throw new Error('Phone sign-in failed')
+
+        // Ensure Firestore profile exists/updated
+        try {
+          await setDoc(
+            doc(db, 'users', user.uid),
+            {
+              phone: user.phoneNumber || null,
+              mode: 'phone',
+              lastLoginAt: Date.now(),
+              createdAt: Date.now(),
+            },
+            { merge: true },
+          )
+        } catch {}
+
+        // Mirror other login flows
+        const profile = await fetchUserProfile(user.uid)
+        this.user = {
+          uid: user.uid,
+          displayName: user.displayName,
+          email: user.email,
+          photoURL: user.photoURL,
+          role: profile?.role || 'user',
+          phone: user.phoneNumber || profile?.phone || undefined,
+        }
+        this.guest = false
+        this.token = await user.getIdToken()
+        localStorage.setItem('user', JSON.stringify(this.user))
+        localStorage.setItem('token', this.token)
+        try {
+          if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
+            const mod = await import('@/services/appTokenService.js')
+            mod.refreshAppToken().catch(() => {})
+          }
+        } catch {}
+        this.refreshPlan().catch(() => {})
+        ElNotification({
+          title: 'Welcome ✨',
+          message: `Signed in with phone ${this.user.phone || ''}`,
+          type: 'success',
+          duration: 2400,
+          offset: 80,
+        })
+        return user
+      } finally {
+        this.loading = false
       }
     },
 
