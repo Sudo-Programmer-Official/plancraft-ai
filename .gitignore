@@ -74,4 +74,91 @@ __pycache__/
 # node_modules/
 # apps/*/node_modules/
 # shared/*/node_modules/
+### Monorepo ignores (appended)
+# OS / Editor
+.DS_Store
+.AppleDouble
+.LSOverride
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# Package managers / logs
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+lib/
+out/
+storybook-static/
+.cache/
+.tmp/
+.temp/
+
+# Framework caches
+.next/
+.nuxt/
+.vite/
+.svelte-kit/
+.angular/
+.vuepress/dist
+.vitepress/dist
+
+# Testing / coverage
+coverage/
+.nyc_output/
+cypress/screenshots/
+cypress/videos/
+playwright-report/
+test-results/
+
+# Tool caches
+.turbo/
+.nx/
+.eslintcache
+.stylelintcache
+
+# Monorepo nested artifacts
+apps/**/node_modules/
+apps/**/dist/
+apps/**/.next/
+apps/**/.nuxt/
+apps/**/.vite/
+apps/**/coverage/
+apps/**/build/
+dev-toolkit/**/node_modules/
+dev-toolkit/**/dist/
+
+# Environment files (local variants only)
+.env.local
+.env.*.local
+.env.test
+.env.test.local
+.envrc
+.direnv/
+# If you intentionally commit canonical env files, keep them tracked:
+#!.env
+#!.env.development
+#!.env.production
+
+# Firebase / secrets
+firebase-debug.log
+.firebase/
+**/firebase-service-account.json
+**/*service-account*.json
+
+# Keys (general)
+*.pem
+*.p12
+*.key
+*.crt
 
