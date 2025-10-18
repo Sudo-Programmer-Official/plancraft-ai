@@ -110,6 +110,13 @@ const allowedOrigins = [
   "https://audit-agent.onrender.com",
   "http://localhost:5173",
   "http://127.0.0.1:5173",
+  // ✅ Production domains
+  "https://www.plancraftai.com",
+  "https://plancraftai.web.app",   // if you still deploy via Firebase Hosting
+
+  // ✅ Local development
+  // ✅ Optional API subdomain (if backend runs separately)
+  "https://api.plancraftai.com",
 ]
   .concat(
     (process.env.CORS_ORIGINS || "")

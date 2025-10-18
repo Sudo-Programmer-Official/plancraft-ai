@@ -13,11 +13,21 @@ const router = express.Router();
 
 const allowedOrigins = [
   "https://plancraftai.com",
-  "http://localhost:5173", // dev
+  "https://www.plancraftai.com",
+  "https://audit-agent-66451.web.app",
   "https://api.plancraftai.com", 
-  "https://audit-agent-66451.web.app", // prod
-  "https://audit-agent-66451.firebaseapp.com", // prod
-];
+  "https://audit-agent-66451.firebaseapp.com",
+  "https://audit-agent.onrender.com",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  // ✅ Production domains
+  "https://www.plancraftai.com",
+  "https://plancraftai.web.app",   // if you still deploy via Firebase Hosting
+
+  // ✅ Local development
+  // ✅ Optional API subdomain (if backend runs separately)
+  "https://api.plancraftai.com",
+]
 
 // Middleware: CORS
 router.use((req, res, next) => {
