@@ -22,8 +22,11 @@
     <div
       class="bg-gradient-to-br from-purple-700 to-pink-600 rounded-2xl shadow-xl p-8 border border-purple-400 relative"
     >
-      <span class="absolute -top-3 right-4 bg-yellow-400 text-black text-xs px-2 py-1 rounded-full">
-        Most Popular
+      <span
+        class="absolute -top-3 right-4 text-black text-xs px-2 py-1 rounded-full"
+        :class="offerActive ? 'bg-yellow-400' : 'bg-indigo-200 text-indigo-900'"
+      >
+        {{ offerActive ? 'Limited Offer' : 'Most Popular' }}
       </span>
       <h3 class="text-xl font-bold mb-4">🚀 Premium</h3>
       <ul class="space-y-2 text-white mb-6">
@@ -32,7 +35,16 @@
         <li>✅ Calendar & WhatsApp integration</li>
         <li>✅ Priority Support</li>
       </ul>
-      <p class="text-2xl font-bold mb-4">$2 / month</p>
+      <!-- Psychological pricing with optional countdown -->
+      <div v-if="offerActive" class="mb-2 flex items-baseline gap-2">
+        <s class="text-gray-200/90 text-lg">$4</s>
+        <span class="text-3xl font-extrabold">$2</span>
+        <span class="text-sm text-green-200">50% OFF</span>
+      </div>
+      <p v-if="offerActive" class="text-xs text-yellow-400 mb-4">
+        ⚡ Limited-time offer! Ends in {{ countdown }}
+      </p>
+      <p v-else class="text-2xl font-bold mb-4">$2 / month</p>
       <div v-if="isPremium" class="space-y-2">
         <button
           :disabled="cancelLoading"
@@ -67,7 +79,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import { useAuthStore } from '@/stores/authStore'
@@ -83,6 +95,8 @@ const loading = ref(false)
 const monthlyPriceId = import.meta.env.VITE_STRIPE_MONTHLY_PRICE_ID || 'price_monthly_default'
 const errorVisible = ref(false)
 const cancelLoading = ref(false)
+const countdown = ref('03:00:00')
+const offerActive = ref(true)
 
 const subStore = useSubscriptionStore()
 const sub = subStore.subscription
@@ -147,6 +161,32 @@ async function onUpgrade() {
 }
 
 onMounted(() => {
+  // Session-limited 3h countdown for the limited offer
+  try {
+    const key = 'promoExpiresAt'
+    let exp = parseInt(sessionStorage.getItem(key) || '0', 10)
+    if (!exp || Number.isNaN(exp) || exp < Date.now()) {
+      exp = Date.now() + 3 * 60 * 60 * 1000
+      sessionStorage.setItem(key, String(exp))
+    }
+    const tick = () => {
+      const left = Math.max(0, exp - Date.now())
+      if (left <= 0) {
+        offerActive.value = false
+        countdown.value = '00:00:00'
+        clearInterval(timer)
+        return
+      }
+      const s = Math.floor(left / 1000)
+      const h = String(Math.floor(s / 3600)).padStart(2, '0')
+      const m = String(Math.floor((s % 3600) / 60)).padStart(2, '0')
+      const sec = String(s % 60).padStart(2, '0')
+      countdown.value = `${h}:${m}:${sec}`
+    }
+    var timer = setInterval(tick, 1000)
+    tick()
+  } catch {}
+
   const qs = window?.location?.search || ''
   const isSuccess = qs.includes('status=success')
   const isCancel = qs.includes('status=cancel')
@@ -187,6 +227,7 @@ onMounted(() => {
     }
   } catch {}
 })
+onUnmounted(() => { try { if (typeof timer !== 'undefined') clearInterval(timer) } catch {} })
 
 // async function onCancel() {
 //   try {
