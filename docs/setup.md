@@ -62,6 +62,64 @@ ALLOW_DEV_ANY_ORIGIN=1
 
 The server runs on port 4000 by default (see `apps/backend-node/index.js`).
 
+## Marketing: LinkedIn Campaign Enhancements
+
+### 1) Current Campaign Overview
+
+Metric | Value | Insights
+--- | --- | ---
+Spend | $19 | Small test budget, perfect for validation
+Impressions | 879 | Healthy reach for a small audience
+CPM | $21 | Normal for LinkedIn Consideration
+Key Result | 6 website visits | ~$3.11/visit — great for cold traffic
+Top Ads | 🧠 Work Smarter, Not Harder; ✨ Designed for Dreamers Who Execute | The second ad got 4 visits despite lower CTR → stronger intent
+
+Traffic cross‑check (Mixpanel): 24 US visitors (Corpus Christi, Tulsa, Council Bluffs, NY) aligned with campaign timing.
+
+### 2) What’s Working
+- Aspirational productivity copy resonates with the audience
+- Creative matches brand (“Dreamers who Execute”)
+- CTR 0.56–1.2% is strong for cold traffic
+
+### 3) Install LinkedIn Insight Tag (per‑session analytics + retargeting)
+
+Add your partner id in the frontend env and Vite will auto‑inject the tag:
+
+1. Set env var in `apps/audit-agent-frontend/.env*`:
+```
+VITE_LINKEDIN_PARTNER_ID=XXXXXX
+```
+2. Build/run as usual; `index.html` conditionally loads the tag when this var is set.
+
+This enables audience building (e.g., “Visited but didn’t sign in”).
+
+Optional conversion example (track a click):
+```js
+// anywhere in the app, after tag loads
+window.lintrk && window.lintrk('track', { conversion_id: 'YOUR_CONVERSION_ID' })
+```
+
+### 4) Define Conversions in LinkedIn
+- Create “Sign‑in Click” and “Upgrade Now” conversions in Campaign Manager.
+- You’ll get a `conversion_id` for each → call `lintrk('track', { conversion_id })` on the click handlers.
+
+### 5) Retargeting Playbook
+After ~300 impressions:
+- Objective: Conversions
+- Audience: “Visited PlanCraftAI.com” (Insight Tag)
+- Message: “You’ve seen how smart planning looks. Ready to unlock reminders?”
+- Budget: $5/day; Expected CPC $1–2; Expected CVR 5–10%
+
+### 6) Next A/B Headlines
+1) 🎯 Plan Less. Achieve More — Meet Your AI Partner.
+2) 🧩 Your Plans. Our AI. Perfect Sync.
+3) 💭 Stop Overthinking. Start Executing with PlanCraftAI.
+
+### 7) Target Narrowing (US)
+- Location: United States
+- Job functions: Founders, Students, PMs, Researchers
+- Interests: Productivity tools, AI assistants, Planning software
+
 ### Deployment
 - Frontend: Firebase Hosting or any static host (Vite build output)
   - Build: `npm run build`
@@ -77,4 +135,3 @@ The server runs on port 4000 by default (see `apps/backend-node/index.js`).
   - The frontend sends small audio chunks every ~2.5s for live partials, and a final full blob on stop.
   - Backend chooses the first accessible model from `OPENAI_TRANSCRIBE_MODEL` + fallbacks.
   - CORS must allow your frontend origin (IP-based origins during dev are handled via `ALLOW_DEV_ANY_ORIGIN=1`).
-

@@ -7,8 +7,14 @@
 
     <!-- Page Title & Description -->
     <title>PlanCraftAI – Peaceful Productivity with AI</title>
-    <meta name="description" content="PlanCraftAI helps you plan, journal, and reflect with voice journaling, AI-powered task planning, and mindful insights. Your personal productivity companion for a balanced life." />
-    <meta name="keywords" content="AI planner, daily tasks, productivity, journaling, AI task generator, mindful planning, time management, focus, self improvement, PlanCraftAI" />
+    <meta
+      name="description"
+      content="PlanCraftAI helps you plan, journal, and reflect with voice journaling, AI-powered task planning, and mindful insights. Your personal productivity companion for a balanced life."
+    />
+    <meta
+      name="keywords"
+      content="AI planner, daily tasks, productivity, journaling, AI task generator, mindful planning, time management, focus, self improvement, PlanCraftAI"
+    />
     <meta name="author" content="PlanCraftAI by Abhishek" />
 
     <!-- App Identity -->
@@ -29,7 +35,10 @@
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://plancraftai.com" />
     <meta property="og:title" content="PlanCraftAI – Plan, Reflect & Grow with AI" />
-    <meta property="og:description" content="Your AI-powered planner for mindful productivity. Create tasks, set reminders, and journal with your voice — all in one calm space." />
+    <meta
+      property="og:description"
+      content="Your AI-powered planner for mindful productivity. Create tasks, set reminders, and journal with your voice — all in one calm space."
+    />
     <meta property="og:image" content="https://plancraftai.com/logo.png" />
     <meta property="og:image:width" content="512" />
     <meta property="og:image:height" content="512" />
@@ -38,8 +47,14 @@
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@PlanCraftAI" />
-    <meta name="twitter:title" content="PlanCraftAI – Peaceful Productivity with Voice Journaling and AI" />
-    <meta name="twitter:description" content="Pause, plan, and reflect with gentle voice journaling, smart tasks, and mindful insights guiding your daily flow." />
+    <meta
+      name="twitter:title"
+      content="PlanCraftAI – Peaceful Productivity with Voice Journaling and AI"
+    />
+    <meta
+      name="twitter:description"
+      content="Pause, plan, and reflect with gentle voice journaling, smart tasks, and mindful insights guiding your daily flow."
+    />
     <meta name="twitter:image" content="https://plancraftai.com/logo.png" />
 
     <!-- PWA -->
@@ -49,7 +64,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
     <!-- Enhanced Discoverability -->
-    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta
+      name="robots"
+      content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
+    />
     <meta name="revisit-after" content="7 days" />
     <meta http-equiv="Content-Language" content="en" />
 
@@ -80,6 +98,38 @@
         }
       }
     </script>
+
+    <!-- LinkedIn Insight Tag (enabled when VITE_LINKEDIN_PARTNER_ID is set) -->
+    <script type="text/javascript">
+      const partnerId = import.meta.env.VITE_LINKEDIN_PARTNER_ID;
+      if (partnerId) {
+        window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];
+        window._linkedin_data_partner_ids.push(partnerId);
+
+        (function(l) {
+          if (!l) {
+            window.lintrk = function(a,b){window.lintrk.q.push([a,b])};
+            window.lintrk.q = [];
+          }
+          const s = document.getElementsByTagName("script")[0];
+          const b = document.createElement("script");
+          b.type = "text/javascript";
+          b.async = true;
+          b.src = "https://snap.licdn.com/li.lms-analytics/insight.min.js";
+          s.parentNode.insertBefore(b, s);
+        })(window.lintrk);
+      }
+    </script>
+
+    <noscript>
+      <img
+        height="1"
+        width="1"
+        style="display: none"
+        alt=""
+        src="https://px.ads.linkedin.com/collect/?pid=8819569&fmt=gif"
+      />
+    </noscript>
   </head>
 
   <body>
@@ -89,15 +139,20 @@
     <!-- Google Analytics -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-N8V946JNDH"></script>
     <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-N8V946JNDH');
+      window.dataLayer = window.dataLayer || []
+      function gtag() {
+        dataLayer.push(arguments)
+      }
+      gtag('js', new Date())
+      gtag('config', 'G-N8V946JNDH')
     </script>
 
     <!-- Fallback for users without JS -->
     <noscript>
-      <p>PlanCraftAI works best with JavaScript enabled. Enable it to experience voice journaling and AI-powered planning.</p>
+      <p>
+        PlanCraftAI works best with JavaScript enabled. Enable it to experience voice journaling and
+        AI-powered planning.
+      </p>
     </noscript>
   </body>
 </html>
