@@ -107,7 +107,7 @@ export async function checkUserPlanUsage(userId, feature) {
   const used = Number(data[key] || 0)
   // Premium or admin users: effectively unlimited usage; free users limited per day
   const isAdmin = role === 'admin' || role === 'superadmin'
-  const limit = (plan === 'premium' || isAdmin) ? 9999 : 3
+  const limit = (plan === 'premium' || isAdmin) ? 9999 : 10
 
   // Under limit: increment and allow
   if (used < limit) {
@@ -154,6 +154,6 @@ export async function getUsageToday(userId, feature = 'reminder') {
   const data = snap.exists ? (snap.data() || {}) : {}
   const used = Number(data[String(feature)] || 0)
   const isAdmin = role === 'admin' || role === 'superadmin'
-  const limit = (plan === 'premium' || isAdmin) ? 9999 : 3
+  const limit = (plan === 'premium' || isAdmin) ? 9999 : 10
   return { used, limit, plan, date: todayKey }
 }
