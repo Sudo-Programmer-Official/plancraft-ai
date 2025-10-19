@@ -201,6 +201,9 @@ app.use(express.json());
 // Mount BEFORE auth-required routers to avoid 401 from other routers' requireAuth middlewares
 app.get('/api/google/oauth/callback', handleOAuthCallback)
 app.get('/api/google-calendar/callback', handleOAuthCallback)
+// Also expose root-level aliases to avoid any /api middleware interference on some hosts
+app.get('/google/oauth/callback', handleOAuthCallback)
+app.get('/google-calendar/callback', handleOAuthCallback)
 
 // Attach auth (prefer X-App-Token, fallback to Firebase) for all API routes
 app.use('/api', attachAuth)
