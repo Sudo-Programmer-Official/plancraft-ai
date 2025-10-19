@@ -38,21 +38,21 @@ try {
 export { analytics };
 
 // Initialize App Check (required if enforcement is enabled for Auth/Firestore/Storage)
-let appCheck = null
-try {
-  if (typeof window !== 'undefined') {
-    // Enable debug token locally if requested
-    // eslint-disable-next-line no-undef
-    if (import.meta.env.VITE_APPCHECK_DEBUG === '1') self.FIREBASE_APPCHECK_DEBUG_TOKEN = true
-    const siteKey = import.meta.env.VITE_APP_CHECK_SITE_KEY || import.meta.env.VITE_APPCHECK_SITE_KEY
-    if (siteKey) {
-      appCheck = initializeAppCheck(firebaseApp, {
-        provider: new ReCaptchaV3Provider(siteKey),
-        isTokenAutoRefreshEnabled: true,
-      })
-    }
-  }
-} catch {}
-export { appCheck }
+// let appCheck = null
+// try {
+//   if (typeof window !== 'undefined') {
+//     // Enable debug token locally if requested
+//     // eslint-disable-next-line no-undef
+//     if (import.meta.env.VITE_APPCHECK_DEBUG === '1') self.FIREBASE_APPCHECK_DEBUG_TOKEN = true
+//     const siteKey = import.meta.env.VITE_APP_CHECK_SITE_KEY || import.meta.env.VITE_APPCHECK_SITE_KEY
+//     if (siteKey) {
+//       appCheck = initializeAppCheck(firebaseApp, {
+//         provider: new ReCaptchaV3Provider(siteKey),
+//         isTokenAutoRefreshEnabled: true,
+//       })
+//     }
+//   }
+// } catch {}
+// export { appCheck }
 
 export default firebaseApp;
