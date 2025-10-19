@@ -104,6 +104,53 @@
             <span class="text-sm">{{ i.name }}</span>
           </button>
         </div>
+
+        <!-- Google Calendar Card -->
+        <div class="mt-6 rounded-lg border border-white/10 bg-slate-900/40 p-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="font-semibold flex items-center gap-2">📆 Google Calendar
+                <span v-if="google.enabled" :class="['text-xs px-2 py-0.5 rounded', google.connected ? 'bg-emerald-700/50 text-emerald-200' : 'bg-yellow-700/40 text-yellow-200']">
+                  {{ google.connected ? 'Connected' : 'Not Connected' }}
+                </span>
+                <span v-else class="text-xs px-2 py-0.5 rounded bg-slate-700/50 text-slate-300">Disabled by server</span>
+              </div>
+              <p class="text-xs text-slate-300 mt-1">Import meetings and show Join links in your tasks.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button v-if="google.enabled && !google.connected && authStore.user" @click="connectGoogle"
+                 class="px-3 py-1.5 rounded bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm">
+                Connect
+              </button>
+              <button v-if="google.connected" @click="syncNow" class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-sm">Sync Now</button>
+            </div>
+          </div>
+
+          <!-- Calendars selection -->
+          <div v-if="google.connected" class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label v-for="cal in google.calendars" :key="cal.id" class="flex items-center gap-2 bg-slate-800/40 border border-slate-700/40 rounded p-2">
+              <input type="checkbox" v-model="cal.selected" @change="onSelectionChange" class="accent-indigo-500">
+              <div class="flex-1">
+                <div class="text-sm">{{ cal.summary || cal.id }}</div>
+                <div class="text-xs text-slate-400">{{ cal.timeZone || '—' }}</div>
+              </div>
+              <span v-if="cal.primary" class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-700/50">primary</span>
+            </label>
+          </div>
+
+          <!-- Window + save -->
+          <div v-if="google.connected" class="mt-3 flex items-center gap-3 flex-wrap">
+            <label class="text-sm text-slate-300">Look-ahead window:</label>
+            <select v-model.number="google.windowDays" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm">
+              <option :value="7">7 days</option>
+              <option :value="14">14 days</option>
+              <option :value="30">30 days</option>
+              <option :value="60">60 days</option>
+            </select>
+            <button @click="saveSelection" class="px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-sm">Save Selection</button>
+            <span v-if="google.status" class="text-xs text-slate-400">Status: {{ google.status }}</span>
+          </div>
+        </div>
       </section>
 
       <!-- Account -->
@@ -130,6 +177,8 @@ import { reactive, ref, onMounted, computed } from "vue"
 import { useAuthStore } from "@/stores/authStore"
 import { useRouter, useRoute } from "vue-router"
 import { ElMessage } from "element-plus"
+import { normalizePhone, guessCountryFromLocale } from '@/utils/phoneUtils'
+import { getGoogleStatus, getGoogleCalendars, saveGoogleCalendarSelection, triggerGoogleSyncNow, requestGoogleConnectUrl } from '@/stores/integrationsStore'
 import { getPreferences as apiGetPrefs, updatePreferences as apiUpdatePrefs, getIntegrations, updateIntegrations } from "@/services/settingsService"
 import { subscribeUserToPush } from "@/services/pwaService"
 import { useSubscriptionStore } from "@/stores/subscriptionStore"
@@ -225,6 +274,7 @@ onMounted(async () => {
   } catch (e) {
     console.warn('Failed to load preferences', e)
   }
+  try { await loadGoogle() } catch {}
 })
 
 // Optional: auto-save debounce can be added later. For now, use Save button.
@@ -259,6 +309,69 @@ const effectiveTwilioPhone = computed(() => {
     return smsPref || voicePref || smsInt || waInt || userPhone || ''
   } catch { return '' }
 })
+
+// Google Calendar integration state and handlers
+const google = reactive({ enabled: true, connected: false, calendars: [], windowDays: 30, status: '', lastRun: null })
+async function connectGoogle() {
+  try {
+    if (!authStore.user?.uid) return
+    const url = await requestGoogleConnectUrl(authStore.user.uid)
+    if (url) window.location.href = url
+    else ElMessage.error('Failed to get Google consent URL')
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.error || 'Failed to start Google connect')
+  }
+}
+
+async function loadGoogle() {
+  try {
+    if (!authStore.user?.uid) return
+    let status
+    try {
+      status = await getGoogleStatus(authStore.user.uid)
+    } catch (e) {
+      // if disabled server-side
+      google.enabled = false
+      return
+    }
+    google.enabled = true
+    google.connected = !!status?.connected
+    google.windowDays = Number(status?.sync?.windowDays || 30)
+    google.status = status?.sync?.status || ''
+    google.lastRun = status?.sync?.lastRun || null
+    if (!google.connected) return
+    const cals = await getGoogleCalendars(authStore.user.uid)
+    google.calendars = Array.isArray(cals) ? cals : []
+  } catch (e) {
+    console.warn('loadGoogle failed', e?.message || e)
+  }
+}
+
+async function saveSelection() {
+  try {
+    if (!authStore.user?.uid) return
+    const selected = (google.calendars || []).filter(c => c.selected).map(c => c.id)
+    await saveGoogleCalendarSelection(authStore.user.uid, selected, google.windowDays)
+    ElMessage.success('Google calendar selection saved')
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.error || 'Failed to save selection')
+  }
+}
+
+async function syncNow() {
+  try {
+    if (!authStore.user?.uid) return
+    const ok = await triggerGoogleSyncNow(authStore.user.uid)
+    if (ok) ElMessage.success('Sync started')
+    else ElMessage.warning('Sync request not accepted')
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.error || 'Sync failed')
+  }
+}
+
+function onSelectionChange() {
+  // placeholder to react to checkbox change; selection is persisted via Save Selection
+}
 
 function handleLogout() {
   authStore.logout()
@@ -345,4 +458,3 @@ section h2 {
   color: #f8fafc;
 }
 </style>
-import { normalizePhone, guessCountryFromLocale } from '@/utils/phoneUtils'

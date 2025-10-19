@@ -60,6 +60,16 @@
                     {{ task.title }}
                   </span>
                   <div class="flex items-center gap-2">
+                    <a
+                      v-if="task?.join?.url"
+                      :href="task.join.url"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="text-xs px-2 py-1 rounded bg-emerald-700 hover:bg-emerald-800 text-white"
+                      :title="`Join ${task?.join?.provider || 'meeting'}`"
+                    >
+                      Join
+                    </a>
                     <span class="text-xs text-slate-400">{{ task.date }}</span>
                     <button
                       v-if="reminderActiveByTask[task.id]"
@@ -94,6 +104,12 @@
                     <p v-if="task.details" class="text-sm text-slate-300">
                       {{ task.details }}
                     </p>
+
+                    <!-- Meeting extras -->
+                    <div v-if="task?.source === 'google_calendar'" class="text-xs text-slate-300 flex items-center gap-2">
+                      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 border border-slate-700/60">Calendar</span>
+                      <a v-if="task?.htmlLink" :href="task.htmlLink" target="_blank" rel="noopener" class="text-indigo-300 underline hover:text-indigo-200">Open in Google Calendar</a>
+                    </div>
 
                     <!-- Optional Link -->
                     <p v-if="task.link" class="text-sm">

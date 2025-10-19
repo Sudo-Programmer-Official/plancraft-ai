@@ -95,6 +95,8 @@ import blogRoutes from "./routes/blogRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import { attachAuth } from "./middleware/auth.js";
 import twilioRoutes from "./routes/twilioRoutes.js";
+import googleAuthRoutes, { handleOAuthCallback } from "./routes/googleAuthRoutes.js";
+import googleCalendarRoutes from "./routes/googleCalendarRoutes.js";
 
 dotenv.config();
 
@@ -195,6 +197,11 @@ app.get('/api/stripe/webhook-health', (req, res) => {
 // JSON parser for all other routes
 app.use(express.json());
 
+// --- Google OAuth callbacks (public) ---
+// Mount BEFORE auth-required routers to avoid 401 from other routers' requireAuth middlewares
+app.get('/api/google/oauth/callback', handleOAuthCallback)
+app.get('/api/google-calendar/callback', handleOAuthCallback)
+
 // Attach auth (prefer X-App-Token, fallback to Firebase) for all API routes
 app.use('/api', attachAuth)
 
@@ -222,6 +229,9 @@ app.use("/api", parseRemindersRoutes);
 app.use("/api", testRoutes);
 app.use("/api/blogs", blogRoutes);
 app.use("/api/twilio", twilioRoutes);
+// Mount Google routes (guarded internally by feature flag)
+app.use("/api", googleAuthRoutes);
+app.use("/api", googleCalendarRoutes);
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
