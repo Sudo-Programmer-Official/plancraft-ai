@@ -16,12 +16,13 @@ router.get('/google/connect', requireAuth, ensureUserMatches, async (req, res) =
     const userId = req.query.userId || req?.user?.uid
     if (!userId) return res.status(400).json({ error: 'Missing userId' })
     const url = await buildConsentUrl(String(userId))
+    try { console.info('[GoogleOAuth] /google/connect', { uid: String(userId), accept: req.headers['accept'], preview: String(url).slice(0, 120) + '…' }) } catch {}
     // If Accept: application/json, return JSON; else redirect for convenience
     const accept = String(req.headers['accept'] || '')
     if (/json/.test(accept)) return res.json({ url })
     return res.redirect(url)
   } catch (e) {
-    console.error('GET /google/connect failed', e)
+    console.error('GET /google/connect failed', e?.message || e)
     return res.status(500).json({ error: 'Internal error' })
   }
 })
@@ -34,13 +35,28 @@ export async function handleOAuthCallback(req, res) {
     }
     const code = String(req.query.code || '')
     const state = String(req.query.state || '')
-    if (!code || !state) return res.status(400).send('Missing code or state')
+    const errParam = String(req.query.error || '')
+
+    const successUrl = process.env.GOOGLE_CONNECT_REDIRECT_SUCCESS || process.env.APP_SUCCESS_URL || 'https://plancraftai.com/settings?google=connected'
+    const failUrlBase = process.env.GOOGLE_CONNECT_REDIRECT_FAILURE || process.env.APP_FAILURE_URL || 'https://plancraftai.com/settings?google=error'
+    const redirectFail = (reason) => {
+      const join = failUrlBase.includes('?') ? '&' : '?'
+      const url = `${failUrlBase}${join}reason=${encodeURIComponent(reason || 'unknown')}`
+      try { console.error('[GoogleOAuth] redirect (fail)', { reason }) } catch {}
+      return res.redirect(url)
+    }
+
+    try { console.info('[GoogleOAuth] callback hit', { hasCode: !!code, hasState: !!state, error: errParam || null }) } catch {}
+    if (errParam) return redirectFail(errParam || 'access_denied')
+    if (!code || !state) return redirectFail('missing_params')
 
     const parsed = await parseAndVerifyState(state)
-    if (!parsed?.userId) return res.status(400).send('Invalid state')
+    if (!parsed?.userId) return redirectFail('invalid_state')
     const userId = parsed.userId
+    try { console.info('[GoogleOAuth] state ok → user', userId) } catch {}
     const tokens = await exchangeCodeForTokens(code)
     await saveUserGoogleTokens(userId, tokens)
+    try { console.info('[GoogleOAuth] tokens saved', { uid: userId, hasRefresh: !!tokens?.refresh_token }) } catch {}
 
     // Prime calendars snapshot on connect (non-fatal if it fails)
     try {
@@ -50,12 +66,18 @@ export async function handleOAuthCallback(req, res) {
       console.warn('listCalendars after connect failed:', e?.message || e)
     }
 
-    const uiUrl = process.env.GOOGLE_CONNECT_REDIRECT_SUCCESS || process.env.APP_SUCCESS_URL || 'https://plancraftai.com/settings'
-    return res.redirect(uiUrl)
+    try { console.info('[GoogleOAuth] redirect →', successUrl) } catch {}
+    return res.redirect(successUrl)
   } catch (e) {
-    console.error('GET /google/oauth/callback error', e)
-    const failUrl = process.env.GOOGLE_CONNECT_REDIRECT_FAILURE || process.env.APP_FAILURE_URL || 'https://plancraftai.com/settings?google=error'
-    try { return res.redirect(failUrl) } catch {}
+    const msg = String(e?.message || '')
+    let reason = 'exchange_failed'
+    if (/invalid[_\s-]?grant/i.test(msg)) reason = 'invalid_grant'
+    else if (/invalid[_\s-]?client/i.test(msg)) reason = 'invalid_client'
+    else if (/redirect_uri/i.test(msg)) reason = 'redirect_uri_mismatch'
+    console.error('GET /google/oauth/callback error', msg)
+    const join = (process.env.GOOGLE_CONNECT_REDIRECT_FAILURE || '').includes('?') ? '&' : '?'
+    const fail = (process.env.GOOGLE_CONNECT_REDIRECT_FAILURE || process.env.APP_FAILURE_URL || 'https://plancraftai.com/settings?google=error') + `${join}reason=${encodeURIComponent(reason)}`
+    try { return res.redirect(fail) } catch {}
     return res.status(500).send('Failed to connect Google')
   }
 }

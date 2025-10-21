@@ -205,6 +205,18 @@ app.get('/api/google-calendar/callback', handleOAuthCallback)
 app.get('/google/oauth/callback', handleOAuthCallback)
 app.get('/google-calendar/callback', handleOAuthCallback)
 
+// Lightweight trace logger for Google OAuth routes (enable with GOOGLE_OAUTH_DEBUG=1)
+if (String(process.env.GOOGLE_OAUTH_DEBUG || '').toLowerCase() === '1' || String(process.env.GOOGLE_OAUTH_DEBUG || '').toLowerCase() === 'true') {
+  app.use((req, _res, next) => {
+    try {
+      if (/google.*callback|google\/connect/.test(req.path)) {
+        console.info('[TRACE]', req.method, req.path, { origin: req.headers.origin, accept: req.headers['accept'] })
+      }
+    } catch {}
+    next()
+  })
+}
+
 // Attach auth (prefer X-App-Token, fallback to Firebase) for all API routes
 app.use('/api', attachAuth)
 

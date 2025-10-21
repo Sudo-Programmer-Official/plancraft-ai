@@ -10,6 +10,14 @@ export const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/calendar.settings.readonly',
 ]
 
+// Debug helper (enable with GOOGLE_OAUTH_DEBUG=1)
+const OAUTH_DEBUG = String(process.env.GOOGLE_OAUTH_DEBUG || '').toLowerCase()
+function dbg(...args) {
+  if (OAUTH_DEBUG === '1' || OAUTH_DEBUG === 'true') {
+    try { console.info('[GoogleOAuth]', ...args) } catch {}
+  }
+}
+
 function getEnv(name, fallback = '') {
   const v = process.env[name]
   return typeof v === 'string' && v.trim() ? v.trim() : fallback
@@ -44,6 +52,7 @@ async function mintState(userId, ttlSeconds = 600) {
       exp,
       createdAt: new Date(),
     })
+    dbg('mintState ok', { uid: String(userId), nonce, exp })
   } catch {}
   return token
 }
@@ -67,6 +76,7 @@ export async function parseAndVerifyState(state) {
       const data = snap.data() || {}
       if (String(data.userId) !== String(userId)) return null
       await ref.delete().catch(() => {})
+      dbg('state verified', { uid: String(userId), nonce })
     } catch {}
     return { userId }
   } catch {
@@ -89,6 +99,7 @@ export async function buildConsentUrl(userId) {
     scope: GOOGLE_SCOPES.join(' '),
     state,
   })
+  dbg('buildConsentUrl', { uid: String(userId), redirect_uri, client_id: client_id?.slice(0, 12) + '…' })
   return `${GOOGLE_OAUTH_BASE}?${params.toString()}`
 }
 
@@ -97,6 +108,17 @@ export async function exchangeCodeForTokens(code) {
   const client_secret = getEnv('GOOGLE_CLIENT_SECRET')
   const redirect_uri = getEnv('GOOGLE_REDIRECT_URI')
   if (!client_id || !client_secret || !redirect_uri) throw new Error('Missing Google OAuth credentials')
+  const maskId = (s) => (s ? `${String(s).slice(0, 8)}…${String(s).slice(-6)}` : 'n/a')
+  const fp = (id, sec) => (
+    crypto.createHash('sha256').update(`${id || ''}:${sec || ''}`).digest('hex').slice(0, 12)
+  )
+  dbg('exchangeCodeForTokens start', {
+    code: String(code || '').slice(0, 8) + '…',
+    redirect_uri,
+    client_id: maskId(client_id),
+    secret_len: (client_secret || '').length,
+    cred_fp: fp(client_id, client_secret),
+  })
   const body = new URLSearchParams({
     code,
     client_id,
@@ -107,11 +129,13 @@ export async function exchangeCodeForTokens(code) {
   const resp = await fetch(TOKEN_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body })
   if (!resp.ok) {
     const text = await resp.text().catch(() => '')
+    dbg('exchangeCodeForTokens failed', { status: resp.status, text: text?.slice(0, 120) })
     throw new Error(`Token exchange failed: ${resp.status} ${text}`)
   }
   const json = await resp.json()
   // Normalize expiry_date in ms epoch
   const expiry_date = json.expires_in ? Date.now() + Number(json.expires_in) * 1000 : undefined
+  dbg('exchangeCodeForTokens ok', { hasRefresh: !!json.refresh_token, expiresIn: json.expires_in })
   return { ...json, expiry_date }
 }
 

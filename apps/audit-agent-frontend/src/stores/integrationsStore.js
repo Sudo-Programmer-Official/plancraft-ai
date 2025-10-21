@@ -1,6 +1,7 @@
 // Lightweight client helpers for Google Calendar integration
 // These are no-ops unless backend feature flag ENABLE_GOOGLE_CALENDAR=1 is set.
 import api from '@/services/api'
+import { auth } from '@/firebase/init'
 
 export async function getGoogleStatus(userId) {
   const { data } = await api.get('/google/status', { params: { userId } })
@@ -31,6 +32,11 @@ export function getGoogleConnectUrl(userId) {
 
 // Preferred: ask backend for the consent URL via XHR (includes auth headers), then navigate.
 export async function requestGoogleConnectUrl(userId) {
+  // Proactively refresh Firebase ID token to avoid backend 401 on stale tokens
+  try {
+    const user = auth?.currentUser
+    if (user && user.getIdToken) await user.getIdToken(true)
+  } catch {}
   const res = await api.get('/google/connect', {
     params: { userId },
     headers: { Accept: 'application/json' },
