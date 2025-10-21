@@ -11,3 +11,34 @@ export async function getAllActiveUsers(limit = 1000) {
   return out
 }
 
+// Ensure a user profile document exists and is timestamped.
+// If creating, set profileComplete based on presence of a name.
+export async function ensureUserProfile(uid, data = {}) {
+  if (!uid) throw new Error('ensureUserProfile: uid is required')
+  const ref = db.collection('users').doc(String(uid))
+  const snap = await ref.get()
+  if (!snap.exists) {
+    const base = {
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }
+    if (base.profileComplete == null) {
+      base.profileComplete = !!(base.name || base.displayName)
+    }
+    await ref.set(base)
+  } else {
+    await ref.set({ updatedAt: new Date() }, { merge: true })
+  }
+  const fresh = await ref.get()
+  return fresh.exists ? fresh.data() : null
+}
+
+// Merge updates into a user profile and bump updatedAt
+export async function updateUserProfile(uid, update = {}) {
+  if (!uid) throw new Error('updateUserProfile: uid is required')
+  await db.collection('users').doc(String(uid)).set(
+    { ...update, updatedAt: new Date() },
+    { merge: true }
+  )
+}

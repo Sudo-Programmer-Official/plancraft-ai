@@ -90,3 +90,18 @@ router.get('/test/whatsapp/check', async (req, res) => {
     res.status(500).json({ ok: false, error: e?.message || 'server error' })
   }
 })
+
+// GET /api/test/profile
+// Verifies that ensureUserProfile has scaffolded the user doc and returns it.
+router.get('/test/profile', async (req, res) => {
+  try {
+    const uid = String(req?.user?.uid || req?.query?.userId || '')
+    if (!uid) return res.status(401).json({ ok: false, error: 'Unauthorized' })
+    const snap = await db.collection('users').doc(uid).get()
+    const exists = snap.exists
+    const data = exists ? (snap.data() || {}) : null
+    return res.json({ ok: true, exists, user: data })
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: e?.message || 'server error' })
+  }
+})

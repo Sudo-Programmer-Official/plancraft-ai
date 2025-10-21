@@ -1,6 +1,7 @@
 import admin from 'firebase-admin'
 import crypto from 'crypto'
 import '../services/firebaseAdmin.js' // ensure admin is initialized
+import { ensureUserProfile } from '../services/userService.js'
 
 function b64urlDecode(str) {
   str = str.replace(/-/g, '+').replace(/_/g, '/')
@@ -67,6 +68,23 @@ export async function requireAuth(req, res, next) {
     await attachAuth(req, res, () => {})
   }
   if (!req.user) return res.status(401).json({ error: 'Unauthorized' })
+
+  // Auto-ensure Firestore user profile exists and is timestamped.
+  try {
+    const uid = String(req.user.uid)
+    // Try to enrich from token payload when available
+    const p = (req.auth && req.auth.payload) || {}
+    const email = req.user.email || p.email || null
+    const name = p.name || p.displayName || null
+    const phone = p.phone_number || p.phone || null
+    await ensureUserProfile(uid, {
+      email: email || undefined,
+      name: name || undefined,
+      phone: phone || undefined,
+      profileComplete: !!name,
+    })
+  } catch {}
+
   return next()
 }
 

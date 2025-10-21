@@ -352,12 +352,13 @@
         </div>
       </footer>
       <PlanSummaryModal :open="planOpen" @close="planOpen = false" />
+      <ProfileSetup :open="profileSetupOpen" @close="profileSetupOpen=false" @saved="onProfileSaved" />
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { hasSubscription, registerPushSubscription } from '@/services/pushService'
 import NotificationBanner from '@/components/NotificationBanner.vue'
 import { onUnmounted } from 'vue'
@@ -370,6 +371,9 @@ import NotificationDropdown from '@/components/NotificationDropdown.vue'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useAuthFlags } from '@/composables/useAuthFlags'
 import PlanSummaryModal from '@/components/PlanSummaryModal.vue'
+import ProfileSetup from '@/components/ProfileSetup.vue'
+import { db } from '@/firebase/init'
+import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { trackLinkedInConversion } from '@/utils/ads'
 const currentUserId = ref(null)
 
@@ -402,12 +406,15 @@ onMounted(() => {
       }
     } catch (_) {}
   }, 0)
+  // Initial check for profile completion
+  try { maybePromptProfile() } catch {}
 })
 
 const sidebarOpen = ref(true) // desktop toggle
 const mobileMenu = ref(false) // mobile drawer toggle
 const showUpgrade = ref(false)
 const planOpen = ref(false)
+const profileSetupOpen = ref(false)
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -440,6 +447,35 @@ function onDocumentClick(e) {
 
 function markAllRead() {
   unreadCount.value = 0
+}
+
+// Prompt for profile setup if incomplete
+watch(() => authStore.user?.uid, () => { maybePromptProfile() })
+
+async function maybePromptProfile() {
+  try {
+    const uid = authStore?.user?.uid
+    if (!uid) return
+    const localKey = `profile_setup_done:${uid}`
+    if (localStorage.getItem(localKey) === '1') return
+    const ref = doc(db, 'users', uid)
+    const snap = await getDoc(ref)
+    if (!snap.exists()) {
+      await setDoc(ref, { createdAt: new Date(), updatedAt: new Date(), profileComplete: false }, { merge: true })
+      profileSetupOpen.value = true
+      return
+    }
+    const data = snap.data() || {}
+    const complete = !!data.profileComplete || !!data.name
+    if (!complete) profileSetupOpen.value = true
+  } catch {}
+}
+
+function onProfileSaved() {
+  try {
+    const uid = authStore?.user?.uid
+    if (uid) localStorage.setItem(`profile_setup_done:${uid}`, '1')
+  } catch {}
 }
 
 const tabs = [

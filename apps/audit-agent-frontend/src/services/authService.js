@@ -33,6 +33,7 @@ export async function signInWithGoogle() {
     name: user.displayName,
     mode: "google",
     createdAt: Date.now(),
+    profileComplete: !!(user.displayName),
   }, { merge: true });
   return user;
 }
@@ -49,6 +50,7 @@ export async function signInWithEmail(email, password) {
     name: user.displayName || '',
     mode: 'email',
     lastLoginAt: Date.now(),
+    ...(user.displayName ? { profileComplete: true } : {}),
   }, { merge: true })
   return user
 }
@@ -61,6 +63,7 @@ export async function registerWithEmail(email, password) {
     name: user.displayName || '',
     mode: 'email',
     createdAt: Date.now(),
+    profileComplete: !!(user.displayName),
   }, { merge: true })
   return user
 }

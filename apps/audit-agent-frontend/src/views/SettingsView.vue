@@ -157,12 +157,32 @@
       <section class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10 max-w-md mx-auto sm:max-w-none">
         <h2 class="text-lg sm:text-xl font-semibold mb-4">👤 Account</h2>
         <div class="flex items-center gap-4 mb-4">
-          <img :src="authStore.user?.photoURL || 'https://i.pravatar.cc/80'" alt="avatar" class="w-14 h-14 rounded-full" />
+          <AvatarUploader :url="authStore.user?.photoURL || authStore.user?.avatarUrl" @updated="onAvatarUpdated" />
           <div>
-            <p class="font-medium">{{ authStore.user?.displayName || 'Guest User' }}</p>
-            <p class="text-sm text-indigo-300">{{ authStore.user?.email }}</p>
+            <p class="font-medium">{{ profileForm.name || authStore.user?.displayName || 'Guest User' }}</p>
+            <p class="text-sm text-indigo-300">{{ profileForm.email || authStore.user?.email }}</p>
           </div>
         </div>
+
+        <div v-if="!profileComplete" class="mb-3 text-yellow-300 text-sm">
+          ⚠️ Your profile is incomplete — add your name to personalize your experience.
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
+          <el-input v-model="profileForm.name" placeholder="Your name" clearable />
+          <el-input v-model="profileForm.email" placeholder="Email (optional)" type="email" clearable />
+          <el-input v-model="profileForm.phone" placeholder="Phone (optional)" type="tel" clearable />
+        </div>
+        <div v-if="emailNeedsReauth" class="mb-4 text-xs text-yellow-300 bg-yellow-400/10 border border-yellow-300/30 rounded px-3 py-2 flex items-center justify-between gap-3">
+          <span>
+            Changing your email requires a recent login. Re-authenticate to continue.
+          </span>
+          <el-button size="small" type="primary" @click="reauthenticate">Re-authenticate</el-button>
+        </div>
+        <div class="flex items-center justify-end gap-3 mb-6">
+          <el-button type="primary" class="bg-gradient-to-r from-indigo-600 to-purple-600" :loading="profileSaving" @click="saveProfile">Save Changes</el-button>
+        </div>
+
         <div class="flex flex-col sm:flex-row gap-3 justify-center items-center w-full">
           <RouterLink to="/help" class="px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base rounded-lg bg-gray-800 hover:bg-gray-700 transition">💬 Help & Feedback</RouterLink>
           <button class="px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base rounded-lg bg-red-600 hover:bg-red-700 transition" @click="handleLogout">Logout</button>
@@ -171,9 +191,63 @@
     </main>
   </div>
   <PlanSummaryModal :open="planOpen" @close="planOpen=false" />
+  <!-- Re-auth dialog -->
+  <el-dialog v-model="reauthOpen" title="Re-authenticate" width="420px" :append-to-body="true">
+    <div v-if="reauthStep === 0" class="space-y-3">
+      <p class="text-sm text-slate-300">Choose a method to verify your identity.</p>
+      <el-radio-group v-model="reauthMethod" class="flex flex-col gap-2">
+        <el-radio v-if="reauthHasGoogle" label="google">Google Popup</el-radio>
+        <el-radio v-if="reauthHasPhone" label="phone">Phone ({{ maskedPhone }})</el-radio>
+      </el-radio-group>
+      <div class="flex justify-end gap-2 pt-2">
+        <el-button @click="reauthOpen=false">Cancel</el-button>
+        <el-button type="primary" :disabled="!reauthMethod" @click="startReauth">Continue</el-button>
+      </div>
+    </div>
+    <div v-else-if="reauthMethod === 'phone'" class="space-y-3">
+      <p class="text-sm text-slate-300">Enter the 6-digit code sent to {{ maskedPhone }}.</p>
+      <el-input v-model="otp" placeholder="OTP code" maxlength="6" />
+      <div class="text-xs text-slate-400 flex items-center justify-between">
+        <span>Didn't receive the code?</span>
+        <div class="flex items-center gap-1">
+          <el-tooltip effect="dark" placement="top" :content="`You can request a new code every ${cooldownDefault}s. Multiple attempts may trigger a longer wait.`">
+            <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-slate-600/40 text-slate-200 cursor-help">i</span>
+          </el-tooltip>
+          <el-button
+            link
+            type="primary"
+            :loading="reauthLoading"
+            :disabled="!canResend"
+            @click="resendOtp"
+          >
+            Resend OTP<span v-if="!canResend"> ({{ resendCooldown }}s)</span>
+          </el-button>
+        </div>
+      </div>
+      <div class="flex justify-between items-center">
+        <el-button link type="primary" @click="resetReauth">Use different method</el-button>
+        <div class="flex gap-2">
+          <el-button @click="reauthOpen=false">Cancel</el-button>
+          <el-button type="primary" :loading="reauthLoading" @click="verifyOtp">Verify</el-button>
+        </div>
+      </div>
+    </div>
+    <div v-else-if="reauthMethod === 'google'" class="space-y-3">
+      <p class="text-sm text-slate-300">We’ll open a Google sign-in popup to verify.</p>
+      <div class="flex justify-between items-center">
+        <el-button link type="primary" @click="resetReauth">Use different method</el-button>
+        <div class="flex gap-2">
+          <el-button @click="reauthOpen=false">Cancel</el-button>
+          <el-button type="primary" :loading="reauthLoading" @click="doGoogleReauth">Continue</el-button>
+        </div>
+      </div>
+    </div>
+  </el-dialog>
+  <!-- Hidden container for re-auth phone reCAPTCHA -->
+  <div id="reauth-recaptcha" style="position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;overflow:hidden" />
 </template>
 <script setup>
-import { reactive, ref, onMounted, computed } from "vue"
+import { reactive, ref, onMounted, computed, watch, onBeforeUnmount } from "vue"
 import { useAuthStore } from "@/stores/authStore"
 import { useRouter, useRoute } from "vue-router"
 import { ElMessage } from "element-plus"
@@ -186,6 +260,10 @@ import { isFeatureAllowed, getRemainingAI } from "@/services/planService"
 import PlanSummaryModal from "@/components/PlanSummaryModal.vue"
 import { useIsPremium } from "@/composables/useIsPremium"
 import { trackLinkedInConversion } from '@/utils/ads'
+import { getAuth, updateProfile, updateEmail, GoogleAuthProvider, reauthenticateWithPopup, RecaptchaVerifier, PhoneAuthProvider, reauthenticateWithCredential } from 'firebase/auth'
+import { db } from '@/firebase/init'
+import { doc, getDoc, setDoc } from 'firebase/firestore'
+import AvatarUploader from '@/components/AvatarUploader.vue'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -195,6 +273,56 @@ const { refresh: refreshPremium } = useIsPremium()
 const dirty = ref(false) // tracks unsaved changes
 const notificationsSection = ref(null)
 const highlightNotifications = ref(false)
+
+// Account profile state
+const auth = getAuth()
+const profileForm = reactive({ name: '', email: '', phone: '' })
+const profileSaving = ref(false)
+const emailNeedsReauth = ref(false)
+const profileComplete = ref(true)
+// Re-auth state
+const reauthOpen = ref(false)
+const reauthMethod = ref('')
+const reauthHasGoogle = ref(false)
+const reauthHasPhone = ref(false)
+const reauthLoading = ref(false)
+const reauthVerificationId = ref('')
+const otp = ref('')
+const reauthStep = ref(0)
+const maskedPhone = computed(() => {
+  try {
+    const raw = auth?.currentUser?.phoneNumber || profileForm.phone || ''
+    if (!raw) return ''
+    const s = String(raw)
+    if (s.length <= 4) return s
+    return s.slice(0, 4) + '…' + s.slice(-2)
+  } catch { return '' }
+})
+
+// Reusable invisible reCAPTCHA instance for phone re-auth
+let reauthRecaptcha = null
+async function ensureReauthRecaptcha(force = false) {
+  try {
+    if (force && reauthRecaptcha) {
+      try { reauthRecaptcha.clear() } catch {}
+      reauthRecaptcha = null
+    }
+    if (!reauthRecaptcha) {
+      reauthRecaptcha = new RecaptchaVerifier(auth, 'reauth-recaptcha', { size: 'invisible' })
+      try { await reauthRecaptcha.render() } catch {}
+    }
+  } catch {}
+  return reauthRecaptcha
+}
+
+// Env-configurable resend cooldown (bounds: 5–120s; default 10s)
+function getCooldownSeconds() {
+  const raw = Number(import.meta.env.VITE_OTP_RESEND_COOLDOWN)
+  if (!Number.isFinite(raw)) return 10
+  return Math.min(Math.max(Math.floor(raw), 5), 120)
+}
+let lastOtpSentAt = 0
+const cooldownDefault = getCooldownSeconds()
 
 // Notification preferences state
 const prefs = reactive({
@@ -270,6 +398,20 @@ onMounted(async () => {
         slack: { userId: resInts?.slack?.userId || '', token: resInts?.slack?.token || '' },
         email: resInts?.email || authStore.user.email || ''
       }
+
+      // Load profile fields and compute profile completion
+      try {
+        const u = auth.currentUser
+        if (u?.uid) {
+          const uref = doc(db, 'users', u.uid)
+          const usnap = await getDoc(uref)
+          const udata = usnap.exists() ? (usnap.data() || {}) : {}
+          profileForm.name = udata.name || u.displayName || ''
+          profileForm.email = udata.email || u.email || ''
+          profileForm.phone = udata.phone || u.phoneNumber || ''
+          profileComplete.value = !!(udata.name || u.displayName)
+        }
+      } catch {}
     }
   } catch (e) {
     console.warn('Failed to load preferences', e)
@@ -422,6 +564,219 @@ async function saveSettings() {
     console.error("Failed to save settings:", error)
     ElMessage.error("❌ Failed to save settings. Please try again.")
   }
+}
+
+function onAvatarUpdated(url) {
+  try {
+    if (!url) return
+    // reflect locally for instant UI update
+    authStore.user = { ...(authStore.user || {}), photoURL: url, avatarUrl: url }
+  } catch {}
+}
+
+async function saveProfile() {
+  const u = auth.currentUser
+  if (!u?.uid) return
+  profileSaving.value = true
+  try {
+    const ref = doc(db, 'users', u.uid)
+    await setDoc(ref, {
+      name: profileForm.name || undefined,
+      email: profileForm.email || undefined,
+      phone: profileForm.phone || undefined,
+      profileComplete: !!(profileForm.name && profileForm.name.trim().length),
+      updatedAt: new Date(),
+    }, { merge: true })
+    try { await updateProfile(u, { displayName: profileForm.name || '' }) } catch {}
+    if (profileForm.email && profileForm.email !== u.email) {
+      try {
+        await updateEmail(u, profileForm.email)
+        emailNeedsReauth.value = false
+      } catch (e) {
+        const msg = String(e?.message || '')
+        // Firebase error code detection across SDK versions
+        if (msg.includes('requires-recent-login') || msg.includes('auth/requires-recent-login')) {
+          emailNeedsReauth.value = true
+        }
+      }
+    }
+    profileComplete.value = !!(profileForm.name && profileForm.name.trim().length)
+    ElMessage.success('Profile updated successfully!')
+  } catch (e) {
+    console.error('Failed to update profile', e)
+    ElMessage.error('Failed to update profile')
+  } finally {
+    profileSaving.value = false
+  }
+}
+
+function reauthenticate() {
+  const u = auth.currentUser
+  if (!u) return
+  const providers = (u.providerData || []).map(p => p.providerId)
+  reauthHasGoogle.value = providers.includes('google.com')
+  reauthHasPhone.value = providers.includes('phone') && !!u.phoneNumber
+  reauthMethod.value = reauthHasGoogle.value && !reauthHasPhone.value ? 'google' : (!reauthHasGoogle.value && reauthHasPhone.value ? 'phone' : '')
+  reauthStep.value = 0
+  otp.value = ''
+  reauthVerificationId.value = ''
+  reauthOpen.value = true
+}
+
+async function startReauth() {
+  const u = auth.currentUser
+  if (!u || !reauthMethod.value) return
+  if (reauthMethod.value === 'google') {
+    return doGoogleReauth()
+  }
+  if (reauthMethod.value === 'phone') {
+    try {
+      reauthLoading.value = true
+      const verifier = await ensureReauthRecaptcha(true)
+      const prov = new PhoneAuthProvider(auth)
+      const vid = await prov.verifyPhoneNumber(u.phoneNumber, verifier)
+      reauthVerificationId.value = vid
+      reauthStep.value = 1
+      ElMessage.success('OTP sent')
+      lastOtpSentAt = Date.now()
+      startResendCooldown(getCooldownSeconds())
+    } catch (e) {
+      console.warn('Send OTP failed', e)
+      const code = String(e?.code || e?.message || '')
+      if (code.includes('too-many-requests')) {
+        startResendCooldown(Math.max(getCooldownSeconds(), 60))
+        ElMessage.error('Too many attempts. Please try again later.')
+      } else {
+        ElMessage.error('Failed to send OTP')
+      }
+    } finally {
+      reauthLoading.value = false
+    }
+  }
+}
+
+async function verifyOtp() {
+  const u = auth.currentUser
+  if (!u || !reauthVerificationId.value || !otp.value) return
+  try {
+    reauthLoading.value = true
+    const cred = PhoneAuthProvider.credential(reauthVerificationId.value, otp.value)
+    await reauthenticateWithCredential(u, cred)
+    await afterReauthEmailUpdate()
+  } catch (e) {
+    console.warn('Verify OTP failed', e)
+    ElMessage.error('Invalid OTP. Try again.')
+  } finally {
+    reauthLoading.value = false
+  }
+}
+
+async function resendOtp() {
+  const u = auth.currentUser
+  if (!u) return
+  try {
+    // Guard: respect cooldown and basic rate limits
+    if (!canResend.value) {
+      return ElMessage.warning(`Please wait ${resendCooldown.value}s before requesting a new code`)
+    }
+    const since = Date.now() - lastOtpSentAt
+    if (since < 2000) { // prevent accidental double-clicks
+      return ElMessage.warning('Please wait a moment before retrying')
+    }
+    reauthLoading.value = true
+    const verifier = await ensureReauthRecaptcha(true)
+    const prov = new PhoneAuthProvider(auth)
+    const vid = await prov.verifyPhoneNumber(u.phoneNumber, verifier)
+    reauthVerificationId.value = vid
+    ElMessage.success('OTP resent')
+    lastOtpSentAt = Date.now()
+    startResendCooldown(getCooldownSeconds())
+  } catch (e) {
+    console.warn('Resend OTP failed', e)
+    const code = String(e?.code || e?.message || '')
+    if (code.includes('too-many-requests')) {
+      startResendCooldown(Math.max(getCooldownSeconds(), 60))
+      ElMessage.error('Too many attempts. Please try again later.')
+    } else {
+      ElMessage.error('Failed to resend OTP')
+    }
+  } finally {
+    reauthLoading.value = false
+  }
+}
+
+// Cooldown logic for resend
+const resendCooldown = ref(0)
+let resendTimer = null
+const canResend = computed(() => resendCooldown.value === 0)
+function clearResendCooldown() {
+  if (resendTimer) {
+    clearInterval(resendTimer)
+    resendTimer = null
+  }
+  resendCooldown.value = 0
+}
+function startResendCooldown(seconds = 10) {
+  clearResendCooldown()
+  resendCooldown.value = seconds
+  resendTimer = setInterval(() => {
+    if (resendCooldown.value <= 1) {
+      clearResendCooldown()
+    } else {
+      resendCooldown.value -= 1
+    }
+  }, 1000)
+}
+
+watch(() => reauthOpen.value, (open) => {
+  if (!open) {
+    clearResendCooldown()
+    reauthStep.value = 0
+    otp.value = ''
+    reauthVerificationId.value = ''
+  }
+})
+
+onBeforeUnmount(() => {
+  clearResendCooldown()
+})
+
+async function doGoogleReauth() {
+  const u = auth.currentUser
+  if (!u) return
+  try {
+    reauthLoading.value = true
+    const gp = new GoogleAuthProvider()
+    await reauthenticateWithPopup(u, gp)
+    await afterReauthEmailUpdate()
+  } catch (e) {
+    console.warn('Google reauth failed', e)
+    ElMessage.error('Google re-authentication failed')
+  } finally {
+    reauthLoading.value = false
+  }
+}
+
+async function afterReauthEmailUpdate() {
+  const u = auth.currentUser
+  if (!u) return
+  try {
+    if (profileForm.email && profileForm.email !== u.email) {
+      await updateEmail(u, profileForm.email)
+    }
+    emailNeedsReauth.value = false
+    ElMessage.success('Re-authenticated successfully!')
+    reauthOpen.value = false
+  } catch (e) {
+    console.warn('Email update post-reauth failed', e)
+    ElMessage.error('Re-auth ok, but email update failed. Try again.')
+  }
+}
+
+function resetReauth() {
+  reauthStep.value = 0
+  otp.value = ''
+  reauthVerificationId.value = ''
 }
 
 async function enablePush() {

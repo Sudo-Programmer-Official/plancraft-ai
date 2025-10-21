@@ -25,7 +25,7 @@ import firebaseApp from '@/firebase/init'
 import { identifyUser, trackEvent } from '@/services/analytics'
 import { getSubscriptionStatus } from '@/services/stripeService'
 import { getUsageStatus } from '@/services/planService'
-import { doc, updateDoc, setDoc } from 'firebase/firestore'
+import { doc, updateDoc, setDoc, onSnapshot } from 'firebase/firestore'
 import { db } from '@/firebase/init'
 import { ElNotification } from 'element-plus'
 import { clearAppToken } from '@/services/appTokenService'
@@ -47,6 +47,7 @@ export const useAuthStore = defineStore('authStore', {
     guest: false,
     usage: { used: 0, limit: 0, plan: '' },
     _refreshTimer: null,
+    _profileUnsub: null,
   }),
 
   actions: {
@@ -59,6 +60,12 @@ export const useAuthStore = defineStore('authStore', {
         if (this._refreshTimer) {
           clearInterval(this._refreshTimer)
           this._refreshTimer = null
+        }
+      } catch {}
+      try {
+        if (this._profileUnsub) {
+          this._profileUnsub()
+          this._profileUnsub = null
         }
       } catch {}
       try {
@@ -144,6 +151,23 @@ export const useAuthStore = defineStore('authStore', {
             identifyUser(this.user)
             localStorage.setItem('user', JSON.stringify(this.user))
             localStorage.setItem('token', this.token)
+            // Live profile sync from Firestore (name/email/plan/etc.)
+            try {
+              if (this._profileUnsub) { this._profileUnsub(); this._profileUnsub = null }
+              this._profileUnsub = onSnapshot(doc(db, 'users', user.uid), (snap) => {
+                if (!snap.exists()) return
+                const data = snap.data() || {}
+                this.user = {
+                  ...(this.user || {}),
+                  ...data,
+                  // prefer Firebase Auth displayName but fall back to profile name
+                  displayName: this.user?.displayName || data.name || null,
+                  email: this.user?.email || data.email || null,
+                  photoURL: data.avatarUrl || this.user?.photoURL || null,
+                }
+                try { localStorage.setItem('user', JSON.stringify(this.user)) } catch {}
+              })
+            } catch {}
             try {
               if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
                 const mod = await import('@/services/appTokenService.js')
@@ -382,6 +406,7 @@ export const useAuthStore = defineStore('authStore', {
               mode: 'phone',
               lastLoginAt: Date.now(),
               createdAt: Date.now(),
+              profileComplete: false,
             },
             { merge: true },
           )
