@@ -101,6 +101,8 @@
       </div>
 
       <p v-if="authStore.loading" class="text-sm text-gray-400 mt-6">✨ Preparing your space...</p>
+      <!-- Dev-only diagnostics -->
+      <GoogleAuthDiagnostic />
     </div>
   </div>
 </template>
@@ -120,6 +122,7 @@ import { RecaptchaVerifier } from 'firebase/auth'
 import { auth } from '@/firebase/init'
 import { ElMessage } from 'element-plus'
 import { normalizePhone, guessCountryFromLocale } from '@/utils/phoneUtils'
+import GoogleAuthDiagnostic from '@/components/GoogleAuthDiagnostic.vue'
 async function loginGoogle() {
   try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_SIGNIN_CLICK) } catch {}
   try {

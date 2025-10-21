@@ -268,6 +268,18 @@ export const useAuthStore = defineStore('authStore', {
         const provider = new GoogleAuthProvider()
         provider.setCustomParameters({ prompt: 'select_account' })
 
+        // Safari/iOS and standalone PWAs are unreliable with popups → prefer redirect
+        try {
+          const ua = navigator.userAgent || ''
+          const isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone
+          const isIOS = /iP(hone|ad|od)/i.test(ua)
+          const isSafari = /safari/i.test(ua) && !/crios|fxios|fxios|edgios|chrome/i.test(ua)
+          if (isStandalone || (isIOS && isSafari)) {
+            await signInWithRedirect(auth, provider)
+            return
+          }
+        } catch {}
+
         // if (isInAppBrowser()) {
         //   console.warn('In-app browser detected — showing warning modal')
         //   // Dynamically mount the modal to DOM
@@ -316,8 +328,20 @@ export const useAuthStore = defineStore('authStore', {
           return
         }
 
-        // Default desktop popup login
-        const user = await signInWithGoogle()
+        // Default attempt: popup; fallback to redirect if it fails
+        let user
+        try {
+          user = await signInWithGoogle()
+        } catch (popupErr) {
+          console.warn('[Auth] Popup sign-in failed; falling back to redirect', popupErr)
+          try {
+            await signInWithRedirect(auth, provider)
+            return
+          } catch (redirErr) {
+            console.error('[Auth] Redirect sign-in also failed', redirErr)
+            throw redirErr
+          }
+        }
         const profile = await fetchUserProfile(user.uid)
         this.user = {
           uid: user.uid,
