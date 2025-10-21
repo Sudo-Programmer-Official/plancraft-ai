@@ -52,6 +52,13 @@
               </button>
             </div>
             <button @click="onReset" class="text-xs text-indigo-300 hover:text-indigo-200">Forgot password?</button>
+            <div class="pt-3 border-t border-gray-800">
+              <div class="flex items-center justify-between text-sm">
+                <span class="text-indigo-200">Or get a magic link</span>
+                <button @click="onSendMagic" class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 transition">Send Link</button>
+              </div>
+              <p v-if="magicSent" class="text-xs text-green-300 mt-2">Magic link sent! Check your email.</p>
+            </div>
           </div>
         </div>
         
@@ -122,6 +129,7 @@ import { RecaptchaVerifier } from 'firebase/auth'
 import { auth } from '@/firebase/init'
 import { ElMessage } from 'element-plus'
 import { normalizePhone, guessCountryFromLocale } from '@/utils/phoneUtils'
+import { sendMagicLink, completeMagicLinkSignIn } from '@/services/authService'
 import GoogleAuthDiagnostic from '@/components/GoogleAuthDiagnostic.vue'
 async function loginGoogle() {
   try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_SIGNIN_CLICK) } catch {}
@@ -144,6 +152,7 @@ async function loginGuest() {
 const showEmail = ref(false)
 const email = ref('')
 const password = ref('')
+const magicSent = ref(false)
 
 async function onLoginEmail() {
   try {
@@ -166,12 +175,31 @@ async function onRegister() {
 }
 
 async function onReset() {
-  if (!email.value) return alert('Enter your email above to reset')
+  if (!email.value) return ElMessage.warning('Enter your email above to reset')
   try {
     await authStore.resetPassword(email.value)
-    alert('Password reset email sent. Check your inbox.')
+    ElMessage.success('Password reset email sent. Check inbox/spam.')
   } catch (e) {
-    alert('Failed to send reset email.')
+    const code = String(e?.code || e?.message || '')
+    if (code.includes('auth/invalid-email')) {
+      ElMessage.error('Invalid email address')
+    } else if (code.includes('auth/user-not-found')) {
+      // Firebase may return this in some configurations
+      ElMessage.success('If an account exists, a reset email has been sent.')
+    } else {
+      ElMessage.error('Failed to send reset email. Try again later.')
+    }
+  }
+}
+
+async function onSendMagic() {
+  if (!email.value) return alert('Enter your email above to receive a link')
+  try {
+    await sendMagicLink(email.value)
+    magicSent.value = true
+  } catch (e) {
+    console.warn('Magic link send failed', e)
+    alert('Failed to send magic link. Please try again.')
   }
 }
 
@@ -315,6 +343,16 @@ onMounted(() => {
     requestAnimationFrame(animate)
   }
   animate()
+})
+
+// Handle magic-link return
+onMounted(async () => {
+  try {
+    const user = await completeMagicLinkSignIn(window.location.href)
+    if (user) redirectAfterLogin()
+  } catch (e) {
+    // ignore when not a magic link
+  }
 })
 </script>
 

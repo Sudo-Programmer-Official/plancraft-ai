@@ -9,6 +9,11 @@ import {
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
 } from "firebase/auth";
+import {
+  sendSignInLinkToEmail,
+  isSignInWithEmailLink,
+  signInWithEmailLink,
+} from 'firebase/auth'
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "@/firebase/init"; // Already initialized
 
@@ -69,7 +74,13 @@ export async function registerWithEmail(email, password) {
 }
 
 export async function sendResetEmail(email) {
-  await sendPasswordResetEmail(auth, email)
+  const actionCodeSettings = {
+    // After the user completes the reset flow, send them back to login
+    url: (typeof window !== 'undefined' ? window.location.origin : '') + '/login?reset=1',
+    // Let Firebase host the reset UI (safer cross‑browser); we only provide a continue URL
+    handleCodeInApp: false,
+  }
+  await sendPasswordResetEmail(auth, email, actionCodeSettings)
 }
 
 // 🔎 Fetch additional user profile fields (e.g., role) from Firestore
@@ -83,4 +94,32 @@ export async function fetchUserProfile(uid) {
     console.warn('fetchUserProfile failed:', e)
     return { role: 'user' }
   }
+}
+
+// Passwordless: send magic link to email
+export async function sendMagicLink(email) {
+  const actionCodeSettings = {
+    url: (typeof window !== 'undefined' ? window.location.origin : '') + '/login',
+    handleCodeInApp: true,
+  }
+  await sendSignInLinkToEmail(auth, email, actionCodeSettings)
+  try { localStorage.setItem('emailForSignIn', email) } catch {}
+}
+
+// Passwordless: complete sign-in from magic link
+export async function completeMagicLinkSignIn(currentUrl) {
+  const emailStored = (() => { try { return localStorage.getItem('emailForSignIn') } catch { return null } })()
+  const email = emailStored || ''
+  if (!isSignInWithEmailLink(auth, currentUrl)) return null
+  const userCred = await signInWithEmailLink(auth, email || window.prompt('Confirm your email for sign-in'), currentUrl)
+  try { localStorage.removeItem('emailForSignIn') } catch {}
+  const user = userCred.user
+  await setDoc(doc(db, 'users', user.uid), {
+    email: user.email,
+    name: user.displayName || '',
+    mode: 'email_link',
+    lastLoginAt: Date.now(),
+    profileComplete: !!(user.displayName),
+  }, { merge: true })
+  return user
 }
