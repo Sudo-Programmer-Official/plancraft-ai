@@ -324,3 +324,7 @@ Type:
 	•	Create starter zip + scripts
 
 You’re one step away from building your own DevOps Agent Framework. Let’s go 🛠️
+
+--
+source ~/google-cloud-sdk/path.zsh.inc
+source ~/google-cloud-sdk/completion.zsh.inc

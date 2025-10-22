@@ -162,3 +162,28 @@ firebase-debug.log
 *.key
 *.crt
 
+
+# --- Google Cloud SDK / CLI Artifacts ---
+google-cloud-sdk/
+bin/
+install/
+bq.*
+core.*
+gcloud.*
+gsutil.*
+*.manifest.json
+*.snapshot.json
+*.crc32c
+*.install
+*.deps.json
+
+# --- Firebase / gcloud local configs ---
+.config/
+.cache/
+.credentials/
+.python-version
+*.pyc
+
+# --- Local shell & setup scripts ---
+fix_cors.sh
+setup_env.sh
