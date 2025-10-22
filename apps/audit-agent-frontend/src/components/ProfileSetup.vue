@@ -32,6 +32,7 @@ import { getAuth, updateProfile, updateEmail } from 'firebase/auth'
 import { db } from '@/firebase/init'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { ElMessage } from 'element-plus'
+import { normalizePhone, guessCountryFromLocale } from '@/utils/phoneUtils'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -79,12 +80,17 @@ async function saveProfile() {
   }
   saving.value = true
   try {
+    let phoneE164 = phone.value.trim()
+    try {
+      const cc = guessCountryFromLocale()
+      phoneE164 = normalizePhone(phoneE164, cc)
+    } catch {}
     await setDoc(
       doc(db, 'users', user.uid),
       {
         name: name.value.trim(),
         email: email.value.trim() || undefined,
-        phone: phone.value.trim() || undefined,
+        phone: phoneE164 || undefined,
         profileComplete: true,
         updatedAt: new Date(),
       },

@@ -531,9 +531,12 @@ async function saveSettings() {
     // Normalize phone before persisting
     try {
       const cc = guessCountryFromLocale()
-      const raw = integrationEndpoints.value?.sms?.phone
-      const norm = normalizePhone(raw, cc)
-      if (norm) integrationEndpoints.value.sms.phone = norm
+      const rawSms = integrationEndpoints.value?.sms?.phone
+      const normSms = normalizePhone(rawSms, cc)
+      if (normSms) integrationEndpoints.value.sms.phone = normSms
+      const rawWa = integrationEndpoints.value?.whatsapp?.phone
+      const normWa = normalizePhone(rawWa, cc)
+      if (normWa) integrationEndpoints.value.whatsapp.phone = normWa
     } catch {}
     const channels = []
     if (prefs.email) channels.push('email')
@@ -580,10 +583,13 @@ async function saveProfile() {
   profileSaving.value = true
   try {
     const ref = doc(db, 'users', u.uid)
+    // Normalize phone before writing
+    let phoneE164 = profileForm.phone || ''
+    try { phoneE164 = normalizePhone(phoneE164, guessCountryFromLocale()) } catch {}
     await setDoc(ref, {
       name: profileForm.name || undefined,
       email: profileForm.email || undefined,
-      phone: profileForm.phone || undefined,
+      phone: phoneE164 || undefined,
       profileComplete: !!(profileForm.name && profileForm.name.trim().length),
       updatedAt: new Date(),
     }, { merge: true })
