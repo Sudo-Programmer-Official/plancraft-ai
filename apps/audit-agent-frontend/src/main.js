@@ -15,6 +15,7 @@ import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import { initAnalytics, bindRouter } from '@/services/analytics'
 import 'driver.js/dist/driver.css'
 import { handleAuthError } from '@/services/firebaseService'
+import { setupLinkedInTag } from './analytics/linkedin.js'
 
 // Day.js timezone defaults
 import dayjs from 'dayjs'
@@ -81,6 +82,8 @@ app.config.errorHandler = (err, vm, info) => {
 // Analytics
 initAnalytics()
 bindRouter(router)
+// LinkedIn Insight Tag (env-driven)
+try { setupLinkedInTag() } catch {}
 
 // ✅ Auth store init
 const authStore = useAuthStore()
