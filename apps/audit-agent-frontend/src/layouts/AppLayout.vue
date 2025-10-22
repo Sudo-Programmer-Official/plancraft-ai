@@ -456,18 +456,25 @@ async function maybePromptProfile() {
   try {
     const uid = authStore?.user?.uid
     if (!uid) return
+    // Do not show for guests
+    if (authStore?.isGuest || authStore?.guest === true) return
     const localKey = `profile_setup_done:${uid}`
     if (localStorage.getItem(localKey) === '1') return
     const ref = doc(db, 'users', uid)
     const snap = await getDoc(ref)
     if (!snap.exists()) {
+      // Only prompt for phone-based accounts
       await setDoc(ref, { createdAt: new Date(), updatedAt: new Date(), profileComplete: false }, { merge: true })
-      profileSetupOpen.value = true
+      // Without a doc we don't yet know the mode; don't show until next fetch
       return
     }
     const data = snap.data() || {}
+    const signInMethod = String(data.mode || authStore?.user?.mode || authStore?.user?.signInMethod || '').toLowerCase()
+    const isPhone = signInMethod === 'phone'
     const complete = !!data.profileComplete || !!data.name
-    if (!complete) profileSetupOpen.value = true
+    if (isPhone && !complete) {
+      profileSetupOpen.value = true
+    }
   } catch {}
 }
 

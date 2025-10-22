@@ -1,6 +1,17 @@
 <template>
-  <el-dialog v-model="openLocal" title="Complete Your Profile" width="420px" :append-to-body="true" :close-on-click-modal="false" :close-on-press-escape="false" @close="handleClose">
-    <div class="space-y-3">
+  <el-dialog
+    v-model="openLocal"
+    title="Complete Your Profile"
+    width="420px"
+    :append-to-body="true"
+    :close-on-click-modal="false"
+    :close-on-press-escape="false"
+    :lock-scroll="true"
+    modal-class="bg-black/70 backdrop-blur-md"
+    class="dark-dialog"
+    @close="handleClose"
+  >
+    <div class="space-y-3 bg-slate-900/80 text-gray-200 rounded-xl p-1">
       <p class="text-sm text-slate-400">
         Add your name to personalize your experience. Email is optional.
       </p>
@@ -35,6 +46,11 @@ const phone = ref('')
 const saving = ref(false)
 
 watch(() => props.open, (v) => { openLocal.value = v })
+
+// Prevent background scroll explicitly (Element Plus also locks scroll).
+watch(openLocal, (v) => {
+  try { document.body.style.overflow = v ? 'hidden' : '' } catch {}
+})
 
 async function loadDefaults() {
   const user = auth.currentUser
@@ -90,4 +106,15 @@ async function saveProfile() {
 </script>
 
 <style scoped>
+.dark-dialog :deep(.el-dialog__header) {
+  background: rgba(15, 23, 42, 0.9); /* slate-900 */
+  color: #e5e7eb; /* gray-200 */
+}
+.dark-dialog :deep(.el-dialog__body) {
+  background: rgba(15, 23, 42, 0.85);
+  color: #e5e7eb;
+}
+.dark-dialog :deep(.el-dialog) {
+  border-radius: 12px;
+}
 </style>
