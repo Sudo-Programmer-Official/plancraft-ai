@@ -58,10 +58,13 @@ async function runChecks() {
     authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
     apiKey: !!import.meta.env.VITE_FIREBASE_API_KEY,
   }
+  const effective = {
+    authDomain: (auth && auth.app && auth.app.options && auth.app.options.authDomain) || null,
+  }
   const shouldRedirect = ua.isStandalone || (ua.isIOS && ua.isSafari) || ua.isInApp
   const canPopup = popupPossible()
   const suggestion = shouldRedirect ? 'Prefer redirect flow on this device' : (canPopup ? 'Popup should work; check Authorized domains' : 'Popup blocked; try redirect')
-  results.value = { ua, origin, referrer, env, canPopup, shouldRedirect, suggestion }
+  results.value = { ua, origin, referrer, env, effective, canPopup, shouldRedirect, suggestion }
 }
 
 async function testPopup() {
@@ -89,4 +92,3 @@ async function testRedirect() {
 
 <style scoped>
 </style>
-

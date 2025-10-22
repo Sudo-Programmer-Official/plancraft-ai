@@ -397,6 +397,30 @@ export const useAuthStore = defineStore('authStore', {
             duration: 2500,
             offset: 80,
           })
+
+          // After a successful redirect sign‑in, navigate away from /login to
+          // prevent a stuck screen. Prefer an explicit redirect param or any
+          // stored intent; otherwise fall back to dashboard.
+          try {
+            // 1) stored intent set by guards
+            const stored = localStorage.getItem('postLoginRedirect')
+            if (stored) {
+              localStorage.removeItem('postLoginRedirect')
+              window.location.replace(stored)
+              return
+            }
+            // 2) redirect query param
+            const params = new URLSearchParams(window.location.search)
+            const q = params.get('redirect')
+            if (q) {
+              window.location.replace(q)
+              return
+            }
+            // 3) default
+            if (window.location.pathname === '/login') {
+              window.location.replace('/dashboard')
+            }
+          } catch {}
         }
       } catch (err) {
         console.warn('Redirect sign-in restore failed:', err)

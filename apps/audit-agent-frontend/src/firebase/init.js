@@ -7,11 +7,19 @@ import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth"
 
 // Build Firebase config from environment with safe fallbacks
 // This lets us swap projects (e.g., PlanCraftAI) without code changes.
+// Defensive: ensure authDomain is a Firebase Hosting domain. If misconfigured
+// (e.g., set to plancraftai.com), override to the project default so Google
+// Auth handler (/__/auth/handler) loads correctly and not our SPA.
+const providedAuthDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "audit-agent-66451.firebaseapp.com"
+const isFirebaseHost = /\.firebaseapp\.com$/.test(providedAuthDomain) || /\.web\.app$/.test(providedAuthDomain)
+const safeAuthDomain = isFirebaseHost ? providedAuthDomain : "audit-agent-66451.firebaseapp.com"
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDI0qFImSxQFYkT5CRu2K1yEZuPX1W2xEY",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "audit-agent-66451.firebaseapp.com",
+  authDomain: safeAuthDomain,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "audit-agent-66451",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "audit-agent-66451.firebasestorage.app",
+  // Storage bucket should be the appspot.com domain
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "audit-agent-66451.appspot.com",
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "488930745261",
   appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:488930745261:web:5fe03c2568c323ec091f24",
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-681FBRFSNY",
