@@ -328,19 +328,34 @@ export const useAuthStore = defineStore('authStore', {
           return
         }
 
-        // Default attempt: popup; fallback to redirect if it fails
+        // Default attempt: popup; be selective about redirect fallback.
         let user
         try {
           user = await signInWithGoogle()
         } catch (popupErr) {
-          console.warn('[Auth] Popup sign-in failed; falling back to redirect', popupErr)
-          try {
-            await signInWithRedirect(auth, provider)
-            return
-          } catch (redirErr) {
-            console.error('[Auth] Redirect sign-in also failed', redirErr)
-            throw redirErr
+          const code = String(popupErr?.code || '')
+          const msg = String(popupErr?.message || '')
+          const popupBlocked = code === 'auth/popup-blocked' || code === 'auth/cancelled-popup-request'
+          const ua = navigator.userAgent || ''
+          const isIOS = /iP(hone|ad|od)/i.test(ua)
+          const isSafari = /safari/i.test(ua) && !/crios|fxios|edgios|chrome/i.test(ua)
+          const isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone
+          const shouldTryRedirect = popupBlocked || isStandalone || (isIOS && isSafari)
+
+          if (shouldTryRedirect) {
+            console.warn('[Auth] Popup sign-in blocked/unavailable; trying redirect instead', { code, msg })
+            try {
+              await signInWithRedirect(auth, provider)
+              return
+            } catch (redirErr) {
+              console.error('[Auth] Redirect sign-in also failed', redirErr)
+              throw redirErr
+            }
           }
+
+          // Do not auto-redirect for other failures (e.g., storage partitioning).
+          // Surface the error so the UI can suggest trying a non-private window.
+          throw popupErr
         }
         const profile = await fetchUserProfile(user.uid)
         this.user = {

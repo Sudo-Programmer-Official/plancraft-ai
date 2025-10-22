@@ -7,12 +7,10 @@ import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth"
 
 // Build Firebase config from environment with safe fallbacks
 // This lets us swap projects (e.g., PlanCraftAI) without code changes.
-// Defensive: ensure authDomain is a Firebase Hosting domain. If misconfigured
-// (e.g., set to plancraftai.com), override to the project default so Google
-// Auth handler (/__/auth/handler) loads correctly and not our SPA.
-const providedAuthDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "audit-agent-66451.firebaseapp.com"
-const isFirebaseHost = /\.firebaseapp\.com$/.test(providedAuthDomain) || /\.web\.app$/.test(providedAuthDomain)
-const safeAuthDomain = isFirebaseHost ? providedAuthDomain : "audit-agent-66451.firebaseapp.com"
+// Use the provided authDomain as-is so teams can use a custom domain
+// (e.g., plancraftai.com) that serves the Firebase auth handler at
+// /__/auth/handler via Firebase Hosting. Falling back only if not provided.
+const safeAuthDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "audit-agent-66451.firebaseapp.com"
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDI0qFImSxQFYkT5CRu2K1yEZuPX1W2xEY",
