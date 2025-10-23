@@ -1,0 +1,16 @@
+{
+  "name": "teams-api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node app.example.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "firebase-admin": "^12.5.0"
+  },
+  "devDependencies": {
+    "dotenv-cli": "^10.0.0"
+  }
+}

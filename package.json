@@ -2,9 +2,15 @@
   "name": "prompt2-monorepo",
   "private": true,
   "version": "1.0.0",
+  "type": "module",
   "scripts": {
     "dev:quote": "pnpm --filter quote dev",
     "dev:page": "pnpm --filter page dev",
     "lint": "pnpm -r --if-present lint"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "firebase-admin": "^13.5.0"
   }
 }

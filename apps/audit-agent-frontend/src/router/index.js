@@ -7,6 +7,7 @@ import PrivacyPolicy from '@/views/PrivacyPolicy.vue'
 import Terms from '@/views/TermsOfService.vue'
 import Contact from '@/views/ContactForm.vue'
 import { useAuthStore } from '@/stores/authStore'
+import installTeamRoutes from './teamRoutes'
 
 const getCurrentUser = () =>
   new Promise((resolve) => {
@@ -99,6 +100,8 @@ const router = createRouter({
     },
   ],
 })
+
+installTeamRoutes(router)
 
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()

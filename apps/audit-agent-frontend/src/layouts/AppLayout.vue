@@ -253,6 +253,22 @@
 
         <!-- Right Section -->
         <div class="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+          <button
+            v-if="teamsEnabled"
+            @click="goToTeams"
+            class="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-sky-500 to-indigo-500 text-white text-sm font-semibold shadow hover:from-sky-400 hover:to-indigo-400 transition"
+          >
+            🚀 Teams
+          </button>
+          <button
+            v-if="teamsEnabled"
+            @click="goToTeams"
+            class="sm:hidden p-2 rounded-full bg-indigo-600/70 text-white"
+            aria-label="Open Teams"
+          >
+            🚀
+          </button>
+
           <!-- Notification Bell -->
           <!-- Right Section -->
           <!-- Notification Bell Wrapper -->
@@ -358,12 +374,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { hasSubscription, registerPushSubscription } from '@/services/pushService'
 import NotificationBanner from '@/components/NotificationBanner.vue'
 import { onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
+import { useOrgStore } from '@/stores/orgStore'
 import { driver } from 'driver.js'
 import 'driver.js/dist/driver.css'
 import { watchNotificationsPublic } from '@/services/firebaseService'
@@ -376,6 +393,19 @@ import { db } from '@/firebase/init'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { trackLinkedInConversion } from '@/utils/ads'
 const currentUserId = ref(null)
+const orgStore = useOrgStore()
+// const teamsEnabled = orgStore.enabled
+const teamsEnabled = computed(() => {
+  try {
+    return import.meta.env.VITE_ENABLE_TEAMS === 'true'
+  } catch {
+    return false
+  }
+})
+
+const hasOrgs = computed(() => orgStore.orgs.length > 0)
+const loadingTeams = ref(false)
+const orgsLoaded = ref(false)
 
 function deriveUidFromStorage() {
   try {
@@ -408,6 +438,7 @@ onMounted(() => {
   }, 0)
   // Initial check for profile completion
   try { maybePromptProfile() } catch {}
+  ensureTeamsLoaded()
 })
 
 const sidebarOpen = ref(true) // desktop toggle
@@ -451,6 +482,15 @@ function markAllRead() {
 
 // Prompt for profile setup if incomplete
 watch(() => authStore.user?.uid, () => { maybePromptProfile() })
+
+watch(() => authStore.user?.uid, (uid) => {
+  if (uid) {
+    ensureTeamsLoaded()
+  } else {
+    orgsLoaded.value = false
+    orgStore.clearOrg()
+  }
+}, { immediate: true })
 
 async function maybePromptProfile() {
   try {
@@ -507,6 +547,48 @@ function goToLogin() {
 
 function trackUpgradeClick() {
   try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_UPGRADE_CLICK) } catch {}
+}
+
+async function ensureTeamsLoaded(force = false) {
+  try {
+    if (!teamsEnabled.value) return
+    if (!authStore?.user) return
+    if (loadingTeams.value) return
+    if (!force && orgsLoaded.value && orgStore.orgs.length) return
+    loadingTeams.value = true
+    await orgStore.fetchOrgs()
+    orgsLoaded.value = true
+  } catch (err) {
+    console.warn('Teams org load failed', err)
+  } finally {
+    loadingTeams.value = false
+  }
+}
+
+async function goToTeams() {
+  if (!teamsEnabled.value) return
+  if (!authStore?.user) {
+    router.push({ path: '/login', query: { redirect: '/team' } })
+    return
+  }
+
+  await ensureTeamsLoaded(true)
+
+  let targetOrgId = orgStore.activeOrgId
+  if (!targetOrgId && orgStore.orgs.length) {
+    targetOrgId = orgStore.orgs[0].id
+    orgStore.setOrg(targetOrgId)
+  }
+
+  if (!targetOrgId) {
+    const name = window.prompt('Name your new team to get started') || 'My Team'
+    targetOrgId = await orgStore.createOrg(name)
+    orgsLoaded.value = true
+  }
+
+  if (targetOrgId) {
+    router.push({ name: 'team-projects', params: { orgId: targetOrgId } })
+  }
 }
 
 onMounted(() => {

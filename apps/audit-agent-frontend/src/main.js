@@ -16,6 +16,7 @@ import { initAnalytics, bindRouter } from '@/services/analytics'
 import 'driver.js/dist/driver.css'
 import { handleAuthError } from '@/services/firebaseService'
 import { setupLinkedInTag } from './analytics/linkedin.js'
+import { setAuthTokenProvider } from '@/lib/api'
 
 // Day.js timezone defaults
 import dayjs from 'dayjs'
@@ -88,6 +89,16 @@ try { setupLinkedInTag() } catch {}
 // ✅ Auth store init
 const authStore = useAuthStore()
 authStore.init()
+
+setAuthTokenProvider(async () => {
+  try {
+    const user = auth?.currentUser
+    if (!user) return localStorage.getItem('token')
+    return await user.getIdToken()
+  } catch {
+    return localStorage.getItem('token')
+  }
+})
 
 // 🆕 Restore Google redirect login results (fix for Safari / LinkedIn)
 try {

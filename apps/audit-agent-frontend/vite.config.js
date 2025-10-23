@@ -74,7 +74,18 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'http://localhost:4000',
+      '/api/orgs': {
+        target: process.env.VITE_TEAMS_API_BASE_URL || 'http://localhost:3000',
+        changeOrigin: true,
+      },
+      '/api/orgs/': {
+        target: process.env.VITE_TEAMS_API_BASE_URL || 'http://localhost:3000',
+        changeOrigin: true,
+      },
+      '/api': {
+        target: process.env.VITE_API_BASE_URL || process.env.VITE_API_BASE_ROOT || 'http://localhost:4000',
+        changeOrigin: true,
+      },
     },
   },
   build: {
