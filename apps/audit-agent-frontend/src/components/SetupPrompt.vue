@@ -113,9 +113,11 @@
 import { ref, onMounted } from 'vue'
 import { hasSubscription, registerPushSubscription } from '@/services/pushService'
 import { useAuthFlags } from '@/composables/useAuthFlags'
+import { useAuthStore } from '@/stores/authStore'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
+
 const { isGuest } = useAuthFlags()
 const props = defineProps({ open: { type: Boolean, default: true } })
 const emit = defineEmits(['close', 'done'])
