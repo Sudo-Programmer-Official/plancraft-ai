@@ -36,6 +36,7 @@ const corsOrigin = process.env.CORS_ORIGIN || '*';
 app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(express.json());
 
+app.get('/', (req, res) => res.json({ status: 'ok', service: 'teams-api' }));
 app.get('/healthz', (req, res) => res.send('ok'));
 app.get('/api/ping', (req, res) => res.json({ pong: true }));
 

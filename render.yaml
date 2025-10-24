@@ -1,0 +1,76 @@
+# Render Monorepo Deployment Blueprint
+# Deploys 3 services: Core API, Teams API, and Frontend (Vue)
+
+services:
+  # ───────────────────────────────────────────────
+  # 1️⃣ CORE BACKEND (main API)
+  # ───────────────────────────────────────────────
+  - type: web
+    name: audit-agent-api
+    env: node
+    rootDir: apps/backend-node
+    buildCommand: npm install
+    startCommand: npm run start || node index.js
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: PORT
+        value: 4000
+      - key: FIREBASE_PROJECT_ID
+        value: audit-agent-66451
+      - key: FIREBASE_STORAGE_BUCKET
+        value: audit-agent-66451.appspot.com
+      - key: FIREBASE_SERVICE_ACCOUNT_BASE64
+        sync: false
+      - key: CORS_ORIGIN
+        value: https://plancraftai.com
+
+  # ───────────────────────────────────────────────
+  # 2️⃣ TEAMS BACKEND (orgs, automations)
+  # ───────────────────────────────────────────────
+  - type: web
+    name: teams-api
+    env: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: node app.example.js
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: PORT
+        value: 3000
+      - key: CORS_ORIGIN
+        value: https://plancraftai.com
+      - key: FIREBASE_SERVICE_ACCOUNT_BASE64
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ENABLE_AUTOMATIONS
+        value: "true"
+
+  # ───────────────────────────────────────────────
+  # 3️⃣ FRONTEND (Vue 3 + Vite)
+  # ───────────────────────────────────────────────
+  - type: web
+    name: plancraftai-frontend
+    env: node
+    rootDir: apps/audit-agent-frontend
+    buildCommand: npm install && npm run build
+    startCommand: npx serve dist -l 5173
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: VITE_API_BASE_URL
+        value: https://audit-agent-api.onrender.com
+      - key: VITE_TEAMS_API_BASE_URL
+        value: https://teams-api.onrender.com
+      - key: VITE_ENABLE_TEAMS
+        value: "true"
+      - key: VITE_FIREBASE_PROJECT_ID
+        value: audit-agent-66451
+      - key: VITE_FIREBASE_STORAGE_BUCKET
+        value: audit-agent-66451.appspot.com
+      - key: VITE_FIREBASE_APP_ID
+        value: 1:488930745261:web:5fe03c2568c323ec091f24
+      - key: VITE_FIREBASE_MEASUREMENT_ID
+        value: G-681FBFRSPNY
