@@ -3,9 +3,30 @@ import { db } from '../../server/firebaseAdmin.js';
 const EMBEDDING_ENDPOINT = process.env.OPENAI_EMBED_ENDPOINT || 'https://api.openai.com/v1/embeddings';
 const EMBEDDING_MODEL = process.env.OPENAI_EMBED_MODEL || process.env.OPENAI_MODEL || 'text-embedding-3-small';
 const EMBEDDING_DIMENSION = Number(process.env.OPENAI_EMBED_DIMENSION || 1536);
+const SEARCH_CACHE_TTL = Number(process.env.VAULT_SEARCH_CACHE_MS || 15_000);
+const MAX_CANDIDATE_LIMIT = Number(process.env.VAULT_SEARCH_CANDIDATE_LIMIT || 320);
+
+const searchCache = new Map(); // Map<string, { results: any[], expires: number }>
 
 function normalizeText(text = '') {
   return String(text || '').trim();
+}
+
+function cacheKey(orgId, query, limit) {
+  return `${orgId}::${query}::${limit}`;
+}
+
+function getCachedResult(key) {
+  const cached = searchCache.get(key);
+  if (cached && cached.expires > Date.now()) {
+    return cached.results;
+  }
+  if (cached) searchCache.delete(key);
+  return null;
+}
+
+function setCachedResult(key, results) {
+  searchCache.set(key, { results, expires: Date.now() + SEARCH_CACHE_TTL });
 }
 
 export async function embedText(text) {
@@ -65,6 +86,12 @@ export async function searchVault({ orgId, query, limit = 20 }) {
   const text = normalizeText(query);
   if (!text) return { results: [] };
 
+  const key = cacheKey(orgId, text, limit);
+  const cached = getCachedResult(key);
+  if (cached) {
+    return { results: cached };
+  }
+
   const embedding = await embedText(text);
   if (!embedding) {
     // fallback: keyword search
@@ -73,16 +100,27 @@ export async function searchVault({ orgId, query, limit = 20 }) {
       .orderBy('createdAt', 'desc')
       .limit(limit)
       .get();
+    const needle = text.toLowerCase();
     const results = snap.docs
       .map((doc) => ({ id: doc.id, score: 0.1, ...doc.data() }))
-      .filter((doc) => normalizeText(`${doc.content} ${doc.summary}`).includes(text.toLowerCase()));
-    return { results: results.slice(0, limit) };
+      .filter((doc) => {
+        const haystack = normalizeText(doc.searchText || `${doc.title || ''} ${doc.summary || ''} ${doc.content || ''}`);
+        return haystack.includes(needle);
+      });
+    const sliced = results.slice(0, limit);
+    setCachedResult(key, sliced);
+    return { results: sliced };
   }
+
+  const candidateLimit = Math.min(
+    MAX_CANDIDATE_LIMIT,
+    Math.max(limit * 6, 120),
+  );
 
   const candidatesSnap = await db
     .collection(`orgs/${orgId}/vault`)
     .orderBy('createdAt', 'desc')
-    .limit(400)
+    .limit(candidateLimit)
     .get();
 
   const scored = candidatesSnap.docs
@@ -95,14 +133,26 @@ export async function searchVault({ orgId, query, limit = 20 }) {
         ...data,
       };
     })
-    .filter((item) => item.score > 0.05)
+    .filter((item) => item.score > 0.05 || normalizeText(`${item.title} ${item.summary}`).includes(text.toLowerCase()))
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
 
+  setCachedResult(key, scored);
+
   return { results: scored };
+}
+
+export function invalidateVaultSearchCache(orgId) {
+  const prefix = `${orgId}::`;
+  for (const key of Array.from(searchCache.keys())) {
+    if (key.startsWith(prefix)) {
+      searchCache.delete(key);
+    }
+  }
 }
 
 export default {
   embedText,
   searchVault,
+  invalidateVaultSearchCache,
 };

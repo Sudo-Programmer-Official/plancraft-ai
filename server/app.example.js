@@ -20,6 +20,10 @@ import pulseRouter from '../src/api/teams/pulseRouter.js';
 import rtcRouter from '../src/api/teams/rtcRouter.js';
 import chatRouter from '../src/api/orgs/chatRouter.js';
 import chatInsightsRouter from '../src/api/orgs/chatInsightsRouter.js';
+import vaultRouter from '../src/api/orgs/vaultRouter.js';
+import feedRouter from '../src/api/orgs/feedRouter.js';
+import assistantRouter from '../src/api/orgs/assistantRouter.js';
+import analyticsRouter from '../src/api/orgs/analyticsRouter.js';
 import initChatGateway from '../src/services/chatGateway.js';
 
 // --- Auth middleware (Firebase ID token) ---
@@ -91,6 +95,10 @@ app.use('/api/orgs/:orgId/meetings', authMiddleware, meetingRouter);
 app.use('/api/orgs/:orgId/automation', authMiddleware, automationRouter);
 app.use('/api/orgs/:orgId/chat', authMiddleware, chatRouter);
 app.use('/api/orgs/:orgId/chat', authMiddleware, chatInsightsRouter);
+app.use('/api/orgs/:orgId/vault', authMiddleware, vaultRouter);
+app.use('/api/orgs/:orgId/feed', authMiddleware, feedRouter);
+app.use('/api/orgs/:orgId/assistant', authMiddleware, assistantRouter);
+app.use('/api/orgs/:orgId/analytics', authMiddleware, analyticsRouter);
 app.use('/api/tasks', authMiddleware, teamTaskRouter);
 app.use('/api/orgs/:orgId/projects/:projectId/tasks', authMiddleware, projectTaskProxyRouter);
 

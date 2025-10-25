@@ -21,12 +21,15 @@ import { computed } from 'vue'
 const props = defineProps<{ orgId: string | null }>()
 
 const items = computed(() => [
+  { route: 'team-feed', label: 'Feed', icon: '📰' },
   { route: 'team-projects', label: 'Projects', icon: '📁' },
   { route: 'team-boards', label: 'Boards', icon: '🗂️' },
   { route: 'team-tasks', label: 'Tasks', icon: '✅' },
   { route: 'team-chat', label: 'Chat', icon: '💬' },
   { route: 'team-pulse', label: 'Pulse', icon: '📊' },
   { route: 'team-meetings', label: 'Meetings', icon: '🗓️' },
+  { route: 'team-vault', label: 'Knowledge Vault', icon: '🧠' },
+  { route: 'team-analytics', label: 'Analytics', icon: '📈' },
   { route: 'team-automations', label: 'Automations', icon: '⚡' },
 ])
 </script>

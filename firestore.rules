@@ -134,6 +134,11 @@ service cloud.firestore {
         }
       }
 
+      match /vault/{itemId} {
+        allow read: if isMember(orgId);
+        allow create, update, delete: if isAdminOrOwner(orgId);
+      }
+
       // automation logs
       match /automationLogs/{logId} {
         allow read: if isMember(orgId);

@@ -51,12 +51,7 @@ export function identifyUser(user) {
 }
 
 export function trackEvent(name, props = {}) {
-  safeInit()
-  try {
-    mixpanel.track(name, props)
-  } catch (e) {
-    console.warn('[analytics] trackEvent error:', e)
-  }
+  fireEvent(name, props)
 }
 
 export function trackPageView(path) {
@@ -96,6 +91,32 @@ export const Analytics = {
   track: trackEvent,
   page: trackPageView,
   bindRouter,
+  trackAssistant: trackAssistantInteraction,
+  trackVaultSearch,
 }
 
 export default Analytics
+
+function fireEvent(name, props = {}) {
+  safeInit()
+  try {
+    mixpanel.track(name, props)
+  } catch (e) {
+    console.warn('[analytics] trackEvent error:', e)
+  }
+  try {
+    if (typeof window !== 'undefined' && typeof window.gtag === 'function') {
+      window.gtag('event', name, props)
+    }
+  } catch (err) {
+    console.warn('[analytics] gtag error:', err)
+  }
+}
+
+export function trackAssistantInteraction(props = {}) {
+  fireEvent('assistant_interaction', props)
+}
+
+export function trackVaultSearch(props = {}) {
+  fireEvent('vault_search', props)
+}

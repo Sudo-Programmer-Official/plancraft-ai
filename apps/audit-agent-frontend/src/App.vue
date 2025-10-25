@@ -41,6 +41,7 @@ const examplePrompt = buildPrompt('Build an AI app for food delivery')
   <transition name="page-fade" mode="out-in" v-else>
     <RouterView />
   </transition>
+  <ToastStack />
   <InstallPrompt />
   <ConfettiOverlay v-if="confettiVisible" @done="confettiVisible = false" />
 
@@ -52,6 +53,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import ConfettiOverlay from '@/components/ConfettiOverlay.vue'
 import { ElNotification } from 'element-plus'
+import ToastStack from '@/components/ToastStack.vue'
 
 const authStore = useAuthStore()
 

@@ -4,7 +4,10 @@
     <div class="team-body">
       <TeamSidebar :org-id="orgId" />
       <main class="team-content">
-        <router-view />
+        <AskTeamsBar v-if="orgId" :org-id="orgId" class="ask-teams-wrapper" />
+        <section class="team-content-view">
+          <router-view />
+        </section>
       </main>
     </div>
     <CommandPalette v-model:open="paletteOpen" :org-id="orgId" :project-id="activeProjectId" />
@@ -25,6 +28,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import NavBarWithOrgSwitcher from '@/components/NavBarWithOrgSwitcher.vue'
 import TeamSidebar from '@/components/TeamSidebar.vue'
+import AskTeamsBar from '@/components/AskTeamsBar.vue'
 import CommandPalette from '@/components/CommandPalette.vue'
 import { useTeamTaskStore } from '@/stores/teamTaskStore'
 import { useProjectStore } from '@/stores/projectStore'
@@ -69,7 +73,10 @@ onBeforeUnmount(() => {
 <style scoped>
 .team-layout { display: flex; flex-direction: column; min-height: 100vh; background: #f5f7fb; }
 .team-body { display: flex; flex: 1; min-height: 0; }
-.team-content { flex: 1; padding: 24px; overflow-y: auto; }
+.team-content { flex: 1; padding: 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 24px; }
+.ask-teams-wrapper { position: sticky; top: 0; z-index: 10; }
+.team-content-view { flex: 1; display: flex; flex-direction: column; }
+.team-content-view :deep(> *) { flex: 1; }
 .command-fab {
   position: fixed;
   right: 32px;

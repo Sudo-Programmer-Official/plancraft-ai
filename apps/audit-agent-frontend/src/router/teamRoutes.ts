@@ -51,6 +51,21 @@ export default function installTeamRoutes(router) {
         component: () => import('@/views/TeamMeetingRoom.vue'),
       },
       {
+        path: 'feed',
+        name: 'team-feed',
+        component: () => import('@/views/OrgFeed.vue'),
+      },
+      {
+        path: 'vault',
+        name: 'team-vault',
+        component: () => import('@/views/TeamVault.vue'),
+      },
+      {
+        path: 'analytics',
+        name: 'team-analytics',
+        component: () => import('@/views/OrgAnalytics.vue'),
+      },
+      {
         path: 'automations',
         name: 'team-automations',
         component: () => import('@/views/TeamAutomations.vue'),

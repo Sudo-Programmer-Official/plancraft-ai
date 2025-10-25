@@ -12,6 +12,9 @@ This folder contains the Teams mode stack (multi-tenant orgs + RBAC) behind a fe
 - **Frontend Pulse view**: `/team/:orgId/pulse` showcases weekly cards, sentiment sparkline, monthly badges, and the AI coach loop.
 - **Team Chat intelligence**: `/team/:orgId/chat` delivers real-time rooms with presence, attachments, AI summaries, reply suggestions, persona coach, and cross-org search via new chat insight endpoints.
 - **Meetings automation**: `/api/orgs/:orgId/meetings/:meetingId/recordings` uploads audio, transcribes via OpenAI, and pipes action items directly into project tasks with updated UI in `TeamMeetingRoom.vue` and `TeamMeetingDetail.vue`.
+- **Knowledge Vault (Sprint 8.1)**: Unified indexing of tasks, meetings, and chat insights with semantic search (`/api/orgs/:orgId/vault/*`) and a new `/team/:orgId/vault` experience for filters, pagination, and admin rebuilds.
+- **Unified Assistant (Sprint 9)**: Org-scoped Ask Teams assistant with `/api/orgs/:orgId/assistant/*`, live vault/feed writes, and the `AskTeamsBar` component embedded in the team layout.
+- **Analytics Dashboard (Sprint 10)**: `/api/orgs/:orgId/analytics` endpoint with an Org Analytics view, Mixpanel hooks, and weekly digest cards for feed/email.
 
 ## Deliverables Included
 
@@ -52,9 +55,26 @@ This folder contains the Teams mode stack (multi-tenant orgs + RBAC) behind a fe
 - `src/services/voiceOrchestrator.js` — voice → tasks stub
 - `src/services/teamPulseService.js` — weekly pulse stats + AI summary helper
 - `src/services/transcriptionService.js` — OpenAI transcription helper for meeting recordings
+- `src/services/vaultIndexer.js` — Knowledge Vault aggregator (tasks, meetings, chat insights)
+- `src/services/vaultSearchService.js` — Embedding-powered vault search with cosine similarity fallback
+- `src/services/contextAggregator.js` — assistant context fusion across tasks, meetings, and vault insights
+- `src/services/assistantService.js` — LLM orchestrator handling intents + vault/feed logging
+- `src/services/analyticsService.js` — org usage aggregations powering dashboards and digests
 - `src/services/automationRules.example.js` — sample rule wiring
 - `scripts/cron/pruneAutomationLogs.example.js` — retention helper
 - `.env.example` — `VITE_ENABLE_TEAMS` flag
+- `src/api/orgs/vaultRouter.js` — Vault REST endpoints (list, search, refresh, delete)
+- `src/api/orgs/assistantRouter.js` — Assistant REST endpoints (`/test-intent`, `/run`) with rate limiting
+- `apps/audit-agent-frontend/src/stores/teamVaultStore.ts` — Pinia store powering vault filters/search
+- `apps/audit-agent-frontend/src/stores/assistantStore.ts` — Assistant state + history manager
+- `apps/audit-agent-frontend/src/stores/analyticsStore.ts` — Org analytics fetch + cache
+- `apps/audit-agent-frontend/src/components/VaultSidebar.vue` — Vault filter sidebar
+- `apps/audit-agent-frontend/src/components/AskTeamsBar.vue` — Ask Teams input, playback, and recap surface
+- `apps/audit-agent-frontend/src/components/ToastStack.vue` — global toast notifications
+- `apps/audit-agent-frontend/src/views/OrgAnalytics.vue` — analytics dashboard cards & highlights
+- `apps/audit-agent-frontend/src/views/TeamVault.vue` — Knowledge Vault workspace UI
+- `docs/TEAM_VAULT.md` — architecture notes + QA checklist for the Knowledge Vault
+- `docs/TEAM_ASSISTANT.md` — Unified assistant architecture, endpoints, and QA checklist
 
 ## Goals (Phase 1)
 
@@ -142,6 +162,22 @@ Key environment variables:
 | `VITE_RTC_ICE_SERVERS` | Frontend override for ICE servers array | Defaults to public STUN list |
 | `FIREBASE_STORAGE_BUCKET` | Optional override for Storage uploads | Uses default service-account bucket |
 | `SOCKET_IO_PATH` / `VITE_SOCKET_IO_PATH` | Path for chat WebSocket gateway | Defaults to `/ws/chat` |
+| `OPENAI_EMBED_ENDPOINT` | Embeddings API endpoint for Knowledge Vault search | `https://api.openai.com/v1/embeddings` |
+| `OPENAI_EMBED_MODEL` | Embedding model powering vault search | `text-embedding-3-small` |
+| `VAULT_MAX_TASKS` | Max task documents ingested per vault rebuild | `300` |
+| `VAULT_MAX_MEETINGS` | Max meeting documents ingested per rebuild | `150` |
+| `VAULT_MAX_CHAT_INSIGHTS` | Max chat insights per room ingested per rebuild | `300` |
+| `VAULT_CONTENT_LIMIT` | Max characters persisted per vault entry | `4000` |
+| `VITE_VAULT_PAGE_LIMIT` | Frontend pagination limit for vault list/search | `25` |
+| `ASSISTANT_FEATURE_DEFAULT` | Default assistant toggle when org settings omit `assistantEnabled` | `false` |
+| `ASSISTANT_RATE_LIMIT_WINDOW_MS` | Rate-limit window for `/api/orgs/:orgId/assistant/*` | `60000` |
+| `ASSISTANT_RATE_LIMIT_MAX` | Maximum assistant requests per window (per uid/IP) | `30` |
+| `OPENAI_ASSISTANT_MODEL` / `ASSISTANT_MODEL` | Override assistant reply model | `gpt-4o-mini` |
+| `ASSISTANT_TASK_CONTEXT_LIMIT` | Number of recent tasks included in assistant context | `5` |
+| `ASSISTANT_MEETING_CONTEXT_LIMIT` | Number of meetings included in assistant context | `3` |
+| `ASSISTANT_CHAT_CONTEXT_LIMIT` | Number of chat insights included in assistant context | `5` |
+| `ELEVENLABS_VOICE_ID` | Optional default ElevenLabs voice for assistant playback | `null` |
+| `VOICE_INPUT_GAIN` | Normalized input gain applied to meeting transcripts before task extraction | `0.85` |
 
 Routes included:
 - `POST /api/orgs` → create org, seed owner membership
@@ -164,6 +200,9 @@ Routes included:
 - `DELETE /api/orgs/:orgId/tasks/:taskId` → delete task
 - `GET /api/orgs/:orgId/projects/:projectId/tasks` → same as above (REST alias)
 - `POST /api/orgs/:orgId/projects/:projectId/tasks` → same as above (alias)
+- `POST /api/orgs/:orgId/assistant/test-intent` → detect assistant intent without executing actions
+- `POST /api/orgs/:orgId/assistant/run` → execute assistant request (task actions, vault/feed updates, reply)
+- `GET /api/orgs/:orgId/analytics` → aggregated usage metrics and highlights for dashboards
 - `GET /api/orgs/:orgId/chat/rooms` → list chat rooms (recent first)
 - `POST /api/orgs/:orgId/chat/rooms` → create room
 - `GET /api/orgs/:orgId/chat/rooms/:roomId/messages` → fetch history (cursor-based)
@@ -183,6 +222,10 @@ Routes included:
 - `POST /api/orgs/:orgId/meetings/:meetingId/recordings` → upload recording (base64) + auto-transcribe + create tasks
 - `POST /api/orgs/:orgId/meetings/:meetingId/transcript` → attach transcript & trigger automations
   - Add `?dryRun=true` to fetch generated tasks without writing or firing automations
+- `GET /api/orgs/:orgId/vault` → list Knowledge Vault entries (filter via `type`, paginate with `cursor`)
+- `GET /api/orgs/:orgId/vault/search` → semantic search (`q` + optional `limit`)
+- `POST /api/orgs/:orgId/vault/refresh` → rebuild Knowledge Vault (admin/owner)
+- `DELETE /api/orgs/:orgId/vault/:vaultId` → remove a vault entry (admin/owner)
 - `GET /api/orgs/:orgId/automation/logs` → list recent automation events
 - Supports query params: `limit`, `cursor`, `event`, `status`, `ruleId`
 - Response shape: `{ items: AutomationLog[], nextCursor: string | null }`
