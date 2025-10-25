@@ -7,6 +7,8 @@ import {
   fetchOrgInvites,
   sendOrgInvite,
   acceptInviteToken,
+  resendOrgInvite,
+  revokeOrgInvite,
 } from '@/services/inviteService'
 import { useAuthStore } from '@/stores/authStore'
 
@@ -175,20 +177,63 @@ export const useOrgStore = defineStore('org', () => {
     }
   }
 
-  async function acceptInvite(token: string) {
+  async function acceptInvite(token: string, options?: { source?: string }) {
     if (!token) throw new Error('Missing invite token')
     try {
       const result = await acceptInviteToken(token)
       if (result?.orgId) {
         await fetchOrgs()
         trackEvent('invite_accepted', { orgId: result.orgId, role: result.role })
+        if (options?.source === 'public') {
+          trackEvent('invite_accepted_public', { orgId: result.orgId, role: result.role })
+        }
       }
       toastStore.push('Welcome to the team! 🎉', { type: 'success', duration: 3200 })
       return result
     } catch (err: any) {
       const message = err?.response?.data?.error || err?.message || 'Failed to accept invite'
       toastStore.push(message, { type: 'error', duration: 3200 })
-      trackEvent('invite_rejected', { reason: message })
+      const analyticsPayload: Record<string, any> = { reason: message }
+      if (options?.source === 'public') {
+        analyticsPayload.source = 'public'
+      }
+      trackEvent('invite_rejected', analyticsPayload)
+      throw err
+    }
+  }
+
+  async function resendInvite(orgId: string, inviteId: string) {
+    if (!orgId || !inviteId) throw new Error('Missing invite identifiers')
+    try {
+      const updated = await resendOrgInvite(orgId, inviteId)
+      const current = invitesByOrg.value[orgId] || []
+      const next = current.map((invite) => (invite.id === inviteId ? { ...invite, ...updated } : invite))
+      setInvites(orgId, next)
+      toastStore.push('Invite resent', { type: 'success', duration: 2500 })
+      trackEvent('invite_resent', { orgId, inviteId })
+      return updated
+    } catch (err: any) {
+      const message = err?.response?.data?.error || err?.message || 'Failed to resend invite'
+      toastStore.push(message, { type: 'error', duration: 3200 })
+      trackEvent('invite_resend_failed', { orgId, inviteId, reason: message })
+      throw err
+    }
+  }
+
+  async function revokeInvite(orgId: string, inviteId: string) {
+    if (!orgId || !inviteId) throw new Error('Missing invite identifiers')
+    try {
+      const updated = await revokeOrgInvite(orgId, inviteId)
+      const current = invitesByOrg.value[orgId] || []
+      const next = current.filter((invite) => invite.id !== inviteId)
+      setInvites(orgId, next)
+      toastStore.push('Invite revoked', { type: 'success', duration: 2500 })
+      trackEvent('invite_revoked', { orgId, inviteId })
+      return updated
+    } catch (err: any) {
+      const message = err?.response?.data?.error || err?.message || 'Failed to revoke invite'
+      toastStore.push(message, { type: 'error', duration: 3200 })
+      trackEvent('invite_revoke_failed', { orgId, inviteId, reason: message })
       throw err
     }
   }
@@ -222,6 +267,8 @@ export const useOrgStore = defineStore('org', () => {
     fetchInvites,
     sendInvite,
     acceptInvite,
+    resendInvite,
+    revokeInvite,
     ensureLastOrgLoaded,
     requestTeamsEntry,
     consumeTeamsEntryRequest,

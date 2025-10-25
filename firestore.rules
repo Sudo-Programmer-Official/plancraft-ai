@@ -139,8 +139,16 @@ service cloud.firestore {
         allow create, update, delete: if isAdminOrOwner(orgId);
       }
 
+      match /templates/{templateId} {
+        allow read: if isMember(orgId);
+        allow create, update, delete: if isAdminOrOwner(orgId);
+      }
+
       match /invites/{inviteId} {
-        allow read, write: if isAdminOrOwner(orgId);
+        allow read: if isAdminOrOwner(orgId);
+        allow create: if isAdminOrOwner(orgId);
+        allow update: if isAdminOrOwner(orgId);
+        allow delete: if isAdminOrOwner(orgId);
       }
 
       // automation logs

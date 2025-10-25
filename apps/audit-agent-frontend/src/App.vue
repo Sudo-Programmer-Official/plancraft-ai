@@ -51,15 +51,17 @@ const examplePrompt = buildPrompt('Build an AI app for food delivery')
 <script setup>
 import InstallPrompt from "@/components/InstallPrompt.vue"
 import { useAuthStore } from '@/stores/authStore'
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import ConfettiOverlay from '@/components/ConfettiOverlay.vue'
 import { ElNotification } from 'element-plus'
 import ToastStack from '@/components/ToastStack.vue'
 import VoiceMicButton from '@/components/shared/VoiceMicButton.vue'
+import { initNotificationChannel, teardownNotificationChannel } from '@/services/notificationService'
 
 const authStore = useAuthStore()
 
 const confettiVisible = ref(false)
+const notificationsReady = ref(false)
 
 function triggerConfetti(count) {
   confettiVisible.value = true
@@ -89,6 +91,25 @@ onMounted(() => {
 onBeforeUnmount(() => {
   try { if (streakHandler) window.removeEventListener('streak-increased', streakHandler) } catch {}
 })
+
+watch(
+  () => authStore.user?.uid,
+  async (uid) => {
+    if (uid) {
+      if (notificationsReady.value) return
+      try {
+        await initNotificationChannel()
+        notificationsReady.value = true
+      } catch (err) {
+        console.warn('[Notifications] init failed:', err)
+      }
+    } else if (notificationsReady.value) {
+      teardownNotificationChannel()
+      notificationsReady.value = false
+    }
+  },
+  { immediate: true },
+)
 
 </script>
 

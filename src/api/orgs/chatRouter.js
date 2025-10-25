@@ -1,6 +1,7 @@
 import express from 'express';
 import admin, { db } from '../../../server/firebaseAdmin.js';
 import withOrgAuth from './middlewares/withOrgAuth.js';
+import { notifyChatMessage } from '../../services/notifierService.js';
 
 const router = express.Router({ mergeParams: true });
 
@@ -116,6 +117,15 @@ router.post('/rooms/:roomId/messages', async (req, res) => {
       .doc(roomId)
       .set({ lastMessageAt: now, updatedAt: now }, { merge: true });
     res.json({ id: ref.id, ...data });
+
+    notifyChatMessage({
+      orgId,
+      roomId,
+      messageId: ref.id,
+      senderUid: req.user?.uid || null,
+      senderName: req.user?.name || null,
+      preview: content || (data.attachments?.length ? 'Shared an attachment' : ''),
+    }).catch((err) => console.warn('[notify] chat.message failed:', err));
   } catch (err) {
     console.error('POST /chat/messages error', err);
     res.status(500).json({ error: 'Failed to send message' });

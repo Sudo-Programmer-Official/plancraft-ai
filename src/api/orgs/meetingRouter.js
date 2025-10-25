@@ -5,6 +5,7 @@ import withOrgAuth from './middlewares/withOrgAuth.js';
 import { scheduleAutomation } from '../../services/automationEngine.js';
 import { voiceToTasks } from '../../services/voiceOrchestrator.js';
 import { transcribeAudioBuffer } from '../../services/transcriptionService.js';
+import { notifyMeetingEvent } from '../../services/notifierService.js';
 
 const router = express.Router({ mergeParams: true });
 
@@ -105,6 +106,14 @@ router.post('/ingest', async (req, res) => {
     });
 
     res.json({ id: ref.id, ...meeting });
+
+    notifyMeetingEvent({
+      orgId,
+      meetingId: ref.id,
+      title: `${req.user?.name || 'Meeting added'}`,
+      body: title,
+      actorUid: req.user?.uid || null,
+    }).catch((err) => console.warn('[notify] meeting.ingest failed:', err));
   } catch (err) {
     console.error('POST /api/orgs/:orgId/meetings/ingest error', err);
     res.status(500).json({ error: 'Failed to ingest meeting' });
@@ -214,6 +223,14 @@ router.post('/:meetingId/recordings', async (req, res) => {
       tasks: createdTasks,
       status: autoTranscribe ? (transcriptText ? 'completed' : 'processing') : 'uploaded',
     });
+
+    notifyMeetingEvent({
+      orgId,
+      meetingId,
+      title: `${req.user?.name || 'Meeting update'}`,
+      body: transcriptText ? 'Meeting transcript is ready.' : 'New meeting recording uploaded.',
+      actorUid: req.user?.uid || null,
+    }).catch((err) => console.warn('[notify] meeting.recording failed:', err));
   } catch (err) {
     console.error('POST /api/orgs/:orgId/meetings/:meetingId/recordings error', err);
     res.status(err?.status || 500).json({ error: err?.message || 'Failed to process recording' });

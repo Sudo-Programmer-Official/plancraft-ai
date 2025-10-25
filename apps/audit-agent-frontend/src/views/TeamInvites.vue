@@ -100,15 +100,15 @@ async function sendInvite(payload: { email: string; role: string }) {
 
 async function handleResend(invite: any) {
   if (!orgId.value) return
-  await orgStore.sendInvite(orgId.value, invite.email, invite.role)
-  trackEvent('invite_resend', { orgId: orgId.value })
+  try {
+    await orgStore.resendInvite(orgId.value, invite.id)
+  } catch {}
 }
 
 async function handleRevoke(invite: any) {
   if (!orgId.value) return
   try {
     await orgStore.revokeInvite(orgId.value, invite.id)
-    trackEvent('invite_revoked', { orgId: orgId.value })
   } catch {}
 }
 

@@ -1,6 +1,7 @@
 import express from 'express';
 import { db } from '../../../server/firebaseAdmin.js';
 import withOrgAuth from './middlewares/withOrgAuth.js';
+import { notifyTaskEvent } from '../../services/notifierService.js';
 
 const router = express.Router({ mergeParams: true });
 
@@ -68,6 +69,14 @@ router.post('/', async (req, res) => {
 
     const ref = await db.collection(`orgs/${orgId}/tasks`).add(data);
     res.json({ id: ref.id, ...data });
+
+    notifyTaskEvent({
+      orgId,
+      taskId: ref.id,
+      title: `${req.user?.name || 'A teammate'} created a task`,
+      body: title,
+      performerUid: req.user?.uid || null,
+    }).catch((err) => console.warn('[notify] task.create failed:', err));
   } catch (err) {
     console.error('POST /api/orgs/:orgId/tasks error', err);
     res.status(500).json({ error: 'Failed to create task' });
@@ -84,7 +93,19 @@ router.patch('/:taskId', async (req, res) => {
     if (!snap.exists) return res.status(404).json({ error: 'Task not found' });
 
     await ref.update(updates);
-    res.json({ id: taskId, ...snap.data(), ...updates });
+    const updated = { id: taskId, ...snap.data(), ...updates };
+    res.json(updated);
+
+    const taskTitle = updated.title || snap.get('title') || 'Task';
+    const status = updates.status || snap.get('status') || null;
+
+    notifyTaskEvent({
+      orgId,
+      taskId,
+      title: `${req.user?.name || 'Task update'}`,
+      body: status ? `${taskTitle} → ${status}` : `${taskTitle} updated`,
+      performerUid: req.user?.uid || null,
+    }).catch((err) => console.warn('[notify] task.update failed:', err));
   } catch (err) {
     console.error('PATCH /api/orgs/:orgId/tasks/:taskId error', err);
     res.status(500).json({ error: 'Failed to update task' });

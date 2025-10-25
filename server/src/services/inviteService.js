@@ -1,11 +1,12 @@
 import crypto from 'crypto'
-import { db } from '../../server/firebaseAdmin.js'
+import { db } from '../../../server/firebaseAdmin.js'
 
 const INVITE_COLLECTION = (orgId) => db.collection(`orgs/${orgId}/invites`)
 const MEMBERS_COLLECTION = (orgId) => db.collection(`orgs/${orgId}/members`)
 
 const RATE_LIMIT_MAX = Number(process.env.INVITE_RATE_LIMIT_MAX || 5)
 const RATE_LIMIT_WINDOW = Number(process.env.INVITE_RATE_LIMIT_WINDOW_MS || 24 * 60 * 60 * 1000)
+const INVITE_EXPIRY_MS = Number(process.env.INVITE_EXPIRY_MS || 7 * 24 * 60 * 60 * 1000)
 
 const rateBuckets = new Map()
 const domainAllowlist = (process.env.INVITE_DOMAIN_ALLOWLIST || '')
@@ -56,7 +57,7 @@ export function generateInviteToken() {
 export async function createInvite({ orgId, email, role = 'member', invitedBy, expiresAt }) {
   const now = new Date()
   const token = generateInviteToken()
-  const expiresDate = expiresAt ? new Date(expiresAt) : new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+  const expiresDate = expiresAt ? new Date(expiresAt) : new Date(now.getTime() + INVITE_EXPIRY_MS)
 
   const data = {
     orgId,
@@ -139,4 +140,70 @@ export async function listInvites(orgId) {
 
 export async function markInviteUsed(invite) {
   await invite.ref.update({ status: 'accepted', updatedAt: new Date() })
+}
+
+function ensureDate(value, fallback) {
+  if (!value) return fallback
+  const date = value?.toDate?.() || value
+  const casted = new Date(date)
+  return Number.isNaN(casted.getTime()) ? fallback : casted
+}
+
+async function getInviteDoc(orgId, inviteId) {
+  const ref = INVITE_COLLECTION(orgId).doc(inviteId)
+  const snap = await ref.get()
+  if (!snap.exists) {
+    const err = new Error('Invite not found')
+    err.status = 404
+    throw err
+  }
+  return { ref, data: snap.data(), id: snap.id }
+}
+
+export async function resendInvite({ orgId, inviteId, requestedBy }) {
+  const { ref, data, id } = await getInviteDoc(orgId, inviteId)
+  if (data.status === 'accepted') {
+    const err = new Error('Invite already accepted')
+    err.status = 400
+    throw err
+  }
+
+  const now = new Date()
+  const expires = ensureDate(data.expiresAt, new Date(now.getTime() + INVITE_EXPIRY_MS))
+  const updates = {
+    token: generateInviteToken(),
+    status: 'pending',
+    updatedAt: now,
+    lastSentAt: now,
+    expiresAt: expires < now ? new Date(now.getTime() + INVITE_EXPIRY_MS) : expires,
+    resendCount: Number(data.resendCount || 0) + 1,
+    lastResentBy: requestedBy || null,
+  }
+
+  await ref.update(updates)
+  logEvent('invite_resent', { orgId, inviteId: id, requestedBy, email: data.email })
+
+  return { id, ...data, ...updates }
+}
+
+export async function revokeInvite({ orgId, inviteId, requestedBy }) {
+  const { ref, data, id } = await getInviteDoc(orgId, inviteId)
+  if (data.status === 'accepted') {
+    const err = new Error('Cannot revoke an accepted invite')
+    err.status = 400
+    throw err
+  }
+
+  const now = new Date()
+  const updates = {
+    status: 'revoked',
+    revokedAt: now,
+    revokedBy: requestedBy || null,
+    updatedAt: now,
+  }
+
+  await ref.update(updates)
+  logEvent('invite_revoked', { orgId, inviteId: id, requestedBy, email: data.email })
+
+  return { id, ...data, ...updates }
 }

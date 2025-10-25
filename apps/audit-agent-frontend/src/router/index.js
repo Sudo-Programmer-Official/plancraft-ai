@@ -10,6 +10,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { useOrgStore } from '@/stores/orgStore'
 import { trackEvent } from '@/services/analytics'
 import installTeamRoutes from './teamRoutes'
+import installPublicRoutes from './publicRoutes'
 
 const getCurrentUser = () =>
   new Promise((resolve) => {
@@ -139,6 +140,7 @@ const router = createRouter({
 })
 
 installTeamRoutes(router)
+installPublicRoutes(router)
 
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()

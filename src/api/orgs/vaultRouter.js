@@ -3,6 +3,7 @@ import { db } from '../../../server/firebaseAdmin.js';
 import withOrgAuth from './middlewares/withOrgAuth.js';
 import { rebuildVault } from '../../services/vaultIndexer.js';
 import { searchVault } from '../../services/vaultSearchService.js';
+import { notifyVaultEvent } from '../../services/notifierService.js';
 
 const router = express.Router({ mergeParams: true });
 
@@ -107,6 +108,14 @@ router.post('/refresh', async (req, res) => {
     const { orgId } = req.params;
     const result = await rebuildVault({ orgId });
     res.json({ ok: true, ...result });
+
+    notifyVaultEvent({
+      orgId,
+      itemId: 'reindex',
+      title: `${req.user?.name || 'Vault refreshed'}`,
+      body: 'Knowledge vault has been reindexed.',
+      actorUid: req.user?.uid || null,
+    }).catch((err) => console.warn('[notify] vault.refresh failed:', err));
   } catch (err) {
     console.error('POST /api/orgs/:orgId/vault/refresh error', err);
     res.status(500).json({ error: 'Failed to refresh vault' });
@@ -124,6 +133,14 @@ router.delete('/:vaultId', async (req, res) => {
     if (!snap.exists) return res.status(404).json({ error: 'Vault item not found' });
     await ref.delete();
     res.json({ ok: true });
+
+    notifyVaultEvent({
+      orgId,
+      itemId: vaultId,
+      title: `${req.user?.name || 'Vault update'}`,
+      body: 'A knowledge item was removed.',
+      actorUid: req.user?.uid || null,
+    }).catch((err) => console.warn('[notify] vault.delete failed:', err));
   } catch (err) {
     console.error('DELETE /api/orgs/:orgId/vault/:vaultId error', err);
     res.status(500).json({ error: 'Failed to delete vault item' });

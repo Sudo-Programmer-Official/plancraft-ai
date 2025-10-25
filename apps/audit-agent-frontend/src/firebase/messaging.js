@@ -29,11 +29,16 @@ async function getMessagingSafe() {
   return getMessaging(app)
 }
 
-export async function requestNotificationPermission() {
+export async function requestNotificationPermission(options = {}) {
   try {
     const messaging = await getMessagingSafe()
     if (!messaging) {
       console.warn("Notifications not supported in this browser.")
+      return null
+    }
+
+    if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
+      console.warn("Notification permission previously denied; skipping FCM token request.")
       return null
     }
 
@@ -43,7 +48,12 @@ export async function requestNotificationPermission() {
       return null
     }
 
-    const token = await getToken(messaging, { vapidKey })
+    const swRegistration = options?.serviceWorkerRegistration || null
+
+    const token = await getToken(messaging, {
+      vapidKey,
+      serviceWorkerRegistration: swRegistration || undefined,
+    })
     if (!token) {
       console.warn("No FCM token returned (permission denied or blocked)")
       return null
@@ -55,12 +65,16 @@ export async function requestNotificationPermission() {
     const auth = getAuth()
     const user = auth.currentUser
     if (user?.uid) {
-      const db = getFirestore()
-      await setDoc(
-        doc(db, "users", user.uid),
-        { fcmToken: token, fcmTokenUpdatedAt: new Date().toISOString() },
-        { merge: true }
-      )
+      try {
+        const db = getFirestore()
+        await setDoc(
+          doc(db, "users", user.uid),
+          { fcmToken: token, fcmTokenUpdatedAt: new Date().toISOString() },
+          { merge: true }
+        )
+      } catch (err) {
+        console.warn("Failed to persist FCM token:", err)
+      }
     }
 
     return token
@@ -76,4 +90,3 @@ export async function onForegroundMessage(callback) {
   if (!messaging) return () => {}
   return onMessage(messaging, callback)
 }
-

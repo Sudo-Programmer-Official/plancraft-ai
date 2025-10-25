@@ -4,13 +4,17 @@ import { db } from '../../../server/firebaseAdmin.js'
 import {
   checkInviteRateLimit,
   createInvite,
-  getInviteByToken,
+  listInvites,
+  resendInvite,
+  revokeInvite,
   validateEmailDomain,
-} from '../../services/inviteService.js'
+} from '../../../server/src/services/inviteService.js'
 
 const router = express.Router({ mergeParams: true })
 
 router.use(withOrgAuth)
+
+const ADMIN_ROLES = ['owner', 'admin']
 
 function validateEmail(email) {
   if (!email) return false
@@ -22,15 +26,48 @@ function validateRole(role) {
   return allowed.includes(String(role || '').toLowerCase())
 }
 
+function ensureAdmin(req, res) {
+  if (!ADMIN_ROLES.includes(String(req.orgRole))) {
+    res.status(403).json({ error: 'Only admins can manage invites' })
+    return false
+  }
+  return true
+}
+
+router.get('/', async (req, res) => {
+  try {
+    if (!ensureAdmin(req, res)) return
+    const { orgId } = req.params
+    const records = await listInvites(orgId)
+    res.json(records)
+  } catch (err) {
+    console.error('GET /api/orgs/:orgId/invites error', err)
+    res.status(500).json({ error: 'Failed to load invites' })
+  }
+})
+
+router.post('/validate-domain', (req, res) => {
+  try {
+    if (!ensureAdmin(req, res)) return
+    const { email } = req.body || {}
+    if (!email || !validateEmail(email)) {
+      return res.status(400).json({ ok: false, allowed: false, reason: 'Valid email required' })
+    }
+    const allowed = validateEmailDomain(email)
+    res.json({ ok: true, allowed })
+  } catch (err) {
+    console.error('POST /api/orgs/:orgId/invites/validate-domain error', err)
+    res.status(500).json({ error: 'Failed to validate domain' })
+  }
+})
+
 router.post('/', async (req, res) => {
   try {
     const { orgId } = req.params
     const { email, role = 'member', expiresAt = null } = req.body || {}
     const uid = req.user?.uid || null
 
-    if (!['owner', 'admin'].includes(String(req.orgRole))) {
-      return res.status(403).json({ error: 'Only admins can invite teammates' })
-    }
+    if (!ensureAdmin(req, res)) return
 
     if (!email || !validateEmail(email)) {
       return res.status(400).json({ error: 'Valid email required' })
@@ -45,7 +82,7 @@ router.post('/', async (req, res) => {
     checkInviteRateLimit(uid)
 
     const invite = await createInvite({ orgId, email, role, invitedBy: uid, expiresAt })
-    res.status(201).json({ id: invite.id, token: invite.token, expiresAt: invite.expiresAt })
+    res.status(201).json(invite)
   } catch (err) {
     console.error('POST /api/orgs/:orgId/invites error', err)
     const status = err?.status || 500
@@ -53,8 +90,37 @@ router.post('/', async (req, res) => {
   }
 })
 
+router.patch('/:inviteId/resend', async (req, res) => {
+  try {
+    if (!ensureAdmin(req, res)) return
+    const { orgId, inviteId } = req.params
+    const uid = req.user?.uid || null
+    const updated = await resendInvite({ orgId, inviteId, requestedBy: uid })
+    res.json(updated)
+  } catch (err) {
+    console.error('PATCH /api/orgs/:orgId/invites/:inviteId/resend error', err)
+    const status = err?.status || 500
+    res.status(status).json({ error: err?.message || 'Failed to resend invite' })
+  }
+})
+
+router.delete('/:inviteId', async (req, res) => {
+  try {
+    if (!ensureAdmin(req, res)) return
+    const { orgId, inviteId } = req.params
+    const uid = req.user?.uid || null
+    const updated = await revokeInvite({ orgId, inviteId, requestedBy: uid })
+    res.json(updated)
+  } catch (err) {
+    console.error('DELETE /api/orgs/:orgId/invites/:inviteId error', err)
+    const status = err?.status || 500
+    res.status(status).json({ error: err?.message || 'Failed to revoke invite' })
+  }
+})
+
 router.get('/:inviteId', async (req, res) => {
   try {
+    if (!ensureAdmin(req, res)) return
     const { orgId, inviteId } = req.params
     const doc = await db.doc(`orgs/${orgId}/invites/${inviteId}`).get()
     if (!doc.exists) return res.status(404).json({ error: 'Invite not found' })

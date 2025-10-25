@@ -7,6 +7,10 @@ import admin, { initFirebaseAdmin } from './firebaseAdmin.js';
 
 import orgRouter from '../src/api/orgs/orgRouter.js';
 import memberRouter from '../src/api/orgs/memberRouter.js';
+import inviteRouter from '../src/api/orgs/inviteRouter.js';
+import templatesRouter from '../src/api/orgs/templatesRouter.js';
+import notificationsRouter from '../src/api/notificationsRouter.js';
+import adminAnalyticsRouter from '../src/api/admin/analyticsRouter.js';
 import projectRouter from '../src/api/orgs/projectRouter.js';
 import boardRouter from '../src/api/orgs/boardRouter.js';
 import taskRouter from '../src/api/orgs/taskRouter.js';
@@ -95,6 +99,10 @@ app.use('/api/invites', invitePublicRouter);
 // Teams APIs
 app.use('/api/orgs', authMiddleware, orgRouter);
 app.use('/api/orgs', authMiddleware, memberRouter);
+app.use('/api/orgs/:orgId/invites', authMiddleware, inviteRouter);
+app.use('/api/orgs/:orgId/templates', authMiddleware, templatesRouter);
+app.use('/api/notifications', authMiddleware, notificationsRouter);
+app.use('/api/admin/analytics', authMiddleware, adminAnalyticsRouter);
 app.use('/api/orgs/:orgId/projects', authMiddleware, projectRouter);
 app.use('/api/orgs/:orgId/boards', authMiddleware, boardRouter);
 app.use('/api/orgs/:orgId/tasks', authMiddleware, taskRouter);

@@ -1,6 +1,6 @@
 import express from 'express'
 import { db } from '../../../server/firebaseAdmin.js'
-import { getInviteByToken, acceptInvite } from '../../services/inviteService.js'
+import { getInviteByToken, acceptInvite } from '../../../server/src/services/inviteService.js'
 
 const router = express.Router()
 
