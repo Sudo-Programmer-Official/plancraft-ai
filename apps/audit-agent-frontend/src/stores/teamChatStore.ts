@@ -46,6 +46,10 @@ export const useTeamChatStore = defineStore('team-chat', () => {
   const loadingMessages = ref(false)
   const presence = ref<Record<string, PresenceUser[]>>({})
   const typingUsers = ref<Record<string, PresenceUser[]>>({})
+  const latestSummary = ref<Record<string, { summary: string; bullets: string[]; tasks: any[]; model: string | null }>>({})
+  const replySuggestions = ref<string[]>([])
+  const coachMessage = ref<string>('')
+  const searchResults = ref<any[]>([])
 
   const currentMessages = computed(() => {
     if (!currentRoomId.value) return []
@@ -132,6 +136,10 @@ export const useTeamChatStore = defineStore('team-chat', () => {
     messageCursor.value = {}
     presence.value = {}
     typingUsers.value = {}
+    latestSummary.value = {}
+    replySuggestions.value = []
+    coachMessage.value = ''
+    searchResults.value = []
   }
 
   async function loadRooms(orgId: string) {
@@ -157,6 +165,8 @@ export const useTeamChatStore = defineStore('team-chat', () => {
     }
     currentRoomId.value = roomId
     socket.value.emit('room:join', { roomId })
+    replySuggestions.value = []
+    coachMessage.value = ''
     if (!messages.value[roomId]) {
       await loadMessages(orgId, roomId)
     }
@@ -207,6 +217,36 @@ export const useTeamChatStore = defineStore('team-chat', () => {
     return apiPost(`/api/orgs/${orgId}/chat/rooms/${roomId}/uploads`, file)
   }
 
+  async function summarizeRoom(orgId: string, roomId: string, payload: { projectId?: string | null; createTasks?: boolean } = {}) {
+    const res = await apiPost(`/api/orgs/${orgId}/chat/rooms/${roomId}/summary`, payload)
+    latestSummary.value[roomId] = {
+      summary: res?.summary || '',
+      bullets: Array.isArray(res?.bullets) ? res.bullets : [],
+      tasks: Array.isArray(res?.tasks) ? res.tasks : [],
+      model: res?.model || null,
+    }
+    return res
+  }
+
+  async function requestReply(orgId: string, roomId: string, payload: { tone?: string }) {
+    const res = await apiPost(`/api/orgs/${orgId}/chat/rooms/${roomId}/reply`, payload)
+    replySuggestions.value = Array.isArray(res?.suggestions) ? res.suggestions : []
+    return res
+  }
+
+  async function searchOrg(orgId: string, query: string) {
+    const params = new URLSearchParams({ q: query })
+    const res = await apiGet(`/api/orgs/${orgId}/chat/search?${params.toString()}`)
+    searchResults.value = Array.isArray(res?.results) ? res.results : []
+    return res
+  }
+
+  async function requestCoach(orgId: string, roomId: string, payload: { persona?: string }) {
+    const res = await apiPost(`/api/orgs/${orgId}/chat/coach`, { roomId, ...payload })
+    coachMessage.value = res?.message || ''
+    return res
+  }
+
   return {
     socket,
     connected,
@@ -218,6 +258,10 @@ export const useTeamChatStore = defineStore('team-chat', () => {
     currentMessages,
     presence,
     typingUsers,
+    latestSummary,
+    replySuggestions,
+    coachMessage,
+    searchResults,
     loadRooms,
     createRoom,
     joinRoom,
@@ -228,5 +272,9 @@ export const useTeamChatStore = defineStore('team-chat', () => {
     uploadAttachment,
     disconnect,
     reset,
+    summarizeRoom,
+    requestReply,
+    searchOrg,
+    requestCoach,
   }
 })

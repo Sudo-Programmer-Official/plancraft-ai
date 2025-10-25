@@ -153,6 +153,13 @@ service cloud.firestore {
           allow update: if isMember(orgId) && request.auth != null;
           allow delete: if isAdminOrOwner(orgId);
         }
+
+        match /insights/{insightId} {
+          allow read: if isMember(orgId);
+          allow create: if isMember(orgId);
+          allow update: if isAdminOrOwner(orgId);
+          allow delete: if isAdminOrOwner(orgId);
+        }
       }
 
       match /rtcRooms/{roomId} {

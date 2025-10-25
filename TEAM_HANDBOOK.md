@@ -11,6 +11,7 @@ This handbook captures the key workflows, endpoints, and operational notes for t
 - **Voice loop**: Frontend `useVoiceCommand` composable streams audio to `/api/voice/*`, backend intent + query services respond with structured JSON and optional ElevenLabs audio (data URLs).
 - **Pulse engine**: `/api/orgs/:orgId/projects/:projectId/pulse/weekly` aggregates tasks + reflections, calls OpenAI for summary, and can synthesise audio with `textToSpeech`.
 - **Meeting automation**: `/api/orgs/:orgId/meetings/:meetingId/recordings` uploads audio, auto-transcribes via OpenAI, and pipes action items into project tasks.
+- **Team chat intelligence**: `/api/orgs/:orgId/chat/...` endpoints provide real-time rooms, AI summaries, reply suggestions, coach personas, and cross-org search.
 
 ---
 

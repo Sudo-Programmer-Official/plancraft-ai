@@ -9,6 +9,7 @@
       @create-room="createRoom"
     />
     <ChatThread
+      ref="threadRef"
       :room="currentRoom"
       :messages="currentMessages"
       :presence="presence[currentRoomId || ''] || []"
@@ -18,6 +19,17 @@
       @typing="handleTyping"
       @pin="handlePin"
     />
+    <ChatInsightsPanel
+      :summary="currentSummary"
+      :suggestions="replySuggestions"
+      :coach-message="coachMessage"
+      :results="searchResults"
+      @summarize="summarize"
+      @suggest="suggestReplies"
+      @use-reply="applySuggestion"
+      @search="runSearch"
+      @coach="askCoach"
+    />
   </section>
   <div v-else class="chat-empty">
     <p>Select a team to start chatting.</p>
@@ -25,11 +37,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import ChatSidebar from '@/components/chat/ChatSidebar.vue'
 import ChatThread from '@/components/chat/ChatThread.vue'
+import ChatInsightsPanel from '@/components/chat/ChatInsightsPanel.vue'
 import { useTeamChatStore } from '@/stores/teamChatStore'
 import { useOrgStore } from '@/stores/orgStore'
 import { useProjectStore } from '@/stores/projectStore'
@@ -47,7 +60,9 @@ const orgId = computed(() => {
   return id || orgStore.activeOrgId
 })
 
-const { rooms, currentRoomId, currentMessages, presence, typingUsers } = storeToRefs(chatStore)
+const { rooms, currentRoomId, currentMessages, presence, typingUsers, latestSummary, replySuggestions, coachMessage, searchResults } = storeToRefs(chatStore)
+
+const threadRef = ref<InstanceType<typeof ChatThread> | null>(null)
 
 const currentRoom = computed(() => rooms.value.find((room) => room.id === currentRoomId.value) || null)
 const currentProject = computed(() => {
@@ -55,6 +70,7 @@ const currentProject = computed(() => {
   if (!projectId) return null
   return projectStore.projects.find((project) => project.id === projectId) || null
 })
+const currentSummary = computed(() => currentRoomId.value ? latestSummary.value[currentRoomId.value] || null : null)
 
 onMounted(async () => {
   if (!orgId.value) return
@@ -114,6 +130,33 @@ function handleTyping(typing: boolean) {
 function handlePin(message: any, pinned: boolean) {
   if (!orgId.value || !currentRoomId.value) return
   chatStore.togglePin(orgId.value, currentRoomId.value, message.id, pinned)
+}
+
+async function summarize() {
+  if (!orgId.value || !currentRoomId.value) return
+  await chatStore.summarizeRoom(orgId.value, currentRoomId.value, { projectId: currentProject.value?.id || null, createTasks: false })
+}
+
+async function suggestReplies(tone: string) {
+  if (!orgId.value || !currentRoomId.value) return
+  await chatStore.requestReply(orgId.value, currentRoomId.value, { tone })
+}
+
+function applySuggestion(text: string) {
+  threadRef.value?.setDraft(text)
+}
+
+async function runSearch(query: string) {
+  if (!orgId.value || !query.trim()) {
+    searchResults.value = []
+    return
+  }
+  await chatStore.searchOrg(orgId.value, query)
+}
+
+async function askCoach(persona: string) {
+  if (!orgId.value || !currentRoomId.value) return
+  await chatStore.requestCoach(orgId.value, currentRoomId.value, { persona })
 }
 
 async function fileToBase64(file: File) {

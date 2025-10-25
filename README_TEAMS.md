@@ -2,7 +2,7 @@
 
 This folder contains the Teams mode stack (multi-tenant orgs + RBAC) behind a feature flag. Recent releases (Sprints 4–6) add the voice-aware pulse system, meeting recordings with auto tasks, and production hardening.
 
-## What’s New (Sprints 4–6)
+## What’s New (Sprints 4–7)
 
 - **Security**: Hardened Firestore rules for nested project tasks & task update streams, plus new composite indexes.
 - **Observability**: Structured JSON logging with `x-request-id` propagation on every request.
@@ -10,6 +10,7 @@ This folder contains the Teams mode stack (multi-tenant orgs + RBAC) behind a fe
 - **Team Pulse API**: `GET /api/orgs/:orgId/projects/:projectId/pulse/weekly` delivers stats, AI summary, and optional ElevenLabs audio recap.
 - **Coach API**: `POST /api/orgs/:orgId/projects/:projectId/pulse/coach` turns summaries into motivational nudges (with voice playback when configured).
 - **Frontend Pulse view**: `/team/:orgId/pulse` showcases weekly cards, sentiment sparkline, monthly badges, and the AI coach loop.
+- **Team Chat intelligence**: `/team/:orgId/chat` delivers real-time rooms with presence, attachments, AI summaries, reply suggestions, persona coach, and cross-org search via new chat insight endpoints.
 - **Meetings automation**: `/api/orgs/:orgId/meetings/:meetingId/recordings` uploads audio, transcribes via OpenAI, and pipes action items directly into project tasks with updated UI in `TeamMeetingRoom.vue` and `TeamMeetingDetail.vue`.
 
 ## Deliverables Included

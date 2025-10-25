@@ -130,6 +130,12 @@ function onFileChange(event: Event) {
 function removeAttachment(index: number) {
   attachments.value.splice(index, 1)
 }
+
+defineExpose({
+  setDraft(value: string) {
+    draft.value = value
+  },
+})
 </script>
 
 <style scoped>
