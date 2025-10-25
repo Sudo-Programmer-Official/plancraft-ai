@@ -24,6 +24,8 @@ const items = computed(() => [
   { route: 'team-projects', label: 'Projects', icon: '📁' },
   { route: 'team-boards', label: 'Boards', icon: '🗂️' },
   { route: 'team-tasks', label: 'Tasks', icon: '✅' },
+  { route: 'team-chat', label: 'Chat', icon: '💬' },
+  { route: 'team-pulse', label: 'Pulse', icon: '📊' },
   { route: 'team-meetings', label: 'Meetings', icon: '🗓️' },
   { route: 'team-automations', label: 'Automations', icon: '⚡' },
 ])
@@ -40,4 +42,3 @@ nav { display: flex; flex-direction: column; gap: 4px; }
   .team-sidebar { display: none; }
 }
 </style>
-

@@ -5,7 +5,10 @@
         <h1>{{ meeting.title }}</h1>
         <p>{{ formatDate(meeting.startAt) }}</p>
       </div>
-      <button type="button" @click="goBack">← Back</button>
+      <div class="detail-actions">
+        <button type="button" @click="startLive">Join Live</button>
+        <button type="button" @click="goBack">← Back</button>
+      </div>
     </header>
 
     <form class="transcript-form" @submit.prevent="commit">
@@ -43,6 +46,16 @@
     <p v-if="!tasksPreview.length && previewed" class="empty-preview">
       No tasks suggested yet. Adjust the transcript or summary and try again.
     </p>
+
+    <section v-if="meeting?.summary" class="meeting-summary">
+      <h2>Latest Summary</h2>
+      <p>{{ meeting.summary }}</p>
+    </section>
+
+    <section v-if="meeting?.transcript" class="meeting-transcript">
+      <h2>Transcript</h2>
+      <pre>{{ meeting.transcript }}</pre>
+    </section>
   </section>
 
   <div v-else class="meeting-missing">
@@ -168,12 +181,18 @@ async function commit() {
 function goBack() {
   router.back()
 }
+
+function startLive() {
+  if (!orgId.value || !meetingId) return
+  router.push({ name: 'team-meeting-room', params: { orgId: orgId.value, meetingId } })
+}
 </script>
 
 <style scoped>
 .meeting-detail { display: flex; flex-direction: column; gap: 20px; padding: 16px; background: #fff; border-radius: 14px; border: 1px solid rgba(0,0,0,0.07); }
 .detail-header { display: flex; justify-content: space-between; align-items: center; }
-.detail-header button { padding: 6px 12px; border: none; background: #111827; color: #fff; border-radius: 6px; cursor: pointer; }
+.detail-actions { display: flex; gap: 8px; }
+.detail-actions button { padding: 6px 12px; border: none; background: #111827; color: #fff; border-radius: 6px; cursor: pointer; }
 .transcript-form { display: flex; flex-direction: column; gap: 14px; }
 textarea { width: 100%; border-radius: 10px; border: 1px solid rgba(0,0,0,0.18); padding: 10px; font-family: inherit; }
 .form-actions { display: flex; gap: 12px; }
@@ -183,6 +202,7 @@ textarea { width: 100%; border-radius: 10px; border: 1px solid rgba(0,0,0,0.18);
 .preview li { border: 1px solid rgba(0,0,0,0.15); border-radius: 10px; padding: 12px; background: #f9fafb; }
 .meta { font-size: 0.8rem; color: rgba(0,0,0,0.6); margin-left: 8px; }
 .empty-preview { padding: 12px; border-radius: 10px; border: 1px dashed rgba(0,0,0,0.3); text-align: center; color: rgba(0,0,0,0.7); background: #fff; }
+.meeting-summary, .meeting-transcript { border: 1px solid rgba(0,0,0,0.1); border-radius: 12px; padding: 12px; background: #f8fafc; }
+.meeting-transcript pre { white-space: pre-wrap; font-family: inherit; margin: 0; color: rgba(0,0,0,0.75); }
 .meeting-missing { padding: 24px; text-align: center; color: rgba(0,0,0,0.6); }
 </style>
-

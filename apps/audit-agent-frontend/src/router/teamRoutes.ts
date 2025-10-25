@@ -26,6 +26,16 @@ export default function installTeamRoutes(router) {
         component: () => import('@/views/TeamTasks.vue'),
       },
       {
+        path: 'chat',
+        name: 'team-chat',
+        component: () => import('@/views/TeamChat.vue'),
+      },
+      {
+        path: 'pulse',
+        name: 'team-pulse',
+        component: () => import('@/views/TeamPulse.vue'),
+      },
+      {
         path: 'meetings',
         name: 'team-meetings',
         component: () => import('@/views/TeamMeetings.vue'),
@@ -34,6 +44,11 @@ export default function installTeamRoutes(router) {
         path: 'meetings/:meetingId',
         name: 'team-meeting-detail',
         component: () => import('@/views/TeamMeetingDetail.vue'),
+      },
+      {
+        path: 'meetings/:meetingId/live',
+        name: 'team-meeting-room',
+        component: () => import('@/views/TeamMeetingRoom.vue'),
       },
       {
         path: 'automations',

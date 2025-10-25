@@ -1,10 +1,21 @@
-# PlanCraftAI — Teams (Phase 1 Blueprint)
+# PlanCraftAI — Teams (Sprints 4–6 Blueprint)
 
-This folder contains scaffolding for Team Mode (multi‑tenant orgs + RBAC) behind a feature flag. It is designed to coexist with existing personal mode without regressions.
+This folder contains the Teams mode stack (multi-tenant orgs + RBAC) behind a feature flag. Recent releases (Sprints 4–6) add the voice-aware pulse system, meeting recordings with auto tasks, and production hardening.
+
+## What’s New (Sprints 4–6)
+
+- **Security**: Hardened Firestore rules for nested project tasks & task update streams, plus new composite indexes.
+- **Observability**: Structured JSON logging with `x-request-id` propagation on every request.
+- **Rate limiting**: Built-in guardrail for `/api/voice/*` with configurable window + cap (`VOICE_RATE_LIMIT_WINDOW_MS`, `VOICE_RATE_LIMIT_MAX`).
+- **Team Pulse API**: `GET /api/orgs/:orgId/projects/:projectId/pulse/weekly` delivers stats, AI summary, and optional ElevenLabs audio recap.
+- **Coach API**: `POST /api/orgs/:orgId/projects/:projectId/pulse/coach` turns summaries into motivational nudges (with voice playback when configured).
+- **Frontend Pulse view**: `/team/:orgId/pulse` showcases weekly cards, sentiment sparkline, monthly badges, and the AI coach loop.
+- **Meetings automation**: `/api/orgs/:orgId/meetings/:meetingId/recordings` uploads audio, transcribes via OpenAI, and pipes action items directly into project tasks with updated UI in `TeamMeetingRoom.vue` and `TeamMeetingDetail.vue`.
 
 ## Deliverables Included
 
 - `CONTEXT_FOR_CODEX.md` — vision + principles for Codex and devs
+- `TEAM_CHAT.md` — chat gateway setup & smoke tests
 - `firestore.rules` — safe RBAC base (org/member access)
 - `indexes.json` — indexes for members/tasks lookups
 - `src/api/orgs/orgRouter.js` — org creation + membership listing
@@ -15,6 +26,7 @@ This folder contains scaffolding for Team Mode (multi‑tenant orgs + RBAC) behi
 - `src/api/orgs/taskRouter.js` — task CRUD + filters
 - `src/api/orgs/meetingRouter.js` — meeting ingest + transcript hooks
 - `src/api/orgs/automationRouter.js` — automation logs API
+- `src/api/orgs/chatRouter.js` — chat room REST helpers (history, pinning, uploads)
 - `frontend/src/layouts/TeamLayout.vue` — shell layout
 - `frontend/src/components/OrgSwitcher.vue` — switcher wired to store/API
 - `frontend/src/components/NavBarWithOrgSwitcher.vue` — nav drop-in for demos
@@ -23,14 +35,22 @@ This folder contains scaffolding for Team Mode (multi‑tenant orgs + RBAC) behi
 - `frontend/src/stores/taskStore.ts` — task data store
 - `frontend/src/stores/meetingStore.ts` — meeting ingest state
 - `frontend/src/stores/automationStore.ts` — automation log state (stub)
+- `frontend/src/stores/teamPulseStore.ts` — pulse + coach state
+- `frontend/src/stores/teamChatStore.ts` — chat websocket + history state
+- `frontend/src/stores/teamRtcStore.ts` — WebRTC session state (streams, chat, reactions)
 - `frontend/src/views/TeamProjects.vue` — team projects view skeleton
 - `frontend/src/views/TeamBoards.vue` — boards placeholder
 - `frontend/src/views/TeamTasks.vue` — tasks placeholder
+- `frontend/src/views/TeamPulse.vue` — weekly pulse, sentiment, coach loop
+- `frontend/src/views/TeamChat.vue` — real-time chat workspace
 - `frontend/src/views/TeamMeetings.vue` — meetings UI
+- `frontend/src/views/TeamMeetingRoom.vue` — live meeting room (WebRTC + chat)
 - `frontend/src/views/TeamAutomations.vue` — automation activity UI
 - `frontend/src/views/TeamMeetingDetail.vue` — transcript preview + commit flow
 - `src/services/automationEngine.js` — event bus for rules
 - `src/services/voiceOrchestrator.js` — voice → tasks stub
+- `src/services/teamPulseService.js` — weekly pulse stats + AI summary helper
+- `src/services/transcriptionService.js` — OpenAI transcription helper for meeting recordings
 - `src/services/automationRules.example.js` — sample rule wiring
 - `scripts/cron/pruneAutomationLogs.example.js` — retention helper
 - `.env.example` — `VITE_ENABLE_TEAMS` flag
@@ -80,6 +100,11 @@ import boardRouter from './src/api/orgs/boardRouter.js'
 import taskRouter from './src/api/orgs/taskRouter.js'
 import meetingRouter from './src/api/orgs/meetingRouter.js'
 import automationRouter from './src/api/orgs/automationRouter.js'
+import teamTaskRouter from './src/api/teams/taskRouter.js'
+import projectTaskProxyRouter from './src/api/teams/projectTaskProxyRouter.js'
+import pulseRouter from './src/api/teams/pulseRouter.js'
+import voiceRouter from './src/api/voice/voiceRouter.js'
+import rtcRouter from './src/api/teams/rtcRouter.js'
 import './src/services/automationRules.example.js' // optional: register automation handlers
 
 const app = express()
@@ -93,7 +118,29 @@ app.use('/api/orgs/:orgId/boards', authMiddleware, boardRouter)
 app.use('/api/orgs/:orgId/tasks', authMiddleware, taskRouter)
 app.use('/api/orgs/:orgId/meetings', authMiddleware, meetingRouter)
 app.use('/api/orgs/:orgId/automation', authMiddleware, automationRouter)
+app.use('/api/tasks', authMiddleware, teamTaskRouter)
+app.use('/api/orgs/:orgId/projects/:projectId/tasks', authMiddleware, projectTaskProxyRouter)
+app.use('/api/orgs/:orgId', authMiddleware, pulseRouter)
+app.use('/api/orgs/:orgId/rtc', authMiddleware, rtcRouter)
+
+const voiceLimiter = createRateLimiter({
+  windowMs: Number(process.env.VOICE_RATE_LIMIT_WINDOW_MS || 60_000),
+  max: Number(process.env.VOICE_RATE_LIMIT_MAX || 20),
+})
+app.use('/api/voice', authMiddleware, voiceLimiter, voiceRouter)
 ```
+
+Key environment variables:
+
+| Variable | Description | Default |
+| --- | --- | --- |
+| `VOICE_RATE_LIMIT_WINDOW_MS` | Rate-limit window for `/api/voice/*` | `60000` |
+| `VOICE_RATE_LIMIT_MAX` | Maximum requests per window (per uid/IP) | `20` |
+| `OPENAI_PULSE_MODEL` | Optional override for weekly pulse & coach prompts | `OPENAI_MODEL` / `gpt-4o-mini` |
+| `OPENAI_TRANSCRIBE_MODEL` | Whisper model for meeting recordings | `whisper-1` |
+| `VITE_RTC_ICE_SERVERS` | Frontend override for ICE servers array | Defaults to public STUN list |
+| `FIREBASE_STORAGE_BUCKET` | Optional override for Storage uploads | Uses default service-account bucket |
+| `SOCKET_IO_PATH` / `VITE_SOCKET_IO_PATH` | Path for chat WebSocket gateway | Defaults to `/ws/chat` |
 
 Routes included:
 - `POST /api/orgs` → create org, seed owner membership
@@ -114,8 +161,25 @@ Routes included:
 - `POST /api/orgs/:orgId/tasks` → create task
 - `PATCH /api/orgs/:orgId/tasks/:taskId` → update task
 - `DELETE /api/orgs/:orgId/tasks/:taskId` → delete task
+- `GET /api/orgs/:orgId/projects/:projectId/tasks` → same as above (REST alias)
+- `POST /api/orgs/:orgId/projects/:projectId/tasks` → same as above (alias)
+- `GET /api/orgs/:orgId/chat/rooms` → list chat rooms (recent first)
+- `POST /api/orgs/:orgId/chat/rooms` → create room
+- `GET /api/orgs/:orgId/chat/rooms/:roomId/messages` → fetch history (cursor-based)
+- `POST /api/orgs/:orgId/chat/rooms/:roomId/messages` → send message (REST fallback)
+- `POST /api/orgs/:orgId/chat/rooms/:roomId/uploads` → upload attachment (base64 → Storage)
+- `POST /api/orgs/:orgId/chat/rooms/:roomId/pin` → toggle pinned message
+- WebSocket gateway: connect to `SOCKET_IO_PATH` (Socket.IO) with `{ token, orgId }` auth for real-time chat + presence
+- `GET /api/orgs/:orgId/projects/:projectId/pulse/weekly` → weekly stats, AI summary, optional audio recap (`?audio=true`)
+- `POST /api/orgs/:orgId/projects/:projectId/pulse/coach` → generate spoken AI nudge (input: `{ prompt?, summary? }`)
+- `POST /api/orgs/:orgId/rtc/offer` → store WebRTC offer (room bootstrap)
+- `POST /api/orgs/:orgId/rtc/answer` → store answer for a room
+- `POST /api/orgs/:orgId/rtc/ice` → append ICE candidate (`role` = `offer` | `answer`)
+- `GET /api/orgs/:orgId/rtc/room/{roomId}` → fetch full room state (offer/answer/candidates)
+- `DELETE /api/orgs/:orgId/rtc/room/{roomId}` → clear room document
 - `GET /api/orgs/:orgId/meetings` → list meetings (latest 50)
 - `POST /api/orgs/:orgId/meetings/ingest` → create meeting entry (calendar/voice)
+- `POST /api/orgs/:orgId/meetings/:meetingId/recordings` → upload recording (base64) + auto-transcribe + create tasks
 - `POST /api/orgs/:orgId/meetings/:meetingId/transcript` → attach transcript & trigger automations
   - Add `?dryRun=true` to fetch generated tasks without writing or firing automations
 - `GET /api/orgs/:orgId/automation/logs` → list recent automation events
@@ -139,7 +203,7 @@ Steps:
    - `CORS_ORIGIN` (e.g., `http://localhost:5173`)
    - `PORT` (optional, defaults to 3000)
 2. Install deps using the example package:
-   - `npm install` with dependencies listed in `package-teams.example.json` (express, cors, firebase-admin)
+   - `npm install` with dependencies listed in `package-teams.example.json` (express, cors, firebase-admin, socket.io)
 3. Start server:
    - `node server/app.example.js`
 4. Health check:
@@ -233,7 +297,7 @@ setAuthTokenProvider(async () => {
 
 Sprint 3 adds:
 - Stores: `meetingStore.ts`, `automationStore.ts`
-- Views: `TeamMeetings.vue`, `TeamMeetingDetail.vue`, `TeamAutomations.vue`
+- Views: `TeamMeetings.vue`, `TeamMeetingDetail.vue`, `TeamMeetingRoom.vue`, `TeamAutomations.vue`
 - Automations tab supports filters (event/rule/status) + infinite scroll
 - Meeting detail page previews generated tasks prior to commit
 
@@ -264,6 +328,7 @@ Sprint 3 adds:
 - `POST /meetings/:id/transcript` ⇒ event `meeting.transcript_ready`
 - Example rule consumes transcript event → calls `voiceToTasks()` → writes to `tasks`
 - Logs stored in `orgs/{orgId}/automationLogs` (filterable, paginated via API)
+- `POST /meetings/:id/recordings` (Sprint 6) accepts base64 audio, uploads to Storage, autotranscribes via OpenAI, and creates project tasks automatically.
 
 4) Customize
 - Replace stub orchestrator with real LLM call (OpenAI/Vertex/etc.)

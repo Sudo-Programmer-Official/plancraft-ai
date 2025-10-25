@@ -114,6 +114,7 @@ import { ref, onMounted } from 'vue'
 import { hasSubscription, registerPushSubscription } from '@/services/pushService'
 import { useAuthFlags } from '@/composables/useAuthFlags'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/authStore'
 
 const router = useRouter()
 const { isGuest } = useAuthFlags()

@@ -8,6 +8,7 @@ export interface MeetingPayload {
   endAt?: string | Date | null
   attendees?: string[]
   notes?: string
+  projectId?: string | null
 }
 
 export interface Meeting extends MeetingPayload {
@@ -15,6 +16,7 @@ export interface Meeting extends MeetingPayload {
   transcript?: string
   summary?: string
   transcriptReady?: boolean
+  projectId?: string | null
   generatedTaskPreview?: Array<{ title: string; status: string; priority: string }>
   createdAt?: string | Date
   updatedAt?: string | Date
@@ -57,6 +59,19 @@ export const useMeetingStore = defineStore('meeting', () => {
     }
   }
 
+  async function uploadRecording(
+    orgId: string,
+    meetingId: string,
+    payload: { audio: { data: string; mimeType?: string }; projectId?: string | null; autoTranscribe?: boolean; prompt?: string },
+  ) {
+    if (!orgId || !meetingId) throw new Error('Missing orgId or meetingId')
+    const res = await apiPost(`/api/orgs/${orgId}/meetings/${meetingId}/recordings`, payload)
+    if (res?.transcript || res?.summary) {
+      upsert({ id: meetingId, transcript: res.transcript, summary: res.summary, transcriptReady: !!res.transcript, updatedAt: new Date().toISOString() })
+    }
+    return res
+  }
+
   async function attachTranscript(orgId: string, meetingId: string, body: { transcript: string; summary?: string }) {
     if (!orgId || !meetingId) throw new Error('Missing orgId or meetingId')
     const updated = await apiPost(`/api/orgs/${orgId}/meetings/${meetingId}/transcript`, body)
@@ -84,10 +99,10 @@ export const useMeetingStore = defineStore('meeting', () => {
     ingesting,
     load,
     ingest,
+    uploadRecording,
     attachTranscript,
     previewTranscript,
     getById,
     clear,
   }
 })
-
