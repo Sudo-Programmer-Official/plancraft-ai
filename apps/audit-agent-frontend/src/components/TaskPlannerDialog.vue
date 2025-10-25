@@ -159,13 +159,12 @@
 <script setup>
 import { ref, computed, watch, onBeforeUnmount, onMounted } from 'vue'
 import { ElNotification, ElMessage } from 'element-plus'
-import api from '@/services/api'
 import VoiceRecorder from '@/components/VoiceRecorder.vue'
 import { generateTasksFromText } from '@/services/aiService'
-import { addTaskToFirebase } from '@/services/firebaseService'
+import { createTaskFromVoice } from '@/services/taskService'
 import { useAuthStore } from '@/stores/authStore'
 import { getPreferences as getUserPreferences } from '@/services/settingsService'
-import { scheduleReminder, getReminderStatus } from '@/services/reminderService'
+import { getReminderStatus } from '@/services/reminderService'
 import { useTasks } from '@/composables/useTasks'
 import { toLocalDateKey, parseLocalDateKey } from '@/utils/dateHelper'
 import { normalizeParsedDateTime } from '@/utils/dateParser'
@@ -539,59 +538,22 @@ async function generateTasks() {
     const effectiveIso = manualIso || aiIso
 
     for (const [i, t] of items.entries()) {
-      const newTask = {
+      const result = await createTaskFromVoice({
         title: t,
         details: '',
-        link: '',
-        completed: false,
         date: toLocalDateKey(parseLocalDateKey(selectedDate.value)),
         order: tasks.value.length + i,
-        logs: [],
-        reminderTime: reminderTime.value || null
+        reminderTime: effectiveIso,
+        source: 'task-planner',
+      })
+
+      const reminder = result.reminder
+      if (reminder?.missingSetup) {
+        notifPromptOpen.value = true
+        suppressAutoClose.value = true
       }
-      const saved = await addTaskToFirebase(newTask)
-      try {
-        const uid = authStore?.user?.uid
-        if (uid && saved?.id && effectiveIso) {
-          const prefs = userPrefs.value?.notifications || {}
-          // Gentle prompt if user hasn't configured any channel yet
-          if (!hasNotificationSetup(prefs)) {
-            notifPromptOpen.value = true
-            suppressAutoClose.value = true
-          }
-          const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
-          try {
-            const chans = [
-              prefs?.whatsapp && 'whatsapp',
-              (prefs?.pwa || prefs?.push) && 'pwa',
-              prefs?.email && 'email',
-              prefs?.sms && 'sms',
-              prefs?.voice_call && 'voice_call',
-            ].filter(Boolean)
-            const resp = await api.post('/reminders/text', {
-              userId: uid,
-              text: newTask.title,
-              scheduledTime: effectiveIso,
-              taskId: saved.id,
-              channels: chans.length ? chans : undefined,
-              timezone: tz,
-            })
-            const warn = resp?.headers?.['x-plan-warning'] || resp?.headers?.['X-Plan-Warning']
-            if (warn) ElMessage({ message: warn, type: 'warning', duration: 5000 })
-            // Notify dashboards/overviews to refresh usage meters
-            try { window.dispatchEvent(new CustomEvent('usage-refresh')) } catch {}
-          } catch (err) {
-            await scheduleReminder(uid, saved.id, newTask.title, effectiveIso, prefs)
-            if (err?.response?.status === 403) {
-              const msg = err?.response?.data?.error || 'Daily reminder limit reached. Upgrade to Pro for unlimited reminders.'
-              ElMessage({ message: msg, type: 'warning', duration: 6000 })
-            }
-            // Still emit refresh to keep UI in sync after fallback
-            try { window.dispatchEvent(new CustomEvent('usage-refresh')) } catch {}
-          }
-        }
-      } catch (e) {
-        console.warn('AI-split reminder schedule failed:', e?.response?.data || e?.message)
+      if (reminder?.warning) {
+        ElMessage({ message: reminder.warning, type: 'warning', duration: 5000 })
       }
     }
     ElNotification({ title: 'Success', message: `${items.length} task${items.length > 1 ? 's' : ''} generated`, type: 'success', duration: 2500 })

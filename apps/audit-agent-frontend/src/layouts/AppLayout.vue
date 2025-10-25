@@ -1,5 +1,6 @@
 <template>
   <NotificationBanner :user-id="currentUserId" />
+  <TeamCreateOrJoin v-model:open="teamModalOpen" @created="handleTeamCreated" />
   <div
     class="flex min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 text-white"
   >
@@ -377,8 +378,9 @@
 import { ref, onMounted, watch, computed } from 'vue'
 import { hasSubscription, registerPushSubscription } from '@/services/pushService'
 import NotificationBanner from '@/components/NotificationBanner.vue'
+import TeamCreateOrJoin from '@/components/TeamCreateOrJoin.vue'
 import { onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { useOrgStore } from '@/stores/orgStore'
 import { driver } from 'driver.js'
@@ -446,8 +448,10 @@ const mobileMenu = ref(false) // mobile drawer toggle
 const showUpgrade = ref(false)
 const planOpen = ref(false)
 const profileSetupOpen = ref(false)
+const teamModalOpen = ref(false)
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 
 // Subscription state via store
@@ -480,17 +484,56 @@ function markAllRead() {
   unreadCount.value = 0
 }
 
+function handleTeamCreated() {
+  teamModalOpen.value = false
+}
+
 // Prompt for profile setup if incomplete
 watch(() => authStore.user?.uid, () => { maybePromptProfile() })
 
 watch(() => authStore.user?.uid, (uid) => {
   if (uid) {
     ensureTeamsLoaded()
+    orgStore.ensureLastOrgLoaded(uid)
   } else {
     orgsLoaded.value = false
     orgStore.clearOrg()
   }
 }, { immediate: true })
+
+function scrubTeamsEntryQuery() {
+  if (route.query?.teamsEntry) {
+    const { teamsEntry, ...rest } = route.query
+    router.replace({ path: route.path, query: rest, hash: route.hash }).catch(() => {})
+  }
+}
+
+function openTeamModal() {
+  if (!teamsEnabled.value) {
+    orgStore.consumeTeamsEntryRequest()
+    return
+  }
+  teamModalOpen.value = true
+  orgStore.consumeTeamsEntryRequest()
+  scrubTeamsEntryQuery()
+}
+
+watch(
+  () => route.query.teamsEntry,
+  (value) => {
+    if (value === '1') {
+      openTeamModal()
+    }
+  },
+  { immediate: true },
+)
+
+watch(
+  () => orgStore.teamsEntryRequested,
+  (flag) => {
+    if (flag) openTeamModal()
+  },
+)
 
 async function maybePromptProfile() {
   try {
@@ -567,28 +610,7 @@ async function ensureTeamsLoaded(force = false) {
 
 async function goToTeams() {
   if (!teamsEnabled.value) return
-  if (!authStore?.user) {
-    router.push({ path: '/login', query: { redirect: '/team' } })
-    return
-  }
-
-  await ensureTeamsLoaded(true)
-
-  let targetOrgId = orgStore.activeOrgId
-  if (!targetOrgId && orgStore.orgs.length) {
-    targetOrgId = orgStore.orgs[0].id
-    orgStore.setOrg(targetOrgId)
-  }
-
-  if (!targetOrgId) {
-    const name = window.prompt('Name your new team to get started') || 'My Team'
-    targetOrgId = await orgStore.createOrg(name)
-    orgsLoaded.value = true
-  }
-
-  if (targetOrgId) {
-    router.push({ name: 'team-projects', params: { orgId: targetOrgId } })
-  }
+  router.push('/teams')
 }
 
 onMounted(() => {

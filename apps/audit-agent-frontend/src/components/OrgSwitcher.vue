@@ -43,10 +43,18 @@ function onSwitch() {
 async function onCreate() {
   const name = window.prompt('Team name?')
   if (!name) return
-  const id = await orgStore.createOrg(name)
-  if (id) {
-    selected.value = id
-    router.push({ name: 'team-projects', params: { orgId: id } })
+  const timezone = (() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || null
+    } catch {
+      return null
+    }
+  })()
+  const result = await orgStore.createOrg({ name, timezone })
+  if (result?.id) {
+    selected.value = result.id
+    await orgStore.seedSampleProject(result.id)
+    router.push({ name: 'team-projects', params: { orgId: result.id } })
   }
 }
 </script>
@@ -58,4 +66,3 @@ button { padding: 6px 12px; border-radius: 8px; border: none; background: #1d4ed
 button:hover { background: #1e40af; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
 </style>
-

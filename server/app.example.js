@@ -24,6 +24,8 @@ import vaultRouter from '../src/api/orgs/vaultRouter.js';
 import feedRouter from '../src/api/orgs/feedRouter.js';
 import assistantRouter from '../src/api/orgs/assistantRouter.js';
 import analyticsRouter from '../src/api/orgs/analyticsRouter.js';
+import waitlistRouter from '../src/api/public/waitlistRouter.js';
+import invitePublicRouter, { acceptInviteHandler } from '../src/api/public/inviteRouter.js';
 import initChatGateway from '../src/services/chatGateway.js';
 
 // --- Auth middleware (Firebase ID token) ---
@@ -84,6 +86,11 @@ app.use((req, res, next) => {
 app.get('/', (req, res) => res.json({ status: 'ok', service: 'teams-api' }));
 app.get('/healthz', (req, res) => res.send('ok'));
 app.get('/api/ping', (req, res) => res.json({ pong: true }));
+
+app.use('/api/waitlist', waitlistRouter);
+app.post('/api/invites/:token/accept', authMiddleware, acceptInviteHandler);
+app.use('/api/invites', invitePublicRouter);
+app.use('/api/invites', invitePublicRouter);
 
 // Teams APIs
 app.use('/api/orgs', authMiddleware, orgRouter);

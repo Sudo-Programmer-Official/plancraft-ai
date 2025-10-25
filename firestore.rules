@@ -139,6 +139,10 @@ service cloud.firestore {
         allow create, update, delete: if isAdminOrOwner(orgId);
       }
 
+      match /invites/{inviteId} {
+        allow read, write: if isAdminOrOwner(orgId);
+      }
+
       // automation logs
       match /automationLogs/{logId} {
         allow read: if isMember(orgId);
@@ -171,6 +175,11 @@ service cloud.firestore {
         allow read: if isMember(orgId);
         allow create, update, delete: if isMember(orgId);
       }
+    }
+
+    match /waitlist_teams/{waitlistId} {
+      allow read: if false;
+      allow write: if false;
     }
   }
 }

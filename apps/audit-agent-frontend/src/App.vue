@@ -41,6 +41,7 @@ const examplePrompt = buildPrompt('Build an AI app for food delivery')
   <transition name="page-fade" mode="out-in" v-else>
     <RouterView />
   </transition>
+  <VoiceMicButton />
   <ToastStack />
   <InstallPrompt />
   <ConfettiOverlay v-if="confettiVisible" @done="confettiVisible = false" />
@@ -54,6 +55,7 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 import ConfettiOverlay from '@/components/ConfettiOverlay.vue'
 import { ElNotification } from 'element-plus'
 import ToastStack from '@/components/ToastStack.vue'
+import VoiceMicButton from '@/components/shared/VoiceMicButton.vue'
 
 const authStore = useAuthStore()
 
@@ -87,6 +89,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   try { if (streakHandler) window.removeEventListener('streak-increased', streakHandler) } catch {}
 })
+
 </script>
 
 <style>

@@ -7,6 +7,8 @@ import PrivacyPolicy from '@/views/PrivacyPolicy.vue'
 import Terms from '@/views/TermsOfService.vue'
 import Contact from '@/views/ContactForm.vue'
 import { useAuthStore } from '@/stores/authStore'
+import { useOrgStore } from '@/stores/orgStore'
+import { trackEvent } from '@/services/analytics'
 import installTeamRoutes from './teamRoutes'
 
 const getCurrentUser = () =>
@@ -33,6 +35,41 @@ const router = createRouter({
     { path: '/privacy', component: PrivacyPolicy },
     { path: '/terms', component: Terms },
     { path: '/contact', component: Contact },
+    {
+      path: '/teams',
+      name: 'teams-entry',
+      async beforeEnter(to, from, next) {
+        trackEvent('teams_route_opened', { from: from?.fullPath || null })
+        const authStore = useAuthStore()
+        const orgStore = useOrgStore()
+        const user = await getCurrentUser()
+
+        if (!user) {
+          return next({ path: '/login', query: { redirect: to.fullPath } })
+        }
+
+        if (!authStore.user) {
+          authStore.user = {
+            uid: user.uid,
+            displayName: user.displayName,
+            email: user.email,
+            photoURL: user.photoURL,
+            role: authStore.user?.role || 'user',
+          }
+        }
+
+        await orgStore.fetchOrgs()
+
+        const targetOrgId = orgStore.activeOrgId || orgStore.lastOrgId
+        if (targetOrgId) {
+          orgStore.setOrg(targetOrgId)
+          return next({ path: `/team/${targetOrgId}` })
+        }
+
+        orgStore.requestTeamsEntry()
+        return next({ path: '/dashboard', query: { teamsEntry: '1' } })
+      },
+    },
 
     // ✅ Blog (public)
     {
@@ -105,6 +142,7 @@ installTeamRoutes(router)
 
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
+  const orgStore = useOrgStore()
 
   // If navigating to login: only redirect away when fully signed-in (not guest)
   if (to.path === '/login') {
@@ -129,6 +167,14 @@ router.beforeEach(async (to, from, next) => {
       }
     } catch {}
     return next({ path: '/login', query: { redirect: to.fullPath } })
+  }
+
+  if (orgStore.enabled) {
+    const last = orgStore.ensureLastOrgLoaded(user.uid)
+    if (last && !orgStore.activeOrgId) {
+      const match = orgStore.orgs.find((org) => org.id === last)
+      if (match) orgStore.setOrg(match.id)
+    }
   }
 
   // Admin guard

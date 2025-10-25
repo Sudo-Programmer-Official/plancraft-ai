@@ -14,7 +14,7 @@ const slugify = (name) =>
 // Create org and seed owner membership
 router.post('/', async (req, res) => {
   try {
-    const { name } = req.body || {};
+    const { name, timezone = null } = req.body || {};
     const uid = req.user?.uid;
     if (!uid) return res.status(401).json({ error: 'Unauthenticated' });
     if (!name) return res.status(400).json({ error: 'Missing name' });
@@ -25,7 +25,7 @@ router.post('/', async (req, res) => {
       ownerUid: uid,
       plan: 'free',
       createdAt: new Date(),
-      settings: { join_policy: 'invite', default_role: 'member' },
+      settings: { join_policy: 'invite', default_role: 'member', timezone: timezone || null },
     };
 
     const orgRef = await db.collection('orgs').add(orgData);

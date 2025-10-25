@@ -51,9 +51,10 @@
             type="primary"
             size="large"
             class="!px-6 !py-3 !rounded-xl font-semibold hover:shadow-indigo-600/40"
-            @click="goToLogin"
-            >🚀 Get Started</el-button
+            @click="goToTeams"
           >
+            {{ teamsCtaLabel }}
+          </el-button>
           <el-button
             size="large"
             plain
@@ -62,23 +63,25 @@
             >🌿 Continue as Guest</el-button
           >
         </div>
-        <RouterLink
-          to="/subscription"
-          class="inline-block mt-6 px-5 py-3 rounded-xl bg-black/20 text-white font-semibold hover:bg-black/30 transition"
-        >
-          ⭐ Explore Premium
-        </RouterLink>
+        <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
+          <RouterLink
+            to="/subscription"
+            class="inline-block px-5 py-3 rounded-xl bg-black/20 text-white font-semibold hover:bg-black/30 transition"
+          >
+            ⭐ Explore Premium
+          </RouterLink>
+          <button
+            v-if="!teamsPublic"
+            type="button"
+            class="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-indigo-500/15 text-indigo-100 font-semibold hover:bg-indigo-500/25 transition"
+            @click="openWaitlist"
+          >
+            📋 Join the Teams Waitlist
+          </button>
+        </div>
       </div>
     </section>
-
-    <!-- For Teams CTA -->
-    <div class="mt-12 flex justify-center">
-      <div
-        class="px-6 py-4 rounded-2xl bg-indigo-500/10 border border-indigo-400/30 text-indigo-200 font-medium text-sm md:text-base shadow-lg backdrop-blur-md"
-      >
-        💼 <span class="font-semibold">PlanCraftAI for Teams</span> — Coming Soon 🚧
-      </div>
-    </div>
+    <TeamsWaitlistModal v-model:open="waitlistOpen" />
 
     <!-- Features -->
     <section
@@ -319,7 +322,9 @@
           Log in to track progress, or explore as a guest to get a feel for it.
         </p>
         <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-          <el-button type="primary" size="large" @click="goToLogin">🚀 Get Started</el-button>
+          <el-button type="primary" size="large" @click="goToTeams">
+            {{ teamsCtaLabel }}
+          </el-button>
           <el-button size="large" plain @click="continueAsGuest">🌿 Explore as Guest</el-button>
         </div>
       </div>
@@ -349,18 +354,39 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter, RouterLink } from 'vue-router'
+import { computed, ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { useHead } from '@vueuse/head'
+import TeamsWaitlistModal from '@/components/TeamsWaitlistModal.vue'
+import { trackEvent } from '@/services/analytics'
 
 const router = useRouter()
-function goToLogin() {
-  router.push('/login')
+const authStore = useAuthStore()
+const waitlistOpen = ref(false)
+const teamsPublic = computed(() => import.meta.env.VITE_TEAMS_PUBLIC === 'on' || import.meta.env.VITE_TEAMS_PUBLIC === 'true')
+const teamsCtaLabel = computed(() => (teamsPublic.value ? '🚀 Try Teams' : '🚀 Join Teams Waitlist'))
+
+function goToTeams() {
+  trackEvent('teams_cta_clicked', {
+    location: 'landing-hero',
+    mode: teamsPublic.value ? 'public' : 'waitlist',
+  })
+  if (teamsPublic.value) {
+    router.push('/teams')
+  } else {
+    trackEvent('teams_waitlist_opened', { location: 'landing-hero' })
+    waitlistOpen.value = true
+  }
 }
+
 function continueAsGuest() {
-  const authStore = useAuthStore()
   authStore.loginAsGuest().then(() => router.push({ name: 'dashboard' }))
+}
+
+function openWaitlist() {
+  trackEvent('teams_waitlist_opened', { location: 'landing-hero', reason: 'secondary-cta' })
+  waitlistOpen.value = true
 }
 
 const SITE_URL = import.meta.env.VITE_SITE_URL || 'https://plancraftai.com'
