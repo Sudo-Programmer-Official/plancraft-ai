@@ -83,8 +83,8 @@ watch(
 <style scoped>
 .team-sidebar {
   width: 224px;
-  background: #fff;
-  border-right: 1px solid rgba(15, 23, 42, 0.08);
+  background: var(--bg-surface-alt);
+  border-right: 1px solid var(--border-subtle);
   padding: 18px 12px;
   display: flex;
   flex-direction: column;
@@ -104,7 +104,7 @@ nav {
   gap: 10px;
   padding: 10px 14px;
   border-radius: 12px;
-  color: rgba(17, 24, 39, 0.72);
+  color: var(--text-secondary);
   text-decoration: none;
   font-weight: 500;
   transition: background 0.18s ease, color 0.18s ease;
@@ -112,13 +112,13 @@ nav {
 }
 
 .nav-link:hover {
-  background: rgba(79, 70, 229, 0.14);
-  color: #4338ca;
+  background: rgba(99, 102, 241, 0.14);
+  color: var(--accent-primary);
 }
 
 .nav-link.is-active {
   background: rgba(99, 102, 241, 0.18);
-  color: #312e81;
+  color: var(--accent-primary-strong);
 }
 
 .icon {
@@ -131,8 +131,8 @@ nav {
   min-width: 22px;
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(79, 70, 229, 0.16);
-  color: #3730a3;
+  background: rgba(99, 102, 241, 0.16);
+  color: var(--accent-primary-strong);
   font-size: 0.75rem;
   font-weight: 600;
   text-align: center;

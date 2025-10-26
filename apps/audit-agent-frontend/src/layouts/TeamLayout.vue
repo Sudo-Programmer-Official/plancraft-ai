@@ -101,12 +101,45 @@ watch(
 </script>
 
 <style scoped>
-.team-layout { display: flex; flex-direction: column; min-height: 100vh; background: #f5f7fb; }
-.team-body { display: flex; flex: 1; min-height: 0; }
-.team-content { flex: 1; padding: 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 24px; }
-.ask-teams-wrapper { position: sticky; top: 0; z-index: 10; }
-.team-content-view { flex: 1; display: flex; flex-direction: column; }
-.team-content-view :deep(> *) { flex: 1; }
+.team-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--bg-app);
+  color: var(--text-primary);
+}
+
+.team-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.team-content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.ask-teams-wrapper {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.team-content-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.team-content-view :deep(> *) {
+  flex: 1;
+}
+
 .command-fab {
   position: fixed;
   right: 32px;
@@ -115,10 +148,10 @@ watch(
   height: 56px;
   border-radius: 999px;
   border: none;
-  background: linear-gradient(160deg, #4f46e5, #8b5cf6);
+  background: var(--accent-gradient);
   color: #fff;
   font-size: 1.6rem;
-  box-shadow: 0 18px 45px rgba(79, 70, 229, 0.35);
+  box-shadow: var(--shadow-elevated);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -126,13 +159,16 @@ watch(
   transition: transform 0.18s ease, box-shadow 0.18s ease;
   z-index: 1100;
 }
+
 .command-fab:hover {
   transform: translateY(-2px) scale(1.03);
-  box-shadow: 0 22px 55px rgba(99, 102, 241, 0.45);
+  box-shadow: 0 22px 55px rgba(99, 102, 241, 0.32);
 }
+
 .command-fab:active {
   transform: translateY(1px) scale(0.98);
 }
+
 @media (max-width: 768px) {
   .command-fab {
     right: 20px;

@@ -1,7 +1,7 @@
 /* === PlanCraftAI Toast Theme === */
 .el-notification {
   border-radius: 0.75rem !important;
-  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 35%, #4c1d95 100%) !important;
+  background: var(--toast-surface) !important;
   color: #e2e8f0 !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
   box-shadow: 0 0 20px rgba(147, 51, 234, 0.3);
@@ -38,4 +38,3 @@
   0% { opacity: 0; transform: translateY(-10px) scale(0.98); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
-

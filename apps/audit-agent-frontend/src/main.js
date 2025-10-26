@@ -1,6 +1,7 @@
 // Global styles
 import './assets/tailwind.scss'
 import './assets/theme.scss'
+import './assets/theme.css'
 import 'element-plus/dist/index.css'
 
 import { createApp } from 'vue'
@@ -17,6 +18,7 @@ import 'driver.js/dist/driver.css'
 import { handleAuthError } from '@/services/firebaseService'
 import { setupLinkedInTag } from './analytics/linkedin.js'
 import { setAuthTokenProvider } from '@/lib/api'
+import { useUiStore } from '@/stores/uiStore'
 
 // Day.js timezone defaults
 import dayjs from 'dayjs'
@@ -89,6 +91,8 @@ try { setupLinkedInTag() } catch {}
 // ✅ Auth store init
 const authStore = useAuthStore()
 authStore.init()
+
+useUiStore()
 
 setAuthTokenProvider(async () => {
   try {

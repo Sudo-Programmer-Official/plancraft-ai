@@ -157,11 +157,13 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: linear-gradient(160deg, rgba(15, 23, 42, 0.92), rgba(30, 64, 175, 0.75));
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
   border-radius: 18px;
   padding: 16px 18px;
-  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.18);
-  color: #f8fafc;
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.12);
+  color: var(--text-primary);
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .ask-teams__field {
@@ -179,22 +181,22 @@ onMounted(() => {
   padding: 10px 12px;
   font-size: 0.95rem;
   font-family: inherit;
-  background: rgba(15, 23, 42, 0.65);
-  color: inherit;
-  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.35);
+  background: var(--bg-surface-alt);
+  color: var(--text-primary);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
 }
 
 .ask-teams__input:focus {
   outline: none;
-  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.9);
+  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.65);
 }
 
 .ask-teams__button {
   border: none;
   border-radius: 12px;
   padding: 10px 16px;
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
-  color: white;
+  background: var(--accent-gradient);
+  color: #f8fafc;
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.18s ease, box-shadow 0.18s ease;
@@ -208,13 +210,13 @@ onMounted(() => {
 
 .ask-teams__button:not(:disabled):hover {
   transform: translateY(-1px);
-  box-shadow: 0 10px 20px rgba(79, 70, 229, 0.35);
+  box-shadow: 0 10px 24px rgba(99, 102, 241, 0.28);
 }
 
 .ask-teams__error {
   margin: 0;
   font-size: 0.85rem;
-  color: #fecaca;
+  color: var(--accent-danger);
 }
 
 .ask-teams__typing {
@@ -227,13 +229,14 @@ onMounted(() => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: rgba(226, 232, 240, 0.8);
+  background: var(--text-secondary);
   animation: bounce 1s infinite ease-in-out;
 }
 
 .ask-teams__typing .dot:nth-child(2) {
   animation-delay: 0.2s;
 }
+
 .ask-teams__typing .dot:nth-child(3) {
   animation-delay: 0.4s;
 }
@@ -248,17 +251,19 @@ onMounted(() => {
 }
 
 .message {
-  background: rgba(15, 23, 42, 0.75);
+  background: var(--bg-surface-alt);
   border-radius: 14px;
   padding: 12px 14px;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+  border: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
   gap: 6px;
+  color: var(--text-primary);
+  transition: border-color 0.2s ease, background 0.2s ease;
 }
 
 .message.user {
-  background: rgba(30, 64, 175, 0.65);
+  background: rgba(99, 102, 241, 0.12);
 }
 
 .message header {
@@ -268,7 +273,7 @@ onMounted(() => {
   font-size: 0.82rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgba(226, 232, 240, 0.85);
+  color: var(--text-muted);
 }
 
 .message .avatar {
@@ -279,21 +284,21 @@ onMounted(() => {
   margin: 0;
   white-space: pre-wrap;
   line-height: 1.5;
-  color: rgba(241, 245, 249, 0.95);
+  color: var(--text-primary);
   font-size: 0.95rem;
 }
 
 .message .timestamp {
   margin-left: auto;
   font-size: 0.75rem;
-  color: rgba(148, 163, 184, 0.8);
+  color: var(--text-muted);
 }
 
 .message .playback {
   align-self: flex-start;
   border: none;
-  background: rgba(59, 130, 246, 0.15);
-  color: #bfdbfe;
+  background: rgba(99, 102, 241, 0.16);
+  color: var(--accent-primary-strong);
   border-radius: 10px;
   padding: 6px 10px;
   font-size: 0.8rem;
@@ -301,7 +306,7 @@ onMounted(() => {
 }
 
 .message .playback:hover {
-  background: rgba(59, 130, 246, 0.25);
+  background: rgba(99, 102, 241, 0.24);
 }
 
 @keyframes bounce {

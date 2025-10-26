@@ -46,9 +46,9 @@ const items = computed(() => [
     gap: 8px;
     padding: 12px 16px;
     overflow-x: auto;
-    background: linear-gradient(180deg, rgba(245, 247, 251, 0.98), rgba(245, 247, 251, 0.9));
+    background: var(--bg-surface);
     backdrop-filter: blur(12px);
-    border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+    border-bottom: 1px solid var(--border-subtle);
   }
 
   .team-mobile-nav::-webkit-scrollbar {
@@ -61,9 +61,9 @@ const items = computed(() => [
     gap: 6px;
     padding: 8px 14px;
     border-radius: 999px;
-    border: 1px solid rgba(148, 163, 184, 0.25);
-    background: rgba(255, 255, 255, 0.85);
-    color: rgba(30, 41, 59, 0.75);
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-surface-alt);
+    color: var(--text-secondary);
     font-size: 0.85rem;
     text-decoration: none;
     white-space: nowrap;
@@ -71,9 +71,9 @@ const items = computed(() => [
   }
 
   .nav-pill.is-active {
-    background: rgba(99, 102, 241, 0.15);
+    background: rgba(99, 102, 241, 0.18);
     border-color: rgba(99, 102, 241, 0.4);
-    color: #312e81;
+    color: var(--accent-primary-strong);
   }
 
   .nav-pill:active {
