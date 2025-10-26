@@ -12,7 +12,7 @@
 
     <div v-if="loading" class="projects-loading">Loading projects…</div>
 
-    <ul v-else class="projects-list" v-if="projects.length">
+    <ul v-else-if="Array.isArray(projects) && projects.length" class="projects-list">
       <li v-for="project in projects" :key="project.id">
         <strong>{{ project.name }}</strong>
         <span class="meta">{{ project.key }} · {{ project.status }}</span>
@@ -26,7 +26,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useOrgStore } from '../stores/orgStore'
 import { useProjectStore } from '../stores/projectStore'
