@@ -1,0 +1,22 @@
+<!-- /public/illustrations/teams-collab.svg -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366F1"/>
+      <stop offset="50%" stop-color="#8B5CF6"/>
+      <stop offset="100%" stop-color="#EC4899"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="400" rx="24" fill="url(#grad)" opacity="0.1"/>
+  <g stroke="url(#grad)" stroke-width="2" fill="none">
+    <circle cx="180" cy="180" r="60" fill="url(#grad)" opacity="0.2"/>
+    <circle cx="620" cy="180" r="60" fill="url(#grad)" opacity="0.2"/>
+    <path d="M240 180 L560 180" stroke="url(#grad)" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  <g fill="#fff" font-family="sans-serif" font-size="22" text-anchor="middle">
+    <text x="180" y="190">You</text>
+    <text x="400" y="170" font-size="18" opacity="0.9">shared tasks</text>
+    <text x="620" y="190">Team</text>
+  </g>
+  <circle cx="400" cy="180" r="6" fill="url(#grad)"/>
+</svg>

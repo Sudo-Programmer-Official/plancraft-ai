@@ -10,22 +10,26 @@
     </div>
 
     <!-- Hero -->
+    <!-- HERO: Landing Top Section -->
     <section
       class="relative py-28 md:py-36 bg-gradient-to-b from-indigo-900 via-purple-900 to-slate-950 overflow-hidden"
     >
+      <!-- Logo -->
       <div class="absolute top-6 left-6 z-20 flex items-center gap-2">
         <img
           src="/logo-bg-remove.png"
           alt="PlanCraftAI Logo"
           class="h-10 w-auto sm:h-12 md:h-14 drop-shadow-lg select-none"
         />
-        <span class="text-lg sm:text-xl md:text-2xl font-bold text-white tracking-tight"
-          >PlanCraftAI</span
-        >
+        <span class="text-lg sm:text-xl md:text-2xl font-bold text-white tracking-tight">
+          PlanCraftAI
+        </span>
       </div>
 
+      <!-- Animated Stars -->
       <canvas ref="starsCanvas" class="absolute inset-0 w-full h-full z-0"></canvas>
 
+      <!-- Content -->
       <div class="relative z-10 max-w-4xl mx-auto text-center">
         <h1
           id="hero-title"
@@ -34,6 +38,7 @@
         >
           Peaceful Productivity
         </h1>
+
         <p
           class="mt-6 text-lg md:text-2xl text-indigo-100 max-w-2xl mx-auto leading-relaxed"
           data-aos="fade-up"
@@ -42,41 +47,37 @@
           Pause, plan, and reflect — with gentle voice journaling, smart tasks, and mindful insights
           guiding your day.
         </p>
+
+        <!-- Primary CTAs -->
+        <!-- Primary CTAs -->
         <div
-          class="mt-10 flex flex-col sm:flex-row gap-4 justify-center"
+          class="mt-10 flex flex-col sm:flex-row flex-wrap gap-4 justify-center"
           data-aos="zoom-in"
           data-aos-delay="250"
         >
-          <el-button
-            type="primary"
-            size="large"
-            class="!px-6 !py-3 !rounded-xl font-semibold hover:shadow-indigo-600/40"
-            @click="goToTeams"
-          >
-            {{ teamsCtaLabel }}
-          </el-button>
-          <el-button
-            size="large"
-            plain
-            class="!px-6 !py-3 !rounded-xl font-semibold hover:bg-indigo-500/10"
-            @click="continueAsGuest"
-            >🌿 Continue as Guest</el-button
-          >
-        </div>
-        <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
+          <!-- 🚀 Get Started -->
           <RouterLink
-            to="/subscription"
-            class="inline-block px-5 py-3 rounded-xl bg-black/20 text-white font-semibold hover:bg-black/30 transition"
+            to="/login"
+            class="inline-flex items-center justify-center h-12 px-6 rounded-xl text-white font-semibold bg-[var(--accent)] hover:bg-[var(--accent-hover)] shadow-lg shadow-indigo-800/40 transition-all"
           >
-            ⭐ Explore Premium
+            🚀 Get Started
           </RouterLink>
+
+          <!-- 🌿 Continue as Guest -->
+          <button
+            @click="continueAsGuest"
+            class="inline-flex items-center justify-center h-12 px-6 rounded-xl font-semibold text-white/90 bg-white/10 hover:bg-white/20 border border-white/20 transition-all"
+          >
+            🌿 Continue as Guest
+          </button>
+
+          <!-- 👥 Join Teams Waitlist -->
           <button
             v-if="!teamsPublic"
-            type="button"
-            class="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-indigo-500/15 text-indigo-100 font-semibold hover:bg-indigo-500/25 transition"
             @click="openWaitlist"
+            class="inline-flex items-center justify-center h-12 px-6 rounded-xl font-semibold bg-indigo-600 text-white hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-900/40"
           >
-            📋 Join the Teams Waitlist
+            👥 Join Teams Waitlist
           </button>
         </div>
       </div>
@@ -113,6 +114,40 @@
             <p class="relative mt-3 text-indigo-200 text-sm leading-relaxed">{{ f.desc }}</p>
           </div>
         </div>
+      </div>
+    </section>
+    <section
+      id="teams"
+      class="relative py-24 bg-gradient-to-b from-indigo-950/80 via-purple-950/70 to-slate-950/80 text-center overflow-hidden"
+    >
+      <!-- Background Accent Glow -->
+      <div
+        class="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_center,_rgba(99,102,241,0.15)_0%,_transparent_70%)]"
+      ></div>
+
+      <div class="max-w-6xl mx-auto px-6">
+        <!-- Title -->
+        <h2
+          class="text-4xl md:text-5xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-300 to-pink-400 mb-6"
+        >
+          👥 Teams that Grow Together
+        </h2>
+
+        <!-- Description -->
+        <p class="text-indigo-200/90 mb-12 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
+          Bring your teammates into a calmer workspace — shared tasks, meeting recaps, and AI
+          insights that adapt to your rhythm.
+        </p>
+
+        <!-- Illustration -->
+
+        <!-- CTA Button -->
+        <button
+          @click="goToTeams"
+          class="inline-flex items-center justify-center h-12 px-8 rounded-xl font-semibold text-white bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-900/40 transition-all"
+        >
+          🚀 Try Teams Now
+        </button>
       </div>
     </section>
 
@@ -226,106 +261,169 @@
       </div>
     </section>
 
-    <section
-      id="plans"
-      class="py-24 bg-gradient-to-b from-indigo-950/70 via-purple-950/60 to-slate-950/80 text-center"
+<section
+  id="plans"
+  class="py-24 bg-gradient-to-b from-indigo-950/70 via-purple-950/60 to-slate-950/80 text-center"
+>
+  <div class="max-w-6xl mx-auto px-4 sm:px-6">
+    <h2 class="text-4xl md:text-5xl font-extrabold text-white mb-4">
+      ✨ Choose Your Flow
+    </h2>
+    <p class="text-indigo-200 mb-12 text-lg max-w-2xl mx-auto">
+      Simple plans designed to help you stay mindful and productive.
+    </p>
+
+    <div
+      class="grid grid-cols-1 md:grid-cols-2 gap-8 justify-center items-stretch max-w-4xl mx-auto"
     >
-      <div class="max-w-6xl mx-auto px-6">
-        <h2 class="text-4xl md:text-5xl font-bold text-white mb-4">✨ Choose Your Flow</h2>
-        <p class="text-indigo-200 mb-12 text-lg">
-          Simple plans designed to help you stay mindful and productive.
-        </p>
-
+      <!-- Free Plan -->
+      <div
+        class="relative flex flex-col justify-between bg-white/10 backdrop-blur-xl rounded-2xl shadow-xl p-8 border border-indigo-400/20 hover:-translate-y-2 hover:scale-[1.01] transition-all hover:shadow-indigo-500/30 duration-300"
+      >
         <div
-          class="grid grid-cols-1 md:grid-cols-2 gap-8 justify-center items-stretch max-w-4xl mx-auto"
+          class="absolute top-0 right-0 bg-indigo-500 text-white text-xs font-semibold px-3 py-1 rounded-bl-lg"
         >
-          <!-- Free Plan -->
-          <div
-            class="relative flex flex-col justify-between bg-white/10 backdrop-blur-xl rounded-2xl shadow-xl p-8 border border-indigo-400/20 hover:-translate-y-2 transition-all hover:shadow-indigo-500/30"
-          >
-            <div
-              class="absolute top-0 right-0 bg-indigo-500 text-white text-xs font-semibold px-3 py-1 rounded-bl-lg"
-            >
-              Free
-            </div>
-            <div>
-              <h3 class="text-2xl font-semibold text-white mb-3">🌿 Free Plan</h3>
-              <p class="text-indigo-200 text-sm mb-6">
-                Perfect for those starting their mindful journey.
-              </p>
-              <ul class="space-y-3 text-left text-sm text-indigo-100 mb-6">
-                <li>✅ Create & manage tasks</li>
-                <li>✅ Daily journaling prompts</li>
-                <li>✅ Limited AI insights</li>
-                <li>✅ Local reminders</li>
-              </ul>
-            </div>
-            <div class="mt-auto">
-              <div class="text-3xl font-bold text-white mb-4">Free</div>
-              <RouterLink
-                to="/login"
-                class="inline-block w-full px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition shadow-lg shadow-indigo-800/40"
-              >
-                Get Started
-              </RouterLink>
-            </div>
-          </div>
-
-          <!-- Premium Plan -->
-          <div
-            class="relative flex flex-col justify-between bg-gradient-to-br from-indigo-500 via-purple-600 to-pink-600 rounded-2xl shadow-xl p-8 border border-white/20 hover:-translate-y-2 transition-all hover:shadow-pink-600/40"
-            style="background: linear-gradient(135deg, #4338ca 0%, #6d28d9 40%, #db2777 100%)"
-          >
-            <div
-              class="absolute top-0 right-0 bg-yellow-400 text-black text-xs font-semibold px-3 py-1 rounded-bl-lg shadow-sm"
-            >
-              Most Popular
-            </div>
-            <div>
-              <h3 class="text-2xl font-semibold text-white mb-3">🚀 Premium Plan</h3>
-              <p class="text-indigo-100 text-sm mb-6">
-                Unlock the full mindful productivity experience.
-              </p>
-              <ul class="space-y-3 text-left text-sm mb-6 text-white/95">
-                <li>⭐ Unlimited reminders & AI summaries</li>
-                <li>⭐ Voice journaling & insights</li>
-                <li>⭐ Calendar & WhatsApp integration</li>
-                <li>⭐ Priority support & early access</li>
-              </ul>
-            </div>
-            <div class="mt-auto">
-              <div class="text-3xl font-bold mb-4">
-                $2<span class="text-sm text-indigo-100">/month</span>
-              </div>
-              <RouterLink
-                to="/subscription"
-                class="inline-block w-full px-6 py-3 rounded-xl bg-white text-indigo-700 font-semibold hover:bg-slate-100 transition shadow-md"
-              >
-                Go Premium ✨
-              </RouterLink>
-            </div>
-          </div>
+          Free
         </div>
-
-        <!-- Reassurance note -->
-        <p class="mt-10 text-sm text-indigo-300">
-          No hidden fees. Cancel anytime from your account settings.
-        </p>
+        <div>
+          <h3 class="text-2xl font-semibold text-white mb-3">🌿 Free Plan</h3>
+          <p class="text-indigo-200 text-sm mb-6">
+            Perfect for those starting their mindful journey.
+          </p>
+          <ul class="space-y-3 text-left text-sm text-indigo-100 mb-6">
+            <li>✅ Create & manage tasks</li>
+            <li>✅ Daily journaling prompts</li>
+            <li>✅ Limited AI insights</li>
+            <li>✅ Local reminders</li>
+          </ul>
+        </div>
+        <div class="mt-auto">
+          <div class="text-3xl font-bold text-white mb-4">Free</div>
+          <RouterLink
+            to="/login"
+            class="inline-flex items-center justify-center w-full h-12 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition-all shadow-lg shadow-indigo-800/40"
+          >
+            🚀 Get Started
+          </RouterLink>
+        </div>
       </div>
-    </section>
+
+      <!-- Premium Plan -->
+      <div
+        class="relative flex flex-col justify-between bg-gradient-to-br from-indigo-500 via-purple-600 to-pink-600 rounded-2xl shadow-xl p-8 border border-white/20 hover:-translate-y-2 hover:scale-[1.01] transition-all duration-300 hover:shadow-pink-600/40"
+      >
+        <div
+          class="absolute top-0 right-0 bg-yellow-400 text-black text-xs font-semibold px-3 py-1 rounded-bl-lg shadow-sm"
+        >
+          Most Popular
+        </div>
+        <div>
+          <h3 class="text-2xl font-semibold text-white mb-3">🚀 Premium Plan</h3>
+          <p class="text-indigo-100 text-sm mb-6">
+            Unlock the full mindful productivity experience.
+          </p>
+          <ul class="space-y-3 text-left text-sm mb-6 text-white/95">
+            <li>⭐ Unlimited reminders & AI summaries</li>
+            <li>⭐ Voice journaling & insights</li>
+            <li>⭐ Calendar & WhatsApp integration</li>
+            <li>⭐ Priority support & early access</li>
+          </ul>
+        </div>
+        <div class="mt-auto">
+          <div class="text-3xl font-bold mb-4">
+            $2<span class="text-sm text-indigo-100">/month</span>
+          </div>
+          <RouterLink
+            to="/subscription"
+            class="inline-flex items-center justify-center w-full h-12 rounded-xl bg-white text-indigo-700 font-semibold hover:bg-slate-100 transition-all shadow-md"
+          >
+            ✨ Go Premium
+          </RouterLink>
+        </div>
+      </div>
+
+      <!-- Teams Plan -->
+      <div
+        class="relative flex flex-col justify-between bg-white/10 backdrop-blur-xl rounded-2xl shadow-xl p-8 border border-indigo-400/20 hover:-translate-y-2 hover:scale-[1.01] transition-all duration-300 hover:shadow-indigo-500/30 md:col-span-2"
+      >
+        <div>
+          <h3 class="text-2xl font-semibold text-white mb-3">👥 Teams Plan (Beta)</h3>
+          <p class="text-indigo-200 text-sm mb-6">
+            Collaborate mindfully with your team using shared tasks, meeting recaps, and AI insights.
+          </p>
+          <ul class="space-y-3 text-left text-sm text-indigo-100 mb-6">
+            <li>✅ Shared task management</li>
+            <li>✅ Team voice journaling</li>
+            <li>✅ AI-generated meeting summaries</li>
+            <li>✅ Team productivity insights</li>
+          </ul>
+        </div>
+        <div class="mt-auto">
+          <div class="text-3xl font-bold text-white mb-4">
+            Starting at $8<span class="text-sm text-indigo-100">/user/month</span>
+          </div>
+          <button
+            @click="goToTeams"
+            class="inline-flex items-center justify-center w-full h-12 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 hover:opacity-90 text-white font-semibold transition-all shadow-lg shadow-indigo-800/40"
+          >
+            {{ teamsCtaLabel }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reassurance note -->
+    <p class="mt-10 text-sm text-indigo-300">
+      No hidden fees. Cancel anytime from your account settings.
+    </p>
+  </div>
+</section>
 
     <!-- CTA -->
-    <section id="cta" class="py-20 bg-gradient-to-b from-slate-900/60 to-slate-950/80 text-center">
+    <!-- CTA -->
+    <section
+      id="cta"
+      class="relative py-20 bg-gradient-to-b from-slate-900/70 via-indigo-950/70 to-slate-950/90 text-center overflow-hidden"
+    >
+      <!-- Soft background glow -->
+      <div
+        class="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_center,_rgba(79,70,229,0.2)_0%,_transparent_70%)]"
+      ></div>
+
       <div class="max-w-3xl mx-auto px-6" data-aos="zoom-in">
-        <h2 class="text-3xl md:text-4xl font-bold text-white">Ready to Begin?</h2>
-        <p class="mt-3 text-indigo-200">
-          Log in to track progress, or explore as a guest to get a feel for it.
+        <!-- Heading -->
+        <h2 class="text-3xl md:text-4xl font-extrabold text-white mb-3">Ready to Begin?</h2>
+
+        <!-- Subtext -->
+        <p class="text-indigo-200/90 text-lg leading-relaxed mb-10">
+          Log in to track progress — or explore as a guest to get a feel for it.
         </p>
-        <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-          <el-button type="primary" size="large" @click="goToTeams">
+
+        <!-- CTA Buttons (same as hero styling) -->
+        <div class="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-4">
+          <!-- 🚀 Get Started -->
+          <RouterLink
+            to="/login"
+            class="inline-flex items-center justify-center h-12 w-64 rounded-xl font-semibold text-white bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-900/40 transition-all"
+          >
+            🚀 Get Started
+          </RouterLink>
+
+          <!-- 👥 Try Teams / Join Waitlist -->
+          <button
+            @click="goToTeams"
+            class="inline-flex items-center justify-center h-12 w-64 rounded-xl font-semibold text-white bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:opacity-90 shadow-lg shadow-indigo-800/40 transition-all"
+          >
             {{ teamsCtaLabel }}
-          </el-button>
-          <el-button size="large" plain @click="continueAsGuest">🌿 Explore as Guest</el-button>
+          </button>
+
+          <!-- 🌿 Continue as Guest -->
+          <button
+            @click="continueAsGuest"
+            class="inline-flex items-center justify-center h-12 w-64 rounded-xl font-semibold text-white/90 bg-white/10 hover:bg-white/20 border border-white/20 transition-all"
+          >
+            🌿 Continue as Guest
+          </button>
         </div>
       </div>
     </section>
@@ -364,8 +462,12 @@ import { trackEvent } from '@/services/analytics'
 const router = useRouter()
 const authStore = useAuthStore()
 const waitlistOpen = ref(false)
-const teamsPublic = computed(() => import.meta.env.VITE_TEAMS_PUBLIC === 'on' || import.meta.env.VITE_TEAMS_PUBLIC === 'true')
-const teamsCtaLabel = computed(() => (teamsPublic.value ? '🚀 Try Teams' : '🚀 Join Teams Waitlist'))
+const teamsPublic = computed(
+  () => import.meta.env.VITE_TEAMS_PUBLIC === 'on' || import.meta.env.VITE_TEAMS_PUBLIC === 'true',
+)
+const teamsCtaLabel = computed(() =>
+  teamsPublic.value ? '🚀 Try Teams' : '🚀 Join Teams Waitlist',
+)
 
 function goToTeams() {
   trackEvent('teams_cta_clicked', {
