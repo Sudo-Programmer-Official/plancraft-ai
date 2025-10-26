@@ -1,50 +1,319 @@
-import express from 'express';
-import admin, { db } from '../../../server/firebaseAdmin.js';
-import withOrgAuth from './middlewares/withOrgAuth.js';
-import { notifyChatMessage } from '../../services/notifierService.js';
+// import express from 'express';
+// import admin, { db } from '../../../server/firebaseAdmin.js';
+// import withOrgAuth from './middlewares/withOrgAuth.js';
+// import { notifyChatMessage } from '../../services/notifierService.js';
+
+// const router = express.Router({ mergeParams: true });
+
+// router.use(withOrgAuth);
+
+// function roomCollection(orgId) {
+//   return db.collection(`orgs/${orgId}/chatRooms`);
+// }
+
+// function messagesCollection(orgId, roomId) {
+//   return roomCollection(orgId).doc(roomId).collection('messages');
+// }
+
+// function sanitizeRoomPayload(body = {}) {
+//   const name = String(body.name || '').trim();
+//   if (!name) {
+//     const err = new Error('Missing room name');
+//     err.status = 400;
+//     throw err;
+//   }
+//   const description = typeof body.description === 'string' ? body.description.trim() : '';
+//   const projectId = typeof body.projectId === 'string' ? body.projectId.trim() || null : null;
+//   return { name, description, projectId };
+// }
+
+// router.get('/rooms', async (req, res) => {
+//   try {
+//     const { orgId } = req.params;
+//     const limit = Number(req.query.limit || 50);
+//     const snap = await roomCollection(orgId).orderBy('updatedAt', 'desc').limit(limit).get();
+//     const rooms = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+//     res.json(rooms);
+//   } catch (err) {
+//     console.error('GET /chat/rooms error', err);
+//     res.status(500).json({ error: 'Failed to load rooms' });
+//   }
+// });
+
+// router.post('/rooms', async (req, res) => {
+//   try {
+//     const { orgId } = req.params;
+//     const room = sanitizeRoomPayload(req.body);
+//     const now = new Date();
+//     const data = {
+//       ...room,
+//       createdAt: now,
+//       updatedAt: now,
+//       createdBy: req.user?.uid || null,
+//       memberCount: 0,
+//       lastMessageAt: null,
+//       pinnedMessageIds: [],
+//     };
+//     const ref = await roomCollection(orgId).add(data);
+//     res.json({ id: ref.id, ...data });
+//   } catch (err) {
+//     console.error('POST /chat/rooms error', err);
+//     res.status(err?.status || 500).json({ error: err?.message || 'Failed to create room' });
+//   }
+// });
+
+// router.get('/rooms/:roomId/messages', async (req, res) => {
+//   try {
+//     const { orgId, roomId } = req.params;
+//     const limit = Number(req.query.limit || 50);
+//     const cursor = req.query.cursor ? String(req.query.cursor) : null;
+
+//     let query = messagesCollection(orgId, roomId)
+//       .orderBy('createdAt', 'desc')
+//       .limit(limit);
+
+//     if (cursor) {
+//       const cursorDoc = await messagesCollection(orgId, roomId).doc(cursor).get();
+//       if (cursorDoc.exists) {
+//         query = query.startAfter(cursorDoc);
+//       }
+//     }
+
+//     const snap = await query.get();
+//     const messages = snap.docs
+//       .map((doc) => ({ id: doc.id, roomId, ...doc.data() }))
+//       .reverse();
+//     const nextCursor = snap.docs.length === limit ? snap.docs[snap.docs.length - 1].id : null;
+//     res.json({ messages, nextCursor });
+//   } catch (err) {
+//     console.error('GET /chat/messages error', err);
+//     res.status(500).json({ error: 'Failed to load messages' });
+//   }
+// });
+
+// router.post('/rooms/:roomId/messages', async (req, res) => {
+//   try {
+//     const { orgId, roomId } = req.params;
+//     const { text = '', attachments = [] } = req.body || {};
+//     const content = String(text || '').trim();
+//     if (!content && !Array.isArray(attachments)) {
+//       return res.status(400).json({ error: 'Missing message content' });
+//     }
+
+//     const now = new Date();
+//     const data = {
+//       text: content,
+//       attachments: Array.isArray(attachments) ? attachments : [],
+//       senderUid: req.user?.uid || null,
+//       senderName: req.user?.name || null,
+//       roomId,
+//       createdAt: now,
+//       updatedAt: now,
+//       pinned: false,
+//       reactions: [],
+//     };
+//     const ref = await messagesCollection(orgId, roomId).add(data);
+//     await roomCollection(orgId)
+//       .doc(roomId)
+//       .set({ lastMessageAt: now, updatedAt: now }, { merge: true });
+//     res.json({ id: ref.id, ...data });
+
+//     notifyChatMessage({
+//       orgId,
+//       roomId,
+//       messageId: ref.id,
+//       senderUid: req.user?.uid || null,
+//       senderName: req.user?.name || null,
+//       preview: content || (data.attachments?.length ? 'Shared an attachment' : ''),
+//     }).catch((err) => console.warn('[notify] chat.message failed:', err));
+//   } catch (err) {
+//     console.error('POST /chat/messages error', err);
+//     res.status(500).json({ error: 'Failed to send message' });
+//   }
+// });
+
+// router.post('/rooms/:roomId/pin', async (req, res) => {
+//   try {
+//     const { orgId, roomId } = req.params;
+//     const { messageId, pinned = true } = req.body || {};
+//     if (!messageId) return res.status(400).json({ error: 'Missing messageId' });
+
+//     await messagesCollection(orgId, roomId)
+//       .doc(messageId)
+//       .set({ pinned: !!pinned, pinnedAt: pinned ? new Date() : null, pinnedBy: pinned ? req.user?.uid || null : null }, { merge: true });
+
+//     if (pinned) {
+//       await roomCollection(orgId)
+//         .doc(roomId)
+//         .set(
+//           { pinnedMessageIds: admin.firestore.FieldValue.arrayUnion(messageId), updatedAt: new Date() },
+//           { merge: true },
+//         );
+//     } else {
+//       await roomCollection(orgId)
+//         .doc(roomId)
+//         .set(
+//           { pinnedMessageIds: admin.firestore.FieldValue.arrayRemove(messageId), updatedAt: new Date() },
+//           { merge: true },
+//         );
+//     }
+
+//     res.json({ ok: true });
+//   } catch (err) {
+//     console.error('POST /chat/pin error', err);
+//     res.status(500).json({ error: 'Failed to update pinned message' });
+//   }
+// });
+
+// router.post('/rooms/:roomId/uploads', async (req, res) => {
+//   try {
+//     const { orgId, roomId } = req.params;
+//     const { data, mimeType, filename } = req.body || {};
+//     if (!data) return res.status(400).json({ error: 'Missing file data' });
+
+//     const decoded = decodeUpload(data, mimeType);
+//     if (!decoded) return res.status(400).json({ error: 'Invalid attachment data' });
+
+//     const storagePath = `orgs/${orgId}/chat/${roomId}/${Date.now()}_${filename || 'attachment'}`;
+//     await admin.storage().bucket().file(storagePath).save(decoded.buffer, {
+//       contentType: decoded.mimeType,
+//       metadata: { orgId, roomId, uploadedBy: req.user?.uid || null },
+//     });
+
+//     const signedUrls = await admin.storage().bucket().file(storagePath).getSignedUrl({
+//       action: 'read',
+//       expires: Date.now() + 1000 * 60 * 60 * 24 * 7,
+//     });
+
+//     res.json({ path: storagePath, url: signedUrls?.[0], mimeType: decoded.mimeType });
+//   } catch (err) {
+//     console.error('POST /chat/uploads error', err);
+//     res.status(500).json({ error: 'Failed to upload file' });
+//   }
+// });
+
+// function decodeUpload(input, inferredMime) {
+//   try {
+//     if (typeof input !== 'string') return null;
+//     let mimeType = inferredMime || 'application/octet-stream';
+//     let base64 = input;
+//     if (input.startsWith('data:')) {
+//       const [, meta, payload] = input.match(/^data:(.*?);base64,(.*)$/) || [];
+//       if (!payload) return null;
+//       mimeType = inferredMime || meta || mimeType;
+//       base64 = payload;
+//     }
+//     const buffer = Buffer.from(base64, 'base64');
+//     return { buffer, mimeType };
+//   } catch (err) {
+//     console.error('decodeUpload error', err);
+//     return null;
+//   }
+// }
+
+// export default router;
+
+import express from "express";
+import admin, { db } from "../../../server/firebaseAdmin.js";
+import withOrgAuth from "./middlewares/withOrgAuth.js";
+import { notifyChatMessage } from "../../services/notifierService.js";
 
 const router = express.Router({ mergeParams: true });
 
+// 🔒 Require authenticated org context for all routes
 router.use(withOrgAuth);
 
-function roomCollection(orgId) {
-  return db.collection(`orgs/${orgId}/chatRooms`);
-}
+/* ──────────────────────────────────────────────
+ * Utility helpers
+ * ────────────────────────────────────────────── */
 
-function messagesCollection(orgId, roomId) {
-  return roomCollection(orgId).doc(roomId).collection('messages');
+const DEFAULT_ROOM_LIMIT = 50;
+const DEFAULT_MSG_LIMIT = 50;
+const MAX_UPLOAD_MB = 15;
+
+const roomsCol = (orgId) => db.collection(`orgs/${orgId}/chatRooms`);
+const messagesCol = (orgId, roomId) =>
+  roomsCol(orgId).doc(roomId).collection("messages");
+
+function isAdmin(req) {
+  const role = String(req.orgRole || req.orgMember?.role || "").toLowerCase();
+  return ["owner", "admin"].includes(role);
 }
 
 function sanitizeRoomPayload(body = {}) {
-  const name = String(body.name || '').trim();
+  const name = String(body.name || "").trim();
   if (!name) {
-    const err = new Error('Missing room name');
+    const err = new Error("Missing room name");
     err.status = 400;
     throw err;
   }
-  const description = typeof body.description === 'string' ? body.description.trim() : '';
-  const projectId = typeof body.projectId === 'string' ? body.projectId.trim() || null : null;
+  const description =
+    typeof body.description === "string" ? body.description.trim() : "";
+  const projectId =
+    typeof body.projectId === "string" && body.projectId.trim()
+      ? body.projectId.trim()
+      : null;
   return { name, description, projectId };
 }
 
-router.get('/rooms', async (req, res) => {
+function decodeUpload(input, inferredMime) {
+  try {
+    if (typeof input !== "string") return null;
+    let mimeType = inferredMime || "application/octet-stream";
+    let base64 = input;
+
+    if (input.startsWith("data:")) {
+      const match = input.match(/^data:(.*?);base64,(.*)$/);
+      if (!match) return null;
+      mimeType = inferredMime || match[1] || mimeType;
+      base64 = match[2];
+    }
+
+    const buffer = Buffer.from(base64, "base64");
+    if (buffer.length > MAX_UPLOAD_MB * 1024 * 1024) {
+      throw new Error("File exceeds max size limit");
+    }
+    return { buffer, mimeType };
+  } catch (err) {
+    console.error("decodeUpload error", err);
+    return null;
+  }
+}
+
+/* ──────────────────────────────────────────────
+ * GET /api/orgs/:orgId/chat/rooms
+ * List chat rooms for an organization
+ * ────────────────────────────────────────────── */
+router.get("/rooms", async (req, res) => {
   try {
     const { orgId } = req.params;
-    const limit = Number(req.query.limit || 50);
-    const snap = await roomCollection(orgId).orderBy('updatedAt', 'desc').limit(limit).get();
-    const rooms = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const limit = Number(req.query.limit) || DEFAULT_ROOM_LIMIT;
+    const snap = await roomsCol(orgId)
+      .orderBy("updatedAt", "desc")
+      .limit(limit)
+      .get();
+
+    const rooms = snap.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
     res.json(rooms);
   } catch (err) {
-    console.error('GET /chat/rooms error', err);
-    res.status(500).json({ error: 'Failed to load rooms' });
+    console.error("❌ GET /chat/rooms error", err);
+    res.status(500).json({ error: "Failed to load rooms" });
   }
 });
 
-router.post('/rooms', async (req, res) => {
+/* ──────────────────────────────────────────────
+ * POST /api/orgs/:orgId/chat/rooms
+ * Create a new chat room
+ * ────────────────────────────────────────────── */
+router.post("/rooms", async (req, res) => {
   try {
     const { orgId } = req.params;
     const room = sanitizeRoomPayload(req.body);
     const now = new Date();
+
     const data = {
       ...room,
       createdAt: now,
@@ -54,50 +323,64 @@ router.post('/rooms', async (req, res) => {
       lastMessageAt: null,
       pinnedMessageIds: [],
     };
-    const ref = await roomCollection(orgId).add(data);
-    res.json({ id: ref.id, ...data });
+
+    const ref = await roomsCol(orgId).add(data);
+    res.status(201).json({ id: ref.id, ...data });
   } catch (err) {
-    console.error('POST /chat/rooms error', err);
-    res.status(err?.status || 500).json({ error: err?.message || 'Failed to create room' });
+    console.error("❌ POST /chat/rooms error", err);
+    res.status(err?.status || 500).json({
+      error: err?.message || "Failed to create room",
+    });
   }
 });
 
-router.get('/rooms/:roomId/messages', async (req, res) => {
+/* ──────────────────────────────────────────────
+ * GET /api/orgs/:orgId/chat/rooms/:roomId/messages
+ * Fetch messages from a chat room
+ * ────────────────────────────────────────────── */
+router.get("/rooms/:roomId/messages", async (req, res) => {
   try {
     const { orgId, roomId } = req.params;
-    const limit = Number(req.query.limit || 50);
+    const limit = Number(req.query.limit) || DEFAULT_MSG_LIMIT;
     const cursor = req.query.cursor ? String(req.query.cursor) : null;
 
-    let query = messagesCollection(orgId, roomId)
-      .orderBy('createdAt', 'desc')
+    let query = messagesCol(orgId, roomId)
+      .orderBy("createdAt", "desc")
       .limit(limit);
 
     if (cursor) {
-      const cursorDoc = await messagesCollection(orgId, roomId).doc(cursor).get();
-      if (cursorDoc.exists) {
-        query = query.startAfter(cursorDoc);
+      const cursorSnap = await messagesCol(orgId, roomId).doc(cursor).get();
+      if (cursorSnap.exists) {
+        query = query.startAfter(cursorSnap);
       }
     }
 
     const snap = await query.get();
     const messages = snap.docs
       .map((doc) => ({ id: doc.id, roomId, ...doc.data() }))
-      .reverse();
-    const nextCursor = snap.docs.length === limit ? snap.docs[snap.docs.length - 1].id : null;
+      .reverse(); // chronological order
+    const nextCursor =
+      snap.size === limit ? snap.docs[snap.docs.length - 1].id : null;
+
     res.json({ messages, nextCursor });
   } catch (err) {
-    console.error('GET /chat/messages error', err);
-    res.status(500).json({ error: 'Failed to load messages' });
+    console.error("❌ GET /chat/messages error", err);
+    res.status(500).json({ error: "Failed to load messages" });
   }
 });
 
-router.post('/rooms/:roomId/messages', async (req, res) => {
+/* ──────────────────────────────────────────────
+ * POST /api/orgs/:orgId/chat/rooms/:roomId/messages
+ * Send a new message (text or attachment)
+ * ────────────────────────────────────────────── */
+router.post("/rooms/:roomId/messages", async (req, res) => {
   try {
     const { orgId, roomId } = req.params;
-    const { text = '', attachments = [] } = req.body || {};
-    const content = String(text || '').trim();
+    const { text = "", attachments = [] } = req.body || {};
+    const content = String(text || "").trim();
+
     if (!content && !Array.isArray(attachments)) {
-      return res.status(400).json({ error: 'Missing message content' });
+      return res.status(400).json({ error: "Missing message content" });
     }
 
     const now = new Date();
@@ -112,103 +395,108 @@ router.post('/rooms/:roomId/messages', async (req, res) => {
       pinned: false,
       reactions: [],
     };
-    const ref = await messagesCollection(orgId, roomId).add(data);
-    await roomCollection(orgId)
+
+    const ref = await messagesCol(orgId, roomId).add(data);
+
+    // Update room’s last activity timestamp
+    await roomsCol(orgId)
       .doc(roomId)
       .set({ lastMessageAt: now, updatedAt: now }, { merge: true });
-    res.json({ id: ref.id, ...data });
 
+    res.status(201).json({ id: ref.id, ...data });
+
+    // 🔔 Non-blocking notification
     notifyChatMessage({
       orgId,
       roomId,
       messageId: ref.id,
       senderUid: req.user?.uid || null,
       senderName: req.user?.name || null,
-      preview: content || (data.attachments?.length ? 'Shared an attachment' : ''),
-    }).catch((err) => console.warn('[notify] chat.message failed:', err));
+      preview:
+        content || (data.attachments?.length ? "📎 Shared an attachment" : ""),
+    }).catch((err) => console.warn("[notify] chat.message failed:", err));
   } catch (err) {
-    console.error('POST /chat/messages error', err);
-    res.status(500).json({ error: 'Failed to send message' });
+    console.error("❌ POST /chat/messages error", err);
+    res.status(500).json({ error: "Failed to send message" });
   }
 });
 
-router.post('/rooms/:roomId/pin', async (req, res) => {
+/* ──────────────────────────────────────────────
+ * POST /api/orgs/:orgId/chat/rooms/:roomId/pin
+ * Pin or unpin a message
+ * ────────────────────────────────────────────── */
+router.post("/rooms/:roomId/pin", async (req, res) => {
   try {
     const { orgId, roomId } = req.params;
     const { messageId, pinned = true } = req.body || {};
-    if (!messageId) return res.status(400).json({ error: 'Missing messageId' });
+    if (!messageId)
+      return res.status(400).json({ error: "Missing messageId" });
 
-    await messagesCollection(orgId, roomId)
+    const now = new Date();
+    await messagesCol(orgId, roomId)
       .doc(messageId)
-      .set({ pinned: !!pinned, pinnedAt: pinned ? new Date() : null, pinnedBy: pinned ? req.user?.uid || null : null }, { merge: true });
+      .set(
+        {
+          pinned: !!pinned,
+          pinnedAt: pinned ? now : null,
+          pinnedBy: pinned ? req.user?.uid || null : null,
+        },
+        { merge: true }
+      );
 
-    if (pinned) {
-      await roomCollection(orgId)
-        .doc(roomId)
-        .set(
-          { pinnedMessageIds: admin.firestore.FieldValue.arrayUnion(messageId), updatedAt: new Date() },
-          { merge: true },
-        );
-    } else {
-      await roomCollection(orgId)
-        .doc(roomId)
-        .set(
-          { pinnedMessageIds: admin.firestore.FieldValue.arrayRemove(messageId), updatedAt: new Date() },
-          { merge: true },
-        );
-    }
+    const updateOp = pinned
+      ? admin.firestore.FieldValue.arrayUnion(messageId)
+      : admin.firestore.FieldValue.arrayRemove(messageId);
+
+    await roomsCol(orgId)
+      .doc(roomId)
+      .set({ pinnedMessageIds: updateOp, updatedAt: now }, { merge: true });
 
     res.json({ ok: true });
   } catch (err) {
-    console.error('POST /chat/pin error', err);
-    res.status(500).json({ error: 'Failed to update pinned message' });
+    console.error("❌ POST /chat/pin error", err);
+    res.status(500).json({ error: "Failed to update pinned message" });
   }
 });
 
-router.post('/rooms/:roomId/uploads', async (req, res) => {
+/* ──────────────────────────────────────────────
+ * POST /api/orgs/:orgId/chat/rooms/:roomId/uploads
+ * Upload a file or image (Base64)
+ * ────────────────────────────────────────────── */
+router.post("/rooms/:roomId/uploads", async (req, res) => {
   try {
     const { orgId, roomId } = req.params;
     const { data, mimeType, filename } = req.body || {};
-    if (!data) return res.status(400).json({ error: 'Missing file data' });
+
+    if (!data) return res.status(400).json({ error: "Missing file data" });
 
     const decoded = decodeUpload(data, mimeType);
-    if (!decoded) return res.status(400).json({ error: 'Invalid attachment data' });
+    if (!decoded) return res.status(400).json({ error: "Invalid attachment data" });
 
-    const storagePath = `orgs/${orgId}/chat/${roomId}/${Date.now()}_${filename || 'attachment'}`;
-    await admin.storage().bucket().file(storagePath).save(decoded.buffer, {
+    const storagePath = `orgs/${orgId}/chat/${roomId}/${Date.now()}_${
+      filename || "attachment"
+    }`;
+
+    const bucket = admin.storage().bucket();
+    await bucket.file(storagePath).save(decoded.buffer, {
       contentType: decoded.mimeType,
-      metadata: { orgId, roomId, uploadedBy: req.user?.uid || null },
+      metadata: {
+        orgId,
+        roomId,
+        uploadedBy: req.user?.uid || null,
+      },
     });
 
-    const signedUrls = await admin.storage().bucket().file(storagePath).getSignedUrl({
-      action: 'read',
-      expires: Date.now() + 1000 * 60 * 60 * 24 * 7,
+    const [signedUrl] = await bucket.file(storagePath).getSignedUrl({
+      action: "read",
+      expires: Date.now() + 1000 * 60 * 60 * 24 * 7, // 7 days
     });
 
-    res.json({ path: storagePath, url: signedUrls?.[0], mimeType: decoded.mimeType });
+    res.json({ path: storagePath, url: signedUrl, mimeType: decoded.mimeType });
   } catch (err) {
-    console.error('POST /chat/uploads error', err);
-    res.status(500).json({ error: 'Failed to upload file' });
+    console.error("❌ POST /chat/uploads error", err);
+    res.status(500).json({ error: "Failed to upload file" });
   }
 });
-
-function decodeUpload(input, inferredMime) {
-  try {
-    if (typeof input !== 'string') return null;
-    let mimeType = inferredMime || 'application/octet-stream';
-    let base64 = input;
-    if (input.startsWith('data:')) {
-      const [, meta, payload] = input.match(/^data:(.*?);base64,(.*)$/) || [];
-      if (!payload) return null;
-      mimeType = inferredMime || meta || mimeType;
-      base64 = payload;
-    }
-    const buffer = Buffer.from(base64, 'base64');
-    return { buffer, mimeType };
-  } catch (err) {
-    console.error('decodeUpload error', err);
-    return null;
-  }
-}
 
 export default router;
