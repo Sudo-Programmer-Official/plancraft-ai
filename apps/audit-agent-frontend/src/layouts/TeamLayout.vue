@@ -1,10 +1,11 @@
 <template>
   <div class="team-layout">
     <NavBarWithOrgSwitcher />
+    <OverlayMask :show="mobileSidebarOpen" @close="uiStore.closeMobileSidebar" />
+    <TeamMobileSidebar :open="mobileSidebarOpen" :org-id="orgId" />
     <div class="team-body">
       <TeamSidebar :org-id="orgId" />
       <main class="team-content">
-        <TeamMobileNav :org-id="orgId" />
         <AskTeamsBar v-if="orgId" :org-id="orgId" class="ask-teams-wrapper" />
         <section class="team-content-view">
           <router-view />
@@ -30,19 +31,22 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import NavBarWithOrgSwitcher from '@/components/NavBarWithOrgSwitcher.vue'
 import TeamSidebar from '@/components/TeamSidebar.vue'
-import TeamMobileNav from '@/components/TeamMobileNav.vue'
+import TeamMobileSidebar from '@/components/TeamMobileSidebar.vue'
+import OverlayMask from '@/components/OverlayMask.vue'
 import AskTeamsBar from '@/components/AskTeamsBar.vue'
 import CommandPalette from '@/components/CommandPalette.vue'
 import TeamCoachOverlay from '@/components/TeamCoachOverlay.vue'
 import { useTeamTaskStore } from '@/stores/teamTaskStore'
 import { useProjectStore } from '@/stores/projectStore'
 import { useFirstRunCoachStore } from '@/stores/firstRunCoachStore'
+import { useUiStore } from '@/stores/uiStore'
 
 const route = useRoute()
 const paletteOpen = ref(false)
 const taskStore = useTeamTaskStore()
 const projectStore = useProjectStore()
 const coachStore = useFirstRunCoachStore()
+const uiStore = useUiStore()
 
 const orgId = computed(() => {
   const param = route.params.orgId
@@ -56,6 +60,7 @@ const activeProjectId = computed(() => {
 })
 
 const showFab = computed(() => !!orgId.value && !!activeProjectId.value)
+const mobileSidebarOpen = computed(() => uiStore.mobileSidebarOpen)
 
 function handleKeydown(event: KeyboardEvent) {
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'j') {
@@ -63,6 +68,10 @@ function handleKeydown(event: KeyboardEvent) {
     paletteOpen.value = true
   }
   if (event.key === 'Escape') {
+    if (mobileSidebarOpen.value) {
+      uiStore.closeMobileSidebar()
+      return
+    }
     paletteOpen.value = false
   }
 }
@@ -98,6 +107,13 @@ watch(
     if (next) coachStore.initForOrg(next)
   },
 )
+
+watch(
+  () => route.fullPath,
+  () => {
+    uiStore.closeMobileSidebar()
+  },
+)
 </script>
 
 <style scoped>
@@ -113,20 +129,24 @@ watch(
   display: flex;
   flex: 1;
   min-height: 0;
+  position: relative;
 }
 
 .team-content {
   flex: 1;
-  padding: 24px;
+  padding: 24px 32px 140px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 24px;
+  min-height: 0;
+  scroll-behavior: smooth;
+  scrollbar-gutter: stable;
 }
 
 .ask-teams-wrapper {
   position: sticky;
-  top: 0;
+  top: 16px;
   z-index: 10;
 }
 
@@ -134,6 +154,7 @@ watch(
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 .team-content-view :deep(> *) {
@@ -143,7 +164,7 @@ watch(
 .command-fab {
   position: fixed;
   right: 32px;
-  bottom: 32px;
+  bottom: calc(32px + env(safe-area-inset-bottom, 0px));
   width: 56px;
   height: 56px;
   border-radius: 999px;
@@ -170,17 +191,35 @@ watch(
 }
 
 @media (max-width: 768px) {
+  .team-content {
+    padding: 16px 16px calc(120px + env(safe-area-inset-bottom, 0px));
+    gap: 20px;
+  }
+
+  .ask-teams-wrapper {
+    top: 8px;
+  }
+
   .command-fab {
-    right: 20px;
-    bottom: 20px;
+    right: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
     width: 52px;
     height: 52px;
   }
 }
 
 @media (max-width: 960px) {
-  .ask-teams-wrapper {
-    top: 112px;
+  .team-content {
+    padding: 20px 24px 132px;
   }
+}
+
+.team-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.team-content::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.4);
+  border-radius: 999px;
 }
 </style>

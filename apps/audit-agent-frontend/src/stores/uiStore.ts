@@ -15,12 +15,13 @@ function detectSystemTheme(): ResolvedTheme {
 
 function applyTheme(theme: ResolvedTheme) {
   const root = document.documentElement
-  root.dataset.theme = theme === 'dark' ? 'dark' : 'light'
+  root.setAttribute('data-theme', theme === 'dark' ? 'dark' : 'light')
 }
 
 export const useUiStore = defineStore('ui', () => {
   const preference = ref<ThemePreference>('system')
   const currentTheme = ref<ResolvedTheme>('light')
+  const mobileSidebarOpen = ref(false)
 
   function resolveTheme(pref: ThemePreference): ResolvedTheme {
     if (pref === 'system') {
@@ -36,6 +37,18 @@ export const useUiStore = defineStore('ui', () => {
   function toggleTheme() {
     const next = currentTheme.value === 'dark' ? 'light' : 'dark'
     preference.value = next
+  }
+
+  function toggleMobileSidebar(force?: boolean) {
+    if (typeof force === 'boolean') {
+      mobileSidebarOpen.value = force
+    } else {
+      mobileSidebarOpen.value = !mobileSidebarOpen.value
+    }
+  }
+
+  function closeMobileSidebar() {
+    mobileSidebarOpen.value = false
   }
 
   function hydrate() {
@@ -80,5 +93,8 @@ export const useUiStore = defineStore('ui', () => {
     currentTheme,
     toggleTheme,
     setPreference,
+    mobileSidebarOpen,
+    toggleMobileSidebar,
+    closeMobileSidebar,
   }
 })

@@ -190,8 +190,8 @@ onBeforeUnmount(() => {
 <style scoped>
 .voice-mic-root {
   position: fixed;
-  right: 24px;
-  bottom: 24px;
+  right: calc(24px + env(safe-area-inset-right, 0px));
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
   z-index: 1050;
 }
 
@@ -203,7 +203,7 @@ onBeforeUnmount(() => {
   background: linear-gradient(145deg, #5a3ffb, #8b5cf6);
   color: #fff;
   font-size: 1.8rem;
-  box-shadow: 0 18px 32px rgba(90, 63, 251, 0.45);
+  box-shadow: 0 18px 32px rgba(90, 63, 251, 0.42);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -224,11 +224,16 @@ onBeforeUnmount(() => {
 
 .voice-mic-btn:hover {
   transform: translateY(-2px) scale(1.03);
-  box-shadow: 0 24px 42px rgba(90, 63, 251, 0.55);
+  box-shadow: 0 22px 40px rgba(90, 63, 251, 0.5);
+}
+
+.voice-mic-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(129, 140, 248, 0.35), 0 22px 40px rgba(90, 63, 251, 0.5);
 }
 
 .voice-mic-btn:hover::after {
-  opacity: 1;
+  opacity: 0.85;
 }
 
 .voice-mic-btn.recording {
@@ -253,7 +258,7 @@ onBeforeUnmount(() => {
 }
 
 .mic-panel {
-  width: min(440px, 100%);
+  width: min(440px, 94vw);
   border-radius: 20px;
   background: rgba(14, 24, 45, 0.92);
   border: 1px solid rgba(120, 140, 210, 0.28);
@@ -423,8 +428,8 @@ onBeforeUnmount(() => {
 
 @media (max-width: 640px) {
   .voice-mic-root {
-    right: 16px;
-    bottom: 16px;
+    right: calc(16px + env(safe-area-inset-right, 0px));
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   }
   .voice-mic-btn {
     width: 56px;

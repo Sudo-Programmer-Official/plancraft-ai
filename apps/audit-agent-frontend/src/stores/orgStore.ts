@@ -72,6 +72,12 @@ export const useOrgStore = defineStore('org', () => {
     return loadLastOrgFromStorage(resolvedUser)
   }
 
+  const initialOrgId = ensureLastOrgLoaded()
+  if (initialOrgId) {
+    activeOrgId.value = initialOrgId
+    activeContext.value = 'team'
+  }
+
   function setOrg(orgId: string) {
     activeOrgId.value = orgId
     activeContext.value = 'team'

@@ -172,6 +172,22 @@ async function fileToBase64(file: File) {
 </script>
 
 <style scoped>
-.team-chat { display: flex; gap: 0; background: #f4f6fb; border-radius: 18px; overflow: hidden; min-height: calc(100vh - 140px); }
-.chat-empty { padding: 32px; border: 1px dashed rgba(15,23,42,0.2); border-radius: 16px; background: #fff; text-align: center; color: rgba(15,23,42,0.6); }
+.team-chat {
+  display: flex;
+  gap: 0;
+  background: var(--bg-elevated);
+  border-radius: 18px;
+  overflow: hidden;
+  min-height: calc(100vh - 140px);
+  border: 1px solid var(--border-soft);
+}
+
+.chat-empty {
+  padding: 32px;
+  border: 1px dashed var(--border-soft);
+  border-radius: 16px;
+  background: var(--bg-elevated);
+  text-align: center;
+  color: var(--text-secondary);
+}
 </style>

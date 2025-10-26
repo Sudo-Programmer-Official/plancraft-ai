@@ -65,16 +65,88 @@ function formatRelative(value: any) {
 </script>
 
 <style scoped>
-.chat-sidebar { width: 240px; background: #fff; border-right: 1px solid rgba(15,23,42,0.08); display: flex; flex-direction: column; }
-header { display: flex; justify-content: space-between; align-items: center; padding: 14px; border-bottom: 1px solid rgba(15,23,42,0.08); }
-header h2 { margin: 0; font-size: 1rem; }
-header button { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #4338ca; }
-ul { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
-li { padding: 12px 16px; display: flex; flex-direction: column; gap: 4px; cursor: pointer; border-bottom: 1px solid rgba(15,23,42,0.04); }
-li.active { background: rgba(79,70,229,0.12); }
-.title { display: flex; align-items: center; gap: 8px; }
-.dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(15,23,42,0.2); }
-.dot.busy { background: #10b981; }
-.meta { font-size: 0.75rem; color: rgba(15,23,42,0.5); display: flex; gap: 6px; }
-small { color: rgba(15,23,42,0.55); }
+.chat-sidebar {
+  width: 240px;
+  background: var(--bg-elevated);
+  border-right: 1px solid var(--border-soft);
+  display: flex;
+  flex-direction: column;
+  color: var(--text-primary);
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+header h2 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+header button {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: color-mix(in srgb, var(--accent) 70%, var(--text-primary) 30%);
+}
+
+ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+}
+
+li {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-soft) 80%, transparent 20%);
+  transition: background 0.18s ease;
+}
+
+li:hover {
+  background: color-mix(in srgb, var(--bg-elevated) 85%, var(--accent) 15%);
+}
+
+li.active {
+  background: color-mix(in srgb, var(--accent) 24%, var(--bg-elevated) 76%);
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text-secondary) 40%, transparent 60%);
+}
+
+.dot.busy {
+  background: color-mix(in srgb, #10b981 70%, var(--bg-elevated) 30%);
+}
+
+.meta {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  display: flex;
+  gap: 6px;
+}
+
+small {
+  color: var(--text-secondary);
+}
 </style>

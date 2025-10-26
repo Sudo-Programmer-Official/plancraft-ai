@@ -168,37 +168,47 @@ onMounted(() => {
 
 .ask-teams__field {
   display: flex;
-  gap: 10px;
-  align-items: flex-end;
+  gap: 12px;
+  align-items: center;
 }
 
 .ask-teams__input {
   flex: 1;
-  min-height: 44px;
+  min-height: var(--input-height);
   resize: none;
   border: none;
-  border-radius: 14px;
-  padding: 10px 12px;
+  border-radius: var(--input-radius);
+  padding: 11px 14px;
   font-size: 0.95rem;
   font-family: inherit;
+  line-height: 1.4;
   background: var(--bg-surface-alt);
   color: var(--text-primary);
   box-shadow: inset 0 0 0 1px var(--border-subtle);
+  transition: box-shadow 0.16s ease, background 0.16s ease;
+}
+
+.ask-teams__input::placeholder {
+  color: var(--text-muted);
 }
 
 .ask-teams__input:focus {
   outline: none;
-  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.65);
+  box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.45), 0 0 0 3px rgba(99, 102, 241, 0.16);
 }
 
 .ask-teams__button {
   border: none;
-  border-radius: 12px;
-  padding: 10px 16px;
+  border-radius: var(--input-radius);
+  height: var(--input-height);
+  padding: 0 22px;
   background: var(--accent-gradient);
   color: #f8fafc;
   font-weight: 600;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
 

@@ -92,13 +92,102 @@ watch(
 </script>
 
 <style scoped>
-.chat-insights { width: 260px; display: flex; flex-direction: column; gap: 16px; background: #fff; border-left: 1px solid rgba(15,23,42,0.08); padding: 16px; }
-.actions, .coach-actions { display: flex; flex-direction: column; gap: 8px; }
-.actions button, .coach-actions button { padding: 8px 12px; border: none; border-radius: 10px; background: linear-gradient(135deg, #4338ca, #6366f1); color: #fff; cursor: pointer; }
-.actions select, .coach-actions select, .search input { border-radius: 8px; border: 1px solid rgba(15,23,42,0.15); padding: 6px; }
-.summary ul, .replies ul, .search .results { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
-.replies ul li button { width: 100%; text-align: left; background: rgba(79,70,229,0.1); border: none; border-radius: 8px; padding: 8px; cursor: pointer; }
-.search form { display: flex; gap: 6px; }
-.results li { background: rgba(15,23,42,0.05); border-radius: 10px; padding: 8px; }
-.coach { background: rgba(34,197,94,0.1); border-radius: 10px; padding: 10px; color: #047857; }
+.chat-insights {
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: var(--bg-elevated);
+  border-left: 1px solid var(--border-soft);
+  padding: 16px;
+  color: var(--text-primary);
+}
+
+.actions,
+.coach-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.actions button,
+.coach-actions button {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent-gradient);
+  color: #fff;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.actions button:hover,
+.coach-actions button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(99, 102, 241, 0.26);
+}
+
+.actions select,
+.coach-actions select,
+.search input {
+  border-radius: 8px;
+  border: 1px solid var(--border-soft);
+  padding: 6px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.actions select:focus-visible,
+.coach-actions select:focus-visible,
+.search input:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent 45%);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent 82%);
+}
+
+.summary ul,
+.replies ul,
+.search .results {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.replies ul li button {
+  width: 100%;
+  text-align: left;
+  background: color-mix(in srgb, var(--accent) 18%, var(--bg-elevated) 82%);
+  border: none;
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: background 0.18s ease;
+}
+
+.replies ul li button:hover {
+  background: color-mix(in srgb, var(--accent) 28%, var(--bg-elevated) 72%);
+}
+
+.search form {
+  display: flex;
+  gap: 6px;
+}
+
+.results li {
+  background: color-mix(in srgb, var(--bg-elevated) 88%, var(--accent) 12%);
+  border-radius: 10px;
+  padding: 8px;
+  color: var(--text-primary);
+}
+
+.coach {
+  background: color-mix(in srgb, #22c55e 16%, var(--bg-elevated) 84%);
+  border-radius: 10px;
+  padding: 10px;
+  color: color-mix(in srgb, #047857 70%, var(--text-primary) 30%);
+}
 </style>

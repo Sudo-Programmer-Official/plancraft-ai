@@ -139,28 +139,215 @@ defineExpose({
 </script>
 
 <style scoped>
-.chat-thread { display: flex; flex: 1; flex-direction: column; background: #f9fafb; border-radius: 16px; overflow: hidden; }
-header { display: flex; justify-content: space-between; align-items: center; padding: 16px; background: #fff; border-bottom: 1px solid rgba(15,23,42,0.08); }
-.presence { display: flex; gap: 6px; }
-.avatar { width: 28px; height: 28px; border-radius: 50%; background: rgba(79,70,229,0.16); display: flex; align-items: center; justify-content: center; font-weight: 600; }
-.messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
-.message { align-self: flex-start; max-width: 70%; padding: 12px; border-radius: 14px; background: #fff; border: 1px solid rgba(15,23,42,0.08); display: flex; flex-direction: column; gap: 4px; }
-.message.mine { align-self: flex-end; background: rgba(79,70,229,0.12); }
-.meta { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: rgba(15,23,42,0.6); }
-.pin { border: none; background: none; color: #4338ca; cursor: pointer; font-size: 0.75rem; }
-.content { margin: 0; font-size: 0.95rem; color: rgba(15,23,42,0.85); white-space: pre-wrap; }
-.attachments { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.attachments a { color: #4338ca; font-size: 0.85rem; }
-footer { padding: 16px; background: #fff; border-top: 1px solid rgba(15,23,42,0.08); display: flex; flex-direction: column; gap: 10px; }
-.typing { font-size: 0.8rem; color: rgba(15,23,42,0.6); display: flex; gap: 8px; }
-.composer { display: flex; flex-direction: column; gap: 8px; }
-textarea { width: 100%; border-radius: 12px; border: 1px solid rgba(15,23,42,0.15); padding: 10px 12px; font-family: inherit; resize: vertical; }
-.actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
-.actions button { padding: 8px 14px; border: none; border-radius: 10px; background: linear-gradient(135deg, #4338ca, #6366f1); color: #fff; font-weight: 600; cursor: pointer; }
-.actions button:disabled { background: rgba(15,23,42,0.2); cursor: not-allowed; }
-.attachment { position: relative; cursor: pointer; color: #4338ca; }
-.attachment input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-.attachment-preview { list-style: none; margin: 0; padding: 0; display: flex; gap: 10px; flex-wrap: wrap; }
-.attachment-preview li { background: rgba(79,70,229,0.1); padding: 6px 10px; border-radius: 10px; display: flex; gap: 6px; align-items: center; }
-.attachment-preview button { border: none; background: none; cursor: pointer; color: #1f2937; }
+.chat-thread {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  background: var(--bg-elevated);
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  color: var(--text-primary);
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.presence {
+  display: flex;
+  gap: 6px;
+}
+
+.avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 18%, var(--bg-elevated) 82%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--accent) 70%, var(--text-primary) 30%);
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--bg-surface);
+}
+
+.message {
+  align-self: flex-start;
+  max-width: 70%;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: color-mix(in srgb, var(--shadow-elevated) 25%, transparent 75%);
+}
+
+.message.mine {
+  align-self: flex-end;
+  background: color-mix(in srgb, var(--accent) 22%, var(--bg-elevated) 78%);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border-soft) 55%);
+  color: var(--text-primary);
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.pin {
+  border: none;
+  background: none;
+  color: color-mix(in srgb, var(--accent) 70%, var(--text-primary) 30%);
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.content {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+}
+
+.attachments {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.attachments a {
+  color: color-mix(in srgb, var(--accent) 70%, var(--text-primary) 30%);
+  font-size: 0.85rem;
+}
+
+footer {
+  padding: 16px;
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.typing {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  display: flex;
+  gap: 8px;
+}
+
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+textarea {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid var(--border-soft);
+  padding: 10px 12px;
+  font-family: inherit;
+  resize: vertical;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+textarea:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent 45%);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent 80%);
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.actions button {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent-gradient);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.actions button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px rgba(99, 102, 241, 0.28);
+}
+
+.actions button:disabled {
+  background: color-mix(in srgb, var(--text-secondary) 20%, transparent 80%);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.attachment {
+  position: relative;
+  cursor: pointer;
+  color: color-mix(in srgb, var(--accent) 70%, var(--text-primary) 30%);
+}
+
+.attachment input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.attachment-preview {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.attachment-preview li {
+  background: color-mix(in srgb, var(--accent) 22%, var(--bg-elevated) 78%);
+  padding: 6px 10px;
+  border-radius: 10px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--text-primary);
+}
+
+.attachment-preview button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text-primary);
+}
 </style>

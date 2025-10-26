@@ -1,5 +1,11 @@
 <template>
   <aside class="team-sidebar">
+    <header class="sidebar-header">
+      <RouterLink to="/dashboard" class="brand-link">
+        <span class="brand-icon" aria-hidden="true">🌙</span>
+        <span class="brand-text">PlanCraftAI</span>
+      </RouterLink>
+    </header>
     <nav>
       <RouterLink
         v-for="item in items"
@@ -82,19 +88,47 @@ watch(
 
 <style scoped>
 .team-sidebar {
-  width: 224px;
+  width: 240px;
   background: var(--bg-surface-alt);
   border-right: 1px solid var(--border-subtle);
-  padding: 18px 12px;
+  padding: 18px 16px 24px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 12px;
+}
+
+.sidebar-header {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.brand-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 1.05rem;
+  text-decoration: none;
+  color: var(--text-primary);
+}
+
+.brand-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  background: var(--bg-surface);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.16);
+  font-size: 1.1rem;
 }
 
 nav {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  padding-top: 8px;
 }
 
 .nav-link {
@@ -119,6 +153,15 @@ nav {
 .nav-link.is-active {
   background: rgba(99, 102, 241, 0.18);
   color: var(--accent-primary-strong);
+}
+
+.nav-link.is-active::before {
+  content: '';
+  position: absolute;
+  inset: 8px auto 8px 0;
+  width: 4px;
+  border-radius: 999px;
+  background: var(--accent-primary-strong);
 }
 
 .icon {

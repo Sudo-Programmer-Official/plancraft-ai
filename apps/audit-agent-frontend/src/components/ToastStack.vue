@@ -72,10 +72,10 @@ async function handleAction(toast) {
   padding: 12px 16px;
   border-radius: 14px;
   min-width: 260px;
-  color: #0f172a;
-  box-shadow: 0 18px 32px rgba(15, 23, 42, 0.15);
-  border: 1px solid rgba(148, 163, 184, 0.24);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.92));
+  color: var(--text-primary);
+  box-shadow: var(--shadow-elevated);
+  border: 1px solid var(--border-strong);
+  background: var(--toast-surface);
 }
 
 .toast.success {
@@ -129,12 +129,17 @@ async function handleAction(toast) {
 
 .toast-enter-active,
 .toast-leave-active {
-  transition: all 0.2s ease;
+  transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
-.toast-enter-from,
+
+.toast-enter-from {
+  opacity: 0;
+  transform: translateY(14px);
+}
+
 .toast-leave-to {
   opacity: 0;
-  transform: translateY(-6px);
+  transform: translateY(-10px);
 }
 
 @media (max-width: 640px) {

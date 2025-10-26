@@ -367,6 +367,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 24px;
+  color: var(--text-primary);
 }
 
 .vault-header {
@@ -379,16 +380,16 @@ onBeforeUnmount(() => {
 .vault-header h1 {
   margin: 0 0 4px;
   font-size: 1.8rem;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .vault-header p {
   margin: 0;
-  color: rgba(17, 24, 39, 0.66);
+  color: var(--text-secondary);
 }
 
 .vault-header .subtle {
-  color: rgba(17, 24, 39, 0.5);
+  color: color-mix(in srgb, var(--text-secondary) 70%, transparent 30%);
   font-style: italic;
 }
 
@@ -412,15 +413,16 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  border: 1px solid rgba(79, 70, 229, 0.2);
-  background: #ffffff;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border-soft) 70%);
+  background: var(--bg-elevated);
   border-radius: 14px;
   padding: 10px 14px;
-  box-shadow: 0 8px 22px rgba(79, 70, 229, 0.05);
+  box-shadow: color-mix(in srgb, var(--shadow-elevated) 45%, transparent 55%);
 }
 
 .search-bar .icon {
   font-size: 1.1rem;
+  color: color-mix(in srgb, var(--accent) 60%, var(--text-primary) 40%);
 }
 
 .search-bar input {
@@ -428,13 +430,14 @@ onBeforeUnmount(() => {
   border: none;
   outline: none;
   font-size: 0.95rem;
-  color: #111827;
+  background: transparent;
+  color: var(--text-primary);
 }
 
 .clear-btn {
   border: none;
   background: none;
-  color: rgba(79, 70, 229, 0.8);
+  color: color-mix(in srgb, var(--accent) 70%, var(--text-primary) 30%);
   cursor: pointer;
   font-size: 0.85rem;
 }
@@ -444,13 +447,15 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 4px;
   font-size: 0.85rem;
-  color: rgba(17, 24, 39, 0.7);
+  color: var(--text-secondary);
 }
 
 .mobile-filter select {
   border-radius: 10px;
-  border: 1px solid rgba(15, 23, 42, 0.18);
+  border: 1px solid var(--border-soft);
   padding: 6px 10px;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
 }
 
 .vault-body {
@@ -471,7 +476,7 @@ onBeforeUnmount(() => {
 }
 
 .vault-skeleton {
-  background: linear-gradient(160deg, rgba(226, 232, 240, 0.65), rgba(226, 232, 240, 0.45));
+  background: linear-gradient(160deg, color-mix(in srgb, var(--bg-elevated) 88%, transparent 12%), color-mix(in srgb, var(--bg-elevated) 65%, transparent 35%));
   border-radius: 16px;
   padding: 18px;
   display: grid;
@@ -484,7 +489,7 @@ onBeforeUnmount(() => {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.45) 40%, transparent 80%);
+  background: linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.35) 40%, transparent 80%);
   transform: translateX(-100%);
   animation: shimmer 1.6s infinite;
 }
@@ -492,7 +497,7 @@ onBeforeUnmount(() => {
 .skeleton-line {
   height: 12px;
   border-radius: 999px;
-  background: rgba(203, 213, 225, 0.45);
+  background: color-mix(in srgb, var(--text-secondary) 20%, transparent 80%);
 }
 
 .skeleton-pill {
@@ -520,11 +525,11 @@ onBeforeUnmount(() => {
 }
 
 .vault-card {
-  background: #ffffff;
+  background: var(--bg-elevated);
   border-radius: 16px;
   padding: 18px 20px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.05);
+  border: 1px solid var(--border-soft);
+  box-shadow: color-mix(in srgb, var(--shadow-elevated) 55%, transparent 45%);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -541,37 +546,37 @@ onBeforeUnmount(() => {
   font-weight: 600;
   padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(79, 70, 229, 0.12);
-  color: #4338ca;
+  background: color-mix(in srgb, var(--accent) 22%, var(--bg-elevated) 78%);
+  color: color-mix(in srgb, var(--accent) 70%, var(--text-primary) 30%);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 .type-task {
-  background: rgba(16, 185, 129, 0.15);
-  color: #047857;
+  background: color-mix(in srgb, #10b981 20%, var(--bg-elevated) 80%);
+  color: color-mix(in srgb, #047857 70%, var(--text-primary) 30%);
 }
 
 .type-meeting {
-  background: rgba(59, 130, 246, 0.16);
-  color: #1d4ed8;
+  background: color-mix(in srgb, #3b82f6 20%, var(--bg-elevated) 80%);
+  color: color-mix(in srgb, #1d4ed8 70%, var(--text-primary) 30%);
 }
 
 .type-chat {
-  background: rgba(236, 72, 153, 0.16);
-  color: #be185d;
+  background: color-mix(in srgb, #ec4899 20%, var(--bg-elevated) 80%);
+  color: color-mix(in srgb, #be185d 70%, var(--text-primary) 30%);
 }
 
 .score-chip {
   margin-left: auto;
   font-size: 0.78rem;
-  color: rgba(17, 24, 39, 0.6);
+  color: var(--text-secondary);
 }
 
 .ghost-btn {
   border: none;
-  background: rgba(15, 23, 42, 0.05);
-  color: rgba(15, 23, 42, 0.7);
+  background: color-mix(in srgb, var(--bg-elevated) 88%, transparent 12%);
+  color: var(--text-secondary);
   padding: 6px 10px;
   border-radius: 8px;
   cursor: pointer;
@@ -581,18 +586,18 @@ onBeforeUnmount(() => {
 .vault-card h3 {
   margin: 0;
   font-size: 1.15rem;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .summary {
   margin: 0;
   font-size: 0.95rem;
   line-height: 1.5;
-  color: rgba(17, 24, 39, 0.75);
+  color: var(--text-secondary);
 }
 
 .summary.muted {
-  color: rgba(17, 24, 39, 0.55);
+  color: color-mix(in srgb, var(--text-secondary) 60%, transparent 40%);
   font-style: italic;
 }
 
@@ -603,8 +608,8 @@ onBeforeUnmount(() => {
 }
 
 .meta-pill {
-  background: rgba(15, 23, 42, 0.06);
-  color: rgba(17, 24, 39, 0.7);
+  background: color-mix(in srgb, var(--bg-elevated) 90%, transparent 10%);
+  color: var(--text-secondary);
   padding: 4px 10px;
   border-radius: 999px;
   font-size: 0.78rem;
@@ -617,19 +622,19 @@ onBeforeUnmount(() => {
 }
 
 .alert.error {
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.4);
-  color: #991b1b;
+  background: color-mix(in srgb, var(--accent-danger) 12%, var(--bg-elevated) 88%);
+  border: 1px solid color-mix(in srgb, var(--accent-danger) 35%, transparent 65%);
+  color: color-mix(in srgb, var(--accent-danger) 70%, var(--text-primary) 30%);
 }
 
 .loading-state,
 .empty-state {
-  background: #ffffff;
+  background: var(--bg-elevated);
   border-radius: 16px;
-  border: 1px dashed rgba(15, 23, 42, 0.12);
+  border: 1px dashed var(--border-soft);
   padding: 32px;
   text-align: center;
-  color: rgba(17, 24, 39, 0.65);
+  color: var(--text-secondary);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -640,20 +645,26 @@ onBeforeUnmount(() => {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  border: 3px solid rgba(79, 70, 229, 0.2);
-  border-top-color: rgba(79, 70, 229, 0.65);
+  border: 3px solid color-mix(in srgb, var(--accent) 30%, transparent 70%);
+  border-top-color: color-mix(in srgb, var(--accent) 75%, transparent 25%);
   animation: spin 0.6s linear infinite;
 }
 
 .refresh-btn {
   border: none;
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  background: var(--accent-gradient);
   color: #fff;
   padding: 10px 18px;
   border-radius: 12px;
   cursor: pointer;
   font-weight: 600;
-  box-shadow: 0 14px 30px rgba(79, 70, 229, 0.3);
+  box-shadow: 0 14px 30px rgba(99, 102, 241, 0.3);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.refresh-btn:hover:not([disabled]) {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 36px rgba(99, 102, 241, 0.32);
 }
 
 .refresh-btn[disabled] {
@@ -666,11 +677,17 @@ onBeforeUnmount(() => {
   align-self: center;
   padding: 10px 16px;
   border-radius: 12px;
-  border: 1px solid rgba(79, 70, 229, 0.3);
-  background: rgba(79, 70, 229, 0.08);
-  color: #4338ca;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border-soft) 65%);
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-elevated) 86%);
+  color: color-mix(in srgb, var(--accent) 70%, var(--text-primary) 30%);
   cursor: pointer;
   font-weight: 600;
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.load-more:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px rgba(99, 102, 241, 0.26);
 }
 
 @keyframes spin {

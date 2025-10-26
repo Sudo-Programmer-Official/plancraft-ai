@@ -60,9 +60,58 @@ async function onCreate() {
 </script>
 
 <style scoped>
-.org-switcher { display: flex; gap: 10px; align-items: center; }
-select { min-width: 180px; padding: 6px 10px; border-radius: 8px; border: 1px solid rgba(15,23,42,0.18); background: #fff; color: #111827; }
-button { padding: 6px 12px; border-radius: 8px; border: none; background: #1d4ed8; color: #fff; font-weight: 500; cursor: pointer; }
-button:hover { background: #1e40af; }
-.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+.org-switcher {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+select {
+  min-width: 190px;
+  padding: 6px 12px;
+  border-radius: var(--input-radius, 10px);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+select:focus-visible {
+  outline: none;
+  border-color: var(--accent-primary-strong);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+button {
+  padding: 8px 14px;
+  min-width: 120px;
+  border-radius: 999px;
+  border: none;
+  background: var(--accent-gradient);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 20px rgba(99, 102, 241, 0.22);
+}
+
+button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
 </style>
