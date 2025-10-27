@@ -410,15 +410,40 @@ async function generateTasks() {
       currentTime: new Date().toISOString()
     })
 
-    if (result?.tasks) {
-      generatedTasks.value = result.tasks
-      taskTimeRelations.value = result.timeRelations || []
-      ElNotification({
-        title: 'Tasks Generated',
-        message: 'Review the timeline and click Save to create tasks',
-        type: 'success'
-      })
-    }
+    // After tasks are generated
+    // Normalize and visually distribute generated tasks
+    const baseTime = dayjs().startOf('hour').add(15, 'minute');
+    const normalized = (result.tasks || []).map((t, i) => {
+      // Prefer ISO scheduledTime, otherwise use time.value (HH:mm) with selected date, otherwise visual spacing
+      let scheduled = null
+      if (t.scheduledTime) {
+        scheduled = dayjs(t.scheduledTime)
+      } else if (t.time && t.time.value) {
+        // t.time.value expected as HH:mm
+        try {
+          scheduled = dayjs(`${selectedDate.value}T${t.time.value}`)
+        } catch {
+          scheduled = null
+        }
+      }
+      if (!scheduled || !scheduled.isValid()) scheduled = baseTime.add(i * 45, 'minute')
+
+      return {
+        ...t,
+        title: (t.title || `Task ${i + 1}`).trim(),
+        time: t.time || { type: 'derived', value: null },
+        estimate_minutes: t.estimate_minutes || 30,
+        scheduledTime: scheduled.toISOString()
+      }
+    })
+
+    generatedTasks.value = normalized
+    taskTimeRelations.value = result.timeRelations || []
+    ElNotification({
+      title: 'Tasks Generated',
+      message: 'Review the timeline and click Save to create tasks',
+      type: 'success'
+    })
   } catch (e) {
     console.error('generateTasks failed', e)
     ElNotification({ title: 'Error', message: 'Failed to generate tasks', type: 'error' })
