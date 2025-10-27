@@ -3,6 +3,7 @@ import multer from "multer"
 import { handleTextReminder } from "../services/textHandler.js"
 import { db } from "../services/firebaseAdmin.js"
 import { handleVoiceCommand } from "../services/voiceHandler.js"
+import { createReminderFromText, queueReminder } from "../services/reminderService.js"
 import { planUsageMiddleware, getUsageToday } from "../services/planService.js"
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc.js'
@@ -64,7 +65,11 @@ router.post("/text", async (req, res) => {
       channelsToUse = Array.from(merged)
     } catch {}
 
-    const reminder = await handleTextReminder(text, userId, channelsToUse, { taskId, scheduledTime, timezone: tz })
+  // Forward sendConfirmation flag (boolean) if caller explicitly requests an immediate confirmation
+  const sendConfirmation = Boolean(req.body?.sendConfirmation)
+  const confirmationChannels = Array.isArray(req.body?.confirmationChannels) ? req.body.confirmationChannels : undefined
+
+  const reminder = await handleTextReminder(text, userId, channelsToUse, { taskId, scheduledTime, timezone: tz, sendConfirmation, confirmationChannels })
 
     // Optional mirror to tasks/{taskId}.reminderTime so UI reflects immediately
     try {
@@ -140,6 +145,64 @@ router.get('/', async (req, res) => {
   } catch (err) {
     console.error('❌ reminders list error', err)
     res.status(500).json({ success: false, error: err?.message || 'Server error' })
+  }
+})
+
+// POST /api/reminders/batch
+// Body: { userId: string, reminders: [{ text, scheduledTime, taskId?, channels?, timezone? }, ...] }
+router.post('/batch', async (req, res) => {
+  try {
+    const { userId, reminders } = req.body || {}
+    if (!userId || !Array.isArray(reminders) || reminders.length === 0) return res.status(400).json({ success: false, error: 'Missing userId or reminders array' })
+
+    // Create reminders without queueing; we'll schedule them with controlled offsets below
+    const created = []
+    for (const r of reminders) {
+      const text = String(r?.text || '')
+      const scheduledTime = r?.scheduledTime
+      const channels = Array.isArray(r?.channels) ? r.channels : undefined
+      const taskId = r?.taskId || null
+      const timezone = r?.timezone || undefined
+      if (!text || !scheduledTime) continue
+      try {
+        const cr = await createReminderFromText(text, userId, channels, { taskId, scheduledTime, timezone, sendConfirmation: false, skipQueue: true })
+        created.push(cr)
+      } catch (e) {
+        console.warn('[Reminder Batch] create failed for item:', e?.message || e)
+      }
+    }
+
+    // Stagger scheduling to avoid provider collisions. Stagger increment per reminder.
+    const STAGGER_MS = Number(process.env.REMINDER_STAGGER_MS || 500) || 500
+    for (let i = 0; i < created.length; i++) {
+      try {
+        const item = created[i]
+        // apply incremental offset
+        const base = item?.scheduledTime ? new Date(item.scheduledTime).getTime() : Date.now()
+        const scheduledMs = base + i * STAGGER_MS
+        const scheduledIso = new Date(scheduledMs).toISOString()
+        // queue with adjusted scheduledTime so queueReminder computes delay from now
+        queueReminder({ ...item, scheduledTime: scheduledIso })
+
+        // Mirror reminderTime to task doc if taskId present
+        if (item?.taskId) {
+          try {
+            const tz = item?.timezone || 'UTC'
+            const hhmm = dayjs.utc(scheduledIso).tz(tz).format('HH:mm')
+            await db.collection('tasks').doc(String(item.taskId)).set({ reminderTime: hhmm, updatedAt: new Date() }, { merge: true })
+          } catch (merr) {
+            console.warn('[Reminder Batch] Mirror reminderTime failed', merr?.message || merr)
+          }
+        }
+      } catch (e) {
+        console.error('[Reminder Batch] scheduling failed', e?.message || e)
+      }
+    }
+
+    res.json({ success: true, created: created.map(c => ({ id: c.id, taskId: c.taskId })) })
+  } catch (e) {
+    console.error('/reminders/batch error:', e)
+    res.status(500).json({ success: false, error: e?.message || 'server error' })
   }
 })
 

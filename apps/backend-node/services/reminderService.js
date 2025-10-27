@@ -190,32 +190,43 @@ export async function createReminderFromText(
   });
   const ref = await db.collection("reminders").add(reminder);
   console.log("[Reminder] Stored docId =", ref.id);
-  await queueReminder({ id: ref.id, ...reminder });
-
-  // Confirmation via WhatsApp (template + fallback)
-  try {
-    const who = getSalutationToken(options);
-    await sendWhatsApp(userId, {
-      template: "reminder_notification_2",
-      // Template expects exactly 3 body params: {{1}} name, {{2}} task, {{3}} local time
-      bodyVars: [who, reminder.task, formatLocalTime(when, reminder.timezone || undefined)],
-      language: { code: "en_US" },
-    });
-    console.log("[Reminder] WhatsApp confirmation sent via template");
-  } catch (e) {
-    const msg = e?.message || "";
-    const isTemplateMissing = msg.includes("132001") || msg.includes("Template name does not exist") || msg.includes("404");
-    if (isTemplateMissing) {
-      console.warn("[Reminder] WhatsApp template missing — falling back to text mode");
-      try {
-        await sendWhatsApp(userId, `✅ Reminder set: "${reminder.task}" at ${formatLocalTime(when, reminder.timezone || undefined)}`);
-        console.log("[Reminder] WhatsApp confirmation sent via text fallback");
-      } catch (fallbackErr) {
-        console.error("[Reminder] WhatsApp fallback failed:", fallbackErr?.message);
+  // If caller requested skipQueue (e.g., batch creation), do not queue here.
+  if (!options?.skipQueue) {
+    await queueReminder({ id: ref.id, ...reminder });
+  } else {
+    console.log('[Reminder] skipQueue=true; deferring queue for batch scheduling')
+  }
+  // By default we DO NOT send immediate confirmations when creating a reminder
+  // (this avoids calling external channels at task-create time). Callers may
+  // explicitly request a confirmation by passing { sendConfirmation: true }
+  // in the options.
+  if (options?.sendConfirmation) {
+    try {
+      const who = getSalutationToken(options);
+      await sendWhatsApp(userId, {
+        template: "reminder_notification_2",
+        // Template expects exactly 3 body params: {{1}} name, {{2}} task, {{3}} local time
+        bodyVars: [who, reminder.task, formatLocalTime(when, reminder.timezone || undefined)],
+        language: { code: "en_US" },
+      });
+      console.log("[Reminder] WhatsApp confirmation sent via template");
+    } catch (e) {
+      const msg = e?.message || "";
+      const isTemplateMissing = msg.includes("132001") || msg.includes("Template name does not exist") || msg.includes("404");
+      if (isTemplateMissing) {
+        console.warn("[Reminder] WhatsApp template missing — falling back to text mode");
+        try {
+          await sendWhatsApp(userId, `✅ Reminder set: "${reminder.task}" at ${formatLocalTime(when, reminder.timezone || undefined)}`);
+          console.log("[Reminder] WhatsApp confirmation sent via text fallback");
+        } catch (fallbackErr) {
+          console.error("[Reminder] WhatsApp fallback failed:", fallbackErr?.message);
+        }
+      } else {
+        console.error("[Reminder] WhatsApp confirmation failed:", msg);
       }
-    } else {
-      console.error("[Reminder] WhatsApp confirmation failed:", msg);
     }
+  } else {
+    console.log('[Reminder] Skipping immediate confirmation (options.sendConfirmation not set)');
   }
 
   return { id: ref.id, ...reminder };
@@ -318,8 +329,21 @@ export function queueReminder(rem) {
       try { await sendReminder({ ...rem, id }); } catch (e) { console.error("sendReminder error:", e?.message); }
     };
 
-    if (delay <= 0) { console.log("[Scheduler] Firing overdue reminder immediately", { id, at: ts.toISOString() }); return fire(); }
-    setTimeout(fire, Math.min(delay, 0x7fffffff));
+    // Avoid firing multiple reminders exactly simultaneously which can cause
+    // collisions with external providers (rate limits, provider throttling).
+    // Add a small randomized jitter (configurable via REMINDER_JITTER_MS) so
+    // reminders scheduled at the same wall-clock time are staggered.
+    const MAX_JITTER_MS = Number(process.env.REMINDER_JITTER_MS || 2000) || 2000
+    const jitter = Math.floor(Math.random() * (MAX_JITTER_MS + 1)) // 0..MAX_JITTER_MS
+
+    if (delay <= 0) {
+      console.log("[Scheduler] Firing overdue reminder immediately", { id, at: ts.toISOString() });
+      // apply small jitter even for overdue reminders to reduce burst
+      return setTimeout(fire, jitter)
+    }
+
+    const finalDelay = Math.min(delay + jitter, 0x7fffffff)
+    setTimeout(fire, finalDelay);
   } catch (e) {
     console.error("queueReminder error:", e);
   }

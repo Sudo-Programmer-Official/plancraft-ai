@@ -345,11 +345,17 @@ Return only the improved response.
   return chatWithFallback({ messages: [{ role: "user", content: prompt }], temperature: 0.4 });
 }
 
-export async function splitTasks(input, { maxItems = 6, context = "" } = {}) {
+export async function splitTasks(input, { maxItems = 6, context = "", timezone = "UTC", currentTime = new Date().toISOString() } = {}) {
   const system = {
     role: "system",
-    content:
-      "You are a productivity coach. Convert free-form notes into a strict list of short, actionable tasks."
+    content: [
+      "You are a productivity coach that understands temporal relationships between tasks.",
+      "Convert free-form notes into structured tasks with timing information.",
+      "Pay attention to sequence words, time references, and parallel task indicators.",
+      `Current time: ${currentTime}`,
+      `User timezone: ${timezone}`,
+      "Extract both explicit times and implicit task relationships."
+    ].join("\n")
   };
 
   const schema = `
@@ -362,7 +368,20 @@ Return ONLY valid JSON in this format:
       "estimate_minutes": 15,
       "energy": "low|medium|high",
       "context": "home|work|computer|phone|errand|meeting|deep-work|planning",
-      "priority": 1
+      "priority": 1,
+      "time": {
+        "type": "absolute|relative",
+        "value": "ISO string for absolute, or relative reference like 'after_task_1', 'with_task_2'",
+        "delay_minutes": 0
+      }
+    }
+  ],
+  "timeRelations": [
+    {
+      "taskId": 1,
+      "followsTaskId": null,
+      "parallelWithTaskId": null,
+      "minimumGapMinutes": 15
     }
   ]
 }`;
@@ -371,9 +390,12 @@ Return ONLY valid JSON in this format:
 Rules:
 - At most ${maxItems} tasks.
 - Each task must start with a verb (e.g., Write, Review, Prepare, Go).
-- No sequence words like "First", "Second", "Lastly".
-- No reflections like "I feel grateful" or "Today is tough".
+- Extract explicit time references into absolute timestamps.
+- Infer relative timing between tasks (e.g., "then", "after that").
+- Detect parallel tasks (e.g., "while", "during", "as").
 - Each task should be atomic, completable in 10–30 minutes.
+- Add minimum gaps between sequential tasks (default 15 minutes).
+- For tasks without explicit times, distribute evenly across next 4 hours.
 - Do not include duplicates or vague filler sentences.
 `;
 
@@ -407,6 +429,32 @@ Rules:
   } catch (err) {
     console.error("❌ Failed to parse AI JSON:", cleaned);
     throw err;
+  }
+
+  // Validate and adjust task times
+  if (parsed?.tasks?.length) {
+    const { autoAdjustTimes, validateTimeRelations } = await import('../utils/timeSequencer.js');
+    
+    // Validate temporal relationships
+    const validation = validateTimeRelations(parsed.tasks, parsed.timeRelations || []);
+    if (!validation.isValid) {
+      console.warn("⚠️ Invalid time relations detected:", validation.errors);
+      // Remove invalid relations but continue processing
+      parsed.timeRelations = [];
+    }
+    
+    // Adjust task times based on relationships
+    try {
+      parsed.tasks = autoAdjustTimes({
+        tasks: parsed.tasks,
+        timeRelations: parsed.timeRelations || [],
+        startTime: currentTime,
+        timezone,
+      });
+    } catch (e) {
+      console.error("❌ Failed to adjust task times:", e);
+      // Preserve original tasks but log error
+    }
   }
 
   return parsed;

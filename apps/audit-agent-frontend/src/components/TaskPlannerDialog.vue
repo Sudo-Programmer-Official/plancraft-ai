@@ -128,136 +128,154 @@
         {{ props.task ? "Update Task" : "Save Task" }}
       </el-button>
     </template> -->
+    <!-- Preview Timeline -->
+    <div v-if="generatedTasks.length > 0" class="mb-5">
+      <TaskTimelinePreview
+        :tasks="generatedTasks"
+        :time-relations="taskTimeRelations"
+        @remove-task="removeGeneratedTask"
+        @update-times="resequenceTasks"
+      />
+    </div>
+
     <!-- Footer -->
-<template v-if="props.editMode" #footer>
-  <div class="flex flex-col sm:flex-row gap-3 w-full">
-    <el-button
-      @click="closeDialog"
-      class="flex-1 px-4 py-2 rounded-lg font-medium border border-gray-500 text-gray-300 hover:bg-gray-700"
-    >
-      Cancel
-    </el-button>
-    <el-button
-      type="primary"
-      @click="save"
-      class="flex-1 px-4 ml-0-custom py-2 rounded-lg text-white font-medium shadow-md
-        bg-gradient-to-r from-emerald-700 via-teal-800 to-cyan-700
-        hover:from-emerald-800 hover:via-teal-900 hover:to-cyan-800
-        transition-all duration-300 [text-shadow:_0_1px_2px_rgba(0,0,0,0.6)]"
-    >
-      {{ props.task ? "Update Task" : "Save Task" }}
-    </el-button>
-  </div>
-</template>
+    <template v-if="props.editMode" #footer>
+      <div class="flex flex-col sm:flex-row gap-3 w-full">
+        <el-button
+          @click="closeDialog"
+          class="flex-1 px-4 py-2 rounded-lg font-medium border border-gray-500 text-gray-300 hover:bg-gray-700"
+        >
+          Cancel
+        </el-button>
+        <el-button
+          type="primary"
+          @click="save"
+          :disabled="loading || generatedTasks.length === 0"
+          class="flex-1 px-4 ml-0-custom py-2 rounded-lg text-white font-medium shadow-md
+            bg-gradient-to-r from-emerald-700 via-teal-800 to-cyan-700
+            hover:from-emerald-800 hover:via-teal-900 hover:to-cyan-800
+            transition-all duration-300 [text-shadow:_0_1px_2px_rgba(0,0,0,0.6)]"
+        >
+          {{ loading ? 'Creating Tasks...' : (props.task ? "Update Task" : "Save Tasks") }}
+        </el-button>
+      </div>
+    </template>
   </el-dialog>
   <!-- Local notification setup prompt -->
   <NotificationPrompt v-model="notifPromptOpen" />
 </template>
 
-
-
 <script setup>
-import { ref, computed, watch, onBeforeUnmount, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElNotification, ElMessage } from 'element-plus'
-import api from '@/services/api'
-import VoiceRecorder from '@/components/VoiceRecorder.vue'
-import { generateTasksFromText } from '@/services/aiService'
-import { addTaskToFirebase } from '@/services/firebaseService'
-import { useAuthStore } from '@/stores/authStore'
-import { getPreferences as getUserPreferences } from '@/services/settingsService'
-import { scheduleReminder, getReminderStatus } from '@/services/reminderService'
-import { useTasks } from '@/composables/useTasks'
-import { toLocalDateKey, parseLocalDateKey } from '@/utils/dateHelper'
-import { normalizeParsedDateTime } from '@/utils/dateParser'
-import { useSubscriptionStore } from '@/stores/subscriptionStore'
-import { isFeatureAllowed } from '@/services/planService'
-import { hasNotificationSetup } from '@/utils/notificationCheck'
-import NotificationPrompt from '@/components/NotificationPrompt.vue'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
-import { toLocal } from '@/utils/timezone'  // add this at top if not imported
-import { toUtcIso, toLocalHHMM, getUserTimezone } from '@/utils/time'
 
+import api from '@/services/api'
+import VoiceRecorder from '@/components/VoiceRecorder.vue'
+import NotificationPrompt from '@/components/NotificationPrompt.vue'
+import TaskTimelinePreview from '@/components/TaskTimelinePreview.vue'
+
+import { generateTasksFromText } from '@/services/aiService'
+import { addTaskToFirebase } from '@/services/firebaseService'
+import { useAuthStore } from '@/stores/authStore'
+import { useTasks } from '@/composables/useTasks'
+import { useSubscriptionStore } from '@/stores/subscriptionStore'
+
+import { getPreferences as getUserPreferences } from '@/services/settingsService'
+import { scheduleReminder, getReminderStatus } from '@/services/reminderService'
+import { hasNotificationSetup } from '@/utils/notificationCheck'
+import { toLocalDateKey, parseLocalDateKey } from '@/utils/dateHelper'
+import { toUtcIso, getUserTimezone } from '@/utils/time'
+import { isFeatureAllowed } from '@/services/planService'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
 
+// === Props & Emits ===
 const props = defineProps({
   open: Boolean,
   date: { type: [String, Date], default: () => toLocalDateKey(new Date()) },
   task: Object,
   editMode: { type: Boolean, default: false },
   readonly: { type: Boolean, default: false },
-  // Optional: lock date input when reusing in Weekly/Monthly
   lockDate: { type: Boolean, default: false },
-  // Optional: disable reminder edits when reusing in Weekly/Monthly
   disableReminder: { type: Boolean, default: false }
 })
 const emit = defineEmits(['close', 'saved'])
 
-const { tasks } = useTasks()
-const reminderTime = ref(props.task ? props.task.reminderTime || '' : '')
-const subStore = useSubscriptionStore()
-
+// === State ===
 const internalOpen = ref(props.open)
 const input = ref('')
 const details = ref('')
 const link = ref('')
-const selectedDate = ref(typeof props.date === 'string' ? props.date : toLocalDateKey(props.date))
+const reminderTime = ref(props.task?.reminderTime || '')
+const selectedDate = ref(
+  typeof props.date === 'string' ? props.date : toLocalDateKey(props.date)
+)
+
+const generatedTasks = ref([])
+const taskTimeRelations = ref([])
 const loading = ref(false)
 const transcribing = ref(false)
 const notifPromptOpen = ref(false)
 const suppressAutoClose = ref(false)
 
-const screenWidth = ref(window.innerWidth)
-onMounted(() => window.addEventListener("resize", () => screenWidth.value = window.innerWidth))
-onBeforeUnmount(() => window.removeEventListener("resize", () => {}))
-const dialogWidth = computed(() => screenWidth.value < 640 ? "90%" : "520px")
+const authStore = useAuthStore()
+const subStore = useSubscriptionStore()
+const { tasks } = useTasks()
+const userPrefs = ref({ notifications: {}, integrations: {} })
 
+// === Responsive Dialog Width ===
+const screenWidth = ref(window.innerWidth)
+const onResize = () => (screenWidth.value = window.innerWidth)
+onMounted(() => window.addEventListener('resize', onResize))
+onBeforeUnmount(() => window.removeEventListener('resize', onResize))
+const dialogWidth = computed(() => (screenWidth.value < 640 ? '90%' : '520px'))
+
+// === Watchers ===
 watch(() => props.task, (task) => {
   if (task) {
-    input.value = task.title || ""
-    details.value = task.details || ""
-    link.value = task.link || ""
+    input.value = task.title || ''
+    details.value = task.details || ''
+    link.value = task.link || ''
     selectedDate.value = task.date
-    reminderTime.value = task.reminderTime || ""
-    // If reminderTime missing but task exists, try to prefill from reminder status
+    reminderTime.value = task.reminderTime || ''
     tryPrefillReminder(task)
   } else {
-    input.value = ""
-    details.value = ""
-    link.value = ""
-    selectedDate.value = props.date || ""
-    reminderTime.value = ""
+    input.value = ''
+    details.value = ''
+    link.value = ''
+    selectedDate.value = props.date || ''
+    reminderTime.value = ''
   }
 }, { immediate: true })
 
-watch(() => props.open, (val) => internalOpen.value = val)
-watch(internalOpen, (val) => { if (!val) emit('close') })
+watch(() => props.open, (v) => (internalOpen.value = v))
+watch(internalOpen, (v) => { if (!v) emit('close') })
 
-const formattedDate = computed(() => {
-  const dateKey = typeof selectedDate.value === "string" ? selectedDate.value : toLocalDateKey(selectedDate.value)
-  const dateObj = parseLocalDateKey(dateKey)
-  return dateObj.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })
+watch(selectedDate, (val) => {
+  if (props.lockDate && props?.task?.date && val !== props.task.date)
+    selectedDate.value = props.task.date
 })
 
-function handleTranscript(text) {
-  input.value = text
-  transcribing.value = true
-  setTimeout(() => transcribing.value = false, 2000)
-}
-function appendDetails(text) {
-  details.value = (details.value + " " + text).trim()
-}
+watch(reminderTime, (val) => {
+  if (
+    props.disableReminder &&
+    typeof props?.task?.reminderTime !== 'undefined' &&
+    val !== (props.task.reminderTime || '')
+  ) reminderTime.value = props.task.reminderTime || ''
+})
 
-const displayLink = computed(() =>
-  link.value.replace(/^https?:\/\//, "").slice(0, 40) + (link.value.length > 40 ? "…" : "")
-)
+watch(notifPromptOpen, (open) => {
+  if (!open && suppressAutoClose.value) {
+    suppressAutoClose.value = false
+    setTimeout(() => closeDialog(), 50)
+  }
+})
 
-const authStore = useAuthStore()
-const userPrefs = ref({ notifications: {}, integrations: {} })
-
+// === Lifecycle: Load Preferences ===
 onMounted(async () => {
   try {
     const uid = authStore?.user?.uid
@@ -265,250 +283,35 @@ onMounted(async () => {
       const res = await getUserPreferences(uid)
       userPrefs.value = res || { notifications: {}, integrations: {} }
     }
-  } catch {}
-  // Attempt prefill when opening in edit mode
+  } catch (e) {
+    console.warn('getUserPreferences failed:', e)
+  }
+
   if (props.task) tryPrefillReminder(props.task)
 })
 
-// Enforce read-only/locked states for date and reminder when reused across views
-watch(selectedDate, (val) => {
-  try {
-    if (props.lockDate && props?.task?.date && val !== props.task.date) {
-      selectedDate.value = props.task.date
-    }
-  } catch {}
+// === Computed ===
+const formattedDate = computed(() => {
+  const key = typeof selectedDate.value === 'string'
+    ? selectedDate.value
+    : toLocalDateKey(selectedDate.value)
+  const d = parseLocalDateKey(key)
+  return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
 })
 
-watch(reminderTime, (val) => {
-  try {
-    if (
-      props.disableReminder &&
-      typeof props?.task?.reminderTime !== 'undefined' &&
-      val !== (props.task.reminderTime || '')
-    ) {
-      reminderTime.value = props.task.reminderTime || ''
-    }
-  } catch {}
-})
+const displayLink = computed(() =>
+  link.value.replace(/^https?:\/\//, '').slice(0, 40) + (link.value.length > 40 ? '…' : '')
+)
 
-// Close planner once prompt dismissed (if we deferred auto-close)
-watch(notifPromptOpen, (open) => {
-  try {
-    if (!open && suppressAutoClose.value) {
-      suppressAutoClose.value = false
-      setTimeout(() => closeDialog(), 50)
-    }
-  } catch {}
-})
+// === Utility Handlers ===
+function handleTranscript(text) {
+  input.value = text
+  transcribing.value = true
+  setTimeout(() => (transcribing.value = false), 2000)
+}
 
-// function tryPrefillReminder(task) {
-//   try {
-//     if (!task?.id || reminderTime.value) return
-//     const uid = authStore?.user?.uid
-//     if (!uid) return
-//     // Query reminder status and set HH:mm from first scheduled item
-//     getReminderStatus(uid, task.id).then((r) => {
-//       const items = Array.isArray(r?.items) ? r.items : []
-//       const active = items.find(it => String(it?.status).toLowerCase() === 'scheduled') || items[0]
-//       const st = active?.scheduledTime
-//       if (!st) return
-//       try {
-//         // Normalize to local time from UTC and format as HH:mm
-//         let iso
-//         if (st && typeof st.toDate === 'function') {
-//           const d = st.toDate()
-//           iso = d && d.toISOString ? d.toISOString() : String(d)
-//         } else if (st instanceof Date) {
-//           iso = st.toISOString()
-//         } else {
-//           iso = String(st)
-//         }
-//         const local = dayjs.utc(iso).local()
-//         reminderTime.value = local.format('HH:mm')
-//       } catch {}
-//     }).catch(() => {})
-//   } catch {}
-// }
-// function tryPrefillReminder(task) {
-//   try {
-//     if (!task?.id || reminderTime.value) return
-//     const uid = authStore?.user?.uid
-//     if (!uid) return
-
-//     getReminderStatus(uid, task.id).then((r) => {
-//       const items = Array.isArray(r?.items) ? r.items : []
-//       const active = items.find(it => String(it?.status).toLowerCase() === 'scheduled') || items[0]
-//       const st = active?.scheduledTime
-//       if (!st) return
-
-//       let iso
-//       if (st && typeof st.toDate === 'function') iso = st.toDate().toISOString()
-//       else if (st instanceof Date) iso = st.toISOString()
-//       else iso = String(st)
-
-//       // ✅ FIX: Convert UTC → user timezone correctly
-//       const userTz = task?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
-//       const local = dayjs.utc(iso).tz(userTz)
-//       reminderTime.value = local.format('HH:mm')
-//     }).catch(() => {})
-//   } catch {}
-// }
-// function tryPrefillReminder(task) {
-//   try {
-//     if (!task?.id || reminderTime.value) return
-//     const uid = authStore?.user?.uid
-//     if (!uid) return
-
-//     const before = reminderTime.value || ''
-//     getReminderStatus(uid, task.id).then((r) => {
-//       const items = Array.isArray(r?.items) ? r.items : []
-//       if (!items.length) return
-
-//       // Prefer active scheduled reminders; choose the most recently created/scheduled
-//       const toJSDate = (v) => {
-//         try {
-//           if (!v) return null
-//           if (typeof v === 'string') return new Date(v)
-//           if (v instanceof Date) return v
-//           if (typeof v.toDate === 'function') return v.toDate()
-//           if (typeof v.seconds === 'number') return new Date(v.seconds * 1000)
-//           if (typeof v._seconds === 'number') return new Date(v._seconds * 1000)
-//         } catch {}
-//         return null
-//       }
-//       const scheduled = items.filter(it => String(it?.status).toLowerCase() === 'scheduled' && !it?.sentAt)
-//       const pool = scheduled.length ? scheduled : items
-//       pool.sort((a, b) => {
-//         const ad = toJSDate(a.createdAt) || toJSDate(a.scheduledTime) || new Date(0)
-//         const bd = toJSDate(b.createdAt) || toJSDate(b.scheduledTime) || new Date(0)
-//         return bd - ad
-//       })
-//       const st = pool[0]?.scheduledTime
-//       if (!st) return
-
-//       let iso
-//       if (st && typeof st.toDate === 'function') iso = st.toDate().toISOString()
-//       else if (st instanceof Date) iso = st.toISOString()
-//       else iso = String(st)
-
-//       // If user typed since request started, do not overwrite
-//       if (before && before !== (reminderTime.value || '')) return
-//       if (reminderTime.value) return
-
-//       const userTz = task?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
-//       const local = (dayjs.utc && dayjs.utc(iso).tz) ? dayjs.utc(iso).tz(userTz) : dayjs.utc(iso).local()
-//       reminderTime.value = local.format('HH:mm')
-//     }).catch(() => {})
-//   } catch {}
-// }
-// function tryPrefillReminder(task) {
-//   try {
-//     if (!task?.id || reminderTime.value) return
-//     const uid = authStore?.user?.uid
-//     if (!uid) return
-
-//     const before = reminderTime.value || ''
-//     getReminderStatus(uid, task.id).then((r) => {
-//       const items = Array.isArray(r?.items) ? r.items : []
-//       if (!items.length) return
-
-//       // Prefer active scheduled reminders; choose the most recently created/scheduled
-//       const toJSDate = (v) => {
-//         try {
-//           if (!v) return null
-//           if (typeof v === 'string') return new Date(v)
-//           if (v instanceof Date) return v
-//           if (typeof v.toDate === 'function') return v.toDate()
-//           if (typeof v.seconds === 'number') return new Date(v.seconds * 1000)
-//           if (typeof v._seconds === 'number') return new Date(v._seconds * 1000)
-//         } catch {}
-//         return null
-//       }
-
-//       const scheduled = items.filter(
-//         it => String(it?.status).toLowerCase() === 'scheduled' && !it?.sentAt
-//       )
-//       const pool = scheduled.length ? scheduled : items
-//       pool.sort((a, b) => {
-//         const ad = toJSDate(a.createdAt) || toJSDate(a.scheduledTime) || new Date(0)
-//         const bd = toJSDate(b.createdAt) || toJSDate(b.scheduledTime) || new Date(0)
-//         return bd - ad
-//       })
-
-//       const st = pool[0]?.scheduledTime
-//       if (!st) return
-
-//       let iso
-//       if (st && typeof st.toDate === 'function') iso = st.toDate().toISOString()
-//       else if (st instanceof Date) iso = st.toISOString()
-//       else iso = String(st)
-
-//       // If user typed since request started, do not overwrite
-//       if (before && before !== (reminderTime.value || '')) return
-//       if (reminderTime.value) return
-
-//       // ✅ FIX: Always convert from UTC → user timezone safely
-//       const userTz = task?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
-//       const local = dayjs.tz(dayjs.utc(iso), userTz)
-//       reminderTime.value = local.format('HH:mm')
-//     }).catch(() => {})
-//   } catch {}
-// }
-
-function tryPrefillReminder(task) {
-  try {
-    if (!task?.id || reminderTime.value) return
-    const uid = authStore?.user?.uid
-    if (!uid) return
-
-    const before = reminderTime.value || ''
-    getReminderStatus(uid, task.id)
-      .then((r) => {
-        const items = Array.isArray(r?.items) ? r.items : []
-        if (!items.length) return
-
-        // Prefer active scheduled reminders; choose the most recently created/scheduled
-        const toJSDate = (v) => {
-          try {
-            if (!v) return null
-            if (typeof v === 'string') return new Date(v)
-            if (v instanceof Date) return v
-            if (typeof v.toDate === 'function') return v.toDate()
-            if (typeof v.seconds === 'number') return new Date(v.seconds * 1000)
-            if (typeof v._seconds === 'number') return new Date(v._seconds * 1000)
-          } catch {}
-          return null
-        }
-
-        const scheduled = items.filter(
-          (it) => String(it?.status).toLowerCase() === 'scheduled' && !it?.sentAt
-        )
-        const pool = scheduled.length ? scheduled : items
-        pool.sort((a, b) => {
-          const ad = toJSDate(a.createdAt) || toJSDate(a.scheduledTime) || new Date(0)
-          const bd = toJSDate(b.createdAt) || toJSDate(b.scheduledTime) || new Date(0)
-          return bd - ad
-        })
-
-        const st = pool[0]?.scheduledTime
-        if (!st) return
-
-        let iso
-        if (st && typeof st.toDate === 'function') iso = st.toDate().toISOString()
-        else if (st instanceof Date) iso = st.toISOString()
-        else iso = String(st)
-
-        // If user typed since request started, do not overwrite
-        if (before && before !== (reminderTime.value || '')) return
-        if (reminderTime.value) return
-
-        // Always convert from UTC → user's local time correctly, using explicit tz
-        const userTz = task?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
-        const local = dayjs.utc(iso).tz(userTz)
-        reminderTime.value = local.format('HH:mm')
-      })
-      .catch(() => {})
-  } catch {}
+function appendDetails(text) {
+  details.value = (details.value + ' ' + text).trim()
 }
 
 function buildLocalIso(ymd, hhmm) {
@@ -520,110 +323,180 @@ function buildLocalIso(ymd, hhmm) {
   }
 }
 
+// === Reminder Prefill ===
+function tryPrefillReminder(task) {
+  try {
+    if (!task?.id || reminderTime.value) return
+    const uid = authStore?.user?.uid
+    if (!uid) return
+    const before = reminderTime.value || ''
+
+    getReminderStatus(uid, task.id)
+      .then((r) => {
+        const items = Array.isArray(r?.items) ? r.items : []
+        if (!items.length) return
+
+        const toJSDate = (v) => {
+          try {
+            if (!v) return null
+            if (typeof v === 'string') return new Date(v)
+            if (v instanceof Date) return v
+            if (typeof v.toDate === 'function') return v.toDate()
+            if (typeof v.seconds === 'number') return new Date(v.seconds * 1000)
+            if (typeof v._seconds === 'number') return new Date(v._seconds * 1000)
+          } catch { return null }
+        }
+
+        const scheduled = items.filter(it =>
+          String(it?.status).toLowerCase() === 'scheduled' && !it?.sentAt
+        )
+        const pool = scheduled.length ? scheduled : items
+        pool.sort((a, b) => {
+          const ad = toJSDate(a.createdAt) || toJSDate(a.scheduledTime) || new Date(0)
+          const bd = toJSDate(b.createdAt) || toJSDate(b.scheduledTime) || new Date(0)
+          return bd - ad
+        })
+
+        const st = pool[0]?.scheduledTime
+        if (!st) return
+
+        const iso = (st instanceof Date)
+          ? st.toISOString()
+          : typeof st.toDate === 'function'
+          ? st.toDate().toISOString()
+          : String(st)
+
+        if (before && before !== (reminderTime.value || '')) return
+        if (reminderTime.value) return
+
+        const userTz = task?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
+        const local = dayjs.utc(iso).tz(userTz)
+        reminderTime.value = local.format('HH:mm')
+      })
+      .catch(e => console.warn('tryPrefillReminder getReminderStatus failed', e))
+  } catch (e) {
+    console.warn('tryPrefillReminder failed', e)
+  }
+}
+
+// === Task Sequencing ===
+async function resequenceTasks() {
+  if (!generatedTasks.value.length) return
+  try {
+    const userTimezone = getUserTimezone()
+    const { autoAdjustTimes } = await import('../utils/timeSequencer.js')
+    const adjusted = autoAdjustTimes({
+      tasks: generatedTasks.value,
+      timeRelations: taskTimeRelations.value,
+      startTime: new Date().toISOString(),
+      timezone: userTimezone
+    })
+    generatedTasks.value = adjusted
+    ElNotification({ title: 'Success', message: 'Task times adjusted', type: 'success' })
+  } catch (e) {
+    console.error('Failed to resequence tasks:', e)
+    ElNotification({ title: 'Error', message: 'Failed to adjust task times', type: 'warning' })
+  }
+}
+
+// === Task Generation ===
 async function generateTasks() {
   if (!input.value.trim()) return
   loading.value = true
   try {
-    const { tasks: items, reminderTime: aiIso } = await generateTasksFromText(input.value)
-    // If AI provided a parsed reminder datetime (UTC ISO), sync date picker + time
-    if (aiIso) {
-      const { date, time } = normalizeParsedDateTime(aiIso)
-      if (date && selectedDate.value !== date) selectedDate.value = date
-      // if (time && reminderTime.value !== time) reminderTime.value = time
-      // Removed double timezone shift: trust aiIso directly as UTC
-    }
-    if (aiIso && !reminderTime.value) {
-      reminderTime.value = null  // DO NOT display auto time in UI
-    }
-    const manualIso = reminderTime.value ? buildLocalIso(toLocalDateKey(parseLocalDateKey(selectedDate.value)), reminderTime.value) : null
-    const effectiveIso = manualIso || aiIso
+    const userTimezone = getUserTimezone()
+    const result = await generateTasksFromText(input.value, {
+      timezone: userTimezone,
+      currentTime: new Date().toISOString()
+    })
 
-    for (const [i, t] of items.entries()) {
-      const newTask = {
-        title: t,
-        details: '',
-        link: '',
-        completed: false,
-        date: toLocalDateKey(parseLocalDateKey(selectedDate.value)),
-        order: tasks.value.length + i,
-        logs: [],
-        reminderTime: reminderTime.value || null
-      }
-      const saved = await addTaskToFirebase(newTask)
-      try {
-        const uid = authStore?.user?.uid
-        if (uid && saved?.id && effectiveIso) {
-          const prefs = userPrefs.value?.notifications || {}
-          // Gentle prompt if user hasn't configured any channel yet
-          if (!hasNotificationSetup(prefs)) {
-            notifPromptOpen.value = true
-            suppressAutoClose.value = true
-          }
-          const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
-          try {
-            const chans = [
-              prefs?.whatsapp && 'whatsapp',
-              (prefs?.pwa || prefs?.push) && 'pwa',
-              prefs?.email && 'email',
-              prefs?.sms && 'sms',
-              prefs?.voice_call && 'voice_call',
-            ].filter(Boolean)
-            const resp = await api.post('/reminders/text', {
-              userId: uid,
-              text: newTask.title,
-              scheduledTime: effectiveIso,
-              taskId: saved.id,
-              channels: chans.length ? chans : undefined,
-              timezone: tz,
-            })
-            const warn = resp?.headers?.['x-plan-warning'] || resp?.headers?.['X-Plan-Warning']
-            if (warn) ElMessage({ message: warn, type: 'warning', duration: 5000 })
-            // Notify dashboards/overviews to refresh usage meters
-            try { window.dispatchEvent(new CustomEvent('usage-refresh')) } catch {}
-          } catch (err) {
-            await scheduleReminder(uid, saved.id, newTask.title, effectiveIso, prefs)
-            if (err?.response?.status === 403) {
-              const msg = err?.response?.data?.error || 'Daily reminder limit reached. Upgrade to Pro for unlimited reminders.'
-              ElMessage({ message: msg, type: 'warning', duration: 6000 })
-            }
-            // Still emit refresh to keep UI in sync after fallback
-            try { window.dispatchEvent(new CustomEvent('usage-refresh')) } catch {}
-          }
-        }
-      } catch (e) {
-        console.warn('AI-split reminder schedule failed:', e?.response?.data || e?.message)
-      }
+    if (result?.tasks) {
+      generatedTasks.value = result.tasks
+      taskTimeRelations.value = result.timeRelations || []
+      ElNotification({
+        title: 'Tasks Generated',
+        message: 'Review the timeline and click Save to create tasks',
+        type: 'success'
+      })
     }
-    ElNotification({ title: 'Success', message: `${items.length} task${items.length > 1 ? 's' : ''} generated`, type: 'success', duration: 2500 })
-    emit('saved', items)
-    if (!notifPromptOpen.value) closeDialog()
-  } catch (err) {
-    const status = err?.response?.status
-    if (status === 403) {
-      const msg = err?.response?.data?.error || 'Daily AI limit reached. Upgrade to Pro to continue.'
-      ElNotification({ title: 'Upgrade Required', message: msg, type: 'warning', duration: 3500 })
-      try { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('upgrade-required', { detail: { source: 'ai-split' } })) } catch {}
-    } else {
-      console.error(err)
-      ElNotification({ title: 'Error', message: 'Task generation failed. Please try again.', type: 'error', duration: 3000 })
-    }
+  } catch (e) {
+    console.error('generateTasks failed', e)
+    ElNotification({ title: 'Error', message: 'Failed to generate tasks', type: 'error' })
   } finally {
     loading.value = false
-    input.value = ''
-    reminderTime.value = ''
   }
 }
 
-function save() {
-  if (props.task) {
-    const dateToSave = props.lockDate && props?.task?.date ? props.task.date : selectedDate.value
-    const reminderToSave = props.disableReminder && typeof props?.task?.reminderTime !== 'undefined'
-      ? (props.task.reminderTime ?? null)
-      : (reminderTime.value || null)
-    emit("saved", { ...props.task, title: input.value, details: details.value, link: link.value, date: dateToSave, reminderTime: reminderToSave })
+// === Save ===
+async function save() {
+  if (generatedTasks.value.length) {
+    // Batch create mode
+    loading.value = true
+    try {
+      const uid = authStore?.user?.uid
+      const prefs = userPrefs.value?.notifications || {}
+      const tz = getUserTimezone()
+      const chans = [
+        prefs?.whatsapp && 'whatsapp',
+        (prefs?.pwa || prefs?.push) && 'pwa',
+        prefs?.email && 'email',
+        prefs?.sms && 'sms',
+        prefs?.voice_call && 'voice_call'
+      ].filter(Boolean)
+
+      if (!hasNotificationSetup(prefs)) {
+        notifPromptOpen.value = true
+        suppressAutoClose.value = true
+      }
+
+      const taskPromises = generatedTasks.value.map(async (task, index) => {
+        const newTask = {
+          title: task.title,
+          details: task.details || '',
+          link: '',
+          completed: false,
+          date: selectedDate.value,
+          order: tasks.value.length + index,
+          logs: [],
+          reminderTime: dayjs(task.scheduledTime).format('HH:mm')
+        }
+
+        const saved = await addTaskToFirebase(newTask)
+        if (uid && saved?.id && task.scheduledTime) {
+          return {
+            text: newTask.title,
+            scheduledTime: task.scheduledTime,
+            taskId: saved.id,
+            channels: chans.length ? chans : undefined,
+            timezone: tz
+          }
+        }
+      })
+
+      const reminderPayloads = (await Promise.all(taskPromises)).filter(Boolean)
+      if (reminderPayloads.length) {
+        await api.post('/reminders/batch', { reminders: reminderPayloads })
+      }
+
+      ElNotification({ title: 'Success', message: `Created ${generatedTasks.value.length} tasks`, type: 'success' })
+      emit('saved')
+      if (!notifPromptOpen.value) closeDialog()
+    } catch (e) {
+      console.error('save() batch failed', e)
+      ElNotification({ title: 'Error', message: 'Failed to save tasks', type: 'error' })
+    } finally {
+      loading.value = false
+    }
+  } else if (props.task) {
+    // Single edit
+    const dateToSave = props.lockDate && props.task?.date ? props.task.date : selectedDate.value
+    const reminderToSave = props.disableReminder && props.task?.reminderTime !== undefined
+      ? props.task.reminderTime ?? null
+      : reminderTime.value || null
+    emit('saved', { ...props.task, title: input.value, details: details.value, link: link.value, date: dateToSave, reminderTime: reminderToSave })
     ElNotification({ title: 'Success', message: 'Task updated successfully', type: 'success', duration: 2000 })
   } else {
-    // Soft prompt if creating with reminder time and no channels configured
+    // Single create
     try {
       if ((reminderTime.value || '').trim()) {
         const prefs = userPrefs.value?.notifications || {}
@@ -632,18 +505,30 @@ function save() {
           suppressAutoClose.value = true
         }
       }
-    } catch {}
-    emit("saved", { title: input.value, details: details.value, link: link.value, date: selectedDate.value, reminderTime: reminderTime.value || null })
-    ElNotification({ title: 'Success', message: 'Task saved successfully', type: 'success', duration: 2000 })
+      emit('saved', {
+        title: input.value,
+        details: details.value,
+        link: link.value,
+        date: selectedDate.value,
+        reminderTime: reminderTime.value || null
+      })
+      ElNotification({ title: 'Success', message: 'Task saved successfully', type: 'success', duration: 2000 })
+    } catch (e) {
+      console.warn('save() single failed', e)
+    }
   }
+
   if (!notifPromptOpen.value) closeDialog()
 }
 
+// === Misc ===
 function closeDialog() {
   internalOpen.value = false
   emit('close')
 }
 </script>
+
+
 
 <style scoped>
 /* Dialog title readable on dark gradient */
