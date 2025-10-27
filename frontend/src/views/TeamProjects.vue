@@ -22,8 +22,14 @@
     <!-- Loading state -->
     <div v-if="loading" class="projects-loading">Loading projects…</div>
 
+    <!-- Error state -->
+    <div v-else-if="error" class="projects-error">
+      <p>Failed to load projects. Please try again.</p>
+      <button class="secondary-btn" @click="retryLoading">Retry</button>
+    </div>
+
     <!-- Projects list -->
-   <ul v-else-if="projects.length" class="projects-list">
+    <ul v-else-if="projects && projects.length > 0" class="projects-list">
       <li
         v-for="project in projects"
         :key="project.id"
@@ -55,7 +61,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch, ref, onMounted } from "vue";
+import { computed, watch, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useOrgStore } from "../stores/orgStore";
 import { useProjectStore } from "../stores/projectStore";
@@ -68,6 +74,7 @@ const projectStore = useProjectStore();
 
 // State
 const creating = ref(false);
+const error = ref<Error | null>(null);
 const orgId = computed(() => {
   const param = route.params.orgId;
   const id =
@@ -75,17 +82,34 @@ const orgId = computed(() => {
   return id || orgStore.activeOrgId;
 });
 const currentOrg = computed(() => orgStore.currentOrg);
-// const projects = computed(() => projectStore.projects);
-const projects = computed(() => projectStore.projects || []);
+
+// Initialize projects store
+projectStore.$reset(); // Reset store state
+
+// Safer projects computation with null checks
+const projects = computed(() => {
+  try {
+    return projectStore.projects ?? [];
+  } catch (err) {
+    error.value = err as Error;
+    return [];
+  }
+});
 const loading = computed(() => projectStore.loading);
 
-// Watch for orgId changes
+// Watch for orgId changes with better error handling
 watch(
   orgId,
   async (id) => {
     if (!id) return;
-    orgStore.setOrg(id);
-    await projectStore.load(id);
+    error.value = null;
+    try {
+      orgStore.setOrg(id);
+      await projectStore.load(id);
+    } catch (err) {
+      error.value = err as Error;
+      console.error("Failed to load projects:", err);
+    }
   },
   { immediate: true }
 );
@@ -112,6 +136,18 @@ function openProject(id: string) {
     name: "TeamProjectDetail",
     params: { orgId: orgId.value, projectId: id },
   });
+}
+
+// Retry handler
+async function retryLoading() {
+  if (!orgId.value) return;
+  error.value = null;
+  try {
+    await projectStore.load(orgId.value);
+  } catch (err) {
+    error.value = err as Error;
+    console.error("Failed to load projects:", err);
+  }
 }
 </script>
 
@@ -177,12 +213,14 @@ function openProject(id: string) {
 
 /* Empty / Loading states */
 .projects-loading,
-.projects-empty {
+.projects-empty,
+.projects-error {
   text-align: center;
   color: #6b7280;
   padding: 2rem;
 }
-.projects-empty p {
+.projects-empty p,
+.projects-error p {
   margin-bottom: 1rem;
 }
 
