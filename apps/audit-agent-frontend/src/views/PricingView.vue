@@ -22,10 +22,7 @@
     <div
       class="bg-gradient-to-br from-purple-700 to-pink-600 rounded-2xl shadow-xl p-8 border border-purple-400 relative"
     >
-      <span
-        class="absolute -top-3 right-4 text-black text-xs px-2 py-1 rounded-full"
-        :class="offerActive ? 'bg-yellow-400' : 'bg-indigo-200 text-indigo-900'"
-      >
+      <span class="premium-badge">
         {{ offerActive ? 'Limited Offer' : 'Most Popular' }}
       </span>
       <h3 class="text-xl font-bold mb-4">🚀 Premium</h3>
@@ -80,14 +77,14 @@
     :close-on-press-escape="!cancelLoading"
     :show-close="!cancelLoading"
   >
-    <div class="flex items-start gap-3 text-slate-200">
-      <span class="text-amber-400 text-xl">⚠️</span>
-      <p>Are you sure you want to cancel your subscription?</p>
+    <div class="flex items-start gap-3 text-[#111]">
+      <span class="text-amber-500 text-xl mt-[1px]">⚠️</span>
+      <p class="leading-relaxed font-medium">Are you sure you want to cancel your subscription?</p>
     </div>
     <template #footer>
-      <div class="flex justify-end gap-2">
-        <el-button @click="dialogVisible = false" :disabled="cancelLoading">No, keep it</el-button>
-        <el-button type="danger" @click="confirmCancel" :loading="cancelLoading">Yes, cancel it</el-button>
+      <div class="flex justify-end gap-2 mt-6">
+        <el-button class="keep-plan-btn" @click="dialogVisible = false" :disabled="cancelLoading">No, keep it</el-button>
+        <el-button class="cancel-plan-btn" @click="confirmCancel" :loading="cancelLoading">Yes, cancel it</el-button>
       </div>
     </template>
   </el-dialog>
@@ -357,22 +354,59 @@ async function confirmCancel() {
   color: #e5d4ff;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
+.premium-badge {
+  position: absolute;
+  top: -0.75rem;
+  right: 1rem;
+  font-size: 0.7rem;
+  font-variant: small-caps;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 0.3rem 0.55rem;
+  color: #000;
+  background: linear-gradient(90deg, #FFD400, #FFB700);
+  border-radius: 6px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+}
+
 .cancel-dialog :deep(.el-dialog) {
-  background: linear-gradient(145deg, #1f2937, #111827);
-  color: #e2e8f0;
-  border-radius: 0.75rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 12px 38px rgba(0, 0, 0, 0.6);
+  background: rgba(248, 249, 250, 0.9);
+  color: #111;
+  border-radius: 12px;
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.25);
+  padding-bottom: 1rem;
 }
-.cancel-dialog :deep(.el-dialog__title) {
-  color: #f9fafb;
+.cancel-dialog :deep(.el-dialog__body) {
+  color: #111;
 }
-.cancel-dialog :deep(.el-button.el-button--danger) {
-  background: linear-gradient(90deg, #ef4444, #dc2626);
-  border: none;
+.keep-plan-btn {
+  border: 1px solid #555;
+  color: #111;
+  background: transparent;
+}
+.keep-plan-btn:hover,
+.keep-plan-btn:focus {
+  background: rgba(17, 17, 17, 0.05);
+  color: #000;
+}
+.keep-plan-btn.is-disabled {
+  border-color: rgba(85, 85, 85, 0.4);
+  color: rgba(17, 17, 17, 0.45);
+}
+.cancel-plan-btn {
+  background: #e34c4c;
+  border: 1px solid #d63a3a;
   color: #fff;
 }
-.cancel-dialog :deep(.el-button.el-button--danger:hover) {
-  background: linear-gradient(90deg, #f87171, #ef4444);
+.cancel-plan-btn:hover,
+.cancel-plan-btn:focus {
+  background: #f05151;
+  border-color: #e13f3f;
+}
+.cancel-plan-btn.is-disabled {
+  background: rgba(227, 76, 76, 0.6);
+  border-color: rgba(214, 58, 58, 0.6);
+  color: rgba(255, 255, 255, 0.75);
 }
 </style>
