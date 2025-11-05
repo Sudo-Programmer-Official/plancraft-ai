@@ -140,6 +140,7 @@ import pushRoutes from './pushRoutes.js'
 import Stripe from 'stripe'
 import { db } from '../services/firebaseAdmin.js'
 import { requireAuth, ensureUserMatches } from '../middleware/auth.js'
+import { normalizeDate } from '../utils/time.js'
 
 const router = express.Router()
 router.use(requireAuth, ensureUserMatches)
@@ -166,9 +167,9 @@ router.get('/subscription/status', async (req, res) => {
     const plan = (status === 'active' || status === 'trialing' || status === 'past_due' || status === 'canceled') ? 'premium' : 'free'
 
     let remainingDays = 0
-    let cancelAt = sub?.cancelAt || null
+    let cancelAt = normalizeDate(sub?.cancelAt)
     try {
-      const end = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null
+      const end = normalizeDate(sub?.currentPeriodEnd)
       if (end) {
         const diffMs = end.getTime() - Date.now()
         remainingDays = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)))
@@ -176,7 +177,12 @@ router.get('/subscription/status', async (req, res) => {
         if (sub?.cancelAtPeriodEnd && !cancelAt) cancelAt = end
       }
     } catch {}
-    return res.json({ plan, status, cancelAt, remainingDays })
+    return res.json({
+      plan,
+      status,
+      cancelAt: cancelAt ? cancelAt.toISOString() : null,
+      remainingDays,
+    })
   } catch (err) {
     console.error('subscription/status error', err)
     res.status(200).json({ plan: 'free', status: 'free', remainingDays: 0 })
@@ -285,6 +291,177 @@ router.post('/subscription/cancel', async (req, res) => {
   } catch (err) {
     console.error('Cancel error:', err)
     res.status(500).json({ error: 'Failed to cancel subscription' })
+  }
+})
+
+const PLAN_ALIAS = {
+  pro: 'MONTHLY',
+  premium: 'MONTHLY',
+  monthly: 'MONTHLY',
+  month: 'MONTHLY',
+  year: 'YEARLY',
+  yearly: 'YEARLY',
+  annual: 'YEARLY',
+  annually: 'YEARLY',
+}
+
+function resolvePlanKey(rawPlan = '') {
+  const value = String(rawPlan || '').toLowerCase()
+  if (!value) return 'MONTHLY'
+  const key = PLAN_ALIAS[value]
+  if (key) return key
+  if (value.includes('year')) return 'YEARLY'
+  return 'MONTHLY'
+}
+
+function resolveStripePriceId(planKey) {
+  const suffix = resolvePlanKey(planKey)
+  const envKey = `STRIPE_${suffix}_PRICE_ID`
+  return process.env[envKey] || process.env.STRIPE_MONTHLY_PRICE_ID || null
+}
+
+router.post('/subscription/reactivate', async (req, res) => {
+  try {
+    const { userId: bodyUserId, uid, successUrl, cancelUrl } = req.body || {}
+    const userId = String(bodyUserId || uid || req?.user?.uid || '')
+    if (!userId) return res.status(400).json({ error: 'Missing userId' })
+
+    const snap = await db.collection('users').doc(userId).get()
+    if (!snap.exists) return res.status(404).json({ error: 'User not found' })
+
+    const data = snap.data() || {}
+    const sub = data.subscription || {}
+    const subId = sub?.stripeSubId || sub?.id
+
+    const successRedirect =
+      successUrl ||
+      process.env.STRIPE_REACTIVATE_SUCCESS_URL ||
+      'https://plancraftai.com/subscription?reactivated=1'
+    const cancelRedirect =
+      cancelUrl ||
+      process.env.STRIPE_REACTIVATE_CANCEL_URL ||
+      'https://plancraftai.com/subscription?reactivate=cancel'
+
+    const planValue = data.plan && data.plan !== 'free' ? data.plan : 'premium'
+    const planKey = resolvePlanKey(sub?.plan || planValue)
+    const priceId = resolveStripePriceId(planKey)
+
+    const isTerminated = String(sub?.status || '').toLowerCase() === 'canceled' && !sub?.cancelAtPeriodEnd
+
+    if (!stripe) {
+      if (!subId) {
+        console.warn('[Reactivate] Stripe disabled and no subscription ID; marking premium locally', { userId })
+      }
+      const payload = {
+        plan: planValue,
+        subscription: {
+          ...sub,
+          status: 'active',
+          cancelAt: null,
+          cancelAtPeriodEnd: false,
+        },
+        updatedAt: new Date(),
+      }
+      await db.collection('users').doc(userId).set(payload, { merge: true })
+      return res.json({ url: successRedirect, restored: true })
+    }
+
+    if (!priceId) {
+      console.error('❌ Reactivate failed: missing Stripe price ID', { planKey })
+      return res.status(500).json({ error: 'Stripe price not configured' })
+    }
+
+    if (!subId || isTerminated) {
+      try {
+        const session = await stripe.checkout.sessions.create({
+          mode: 'subscription',
+          payment_method_types: ['card'],
+          line_items: [{ price: priceId, quantity: 1 }],
+          success_url: successRedirect,
+          cancel_url: cancelRedirect,
+          metadata: { userId, action: 'reactivate', plan: planKey },
+        })
+        return res.json({ url: session.url, resumedViaCheckout: true })
+      } catch (err) {
+        console.error('❌ Stripe checkout (reactivate) failed:', {
+          message: err?.message,
+          type: err?.type,
+          code: err?.code,
+          requestId: err?.requestId,
+          userId,
+        })
+        const status = err?.statusCode || err?.status || 500
+        return res.status(status).json({ error: err?.message || 'Reactivate checkout failed' })
+      }
+    }
+
+    let result
+    try {
+      result = await stripe.subscriptions.update(String(subId), { cancel_at_period_end: false })
+    } catch (err) {
+      const message = err?.message || 'Stripe reactivate failed'
+      const canRetryViaCheckout = /only update its cancellation_details/i.test(message)
+      if (canRetryViaCheckout) {
+        try {
+          const session = await stripe.checkout.sessions.create({
+            mode: 'subscription',
+            payment_method_types: ['card'],
+            line_items: [{ price: priceId, quantity: 1 }],
+            success_url: successRedirect,
+            cancel_url: cancelRedirect,
+            metadata: { userId, action: 'reactivate', plan: planKey, fallback: 'checkout' },
+          })
+          return res.json({ url: session.url, resumedViaCheckout: true })
+        } catch (checkoutErr) {
+          console.error('❌ Stripe checkout fallback failed:', {
+            message: checkoutErr?.message,
+            type: checkoutErr?.type,
+            code: checkoutErr?.code,
+            requestId: checkoutErr?.requestId,
+            userId,
+          })
+          const status = checkoutErr?.statusCode || checkoutErr?.status || 500
+          return res.status(status).json({ error: checkoutErr?.message || 'Reactivate checkout failed' })
+        }
+      }
+
+      console.error('❌ Stripe reactivate failed:', {
+        message,
+        type: err?.type,
+        code: err?.code,
+        requestId: err?.requestId,
+        subId,
+        userId,
+      })
+      const status = err?.statusCode || err?.status || 500
+      return res.status(status).json({ error: message })
+    }
+
+    const currentPeriodEnd = result?.current_period_end
+      ? new Date(result.current_period_end * 1000)
+      : normalizeDate(sub?.currentPeriodEnd)
+
+    const payload = {
+      plan: planValue,
+      subscription: {
+        ...sub,
+        plan: planValue,
+        status: (result?.status === 'active' || result?.status === 'trialing') ? 'active' : result?.status,
+        cancelAt: null,
+        cancelAtPeriodEnd: false,
+        currentPeriodEnd,
+        stripeSubId: result?.id || sub?.stripeSubId || subId,
+        customerId: result?.customer || sub?.customerId || null,
+      },
+      updatedAt: new Date(),
+    }
+
+    await db.collection('users').doc(userId).set(payload, { merge: true })
+
+    return res.json({ url: successRedirect })
+  } catch (err) {
+    console.error('Reactivate error:', err)
+    res.status(500).json({ error: 'Failed to reactivate subscription' })
   }
 })
 
