@@ -450,10 +450,17 @@ const authStore = useAuthStore()
 const { isPremium, isGuest, isFreeUser } = useAuthFlags()
 const routerNav = useRouter()
 const subStore = useSubscriptionStore()
-const reactivateEligible = computed(() => String(subStore.subscription?.status || '').toLowerCase() === 'canceled' && !!subStore.subscription?.cancelAt)
 const daysLeft = computed(() => {
   const d = subStore.subscription?.cancelAt
   return d ? Math.max(0, dayjs(d).diff(dayjs(), 'day')) : 0
+})
+const reactivateEligible = computed(() => {
+  const status = String(subStore.subscription?.status || '').toLowerCase()
+  const hasCancelAt = !!subStore.subscription?.cancelAt
+  if (!hasCancelAt) return false
+  const remaining = daysLeft.value
+  if (remaining > 7) return false
+  return status === 'canceled' || status === 'active'
 })
 const cancelAtFmt = computed(() => subStore.subscription?.cancelAt ? dayjs(subStore.subscription.cancelAt).format('MMM D, YYYY') : '')
 
