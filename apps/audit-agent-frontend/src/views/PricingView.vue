@@ -79,7 +79,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import { useAuthStore } from '@/stores/authStore'
@@ -97,11 +97,55 @@ const monthlyPriceId = import.meta.env.VITE_STRIPE_MONTHLY_PRICE_ID || 'price_mo
 const errorVisible = ref(false)
 const cancelLoading = ref(false)
 const countdown = ref('03:00:00')
-const offerActive = ref(true)
+const offerActive = ref(false)
+let promoTimer = null
 
 const subStore = useSubscriptionStore()
 const sub = subStore.subscription
 const { isPremium } = useIsPremium()
+
+function stopPromoTimer() {
+  if (promoTimer) {
+    clearInterval(promoTimer)
+    promoTimer = null
+  }
+  offerActive.value = false
+}
+
+function startPromoTimer() {
+  if (promoTimer || isPremium.value) return
+  try {
+    const key = 'promoExpiresAt'
+    let exp = parseInt(sessionStorage.getItem(key) || '0', 10)
+    if (!exp || Number.isNaN(exp) || exp < Date.now()) {
+      exp = Date.now() + 3 * 60 * 60 * 1000
+      sessionStorage.setItem(key, String(exp))
+    }
+    const tick = () => {
+      if (isPremium.value) {
+        stopPromoTimer()
+        return
+      }
+      const left = Math.max(0, exp - Date.now())
+      if (left <= 0) {
+        countdown.value = '00:00:00'
+        stopPromoTimer()
+        try { sessionStorage.removeItem(key) } catch {}
+        return
+      }
+      const s = Math.floor(left / 1000)
+      const h = String(Math.floor(s / 3600)).padStart(2, '0')
+      const m = String(Math.floor((s % 3600) / 60)).padStart(2, '0')
+      const sec = String(s % 60).padStart(2, '0')
+      countdown.value = `${h}:${m}:${sec}`
+      offerActive.value = true
+    }
+    promoTimer = setInterval(tick, 1000)
+    tick()
+  } catch {
+    stopPromoTimer()
+  }
+}
 
 // async function onUpgrade() {
 //   try {
@@ -164,31 +208,12 @@ async function onUpgrade() {
 }
 
 onMounted(() => {
-  // Session-limited 3h countdown for the limited offer
-  try {
-    const key = 'promoExpiresAt'
-    let exp = parseInt(sessionStorage.getItem(key) || '0', 10)
-    if (!exp || Number.isNaN(exp) || exp < Date.now()) {
-      exp = Date.now() + 3 * 60 * 60 * 1000
-      sessionStorage.setItem(key, String(exp))
-    }
-    const tick = () => {
-      const left = Math.max(0, exp - Date.now())
-      if (left <= 0) {
-        offerActive.value = false
-        countdown.value = '00:00:00'
-        clearInterval(timer)
-        return
-      }
-      const s = Math.floor(left / 1000)
-      const h = String(Math.floor(s / 3600)).padStart(2, '0')
-      const m = String(Math.floor((s % 3600) / 60)).padStart(2, '0')
-      const sec = String(s % 60).padStart(2, '0')
-      countdown.value = `${h}:${m}:${sec}`
-    }
-    var timer = setInterval(tick, 1000)
-    tick()
-  } catch {}
+  if (isPremium.value) {
+    stopPromoTimer()
+    try { sessionStorage.removeItem('promoExpiresAt') } catch {}
+  } else {
+    startPromoTimer()
+  }
 
   const qs = window?.location?.search || ''
   const isSuccess = qs.includes('status=success')
@@ -230,7 +255,17 @@ onMounted(() => {
     }
   } catch {}
 })
+watch(isPremium, (val) => {
+  if (val) {
+    stopPromoTimer()
+    try { sessionStorage.removeItem('promoExpiresAt') } catch {}
+  } else {
+    startPromoTimer()
+  }
+})
+
 onUnmounted(() => { try { if (typeof timer !== 'undefined') clearInterval(timer) } catch {} })
+onUnmounted(() => stopPromoTimer())
 
 // async function onCancel() {
 //   try {
