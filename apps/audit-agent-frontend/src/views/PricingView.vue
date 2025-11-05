@@ -49,7 +49,7 @@
         <button
           :disabled="cancelLoading"
           @click="onCancel"
-          class="w-full py-2 rounded-lg bg-black/20 text-white font-semibold hover:bg-black/30 transition disabled:opacity-60 text-sm sm:text-base"
+          class="w-full py-2 rounded-lg bg-gradient-to-r from-rose-600 to-red-500 text-white font-semibold hover:from-rose-700 hover:to-red-600 transition disabled:opacity-60 text-sm sm:text-base"
         >
           <span v-if="cancelLoading">Canceling…</span>
           <span v-else>Cancel Subscription</span>
@@ -71,6 +71,26 @@
     <p v-if="$route.query.status === 'success'" class="text-green-400">✅ Payment complete. Premium is now active! 🎉</p>
     <p v-else-if="$route.query.status === 'cancel'" class="text-red-400">❌ Checkout canceled. You can try again anytime.</p>
   </div>
+  <el-dialog
+    v-model="dialogVisible"
+    title="Cancel Subscription"
+    width="420px"
+    class="cancel-dialog"
+    :close-on-click-modal="false"
+    :close-on-press-escape="!cancelLoading"
+    :show-close="!cancelLoading"
+  >
+    <div class="flex items-start gap-3 text-slate-200">
+      <span class="text-amber-400 text-xl">⚠️</span>
+      <p>Are you sure you want to cancel your subscription?</p>
+    </div>
+    <template #footer>
+      <div class="flex justify-end gap-2">
+        <el-button @click="dialogVisible = false" :disabled="cancelLoading">No, keep it</el-button>
+        <el-button type="danger" @click="confirmCancel" :loading="cancelLoading">Yes, cancel it</el-button>
+      </div>
+    </template>
+  </el-dialog>
   <ErrorDialog
     v-model="errorVisible"
     title="Action Failed"
@@ -81,7 +101,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
+import { ElMessage, ElNotification } from 'element-plus'
 import { useAuthStore } from '@/stores/authStore'
 import { createCheckoutSession, cancelSubscription } from '@/services/stripeService'
 import { trackEvent } from '@/services/analytics'
@@ -103,6 +123,8 @@ let promoTimer = null
 const subStore = useSubscriptionStore()
 const sub = subStore.subscription
 const { isPremium } = useIsPremium()
+
+const dialogVisible = ref(false)
 
 function stopPromoTimer() {
   if (promoTimer) {
@@ -296,31 +318,28 @@ onUnmounted(() => stopPromoTimer())
 //   }
 // }
 async function onCancel() {
+  if (!authStore.user) {
+    router.push('/login')
+    return
+  }
+  dialogVisible.value = true
+}
+
+async function confirmCancel() {
+  if (!authStore.user?.uid) {
+    dialogVisible.value = false
+    router.push('/login')
+    return
+  }
+  cancelLoading.value = true
   try {
-    if (!authStore.user) return router.push('/login')
-
-    await ElMessageBox.confirm(
-      'Are you sure you want to cancel your subscription?',
-      'Cancel Subscription',
-      {
-        confirmButtonText: 'Yes, cancel it',
-        cancelButtonText: 'No, keep it',
-        type: 'warning',
-      }
-    )
-
-    cancelLoading.value = true
-
-    // 🚀 Cancel on backend
     await cancelSubscription(authStore.user.uid)
-
-    // ✅ Refresh both authStore and subStore
     await Promise.all([
       authStore.refreshUser?.(),
       subStore.fetchStatus(authStore.user.uid),
     ])
-
     ElMessage.success("Subscription canceled. You’ll remain Premium until the period ends.")
+    dialogVisible.value = false
   } catch (e) {
     console.error(e)
     errorVisible.value = true
@@ -337,5 +356,23 @@ async function onCancel() {
   backdrop-filter: blur(12px);
   color: #e5d4ff;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+.cancel-dialog :deep(.el-dialog) {
+  background: linear-gradient(145deg, #1f2937, #111827);
+  color: #e2e8f0;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 12px 38px rgba(0, 0, 0, 0.6);
+}
+.cancel-dialog :deep(.el-dialog__title) {
+  color: #f9fafb;
+}
+.cancel-dialog :deep(.el-button.el-button--danger) {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+  border: none;
+  color: #fff;
+}
+.cancel-dialog :deep(.el-button.el-button--danger:hover) {
+  background: linear-gradient(90deg, #f87171, #ef4444);
 }
 </style>
