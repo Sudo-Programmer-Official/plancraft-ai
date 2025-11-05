@@ -294,4 +294,86 @@ router.post('/subscription/cancel', async (req, res) => {
   }
 })
 
+router.post('/subscription/reactivate', async (req, res) => {
+  try {
+    const { userId: bodyUserId, uid, successUrl } = req.body || {}
+    const userId = String(bodyUserId || uid || req?.user?.uid || '')
+    if (!userId) return res.status(400).json({ error: 'Missing userId' })
+
+    const snap = await db.collection('users').doc(userId).get()
+    if (!snap.exists) return res.status(404).json({ error: 'User not found' })
+
+    const data = snap.data() || {}
+    const sub = data.subscription || {}
+    const subId = sub?.stripeSubId || sub?.id
+    if (!subId) {
+      console.warn('[Reactivate] Missing Stripe subscription ID', { userId })
+      return res.status(400).json({ error: 'No subscription to reactivate' })
+    }
+
+    const successRedirect =
+      successUrl ||
+      process.env.STRIPE_REACTIVATE_SUCCESS_URL ||
+      'https://plancraftai.com/subscription?reactivated=1'
+
+    if (!stripe) {
+      const payload = {
+        plan: data.plan && data.plan !== 'free' ? data.plan : 'premium',
+        subscription: {
+          ...sub,
+          status: 'active',
+          cancelAt: null,
+          cancelAtPeriodEnd: false,
+        },
+        updatedAt: new Date(),
+      }
+      await db.collection('users').doc(userId).set(payload, { merge: true })
+      return res.json({ url: successRedirect, restored: true })
+    }
+
+    let result
+    try {
+      result = await stripe.subscriptions.update(String(subId), { cancel_at_period_end: false })
+    } catch (err) {
+      console.error('❌ Stripe reactivate failed:', {
+        message: err?.message,
+        type: err?.type,
+        code: err?.code,
+        requestId: err?.requestId,
+        subId,
+        userId,
+      })
+      const status = err?.statusCode || err?.status || 500
+      return res.status(status).json({ error: err?.message || 'Stripe reactivate failed' })
+    }
+
+    const planValue = data.plan && data.plan !== 'free' ? data.plan : 'premium'
+    const currentPeriodEnd = result?.current_period_end
+      ? new Date(result.current_period_end * 1000)
+      : normalizeDate(sub?.currentPeriodEnd)
+
+    const payload = {
+      plan: planValue,
+      subscription: {
+        ...sub,
+        plan: planValue,
+        status: (result?.status === 'active' || result?.status === 'trialing') ? 'active' : result?.status,
+        cancelAt: null,
+        cancelAtPeriodEnd: false,
+        currentPeriodEnd,
+        stripeSubId: result?.id || sub?.stripeSubId || subId,
+        customerId: result?.customer || sub?.customerId || null,
+      },
+      updatedAt: new Date(),
+    }
+
+    await db.collection('users').doc(userId).set(payload, { merge: true })
+
+    return res.json({ url: successRedirect })
+  } catch (err) {
+    console.error('Reactivate error:', err)
+    res.status(500).json({ error: 'Failed to reactivate subscription' })
+  }
+})
+
 export default router
