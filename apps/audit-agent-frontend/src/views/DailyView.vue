@@ -96,7 +96,11 @@ function handleMorningTranscript(text) {
 
 async function generateTasks() {
   if (!planningInput.value.trim()) return
-  const { tasks: generated } = await generateTasksFromText(planningInput.value)
+  const planDate = toLocalDateKey(new Date())
+  const { tasks: generated } = await generateTasksFromText(planningInput.value, {
+    planDate,
+    debugLabel: 'DailyView',
+  })
   for (const [i, t] of generated.entries()) {
     const newTask = {
       title: t,

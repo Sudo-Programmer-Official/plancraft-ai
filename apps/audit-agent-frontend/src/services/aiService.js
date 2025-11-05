@@ -4,6 +4,9 @@ import api from '@/services/api'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
+import { ElMessage } from 'element-plus'
+import { buildTimeContext } from '@/services/time_context'
+import { normalizeTemporalTasks } from '@/services/time_parser'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -11,6 +14,15 @@ dayjs.extend(timezone)
 // 🔹 Utility: safe response unwrap
 function safeGet(res, key, fallback = null) {
   return res?.data?.[key] ?? fallback;
+}
+
+function logTimeBrain(event, payload) {
+  try {
+    // eslint-disable-next-line no-console
+    console.log(`[TimeBrain][Service] ${event}`, payload)
+  } catch {
+    /* noop */
+  }
 }
 
 /**
@@ -45,7 +57,11 @@ export async function summarizeTasks(tasks) {
       weeklyWarning: summary["Weekly warning"] ?? summary.weeklyWarning ?? "",
     };
   } catch (err) {
-    console.error("❌ Task Summarize API Error:", err?.response?.data || err.message);
+    const msg = err?.response?.data || err?.message
+    console.error("❌ Task Summarize API Error:", msg);
+    if (err?.code === 'ECONNABORTED' || /timeout/i.test(String(msg))) {
+      try { ElMessage.warning('AI summarizer took too long. Try a shorter selection.'); } catch {}
+    }
     return {
       completedPct: 0,
       pending: 0,
@@ -58,44 +74,72 @@ export async function summarizeTasks(tasks) {
 }
 
 /**
- * ✨ Generate tasks from freeform text
+ * ✨ Generate tasks from freeform text with temporal context
  */
-export async function generateTasksFromText(text) {
+export async function generateTasksFromText(text, options = {}) {
+  const trimmed = String(text ?? '').trim()
+  if (!trimmed) {
+    return { tasks: [], items: [], reminderTime: null, revalidation: [], context: null, contextSerialized: null }
+  }
+
+  const {
+    planDate,
+    timezone,
+    now,
+    lastTaskEnd,
+    userPreferences,
+    memorySnapshot,
+    existingTasks,
+    maxItems,
+    debugLabel,
+  } = options
+
+  const contextBundle = buildTimeContext({
+    planDate,
+    timezone,
+    now,
+    lastTaskEnd,
+    userPreferences,
+    memorySnapshot,
+    existingTasks,
+  })
+
+  const payload = {
+    text: trimmed,
+    timezone: contextBundle.context.timezone,
+    context: contextBundle.serialized,
+    maxItems: maxItems ?? 6,
+    timeContext: contextBundle.context,
+  }
+
+  logTimeBrain('generateTasksFromText:request', {
+    label: debugLabel,
+    timezone: payload.timezone,
+    planDate: contextBundle.context.plan_date,
+  })
+
   try {
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
-    const res = await api.post("/split-tasks", { text, timezone: tz });
+    const res = await api.post("/split-tasks", payload);
     const raw = Array.isArray(res?.data?.tasks) ? res.data.tasks : []
+    const { tasks: normalized, revalidation } = normalizeTemporalTasks(raw, contextBundle.context)
     const reminderTime = res?.data?.reminderTime ?? null
 
-    const items = raw
-      .map((entry) => {
-        if (typeof entry === 'string') {
-          const title = entry.trim()
-          return title ? { title } : null
-        }
-        if (!entry || typeof entry !== 'object') return null
-        const title = String(entry.title || entry.name || '').trim()
-        if (!title) return null
-        const normalizeNumber = (value) => {
-          const num = Number(value)
-          return Number.isFinite(num) && num > 0 ? num : undefined
-        }
-        return {
-          title,
-          details: entry.details ?? '',
-          link: entry.link ?? '',
-          estimate_minutes: normalizeNumber(entry.estimate_minutes ?? entry.estimateMinutes ?? entry.duration ?? entry.durationMinutes),
-          time: entry.time ?? null,
-          scheduledTime: entry.scheduledTime ?? entry.scheduled_time ?? null,
-          relation: entry.relation ?? entry.timeRelation ?? null,
-          gapMinutes: normalizeNumber(entry.gapMinutes ?? entry.gap_minutes),
-          timeHint: entry.timeHint ?? entry.time_hint ?? null,
-        }
-      })
-      .filter(Boolean)
+    logTimeBrain('generateTasksFromText:response', {
+      label: debugLabel,
+      count: normalized.length,
+      reminderTime,
+      needsRecheck: revalidation.length,
+    })
 
-    const tasks = items.map((t) => t.title).filter(Boolean)
-    return { tasks, items, reminderTime }
+    return {
+      tasks: normalized.map((t) => t.title).filter(Boolean),
+      items: normalized,
+      reminderTime,
+      revalidation,
+      context: contextBundle.context,
+      contextSerialized: contextBundle.serialized,
+      raw: raw,
+    }
   } catch (err) {
     console.error("❌ Generate Tasks API Error:", err?.response?.data || err.message);
     throw new Error("Failed to generate tasks. Please try again later.");
@@ -105,18 +149,59 @@ export async function generateTasksFromText(text) {
 /**
  * ✨ Extract reminder time (ISO) from freeform text
  */
-export async function extractReminderTime(text, { now, timezone: tz } = {}) {
+export async function extractReminderTime(text, options = {}) {
+  const trimmed = String(text ?? '').trim()
+  if (!trimmed) return null
+
+  const {
+    now,
+    timezone: tz,
+    planDate,
+    lastTaskEnd,
+    userPreferences,
+    memorySnapshot,
+    existingTasks,
+    contextBundle: providedContext,
+    debugLabel,
+  } = options
+
+  const contextBundle = providedContext || buildTimeContext({
+    planDate,
+    timezone: tz,
+    now,
+    lastTaskEnd,
+    userPreferences,
+    memorySnapshot,
+    existingTasks,
+  })
+
+  const timezoneGuess = tz || contextBundle.context.timezone || 'UTC'
+  const nowAnchor = (() => {
+    if (typeof now === 'string' && now) return now
+    if (now instanceof Date) return dayjs(now).tz(timezoneGuess).format('YYYY-MM-DDTHH:mm:ssZ')
+    return contextBundle.context.now || dayjs().tz(timezoneGuess).format('YYYY-MM-DDTHH:mm:ssZ')
+  })()
+
+  const payload = {
+    text: trimmed,
+    timezone: timezoneGuess,
+    now: nowAnchor,
+    context: contextBundle.serialized,
+    timeContext: contextBundle.context,
+  }
+
+  logTimeBrain('extractReminderTime:request', {
+    label: debugLabel,
+    timezone: timezoneGuess,
+    planDate: contextBundle.context.plan_date,
+  })
+
   try {
-    const timezoneGuess = tz || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-    const anchor = now
-      ? now
-      : dayjs().tz(timezoneGuess).format('YYYY-MM-DDTHH:mm:ssZ')
-    const payload = { text, timezone: timezoneGuess, now: anchor }
     const res = await api.post("/extract-time", payload);
     const iso = res?.data?.reminderTime
     const normalized = typeof iso === 'string' && iso ? iso : null
     try {
-      console.log('[TimeFlow] frontend extractReminderTime', { text, now: anchor, timezone: timezoneGuess, iso: normalized })
+      console.log('[TimeFlow] frontend extractReminderTime', { text: trimmed.slice(0, 80), now: nowAnchor, timezone: timezoneGuess, iso: normalized })
     } catch {}
     return normalized
   } catch (err) {

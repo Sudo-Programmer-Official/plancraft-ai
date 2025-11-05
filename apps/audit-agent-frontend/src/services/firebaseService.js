@@ -194,6 +194,17 @@ export async function addTaskToFirebase(task) {
   }
 
   if ('channels' in task) payload.channels = Array.isArray(task.channels) ? task.channels : null
+  if ('timeHint' in task) payload.timeHint = task.timeHint || null
+  if ('relation' in task) payload.timeRelation = task.relation || null
+  if ('gapMinutes' in task) {
+    const gap = Number(task.gapMinutes)
+    payload.gapMinutes = Number.isFinite(gap) && gap >= 0 ? gap : null
+  }
+  if ('confidence' in task) {
+    const conf = Number(task.confidence)
+    payload.timeConfidence = Number.isFinite(conf) ? conf : null
+  }
+  if ('meta' in task) payload.timeMeta = task.meta || null
 
   const docRef = await safeAction(addDoc(tasksRef, payload));
 

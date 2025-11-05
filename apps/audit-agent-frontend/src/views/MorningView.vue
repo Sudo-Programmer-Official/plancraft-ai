@@ -49,8 +49,16 @@ const aiTasks = ref([])
 
 async function generateTasks() {
   try {
-    const { tasks } = await generateTasksFromText(planText.value)
-    aiTasks.value = tasks.map(t => ({ title: t }))
+    const planDate = new Date().toISOString().split('T')[0]
+    const result = await generateTasksFromText(planText.value, {
+      planDate,
+      debugLabel: 'MorningView',
+    })
+    aiTasks.value = (result.items || []).map(item => ({
+      title: item.title,
+      parsedTimeLocal: item.parsedTimeLocal,
+      confidence: item.confidence,
+    }))
   } catch (err) {
     const status = err?.response?.status
     if (status === 403) {

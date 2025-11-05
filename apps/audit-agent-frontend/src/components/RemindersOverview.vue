@@ -138,6 +138,15 @@ const { isPremium, isGuest, isFreeUser } = useAuthFlags()
 const customDate = ref(dayjs().format('YYYY-MM-DD'))
 const authStore = useAuthStore()
 
+function logTimeBrainReminder(event, payload) {
+  try {
+    // eslint-disable-next-line no-console
+    console.log(`[TimeBrain][Reminders] ${event}`, payload)
+  } catch {
+    /* noop */
+  }
+}
+
 // async function scrollToCustomDate() {
 //   const selected = customDate.value
 //   const keys = Object.keys(groupedReminders.value)
@@ -148,6 +157,7 @@ const authStore = useAuthStore()
 async function scrollToCustomDate() {
   const selected = dayjs(customDate.value).format('YYYY-MM-DD')
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  logTimeBrainReminder('scroll-to-date', { selected, zone })
 
   for (const [groupLabel, reminders] of Object.entries(groupedReminders.value)) {
     const firstReminder = reminders?.[0]
@@ -226,13 +236,14 @@ async function loadReminders() {
   if (!uid) {
     reminders.value = []
     loading.value = false
+    logTimeBrainReminder('load-reminders:skipped', { reason: 'no-uid' })
     return
   }
   loading.value = true
   try {
     const { data } = await api.get('/reminders', { params: { userId: uid } })
     const rows = Array.isArray(data?.items) ? data.items : []
-    console.log('[RemindersOverview] API rows', rows.length)
+    logTimeBrainReminder('load-reminders:api', { rows: rows.length })
     const now = Date.now()
     const upcoming = rows
       .filter((r) => {
@@ -246,9 +257,11 @@ async function loadReminders() {
         return dt ? dt.getTime() >= now - 60 * 60 * 1000 : false
       })
     reminders.value = upcoming
+    logTimeBrainReminder('load-reminders:upcoming', { count: upcoming.length })
     selectedGroup.value ||= Object.keys(groupedReminders.value)[0] || null
   } catch (err) {
     console.warn('[RemindersOverview] Failed to load reminders', err?.message || err)
+    logTimeBrainReminder('load-reminders:error', { message: err?.message })
   } finally {
     loading.value = false
   }

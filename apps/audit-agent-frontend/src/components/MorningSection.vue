@@ -56,7 +56,11 @@ async function generateTasks() {
   if (!planningInput.value.trim()) return
 
   try {
-    const { tasks: generated } = await generateTasksFromText(planningInput.value)
+    const planDate = toLocalDateKey(new Date())
+    const { tasks: generated } = await generateTasksFromText(planningInput.value, {
+      planDate,
+      debugLabel: 'MorningSection',
+    })
     for (const [i, t] of generated.entries()) {
       const newTask = {
         title: t,

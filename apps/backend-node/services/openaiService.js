@@ -22,12 +22,23 @@ const FALLBACK_MODELS = (
   ]
 ).map((s) => s.trim()).filter(Boolean);
 
-export async function chatWithFallback({ messages, temperature = 0.7, modelList }) {
+export async function chatWithFallback({ messages, temperature = 0.7, modelList, timeoutMs = 60000 }) {
   const models = modelList && modelList.length ? modelList : [DEFAULT_MODEL, ...FALLBACK_MODELS];
   let lastErr;
   for (const model of models) {
     try {
-      const res = await openai.chat.completions.create({ model, messages, temperature });
+      const startedAt = Date.now();
+      const res = await openai.chat.completions.create(
+        {
+          model,
+          messages,
+          temperature,
+        },
+        { timeout: timeoutMs },
+      );
+      const elapsed = Date.now() - startedAt;
+      // eslint-disable-next-line no-console
+      console.log(`[openaiService] ${model} responded in ${elapsed}ms`);
       return res.choices[0]?.message?.content?.trim() ?? "";
     } catch (err) {
       lastErr = err;
@@ -345,7 +356,7 @@ Return only the improved response.
   return chatWithFallback({ messages: [{ role: "user", content: prompt }], temperature: 0.4 });
 }
 
-export async function splitTasks(input, { maxItems = 6, context = "" } = {}) {
+export async function splitTasks(input, { maxItems = 6, context = "", timeContext = null } = {}) {
   const system = {
     role: "system",
     content:
@@ -385,9 +396,22 @@ Rules:
 - Keep gapMinutes between 5 and 60 minutes when relation is "after_previous".
 `;
 
+  const contextBlock = (() => {
+    if (typeof context === 'string' && context.trim()) return context.trim()
+    if (timeContext) {
+      try { return JSON.stringify(timeContext, null, 2) } catch { return String(timeContext) }
+    }
+    return ""
+  })()
+
   const user = {
     role: "user",
-    content: `${context ? `Context: ${context}\n` : ""}User notes:\n"""${input}"""\n\n${schema}\n${rules}`,
+    content: [
+      contextBlock ? `Temporal Context:\n${contextBlock}` : '',
+      `User notes:\n"""${input}"""`,
+      schema,
+      rules,
+    ].filter(Boolean).join('\n\n'),
   };
 
   const content = await chatWithFallback({
@@ -428,9 +452,13 @@ Rules:
 }
 
 // ✨ Extract reminder time from natural language text
-export async function extractReminderTime(input, { nowISO, timezone: tzOpt } = {}) {
+export async function extractReminderTime(input, { nowISO, timezone: tzOpt, timeContext = null } = {}) {
   const now = typeof nowISO === 'string' && nowISO ? nowISO : new Date().toISOString()
   const tz = typeof tzOpt === 'string' && tzOpt ? tzOpt : 'UTC'
+  const contextBlock = (() => {
+    if (!timeContext) return ''
+    try { return JSON.stringify(timeContext, null, 2) } catch { return String(timeContext) }
+  })()
 
   const system = {
     role: 'system',
@@ -443,7 +471,18 @@ export async function extractReminderTime(input, { nowISO, timezone: tzOpt } = {
   }
   const user = {
     role: 'user',
-    content: `Current time (ISO): ${now}\nUser timezone (IANA): ${tz}\n\nText: "${input}"\n\nReturn ONLY valid JSON with exactly this shape:\n{ "reminderTime": "<UTC ISO 8601 with Z>" | null }\n\nRules:\n- If the text has no time reference, return null.\n- If time is relative (e.g., in 10 minutes), compute absolute time using the provided current time and timezone.\n- Output MUST be a UTC timestamp with 'Z' suffix.\n- Do not include explanations.`
+    content: [
+      `Current time (ISO): ${now}`,
+      `User timezone (IANA): ${tz}`,
+      contextBlock ? `Temporal context:\n${contextBlock}` : '',
+      `Text: "${input}"`,
+      'Return ONLY valid JSON with exactly this shape:\n{ "reminderTime": "<UTC ISO 8601 with Z>" | null }',
+      'Rules:',
+      '- If the text has no time reference, return null.',
+      '- If time is relative (e.g., in 10 minutes), compute absolute time using the provided current time and timezone.',
+      "- Output MUST be a UTC timestamp with 'Z' suffix.",
+      '- Do not include explanations.',
+    ].filter(Boolean).join('\n\n')
   }
 
   const content = await chatWithFallback({

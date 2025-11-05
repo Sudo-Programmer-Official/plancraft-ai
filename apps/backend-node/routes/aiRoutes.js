@@ -290,7 +290,7 @@ router.post("/tasks/summarize", async (req, res) => {
 // });
 router.post('/split-tasks', async (req, res) => {
   try {
-    const { text, maxItems = 6, context = '' } = req.body || {}
+    const { text, maxItems = 6, context = '', timeContext = null } = req.body || {}
     const tz = (req.body && req.body.timezone) || req.headers['x-user-tz'] || 'UTC'
     if (!text || typeof text !== 'string') {
       return res.status(400).json({ error: "'text' is required" })
@@ -305,7 +305,7 @@ router.post('/split-tasks', async (req, res) => {
         }
       }
     } catch {}
-    const result = await splitTasks(text, { maxItems, context })
+    const result = await splitTasks(text, { maxItems, context, timeContext })
     if (!result || !Array.isArray(result.tasks)) {
       return res.status(502).json({ error: 'Upstream returned unexpected format.' })
     }
@@ -333,7 +333,7 @@ router.post('/split-tasks', async (req, res) => {
     } catch {}
     // Attempt time extraction from the same input (non-fatal)
     let reminderTime = null
-    try { reminderTime = await extractReminderTime(text, { nowISO: new Date().toISOString(), timezone: tz }) } catch {}
+    try { reminderTime = await extractReminderTime(text, { nowISO: new Date().toISOString(), timezone: tz, timeContext }) } catch {}
     res.json({ tasks, reminderTime })
   } catch (error) {
     console.error('❌ Split Tasks API Error:', error)
@@ -344,12 +344,12 @@ router.post('/split-tasks', async (req, res) => {
 // POST /api/ai/extract-time
 router.post('/extract-time', async (req, res) => {
   try {
-    const { text, now } = req.body || {}
+    const { text, now, timeContext = null } = req.body || {}
     const tz = (req.body && req.body.timezone) || req.headers['x-user-tz'] || 'UTC'
     if (!text || typeof text !== 'string') {
       return res.status(400).json({ error: "'text' is required" })
     }
-    const iso = await extractReminderTime(text, { nowISO: now, timezone: tz })
+    const iso = await extractReminderTime(text, { nowISO: now, timezone: tz, timeContext })
     res.json({ reminderTime: iso || null })
   } catch (error) {
     console.error('❌ Extract Time API Error:', error)
