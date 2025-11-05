@@ -20,6 +20,95 @@ dayjs.extend(timezone);
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+const REMINDER_CHANNEL_ALLOW_LIST = ['pwa', 'whatsapp', 'email', 'sms', 'voice_call'];
+const VOICE_CALL_MIN_LEAD_MS = 60 * 1000;
+const ENV_DEFAULT_CHANNELS = Array.isArray(process.env.DEFAULT_REMINDER_CHANNELS?.split?.(','))
+  ? process.env.DEFAULT_REMINDER_CHANNELS.split(',').map((c) => String(c || '').trim().toLowerCase()).filter((c) => REMINDER_CHANNEL_ALLOW_LIST.includes(c))
+  : null;
+const DEFAULT_CHANNELS = (ENV_DEFAULT_CHANNELS && ENV_DEFAULT_CHANNELS.length)
+  ? ENV_DEFAULT_CHANNELS
+  : ['pwa', 'whatsapp'];
+const MAX_DELAY_MS = 24 * 60 * 60 * 1000;
+
+function deriveReminderPrefsFromUser(data = {}) {
+  try {
+    if (!data || typeof data !== 'object') {
+      return { enabled: true, channels: DEFAULT_CHANNELS.slice(0, 2) };
+    }
+    const root = data?.notifications || {};
+    const nested = data?.preferences?.notifications || {};
+    const reminders = data?.preferences?.reminders || {};
+
+    const channelCandidates =
+      Array.isArray(reminders?.channels) && reminders.channels.length
+        ? reminders.channels
+        : Array.isArray(nested?.channels) && nested.channels.length
+          ? nested.channels
+          : Array.isArray(root?.channels) && root.channels.length
+            ? root.channels
+            : [
+                (nested.email ?? root.email) && 'email',
+                ((nested.push ?? root.push) || (nested.pwa ?? root.pwa)) && 'pwa',
+                (nested.whatsapp ?? root.whatsapp) && 'whatsapp',
+                (nested.sms ?? root.sms) && 'sms',
+                (nested.voice_call ?? root.voice_call) && 'voice_call',
+              ].filter(Boolean);
+
+    const channels = Array.from(
+      new Set(
+        channelCandidates
+          .map((c) => String(c || '').toLowerCase())
+          .filter((c) => REMINDER_CHANNEL_ALLOW_LIST.includes(c))
+      )
+    );
+
+    const enabled =
+      reminders?.enabled !== undefined
+        ? !!reminders.enabled
+        : channels.length > 0 ||
+          !!root?.whatsapp ||
+          !!root?.push ||
+          !!root?.pwa ||
+          !!root?.email ||
+          !!root?.sms ||
+          !!root?.voice_call ||
+          !!nested?.whatsapp ||
+          !!nested?.push ||
+          !!nested?.pwa ||
+          !!nested?.email ||
+          !!nested?.sms ||
+          !!nested?.voice_call;
+
+    const fallback = channels.length ? channels : DEFAULT_CHANNELS.slice(0, 2);
+    return { enabled, channels: fallback };
+  } catch {
+    return { enabled: true, channels: DEFAULT_CHANNELS.slice(0, 2) };
+  }
+}
+
+function sanitizeReminderChannels(channels = [], scheduledDate, source = '') {
+  const now = Date.now();
+  const scheduledMs = scheduledDate instanceof Date ? scheduledDate.getTime() : NaN;
+  const normalized = Array.from(
+    new Set(
+      (channels || [])
+        .map((c) => String(c || '').toLowerCase())
+        .filter((c) => REMINDER_CHANNEL_ALLOW_LIST.includes(c))
+    )
+  );
+
+  const filtered = normalized.filter((c) => {
+    if (c !== 'voice_call') return true;
+    if (source === 'planner' || source === 'task_create') return false;
+    if (!Number.isFinite(scheduledMs)) return false;
+    return scheduledMs - now > VOICE_CALL_MIN_LEAD_MS;
+  });
+
+  const limited = filtered.slice(0, 2);
+  const fallback = DEFAULT_CHANNELS.slice(0, 2);
+  return limited.length ? limited : fallback;
+}
+
 // Normalize any ISO-like input to a single UTC ISO string.
 function ensureUtcIso(isoLike, tzOpt) {
   try {
@@ -92,7 +181,7 @@ export async function createReminderFromText(
       if (!(when instanceof Date) || isNaN(when.getTime())) throw new Error("Invalid scheduledTime");
       parsed = { task: text, time: when.toISOString() };
     } catch (e) {
-      console.warn("[Reminder] Invalid scheduledTime, falling back to GPT:", e?.message);
+      console.warn("[ReminderService:parse] Invalid scheduledTime, falling back to GPT:", e?.message);
     }
   }
 
@@ -120,8 +209,12 @@ export async function createReminderFromText(
       parsed = JSON.parse(content);
       parsedByAi = true;
     } catch (e) {
-      console.warn("[Reminder] GPT parse failed; fallback:", e?.message);
+      console.warn("[ReminderService:ai] GPT parse failed; fallback:", e?.message);
     }
+  }
+
+  if (!parsed || typeof parsed !== 'object') {
+    parsed = {};
   }
 
   // Fallback heuristic (+1h if GPT parse fails)
@@ -144,77 +237,76 @@ export async function createReminderFromText(
   const tzForUser = options?.timezone || null;
 
   // Resolve channels: provided list, else user preferences, else sane default
-  let chosenChannels = Array.isArray(channels) && channels.length ? channels.slice() : null
-  if (!chosenChannels || !chosenChannels.length) {
-    try {
-      const doc = await db.collection('users').doc(String(userId)).get()
-      const data = doc.exists ? (doc.data() || {}) : {}
-      const root = data?.notifications || {}
-      const nested = data?.preferences?.notifications || {}
-      const prefChannels = Array.isArray(nested.channels)
-        ? nested.channels
-        : Array.isArray(root.channels)
-          ? root.channels
-          : null
-      const prefDerived = [
-        (nested.email ?? root.email) && 'email',
-        ((nested.push ?? root.push) || (nested.pwa ?? root.pwa)) && 'pwa',
-        (nested.whatsapp ?? root.whatsapp) && 'whatsapp',
-        (nested.sms ?? root.sms) && 'sms',
-        (nested.voice_call ?? root.voice_call) && 'voice_call',
-      ].filter(Boolean)
-      const merged = new Set([...(prefChannels || prefDerived)])
-      chosenChannels = Array.from(merged)
-    } catch {
-      chosenChannels = null
-    }
+  let derivedPrefs = null
+  try {
+    const doc = await db.collection('users').doc(String(userId)).get()
+    const data = doc.exists ? (doc.data() || {}) : {}
+    derivedPrefs = deriveReminderPrefsFromUser(data)
+  } catch {
+    derivedPrefs = null
   }
-  const defaultChannels = ["whatsapp", "pwa", "email"]
+
+  const requestedChannels = Array.isArray(channels) ? channels.slice() : []
+  let candidateChannels = requestedChannels.slice()
+  if (!candidateChannels.length && derivedPrefs?.enabled) {
+    candidateChannels = derivedPrefs.channels.slice()
+  } else if (candidateChannels.length && derivedPrefs?.enabled) {
+    candidateChannels = Array.from(new Set([...candidateChannels, ...derivedPrefs.channels]))
+  }
+  if (!candidateChannels.length) {
+    candidateChannels = DEFAULT_CHANNELS.slice()
+  }
+
+  const reminderChannels = sanitizeReminderChannels(candidateChannels, when, options?.source)
   const reminder = {
     task: String(parsed.task || text),
     scheduledTime: when,
     userId: String(userId),
-    channels: Array.isArray(chosenChannels) && chosenChannels.length ? chosenChannels : defaultChannels,
+    channels: reminderChannels,
     createdAt: new Date(),
     status: "scheduled",
     sentAt: null,
     taskId: options?.taskId || null,
     timezone: tzForUser,
+    source: options?.source || 'reminder',
   };
 
-  console.log("[Reminder] Persisting reminder", {
+  const logSource = options?.source || 'manual'
+  console.log(`[ReminderService:${logSource}] Persisting reminder`, {
     userId: reminder.userId,
     taskId: reminder.taskId,
     when: reminder.scheduledTime?.toISOString?.(),
     channels: reminder.channels,
   });
   const ref = await db.collection("reminders").add(reminder);
-  console.log("[Reminder] Stored docId =", ref.id);
+  console.log(`[ReminderService:${logSource}] Stored docId =`, ref.id);
   await queueReminder({ id: ref.id, ...reminder });
 
   // Confirmation via WhatsApp (template + fallback)
   try {
-    const who = getSalutationToken(options);
-    await sendWhatsApp(userId, {
-      template: "reminder_notification_2",
-      // Template expects exactly 3 body params: {{1}} name, {{2}} task, {{3}} local time
-      bodyVars: [who, reminder.task, formatLocalTime(when, reminder.timezone || undefined)],
-      language: { code: "en_US" },
-    });
-    console.log("[Reminder] WhatsApp confirmation sent via template");
+    if (reminder.channels.includes('whatsapp')) {
+      const who = getSalutationToken(options);
+      await sendWhatsApp(userId, {
+        template: "reminder_notification_2",
+        // Template expects exactly 3 body params: {{1}} name, {{2}} task, {{3}} local time
+        bodyVars: [who, reminder.task, formatLocalTime(when, reminder.timezone || undefined)],
+        language: { code: "en_US" },
+      });
+      console.log("[ReminderService:delivery] WhatsApp confirmation sent via template");
+    }
   } catch (e) {
     const msg = e?.message || "";
     const isTemplateMissing = msg.includes("132001") || msg.includes("Template name does not exist") || msg.includes("404");
-    if (isTemplateMissing) {
-      console.warn("[Reminder] WhatsApp template missing — falling back to text mode");
+    if (isTemplateMissing && reminder.channels.includes('whatsapp')) {
+      console.warn("[ReminderService:delivery] WhatsApp template missing — falling back to text mode");
       try {
         await sendWhatsApp(userId, `✅ Reminder set: "${reminder.task}" at ${formatLocalTime(when, reminder.timezone || undefined)}`);
-        console.log("[Reminder] WhatsApp confirmation sent via text fallback");
+        console.log("[ReminderService:delivery] WhatsApp confirmation sent via text fallback");
       } catch (fallbackErr) {
-        console.error("[Reminder] WhatsApp fallback failed:", fallbackErr?.message);
+        console.error("[ReminderService:delivery] WhatsApp fallback failed:", fallbackErr?.message);
       }
-    } else {
-      console.error("[Reminder] WhatsApp confirmation failed:", msg);
+    } else if (reminder.channels.includes('whatsapp')) {
+      console.error("[ReminderService:delivery] WhatsApp confirmation failed:", msg);
     }
   }
 
@@ -229,9 +321,9 @@ export async function sendReminder(reminder) {
   const userId = String(reminder?.userId || "");
   const task = String(reminder?.task || "");
   const when = reminder?.scheduledTime ? formatLocalTime(reminder.scheduledTime, reminder?.timezone || undefined) : "soon";
+  const source = reminder?.source || 'manual';
 
-  console.log("[Scheduler] Executing reminder", { id: reminder?.id, userId, task, when, channels, ts: new Date().toISOString() });
-  try { console.log('[Reminder] Channels:', channels) } catch {}
+  console.log(`[ReminderService:${source}] Executing reminder`, { id: reminder?.id, userId, task, when, channels, ts: new Date().toISOString() });
 
   try {
     if (channels.includes("whatsapp")) {
@@ -243,20 +335,20 @@ export async function sendReminder(reminder) {
           bodyVars: [who, task, when],
           language: { code: "en_US" },
         });
-        console.log("[Delivery] WhatsApp ok (template)", { userId, id: reminder?.id, result: r });
+        console.log("[ReminderService:delivery] WhatsApp ok (template)", { userId, id: reminder?.id, result: r });
       } catch (e) {
         const msg = e?.message || "";
         const isTemplateMissing = msg.includes("132001") || msg.includes("Template name does not exist") || msg.includes("404");
         if (isTemplateMissing) {
-          console.warn("[WhatsApp] Template missing, falling back to text mode:", msg);
+          console.warn("[ReminderService:delivery] WhatsApp template missing, falling back to text mode:", msg);
           try {
             const r2 = await sendWhatsApp(userId, `⏰ Reminder: ${task} (${when})`);
-            console.log("[Delivery] WhatsApp ok (fallback)", { userId, id: reminder?.id, result: r2 });
+            console.log("[ReminderService:delivery] WhatsApp ok (fallback)", { userId, id: reminder?.id, result: r2 });
           } catch (fallbackErr) {
-            console.error("[Delivery] WhatsApp fallback failed:", fallbackErr?.message);
+            console.error("[ReminderService:delivery] WhatsApp fallback failed:", fallbackErr?.message);
           }
         } else {
-          console.error("[Delivery] WhatsApp send failed (other error):", msg);
+          console.error("[ReminderService:delivery] WhatsApp send failed (other error):", msg);
         }
       }
     }
@@ -264,36 +356,36 @@ export async function sendReminder(reminder) {
     if (channels.includes("email")) {
       try {
         const r = await sendEmail(userId, task);
-        console.log("[Delivery] Email ok", { userId, id: reminder?.id, result: r });
+        console.log("[ReminderService:delivery] Email ok", { userId, id: reminder?.id, result: r });
       } catch (e) {
-        console.error("[Delivery] Email send failed:", e?.message);
+        console.error("[ReminderService:delivery] Email send failed:", e?.message);
       }
     }
 
     if (channels.includes("pwa")) {
       try {
         const r = await sendPWA(userId, task);
-        console.log("[Delivery] PWA ok", { userId, id: reminder?.id, result: r });
+        console.log("[ReminderService:delivery] PWA ok", { userId, id: reminder?.id, result: r });
       } catch (e) {
-        console.error("[Delivery] PWA send failed:", e?.message);
+        console.error("[ReminderService:delivery] PWA send failed:", e?.message);
       }
     }
 
     if (channels.includes("sms")) {
       try {
         const sid = await sendSMSForUser(userId, `⏰ Reminder: ${task} (${when})`);
-        console.log("[Delivery] SMS ok", { userId, id: reminder?.id, sid });
+        console.log("[ReminderService:delivery] SMS ok", { userId, id: reminder?.id, sid });
       } catch (e) {
-        console.error("[Delivery] SMS send failed:", e?.message || e);
+        console.error("[ReminderService:delivery] SMS send failed:", e?.message || e);
       }
     }
 
     if (channels.includes("voice_call")) {
       try {
         const sid = await makeCallForUser(userId, `Reminder: ${task}. Scheduled for ${when}.`);
-        console.log("[Delivery] Voice call ok", { userId, id: reminder?.id, sid });
+        console.log("[ReminderService:delivery] Voice call ok", { userId, id: reminder?.id, sid });
       } catch (e) {
-        console.error("[Delivery] Voice call failed:", e?.message || e);
+        console.error("[ReminderService:delivery] Voice call failed:", e?.message || e);
       }
     }
   } finally {
@@ -312,14 +404,26 @@ export function queueReminder(rem) {
     const delay = ts.getTime() - Date.now();
     if (!Number.isFinite(delay)) return;
 
-    console.log(`[Scheduler] Queued reminder id=${id} taskId=${rem?.taskId || "n/a"} at=${ts.toISOString()}`);
+    console.log(`[ReminderService:scheduler] Queued reminder id=${id} taskId=${rem?.taskId || "n/a"} at=${ts.toISOString()}`);
+
+    const safeDelay = Math.min(delay, MAX_DELAY_MS, 0x7fffffff);
+    if (delay > MAX_DELAY_MS) {
+      console.warn(`[ReminderService:scheduler] Reminder ${id} scheduled beyond 24h (${(delay / 3600000).toFixed(1)}h). Will re-queue closer to send time.`);
+    }
 
     const fire = async () => {
-      try { await sendReminder({ ...rem, id }); } catch (e) { console.error("sendReminder error:", e?.message); }
+      try {
+        const remaining = ts.getTime() - Date.now();
+        if (remaining > 1000) {
+          console.log(`[ReminderService:scheduler] Re-queuing reminder ${id}; ${Math.ceil(remaining / 60000)}m remaining`);
+          return queueReminder({ ...rem, id });
+        }
+        await sendReminder({ ...rem, id });
+      } catch (e) { console.error("sendReminder error:", e?.message); }
     };
 
-    if (delay <= 0) { console.log("[Scheduler] Firing overdue reminder immediately", { id, at: ts.toISOString() }); return fire(); }
-    setTimeout(fire, Math.min(delay, 0x7fffffff));
+    if (delay <= 0) { console.log("[ReminderService:scheduler] Firing overdue reminder immediately", { id, at: ts.toISOString() }); return fire(); }
+    setTimeout(fire, safeDelay);
   } catch (e) {
     console.error("queueReminder error:", e);
   }

@@ -21,3 +21,9 @@ export async function updatePreferences(userId, preferences) {
   const res = await api.post('/settings/updatePreferences', { userId, preferences })
   return res?.data || { success: true }
 }
+
+export async function getReminderPreferences(userId) {
+  if (!userId) return {}
+  const res = await api.get(`/settings/${userId}/reminder-preferences`)
+  return res?.data || {}
+}

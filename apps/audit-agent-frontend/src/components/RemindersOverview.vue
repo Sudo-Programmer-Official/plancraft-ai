@@ -107,10 +107,9 @@
 </script> -->
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, computed, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { collection, query, where, onSnapshot } from 'firebase/firestore'
-import { db, auth } from '@/firebase/init'
+import { auth } from '@/firebase/init'
 import api from '@/services/api'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
@@ -120,6 +119,7 @@ import _ from 'lodash'
 import { toJsDate as toJsDateUtil } from '@/utils/time'
 import { useAuthFlags } from '@/composables/useAuthFlags'
 import { trackLinkedInConversion } from '@/utils/ads'
+import { useAuthStore } from '@/stores/authStore'
 
 // Time setup
 dayjs.extend(utc)
@@ -131,11 +131,12 @@ const reminders = ref([])
 const loading = ref(true)
 const selectedGroup = ref(null)
 const groupRefs = new Map()
-let unbind = null
+let refreshTimer = null
 
 const usage = ref({ used: 0, limit: 0, plan: '' })
 const { isPremium, isGuest, isFreeUser } = useAuthFlags()
 const customDate = ref(dayjs().format('YYYY-MM-DD'))
+const authStore = useAuthStore()
 
 // async function scrollToCustomDate() {
 //   const selected = customDate.value
@@ -164,7 +165,7 @@ async function scrollToCustomDate() {
 }
 async function fetchUsage() {
   try {
-    const uid = auth?.currentUser?.uid || localStorage.getItem('uid')
+    const uid = authStore?.user?.uid || auth?.currentUser?.uid || localStorage.getItem('uid')
     if (!uid) return
     const { data } = await api.get('/reminders/usage', { params: { userId: uid } })
     if (data?.success) usage.value = { used: data.used || 0, limit: data.limit || 0, plan: data.plan || '' }
@@ -208,11 +209,11 @@ function formatRelative(iso) {
 
 const groupedReminders = computed(() => {
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
-  const sorted = _.sortBy(reminders.value, r => {
+  const sorted = _.sortBy(reminders.value, (r) => {
     const d = toJsDate(r.scheduledTime)
     return d ? d.getTime() : 0
   })
-  return _.groupBy(sorted, r => {
+  return _.groupBy(sorted, (r) => {
     const date = dayjs.utc(toJsDate(r.scheduledTime)).tz(zone)
     if (date.isSame(dayjs(), 'day')) return 'Today'
     if (date.isSame(dayjs().add(1, 'day'), 'day')) return 'Tomorrow'
@@ -220,24 +221,37 @@ const groupedReminders = computed(() => {
   })
 })
 
-function watchReminders() {
-  const uid = auth?.currentUser?.uid || localStorage.getItem('uid')
-  if (!uid) { loading.value = false; return }
-  const q = query(collection(db, 'reminders'), where('userId', '==', uid))
-  unbind = onSnapshot(q, (snap) => {
+async function loadReminders() {
+  const uid = authStore?.user?.uid || auth?.currentUser?.uid || localStorage.getItem('uid')
+  if (!uid) {
+    reminders.value = []
+    loading.value = false
+    return
+  }
+  loading.value = true
+  try {
+    const { data } = await api.get('/reminders', { params: { userId: uid } })
+    const rows = Array.isArray(data?.items) ? data.items : []
+    console.log('[RemindersOverview] API rows', rows.length)
     const now = Date.now()
-    const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }))
     const upcoming = rows
-      .filter(r => String(r?.status || '').toLowerCase() === 'scheduled' && !r?.sentAt)
-      .filter(r => {
+      .filter((r) => {
+        const status = String(r?.status || '').toLowerCase()
         const dt = toJsDate(r?.scheduledTime)
-        return dt ? dt.getTime() >= now - 60 * 1000 : false
+        const recent = dt ? dt.getTime() >= now - 15 * 60 * 1000 : false
+        return ['scheduled', 'pending'].includes(status) || (status === 'sent' && recent)
+      })
+      .filter((r) => {
+        const dt = toJsDate(r?.scheduledTime)
+        return dt ? dt.getTime() >= now - 60 * 60 * 1000 : false
       })
     reminders.value = upcoming
-    loading.value = false
     selectedGroup.value ||= Object.keys(groupedReminders.value)[0] || null
-    fetchUsage()
-  }, () => { loading.value = false })
+  } catch (err) {
+    console.warn('[RemindersOverview] Failed to load reminders', err?.message || err)
+  } finally {
+    loading.value = false
+  }
 }
 
 async function onCancel(r) {
@@ -245,6 +259,7 @@ async function onCancel(r) {
     const uid = auth?.currentUser?.uid || localStorage.getItem('uid')
     if (!uid) return
     if (r?.taskId) await api.post('/reminders/cancel', { userId: uid, taskId: r.taskId })
+    await loadReminders()
   } catch (e) {
     console.warn('Cancel failed', e?.response?.data || e?.message)
   }
@@ -265,17 +280,44 @@ async function onSnooze(r) {
       taskId: r.taskId || null,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     })
+    await loadReminders()
   } catch (e) {
     console.warn('Snooze failed', e?.response?.data || e?.message)
   }
 }
 
-onMounted(() => { watchReminders(); fetchUsage() })
-onUnmounted(() => { if (unbind) unbind() })
+onMounted(() => {
+  loadReminders()
+  fetchUsage()
+  refreshTimer = setInterval(loadReminders, 60 * 1000)
+})
+onUnmounted(() => {
+  if (refreshTimer) {
+    clearInterval(refreshTimer)
+    refreshTimer = null
+  }
+})
 
 // Refresh usage meter when other parts of app schedule reminders
-onMounted(() => { try { window.addEventListener('usage-refresh', fetchUsage) } catch {} })
-onUnmounted(() => { try { window.removeEventListener('usage-refresh', fetchUsage) } catch {} })
+onMounted(() => {
+  try {
+    window.addEventListener('usage-refresh', fetchUsage)
+    window.addEventListener('usage-refresh', loadReminders)
+  } catch {}
+})
+onUnmounted(() => {
+  try {
+    window.removeEventListener('usage-refresh', fetchUsage)
+    window.removeEventListener('usage-refresh', loadReminders)
+  } catch {}
+})
+
+watch(
+  () => authStore?.user?.uid,
+  (uid) => {
+    if (uid) loadReminders()
+  }
+)
 </script>
 
 <style scoped>

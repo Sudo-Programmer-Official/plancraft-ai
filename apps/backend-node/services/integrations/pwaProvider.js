@@ -26,10 +26,14 @@ export async function sendPWA(userId, message) {
       return { ok: false, error: 'no subscriptions' }
     }
 
+    const isStructured = message && typeof message === 'object'
+    const title = isStructured && message.title ? String(message.title) : 'PlanCraftAI Reminder'
+    const body = isStructured && message.body ? String(message.body) : String(message || 'Reminder')
     const payload = JSON.stringify({
-      title: 'PlanCraftAI Reminder',
-      body: String(message || 'Reminder'),
+      title,
+      body,
       icon: '/icons/icon-192x192.png',
+      data: isStructured && message.data ? message.data : undefined,
     })
 
     let ok = 0

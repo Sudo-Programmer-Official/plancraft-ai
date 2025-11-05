@@ -318,7 +318,19 @@ router.post('/split-tasks', async (req, res) => {
         energy: ['low', 'medium', 'high'].includes((t.energy || '').toLowerCase()) ? t.energy.toLowerCase() : 'low',
         context: typeof t.context === 'string' ? t.context : 'planning',
         priority: Number.isFinite(t.priority) ? t.priority : Math.min(i + 1, 3),
+        scheduledTime: typeof t.scheduledTime === 'string' ? t.scheduledTime : null,
+        timeHint: typeof t.timeHint === 'string' ? t.timeHint : null,
+        relation: ['after_previous', 'same_time_previous', 'independent'].includes(String(t.relation || '').toLowerCase())
+          ? String(t.relation).toLowerCase()
+          : 'independent',
+        gapMinutes: Number.isFinite(t.gapMinutes) ? Math.max(0, Math.min(Number(t.gapMinutes), 120)) : 15,
       }))
+    try {
+      console.log('[TimeFlow] /split-tasks normalized', {
+        count: tasks.length,
+        sample: tasks[0] || null,
+      })
+    } catch {}
     // Attempt time extraction from the same input (non-fatal)
     let reminderTime = null
     try { reminderTime = await extractReminderTime(text, { nowISO: new Date().toISOString(), timezone: tz }) } catch {}

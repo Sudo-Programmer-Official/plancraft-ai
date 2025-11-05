@@ -97,6 +97,7 @@ import { attachAuth } from "./middleware/auth.js";
 import twilioRoutes from "./routes/twilioRoutes.js";
 import googleAuthRoutes, { handleOAuthCallback } from "./routes/googleAuthRoutes.js";
 import googleCalendarRoutes from "./routes/googleCalendarRoutes.js";
+import notifyRouter from "./routes/notifyRouter.js";
 
 dotenv.config();
 
@@ -232,6 +233,7 @@ app.use("/api/usage", usageRoutes);
 app.use("/api", transcribeRoutes);
 app.use("/api", subscriptionRoutes);
 app.use("/api", notificationRoutes);
+app.use("/api/notify", notifyRouter);
 app.use("/api", stripeRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api", settingsRoutes);

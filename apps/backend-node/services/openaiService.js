@@ -352,7 +352,7 @@ export async function splitTasks(input, { maxItems = 6, context = "" } = {}) {
       "You are a productivity coach. Convert free-form notes into a strict list of short, actionable tasks."
   };
 
-  const schema = `
+const schema = `
 Return ONLY valid JSON in this format:
 {
   "tasks": [
@@ -362,7 +362,11 @@ Return ONLY valid JSON in this format:
       "estimate_minutes": 15,
       "energy": "low|medium|high",
       "context": "home|work|computer|phone|errand|meeting|deep-work|planning",
-      "priority": 1
+      "priority": 1,
+      "scheduledTime": "2025-11-02T15:30" | null,
+      "timeHint": "Describe timing in user's words" | null,
+      "relation": "after_previous|same_time_previous|independent",
+      "gapMinutes": 15
     }
   ]
 }`;
@@ -375,6 +379,10 @@ Rules:
 - No reflections like "I feel grateful" or "Today is tough".
 - Each task should be atomic, completable in 10–30 minutes.
 - Do not include duplicates or vague filler sentences.
+- If the note implies a specific time (e.g., "at 3:15 PM", "after dinner", "tonight at 8"), set scheduledTime using YYYY-MM-DDTHH:mm (assume the user's current day unless otherwise specified) and copy the original phrase into timeHint.
+- If timing is relative (e.g., "after class", "then go to the gym"), set relation to "after_previous" and provide a reasonable gapMinutes (default 15 unless another break is implied). If it should start together with the prior task (e.g., "stretch while watching lecture"), use "same_time_previous".
+- When timing is unspecified, use relation "independent" and set scheduledTime/timeHint to null.
+- Keep gapMinutes between 5 and 60 minutes when relation is "after_previous".
 `;
 
   const user = {
@@ -408,6 +416,13 @@ Rules:
     console.error("❌ Failed to parse AI JSON:", cleaned);
     throw err;
   }
+
+  try {
+    console.log("[TimeFlow] splitTasks: raw parsed payload", {
+      count: Array.isArray(parsed?.tasks) ? parsed.tasks.length : 0,
+      sample: Array.isArray(parsed?.tasks) && parsed.tasks.length ? parsed.tasks[0] : null,
+    });
+  } catch {}
 
   return parsed;
 }
@@ -473,7 +488,12 @@ export async function extractReminderTime(input, { nowISO, timezone: tzOpt } = {
     const rt = parsed?.reminderTime
     if (!rt) return null
     const iso = normalizeToUtcIso(rt)
-    if (iso) return iso
+    if (iso) {
+      try {
+        console.log('[TimeFlow] extractReminderTime success', { input, now, tz, candidate: rt, iso })
+      } catch {}
+      return iso
+    }
   } catch {
     // fall through
   }
@@ -482,7 +502,15 @@ export async function extractReminderTime(input, { nowISO, timezone: tzOpt } = {
   const m = cleaned.match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?/)
   if (m) {
     const iso = normalizeToUtcIso(m[0])
-    if (iso) return iso
+    if (iso) {
+      try {
+        console.log('[TimeFlow] extractReminderTime fallback match', { input, now, tz, candidate: m[0], iso })
+      } catch {}
+      return iso
+    }
   }
+  try {
+    console.warn('[TimeFlow] extractReminderTime failed to resolve', { input, now, tz, cleaned })
+  } catch {}
   return null
 }

@@ -553,14 +553,18 @@ async function saveSettings() {
       calls: !!(prefs.calls || prefs.sms || prefs.voice_call),
       channels,
     }
+    const reminderDefaults = {
+      enabled: channels.length > 0,
+      channels,
+    }
     const toggles = integrationOptions.reduce((acc, i) => {
       acc[i.key] = !!i.selected
       return acc
     }, {})
 
-    await apiUpdatePrefs(authStore.user?.uid, { notifications, integrations: toggles })
+    await apiUpdatePrefs(authStore.user?.uid, { notifications, integrations: toggles, reminders: reminderDefaults })
     await updateIntegrations(authStore.user?.uid, integrationEndpoints.value)
-    console.log("Settings saved:", { notifications, integrationToggles: toggles, integrationEndpoints: integrationEndpoints.value })
+    console.log("Settings saved:", { notifications, reminderDefaults, integrationToggles: toggles, integrationEndpoints: integrationEndpoints.value })
     ElMessage.success("✅ Settings saved successfully!")
     dirty.value = false // reset dirty flag
   } catch (error) {

@@ -156,7 +156,7 @@ export async function fetchTasksBetween(startYMD, endYMD) {
 /**
  * ✅ Add a new task to Firestore
  */
-  export async function addTaskToFirebase(task) {
+export async function addTaskToFirebase(task) {
   const user = auth.currentUser;
   if (!user) {
     handleAuthError({ code: 'unauthenticated', message: 'User not logged in' })
@@ -164,20 +164,36 @@ export async function fetchTasksBetween(startYMD, endYMD) {
   }
 
   // Prepare safe payload
-    const payload = {
-      title: task.title || "New Task",
-      details: task.details || "",
-      completed: task.completed ?? false,
-      logs: task.logs ?? [],
-      attachments: task.attachments ?? [],
-      date: typeof task.date === 'string' && /\d{4}-\d{2}-\d{2}/.test(task.date)
-        ? task.date
-        : toLocalDateKey(new Date()), // YYYY-MM-DD
-      order: task.order ?? 0,
-      userId: user.uid,
-      createdAt: serverTimestamp(),
-      
-    };
+  const payload = {
+    title: task?.title || "New Task",
+    details: task?.details || "",
+    completed: task?.completed ?? false,
+    logs: Array.isArray(task?.logs) ? task.logs : [],
+    attachments: Array.isArray(task?.attachments) ? task.attachments : [],
+    date: typeof task?.date === 'string' && /\d{4}-\d{2}-\d{2}/.test(task.date)
+      ? task.date
+      : toLocalDateKey(new Date()), // YYYY-MM-DD
+    order: task?.order ?? 0,
+    userId: user.uid,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  }
+
+  if (typeof task?.link === 'string') payload.link = task.link.trim()
+  if ('reminderTime' in task) payload.reminderTime = task.reminderTime ?? null
+  if ('timezone' in task && task.timezone) payload.timezone = task.timezone
+  if ('scheduledTime' in task) payload.scheduledTime = task.scheduledTime ?? null
+  if ('time' in task) payload.time = task.time ?? null
+  if ('source' in task) payload.source = task.source || 'manual'
+  if ('duration' in task) payload.duration = task.duration
+  if ('metadata' in task) payload.metadata = task.metadata
+
+  if ('estimate_minutes' in task) {
+    const est = Number(task.estimate_minutes)
+    payload.estimate_minutes = Number.isFinite(est) && est > 0 ? est : null
+  }
+
+  if ('channels' in task) payload.channels = Array.isArray(task.channels) ? task.channels : null
 
   const docRef = await safeAction(addDoc(tasksRef, payload));
 

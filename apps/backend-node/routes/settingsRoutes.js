@@ -6,6 +6,8 @@ import { normalizePhone, guessCountry } from '../utils/phone.js'
 const router = express.Router()
 router.use(requireAuth, ensureUserMatches)
 
+const CHANNEL_ALLOW_LIST = ['email','pwa','whatsapp','sms','voice_call']
+
 // POST /api/settings/updatePreferences
 router.post('/settings/updatePreferences', async (req, res) => {
   try {
@@ -13,10 +15,21 @@ router.post('/settings/updatePreferences', async (req, res) => {
     if (!userId) return res.status(400).json({ error: 'Missing userId' })
 
     // Normalize channels list if supplied
-    const allowed = ['email','pwa','whatsapp','sms','voice_call']
     const inChannels = Array.isArray(preferences?.notifications?.channels)
-      ? preferences.notifications.channels.filter(c => allowed.includes(String(c)))
+      ? preferences.notifications.channels
+          .map((c) => String(c).toLowerCase())
+          .filter((c) => CHANNEL_ALLOW_LIST.includes(c))
       : undefined
+
+    const reminderPref = preferences?.reminders || {}
+    const reminderChannels = Array.isArray(reminderPref?.channels)
+      ? reminderPref.channels
+          .map((c) => String(c).toLowerCase())
+          .filter((c) => CHANNEL_ALLOW_LIST.includes(c))
+      : undefined
+    const reminderPayload = {}
+    if (reminderPref?.enabled !== undefined) reminderPayload.enabled = !!reminderPref.enabled
+    if (reminderChannels) reminderPayload.channels = reminderChannels
 
     await db.collection('users').doc(userId).set(
       {
@@ -33,6 +46,7 @@ router.post('/settings/updatePreferences', async (req, res) => {
             // persist channels array when provided
             ...(inChannels ? { channels: inChannels } : {}),
           },
+          ...(Object.keys(reminderPayload).length ? { reminders: reminderPayload } : {}),
           integrations: {
             googleCalendar: !!preferences?.integrations?.googleCalendar,
             slack: !!preferences?.integrations?.slack,
@@ -65,6 +79,67 @@ router.get('/settings/preferences', async (req, res) => {
   } catch (err) {
     console.error('❌ getPreferences error:', err)
     res.status(500).json({ error: 'Failed to fetch preferences' })
+  }
+})
+
+// GET /api/settings/:userId/reminder-preferences
+router.get('/settings/:userId/reminder-preferences', async (req, res) => {
+  try {
+    const { userId } = req.params || {}
+    if (!userId) return res.status(400).json({ error: 'Missing userId' })
+
+    const snap = await db.collection('users').doc(String(userId)).get()
+    const data = snap.exists ? snap.data() : {}
+    const notifications = data?.preferences?.notifications || {}
+    const rootNotifications = data?.notifications || {}
+    const reminders = data?.preferences?.reminders || {}
+
+    const enabled =
+      reminders?.enabled !== undefined
+        ? !!reminders.enabled
+        : !!notifications?.calls ||
+          !!notifications?.whatsapp ||
+          !!notifications?.push ||
+          !!notifications?.pwa ||
+          !!notifications?.email ||
+          !!notifications?.sms ||
+          !!rootNotifications?.whatsapp ||
+          !!rootNotifications?.push ||
+          !!rootNotifications?.pwa ||
+          !!rootNotifications?.email ||
+          !!rootNotifications?.sms ||
+          !!rootNotifications?.voice_call
+
+    const channelsSource =
+      Array.isArray(reminders?.channels) && reminders.channels.length
+        ? reminders.channels
+        : Array.isArray(notifications?.channels) && notifications.channels.length
+          ? notifications.channels
+          : Array.isArray(rootNotifications?.channels) && rootNotifications.channels.length
+            ? rootNotifications.channels
+          : [
+              (notifications?.email ?? rootNotifications?.email) && 'email',
+              ((notifications?.push ?? rootNotifications?.push) || (notifications?.pwa ?? rootNotifications?.pwa)) && 'pwa',
+              (notifications?.whatsapp ?? rootNotifications?.whatsapp) && 'whatsapp',
+              (notifications?.sms ?? rootNotifications?.sms) && 'sms',
+              (notifications?.voice_call ?? rootNotifications?.voice_call) && 'voice_call',
+            ].filter(Boolean)
+
+    const channels = Array.from(
+      new Set(
+        channelsSource
+          .map((c) => String(c || '').toLowerCase())
+          .filter((c) => CHANNEL_ALLOW_LIST.includes(c))
+      )
+    )
+
+    res.json({
+      enabled,
+      channels,
+    })
+  } catch (err) {
+    console.error('❌ getReminderPreferences error:', err)
+    res.status(500).json({ error: 'Failed to fetch reminder preferences' })
   }
 })
 

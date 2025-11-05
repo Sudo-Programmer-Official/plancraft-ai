@@ -52,6 +52,40 @@
       />
     </div>
 
+    <div class="mb-4">
+      <div class="flex items-center gap-3 mb-2">
+        <el-switch
+          v-model="setReminder"
+          active-text="Set reminder"
+          :disabled="props.readonly || props.disableReminder"
+        ></el-switch>
+        <span class="text-xs text-slate-300">Choose up to two instant alerts; email/SMS/voice are for scheduled reminders.</span>
+      </div>
+      <div class="channel-toggle-grid">
+        <el-tooltip
+          v-for="option in channelOptions"
+          :key="option.id"
+          effect="dark"
+          placement="top"
+          :content="option.label"
+        >
+          <button
+            class="channel-toggle"
+            type="button"
+            :disabled="props.readonly || props.disableReminder"
+            :class="{
+              'channel-toggle--active': isChannelSelected(option.id),
+              'channel-toggle--inactive': !isChannelSelected(option.id),
+              'channel-toggle--disabled': !setReminder || props.readonly || props.disableReminder
+            }"
+            @click="toggleChannel(option.id)"
+          >
+            <span class="text-lg leading-none">{{ option.icon }}</span>
+          </button>
+        </el-tooltip>
+      </div>
+    </div>
+
     <!-- Details + Link (only in edit mode) -->
     <div v-if="props.task" class="mb-5 space-y-3">
       <div>
@@ -161,14 +195,13 @@ import { ref, computed, watch, onBeforeUnmount, onMounted } from 'vue'
 import { ElNotification, ElMessage } from 'element-plus'
 import api from '@/services/api'
 import VoiceRecorder from '@/components/VoiceRecorder.vue'
-import { generateTasksFromText } from '@/services/aiService'
+import { generateTasksFromText, extractReminderTime } from '@/services/aiService'
 import { addTaskToFirebase } from '@/services/firebaseService'
 import { useAuthStore } from '@/stores/authStore'
-import { getPreferences as getUserPreferences } from '@/services/settingsService'
+import { getPreferences as getUserPreferences, getReminderPreferences } from '@/services/settingsService'
 import { scheduleReminder, getReminderStatus } from '@/services/reminderService'
 import { useTasks } from '@/composables/useTasks'
 import { toLocalDateKey, parseLocalDateKey } from '@/utils/dateHelper'
-import { normalizeParsedDateTime } from '@/utils/dateParser'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { isFeatureAllowed } from '@/services/planService'
 import { hasNotificationSetup } from '@/utils/notificationCheck'
@@ -182,6 +215,138 @@ import { toUtcIso, toLocalHHMM, getUserTimezone } from '@/utils/time'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
+
+const DURATION_HINTS = {
+  class: 75,
+  lecture: 60,
+  exam: 120,
+  study: 45,
+  homework: 40,
+  assignment: 40,
+  gym: 60,
+  workout: 60,
+  run: 45,
+  dinner: 45,
+  lunch: 40,
+  breakfast: 20,
+  meeting: 30,
+  call: 20,
+  sleep: 480,
+}
+
+const REMINDER_CHANNEL_ALLOW_LIST = ['pwa', 'whatsapp', 'email', 'sms', 'voice_call']
+const CREATION_CHANNELS = ['pwa', 'whatsapp']
+const channelOptions = [
+  { id: 'pwa', label: 'PWA Push (browser)', icon: '📳' },
+  { id: 'whatsapp', label: 'WhatsApp', icon: '💬' },
+  { id: 'email', label: 'Email', icon: '📧' },
+  { id: 'sms', label: 'SMS', icon: '📲' },
+  { id: 'voice_call', label: 'Voice Call', icon: '📞' },
+]
+const channelOptionIds = channelOptions.map((option) => option.id)
+const RELATIVE_HINT_PATTERN = /\b(in\s+\d+|after\b|before\b|later\b|then\b|next\b|from now\b|soon\b)/i
+
+function inferDuration(title, fallback = 30) {
+  try {
+    const key = String(title || '').toLowerCase()
+    for (const [k, mins] of Object.entries(DURATION_HINTS)) {
+      if (key.includes(k)) return mins
+    }
+  } catch {}
+  return fallback
+}
+
+function normalizeReminderPreferences(raw) {
+  const channels = Array.isArray(raw?.channels)
+    ? Array.from(
+        new Set(
+          raw.channels
+            .map((c) => String(c || '').toLowerCase())
+            .filter((c) => REMINDER_CHANNEL_ALLOW_LIST.includes(c))
+        )
+      )
+    : []
+  const fallback = channels.length ? channels : ['pwa', 'whatsapp']
+  const enabled =
+    raw?.enabled !== undefined ? !!raw.enabled : fallback.length > 0
+  return { enabled, channels: fallback }
+}
+
+function applyReminderDefaults(source) {
+  const normalized = normalizeReminderPreferences(source || reminderPrefs.value)
+  reminderPrefs.value = normalized
+  setReminder.value = !!normalized.enabled
+  const valid = normalized.channels.filter((ch) => channelOptionIds.includes(ch))
+  allowedReminderChannels.value = valid.length ? valid : ['pwa', 'whatsapp'].filter((ch) => channelOptionIds.includes(ch))
+}
+
+function computeCreationChannels() {
+  const selected = new Set(
+    (allowedReminderChannels.value || []).map((c) => String(c || '').toLowerCase())
+  )
+  const defaults = Array.isArray(reminderPrefs.value?.channels)
+    ? reminderPrefs.value.channels.map((c) => String(c || '').toLowerCase())
+    : []
+  const combined = CREATION_CHANNELS.filter((channel) => selected.has(channel) || defaults.includes(channel))
+  return combined.slice(0, 2)
+}
+
+function computeReminderChannels() {
+  const base = new Set(
+    Array.isArray(reminderPrefs.value?.channels)
+      ? reminderPrefs.value.channels.map((c) => String(c || '').toLowerCase())
+      : []
+  )
+  const toggled = new Set((allowedReminderChannels.value || []).map((c) => String(c || '').toLowerCase()))
+  for (const option of channelOptions) {
+    if (toggled.has(option.id)) base.add(option.id)
+    else base.delete(option.id)
+  }
+  const merged = Array.from(base).filter((c) =>
+    REMINDER_CHANNEL_ALLOW_LIST.includes(c)
+  )
+  return merged.length ? merged : ['pwa']
+}
+
+function isChannelSelected(id) {
+  const normalized = String(id || '').toLowerCase()
+  return allowedReminderChannels.value.some((ch) => String(ch || '').toLowerCase() === normalized)
+}
+
+function toggleChannel(id) {
+  if (props.readonly || props.disableReminder) return
+  if (!setReminder.value) {
+    setReminder.value = true
+  }
+  const normalized = String(id || '').toLowerCase()
+  if (!channelOptionIds.includes(normalized)) return
+  const previousOrder = (allowedReminderChannels.value || []).map((ch) => String(ch || '').toLowerCase())
+  const currentSet = new Set(
+    (allowedReminderChannels.value || []).map((ch) => String(ch || '').toLowerCase())
+  )
+  const alreadySelected = currentSet.has(normalized)
+  if (alreadySelected) {
+    currentSet.delete(normalized)
+  } else {
+    currentSet.add(normalized)
+    if (CREATION_CHANNELS.includes(normalized)) {
+      const creationSelected = Array.from(currentSet).filter((channelId) =>
+        CREATION_CHANNELS.includes(channelId)
+      )
+      if (creationSelected.length > 2) {
+        const orderedExisting = previousOrder.filter(
+          (channelId) => CREATION_CHANNELS.includes(channelId) && channelId !== normalized
+        )
+        if (orderedExisting.length) {
+          currentSet.delete(orderedExisting[0])
+        }
+      }
+    }
+  }
+  allowedReminderChannels.value = channelOptions
+    .map((opt) => opt.id)
+    .filter((channelId) => currentSet.has(channelId))
+}
 
 const props = defineProps({
   open: Boolean,
@@ -197,7 +362,10 @@ const props = defineProps({
 const emit = defineEmits(['close', 'saved'])
 
 const { tasks } = useTasks()
+const reminderPrefs = ref({ enabled: true, channels: ['pwa', 'whatsapp'] })
 const reminderTime = ref(props.task ? props.task.reminderTime || '' : '')
+const setReminder = ref(false)
+const allowedReminderChannels = ref([])
 const subStore = useSubscriptionStore()
 
 const internalOpen = ref(props.open)
@@ -222,6 +390,10 @@ watch(() => props.task, (task) => {
     link.value = task.link || ""
     selectedDate.value = task.date
     reminderTime.value = task.reminderTime || ""
+    setReminder.value = !!task.reminderTime
+    allowedReminderChannels.value = reminderPrefs.value.channels.filter((ch) =>
+      CREATION_CHANNELS.includes(ch)
+    )
     // If reminderTime missing but task exists, try to prefill from reminder status
     tryPrefillReminder(task)
   } else {
@@ -230,10 +402,14 @@ watch(() => props.task, (task) => {
     link.value = ""
     selectedDate.value = props.date || ""
     reminderTime.value = ""
+    applyReminderDefaults()
   }
 }, { immediate: true })
 
-watch(() => props.open, (val) => internalOpen.value = val)
+watch(() => props.open, (val) => {
+  internalOpen.value = val
+  if (val && !props.task) applyReminderDefaults(reminderPrefs.value)
+})
 watch(internalOpen, (val) => { if (!val) emit('close') })
 
 const formattedDate = computed(() => {
@@ -264,6 +440,19 @@ onMounted(async () => {
     if (uid) {
       const res = await getUserPreferences(uid)
       userPrefs.value = res || { notifications: {}, integrations: {} }
+      try {
+        const reminderData = await getReminderPreferences(uid)
+        const normalized = normalizeReminderPreferences(reminderData)
+        reminderPrefs.value = normalized
+        if (!props.task) applyReminderDefaults(normalized)
+        else {
+          const valid = normalized.channels.filter((ch) => channelOptionIds.includes(ch))
+          allowedReminderChannels.value = valid.length ? valid : ['pwa', 'whatsapp'].filter((ch) => channelOptionIds.includes(ch))
+        }
+      } catch (prefErr) {
+        console.warn('Failed to load reminder preferences', prefErr)
+        if (!props.task) applyReminderDefaults(reminderPrefs.value)
+      }
     }
   } catch {}
   // Attempt prefill when opening in edit mode
@@ -289,6 +478,18 @@ watch(reminderTime, (val) => {
       reminderTime.value = props.task.reminderTime || ''
     }
   } catch {}
+})
+
+watch(setReminder, (enabled) => {
+  if (!enabled) return
+  if (!allowedReminderChannels.value.length) {
+    const defaults = Array.isArray(reminderPrefs.value.channels)
+      ? reminderPrefs.value.channels.filter((ch) => channelOptionIds.includes(ch))
+      : []
+    allowedReminderChannels.value = defaults.length
+      ? defaults
+      : ['pwa', 'whatsapp'].filter((ch) => channelOptionIds.includes(ch))
+  }
 })
 
 // Close planner once prompt dismissed (if we deferred auto-close)
@@ -524,78 +725,333 @@ async function generateTasks() {
   if (!input.value.trim()) return
   loading.value = true
   try {
-    const { tasks: items, reminderTime: aiIso } = await generateTasksFromText(input.value)
-    // If AI provided a parsed reminder datetime (UTC ISO), sync date picker + time
-    if (aiIso) {
-      const { date, time } = normalizeParsedDateTime(aiIso)
-      if (date && selectedDate.value !== date) selectedDate.value = date
-      // if (time && reminderTime.value !== time) reminderTime.value = time
-      // Removed double timezone shift: trust aiIso directly as UTC
-    }
-    if (aiIso && !reminderTime.value) {
-      reminderTime.value = null  // DO NOT display auto time in UI
-    }
-    const manualIso = reminderTime.value ? buildLocalIso(toLocalDateKey(parseLocalDateKey(selectedDate.value)), reminderTime.value) : null
-    const effectiveIso = manualIso || aiIso
+    const result = await generateTasksFromText(input.value)
+    const rawList = Array.isArray(result?.items) && result.items.length
+      ? result.items
+      : Array.isArray(result?.tasks)
+        ? result.tasks
+        : []
 
-    for (const [i, t] of items.entries()) {
-      const newTask = {
-        title: t,
-        details: '',
-        link: '',
-        completed: false,
-        date: toLocalDateKey(parseLocalDateKey(selectedDate.value)),
-        order: tasks.value.length + i,
-        logs: [],
-        reminderTime: reminderTime.value || null
-      }
-      const saved = await addTaskToFirebase(newTask)
+    const tz = getUserTimezone()
+    const todayKey = toLocalDateKey(new Date())
+    const selectedKey = (() => {
+      if (typeof selectedDate.value === 'string' && selectedDate.value) return selectedDate.value
       try {
-        const uid = authStore?.user?.uid
-        if (uid && saved?.id && effectiveIso) {
-          const prefs = userPrefs.value?.notifications || {}
-          // Gentle prompt if user hasn't configured any channel yet
-          if (!hasNotificationSetup(prefs)) {
-            notifPromptOpen.value = true
-            suppressAutoClose.value = true
-          }
-          const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+        return toLocalDateKey(parseLocalDateKey(selectedDate.value))
+      } catch {
+        return todayKey
+      }
+    })()
+
+    const nowIso = dayjs().tz(tz).toISOString()
+    const nowAnchor = dayjs().tz(tz)
+    const nowIso = nowAnchor.format('YYYY-MM-DDTHH:mm:ssZ')
+    const parsedHints = await Promise.all(
+      rawList.map(async (task) => {
+        const base = typeof task === 'string' ? null : (task || {})
+        if (!base) return null
+        if (base.scheduledTime || base.scheduled_time) return null
+        const rawHint = base.timeHint ?? base.time_hint ?? null
+        if (!rawHint || typeof rawHint !== 'string') return null
+        const hint = rawHint.trim()
+        if (!hint) return null
+        if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(hint)) return hint
+        try {
+          const isRelative = RELATIVE_HINT_PATTERN.test(hint)
+          const containsExplicitClock = /(\d{1,2}:\d{2})|(\d{1,2}\s?(am|pm))|(\d{4}-\d{2}-\d{2})/i.test(hint)
+          const query = isRelative && !containsExplicitClock
+            ? hint
+            : `Plan date: ${selectedKey}. ${hint}`
+          const iso = await extractReminderTime(query, { now: nowIso, timezone: tz })
           try {
-            const chans = [
-              prefs?.whatsapp && 'whatsapp',
-              (prefs?.pwa || prefs?.push) && 'pwa',
-              prefs?.email && 'email',
-              prefs?.sms && 'sms',
-              prefs?.voice_call && 'voice_call',
-            ].filter(Boolean)
-            const resp = await api.post('/reminders/text', {
-              userId: uid,
-              text: newTask.title,
-              scheduledTime: effectiveIso,
-              taskId: saved.id,
-              channels: chans.length ? chans : undefined,
-              timezone: tz,
-            })
-            const warn = resp?.headers?.['x-plan-warning'] || resp?.headers?.['X-Plan-Warning']
-            if (warn) ElMessage({ message: warn, type: 'warning', duration: 5000 })
-            // Notify dashboards/overviews to refresh usage meters
-            try { window.dispatchEvent(new CustomEvent('usage-refresh')) } catch {}
-          } catch (err) {
-            await scheduleReminder(uid, saved.id, newTask.title, effectiveIso, prefs)
-            if (err?.response?.status === 403) {
-              const msg = err?.response?.data?.error || 'Daily reminder limit reached. Upgrade to Pro for unlimited reminders.'
-              ElMessage({ message: msg, type: 'warning', duration: 6000 })
+            console.log('[TimeFlow] planner.hintParse', { hint, query, now: nowIso, timezone: tz, iso })
+          } catch {}
+          if (!iso) return null
+          const parsed = dayjs(iso)
+          if (!parsed.isValid()) return iso
+          const parsedInTz = parsed.tz(tz)
+          if (
+            selectedKey &&
+            parsedInTz.isValid() &&
+            parsedInTz.format('YYYY-MM-DD') !== selectedKey &&
+            !/\d{4}-\d{2}-\d{2}/.test(hint)
+          ) {
+            const adjusted = dayjs.tz(`${selectedKey}T${parsedInTz.format('HH:mm')}`, tz, true)
+            if (adjusted.isValid()) return adjusted.utc().toISOString()
+          }
+          return parsed.utc().toISOString()
+        } catch {
+          return null
+        }
+      })
+    )
+
+    const earliestStart = (() => {
+      try {
+        const candidate = dayjs.tz(`${selectedKey}T06:00`, tz)
+        return candidate.isValid() ? candidate : dayjs().tz(tz)
+      } catch {
+        return dayjs().tz(tz)
+      }
+    })()
+
+    const computeCursorStart = () => {
+      try {
+        const now = dayjs().tz(tz)
+        let base = dayjs.tz(`${selectedKey}T09:00`, tz)
+        if (!base.isValid()) base = dayjs.tz(selectedKey, tz)
+        if (!base.isValid()) base = now
+        if (selectedKey === todayKey && now.isAfter(base)) {
+          base = now.add(15, 'minute')
+        }
+        if (base.isBefore(earliestStart)) base = earliestStart.clone()
+        return base.startOf('minute')
+      } catch {
+        return dayjs().tz(tz)
+      }
+    }
+
+    let cursor = computeCursorStart()
+    let lastStart = null
+    let lastEnd = null
+
+    const normalizeTask = (task, idx) => {
+      const base = typeof task === 'string' ? { title: task } : (task || {})
+      const title = String(base.title || base.name || '').trim()
+      if (!title) return null
+
+      const estimateRaw = base.estimate_minutes ?? base.estimateMinutes ?? base.duration ?? base.durationMinutes
+      const estimate = Number.isFinite(Number(estimateRaw)) && Number(estimateRaw) > 0
+        ? Math.round(Number(estimateRaw))
+        : inferDuration(title)
+      const blockMinutes = Math.max(estimate, 30)
+
+      const toDayjs = (value) => {
+        try {
+          if (!value) return null
+          if (value instanceof Date) {
+            const d = dayjs(value).tz(tz)
+            return d.isValid() ? d : null
+          }
+          if (typeof value === 'string') {
+            const trimmed = value.trim()
+            if (/^\d{1,2}:\d{2}$/.test(trimmed)) {
+              const [h, m] = trimmed.split(':')
+              const hh = String(h).padStart(2, '0')
+              const mm = String(m).padStart(2, '0')
+              const candidate = dayjs.tz(`${selectedKey}T${hh}:${mm}`, tz)
+              return candidate.isValid() ? candidate : null
             }
-            // Still emit refresh to keep UI in sync after fallback
-            try { window.dispatchEvent(new CustomEvent('usage-refresh')) } catch {}
+            const candidate = dayjs(trimmed)
+            return candidate.isValid() ? candidate.tz(tz) : null
+          }
+          if (typeof value === 'object') {
+            if (value?.value) return toDayjs(value.value)
+            if (value?.time) return toDayjs(value.time)
+          }
+        } catch {}
+        return null
+      }
+
+      let scheduled = null
+      let isAbsolute = false
+      const relationType = String(base.relation || '').toLowerCase()
+      const gapMinutes = Number.isFinite(Number(base.gapMinutes))
+        ? Math.min(Math.max(Number(base.gapMinutes), 5), 120)
+        : 15
+
+      const directSchedule = toDayjs(base.scheduledTime || base.scheduled_time || null)
+      if (directSchedule) {
+        scheduled = directSchedule
+        isAbsolute = true
+      } else {
+        const fromTimeField = toDayjs(base.time)
+        if (fromTimeField) {
+          scheduled = fromTimeField
+          isAbsolute = true
+        }
+      }
+
+      const parsedHintIso = parsedHints[idx] || null
+      if (!scheduled || !scheduled.isValid()) {
+        if (parsedHintIso) {
+          const hinted = toDayjs(parsedHintIso)
+          if (hinted && hinted.isValid()) {
+            scheduled = hinted
+            isAbsolute = true
+          }
+        } else if (base.timeHint) {
+          const hinted = toDayjs(base.timeHint)
+          if (hinted && hinted.isValid()) {
+            scheduled = hinted
+            isAbsolute = true
           }
         }
-      } catch (e) {
-        console.warn('AI-split reminder schedule failed:', e?.response?.data || e?.message)
+      }
+
+      if (!scheduled || !scheduled.isValid()) {
+        if (relationType === 'after_previous' && lastEnd && lastEnd.isValid()) {
+          scheduled = lastEnd.clone().add(gapMinutes, 'minute')
+          isAbsolute = true
+        } else if (relationType === 'same_time_previous' && lastStart && lastStart.isValid()) {
+          scheduled = lastStart.clone()
+          isAbsolute = true
+        }
+      }
+
+      if (!scheduled || !scheduled.isValid()) {
+        if (!cursor || !cursor.isValid()) cursor = computeCursorStart()
+        scheduled = cursor
+        isAbsolute = false
+      }
+
+      if (scheduled.isBefore(earliestStart)) {
+        scheduled = earliestStart.clone()
+      }
+
+      const next = scheduled.add(blockMinutes, 'minute')
+      if (relationType === 'after_previous') {
+        cursor = next
+      } else if (relationType === 'same_time_previous') {
+        if (!cursor || !cursor.isValid() || next.isAfter(cursor)) {
+          cursor = next
+        }
+      } else if (!cursor || !cursor.isValid() || next.isAfter(cursor)) {
+        cursor = next
+      } else if (!isAbsolute) {
+        cursor = cursor.add(blockMinutes, 'minute')
+      }
+
+      const scheduledUtc = scheduled.clone().utc().toISOString()
+      lastStart = scheduled.clone()
+      lastEnd = scheduled.clone().add(blockMinutes, 'minute')
+
+      try {
+        console.log('[TimeFlow] planner.normalizeTask', {
+          title,
+          relationType,
+          timeHint: base.timeHint ?? null,
+          parsedHintIso,
+          scheduledUtc,
+        })
+      } catch {}
+
+      return {
+        title,
+        details: base.details || '',
+        link: base.link || '',
+        estimate_minutes: blockMinutes,
+        scheduledTime: scheduledUtc,
+        time: base.time && typeof base.time === 'object'
+          ? { ...base.time }
+          : {
+              type: isAbsolute ? 'absolute' : 'derived',
+              value: isAbsolute ? scheduled.format('HH:mm') : null,
+            },
+        timezone: tz,
+        source: 'planner',
       }
     }
-    ElNotification({ title: 'Success', message: `${items.length} task${items.length > 1 ? 's' : ''} generated`, type: 'success', duration: 2500 })
-    emit('saved', items)
+
+    const preparedTasks = rawList.map((task, idx) => normalizeTask(task, idx)).filter(Boolean)
+    if (!preparedTasks.length) {
+      throw new Error('No tasks generated from input')
+    }
+
+    const uid = authStore?.user?.uid
+    const orderBase = tasks.value?.length || 0
+    const dateKey = selectedKey || todayKey
+
+    const savedItems = await Promise.all(
+      preparedTasks.map(async (task, idx) => {
+        const payload = {
+          title: task.title ?? `Task ${idx + 1}`,
+          details: task.details ?? '',
+          link: task.link ?? '',
+          completed: false,
+          date: dateKey,
+          order: orderBase + idx,
+          logs: [],
+          estimate_minutes: task.estimate_minutes ?? inferDuration(task.title),
+          reminderTime: task.time?.value || null,
+          scheduledTime: task.scheduledTime ?? null,
+          time: task.time ?? { type: 'derived', value: null },
+          timezone: tz,
+          source: 'planner',
+        }
+        return await addTaskToFirebase(payload)
+      })
+    )
+
+    try {
+      const taskIds = savedItems.map((item) => item?.id).filter(Boolean)
+      if (uid && taskIds.length) {
+        const creationChannels = computeCreationChannels()
+        if (creationChannels.length) {
+          await api.post('/notify/task-created', {
+            userId: uid,
+            taskIds,
+            channels: creationChannels,
+          })
+        }
+      }
+    } catch (e) {
+      console.warn('creation ping failed (non-blocking)', e?.message || e)
+    }
+
+    if (setReminder.value && uid) {
+      const prefs = userPrefs.value?.notifications || {}
+      if (!hasNotificationSetup(prefs)) {
+        notifPromptOpen.value = true
+        suppressAutoClose.value = true
+      }
+
+      const reminderChannels = computeReminderChannels()
+
+      const reminders = savedItems
+        .map((saved, index) => {
+          const task = preparedTasks[index]
+          if (!saved?.id || !task?.scheduledTime) return null
+          return {
+            taskId: saved.id,
+            text: task.title,
+            scheduledTime: task.scheduledTime,
+            timezone: tz,
+            channels: reminderChannels,
+          }
+        })
+        .filter(Boolean)
+
+      if (reminders.length) {
+        try {
+          const resp = await api.post('/reminders/batch', { userId: uid, reminders })
+          const warn = resp?.headers?.['x-plan-warning'] || resp?.headers?.['X-Plan-Warning']
+          if (warn) ElMessage({ message: warn, type: 'warning', duration: 5000 })
+          try { window.dispatchEvent(new CustomEvent('usage-refresh')) } catch {}
+        } catch (err) {
+          console.warn('Batch reminder schedule failed; falling back', err?.response?.data || err?.message || err)
+          if (err?.response?.status === 403) {
+            const msg = err?.response?.data?.error || 'Daily reminder limit reached. Upgrade to Pro for unlimited reminders.'
+            ElMessage({ message: msg, type: 'warning', duration: 6000 })
+          }
+          const fallbackPrefs = reminderChannels.reduce((acc, ch) => {
+            acc[ch] = true
+            return acc
+          }, {})
+          for (const reminder of reminders) {
+            try {
+              await scheduleReminder(uid, reminder.taskId, reminder.text, reminder.scheduledTime, fallbackPrefs)
+            } catch (e) {
+              console.warn('Fallback reminder schedule failed', e?.message || e)
+            }
+          }
+          try { window.dispatchEvent(new CustomEvent('usage-refresh')) } catch {}
+        }
+      }
+    }
+
+    ElNotification({ title: 'Success', message: `${savedItems.length} task${savedItems.length > 1 ? 's' : ''} generated`, type: 'success', duration: 2500 })
+    emit('saved', savedItems)
     if (!notifPromptOpen.value) closeDialog()
   } catch (err) {
     const status = err?.response?.status
@@ -603,6 +1059,8 @@ async function generateTasks() {
       const msg = err?.response?.data?.error || 'Daily AI limit reached. Upgrade to Pro to continue.'
       ElNotification({ title: 'Upgrade Required', message: msg, type: 'warning', duration: 3500 })
       try { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('upgrade-required', { detail: { source: 'ai-split' } })) } catch {}
+    } else if (err?.message === 'No tasks generated from input') {
+      ElNotification({ title: 'No Tasks', message: 'I could not find tasks to create. Try adding more details.', type: 'warning', duration: 3000 })
     } else {
       console.error(err)
       ElNotification({ title: 'Error', message: 'Task generation failed. Please try again.', type: 'error', duration: 3000 })
@@ -611,6 +1069,8 @@ async function generateTasks() {
     loading.value = false
     input.value = ''
     reminderTime.value = ''
+    setReminder.value = false
+    allowedReminderChannels.value = []
   }
 }
 
@@ -666,6 +1126,40 @@ function closeDialog() {
 
 :deep(.el-input__inner::placeholder) {
   color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.channel-toggle-grid {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.channel-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(15, 23, 42, 0.4);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.channel-toggle--active {
+  background: rgba(59, 130, 246, 0.25);
+  border-color: rgba(59, 130, 246, 0.6);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.4);
+}
+
+.channel-toggle--inactive {
+  opacity: 0.75;
+}
+
+.channel-toggle--disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 </style>
 
