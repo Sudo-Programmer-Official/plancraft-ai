@@ -140,6 +140,7 @@ import pushRoutes from './pushRoutes.js'
 import Stripe from 'stripe'
 import { db } from '../services/firebaseAdmin.js'
 import { requireAuth, ensureUserMatches } from '../middleware/auth.js'
+import { normalizeDate } from '../utils/time.js'
 
 const router = express.Router()
 router.use(requireAuth, ensureUserMatches)
@@ -166,9 +167,9 @@ router.get('/subscription/status', async (req, res) => {
     const plan = (status === 'active' || status === 'trialing' || status === 'past_due' || status === 'canceled') ? 'premium' : 'free'
 
     let remainingDays = 0
-    let cancelAt = sub?.cancelAt || null
+    let cancelAt = normalizeDate(sub?.cancelAt)
     try {
-      const end = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null
+      const end = normalizeDate(sub?.currentPeriodEnd)
       if (end) {
         const diffMs = end.getTime() - Date.now()
         remainingDays = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)))
@@ -176,7 +177,12 @@ router.get('/subscription/status', async (req, res) => {
         if (sub?.cancelAtPeriodEnd && !cancelAt) cancelAt = end
       }
     } catch {}
-    return res.json({ plan, status, cancelAt, remainingDays })
+    return res.json({
+      plan,
+      status,
+      cancelAt: cancelAt ? cancelAt.toISOString() : null,
+      remainingDays,
+    })
   } catch (err) {
     console.error('subscription/status error', err)
     res.status(200).json({ plan: 'free', status: 'free', remainingDays: 0 })
