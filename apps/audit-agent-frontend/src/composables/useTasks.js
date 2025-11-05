@@ -11,6 +11,7 @@ import {
   updateTaskInFirebase,
   deleteTaskFromFirebase,
 } from '@/services/firebaseService'
+import { resolveCategory } from '@/constants/taskCategories'
 
 // 🔗 Shared singleton state
 const tasks = ref([])
@@ -25,11 +26,19 @@ export function useTasks() {
     return Array.from(new Map((Array.isArray(list) ? list : []).map(t => [t.id, t])).values())
   }
 
+  function normalizeList(raw) {
+    const base = Array.isArray(raw) ? raw : []
+    return base.map((task) => ({
+      ...task,
+      category: resolveCategory(task?.category),
+    }))
+  }
+
   async function loadTasks() {
-    let raw = await fetchTasksForToday()
+    const raw = await fetchTasksForToday()
 
     // Ensure newest first + incomplete before complete
-    tasks.value = uniqueById(raw).sort((a, b) => {
+    tasks.value = normalizeList(uniqueById(raw)).sort((a, b) => {
       if (a.completed !== b.completed) {
         return a.completed - b.completed // incomplete first
       }
@@ -44,9 +53,9 @@ export function useTasks() {
    * Load tasks for a specific date (YYYY-MM-DD)
    */
   async function loadTasksForDate(dateStr) {
-    let raw = await fetchTasksByDate(dateStr)
+    const raw = await fetchTasksByDate(dateStr)
 
-    tasks.value = uniqueById(raw).sort((a, b) => {
+    tasks.value = normalizeList(uniqueById(raw)).sort((a, b) => {
       if (a.completed !== b.completed) {
         return a.completed - b.completed
       }
@@ -61,7 +70,7 @@ export function useTasks() {
    * Load tasks for a date range inclusive (YYYY-MM-DD)
    */
   async function loadTasksForRange(startYMD, endYMD) {
-    tasks.value = uniqueById(await fetchTasksBetween(startYMD, endYMD))
+    tasks.value = normalizeList(uniqueById(await fetchTasksBetween(startYMD, endYMD)))
 
     // add sorting if needed
     tasks.value.sort((a, b) => {
@@ -94,7 +103,8 @@ export function useTasks() {
 
     const saved = await addTaskToFirebase(task)
     // Replace by id if exists; then put newest first
-    tasks.value = [saved, ...tasks.value.filter(t => t.id !== saved.id)]
+    const normalized = { ...saved, category: resolveCategory(saved?.category) }
+    tasks.value = [normalized, ...tasks.value.filter(t => t.id !== normalized.id)]
     try { if (import.meta.env.DEV) console.log('[useTasks] addTask ids:', tasks.value.map(t => t.id)) } catch {}
     try {
       trackEvent('Task Created', {

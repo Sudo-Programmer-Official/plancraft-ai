@@ -43,18 +43,27 @@
           :key="task.id"
           class="flex justify-between items-center bg-black/20 px-4 py-3 rounded-xl"
         >
-          <div>
-            <p
-              :class="['font-medium', task.completed ? 'line-through text-gray-400' : 'text-white']"
-            >
-              {{ task.title }}
+          <div class="flex-1 pr-4">
+            <div class="flex items-center gap-2 flex-wrap">
+              <p
+                :class="['font-medium', task.completed ? 'line-through text-gray-400' : 'text-white']"
+              >
+                {{ task.title }}
+              </p>
+              <span
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-900/70 text-[11px] font-medium shadow-sm"
+                :class="categoryColor(task.category)"
+              >
+                <span class="leading-none">{{ categoryIcon(task.category) }}</span>
+                <span>{{ categoryLabel(task.category) }}</span>
+              </span>
               <span
                 v-if="hasLate(task)"
-                class="ml-2 text-[10px] px-2 py-0.5 rounded bg-red-600/30 border border-red-500/40 text-red-200 align-middle"
+                class="text-[10px] px-2 py-0.5 rounded bg-red-600/30 border border-red-500/40 text-red-200 align-middle"
               >
                 Late<span v-if="lateDelay(task) !== null"> ({{ lateDelay(task) }}d)</span>
               </span>
-            </p>
+            </div>
             <p v-if="task.details" class="text-sm text-gray-400">{{ task.details }}</p>
           </div>
           <div class="flex items-center gap-3">
@@ -105,6 +114,7 @@ import { scheduleReminder } from '@/services/reminderService.js'
 import api from '@/services/api'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/authStore'
+import { getCategoryIcon, getCategoryColor, resolveCategory } from '@/constants/taskCategories'
 
 const { tasks, toggleComplete, loadTasksForRange } = useTasks()
 
@@ -113,6 +123,18 @@ const { authStore, userPrefs } = useAuthStore()
 const showPlanner = ref(false)
 const viewingTask = ref(null)
 const plannerDate = ref(new Date())
+
+function categoryIcon(value) {
+  return getCategoryIcon(value)
+}
+
+function categoryColor(value) {
+  return getCategoryColor(value)
+}
+
+function categoryLabel(value) {
+  return resolveCategory(value)
+}
 
 const selectedDate = ref(new Date())
 const currentMonth = ref(selectedDate.value.getMonth())

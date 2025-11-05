@@ -113,6 +113,9 @@ export function normalizeTemporalTasks(rawItems = [], context = {}) {
     const rawPhrase = typeof item.rawPhrase === 'string' && item.rawPhrase.trim()
       ? item.rawPhrase.trim()
       : null
+    const category = typeof item.category === 'string' && item.category.trim()
+      ? item.category.trim()
+      : 'Uncategorized'
 
     const task = {
       title,
@@ -126,6 +129,7 @@ export function normalizeTemporalTasks(rawItems = [], context = {}) {
       confidence,
       parsedTimeLocal: parsedLocal,
       sourceIndex: index,
+      category,
       meta: {
         original: item,
         reason: null,

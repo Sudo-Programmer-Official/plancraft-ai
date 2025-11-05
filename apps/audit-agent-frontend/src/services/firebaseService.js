@@ -168,6 +168,9 @@ export async function addTaskToFirebase(task) {
     title: task?.title || "New Task",
     details: task?.details || "",
     completed: task?.completed ?? false,
+    category: typeof task?.category === 'string' && task.category.trim()
+      ? task.category.trim()
+      : 'Uncategorized',
     logs: Array.isArray(task?.logs) ? task.logs : [],
     attachments: Array.isArray(task?.attachments) ? task.attachments : [],
     date: typeof task?.date === 'string' && /\d{4}-\d{2}-\d{2}/.test(task.date)
@@ -194,6 +197,9 @@ export async function addTaskToFirebase(task) {
   }
 
   if ('channels' in task) payload.channels = Array.isArray(task.channels) ? task.channels : null
+  if ('reminderChannels' in task) {
+    payload.reminderChannels = Array.isArray(task.reminderChannels) ? task.reminderChannels : null
+  }
   if ('timeHint' in task) payload.timeHint = task.timeHint || null
   if ('relation' in task) payload.timeRelation = task.relation || null
   if ('gapMinutes' in task) {

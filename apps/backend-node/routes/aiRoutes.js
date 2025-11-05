@@ -2,6 +2,7 @@
 import express from "express";
 import { requireAuth } from "../middleware/auth.js";
 import { enhanceJournalEntry, summarizeTasks, splitTasks, extractReminderTime } from "../services/openaiService.js";
+import { inferCategory } from "../services/categoryService.js";
 import { checkUserPlanUsage } from "../services/planService.js";
 import OpenAI from "openai";
 import dotenv from "dotenv";
@@ -309,7 +310,7 @@ router.post('/split-tasks', async (req, res) => {
     if (!result || !Array.isArray(result.tasks)) {
       return res.status(502).json({ error: 'Upstream returned unexpected format.' })
     }
-    const tasks = result.tasks
+    const normalizedTasks = result.tasks
       .filter((t) => t && typeof t.title === 'string' && t.title.trim().length > 0)
       .map((t, i) => ({
         title: t.title.trim(),
@@ -327,6 +328,22 @@ router.post('/split-tasks', async (req, res) => {
           : 'independent',
         gapMinutes: Number.isFinite(t.gapMinutes) ? Math.max(0, Math.min(Number(t.gapMinutes), 120)) : 15,
       }))
+    const tasks = await Promise.all(
+      normalizedTasks.map(async (task) => {
+        let category = 'Other'
+        try {
+          category = await inferCategory(task.title, task.details)
+        } catch (err) {
+          try {
+            console.warn('[TimeBrain][Category] assign:error', {
+              title: task.title,
+              message: err?.message || err,
+            })
+          } catch {}
+        }
+        return { ...task, category }
+      })
+    )
     try {
       console.log('[TimeFlow] /split-tasks normalized', {
         count: tasks.length,

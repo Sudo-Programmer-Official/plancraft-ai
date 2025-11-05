@@ -39,13 +39,36 @@
           <h2 class="text-xl font-semibold">Tasks for {{ dayLabel }}</h2>
         </div>
 
-        <TransitionGroup name="fade-move" tag="ul" class="space-y-3">
+        <div class="flex gap-3 overflow-x-auto pb-2 mb-4">
+          <button
+            v-for="category in categories"
+            :key="category"
+            type="button"
+            @click="activeCategory = category"
+            :class="[
+              'flex-shrink-0 px-3 py-1 rounded-lg font-medium text-sm transition-all duration-300 ease-in-out',
+              activeCategory === category
+                ? 'bg-indigo-700 text-white shadow-[0_0_10px_rgba(99,102,241,0.5)]'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700',
+            ]"
+          >
+            <span class="mr-1 text-base leading-none">{{ categoryIcon(category) }}</span>
+            {{ category }}
+          </button>
+        </div>
+
+        <TransitionGroup
+          v-if="filteredTasks.length"
+          name="fade-move"
+          tag="ul"
+          class="space-y-3"
+        >
           <li
             v-for="task in filteredTasks"
             :key="task.id"
-            class="flex justify-between items-center bg-black/20 px-4 py-3 rounded-xl"
+            class="flex justify-between items-center bg-black/20 px-4 py-3 rounded-xl border border-slate-700/60"
           >
-            <div>
+            <div class="flex-1">
               <p
                 :class="[
                   'font-medium',
@@ -53,6 +76,13 @@
                 ]"
               >
                 {{ task.title }}
+                <span
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-900/70 text-[11px] font-medium shadow-sm ml-2"
+                  :class="categoryColor(task.category)"
+                >
+                  <span class="leading-none">{{ categoryIcon(task.category) }}</span>
+                  <span>{{ categoryLabel(task.category) }}</span>
+                </span>
                 <span
                   v-if="hasLate(task)"
                   class="ml-2 text-[10px] px-2 py-0.5 rounded bg-red-600/30 border border-red-500/40 text-red-200 align-middle"
@@ -77,6 +107,9 @@
             </div>
           </li>
         </TransitionGroup>
+        <p v-else class="text-sm text-slate-300">
+          {{ activeCategory === 'All' ? 'No tasks for this day yet.' : 'No tasks for this category on this day.' }}
+        </p>
       </section>
     </div>
   </div>
@@ -119,6 +152,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { ElMessage } from 'element-plus'
 import { hasNotificationSetup } from '@/utils/notificationCheck'
 import NotificationPrompt from '@/components/NotificationPrompt.vue'
+import { TASK_CATEGORY_FILTERS, getCategoryIcon, getCategoryColor, resolveCategory } from '@/constants/taskCategories'
 const { tasks, toggleComplete, loadTasksForRange } = useTasks()
 const days = [
   { label: 'Mon', value: 0 },
@@ -129,6 +163,8 @@ const days = [
   { label: 'Sat', value: 5 },
   { label: 'Sun', value: 6 },
 ]
+const categories = TASK_CATEGORY_FILTERS
+const activeCategory = ref('All')
 const { authStore, userPrefs } = useAuthStore()
 const selectedDate = ref(new Date())
 const currentWeekStart = computed(() => startOfWeek(selectedDate.value))
@@ -206,11 +242,25 @@ async function handleSaveAndSchedule(payload) {
 }
 const filteredTasks = computed(() => {
   const target = toYMD(selectedDate.value)
-  return tasks.value.filter((task) => {
+  const byDate = tasks.value.filter((task) => {
     const taskDate = typeof task.date === 'string' ? task.date : toYMD(task.date)
     return taskDate === target
   })
+  if (activeCategory.value === 'All') return byDate
+  return byDate.filter((task) => resolveCategory(task?.category) === activeCategory.value)
 })
+
+function categoryIcon(value) {
+  return getCategoryIcon(value)
+}
+
+function categoryColor(value) {
+  return getCategoryColor(value)
+}
+
+function categoryLabel(value) {
+  return resolveCategory(value)
+}
 
 const completedCount = computed(() => tasks.value.filter((t) => t.completed).length)
 const remainingCount = computed(() => tasks.value.filter((t) => !t.completed).length)

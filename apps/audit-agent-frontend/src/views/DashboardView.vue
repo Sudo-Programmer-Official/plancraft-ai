@@ -76,20 +76,50 @@
           </button>
         </div>
 
+        <div class="flex gap-3 overflow-x-auto pb-2 mb-3">
+          <button
+            v-for="category in categoryFilters"
+            :key="category"
+            type="button"
+            @click="dashboardCategory = category"
+            :class="[
+              'flex-shrink-0 px-3 py-1 rounded-lg font-medium text-xs transition-all duration-300 ease-in-out',
+              dashboardCategory === category
+                ? 'bg-indigo-700 text-white shadow-[0_0_10px_rgba(99,102,241,0.5)]'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700',
+            ]"
+          >
+            <span class="mr-1 text-base leading-none">{{ categoryIcon(category) }}</span>
+            {{ category }}
+          </button>
+        </div>
+
         <ul
-          v-if="sortedDaily.length"
+          v-if="filteredDaily.length"
           ref="dailyList"
           class="space-y-2 text-sm max-h-64 overflow-y-auto pr-2 custom-scroll"
         >
           <li
-            v-for="task in sortedDaily"
+            v-for="task in filteredDaily"
             :key="task.id"
-            class="flex justify-between items-center p-2 rounded bg-gray-800"
+            class="flex justify-between items-center p-3 rounded-xl bg-gray-800 border border-gray-700/60"
           >
-            <div class="flex flex-col">
-              <span :class="{ 'line-through text-gray-500': task.completed }">
-                {{ task.title }}
-              </span>
+            <div class="flex flex-col gap-1">
+              <div class="flex items-center gap-2">
+                <span
+                  class="font-medium"
+                  :class="{ 'line-through text-gray-500': task.completed, 'text-slate-100': !task.completed }"
+                >
+                  {{ task.title }}
+                </span>
+                <div
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-900/70 text-[11px] font-medium shadow-sm"
+                  :class="categoryColor(task.category)"
+                >
+                  <span class="leading-none">{{ categoryIcon(task.category) }}</span>
+                  <span>{{ categoryLabel(task.category) }}</span>
+                </div>
+              </div>
               <small class="text-gray-400">{{ task.date }}</small>
             </div>
 
@@ -102,14 +132,14 @@
               >
                 🔔
               </button>
-              <button
+              <!-- <button
                 v-else
                 @click.stop="openDialog(task)"
                 class="text-gray-500 hover:text-gray-300"
                 title="No reminder — click to add"
               >
                 🔔
-              </button>
+              </button> -->
               <button
                 @click.stop="openDialog(task)"
                 class="text-gray-400 hover:text-indigo-400 mr-4"
@@ -128,7 +158,9 @@
           </li>
         </ul>
 
-        <p v-else class="text-gray-400 text-sm">No tasks today.</p>
+        <p v-else class="text-gray-400 text-sm">
+          {{ dashboardCategory === 'All' ? 'No tasks today.' : 'No tasks in this category yet.' }}
+        </p>
 
         <TaskPlannerDialog
           v-if="showPlanner"
@@ -161,18 +193,35 @@
         <p class="text-sm text-gray-400">
           {{ doneWeekly }}/{{ weeklyTasks.length }} completed this week
         </p>
-        <ul class="mt-3 space-y-2 text-sm max-h-40 overflow-y-auto custom-scroll">
+        <ul
+          v-if="filteredWeeklyPreview.length"
+          class="mt-3 space-y-2 text-sm max-h-40 overflow-y-auto custom-scroll"
+        >
           <li
-            v-for="task in weeklyTasks.slice(0, 5)"
+            v-for="task in filteredWeeklyPreview"
             :key="task.id"
-            class="p-2 rounded bg-gray-800 flex justify-between"
+            class="p-3 rounded-xl bg-gray-800 border border-gray-700/60 flex justify-between items-start gap-3"
           >
-            <span :class="{ 'line-through text-gray-500': task.completed }">
-              {{ task.title }}
-            </span>
-            <small class="text-gray-400">{{ task.date }}</small>
+            <div class="flex flex-col gap-1">
+              <div class="flex items-center gap-2">
+                <span :class="{ 'line-through text-gray-500': task.completed, 'text-white': !task.completed }">
+                  {{ task.title }}
+                </span>
+                <div
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-900/70 text-[11px] font-medium shadow-sm"
+                  :class="categoryColor(task.category)"
+                >
+                  <span class="leading-none">{{ categoryIcon(task.category) }}</span>
+                  <span>{{ categoryLabel(task.category) }}</span>
+                </div>
+              </div>
+              <small class="text-gray-400">{{ task.date }}</small>
+            </div>
           </li>
         </ul>
+        <p v-else class="text-gray-400 text-sm mt-2">
+          {{ dashboardCategory === 'All' ? 'No weekly tasks yet.' : 'No weekly tasks in this category.' }}
+        </p>
       </div>
 
       <!-- Monthly Card -->
@@ -443,6 +492,7 @@ import { listReports, generateReport } from '@/services/reportsService'
 import api from '@/services/api'
 import { getPreferences as getUserPreferences } from '@/services/settingsService'
 import { ElMessage, ElNotification } from 'element-plus'
+import { TASK_CATEGORY_FILTERS, getCategoryIcon, getCategoryColor, resolveCategory } from '@/constants/taskCategories'
 // import { onAuthStateChanged } from 'firebase/auth'
 // import { auth } from '@/firebase/init'
 
@@ -505,6 +555,8 @@ const latestReport = ref(null)
 const generatingWeekly = ref(false)
 const generatingMonthly = ref(false)
 const sparklineCanvas = ref(null)
+const categoryFilters = TASK_CATEGORY_FILTERS
+const dashboardCategory = ref('All')
 
 const showSetup = ref(false)
 
@@ -804,6 +856,7 @@ onMounted(() => {
           return {
             id: docSnap.id,
             ...data,
+            category: resolveCategory(data?.category),
             date: typeof data.date === 'string' ? data.date : toYMD(data.date?.toDate?.() || data.date),
           }
         })
@@ -898,6 +951,30 @@ const sortedDaily = computed(() =>
   [...dailyTasks.value].sort((a, b) => (a.completed !== b.completed ? a.completed - b.completed : (b.createdAt || 0) - (a.createdAt || 0)))
 )
 
+function categoryIcon(value) {
+  return getCategoryIcon(value)
+}
+
+function categoryColor(value) {
+  return getCategoryColor(value)
+}
+
+function categoryLabel(value) {
+  return resolveCategory(value)
+}
+
+const filteredDaily = computed(() => {
+  if (dashboardCategory.value === 'All') return sortedDaily.value
+  return sortedDaily.value.filter((task) => resolveCategory(task?.category) === dashboardCategory.value)
+})
+
+const filteredWeeklyPreview = computed(() => {
+  const base = dashboardCategory.value === 'All'
+    ? weeklyTasks.value
+    : weeklyTasks.value.filter((task) => resolveCategory(task?.category) === dashboardCategory.value)
+  return base.slice(0, 5)
+})
+
 const doneWeekly = computed(() => weeklyTasks.value.filter((t) => t.completed).length)
 const doneMonthly = computed(() => monthlyTasks.value.filter((t) => t.completed).length)
 
@@ -950,7 +1027,26 @@ async function handleSaveAndSchedule(payload) {
     if (!uid || !taskId) return
     if (payload?.reminderTime) {
       const iso = buildLocalIso(payload.date, payload.reminderTime)
-      const prefs = userPrefs.value?.notifications || {}
+      const explicitChannels = Array.isArray(payload?.reminderChannels)
+        ? payload.reminderChannels
+        : (Array.isArray(payload?.channels) ? payload.channels : [])
+      const normalizedChannels = Array.from(
+        new Set(
+          explicitChannels
+            .map((c) => String(c || '').toLowerCase())
+            .filter((c) => ['pwa', 'whatsapp', 'email', 'sms', 'voice_call'].includes(c))
+        )
+      )
+      const prefs = normalizedChannels.length
+        ? {
+            whatsapp: normalizedChannels.includes('whatsapp'),
+            pwa: normalizedChannels.includes('pwa'),
+            push: normalizedChannels.includes('pwa'),
+            email: normalizedChannels.includes('email'),
+            sms: normalizedChannels.includes('sms'),
+            voice_call: normalizedChannels.includes('voice_call'),
+          }
+        : userPrefs.value?.notifications || {}
       // Prefer direct API call to catch soft warnings via response headers
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
       try {
@@ -959,7 +1055,7 @@ async function handleSaveAndSchedule(payload) {
           text: payload.title,
           scheduledTime: iso,
           taskId,
-          channels: Array.isArray(prefs?.channels) ? prefs.channels : undefined,
+          channels: normalizedChannels.length ? normalizedChannels : undefined,
           timezone: tz,
         })
         // Soft warning header when free limit reached but allowed once

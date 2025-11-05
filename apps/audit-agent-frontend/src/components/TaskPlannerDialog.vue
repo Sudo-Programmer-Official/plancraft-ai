@@ -610,6 +610,46 @@ function computeLastTaskEndIso(contextTasks, tz) {
   return sorted[sorted.length - 1].ends_at.format('YYYY-MM-DDTHH:mm:ssZ')
 }
 
+async function inferReminderTimeFromInput() {
+  try {
+    if (props.disableReminder || !setReminder.value) return null
+    const raw = input.value?.trim()
+    if (!raw) return null
+
+    const tzCandidate = getUserTimezone()
+    const tz = typeof tzCandidate === 'string' && tzCandidate.includes('/')
+      ? tzCandidate
+      : Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+
+    const contextTasks = collectContextTasks(selectedDate.value, tz)
+    const lastTaskEnd = computeLastTaskEndIso(contextTasks, tz)
+
+    const iso = await extractReminderTime(raw, {
+      planDate: selectedDate.value,
+      timezone: tz,
+      lastTaskEnd,
+      existingTasks: contextTasks,
+      userPreferences: reminderPrefs.value,
+      now: new Date(),
+      debugLabel: 'TaskPlannerDialog:manual-save',
+    })
+
+    if (!iso) return null
+    const parsed = dayjs(iso)
+    if (!parsed.isValid()) return null
+
+    const local = parsed.tz(tz)
+    reminderTime.value = local.format('HH:mm')
+    if (!props.lockDate) {
+      selectedDate.value = normalizeDateInput(local.format('YYYY-MM-DD'))
+    }
+    return iso
+  } catch (err) {
+    console.warn('Failed to infer reminder time from input', err?.message || err)
+    return null
+  }
+}
+
 function normalizeTitleKey(value) {
   if (!value) return ''
   return String(value)
@@ -755,6 +795,7 @@ async function generateTasks() {
       displayTitle: task.displayTitle || task.finalTitle || task.title,
       rawPhrase: task.rawPhrase || task.title,
       details: task.details || '',
+      category: task.category || 'Uncategorized',
       scheduledTime: task.scheduledTime,
       timezone: tz,
       reminderTime: task.reminderTime,
@@ -800,11 +841,28 @@ async function generateTasks() {
 }
 
 /* ---------------- Save Handler ---------------- */
-function save() {
+async function save() {
+  if (!props.disableReminder && setReminder.value && !reminderTime.value) {
+    await inferReminderTimeFromInput()
+    if (!reminderTime.value) {
+      ElMessage({
+        type: 'warning',
+        message: 'Please choose a reminder time or include a specific time in your task.',
+        duration: 4000,
+      })
+      return
+    }
+  }
+
   const dateToSave = props.lockDate && props.task?.date ? props.task.date : selectedDate.value
-  const reminderToSave = props.disableReminder
-    ? props.task?.reminderTime
-    : reminderTime.value || null
+  let reminderToSave = null
+  if (props.disableReminder) {
+    reminderToSave = props.task?.reminderTime ?? null
+  } else if (setReminder.value) {
+    reminderToSave = reminderTime.value || null
+  }
+
+  const channelsToSave = setReminder.value ? computeReminderChannels() : []
 
   emit('saved', {
     ...props.task,
@@ -812,6 +870,8 @@ function save() {
     details: details.value,
     date: dateToSave,
     reminderTime: reminderToSave,
+    reminderChannels: channelsToSave,
+    channels: channelsToSave,
   })
   ElNotification({ title: 'Success', message: 'Task saved', type: 'success' })
   closeDialog()

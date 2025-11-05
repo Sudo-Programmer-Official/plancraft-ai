@@ -399,14 +399,44 @@ export async function sendReminder(reminder) {
 export function queueReminder(rem) {
   try {
     const id = String(rem?.id || rem?._id || "");
-    const when = rem?.scheduledTime || rem?.time;
-    const ts = when instanceof Date ? when : new Date(when);
+    const whenRaw = rem?.scheduledTime || rem?.time;
+
+    const toDate = (input) => {
+      if (!input) return null;
+      if (input instanceof Date) return isNaN(input.getTime()) ? null : input;
+      if (typeof input.toDate === 'function') {
+        try {
+          const converted = input.toDate();
+          if (converted instanceof Date && !isNaN(converted.getTime())) return converted;
+        } catch {}
+      }
+      if (typeof input.seconds === 'number') {
+        const d = new Date(input.seconds * 1000);
+        if (!isNaN(d.getTime())) return d;
+      }
+      if (typeof input._seconds === 'number') {
+        const d = new Date(input._seconds * 1000);
+        if (!isNaN(d.getTime())) return d;
+      }
+      try {
+        const parsed = new Date(input);
+        if (!isNaN(parsed.getTime())) return parsed;
+      } catch {}
+      return null;
+    };
+
+    const ts = toDate(whenRaw);
+    if (!ts) {
+      console.warn('[ReminderService:scheduler] Unable to coerce scheduledTime', { id, whenRaw });
+      return;
+    }
+
     const delay = ts.getTime() - Date.now();
     if (!Number.isFinite(delay)) return;
 
     console.log(`[ReminderService:scheduler] Queued reminder id=${id} taskId=${rem?.taskId || "n/a"} at=${ts.toISOString()}`);
 
-    const safeDelay = Math.min(delay, MAX_DELAY_MS, 0x7fffffff);
+    const safeDelay = Math.min(Math.max(delay, 0), MAX_DELAY_MS, 0x7fffffff);
     if (delay > MAX_DELAY_MS) {
       console.warn(`[ReminderService:scheduler] Reminder ${id} scheduled beyond 24h (${(delay / 3600000).toFixed(1)}h). Will re-queue closer to send time.`);
     }

@@ -1,6 +1,62 @@
 // src/services/stripeService.js
 import api from '@/services/api'
 
+const DEFAULT_STATUS = Object.freeze({ plan: 'free', status: 'free', remainingDays: 0, cancelAt: null })
+const CACHE_KEY = 'subscription_status_cache'
+const CACHE_TTL_MS = 1000 * 60 * 5 // 5 minutes
+
+function loadCacheMap() {
+  if (typeof window === 'undefined' || !window.localStorage) return {}
+  try {
+    const raw = window.localStorage.getItem(CACHE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      return parsed && typeof parsed === 'object' ? parsed : {}
+    }
+  } catch {}
+  return {}
+}
+
+function persistCacheMap(map) {
+  if (typeof window === 'undefined' || !window.localStorage) return
+  try {
+    window.localStorage.setItem(CACHE_KEY, JSON.stringify(map))
+  } catch {}
+}
+
+function readCachedStatus(userId) {
+  if (!userId) return null
+  try {
+    const map = loadCacheMap()
+    const entry = map[userId]
+    if (!entry) return null
+    if (!entry.ts || Date.now() - entry.ts > CACHE_TTL_MS) return null
+    return entry.data || null
+  } catch {
+    return null
+  }
+}
+
+function writeCachedStatus(userId, data) {
+  if (!userId || !data) return
+  try {
+    const map = loadCacheMap()
+    map[userId] = { ts: Date.now(), data }
+    persistCacheMap(map)
+  } catch {}
+}
+
+function normalizeStatus(payload) {
+  if (!payload || typeof payload !== 'object') return { ...DEFAULT_STATUS }
+  const plan = payload.plan || (payload.status === 'active' ? 'premium' : 'free')
+  return {
+    plan,
+    status: payload.status || (plan === 'premium' ? 'active' : 'free'),
+    remainingDays: Number(payload.remainingDays || 0),
+    cancelAt: payload.cancelAt || null,
+  }
+}
+
 export async function createCheckoutSession(plan, userId) {
   try {
     const successUrl = window.location.origin + '/subscription?status=success'
@@ -23,12 +79,43 @@ export async function createCheckoutSession(plan, userId) {
 }
 
 export async function getSubscriptionStatus(userId) {
+  if (!userId) return { ...DEFAULT_STATUS }
+
+  // Best effort: skip remote lookup if offline and cached data exists
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    const cachedOffline = readCachedStatus(userId)
+    if (cachedOffline) return normalizeStatus(cachedOffline)
+    return { ...DEFAULT_STATUS }
+  }
+
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null
+  const timeoutMs = 12000
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null
+
   try {
-    const res = await api.get('/subscription/status', { params: { userId } })
-    return res?.data || { plan: 'free', remainingDays: 0 }
+    const res = await api.get('/subscription/status', {
+      params: { userId },
+      signal: controller?.signal,
+      timeout: timeoutMs,
+    })
+    const normalized = normalizeStatus(res?.data)
+    writeCachedStatus(userId, normalized)
+    return normalized
   } catch (err) {
-    console.error('Subscription status error:', err?.response?.data || err?.message)
-    return { plan: 'free', remainingDays: 0 }
+    const cached = readCachedStatus(userId)
+    if (cached) {
+      console.info('Subscription status fallback to cache:', err?.message || err)
+      return normalizeStatus(cached)
+    }
+    const message = err?.response?.data || err?.message || err
+    if (err?.code === 'ERR_CANCELED') {
+      console.warn('Subscription status request timed out, using defaults')
+    } else {
+      console.error('Subscription status error:', message)
+    }
+    return { ...DEFAULT_STATUS }
+  } finally {
+    if (timer) clearTimeout(timer)
   }
 }
 

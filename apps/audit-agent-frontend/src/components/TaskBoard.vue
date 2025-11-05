@@ -28,6 +28,24 @@
       </button>
     </div>
 
+    <div class="flex gap-3 overflow-x-auto pb-2 mb-4 mt-2">
+      <button
+        v-for="category in categories"
+        :key="category"
+        type="button"
+        @click="activeCategory = category"
+        :class="[
+          'flex-shrink-0 px-3 py-1 rounded-lg font-medium text-sm transition-all duration-300 ease-in-out',
+          activeCategory === category
+            ? 'bg-indigo-700 text-white shadow-[0_0_10px_rgba(99,102,241,0.5)]'
+            : 'bg-slate-800 text-slate-300 hover:bg-slate-700',
+        ]"
+      >
+        <span class="mr-1 text-base leading-none">{{ categoryIcon(category) }}</span>
+        {{ category }}
+      </button>
+    </div>
+
     <!-- Draggable tasks -->
     <div class="max-h-96 overflow-y-auto custom-scroll pr-2">
       <draggable
@@ -35,10 +53,12 @@
         item-key="id"
         class="space-y-3"
         handle=".drag-handle"
+        :disabled="activeCategory !== 'All'"
         @end="persistOrder"
       >
         <template #item="{ element: task }">
           <div
+            v-if="shouldRenderTask(task)"
             class="bg-slate-900/40 p-4 rounded-xl shadow border border-slate-700/50 transition-all"
           >
             <div class="flex items-start gap-3">
@@ -52,14 +72,23 @@
 
               <!-- Main body -->
               <div class="flex-1">
-                <div class="flex justify-between items-center">
-                  <span
-                    class="text-base sm:text-lg font-medium"
-                    :class="{ 'line-through text-slate-500': task.completed }"
-                  >
-                    {{ task.title }}
-                  </span>
-                  <div class="flex items-center gap-2">
+                <div class="flex justify-between items-start gap-3 flex-wrap">
+                  <div class="flex items-center gap-3">
+                    <span
+                      class="text-base sm:text-lg font-medium"
+                      :class="{ 'line-through text-slate-500': task.completed }"
+                    >
+                      {{ task.title }}
+                    </span>
+                    <div
+                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/70 text-xs font-medium shadow-sm"
+                      :class="categoryColor(task.category)"
+                    >
+                      <span class="text-base leading-none">{{ categoryIcon(task.category) }}</span>
+                      <span>{{ categoryLabel(task.category) }}</span>
+                    </div>
+                  </div>
+                    <div class="flex items-center gap-2">
                     <a
                       v-if="task?.join?.url"
                       :href="task.join.url"
@@ -72,18 +101,17 @@
                     </a>
                     <span class="text-xs text-slate-400">{{ task.date }}</span>
                     <button
+                      @click.stop="openDialog(task)"
+                      class="text-slate-400 text-sm hover:text-slate-200"
+                      title="Edit task"
+                    >
+                      ✏️
+                    </button>
+                    <button
                       v-if="reminderActiveByTask[task.id]"
                       @click.stop="onReminderClick(task)"
                       class="text-yellow-400 text-sm hover:opacity-80"
                       title="Reminder active — click to manage"
-                    >
-                      🔔
-                    </button>
-                    <button
-                      v-else
-                      @click.stop="openDialog(task)"
-                      class="text-slate-400 text-sm hover:text-slate-200"
-                      title="No reminder — click to add"
                     >
                       🔔
                     </button>
@@ -157,6 +185,12 @@
           </div>
         </template>
       </draggable>
+      <p
+        v-if="visibleTasks.length === 0"
+        class="text-sm text-slate-400 mt-4"
+      >
+        No tasks in this category yet.
+      </p>
     </div>
   </section>
 
@@ -174,7 +208,7 @@
 
 <script setup>
 import draggable from 'vuedraggable'
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useTasks } from '@/composables/useTasks'
 import { addTaskToFirebase, updateTaskInFirebase } from '@/services/firebaseService'
 import TaskPlannerDialog from './TaskPlannerDialog.vue'
@@ -183,6 +217,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { getReminderStatus, scheduleReminder } from '@/services/reminderService'
 import api from '@/services/api'
 import { getPreferences as getUserPreferences } from '@/services/settingsService'
+import { TASK_CATEGORY_FILTERS, getCategoryIcon, getCategoryColor, resolveCategory } from '@/constants/taskCategories'
 
 const { tasks, loadTasks, toggleComplete, deleteTask, persistOrder } = useTasks()
 
@@ -197,6 +232,32 @@ const expanded = ref(new Set())
 const reminderActiveByTask = ref({})
 const userPrefs = ref({ notifications: {}, integrations: {} })
 const authStore = useAuthStore()
+const categories = TASK_CATEGORY_FILTERS
+const activeCategory = ref('All')
+
+const visibleTasks = computed(() => {
+  if (activeCategory.value === 'All') return tasks.value
+  const selected = activeCategory.value
+  return tasks.value.filter((task) => resolveCategory(task?.category) === selected)
+})
+
+function categoryIcon(value) {
+  return getCategoryIcon(value)
+}
+
+function categoryColor(value) {
+  return getCategoryColor(value)
+}
+
+function categoryLabel(value) {
+  return resolveCategory(value)
+}
+
+function shouldRenderTask(task) {
+  if (!task) return false
+  if (activeCategory.value === 'All') return true
+  return resolveCategory(task?.category) === activeCategory.value
+}
 
 function toggleExpand(id) {
   if (expanded.value.has(id)) expanded.value.delete(id)
@@ -319,6 +380,7 @@ async function onReminderClick(task) {
     console.warn('Reminder manage failed', e?.response?.data || e?.message)
   }
 }
+
 </script>
 
 <style scoped>
