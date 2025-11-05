@@ -1,82 +1,132 @@
 <template>
-  <div
-    class="min-h-screen bg-gradient-to-b from-indigo-900 via-blue-900 to-blue-800 px-6 py-10 text-white"
-  >
-    <header class="text-center mb-8">
-      <h1 class="text-3xl font-bold">Monthly Task Overview</h1>
-      <p class="text-gray-300">{{ tasksForSelectedDay.length }} tasks on {{ selectedDateLabel }}</p>
+  <div class="min-h-screen bg-gradient-to-b from-indigo-900 via-blue-900 to-blue-800 text-white">
+    <header class="px-4 sm:px-8 pt-10 pb-6 space-y-2 text-center sm:text-left">
+      <h1 class="text-3xl font-bold">🗓️ Monthly Task Overview</h1>
+      <p class="text-gray-300 text-sm sm:text-base">
+        {{ headerSubtitle }}
+      </p>
     </header>
 
-    <section class="bg-black/30 rounded-2xl p-6 shadow-lg mb-8">
-      <div class="flex justify-between items-center mb-4">
-        <button @click="prevMonth" class="px-3 py-1 bg-indigo-600 rounded">‹</button>
-        <h2 class="text-xl font-semibold">{{ currentMonthLabel }} {{ currentYear }}</h2>
-        <button @click="nextMonth" class="px-3 py-1 bg-indigo-600 rounded">›</button>
-      </div>
+    <section class="monthly-tasks px-4 sm:px-8 pb-12 space-y-10">
+      <div class="calendar-section bg-black/30 rounded-2xl p-6 shadow-lg border border-white/10">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+          <button
+            @click="prevMonth"
+            class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 transition-colors"
+          >
+            ‹
+          </button>
+          <h2 class="text-xl font-semibold">{{ currentMonthLabel }} {{ currentYear }}</h2>
+          <button
+            @click="nextMonth"
+            class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 transition-colors"
+          >
+            ›
+          </button>
+        </div>
 
-      <div class="grid grid-cols-7 gap-2 text-center">
-        <div v-for="d in daysOfWeek" :key="d" class="text-gray-400 font-medium">{{ d }}</div>
-        <div
-          v-for="day in calendarDays"
-          :key="day.date.toISOString()"
-          @click="selectDate(day.date)"
-          :class="[
-            'cursor-pointer rounded-lg py-2',
-            day.isCurrentMonth ? 'text-white' : 'text-gray-500',
-            isToday(day.date) ? 'border border-indigo-400' : '',
-            isSelected(day.date) ? 'bg-indigo-600 text-white' : 'hover:bg-indigo-500/40',
-          ]"
-        >
-          {{ day.date.getDate() }}
+        <div class="grid grid-cols-7 gap-2 text-center text-sm">
+          <div v-for="d in daysOfWeek" :key="d" class="text-gray-400 font-medium uppercase tracking-wide">
+            {{ d }}
+          </div>
+          <div
+            v-for="day in calendarDays"
+            :key="day.date.toISOString()"
+            @click="selectDate(day.date)"
+            :class="[
+              'cursor-pointer rounded-lg py-2 transition-all duration-200',
+              day.isCurrentMonth ? 'text-white' : 'text-gray-500',
+              isToday(day.date) ? 'border border-indigo-400' : '',
+              isSelected(day.date) ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30' : 'hover:bg-indigo-500/40',
+            ]"
+          >
+            {{ day.date.getDate() }}
+          </div>
         </div>
       </div>
-    </section>
 
-    <section class="bg-black/30 rounded-2xl p-6 shadow-lg">
-      <div class="flex justify-between items-center mb-4">
-        <h2 class="text-xl font-semibold">Tasks for {{ selectedDateLabel }}</h2>
-      </div>
+      <hr class="border-slate-700/40" />
 
-      <TransitionGroup name="fade-move" tag="ul" class="space-y-3">
-        <li
-          v-for="task in tasksForSelectedDay"
-          :key="task.id"
-          class="flex justify-between items-center bg-black/20 px-4 py-3 rounded-xl"
+      <div class="tasks-section bg-black/30 rounded-2xl p-6 shadow-lg border border-white/10">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <h3 class="text-lg sm:text-xl font-semibold">Tasks for {{ selectedDateLabel }}</h3>
+          <span class="text-sm text-indigo-200">
+            {{ tasksForSelectedDay.length }} task{{ tasksForSelectedDay.length === 1 ? '' : 's' }}
+          </span>
+        </div>
+
+        <div
+          v-if="tasksForSelectedDay.length"
+          class="flex flex-wrap gap-2 text-xs text-slate-300 mb-4"
         >
-          <div class="flex-1 pr-4">
-            <div class="flex items-center gap-2 flex-wrap">
-              <p
-                :class="['font-medium', task.completed ? 'line-through text-gray-400' : 'text-white']"
-              >
-                {{ task.title }}
+          <span
+            v-for="entry in categorySummaryEntries"
+            :key="entry.name"
+            class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-slate-900/70 border border-slate-700/70 shadow-sm"
+          >
+            <span>{{ entry.icon }}</span>
+            <span class="text-slate-200">{{ entry.name }}</span>
+            <span class="text-slate-400 font-semibold">{{ entry.count }}</span>
+          </span>
+        </div>
+        <p
+          v-else
+          class="text-xs text-slate-400 mb-4"
+        >
+          Nothing scheduled for this day. Use the planner to add your next move.
+        </p>
+
+        <TransitionGroup
+          v-if="tasksForSelectedDay.length"
+          name="fade-move"
+          tag="ul"
+          class="space-y-3"
+        >
+          <li
+            v-for="task in tasksForSelectedDay"
+            :key="task.id"
+            class="flex justify-between items-center bg-black/25 px-4 py-3 rounded-xl border border-slate-800/80 hover:border-indigo-500/40 transition"
+          >
+            <div class="flex-1 pr-4">
+              <div class="flex items-center gap-2 flex-wrap">
+                <p
+                  :class="[
+                    'font-medium',
+                    task.completed ? 'line-through text-gray-400' : 'text-white',
+                  ]"
+                >
+                  {{ task.title }}
+                </p>
+                <span
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-900/70 text-[11px] font-medium shadow-sm"
+                  :class="categoryColor(task.category)"
+                >
+                  <span class="leading-none">{{ categoryIcon(task.category) }}</span>
+                  <span>{{ categoryLabel(task.category) }}</span>
+                </span>
+                <span
+                  v-if="hasLate(task)"
+                  class="text-[10px] px-2 py-0.5 rounded bg-red-600/30 border border-red-500/40 text-red-200 align-middle"
+                >
+                  Late<span v-if="lateDelay(task) !== null"> ({{ lateDelay(task) }}d)</span>
+                </span>
+              </div>
+              <p v-if="task.details" class="text-sm text-gray-400 mt-1">
+                {{ task.details }}
               </p>
-              <span
-                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-900/70 text-[11px] font-medium shadow-sm"
-                :class="categoryColor(task.category)"
-              >
-                <span class="leading-none">{{ categoryIcon(task.category) }}</span>
-                <span>{{ categoryLabel(task.category) }}</span>
-              </span>
-              <span
-                v-if="hasLate(task)"
-                class="text-[10px] px-2 py-0.5 rounded bg-red-600/30 border border-red-500/40 text-red-200 align-middle"
-              >
-                Late<span v-if="lateDelay(task) !== null"> ({{ lateDelay(task) }}d)</span>
-              </span>
             </div>
-            <p v-if="task.details" class="text-sm text-gray-400">{{ task.details }}</p>
-          </div>
-          <div class="flex items-center gap-3">
-            <button @click="onView(task)" class="text-gray-400 hover:text-white">🍔</button>
-            <input
-              type="checkbox"
-              :checked="task.completed"
-              @change="toggleComplete(task)"
-              class="w-5 h-5 accent-indigo-500"
-            />
-          </div>
-        </li>
-      </TransitionGroup>
+            <div class="flex items-center gap-3">
+              <button @click="onView(task)" class="text-gray-400 hover:text-white">🍔</button>
+              <input
+                type="checkbox"
+                :checked="task.completed"
+                @change="toggleComplete(task)"
+                class="w-5 h-5 accent-indigo-500"
+              />
+            </div>
+          </li>
+        </TransitionGroup>
+      </div>
     </section>
 
     <!-- <TaskPlannerDialog
@@ -239,6 +289,25 @@ const tasksForSelectedDay = computed(() => {
   })
 })
 
+const categorySummaryEntries = computed(() => {
+  if (!tasksForSelectedDay.value.length) return []
+  const counts = tasksForSelectedDay.value.reduce((acc, task) => {
+    const key = resolveCategory(task?.category)
+    acc[key] = (acc[key] || 0) + 1
+    return acc
+  }, {})
+  return Object.entries(counts)
+    .map(([name, count]) => ({
+      name,
+      count,
+      icon: getCategoryIcon(name),
+    }))
+    .sort((a, b) => {
+      if (b.count === a.count) return a.name.localeCompare(b.name)
+      return b.count - a.count
+    })
+})
+
 const calendarDays = computed(() => getCalendarDays(currentMonth.value, currentYear.value))
 
 function getCalendarDays(month, year) {
@@ -355,6 +424,14 @@ const selectedDateLabel = computed(() =>
     day: 'numeric',
   }),
 )
+
+const headerSubtitle = computed(() => {
+  const count = tasksForSelectedDay.value.length
+  if (count === 0) {
+    return `No tasks scheduled for ${selectedDateLabel.value}.`
+  }
+  return `${count} task${count === 1 ? '' : 's'} on ${selectedDateLabel.value}`
+})
 </script>
 
 <style scoped>

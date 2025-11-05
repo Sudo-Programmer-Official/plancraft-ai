@@ -493,6 +493,7 @@ const tabs = [
   { name: 'Journal', icon: '📝', path: '/journal' },
   { name: 'Reminders', icon: '🔔', path: '/reminders' },
   { name: 'Reports', icon: '📈', path: '/reports' },
+  { name: 'Talk to Planner', icon: '🧠', path: '/talk-to-planner' },
 ]
 
 async function handleLogout() {

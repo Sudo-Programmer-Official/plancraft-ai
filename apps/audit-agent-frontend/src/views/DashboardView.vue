@@ -4,55 +4,51 @@
     Checking session…
   </div>
   <SetupPrompt v-else-if="showSetup" @done="showSetup = false" @close="showSetup = false" />
-  <main
-    v-else
-    class="bg-animated min-h-screen px-2 py-6 sm:px-4 md:px-6 space-y-6 lg:space-y-8 pb-12 transition-colors"
-  >
-    <GuestBanner :isGuest="authStore.guest" @login="redirectToLogin" />
+  <main v-else class="bg-animated min-h-screen py-6 transition-colors">
+    <div class="flex flex-col gap-6 px-4 sm:px-6 md:px-8 pb-12">
+      <GuestBanner :isGuest="authStore.guest" @login="redirectToLogin" />
 
     <!-- Tier 1 · Overview -->
-    <section class="space-y-4">
-      <div class="dashboard-card greeting-card space-y-4">
-        <div>
+    <section class="flex flex-col gap-4">
+      <div
+        class="rounded-2xl p-5 sm:p-6 bg-gradient-to-br from-indigo-950 via-purple-950 to-slate-950 shadow-md shadow-indigo-900/40 flex flex-col gap-4 text-slate-100"
+      >
+        <div class="space-y-2">
           <p class="text-xs sm:text-sm uppercase tracking-widest text-indigo-300/80">
             Your companion workspace
           </p>
-          <div class="flex flex-wrap items-end gap-2">
-            <h1 class="text-2xl sm:text-3xl font-semibold text-slate-100">
-              {{ greetingHeadline }}
-            </h1>
-            <span v-if="dailyTasks.length" class="text-indigo-200/90 text-sm sm:text-base">
-              Let’s craft an intentional day.
-            </span>
-          </div>
+          <h2 class="text-2xl sm:text-3xl font-semibold">
+            {{ greetingHeadline }}
+          </h2>
+          <p class="text-sm text-slate-300">Let’s craft an intentional day.</p>
         </div>
 
-        <transition-group name="slide" tag="div">
+        <transition-group name="slide" tag="div" class="space-y-2">
           <div
             v-if="currentInsight"
             :key="currentInsight"
-            class="text-indigo-200/90 text-sm sm:text-base max-w-2xl leading-relaxed"
+            class="text-indigo-200/90 text-sm sm:text-base leading-relaxed"
           >
             {{ currentInsight }}
           </div>
         </transition-group>
 
         <div
-          class="now-bar rounded-xl bg-indigo-900/40 border border-indigo-700/40 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+          class="rounded-xl bg-slate-900/50 border border-indigo-700/40 px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm sm:text-base"
         >
           <div class="flex items-center gap-2 text-slate-200">
             <span class="text-xl">🕐</span>
             <span class="font-medium text-sm sm:text-base">Current Focus</span>
           </div>
-          <div class="text-indigo-200 text-sm sm:text-base font-medium">
-            {{ currentFocusTask?.title || "All caught up — take a mindful pause." }}
-          </div>
+          <span class="text-indigo-300 font-medium truncate">
+            {{ currentFocusTask?.title || 'All caught up — take a mindful pause.' }}
+          </span>
         </div>
       </div>
 
       <div
         v-if="carryoverCount > 0 || (usage.plan === 'free' && !isPremium.value) || reactivateEligible"
-        class="grid gap-3 lg:grid-cols-3"
+        class="flex flex-col gap-3 lg:grid lg:grid-cols-3"
       >
         <div
           v-if="carryoverCount > 0"
@@ -139,7 +135,7 @@
 
     <!-- Tier 2 · Workspaces -->
     <section class="grid gap-4 lg:gap-6 xl:grid-cols-5">
-      <div v-if="showDaily" class="dashboard-card daily-card xl:col-span-3 space-y-5">
+      <div v-if="showDaily" class="card-mobile daily-card xl:col-span-3 space-y-5 overflow-hidden">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h3 class="text-lg sm:text-xl font-semibold text-slate-100">
@@ -158,7 +154,7 @@
           </button>
         </div>
 
-        <div class="flex gap-2 sm:gap-3 overflow-x-auto pb-2">
+        <div class="flex flex-wrap gap-2 overflow-x-auto sm:overflow-visible pb-2 scrollbar-hide">
           <button
             v-for="category in categoryFilters"
             :key="category"
@@ -193,7 +189,7 @@
           <ul
             v-if="filteredDaily.length"
             ref="dailyList"
-            class="space-y-2 text-sm max-h-64 overflow-y-auto pr-1 custom-scroll"
+            class="space-y-2 text-sm max-h-64 overflow-y-auto pr-1 scrollbar-plan"
           >
             <li
               v-for="task in filteredDaily"
@@ -262,7 +258,7 @@
         />
       </div>
 
-      <div v-if="showWeekly" class="dashboard-card weekly-card xl:col-span-2 space-y-4">
+      <div v-if="showWeekly" class="card-mobile weekly-card xl:col-span-2 space-y-4 overflow-hidden">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 class="text-lg sm:text-xl font-semibold text-slate-100">📆 This Week’s Horizon</h3>
@@ -294,14 +290,14 @@
           {{ doneWeekly }}/{{ weeklyTasks.length }} completed this week
         </p>
 
-        <ul
+        <div
           v-if="filteredWeeklyPreview.length"
-          class="space-y-2 text-sm max-h-56 overflow-y-auto custom-scroll pr-1"
+          class="flex flex-col sm:flex-row sm:flex-wrap gap-3 text-sm max-h-56 overflow-y-auto pr-1 scrollbar-plan"
         >
-          <li
+          <div
             v-for="task in filteredWeeklyPreview"
             :key="task.id"
-            class="p-3 rounded-xl bg-slate-900/70 border border-slate-800/80 hover:border-indigo-500/40 transition flex justify-between items-start gap-3"
+            class="w-full sm:w-[48%] p-3 rounded-xl bg-slate-900/70 border border-slate-800/80 hover:border-indigo-500/40 transition flex justify-between items-start gap-3"
           >
             <div class="space-y-1">
               <div class="flex flex-wrap items-center gap-2">
@@ -318,18 +314,18 @@
               </div>
               <small class="text-slate-400 text-xs">{{ task.date }}</small>
             </div>
-          </li>
-        </ul>
+          </div>
+        </div>
         <p v-else class="text-slate-400 text-sm">
           {{ dashboardCategory === 'All' ? 'No weekly tasks yet.' : 'No weekly tasks in this category.' }}
         </p>
       </div>
 
-      <div v-if="showQuickLinks" class="dashboard-card quick-links-card xl:col-span-2">
+      <div v-if="showQuickLinks" class="card-mobile quick-links-card xl:col-span-2 overflow-hidden">
         <QuickLinksCard />
       </div>
 
-      <div v-if="showMonthly" class="dashboard-card monthly-card xl:col-span-3 space-y-4">
+      <div v-if="showMonthly" class="card-mobile monthly-card xl:col-span-3 space-y-4 overflow-hidden">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 class="text-lg sm:text-xl font-semibold text-slate-100">🌙 Monthly Momentum</h3>
@@ -359,8 +355,15 @@
     </section>
 
     <!-- Tier 3 · Analytics & Insights -->
-    <section class="grid gap-4 lg:gap-6 lg:grid-cols-2">
-      <div v-if="showJournal" class="dashboard-card journal-card space-y-4">
+    <section class="flex flex-col gap-4 lg:grid lg:grid-cols-2 lg:gap-6">
+      <div
+        v-if="showJournal"
+        :class="[
+          'card-mobile journal-card space-y-4 overflow-hidden',
+          isMobile ? 'order-2' : 'order-1',
+          'lg:order-none'
+        ]"
+      >
         <div class="flex flex-wrap items-center justify-between gap-3">
           <h3 class="text-lg sm:text-xl font-semibold text-slate-100">📖 Journal Snapshot</h3>
           <div class="flex items-center gap-2">
@@ -397,7 +400,14 @@
         <p v-else class="text-slate-400 text-sm">No reflections yet. Start journaling today!</p>
       </div>
 
-      <div v-if="showAIInsights" class="dashboard-card ai-card space-y-4">
+      <div
+        v-if="showAIInsights"
+        :class="[
+          'card-mobile ai-card space-y-4 overflow-hidden',
+          isMobile ? 'order-1' : 'order-2',
+          'lg:order-none'
+        ]"
+      >
         <div class="flex items-center justify-between">
           <h3 class="text-lg sm:text-xl font-semibold text-slate-100 flex items-center gap-2">
             🤖 AI Insights
@@ -465,7 +475,7 @@
         <p v-else class="text-slate-400 text-sm">Fetching AI insights…</p>
       </div>
 
-      <div class="dashboard-card report-card lg:col-span-2 space-y-4">
+      <div class="card-mobile report-card lg:col-span-2 space-y-4 overflow-hidden">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div class="flex items-center gap-2">
             <span class="text-xl">📊</span>
@@ -569,7 +579,7 @@
     </section>
 
     <!-- Tier 4 · AI Quick Actions -->
-    <section class="dashboard-card flex flex-col items-center gap-4 text-center">
+    <section class="card-mobile flex flex-col items-center gap-4 text-center overflow-hidden">
       <h3 class="text-base sm:text-lg font-semibold text-slate-100">✨ AI Quick Actions</h3>
       <p class="text-xs sm:text-sm text-indigo-200/80 max-w-2xl">
         Give your assistant a gentle nudge — reflect, plan, or dive deeper into insights.
@@ -599,6 +609,7 @@
         </button>
       </div>
     </section>
+    </div>
   </main>
 </template>
 
@@ -665,6 +676,18 @@ const showWeekly = ref(true)
 const showMonthly = ref(true)
 const showJournal = ref(true)
 const showAIInsights = ref(true)
+const isMobile = ref(false)
+
+const updateIsMobile = () => {
+  if (typeof window === 'undefined') return
+  isMobile.value = window.innerWidth < 768
+}
+
+onMounted(() => {
+  if (typeof window === 'undefined') return
+  updateIsMobile()
+  window.addEventListener('resize', updateIsMobile, { passive: true })
+})
 
 // Usage meter (free plan)
 const usage = ref({ used: 0, limit: 0, plan: '' })
@@ -1237,6 +1260,7 @@ onMounted(() => {
 onUnmounted(() => {
   if (unsubscribe.value) unsubscribe.value()
   if (insightIntervalId.value) clearInterval(insightIntervalId.value)
+  if (typeof window !== 'undefined') window.removeEventListener('resize', updateIsMobile)
 })
 
 async function redirectToLogin() {
@@ -1517,23 +1541,10 @@ onUnmounted(() => {
   }
 }
 
-.dashboard-card {
-  background: linear-gradient(145deg, rgba(30, 27, 75, 0.88), rgba(49, 46, 129, 0.85), rgba(76, 29, 149, 0.82));
-  border-radius: 1.25rem;
-  padding: 1.75rem;
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  box-shadow: 0 18px 38px rgba(11, 13, 26, 0.45);
-  backdrop-filter: blur(10px);
-}
-
 .dashboard-banner {
   border-radius: 1.15rem;
   padding: 1rem 1.25rem;
   box-shadow: inset 0 1px 12px rgba(255, 255, 255, 0.06);
-}
-
-.now-bar {
-  box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.08);
 }
 
 .action-chip {
@@ -1555,16 +1566,5 @@ onUnmounted(() => {
 .slide-leave-to {
   opacity: 0;
   transform: translateY(6px);
-}
-
-.custom-scroll::-webkit-scrollbar {
-  width: 6px;
-}
-.custom-scroll::-webkit-scrollbar-thumb {
-  background-color: #4b5563;
-  border-radius: 9999px;
-}
-.custom-scroll::-webkit-scrollbar-track {
-  background: transparent;
 }
 </style>
