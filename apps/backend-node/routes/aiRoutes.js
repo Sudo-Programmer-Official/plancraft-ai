@@ -313,6 +313,8 @@ router.post('/split-tasks', async (req, res) => {
       .filter((t) => t && typeof t.title === 'string' && t.title.trim().length > 0)
       .map((t, i) => ({
         title: t.title.trim(),
+        displayTitle: typeof t.displayTitle === 'string' ? t.displayTitle.trim() : t.title.trim(),
+        rawPhrase: typeof t.rawPhrase === 'string' ? t.rawPhrase.trim() : t.title.trim(),
         details: typeof t.details === 'string' ? t.details.trim() : '',
         estimate_minutes: Number.isFinite(t.estimate_minutes) ? t.estimate_minutes : 15,
         energy: ['low', 'medium', 'high'].includes((t.energy || '').toLowerCase()) ? t.energy.toLowerCase() : 'low',

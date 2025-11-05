@@ -610,6 +610,54 @@ function computeLastTaskEndIso(contextTasks, tz) {
   return sorted[sorted.length - 1].ends_at.format('YYYY-MM-DDTHH:mm:ssZ')
 }
 
+function normalizeTitleKey(value) {
+  if (!value) return ''
+  return String(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function capitalizeTitle(str) {
+  if (!str) return ''
+  return str.charAt(0).toUpperCase() + str.slice(1)
+}
+
+function enrichTitle(task) {
+  const rawPhrase = task.rawPhrase || ''
+  const displayTitle = task.displayTitle || ''
+  const baseTitle = task.title || ''
+
+  const candidateList = [
+    displayTitle,
+    baseTitle,
+    rawPhrase,
+  ].map(v => (typeof v === 'string' ? v.trim() : '')).filter(Boolean)
+
+  let chosen = candidateList[0] || ''
+
+  if (chosen.split(/\s+/).length <= 1) {
+    const alt = candidateList.find(v => v.split(/\s+/).length > 1)
+    if (alt) chosen = alt
+  }
+
+  if (/^go$/i.test(chosen) && rawPhrase) chosen = rawPhrase
+
+  if (/^(sleep|bed|dinner|lunch|breakfast)$/i.test(chosen)) {
+    chosen = `Prepare for ${chosen}`
+  } else if (/^(sleep|bed)\b/i.test(chosen) && !/(prepare|plan|schedule)/i.test(chosen)) {
+    chosen = chosen.replace(/^\s*go\b/i, 'Prepare').trim()
+  }
+
+  chosen = chosen.replace(/^\s*to\s+/i, '').trim()
+  if (/^sleep$/i.test(chosen)) chosen = 'Prepare for sleep'
+
+  if (!chosen) chosen = baseTitle || rawPhrase
+  chosen = capitalizeTitle(chosen)
+  return chosen || 'Plan task'
+}
+
 /* ---------------- Main Generator ---------------- */
 async function generateTasks() {
   if (!input.value.trim()) return
@@ -678,7 +726,20 @@ async function generateTasks() {
       })
     }
 
-    if (!resolved.length) {
+    const seenKeys = new Set()
+    const refined = []
+    for (const item of resolved) {
+      const finalTitle = enrichTitle(item)
+      const key = normalizeTitleKey(finalTitle)
+      if (key && seenKeys.has(key)) {
+        logTimeBrainDialog('generate:dedupe-skip', { title: finalTitle })
+        continue
+      }
+      if (key) seenKeys.add(key)
+      refined.push({ ...item, finalTitle })
+    }
+
+    if (!refined.length) {
       logTimeBrainDialog('generate:empty', { reason: 'no-tasks-returned' })
       ElNotification({
         title: 'No Tasks Generated',
@@ -689,8 +750,10 @@ async function generateTasks() {
       return
     }
 
-    const prepared = resolved.map((task, idx) => ({
-      title: task.title || `Task ${idx + 1}`,
+    const prepared = refined.map((task, idx) => ({
+      title: task.finalTitle || task.title || `Task ${idx + 1}`,
+      displayTitle: task.displayTitle || task.finalTitle || task.title,
+      rawPhrase: task.rawPhrase || task.title,
       details: task.details || '',
       scheduledTime: task.scheduledTime,
       timezone: tz,
@@ -699,7 +762,12 @@ async function generateTasks() {
       relation: task.relation,
       gapMinutes: task.gapMinutes,
       confidence: task.confidence,
-      meta: task.meta,
+      meta: {
+        ...task.meta,
+        finalTitle: task.finalTitle,
+        rawPhrase: task.rawPhrase,
+        displayTitle: task.displayTitle,
+      },
     }))
 
     const saved = await Promise.all(
@@ -722,6 +790,7 @@ async function generateTasks() {
     })
     emit('saved', saved)
     logTimeBrainDialog('generate:completed', { saved: saved.length })
+    if (!notifPromptOpen.value) closeDialog()
   } catch (err) {
     console.error('Generate failed', err)
     ElNotification({ title: 'Error', message: 'Task generation failed', type: 'error' })

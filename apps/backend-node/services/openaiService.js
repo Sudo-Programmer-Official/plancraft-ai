@@ -368,7 +368,9 @@ Return ONLY valid JSON in this format:
 {
   "tasks": [
     {
-      "title": "Action verb + clear outcome (max 8 words)",
+      "title": "Action verb + clear outcome (max 9 words)",
+      "displayTitle": "User-friendly phrasing retaining key noun (e.g., \"Prepare for sleep\")",
+      "rawPhrase": "Exact snippet from the user input that inspired this task",
       "details": "Specifics or success criteria",
       "estimate_minutes": 15,
       "energy": "low|medium|high",
@@ -386,13 +388,19 @@ Return ONLY valid JSON in this format:
 Rules:
 - At most ${maxItems} tasks.
 - Each task must start with a verb (e.g., Write, Review, Prepare, Go).
+- Titles MUST include both the intent and the key noun (e.g., "Go to sleep" → "Prepare for sleep", "Attend" → "Attend biology class").
+- Never output a generic verb alone ("Go", "Set", "Do"); expand it using the surrounding noun phrase.
+- Populate displayTitle with the polished, user-friendly text you would show in the UI (keep it short but descriptive).
+- Populate rawPhrase with the exact fragment from the user input so downstream systems can learn user language.
 - No sequence words like "First", "Second", "Lastly".
 - No reflections like "I feel grateful" or "Today is tough".
 - Each task should be atomic, completable in 10–30 minutes.
 - Do not include duplicates or vague filler sentences.
+- Treat meta commands like "set a reminder" or "remember to" as part of the underlying action; do not output separate tasks that only restate the reminder mechanic unless the user explicitly asks for that as a standalone deliverable.
 - If the note implies a specific time (e.g., "at 3:15 PM", "after dinner", "tonight at 8"), set scheduledTime using YYYY-MM-DDTHH:mm (assume the user's current day unless otherwise specified) and copy the original phrase into timeHint.
 - If timing is relative (e.g., "after class", "then go to the gym"), set relation to "after_previous" and provide a reasonable gapMinutes (default 15 unless another break is implied). If it should start together with the prior task (e.g., "stretch while watching lecture"), use "same_time_previous".
 - When timing is unspecified, use relation "independent" and set scheduledTime/timeHint to null.
+- Remove duplicates: if two candidate tasks would resolve to the same normalized idea (e.g., "Set reminder to call Mom" and "Call Mom"), choose the clearer one.
 - Keep gapMinutes between 5 and 60 minutes when relation is "after_previous".
 `;
 
