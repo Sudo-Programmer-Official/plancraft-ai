@@ -6,6 +6,7 @@ import { sendPWA } from './integrations/pwaProvider.js'
 import { sendEmail } from './integrations/emailProvider.js'
 import { makeCallForUser, sendSMSForUser } from './twilioService.js'
 import { getUserPrefs } from './userPrefService.js'
+import { buildReminderBrandCopy } from './notificationTemplates.js'
 
 export async function sendNotification(userId, message, channel = 'all', options = {}) {
   const snap = await db.collection('users').doc(String(userId)).get()
@@ -283,16 +284,42 @@ export async function notifyReminderDue(userId, itemsInput = [], options = {}) {
   const reminders = ensureArray(itemsInput)
   const includeVoice = options.includeVoice !== false
 
-  const title = options.title || '⏰ Task Reminder'
+  const brandToneEnabled = options.brandTone !== false
+  let brandCopy = null
+  if (brandToneEnabled) {
+    try {
+      const identity = await loadNotificationIdentity(userId)
+      const callerCta =
+        options.ctaUrl ||
+        options.deepLink ||
+        (options.pwa && options.pwa.data && (options.pwa.data.url || options.pwa.data.cta)) ||
+        null
+      brandCopy = buildReminderBrandCopy({
+        name: identity.firstName || identity.displayName,
+        reminders,
+        timezone: identity.timezone || reminders[0]?.timezone,
+        ctaUrl: callerCta,
+      })
+    } catch (err) {
+      console.warn('[Notification] brand copy fallback', err?.message || err)
+      brandCopy = null
+    }
+  }
+
+  const title = options.title || brandCopy?.headline || '⏰ Task Reminder'
   const message =
     options.message ||
     buildGroupedMessage(title, reminders, { fallback: 'You have something coming up soon.' })
 
   const voiceMessage =
-    includeVoice && (options.voiceMessage || buildVoiceSummary('Heads up, you have reminders waiting', reminders))
+    includeVoice &&
+    (options.voiceMessage ||
+      brandCopy?.voiceMessage ||
+      buildVoiceSummary('Heads up, you have reminders waiting', reminders))
 
-  const subject = options.subject || 'PlanCraftAI Reminder'
-  const smsMessage = options.smsMessage || message.replace(/\*/g, '')
+  const subject = options.subject || brandCopy?.subject || 'PlanCraftAI Reminder'
+  const smsMessageBaseline = brandCopy?.sms || message.replace(/\*/g, '')
+  const smsMessage = options.smsMessage || smsMessageBaseline
 
   const limitTo = options.limitTo
   const channelResolution = await resolveUserChannels(userId, options.channels, {
@@ -307,8 +334,8 @@ export async function notifyReminderDue(userId, itemsInput = [], options = {}) {
     message,
     subject,
     whatsappPrimary: options.whatsappTemplate || options.whatsapp,
-    whatsappFallback: options.whatsappFallback || message,
-    emailMessage: options.emailMessage || message,
+    whatsappFallback: options.whatsappFallback || brandCopy?.whatsapp || message,
+    emailMessage: options.emailMessage || brandCopy?.email || message,
     pwa: options.pwa || {
       title: 'Reminder due',
       body: message,
@@ -357,4 +384,31 @@ export async function sendTaskNotification(userId, task, options = {}) {
 export async function sendReminderNotification(userId, reminder, options = {}) {
   const items = ensureArray(reminder)
   return notifyReminderDue(userId, items, options)
+}
+
+async function loadNotificationIdentity(userId) {
+  if (!userId) return {}
+  try {
+    const snap = await db.collection('users').doc(String(userId)).get()
+    if (!snap.exists) return {}
+    const data = snap.data() || {}
+    const displayName =
+      data.displayName ||
+      data.name ||
+      data.fullName ||
+      (data.profile && (data.profile.displayName || data.profile.name)) ||
+      null
+    const timezone =
+      data.timezone ||
+      data.tz ||
+      (data.preferences && data.preferences.timezone) ||
+      (data.settings && data.settings.timezone) ||
+      (data.profile && data.profile.timezone) ||
+      null
+    const firstName = displayName ? String(displayName).split(' ')[0] : null
+    return { displayName, firstName, timezone }
+  } catch (err) {
+    console.warn('[Notification] identity lookup failed', err?.message || err)
+    return {}
+  }
 }

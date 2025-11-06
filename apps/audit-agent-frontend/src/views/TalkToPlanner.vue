@@ -5,21 +5,60 @@
         <span class="text-pink-400">🧠</span>
         Talk to Planner
       </h2>
-      <button
-        class="clear-btn"
-        @click="clearChat"
-        :disabled="assistantThinking"
-        title="Clear Conversation"
-      >
-        <svg class="icon icon-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="1.6"
-            d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.166L19.28 19.5a1.125 1.125 0 01-1.12 1.05H5.84a1.125 1.125 0 01-1.12-1.05L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .563c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.398m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-          />
-        </svg>
-      </button>
+      <div class="header-actions">
+        <button
+          type="button"
+          class="voice-toggle"
+          :class="{ active: isVoiceOn }"
+          :aria-pressed="isVoiceOn"
+          :title="isVoiceOn ? 'Mute voice responses' : 'Enable voice responses'"
+          @click="toggleVoice"
+        >
+          <span v-if="voiceRequestingFor" class="loader loader--tiny" aria-hidden="true"></span>
+          <template v-else>
+            <svg
+              v-if="isVoiceOn"
+              class="icon icon-speaker"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+            >
+              <path d="M5 9.2v5.6h3.4L12 18.5V5.5L8.4 9.2H5Z" fill="currentColor" stroke="none" />
+              <path d="M15 9.2c1 .9 1.5 2 1.5 3.3s-.5 2.5-1.5 3.3" stroke-linecap="round" />
+              <path d="M17.6 7.2C19.1 8.7 20 10.3 20 12s-.9 3.3-2.4 4.8" stroke-linecap="round" />
+            </svg>
+            <svg
+              v-else
+              class="icon icon-speaker"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+            >
+              <path d="M5 9.2v5.6h3.4L12 18.5V5.5L8.4 9.2H5Z" fill="currentColor" stroke="none" />
+              <path d="M16 9.5l4 5" stroke-linecap="round" />
+              <path d="M20 9.5l-4 5" stroke-linecap="round" />
+            </svg>
+          </template>
+        </button>
+        <button
+          type="button"
+          class="clear-btn"
+          @click="clearChat"
+          :disabled="assistantThinking"
+          title="Clear Conversation"
+        >
+          <svg class="icon icon-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="1.6"
+              d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.166L19.28 19.5a1.125 1.125 0 01-1.12 1.05H5.84a1.125 1.125 0 01-1.12-1.05L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .563c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.398m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+            />
+          </svg>
+        </button>
+      </div>
     </header>
 
     <transition name="toast-fade">
@@ -52,7 +91,35 @@
             </div>
           </div>
           <div class="chat-text">
-            <p v-if="message.text">{{ message.text }}</p>
+            <div
+              v-if="message.text"
+              class="chat-text__content"
+              :class="{ 'chat-text__content--assistant': message.sender === 'assistant' }"
+            >
+              <p class="message-text">{{ message.text }}</p>
+              <button
+                v-if="message.sender === 'assistant'"
+                type="button"
+                class="voice-replay-btn"
+                :disabled="voiceRequestingFor === message.id"
+                :title="voiceRequestingFor === message.id ? 'Generating voice...' : 'Play voice reply'"
+                @click="playVoiceForMessage(message)"
+              >
+                <span v-if="voiceRequestingFor === message.id" class="loader loader--tiny"></span>
+                <svg
+                  v-else
+                  class="icon icon-speaker-mini"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                >
+                  <path d="M6 9v6h3.2L12 18V6l-2.8 3H6Z" fill="currentColor" stroke="none" />
+                  <path d="M14.1 9.5a2.5 2.5 0 0 1 0 5" stroke-linecap="round" />
+                  <path d="M16.6 8a4 4 0 0 1 0 8" stroke-linecap="round" />
+                </svg>
+              </button>
+            </div>
 
             <div v-if="message.results?.length" class="chat-results">
               <div
@@ -192,6 +259,7 @@
 <script setup>
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { queryPlannerAssistant } from '@/services/plannerService'
+import { requestSpeechUrl, supportsWebSpeech, speakWithWebSpeech } from '@/services/ttsService'
 import { useAuthStore } from '@/stores/authStore'
 import { ElMessage } from 'element-plus'
 import { recordAndSendToBackend } from '@/utils/backendRecorder'
@@ -212,6 +280,30 @@ const messageSeed = ref(0)
 const isRecording = ref(false)
 const isTranscribing = ref(false)
 let recorder = null
+
+const VOICE_PREF_KEY = 'planner_voice_enabled'
+const DEFAULT_VOICE_ENABLED = true
+const isVoiceOn = ref(DEFAULT_VOICE_ENABLED)
+const voiceRequestingFor = ref(null)
+const activeAudio = ref(null)
+const audioCleanupMap = new WeakMap()
+const hasWebSpeech = supportsWebSpeech()
+let voiceRequestToken = 0
+const lastAutoSpokenMessageId = ref(null)
+const speechFallbackOptions = { rate: 1.05, pitch: 1, volume: 1 }
+
+if (typeof window !== 'undefined') {
+  try {
+    const stored = localStorage.getItem(VOICE_PREF_KEY)
+    if (stored != null) {
+      isVoiceOn.value = stored === '1' || stored === 'true'
+    } else {
+      localStorage.setItem(VOICE_PREF_KEY, isVoiceOn.value ? '1' : '0')
+    }
+  } catch {
+    /* noop */
+  }
+}
 
 function createWelcomeMessage(name) {
   const greetingName = name ? name.split(' ')[0] : 'there'
@@ -261,15 +353,144 @@ watch(
   },
 )
 
+watch(isVoiceOn, (enabled) => {
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(VOICE_PREF_KEY, enabled ? '1' : '0')
+    } catch {
+      /* noop */
+    }
+  }
+  if (!enabled) {
+    voiceRequestToken += 1
+    voiceRequestingFor.value = null
+    stopVoicePlayback()
+  } else {
+    lastAutoSpokenMessageId.value = null
+  }
+})
+
+watch(
+  () => messages.value[messages.value.length - 1],
+  (message) => {
+    if (!message) return
+    if (message.sender !== 'assistant') return
+    if (!isVoiceOn.value) return
+    if (String(message.id || '').startsWith('assistant-error')) return
+    if (String(message.id || '').startsWith('welcome-')) return
+    const content = String(message.text || '').trim()
+    if (!content) return
+    if (lastAutoSpokenMessageId.value === message.id) return
+    lastAutoSpokenMessageId.value = message.id
+    speakAssistantMessage(message)
+  },
+)
+
 const sendDisabled = computed(() => assistantThinking.value || !inputText.value.trim())
 
 function clearChat() {
   messages.value = [createWelcomeMessage(userDisplayName.value)]
+  lastAutoSpokenMessageId.value = null
+  voiceRequestToken += 1
+  voiceRequestingFor.value = null
+  stopVoicePlayback()
 }
 
 function sendMessage() {
   if (!sendDisabled.value) {
     sendQuery()
+  }
+}
+
+function toggleVoice() {
+  isVoiceOn.value = !isVoiceOn.value
+}
+
+function playVoiceForMessage(message) {
+  if (!message || !message.text) return
+  speakAssistantMessage(message, { allowWhenMuted: true })
+}
+
+async function speakAssistantMessage(message, options = {}) {
+  const { allowWhenMuted = false } = options
+  if (!allowWhenMuted && !isVoiceOn.value) return
+  const text = String(message?.text || '').trim()
+  if (!text) return
+
+  const token = ++voiceRequestToken
+  voiceRequestingFor.value = message?.id || null
+
+  try {
+    const result = await requestSpeechUrl(text)
+    if (token !== voiceRequestToken) return
+    if (!allowWhenMuted && !isVoiceOn.value) return
+
+    if (result?.url) {
+      stopVoicePlayback()
+      const audio = new Audio(result.url)
+      const handleCleanup = () => {
+        audio.removeEventListener('ended', handleCleanup)
+        audio.removeEventListener('error', handleError)
+        audioCleanupMap.delete(audio)
+        if (activeAudio.value === audio) {
+          activeAudio.value = null
+        }
+      }
+      const handleError = (err) => {
+        handleCleanup()
+        if (hasWebSpeech) {
+          speakWithWebSpeech(text, speechFallbackOptions)
+        } else {
+          console.warn('[TalkToPlanner] Audio playback failed', err)
+        }
+      }
+      audio.addEventListener('ended', handleCleanup)
+      audio.addEventListener('error', handleError)
+      audioCleanupMap.set(audio, handleCleanup)
+      activeAudio.value = audio
+      const playPromise = audio.play()
+      if (playPromise && typeof playPromise.then === 'function') {
+        playPromise.catch((err) => {
+          handleError(err)
+        })
+      }
+    } else if (hasWebSpeech) {
+      speakWithWebSpeech(text, speechFallbackOptions)
+    }
+  } catch (err) {
+    console.warn('[TalkToPlanner] Voice request failed', err)
+    if (hasWebSpeech) {
+      speakWithWebSpeech(text, speechFallbackOptions)
+    }
+  } finally {
+    if (token === voiceRequestToken) {
+      voiceRequestingFor.value = null
+    }
+  }
+}
+
+function stopVoicePlayback() {
+  const audio = activeAudio.value
+  if (audio) {
+    try {
+      const cleanup = audioCleanupMap.get(audio)
+      if (typeof cleanup === 'function') {
+        cleanup()
+      }
+      audioCleanupMap.delete(audio)
+      audio.pause()
+      audio.currentTime = 0
+    } catch {
+      /* noop */
+    }
+    activeAudio.value = null
+  }
+  if (hasWebSpeech) {
+    try {
+      window.speechSynthesis.cancel()
+    } catch {
+      /* noop */
+    }
   }
 }
 
@@ -539,6 +760,7 @@ async function stopRecording() {
 }
 
 onBeforeUnmount(() => {
+  stopVoicePlayback()
   if (isRecording.value || isTranscribing.value) {
     stopRecording()
   }
@@ -573,6 +795,58 @@ onBeforeUnmount(() => {
   font-size: 1.6rem;
   font-weight: 600;
   color: #f3e8ff;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.voice-toggle {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.8);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.voice-toggle:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+}
+
+.voice-toggle:focus-visible,
+.voice-replay-btn:focus-visible {
+  outline: 2px solid rgba(196, 181, 253, 0.8);
+  outline-offset: 2px;
+}
+
+.voice-toggle.active {
+  background: rgba(167, 139, 250, 0.22);
+  border-color: rgba(196, 181, 253, 0.55);
+  color: #f5f3ff;
+  box-shadow: 0 0 12px rgba(196, 181, 253, 0.25);
+}
+
+.voice-toggle .icon {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.loader--tiny {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
 }
 
 .clear-btn {
@@ -700,6 +974,57 @@ onBeforeUnmount(() => {
 .chat-text {
   flex: 1;
   color: rgba(243, 244, 255, 0.9);
+}
+
+.chat-text__content {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.chat-text__content--assistant {
+  padding-right: 0.25rem;
+}
+
+.message-text {
+  flex: 1;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.voice-replay-btn {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.voice-replay-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.voice-replay-btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+  transform: none;
+}
+
+.voice-replay-btn .icon {
+  width: 1rem;
+  height: 1rem;
 }
 
 .icon {

@@ -1,6 +1,7 @@
 import express from 'express'
 import { requireAuth, ensureUserMatches } from '../middleware/auth.js'
 import { sendSMS, sendSMSForUser, makeCall, makeCallForUser } from '../services/twilioService.js'
+import { generateVoice } from '../services/ttsService.js'
 import { db } from '../services/firebaseAdmin.js'
 
 const router = express.Router()
@@ -53,15 +54,68 @@ export default router
 
 // POST (or GET) /api/twilio/voice-response
 // Returns simple TwiML for configured number voice handler
+const PUBLIC_API_BASE =
+  process.env.API_BASE_URL ||
+  process.env.PUBLIC_API_BASE ||
+  process.env.APP_BASE_URL ||
+  process.env.TTS_PUBLIC_BASE ||
+  ''
+
+function escapeXml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function resolvePublicBase(req) {
+  const configured = String(PUBLIC_API_BASE || '').trim()
+  if (configured) return configured.replace(/\/$/, '')
+
+  const forwardedProto = req.headers['x-forwarded-proto']
+  const protoHeader = Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto
+  const proto = (protoHeader || req.protocol || 'https').split(',')[0].trim() || 'https'
+  const host = req.get('host')
+  if (!host) return ''
+  return `${proto}://${host}`.replace(/\/$/, '')
+}
+
+function buildPlayResponse(audioUrl, fallbackText) {
+  const safeAudio = escapeXml(audioUrl)
+  const safeFallback = escapeXml(fallbackText)
+  return (
+    `<?xml version="1.0" encoding="UTF-8"?>` +
+    `<Response>` +
+    `<Play>${safeAudio}</Play>` +
+    `<Say voice="alice">${safeFallback}</Say>` +
+    `</Response>`
+  )
+}
+
 router.all('/voice-response', async (req, res) => {
+  const rawMessage =
+    (req.body && (req.body.message || req.body.Body)) ||
+    req.query.message ||
+    'This is PlanCraft AI. Thanks for calling. We have recorded your call.'
+  const message = String(rawMessage || '').trim() || 'This is PlanCraft AI. Thanks for calling. We have recorded your call.'
+  res.set('Content-Type', 'text/xml')
+
   try {
-    const say = String((req.body && (req.body.message || req.body.Body)) || req.query.message || 'This is PlanCraft AI. Thanks for calling. We have recorded your call.')
-    const twiml = `<?xml version="1.0" encoding="UTF-8"?>\n<Response><Say voice="alice">${say}</Say></Response>`
-    res.set('Content-Type', 'text/xml')
-    return res.status(200).send(twiml)
+    const voice = await generateVoice(message)
+    const base = resolvePublicBase(req)
+    if (voice?.url && base) {
+      const absoluteUrl = `${base}${voice.url}`
+      const twiml = buildPlayResponse(absoluteUrl, message)
+      return res.status(200).send(twiml)
+    }
+    const fallback = `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice">${escapeXml(message)}</Say></Response>`
+    return res.status(200).send(fallback)
   } catch (e) {
-    res.set('Content-Type', 'text/xml')
-    return res.status(200).send('<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice">Hello from PlanCraft AI</Say></Response>')
+    console.error('[Twilio] voice-response TTS failed', e?.message || e)
+    const fallback = `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice">${escapeXml(message)}</Say></Response>`
+    return res.status(200).send(fallback)
   }
 })
 
