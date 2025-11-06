@@ -106,6 +106,24 @@
           <span>{{ tab.icon }}</span>
           <span v-if="sidebarOpen">{{ tab.name }}</span>
         </RouterLink>
+        <div class="pt-4">
+          <p
+            v-if="sidebarOpen"
+            class="px-3 text-xs font-semibold uppercase tracking-widest text-slate-400/80"
+          >
+            AI Quick Actions
+          </p>
+        </div>
+        <RouterLink
+          v-for="tab in aiQuickActions"
+          :key="tab.name"
+          :to="tab.path"
+          class="flex items-center gap-3 w-full p-3 rounded transition hover:bg-gray-800"
+          active-class="bg-indigo-600"
+        >
+          <span>{{ tab.icon }}</span>
+          <span v-if="sidebarOpen">{{ tab.name }}</span>
+        </RouterLink>
       </nav>
 
       <!-- Sidebar Footer: segmented actions -->
@@ -177,6 +195,18 @@
           <nav class="space-y-2 flex-1 overflow-y-auto">
             <RouterLink
               v-for="tab in tabs"
+              :key="tab.name"
+              :to="tab.path"
+              class="block px-3 py-2 rounded hover:bg-indigo-600"
+              @click="mobileMenu = false"
+            >
+              {{ tab.icon }} {{ tab.name }}
+            </RouterLink>
+            <p class="px-3 pt-4 pb-1 text-xs font-semibold uppercase tracking-widest text-slate-400/80">
+              AI Quick Actions
+            </p>
+            <RouterLink
+              v-for="tab in aiQuickActions"
               :key="tab.name"
               :to="tab.path"
               class="block px-3 py-2 rounded hover:bg-indigo-600"
@@ -493,6 +523,10 @@ const tabs = [
   { name: 'Journal', icon: '📝', path: '/journal' },
   { name: 'Reminders', icon: '🔔', path: '/reminders' },
   { name: 'Reports', icon: '📈', path: '/reports' },
+]
+
+const aiQuickActions = [
+  { name: 'Talk to Planner', icon: '🧠', path: '/talk-to-planner' },
 ]
 
 async function handleLogout() {

@@ -98,6 +98,7 @@ import twilioRoutes from "./routes/twilioRoutes.js";
 import googleAuthRoutes, { handleOAuthCallback } from "./routes/googleAuthRoutes.js";
 import googleCalendarRoutes from "./routes/googleCalendarRoutes.js";
 import notifyRouter from "./routes/notifyRouter.js";
+import plannerRoutes from "./routes/plannerRoutes.js";
 
 dotenv.config();
 
@@ -246,6 +247,7 @@ app.use("/api", parseRemindersRoutes);
 app.use("/api", testRoutes);
 app.use("/api/blogs", blogRoutes);
 app.use("/api/twilio", twilioRoutes);
+app.use("/api/planner", plannerRoutes);
 // Mount Google routes (guarded internally by feature flag)
 app.use("/api", googleAuthRoutes);
 app.use("/api", googleCalendarRoutes);

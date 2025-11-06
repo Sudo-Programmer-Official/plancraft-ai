@@ -43,7 +43,7 @@ async function toggleRecording() {
 
       recorder = await recordAndSendToBackend((text, isFinal) => {
         transcript.value = text
-        emit("transcribed", text)
+        emit("transcribed", text, isFinal === true)
         if (isFinal) {
           isTranscribing.value = false
         }

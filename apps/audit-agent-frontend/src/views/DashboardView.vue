@@ -583,13 +583,13 @@
           <span class="text-lg">🧠</span>
           <span>{{ isRefreshingSummary ? 'Refreshing summary…' : 'Generate Summary' }}</span>
         </button>
-        <button
-          @click="openPlanner"
+        <RouterLink
+          to="/talk-to-planner"
           class="action-chip bg-transparent border border-indigo-400/60 text-indigo-200 hover:bg-indigo-500/10"
         >
           <span class="text-lg">💬</span>
           <span>Talk to Planner</span>
-        </button>
+        </RouterLink>
         <button
           @click="goToProgress"
           class="action-chip bg-transparent border border-slate-500/60 text-slate-200 hover:bg-slate-500/10"

@@ -57,13 +57,27 @@
       </RouterLink>
     </div>
 
-    <!-- Empty state -->
-    <div v-if="!loading && reminders.length === 0" class="text-gray-400 text-center mt-10">
-      No active reminders 🎉
+    <div v-if="loading" class="mt-12">
+      <EmptyState
+        title="Syncing reminders"
+        subtitle="We’re pulling your upcoming reminders and notification channels."
+        icon="⏳"
+      >
+        <div class="w-full max-w-3xl mt-4">
+          <el-skeleton :rows="3" animated />
+        </div>
+      </EmptyState>
     </div>
 
+    <EmptyState
+      v-else-if="reminders.length === 0"
+      title="No Reminders Yet"
+      subtitle="Schedule a reminder from a task or ask the assistant to nudge you tomorrow."
+      icon="🔔"
+    />
+
     <!-- Reminders list -->
-    <template v-else>
+    <div v-else>
       <div
         v-for="(group, date) in groupedReminders"
         :key="date"
@@ -97,7 +111,7 @@
           </div>
         </TransitionGroup>
       </div>
-    </template>
+    </div>
   </div>
 </template>
 
@@ -120,6 +134,7 @@ import { toJsDate as toJsDateUtil } from '@/utils/time'
 import { useAuthFlags } from '@/composables/useAuthFlags'
 import { trackLinkedInConversion } from '@/utils/ads'
 import { useAuthStore } from '@/stores/authStore'
+import EmptyState from '@/components/EmptyState.vue'
 
 // Time setup
 dayjs.extend(utc)

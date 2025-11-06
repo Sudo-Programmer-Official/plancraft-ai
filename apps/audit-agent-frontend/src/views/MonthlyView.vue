@@ -1,83 +1,158 @@
 <template>
   <div
-    class="min-h-screen bg-gradient-to-b from-indigo-900 via-blue-900 to-blue-800 px-6 py-10 text-white"
+    class="min-h-screen bg-gradient-to-br from-indigo-950 via-blue-900 to-blue-800 text-white"
   >
-    <header class="text-center mb-8">
-      <h1 class="text-3xl font-bold">Monthly Task Overview</h1>
-      <p class="text-gray-300">{{ tasksForSelectedDay.length }} tasks on {{ selectedDateLabel }}</p>
-    </header>
+    <div class="monthly-tasks max-w-5xl mx-auto px-4 sm:px-8 pt-10 pb-16 space-y-8">
+      <header class="space-y-3">
+        <h1 class="flex items-center gap-2 text-3xl font-semibold text-slate-50">
+          <span>📆</span>
+          <span>Monthly Task Overview</span>
+        </h1>
+        <p class="text-sm sm:text-base text-slate-300">
+          {{ tasksForSelectedDay.length }} {{ tasksForSelectedDay.length === 1 ? 'task' : 'tasks' }}
+          planned for {{ formattedDate }}
+        </p>
+      </header>
 
-    <section class="bg-black/30 rounded-2xl p-6 shadow-lg mb-8">
-      <div class="flex justify-between items-center mb-4">
-        <button @click="prevMonth" class="px-3 py-1 bg-indigo-600 rounded">‹</button>
-        <h2 class="text-xl font-semibold">{{ currentMonthLabel }} {{ currentYear }}</h2>
-        <button @click="nextMonth" class="px-3 py-1 bg-indigo-600 rounded">›</button>
-      </div>
-
-      <div class="grid grid-cols-7 gap-2 text-center">
-        <div v-for="d in daysOfWeek" :key="d" class="text-gray-400 font-medium">{{ d }}</div>
-        <div
-          v-for="day in calendarDays"
-          :key="day.date.toISOString()"
-          @click="selectDate(day.date)"
-          :class="[
-            'cursor-pointer rounded-lg py-2',
-            day.isCurrentMonth ? 'text-white' : 'text-gray-500',
-            isToday(day.date) ? 'border border-indigo-400' : '',
-            isSelected(day.date) ? 'bg-indigo-600 text-white' : 'hover:bg-indigo-500/40',
-          ]"
-        >
-          {{ day.date.getDate() }}
+      <section
+        class="calendar-section bg-slate-950/40 rounded-3xl border border-slate-800/60 shadow-xl shadow-indigo-900/30 p-6 sm:p-8 space-y-6"
+      >
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <button
+            @click="prevMonth"
+            class="rounded-full bg-indigo-600/80 hover:bg-indigo-500 transition px-4 py-2 text-lg"
+            aria-label="Previous month"
+          >
+            ‹
+          </button>
+          <div class="text-center">
+            <h2 class="text-xl font-semibold text-slate-100">
+              {{ currentMonthLabel }} {{ currentYear }}
+            </h2>
+            <p class="text-xs text-slate-400 tracking-wide uppercase">Tap a date to focus</p>
+          </div>
+          <button
+            @click="nextMonth"
+            class="rounded-full bg-indigo-600/80 hover:bg-indigo-500 transition px-4 py-2 text-lg"
+            aria-label="Next month"
+          >
+            ›
+          </button>
         </div>
-      </div>
-    </section>
 
-    <section class="bg-black/30 rounded-2xl p-6 shadow-lg">
-      <div class="flex justify-between items-center mb-4">
-        <h2 class="text-xl font-semibold">Tasks for {{ selectedDateLabel }}</h2>
-      </div>
+        <div class="grid grid-cols-7 gap-2 text-center text-sm sm:text-base">
+          <div v-for="d in daysOfWeek" :key="d" class="text-slate-400 font-semibold uppercase">
+            {{ d }}
+          </div>
+          <div
+            v-for="day in calendarDays"
+            :key="day.date.toISOString()"
+            @click="selectDate(day.date)"
+            :class="[
+              'cursor-pointer rounded-xl py-2 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400',
+              day.isCurrentMonth ? 'text-white' : 'text-slate-500',
+              isToday(day.date) ? 'border border-indigo-400/80 shadow-inner shadow-indigo-500/30' : '',
+              isSelected(day.date)
+                ? 'bg-gradient-to-br from-indigo-600 via-indigo-500 to-indigo-400 text-white shadow-lg shadow-indigo-900/40'
+                : 'hover:bg-indigo-500/30 hover:text-white',
+            ]"
+          >
+            {{ day.date.getDate() }}
+          </div>
+        </div>
+      </section>
 
-      <TransitionGroup name="fade-move" tag="ul" class="space-y-3">
-        <li
-          v-for="task in tasksForSelectedDay"
-          :key="task.id"
-          class="flex justify-between items-center bg-black/20 px-4 py-3 rounded-xl"
+      <hr class="border-slate-700/40 my-6" />
+
+      <section
+        class="tasks-section bg-slate-950/40 rounded-3xl border border-slate-800/60 shadow-xl shadow-indigo-900/30 p-6 sm:p-8 space-y-5"
+      >
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <h3 class="text-lg sm:text-xl font-semibold text-slate-100">
+            Tasks for {{ formattedDate }}
+          </h3>
+          <button
+            v-if="tasksForSelectedDay.length"
+            @click="loadMonth"
+            class="self-start sm:self-auto inline-flex items-center gap-2 text-xs font-medium text-indigo-200/80 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            🔄 Refresh day snapshot
+          </button>
+        </div>
+
+        <div
+          v-if="categorySummaryText"
+          class="flex flex-wrap items-center gap-2 sm:gap-3 rounded-2xl bg-gradient-to-r from-indigo-700/30 via-indigo-600/20 to-emerald-600/30 border border-indigo-500/30 px-4 py-3 text-xs sm:text-sm text-indigo-100 shadow-inner shadow-indigo-900/40"
         >
-          <div class="flex-1 pr-4">
-            <div class="flex items-center gap-2 flex-wrap">
+          <span class="font-medium text-indigo-200/90">Highlights:</span>
+          <span class="text-slate-100/80">{{ categorySummaryText }}</span>
+        </div>
+
+        <TransitionGroup
+          v-if="tasksForSelectedDay.length"
+          name="fade-move"
+          tag="ul"
+          class="space-y-4"
+        >
+          <li
+            v-for="task in tasksForSelectedDay"
+            :key="task.id"
+            class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl bg-slate-900/50 border border-slate-800/70 px-4 py-4 shadow-lg shadow-indigo-950/20 transition hover:border-indigo-500/50 hover:shadow-indigo-900/40"
+          >
+            <div class="flex-1 space-y-2">
+              <div
+                class="flex items-center gap-3 text-xs font-medium text-slate-400 uppercase tracking-wide"
+              >
+                <div class="flex items-center gap-2 text-sm normal-case">
+                  <span class="text-base">{{ categoryIcon(task.category) }}</span>
+                  <span :class="categoryColor(task.category)">{{ categoryLabel(task.category) }}</span>
+                </div>
+                <span
+                  v-if="hasLate(task)"
+                  class="text-[11px] px-2 py-0.5 rounded-full bg-red-600/20 border border-red-500/40 text-red-200 shadow-sm"
+                >
+                  Late<span v-if="lateDelay(task) !== null"> ({{ lateDelay(task) }}d)</span>
+                </span>
+              </div>
+
               <p
-                :class="['font-medium', task.completed ? 'line-through text-gray-400' : 'text-white']"
+                :class="[
+                  'text-base sm:text-lg font-semibold leading-tight',
+                  task.completed ? 'line-through text-slate-500' : 'text-slate-100',
+                ]"
               >
                 {{ task.title }}
               </p>
-              <span
-                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-900/70 text-[11px] font-medium shadow-sm"
-                :class="categoryColor(task.category)"
-              >
-                <span class="leading-none">{{ categoryIcon(task.category) }}</span>
-                <span>{{ categoryLabel(task.category) }}</span>
-              </span>
-              <span
-                v-if="hasLate(task)"
-                class="text-[10px] px-2 py-0.5 rounded bg-red-600/30 border border-red-500/40 text-red-200 align-middle"
-              >
-                Late<span v-if="lateDelay(task) !== null"> ({{ lateDelay(task) }}d)</span>
-              </span>
+
+              <p v-if="task.details" class="text-sm text-slate-400 max-w-2xl">
+                {{ task.details }}
+              </p>
             </div>
-            <p v-if="task.details" class="text-sm text-gray-400">{{ task.details }}</p>
-          </div>
-          <div class="flex items-center gap-3">
-            <button @click="onView(task)" class="text-gray-400 hover:text-white">🍔</button>
-            <input
-              type="checkbox"
-              :checked="task.completed"
-              @change="toggleComplete(task)"
-              class="w-5 h-5 accent-indigo-500"
-            />
-          </div>
-        </li>
-      </TransitionGroup>
-    </section>
+
+            <div class="flex items-center gap-3 self-end sm:self-auto">
+              <button
+                @click="onView(task)"
+                class="text-slate-400 hover:text-white transition-colors text-xl leading-none"
+                aria-label="View task details"
+              >
+                🍔
+              </button>
+              <input
+                type="checkbox"
+                :checked="task.completed"
+                @change="toggleComplete(task)"
+                class="w-5 h-5 accent-indigo-500 rounded"
+                :aria-label="`Mark ${task.title} as ${task.completed ? 'incomplete' : 'complete'}`"
+              />
+            </div>
+          </li>
+        </TransitionGroup>
+
+        <p v-else class="text-sm text-indigo-100/70">
+          No tasks scheduled yet for this date. Use the planner to add something meaningful.
+        </p>
+      </section>
+    </div>
 
     <!-- <TaskPlannerDialog
       v-if="showPlanner"
@@ -267,6 +342,31 @@ function getCalendarDays(month, year) {
 
 const daysOfWeek = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
+const categoryBreakdown = computed(() => {
+  if (!tasksForSelectedDay.value.length) return []
+  const tally = tasksForSelectedDay.value.reduce((acc, task) => {
+    const label = categoryLabel(task.category)
+    acc[label] = (acc[label] || 0) + 1
+    return acc
+  }, {})
+  return Object.entries(tally)
+    .map(([label, count]) => ({
+      label,
+      count,
+    }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+})
+
+const categorySummaryText = computed(() => {
+  if (!categoryBreakdown.value.length) return ''
+  return categoryBreakdown.value
+    .map(({ label, count }) => {
+      const unit = count === 1 ? 'task' : 'tasks'
+      return `${count} ${label} ${unit}`
+    })
+    .join(', ')
+})
+
 function isToday(date) {
   const today = new Date()
   return (
@@ -355,6 +455,8 @@ const selectedDateLabel = computed(() =>
     day: 'numeric',
   }),
 )
+
+const formattedDate = computed(() => selectedDateLabel.value)
 </script>
 
 <style scoped>
