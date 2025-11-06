@@ -613,18 +613,6 @@ h1, h2 {
   color: rgba(255, 255, 255, 0.5) !important;
 }
 
-/* Scrollbar */
-.custom-scroll::-webkit-scrollbar {
-  width: 6px;
-}
-.custom-scroll::-webkit-scrollbar-thumb {
-  background: rgba(99, 102, 241, 0.4);
-  border-radius: 4px;
-}
-.custom-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(129, 140, 248, 0.6);
-}
-
 /* Animations */
 .shadow-md {
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4), 0 4px 10px rgba(0, 0, 0, 0.3);
@@ -635,10 +623,6 @@ h1, h2 {
   color: #93c5fd;
 }
 
-/* Utility adjustments */
-.custom-scroll {
-  padding-right: 4px;
-}
 :deep(.el-input__inner),
 :deep(.el-textarea__inner) {
   color: #ffffff !important;

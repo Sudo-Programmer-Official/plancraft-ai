@@ -1,5 +1,7 @@
 <template>
-   <div class="min-h-screen bg-gradient-to-br from-slate-900 to-indigo-950 px-4 sm:px-6 py-8 text-white overflow-y-auto scrollbar-thin scrollbar-thumb-white scrollbar-track-slate-800">
+  <div
+    class="min-h-screen bg-gradient-to-br from-slate-900 to-indigo-950 px-4 sm:px-6 py-8 text-white overflow-y-auto scrollbar-plan"
+  >
     <GuestBanner :isGuest="authStore.guest" @login="redirectToLogin" />
 
     <!-- Header -->
@@ -155,12 +157,5 @@ async function saveReflection() {
     flex-direction: row;
     align-items: baseline !important;
   }
-}
-/* Optional if not using Tailwind plugin */
-.scrollbar-thin {
-  scrollbar-width: thin;
-}
-.scrollbar-thumb-white {
-  scrollbar-color: white transparent;
 }
 </style>

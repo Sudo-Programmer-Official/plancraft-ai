@@ -51,7 +51,7 @@
           <button @click="logout" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm">Logout</button>
         </div>
       </header>
-      <main class="p-6 flex-1 overflow-y-auto">
+      <main class="p-6 flex-1 overflow-y-auto scrollbar-plan">
         <RouterView />
       </main>
       <footer class="py-3 text-center text-xs text-indigo-300 bg-slate-950/95 border-t border-gray-800">

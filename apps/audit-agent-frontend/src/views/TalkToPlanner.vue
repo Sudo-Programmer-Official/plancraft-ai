@@ -1,90 +1,161 @@
 <template>
-  <div
-    class="planner-chat min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 text-white flex flex-col"
-  >
-    <div class="max-w-5xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex-1 flex flex-col">
-      <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div class="flex items-center gap-3">
-          <div class="assistant-orb" aria-hidden="true"></div>
-          <div>
-            <h2 class="text-2xl sm:text-3xl font-semibold text-slate-50 flex items-center gap-2">
-              <span>🧠</span>
-              <span>Talk to Planner</span>
-            </h2>
-            <p class="text-sm sm:text-base text-slate-300">
-              Ask about your tasks, reminders, secure docs, or request actions. One assistant, all
-              your workflows.
-            </p>
+  <div class="talk-planner-wrapper">
+    <header class="talk-header">
+      <h2 class="talk-title">
+        <span class="text-pink-400">🧠</span>
+        Talk to Planner
+      </h2>
+      <button
+        class="clear-btn"
+        @click="clearChat"
+        :disabled="assistantThinking"
+        title="Clear Conversation"
+      >
+        <svg class="icon icon-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="1.6"
+            d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.166L19.28 19.5a1.125 1.125 0 01-1.12 1.05H5.84a1.125 1.125 0 01-1.12-1.05L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .563c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.398m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+          />
+        </svg>
+      </button>
+    </header>
+
+    <transition name="toast-fade">
+      <div v-if="isRecording" class="listening-toast">
+        Planner is listening…
+      </div>
+    </transition>
+
+    <div ref="chatContainer" class="chat-body scrollbar-plan">
+      <TransitionGroup name="fade-up" tag="div" class="chat-stream">
+        <div
+          v-for="message in messages"
+          :key="message.id"
+          :class="['chat-bubble', message.sender]"
+        >
+          <div class="icon-wrapper">
+            <div
+              v-if="message.sender === 'assistant'"
+              class="ai-icon"
+              role="img"
+              aria-label="Planner avatar"
+            ></div>
+            <div
+              v-else
+              class="user-icon"
+              role="img"
+              aria-label="You"
+            >
+              {{ userInitial }}
+            </div>
+          </div>
+          <div class="chat-text">
+            <p>{{ message.text }}</p>
+            <div v-if="message.actions?.length" class="chat-actions">
+              <button
+                v-for="action in message.actions"
+                :key="action.id"
+                type="button"
+                class="action-chip"
+                @click="runAction(message, action)"
+              >
+                <svg class="icon icon-bolt" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M13 2l-8 12h6l-2 8 8-12h-6z" />
+                </svg>
+                <span>{{ action.label }}</span>
+              </button>
+            </div>
           </div>
         </div>
-        <div class="flex items-center gap-2">
-          <el-button size="small" plain @click="clearChat" :disabled="assistantThinking">
-            Clear
-          </el-button>
-        </div>
-      </header>
-
-      <div
-        ref="chatContainer"
-        class="chat-box flex-1 overflow-y-auto bg-slate-950/60 border border-slate-800/60 rounded-3xl px-4 sm:px-6 py-6 space-y-4 shadow-inner shadow-indigo-950/40"
-      >
-        <TransitionGroup name="fade-up" tag="div" class="space-y-4 flex flex-col">
-          <ChatBubble
-            v-for="message in messages"
-            :key="message.id"
-            :sender="message.sender"
-            :text="message.text"
-            :typing="message.typing"
-            :actions="message.actions"
-            :name="userDisplayName"
-            @action="runAction(message, $event)"
-          />
-        </TransitionGroup>
-
-        <ChatBubble
+        <div
           v-if="assistantThinking"
           key="assistant-typing"
-          sender="assistant"
-          typing
-          text=""
-        />
-      </div>
-
-      <footer
-        class="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-slate-950/70 border border-slate-800/70 rounded-3xl px-4 py-4 shadow-xl shadow-indigo-950/30"
-      >
-        <VoiceRecorder
-          class="sm:w-auto"
-          @transcribed="handleVoiceTranscript"
-        />
-        <el-input
-          v-model="input"
-          :disabled="assistantThinking"
-          placeholder="Ask your planner anything — “Share my focus tasks”, “Log a client call”, “What’s my Aadhaar number?”"
-          @keyup.enter="triggerSend"
-        />
-        <el-button type="primary" :loading="assistantThinking" :disabled="sendDisabled" @click="sendQuery">
-          Send
-        </el-button>
-      </footer>
+          class="chat-bubble assistant typing"
+        >
+          <div class="icon-wrapper">
+            <div class="ai-icon" role="img" aria-label="Planner avatar"></div>
+          </div>
+          <div class="chat-text">
+            <div class="typing-dots">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          </div>
+        </div>
+      </TransitionGroup>
     </div>
+
+    <footer
+      class="chat-input-bar"
+      :class="{ 'chat-input-bar--recording': isRecording || isTranscribing }"
+    >
+      <button
+        @click="startRecording"
+        :class="['mic-btn', { active: isRecording || isTranscribing }]"
+        :title="isRecording ? 'Stop recording' : 'Start voice input'"
+      >
+        <svg class="icon icon-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="1.6"
+            d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3z"
+          />
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="1.6"
+            d="M19 11a7 7 0 01-14 0m7 7v3m-4 0h8"
+          />
+        </svg>
+      </button>
+      <input
+        v-model="inputText"
+        :disabled="assistantThinking"
+        placeholder="Ask your planner..."
+        class="chat-input"
+        @keydown.enter="sendMessage"
+      />
+      <button
+        @click="sendMessage"
+        class="send-btn"
+        :disabled="sendDisabled"
+        title="Send message"
+      >
+        <span v-if="assistantThinking" class="loader"></span>
+        <svg v-else class="icon icon-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="1.7"
+            d="M12 5l6 6m-6-6l-6 6m6-6v14"
+          />
+        </svg>
+      </button>
+    </footer>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue'
-import ChatBubble from '@/components/ChatBubble.vue'
-import VoiceRecorder from '@/components/VoiceRecorder.vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { queryPlannerAssistant } from '@/services/plannerService'
 import { useAuthStore } from '@/stores/authStore'
 import { ElMessage } from 'element-plus'
+import { recordAndSendToBackend } from '@/utils/backendRecorder'
+import { trackEvent } from '@/services/analytics'
 
 const authStore = useAuthStore()
 
 const assistantThinking = ref(false)
-const input = ref('')
+const inputText = ref('')
 const chatContainer = ref(null)
 const messageSeed = ref(0)
+const isRecording = ref(false)
+const isTranscribing = ref(false)
+let recorder = null
 
 function createWelcomeMessage(name) {
   const greetingName = name ? name.split(' ')[0] : 'there'
@@ -105,6 +176,7 @@ const userDisplayName = computed(() => {
 })
 
 const userId = computed(() => authStore?.user?.uid || localStorage.getItem('uid') || null)
+const userInitial = computed(() => (userDisplayName.value || 'You').charAt(0).toUpperCase())
 
 const messages = ref([createWelcomeMessage(userDisplayName.value)])
 
@@ -133,14 +205,16 @@ watch(
   },
 )
 
-const sendDisabled = computed(() => assistantThinking.value || !input.value.trim())
+const sendDisabled = computed(() => assistantThinking.value || !inputText.value.trim())
 
 function clearChat() {
   messages.value = [createWelcomeMessage(userDisplayName.value)]
 }
 
-function triggerSend() {
-  if (!sendDisabled.value) sendQuery()
+function sendMessage() {
+  if (!sendDisabled.value) {
+    sendQuery()
+  }
 }
 
 function historyForRequest(excludeId) {
@@ -153,7 +227,7 @@ function historyForRequest(excludeId) {
 }
 
 async function sendQuery(forcedInput = null) {
-  const rawInput = forcedInput != null ? forcedInput : input.value
+  const rawInput = forcedInput != null ? forcedInput : inputText.value
   const query = String(rawInput || '').trim()
   if (!query) {
     return
@@ -172,7 +246,7 @@ async function sendQuery(forcedInput = null) {
   }
 
   messages.value.push(userMessage)
-  input.value = ''
+  inputText.value = ''
   assistantThinking.value = true
 
   try {
@@ -239,47 +313,441 @@ function runAction(_message, action) {
 
 function handleVoiceTranscript(text, isFinal = false) {
   if (!text) return
-  input.value = text
-  if (isFinal) {
+  inputText.value = text
+  if (isFinal && !assistantThinking.value) {
     sendQuery(text)
   }
 }
+
+async function startRecording() {
+  try {
+    if (!isRecording.value) {
+      if (assistantThinking.value) {
+        ElMessage.info('Wait for the planner to finish before recording again.')
+        return
+      }
+      inputText.value = ''
+      isTranscribing.value = false
+      recorder = await recordAndSendToBackend((text, isFinal) => {
+        handleVoiceTranscript(text, isFinal)
+        if (isFinal) {
+          isTranscribing.value = false
+          trackEvent('Voice Transcribed', { length: text?.length || 0 })
+        }
+      })
+      isRecording.value = true
+    } else {
+      await stopRecording()
+    }
+  } catch (err) {
+    console.error('🎤 Recording error:', err)
+    isRecording.value = false
+    isTranscribing.value = false
+    ElMessage.error('Microphone unavailable. Please check permissions.')
+  }
+}
+
+async function stopRecording() {
+  if (!recorder) return
+  isRecording.value = false
+  isTranscribing.value = true
+  try {
+    if (typeof recorder._stop === 'function') {
+      await recorder._stop()
+    }
+  } finally {
+    recorder = null
+    if (isTranscribing.value) {
+      isTranscribing.value = false
+    }
+  }
+}
+
+onBeforeUnmount(() => {
+  if (isRecording.value || isTranscribing.value) {
+    stopRecording()
+  }
+})
 </script>
 
 <style scoped>
-.assistant-orb {
-  width: 52px;
-  height: 52px;
-  border-radius: 9999px;
-  background: radial-gradient(circle at 30% 30%, rgba(99, 102, 241, 0.95), rgba(56, 189, 248, 0.6));
+.talk-planner-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1rem;
+  background: linear-gradient(180deg, rgba(25, 20, 40, 0.95), rgba(20, 18, 35, 0.98));
+  border-radius: 1rem;
+  box-shadow: 0 0 30px rgba(90, 60, 150, 0.2);
+  color: #f9f8ff;
+}
+
+.talk-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.talk-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.6rem;
+  font-weight: 600;
+  color: #f3e8ff;
+}
+
+.clear-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 1.3rem;
+  transition: color 0.2s ease;
+  cursor: pointer;
+}
+
+.clear-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.clear-btn:not(:disabled):hover {
+  color: #f87171;
+}
+
+.listening-toast {
+  align-self: flex-start;
+  background: rgba(115, 83, 255, 0.2);
+  border: 1px solid rgba(173, 139, 255, 0.35);
+  color: #e9ddff;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+  box-shadow: 0 0 12px rgba(120, 90, 255, 0.25);
+}
+
+.chat-body {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 1rem 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-stream {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.chat-bubble {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  max-width: 78%;
+  padding: 0.78rem 1rem;
+  border-radius: 1rem;
+  line-height: 1.45;
+  word-break: break-word;
+  box-shadow: 0 10px 25px rgba(34, 20, 70, 0.2);
+  backdrop-filter: blur(10px);
+  position: relative;
+  border: 1px solid transparent;
+}
+
+.chat-bubble.assistant {
+  align-self: flex-start;
+  background: rgba(72, 42, 150, 0.32);
+  border-color: rgba(142, 102, 255, 0.25);
+}
+
+.chat-bubble.assistant::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 1rem;
+  background: radial-gradient(circle at top left, rgba(178, 142, 255, 0.22), transparent 65%);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.chat-bubble.user {
+  align-self: flex-end;
+  background: linear-gradient(120deg, #6d28d9, #9333ea);
+  color: #fdfbff;
+  border-color: rgba(147, 51, 234, 0.5);
+}
+
+.chat-bubble.user .chat-text {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.chat-bubble.typing {
+  max-width: 220px;
+}
+
+.icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ai-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #c084fc, #4c1d95);
   box-shadow:
-    0 0 24px rgba(99, 102, 241, 0.65),
-    inset 0 0 18px rgba(56, 189, 248, 0.45);
-  animation: orbPulse 4s ease-in-out infinite;
+    0 0 12px rgba(192, 132, 252, 0.55),
+    0 0 24px rgba(91, 33, 182, 0.45);
+  animation: orbGlow 6s ease-in-out infinite;
+}
+
+.user-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  text-transform: uppercase;
+}
+
+.chat-text {
+  flex: 1;
+  color: rgba(243, 244, 255, 0.9);
+}
+
+.icon {
+  display: block;
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.icon-bolt {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.chat-actions {
+  margin-top: 0.6rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.action-chip {
+  background: rgba(147, 197, 253, 0.18);
+  border: 1px solid rgba(147, 197, 253, 0.32);
+  color: #e2e8f0;
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.action-chip:hover {
+  background: rgba(147, 197, 253, 0.28);
+  border-color: rgba(196, 181, 253, 0.6);
+}
+
+.typing-dots {
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.typing-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(234, 232, 255, 0.9);
+  animation: typing 1.2s infinite ease-in-out;
+}
+
+.typing-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+.chat-input-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: rgba(40, 35, 70, 0.8);
+  border: 1px solid rgba(100, 100, 255, 0.15);
+  border-radius: 2rem;
+  padding: 0.5rem 0.8rem;
+  margin-top: 1rem;
+  box-shadow: 0 16px 32px rgba(20, 16, 40, 0.35);
+  backdrop-filter: blur(8px);
+}
+
+.chat-input-bar--recording {
+  border-color: rgba(168, 85, 247, 0.55);
+  box-shadow: 0 0 18px rgba(168, 85, 247, 0.4);
+}
+
+.chat-input {
+  flex-grow: 1;
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-size: 1rem;
+  outline: none;
+}
+
+.chat-input::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.mic-btn,
+.send-btn {
+  background: rgba(90, 70, 150, 0.3);
+  border: none;
+  color: #c4b5fd;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mic-btn.active {
+  background: radial-gradient(circle at center, #a855f7, #6d28d9);
+  box-shadow: 0 0 15px rgba(168, 85, 247, 0.7);
+  color: #ffffff;
+  animation: pulse 1.5s infinite;
+}
+
+.mic-btn:hover,
+.send-btn:hover {
+  background: rgba(140, 100, 255, 0.4);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.mic-btn:disabled,
+.send-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.icon-arrow {
+  transform: rotate(45deg);
+}
+
+.toast-fade-enter-active,
+.toast-fade-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.toast-fade-enter-from,
+.toast-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
 }
 
 .fade-up-enter-active,
 .fade-up-leave-active {
-  transition: all 220ms ease;
+  transition: all 0.22s ease;
 }
+
 .fade-up-enter-from,
 .fade-up-leave-to {
   opacity: 0;
   transform: translateY(12px);
 }
 
-@keyframes orbPulse {
-  0%, 100% {
+@keyframes typing {
+  0%,
+  80%,
+  100% {
+    transform: scale(0.7);
+    opacity: 0.4;
+  }
+  40% {
     transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes orbGlow {
+  0%,
+  100% {
+    transform: rotate(0deg);
     box-shadow:
-      0 0 24px rgba(99, 102, 241, 0.65),
-      inset 0 0 18px rgba(56, 189, 248, 0.38);
+      0 0 12px rgba(192, 132, 252, 0.55),
+      0 0 24px rgba(91, 33, 182, 0.45);
   }
   50% {
-    transform: scale(1.06);
+    transform: rotate(10deg);
     box-shadow:
-      0 0 36px rgba(129, 140, 248, 0.75),
-      inset 0 0 26px rgba(59, 130, 246, 0.45);
+      0 0 18px rgba(192, 132, 252, 0.75),
+      0 0 32px rgba(91, 33, 182, 0.55);
+  }
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.loader {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #ffffff;
+  border-radius: 999px;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 10px rgba(168, 85, 247, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(168, 85, 247, 0.8);
+  }
+}
+
+@media (max-width: 768px) {
+  .talk-planner-wrapper {
+    padding: 0.75rem;
+  }
+
+  .chat-bubble {
+    max-width: 88%;
+  }
+
+  .chat-input {
+    font-size: 0.95rem;
   }
 }
 </style>

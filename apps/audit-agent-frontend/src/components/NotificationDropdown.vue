@@ -29,7 +29,7 @@
     <!-- Notification List -->
     <ul
       v-else
-      class="divide-y divide-gray-800 max-h-72 overflow-y-auto text-sm text-gray-300"
+      class="divide-y divide-gray-800 max-h-72 overflow-y-auto text-sm text-gray-300 scrollbar-plan"
     >
       <li
         v-for="note in items"

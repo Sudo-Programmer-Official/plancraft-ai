@@ -12,207 +12,316 @@
 
     <!-- Tier 1 · Overview -->
     <section class="space-y-4">
-      <div class="dashboard-card greeting-card space-y-4">
-        <div>
-          <p class="text-xs sm:text-sm uppercase tracking-widest text-indigo-300/80">
-            Your companion workspace
-          </p>
-          <div class="flex flex-wrap items-end gap-2">
-            <h1 class="text-2xl sm:text-3xl font-semibold text-slate-100">
-              {{ greetingHeadline }}
-            </h1>
-            <span v-if="dailyTasks.length" class="text-indigo-200/90 text-sm sm:text-base">
-              Let’s craft an intentional day.
-            </span>
+      <div class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4">
+        <div class="dashboard-card greeting-card space-y-4">
+          <div>
+            <p class="text-xs sm:text-sm uppercase tracking-widest text-indigo-300/80">
+              Your companion workspace
+            </p>
+            <div class="flex flex-wrap items-end gap-2">
+              <h1 class="text-2xl sm:text-3xl font-semibold text-slate-100">
+                {{ greetingHeadline }}
+              </h1>
+              <span v-if="dailyTasks.length" class="text-indigo-200/90 text-sm sm:text-base">
+                Let’s craft an intentional day.
+              </span>
+            </div>
           </div>
-        </div>
 
-        <transition-group name="slide" tag="div">
+          <transition-group name="slide" tag="div">
+            <div
+              v-if="currentInsight"
+              :key="currentInsight"
+              class="text-indigo-200/90 text-sm sm:text-base max-w-2xl leading-relaxed"
+            >
+              {{ currentInsight }}
+            </div>
+          </transition-group>
+
           <div
-            v-if="currentInsight"
-            :key="currentInsight"
-            class="text-indigo-200/90 text-sm sm:text-base max-w-2xl leading-relaxed"
+            class="now-bar rounded-xl bg-indigo-900/40 border border-indigo-700/40 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
           >
-            {{ currentInsight }}
-          </div>
-        </transition-group>
-
-        <div
-          class="now-bar rounded-xl bg-indigo-900/40 border border-indigo-700/40 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
-        >
-          <div class="flex items-center gap-2 text-slate-200">
-            <span class="text-xl">🕐</span>
-            <span class="font-medium text-sm sm:text-base">Current Focus</span>
-          </div>
-          <div class="text-indigo-200 text-sm sm:text-base font-medium">
-            {{ currentFocusTask?.title || "All caught up — take a mindful pause." }}
+            <div class="flex items-center gap-2 text-slate-200">
+              <span class="text-xl">🕐</span>
+              <span class="font-medium text-sm sm:text-base">Current Focus</span>
+            </div>
+            <div class="text-indigo-200 text-sm sm:text-base font-medium">
+              {{ currentFocusTask?.title || "All caught up — take a mindful pause." }}
+            </div>
           </div>
         </div>
       </div>
 
       <div
         v-if="carryoverCount > 0 || (usage.plan === 'free' && !isPremium.value) || reactivateEligible"
-        class="grid gap-3 lg:grid-cols-3"
+        class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4"
       >
-        <div
-          v-if="carryoverCount > 0"
-          class="dashboard-banner bg-amber-500/10 border-amber-400/30 text-amber-100 flex items-start justify-between gap-3"
-        >
-          <div class="flex items-center gap-3">
-            <span class="text-xl">🔄</span>
-            <div>
-              <p class="text-sm sm:text-base font-medium">
-                {{ carryoverCount }} unfinished task{{ carryoverCount === 1 ? '' : 's' }} from today.
-              </p>
-              <p class="text-xs sm:text-sm opacity-80">
-                Move a few forward so tomorrow starts lighter.
-              </p>
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+          <div
+            v-if="carryoverCount > 0"
+            class="dashboard-banner bg-amber-500/10 border-amber-400/30 text-amber-100 flex items-start justify-between gap-3"
+          >
+            <div class="flex items-center gap-3">
+              <span class="text-xl">🔄</span>
+              <div>
+                <p class="text-sm sm:text-base font-medium">
+                  {{ carryoverCount }} unfinished task{{ carryoverCount === 1 ? '' : 's' }} from today.
+                </p>
+                <p class="text-xs sm:text-sm opacity-80">
+                  Move a few forward so tomorrow starts lighter.
+                </p>
+              </div>
+            </div>
+            <div class="flex flex-shrink-0 items-center gap-2">
+              <button
+                @click="applyCarryover(3)"
+                class="px-3 py-1.5 rounded-lg bg-amber-500/90 hover:bg-amber-500 text-slate-900 text-xs font-semibold shadow-sm"
+              >
+                Move {{ Math.min(3, carryoverCount) }}
+              </button>
+              <button
+                @click="ignoreCarryover()"
+                class="px-3 py-1.5 rounded-lg bg-black/40 hover:bg-black/50 text-amber-50 text-xs font-medium"
+              >
+                Ignore
+              </button>
             </div>
           </div>
-          <div class="flex flex-shrink-0 items-center gap-2">
-            <button
-              @click="applyCarryover(3)"
-              class="px-3 py-1.5 rounded-lg bg-amber-500/90 hover:bg-amber-500 text-slate-900 text-xs font-semibold shadow-sm"
-            >
-              Move {{ Math.min(3, carryoverCount) }}
-            </button>
-            <button
-              @click="ignoreCarryover()"
-              class="px-3 py-1.5 rounded-lg bg-black/40 hover:bg-black/50 text-amber-50 text-xs font-medium"
-            >
-              Ignore
-            </button>
-          </div>
-        </div>
 
-        <div
-          v-if="usage.plan === 'free' && !isPremium.value"
-          class="dashboard-banner bg-indigo-600/10 border-indigo-500/40 text-indigo-100 flex items-center justify-between gap-3"
-        >
-          <div class="flex items-center gap-2">
-            <span class="text-xl">🚀</span>
-            <p class="text-sm sm:text-base">
-              You’ve used {{ usage.used }}/{{ usage.limit }} reminders today.
-            </p>
+          <div
+            v-if="usage.plan === 'free' && !isPremium.value"
+            class="dashboard-banner bg-indigo-600/10 border-indigo-500/40 text-indigo-100 flex items-center justify-between gap-3"
+          >
+            <div class="flex items-center gap-2">
+              <span class="text-xl">🚀</span>
+              <p class="text-sm sm:text-base">
+                You’ve used {{ usage.used }}/{{ usage.limit }} reminders today.
+              </p>
+            </div>
+            <button
+              v-if="!isGuest.value"
+              @click="goToUpgrade"
+              class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold"
+            >
+              Upgrade
+            </button>
+            <RouterLink
+              v-else
+              to="/login"
+              class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold"
+            >
+              🔑 Sign in
+            </RouterLink>
           </div>
-          <button
-            v-if="!isGuest.value"
-            @click="goToUpgrade"
-            class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold"
-          >
-            Upgrade
-          </button>
-          <RouterLink
-            v-else
-            to="/login"
-            class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold"
-          >
-            🔑 Sign in
-          </RouterLink>
-        </div>
 
-        <div
-          v-if="reactivateEligible"
-          class="dashboard-banner bg-yellow-500/10 border-yellow-400/30 text-yellow-50 flex items-start gap-3"
-        >
-          <span class="text-xl">🔁</span>
-          <div class="flex-1 space-y-1">
-            <p class="font-medium text-sm sm:text-base">
-              Premium until {{ cancelAtFmt }}
-              <span v-if="daysLeft > 0">
-                ({{ daysLeft }} day{{ daysLeft === 1 ? '' : 's' }} left)
-              </span>
-            </p>
-            <p class="text-xs sm:text-sm opacity-80">
-              Reactivate instantly to keep all pro automations and reminders.
-            </p>
-          </div>
-          <button
-            @click="onReactivate"
-            class="px-3 py-1.5 rounded-lg bg-black/30 hover:bg-black/45 text-yellow-50 text-xs font-semibold"
+          <div
+            v-if="reactivateEligible"
+            class="dashboard-banner bg-yellow-500/10 border-yellow-400/30 text-yellow-50 flex items-start gap-3"
           >
-            Reactivate
-          </button>
+            <span class="text-xl">🔁</span>
+            <div class="flex-1 space-y-1">
+              <p class="font-medium text-sm sm:text-base">
+                Premium until {{ cancelAtFmt }}
+                <span v-if="daysLeft > 0">
+                  ({{ daysLeft }} day{{ daysLeft === 1 ? '' : 's' }} left)
+                </span>
+              </p>
+              <p class="text-xs sm:text-sm opacity-80">
+                Reactivate instantly to keep all pro automations and reminders.
+              </p>
+            </div>
+            <button
+              @click="onReactivate"
+              class="px-3 py-1.5 rounded-lg bg-black/30 hover:bg-black/45 text-yellow-50 text-xs font-semibold"
+            >
+              Reactivate
+            </button>
+          </div>
         </div>
       </div>
     </section>
 
     <!-- Tier 2 · Workspaces -->
-    <section class="grid gap-4 lg:gap-6 xl:grid-cols-5">
-      <div v-if="showDaily" class="dashboard-card daily-card xl:col-span-3 space-y-5">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <h3 class="text-lg sm:text-xl font-semibold text-slate-100">
-              📅 Today’s Focus
-            </h3>
-            <p class="text-xs sm:text-sm text-indigo-200/80">
-              Prioritise, drag, and complete your most important work.
+    <section class="grid grid-cols-1 gap-4 lg:gap-6 md:grid-cols-2 xl:grid-cols-5">
+      <div
+        v-if="showDaily"
+        class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 xl:col-span-3"
+      >
+        <div class="dashboard-card daily-card space-y-5">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h3 class="text-lg sm:text-xl font-semibold text-slate-100">
+                📅 Today’s Focus
+              </h3>
+              <p class="text-xs sm:text-sm text-indigo-200/80">
+                Prioritise, drag, and complete your most important work.
+              </p>
+            </div>
+            <button
+              @click="openPlanner"
+              class="inline-flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg text-white bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 shadow-md transition"
+            >
+              <span class="text-base">＋</span>
+              Plan New Task
+            </button>
+          </div>
+
+          <div class="flex gap-2 sm:gap-3 overflow-x-auto pb-2 scrollbar-plan">
+            <button
+              v-for="category in categoryFilters"
+              :key="category"
+              type="button"
+              @click="dashboardCategory = category"
+              :class="[
+                'flex-shrink-0 px-3 py-1.5 rounded-lg font-medium text-xs transition-all duration-300 ease-in-out',
+                dashboardCategory === category
+                  ? 'bg-indigo-700 text-white shadow-[0_0_14px_rgba(99,102,241,0.5)]'
+                  : 'bg-slate-800/70 text-slate-300 hover:bg-slate-700/80',
+              ]"
+            >
+              <span class="mr-1 text-base leading-none">{{ categoryIcon(category) }}</span>
+              {{ category }}
+            </button>
+          </div>
+
+          <div class="space-y-3">
+            <div class="progress-card bg-slate-900/50 border border-slate-700/40 rounded-xl px-4 py-3">
+              <div class="flex items-center justify-between text-xs sm:text-sm text-slate-300 mb-2">
+                <span>Completion</span>
+                <span>{{ dailyProgress }}%</span>
+              </div>
+              <div class="h-2 rounded-full bg-slate-800 overflow-hidden">
+                <div
+                  class="h-full rounded-full bg-gradient-to-r from-indigo-400 via-indigo-500 to-emerald-400 transition-all"
+                  :style="{ width: `${dailyProgress}%` }"
+                ></div>
+              </div>
+            </div>
+
+            <div
+              v-if="filteredDaily.length"
+              ref="dailyList"
+              class="overflow-y-auto max-h-[60vh] md:max-h-64 scrollbar-plan rounded-2xl pr-1"
+            >
+              <ul class="space-y-2 text-sm">
+                <li
+                  v-for="task in filteredDaily"
+                  :key="task.id"
+                  class="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-900/70 border border-slate-800/80 hover:border-indigo-500/40 transition"
+                >
+                  <div class="flex flex-1 items-start gap-3">
+                    <input
+                      type="checkbox"
+                      :checked="task.completed"
+                      @change="() => toggleComplete(task)"
+                      class="mt-0.5 w-4 h-4 cursor-pointer accent-indigo-500"
+                    />
+                    <div class="flex-1 space-y-1">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span
+                          class="font-medium"
+                          :class="{ 'line-through text-slate-500': task.completed, 'text-slate-100': !task.completed }"
+                        >
+                          {{ task.title }}
+                        </span>
+                        <div
+                          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/80 text-[11px] font-medium shadow-sm"
+                          :class="categoryColor(task.category)"
+                        >
+                          <span class="leading-none">{{ categoryIcon(task.category) }}</span>
+                          <span>{{ categoryLabel(task.category) }}</span>
+                        </div>
+                      </div>
+                      <small class="text-slate-400 text-xs">{{ task.date }}</small>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button
+                      v-if="reminderActiveByTask[task.id]"
+                      @click.stop="onReminderClick(task)"
+                      class="text-yellow-400 hover:opacity-80 text-lg"
+                      title="Reminder active — click to manage"
+                    >
+                      🔔
+                    </button>
+                    <button
+                      @click.stop="openDialog(task)"
+                      class="text-slate-300 hover:text-indigo-300 text-sm"
+                      title="Edit Task"
+                    >
+                      ✏️
+                    </button>
+                  </div>
+                </li>
+              </ul>
+            </div>
+
+            <p v-else class="text-slate-400 text-sm">
+              {{ dashboardCategory === 'All' ? 'No tasks today.' : 'No tasks in this category yet.' }}
             </p>
           </div>
-          <button
-            @click="openPlanner"
-            class="inline-flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg text-white bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 shadow-md transition"
-          >
-            <span class="text-base">＋</span>
-            Plan New Task
-          </button>
-        </div>
 
-        <div class="flex gap-2 sm:gap-3 overflow-x-auto pb-2">
-          <button
-            v-for="category in categoryFilters"
-            :key="category"
-            type="button"
-            @click="dashboardCategory = category"
-            :class="[
-              'flex-shrink-0 px-3 py-1.5 rounded-lg font-medium text-xs transition-all duration-300 ease-in-out',
-              dashboardCategory === category
-                ? 'bg-indigo-700 text-white shadow-[0_0_14px_rgba(99,102,241,0.5)]'
-                : 'bg-slate-800/70 text-slate-300 hover:bg-slate-700/80',
-            ]"
-          >
-            <span class="mr-1 text-base leading-none">{{ categoryIcon(category) }}</span>
-            {{ category }}
-          </button>
+          <TaskPlannerDialog
+            v-if="showPlanner"
+            :open="showPlanner"
+            :date="selectedDate"
+            :task="selectedTask"
+            :edit-mode="!!selectedTask"
+            @close="closePlanner"
+            @saved="handleSaveAndSchedule"
+          />
         </div>
+      </div>
 
-        <div class="space-y-3">
+      <div
+        v-if="showWeekly"
+        class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 xl:col-span-2"
+      >
+        <div class="dashboard-card weekly-card space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 class="text-lg sm:text-xl font-semibold text-slate-100">📆 This Week’s Horizon</h3>
+              <p class="text-xs sm:text-sm text-indigo-200/80">
+                Track steady progress toward your broader goals.
+              </p>
+            </div>
+            <router-link
+              to="/weekly"
+              class="text-xs px-3 py-1.5 rounded-lg font-semibold bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 text-white shadow-sm transition"
+            >
+              Weekly view →
+            </router-link>
+          </div>
+
           <div class="progress-card bg-slate-900/50 border border-slate-700/40 rounded-xl px-4 py-3">
             <div class="flex items-center justify-between text-xs sm:text-sm text-slate-300 mb-2">
               <span>Completion</span>
-              <span>{{ dailyProgress }}%</span>
+              <span>{{ weeklyProgress }}%</span>
             </div>
             <div class="h-2 rounded-full bg-slate-800 overflow-hidden">
               <div
-                class="h-full rounded-full bg-gradient-to-r from-indigo-400 via-indigo-500 to-emerald-400 transition-all"
-                :style="{ width: `${dailyProgress}%` }"
+                class="h-full rounded-full bg-gradient-to-r from-emerald-300 via-emerald-400 to-indigo-500 transition-all"
+                :style="{ width: `${weeklyProgress}%` }"
               ></div>
             </div>
           </div>
+          <p class="text-xs text-slate-300">
+            {{ doneWeekly }}/{{ weeklyTasks.length }} completed this week
+          </p>
 
-          <ul
-            v-if="filteredDaily.length"
-            ref="dailyList"
-            class="space-y-2 text-sm max-h-64 overflow-y-auto pr-1 custom-scroll"
+          <div
+            v-if="filteredWeeklyPreview.length"
+            class="overflow-y-auto max-h-[60vh] md:max-h-56 scrollbar-plan rounded-2xl pr-1"
           >
-            <li
-              v-for="task in filteredDaily"
-              :key="task.id"
-              class="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-900/70 border border-slate-800/80 hover:border-indigo-500/40 transition"
-            >
-              <div class="flex flex-1 items-start gap-3">
-                <input
-                  type="checkbox"
-                  :checked="task.completed"
-                  @change="() => toggleComplete(task)"
-                  class="mt-0.5 w-4 h-4 cursor-pointer accent-indigo-500"
-                />
-                <div class="flex-1 space-y-1">
+            <ul class="space-y-2 text-sm">
+              <li
+                v-for="task in filteredWeeklyPreview"
+                :key="task.id"
+                class="p-3 rounded-xl bg-slate-900/70 border border-slate-800/80 hover:border-indigo-500/40 transition flex justify-between items-start gap-3"
+              >
+                <div class="space-y-1">
                   <div class="flex flex-wrap items-center gap-2">
-                    <span
-                      class="font-medium"
-                      :class="{ 'line-through text-slate-500': task.completed, 'text-slate-100': !task.completed }"
-                    >
+                    <span :class="{ 'line-through text-slate-500': task.completed, 'text-white': !task.completed }">
                       {{ task.title }}
                     </span>
                     <div
@@ -225,378 +334,311 @@
                   </div>
                   <small class="text-slate-400 text-xs">{{ task.date }}</small>
                 </div>
-              </div>
-              <div class="flex items-center gap-2">
-                <button
-                  v-if="reminderActiveByTask[task.id]"
-                  @click.stop="onReminderClick(task)"
-                  class="text-yellow-400 hover:opacity-80 text-lg"
-                  title="Reminder active — click to manage"
-                >
-                  🔔
-                </button>
-                <button
-                  @click.stop="openDialog(task)"
-                  class="text-slate-300 hover:text-indigo-300 text-sm"
-                  title="Edit Task"
-                >
-                  ✏️
-                </button>
-              </div>
-            </li>
-          </ul>
-
+              </li>
+            </ul>
+          </div>
           <p v-else class="text-slate-400 text-sm">
-            {{ dashboardCategory === 'All' ? 'No tasks today.' : 'No tasks in this category yet.' }}
+            {{ dashboardCategory === 'All' ? 'No weekly tasks yet.' : 'No weekly tasks in this category.' }}
           </p>
         </div>
-
-        <TaskPlannerDialog
-          v-if="showPlanner"
-          :open="showPlanner"
-          :date="selectedDate"
-          :task="selectedTask"
-          :edit-mode="!!selectedTask"
-          @close="closePlanner"
-          @saved="handleSaveAndSchedule"
-        />
       </div>
 
-      <div v-if="showWeekly" class="dashboard-card weekly-card xl:col-span-2 space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 class="text-lg sm:text-xl font-semibold text-slate-100">📆 This Week’s Horizon</h3>
-            <p class="text-xs sm:text-sm text-indigo-200/80">
-              Track steady progress toward your broader goals.
-            </p>
-          </div>
-          <router-link
-            to="/weekly"
-            class="text-xs px-3 py-1.5 rounded-lg font-semibold bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 text-white shadow-sm transition"
-          >
-            Weekly view →
-          </router-link>
+      <div
+        v-if="showQuickLinks"
+        class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 xl:col-span-2"
+      >
+        <div class="dashboard-card quick-links-card">
+          <QuickLinksCard />
         </div>
+      </div>
 
-        <div class="progress-card bg-slate-900/50 border border-slate-700/40 rounded-xl px-4 py-3">
-          <div class="flex items-center justify-between text-xs sm:text-sm text-slate-300 mb-2">
-            <span>Completion</span>
-            <span>{{ weeklyProgress }}%</span>
-          </div>
-          <div class="h-2 rounded-full bg-slate-800 overflow-hidden">
-            <div
-              class="h-full rounded-full bg-gradient-to-r from-emerald-300 via-emerald-400 to-indigo-500 transition-all"
-              :style="{ width: `${weeklyProgress}%` }"
-            ></div>
-          </div>
-        </div>
-        <p class="text-xs text-slate-300">
-          {{ doneWeekly }}/{{ weeklyTasks.length }} completed this week
-        </p>
-
-        <ul
-          v-if="filteredWeeklyPreview.length"
-          class="space-y-2 text-sm max-h-56 overflow-y-auto custom-scroll pr-1"
-        >
-          <li
-            v-for="task in filteredWeeklyPreview"
-            :key="task.id"
-            class="p-3 rounded-xl bg-slate-900/70 border border-slate-800/80 hover:border-indigo-500/40 transition flex justify-between items-start gap-3"
-          >
-            <div class="space-y-1">
-              <div class="flex flex-wrap items-center gap-2">
-                <span :class="{ 'line-through text-slate-500': task.completed, 'text-white': !task.completed }">
-                  {{ task.title }}
-                </span>
-                <div
-                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/80 text-[11px] font-medium shadow-sm"
-                  :class="categoryColor(task.category)"
-                >
-                  <span class="leading-none">{{ categoryIcon(task.category) }}</span>
-                  <span>{{ categoryLabel(task.category) }}</span>
-                </div>
-              </div>
-              <small class="text-slate-400 text-xs">{{ task.date }}</small>
+      <div
+        v-if="showMonthly"
+        class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 xl:col-span-3"
+      >
+        <div class="dashboard-card monthly-card space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 class="text-lg sm:text-xl font-semibold text-slate-100">🌙 Monthly Momentum</h3>
+              <p class="text-xs sm:text-sm text-indigo-200/80">
+                Keep an eye on long-run commitments and rituals.
+              </p>
             </div>
-          </li>
-        </ul>
-        <p v-else class="text-slate-400 text-sm">
-          {{ dashboardCategory === 'All' ? 'No weekly tasks yet.' : 'No weekly tasks in this category.' }}
-        </p>
-      </div>
-
-      <div v-if="showQuickLinks" class="dashboard-card quick-links-card xl:col-span-2">
-        <QuickLinksCard />
-      </div>
-
-      <div v-if="showMonthly" class="dashboard-card monthly-card xl:col-span-3 space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 class="text-lg sm:text-xl font-semibold text-slate-100">🌙 Monthly Momentum</h3>
-            <p class="text-xs sm:text-sm text-indigo-200/80">
-              Keep an eye on long-run commitments and rituals.
-            </p>
+            <router-link
+              to="/monthly"
+              class="text-xs px-3 py-1.5 rounded-lg font-semibold bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 text-white shadow-sm transition"
+            >
+              Monthly view →
+            </router-link>
           </div>
-          <router-link
-            to="/monthly"
-            class="text-xs px-3 py-1.5 rounded-lg font-semibold bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 text-white shadow-sm transition"
-          >
-            Monthly view →
-          </router-link>
-        </div>
-        <div class="space-y-2">
-          <p class="text-sm text-slate-300">
-            {{ doneMonthly }}/{{ monthlyTasks.length }} completed this month
-          </p>
-          <div class="h-2 rounded-full bg-slate-800 overflow-hidden">
-            <div
-              class="h-full rounded-full bg-gradient-to-r from-indigo-500 via-blue-500 to-purple-500 transition-all"
-              :style="{ width: progressBarWidth }"
-            ></div>
+          <div class="space-y-2">
+            <p class="text-sm text-slate-300">
+              {{ doneMonthly }}/{{ monthlyTasks.length }} completed this month
+            </p>
+            <div class="h-2 rounded-full bg-slate-800 overflow-hidden">
+              <div
+                class="h-full rounded-full bg-gradient-to-r from-indigo-500 via-blue-500 to-purple-500 transition-all"
+                :style="{ width: progressBarWidth }"
+              ></div>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
     <!-- Tier 3 · Analytics & Insights -->
-    <section class="grid gap-4 lg:gap-6 lg:grid-cols-2">
-      <div v-if="showJournal" class="dashboard-card journal-card space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <h3 class="text-lg sm:text-xl font-semibold text-slate-100">📖 Journal Snapshot</h3>
-          <div class="flex items-center gap-2">
-            <router-link
-              to="/reports"
-              class="text-indigo-300 hover:text-indigo-100 text-xs font-semibold"
-            >
-              Reports →
-            </router-link>
-            <router-link
-              to="/journal"
-              class="inline-flex items-center text-xs px-3 py-1.5 rounded-lg font-semibold bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 text-white shadow-sm transition"
-            >
-              Open Journal
-            </router-link>
+    <section class="grid grid-cols-1 gap-4 lg:gap-6 lg:grid-cols-2">
+      <div
+        v-if="showJournal"
+        class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4"
+      >
+        <div class="dashboard-card journal-card space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <h3 class="text-lg sm:text-xl font-semibold text-slate-100">📖 Journal Snapshot</h3>
+            <div class="flex items-center gap-2">
+              <router-link
+                to="/reports"
+                class="text-indigo-300 hover:text-indigo-100 text-xs font-semibold"
+              >
+                Reports →
+              </router-link>
+              <router-link
+                to="/journal"
+                class="inline-flex items-center text-xs px-3 py-1.5 rounded-lg font-semibold bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 text-white shadow-sm transition"
+              >
+                Open Journal
+              </router-link>
+            </div>
           </div>
+          <div v-if="journalLogs.length" class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm sm:text-base">
+            <div class="p-3 rounded-xl bg-slate-900/70 border border-slate-800/80 text-center space-y-1">
+              <p class="text-2xl">🔥</p>
+              <p class="font-medium" :class="{ 'animate-pulse': displayStreak >= 1 }">
+                {{ displayStreak }}-day streak
+              </p>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/70 border border-slate-800/80 text-center space-y-1">
+              <p class="text-2xl">{{ journalLogs[0].mood?.emoji || "📝" }}</p>
+              <p class="font-medium">Last Mood</p>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/70 border border-slate-800/80 text-center space-y-1">
+              <p class="text-2xl">📒</p>
+              <p class="font-medium">{{ journalLogs.length }} reflections</p>
+            </div>
+          </div>
+          <p v-else class="text-slate-400 text-sm">No reflections yet. Start journaling today!</p>
         </div>
-        <div v-if="journalLogs.length" class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm sm:text-base">
-          <div class="p-3 rounded-xl bg-slate-900/70 border border-slate-800/80 text-center space-y-1">
-            <p class="text-2xl">🔥</p>
-            <p class="font-medium" :class="{ 'animate-pulse': displayStreak >= 1 }">
-              {{ displayStreak }}-day streak
-            </p>
-          </div>
-          <div class="p-3 rounded-xl bg-slate-900/70 border border-slate-800/80 text-center space-y-1">
-            <p class="text-2xl">{{ journalLogs[0].mood?.emoji || "📝" }}</p>
-            <p class="font-medium">Last Mood</p>
-          </div>
-          <div class="p-3 rounded-xl bg-slate-900/70 border border-slate-800/80 text-center space-y-1">
-            <p class="text-2xl">📒</p>
-            <p class="font-medium">{{ journalLogs.length }} reflections</p>
-          </div>
-        </div>
-        <p v-else class="text-slate-400 text-sm">No reflections yet. Start journaling today!</p>
       </div>
 
-      <div v-if="showAIInsights" class="dashboard-card ai-card space-y-4">
-        <div class="flex items-center justify-between">
-          <h3 class="text-lg sm:text-xl font-semibold text-slate-100 flex items-center gap-2">
-            🤖 AI Insights
-          </h3>
-          <router-link to="/reports" class="text-indigo-300 hover:text-indigo-100 text-xs font-semibold">
-            View all →
-          </router-link>
-        </div>
-        <div v-if="aiSummary" class="space-y-4">
-          <div class="flex justify-between items-center text-xs sm:text-sm text-slate-300">
-            <span>✅ Completed {{ aiSummary.completedPct }}%</span>
-            <span>📌 Pending {{ aiSummary.pending }}</span>
-          </div>
-
-          <div
-            v-if="aiSummary.focus"
-            class="rounded-xl border border-indigo-600/50 bg-gradient-to-br from-indigo-900/60 via-indigo-900/40 to-slate-900/50 px-4 py-3 text-sm text-slate-200"
-          >
-            <strong class="text-indigo-200">🎯 Focus:</strong> {{ aiSummary.focus }}
-          </div>
-
-          <div class="grid gap-3 sm:grid-cols-2">
-            <div
-              class="insight-card bg-gradient-to-br from-emerald-700/50 via-emerald-800/40 to-slate-900/70 border border-emerald-400/40 rounded-2xl px-4 py-3 text-sm text-emerald-100 space-y-2"
-            >
-              <div class="flex items-center justify-between">
-                <span class="font-semibold">⚡ Quick Wins</span>
-                <span class="text-xs opacity-80">{{ aiSummary.quickWins.length }}</span>
-              </div>
-              <ul v-if="aiSummary.quickWins.length" class="space-y-1 text-emerald-50/90 text-sm leading-relaxed">
-                <li v-for="(item, index) in aiSummary.quickWins" :key="`quick-${index}`">• {{ item }}</li>
-              </ul>
-              <p v-else class="text-xs text-emerald-100/70">Add a couple of five‑minute tasks.</p>
-            </div>
-
-            <div
-              class="insight-card bg-gradient-to-br from-amber-700/50 via-orange-800/40 to-slate-900/70 border border-amber-400/40 rounded-2xl px-4 py-3 text-sm text-amber-100 space-y-2"
-            >
-              <div class="flex items-center justify-between">
-                <span class="font-semibold">🏋 Heavy Lifts</span>
-                <span class="text-xs opacity-80">{{ aiSummary.heavyLifts.length }}</span>
-              </div>
-              <ul v-if="aiSummary.heavyLifts.length" class="space-y-1 text-amber-50/90 text-sm leading-relaxed">
-                <li v-for="(item, index) in aiSummary.heavyLifts" :key="`heavy-${index}`">• {{ item }}</li>
-              </ul>
-              <p v-else class="text-xs text-amber-100/70">No heavy lifts queued — plan one big next step.</p>
-            </div>
-
-            <div
-              class="insight-card sm:col-span-2 bg-gradient-to-br from-rose-700/40 via-red-800/40 to-slate-900/70 border border-rose-400/40 rounded-2xl px-4 py-3 text-sm text-rose-100 space-y-2"
-            >
-              <div class="flex items-center gap-2">
-                <span class="text-lg">🚨</span>
-                <span class="font-semibold">Weekly Watch</span>
-              </div>
-              <p v-if="aiSummary.weeklyWarning" class="text-rose-50/80 leading-relaxed">
-                {{ aiSummary.weeklyWarning }}
-              </p>
-              <p v-else class="text-xs text-rose-100/70">
-                Looking balanced. Keep checking in with your planner.
-              </p>
-            </div>
-          </div>
-        </div>
-        <p v-else class="text-slate-400 text-sm">Fetching AI insights…</p>
-      </div>
-
-      <div class="dashboard-card report-card lg:col-span-2 space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div class="flex items-center gap-2">
-            <span class="text-xl">📊</span>
-            <div>
-              <h3 class="text-lg sm:text-xl font-semibold text-slate-100">
-                Reports Snapshot
-              </h3>
-              <p class="text-xs sm:text-sm text-indigo-200/80">
-                Keep tabs on performance, pacing, and focus trends.
-              </p>
-            </div>
-          </div>
-          <div class="flex flex-wrap gap-2">
-            <button
-              @click="onGenerateWeekly"
-              :disabled="generatingWeekly || generatingMonthly"
-              class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 disabled:opacity-50 text-white text-xs font-semibold shadow-sm transition"
-            >
-              Generate Weekly
-            </button>
-            <button
-              @click="onGenerateMonthly"
-              :disabled="generatingWeekly || generatingMonthly"
-              class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-fuchsia-600 to-purple-700 hover:from-fuchsia-500 hover:to-purple-600 disabled:opacity-50 text-white text-xs font-semibold shadow-sm transition"
-            >
-              Generate Monthly
-            </button>
-            <router-link
-              to="/reports"
-              class="text-xs px-3 py-1.5 rounded-lg bg-transparent border border-indigo-600/60 text-indigo-200 hover:bg-indigo-600/20 font-semibold transition"
-            >
-              Open →
+      <div
+        v-if="showAIInsights"
+        class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4"
+      >
+        <div class="dashboard-card ai-card space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg sm:text-xl font-semibold text-slate-100 flex items-center gap-2">
+              🤖 AI Insights
+            </h3>
+            <router-link to="/reports" class="text-indigo-300 hover:text-indigo-100 text-xs font-semibold">
+              View all →
             </router-link>
           </div>
-        </div>
-
-        <div v-if="latestReport" class="space-y-4">
-          <div class="text-sm sm:text-base text-indigo-200/80 flex flex-wrap gap-2">
-            <span class="font-medium uppercase tracking-wide text-indigo-300">
-              {{ latestReport.period?.toUpperCase?.() || latestReport.period }}
-            </span>
-            <span>•</span>
-            <span>{{ latestReport.start }} → {{ latestReport.end }}</span>
-          </div>
-
-          <div class="flex flex-wrap items-center gap-4">
-            <div class="flex items-center gap-1">
-              <span class="text-emerald-400 font-semibold text-lg">
-                {{ latestReport.metrics?.totalCompleted || 0 }}
-              </span>
-              <span class="text-sm text-slate-300">completed</span>
+          <div v-if="aiSummary" class="space-y-4">
+            <div class="flex justify-between items-center text-xs sm:text-sm text-slate-300">
+              <span>✅ Completed {{ aiSummary.completedPct }}%</span>
+              <span>📌 Pending {{ aiSummary.pending }}</span>
             </div>
-            <div class="flex items-center gap-1">
-              <span class="hidden sm:block text-slate-500">•</span>
-            </div>
-            <div class="flex items-center gap-1">
-              <span class="text-slate-100 font-semibold text-lg">
-                {{ latestReport.metrics?.totalTasks || 0 }}
-              </span>
-              <span class="text-sm text-slate-300">total</span>
-            </div>
-          </div>
 
-          <canvas
-            ref="sparklineCanvas"
-            width="220"
-            height="48"
-            class="w-full h-14 opacity-90"
-          ></canvas>
-
-          <div class="flex flex-wrap gap-3">
-            <a
-              v-if="latestReport.urls?.html"
-              :href="latestReport.urls.html"
-              target="_blank"
-              class="px-4 py-2 rounded-lg bg-indigo-700 hover:bg-indigo-600 text-white text-xs sm:text-sm font-medium shadow-sm transition"
+            <div
+              v-if="aiSummary.focus"
+              class="rounded-xl border border-indigo-600/50 bg-gradient-to-br from-indigo-900/60 via-indigo-900/40 to-slate-900/50 px-4 py-3 text-sm text-slate-200"
             >
-              View HTML
-            </a>
-            <a
-              v-if="latestReport.urls?.pdf"
-              :href="latestReport.urls.pdf"
-              target="_blank"
-              class="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs sm:text-sm font-medium shadow-sm transition"
-            >
-              Download PDF
-            </a>
-          </div>
-        </div>
+              <strong class="text-indigo-200">🎯 Focus:</strong> {{ aiSummary.focus }}
+            </div>
 
-        <div v-else class="text-center text-sm text-indigo-200/70 space-y-2">
-          <p>No reports yet.</p>
-          <router-link
-            to="/reports"
-            class="text-indigo-300 hover:text-indigo-100 font-semibold"
-          >
-            Generate one to see your progress ✨
-          </router-link>
+            <div class="grid gap-3 sm:grid-cols-2">
+              <div
+                class="insight-card bg-gradient-to-br from-emerald-700/50 via-emerald-800/40 to-slate-900/70 border border-emerald-400/40 rounded-2xl px-4 py-3 text-sm text-emerald-100 space-y-2"
+              >
+                <div class="flex items-center justify-between">
+                  <span class="font-semibold">⚡ Quick Wins</span>
+                  <span class="text-xs opacity-80">{{ aiSummary.quickWins.length }}</span>
+                </div>
+                <ul v-if="aiSummary.quickWins.length" class="space-y-1 text-emerald-50/90 text-sm leading-relaxed">
+                  <li v-for="(item, index) in aiSummary.quickWins" :key="`quick-${index}`">• {{ item }}</li>
+                </ul>
+                <p v-else class="text-xs text-emerald-100/70">Add a couple of five‑minute tasks.</p>
+              </div>
+
+              <div
+                class="insight-card bg-gradient-to-br from-amber-700/50 via-orange-800/40 to-slate-900/70 border border-amber-400/40 rounded-2xl px-4 py-3 text-sm text-amber-100 space-y-2"
+              >
+                <div class="flex items-center justify-between">
+                  <span class="font-semibold">🏋 Heavy Lifts</span>
+                  <span class="text-xs opacity-80">{{ aiSummary.heavyLifts.length }}</span>
+                </div>
+                <ul v-if="aiSummary.heavyLifts.length" class="space-y-1 text-amber-50/90 text-sm leading-relaxed">
+                  <li v-for="(item, index) in aiSummary.heavyLifts" :key="`heavy-${index}`">• {{ item }}</li>
+                </ul>
+                <p v-else class="text-xs text-amber-100/70">No heavy lifts queued — plan one big next step.</p>
+              </div>
+
+              <div
+                class="insight-card sm:col-span-2 bg-gradient-to-br from-rose-700/40 via-red-800/40 to-slate-900/70 border border-rose-400/40 rounded-2xl px-4 py-3 text-sm text-rose-100 space-y-2"
+              >
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">🚨</span>
+                  <span class="font-semibold">Weekly Watch</span>
+                </div>
+                <p v-if="aiSummary.weeklyWarning" class="text-rose-50/80 leading-relaxed">
+                  {{ aiSummary.weeklyWarning }}
+                </p>
+                <p v-else class="text-xs text-rose-100/70">
+                  Looking balanced. Keep checking in with your planner.
+                </p>
+              </div>
+            </div>
+          </div>
+          <p v-else class="text-slate-400 text-sm">Fetching AI insights…</p>
+        </div>
+      </div>
+
+      <div class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 lg:col-span-2">
+        <div class="dashboard-card report-card space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+              <span class="text-xl">📊</span>
+              <div>
+                <h3 class="text-lg sm:text-xl font-semibold text-slate-100">
+                  Reports Snapshot
+                </h3>
+                <p class="text-xs sm:text-sm text-indigo-200/80">
+                  Keep tabs on performance, pacing, and focus trends.
+                </p>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button
+                @click="onGenerateWeekly"
+                :disabled="generatingWeekly || generatingMonthly"
+                class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 disabled:opacity-50 text-white text-xs font-semibold shadow-sm transition"
+              >
+                Generate Weekly
+              </button>
+              <button
+                @click="onGenerateMonthly"
+                :disabled="generatingWeekly || generatingMonthly"
+                class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-fuchsia-600 to-purple-700 hover:from-fuchsia-500 hover:to-purple-600 disabled:opacity-50 text-white text-xs font-semibold shadow-sm transition"
+              >
+                Generate Monthly
+              </button>
+              <router-link
+                to="/reports"
+                class="text-xs px-3 py-1.5 rounded-lg bg-transparent border border-indigo-600/60 text-indigo-200 hover:bg-indigo-600/20 font-semibold transition"
+              >
+                Open →
+              </router-link>
+            </div>
+          </div>
+
+          <div v-if="latestReport" class="space-y-4">
+            <div class="text-sm sm:text-base text-indigo-200/80 flex flex-wrap gap-2">
+              <span class="font-medium uppercase tracking-wide text-indigo-300">
+                {{ latestReport.period?.toUpperCase?.() || latestReport.period }}
+              </span>
+              <span>•</span>
+              <span>{{ latestReport.start }} → {{ latestReport.end }}</span>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-4">
+              <div class="flex items-center gap-1">
+                <span class="text-emerald-400 font-semibold text-lg">
+                  {{ latestReport.metrics?.totalCompleted || 0 }}
+                </span>
+                <span class="text-sm text-slate-300">completed</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <span class="hidden sm:block text-slate-500">•</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <span class="text-slate-100 font-semibold text-lg">
+                  {{ latestReport.metrics?.totalTasks || 0 }}
+                </span>
+                <span class="text-sm text-slate-300">total</span>
+              </div>
+            </div>
+
+            <canvas
+              ref="sparklineCanvas"
+              width="220"
+              height="48"
+              class="w-full h-14 opacity-90"
+            ></canvas>
+
+            <div class="flex flex-wrap gap-3">
+              <a
+                v-if="latestReport.urls?.html"
+                :href="latestReport.urls.html"
+                target="_blank"
+                class="px-4 py-2 rounded-lg bg-indigo-700 hover:bg-indigo-600 text-white text-xs sm:text-sm font-medium shadow-sm transition"
+              >
+                View HTML
+              </a>
+              <a
+                v-if="latestReport.urls?.pdf"
+                :href="latestReport.urls.pdf"
+                target="_blank"
+                class="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs sm:text-sm font-medium shadow-sm transition"
+              >
+                Download PDF
+              </a>
+            </div>
+          </div>
+
+          <div v-else class="text-center text-sm text-indigo-200/70 space-y-2">
+            <p>No reports yet.</p>
+            <router-link
+              to="/reports"
+              class="text-indigo-300 hover:text-indigo-100 font-semibold"
+            >
+              Generate one to see your progress ✨
+            </router-link>
+          </div>
         </div>
       </div>
     </section>
 
     <!-- Tier 4 · AI Quick Actions -->
-    <section class="dashboard-card flex flex-col items-center gap-4 text-center">
-      <h3 class="text-base sm:text-lg font-semibold text-slate-100">✨ AI Quick Actions</h3>
-      <p class="text-xs sm:text-sm text-indigo-200/80 max-w-2xl">
-        Give your assistant a gentle nudge — reflect, plan, or dive deeper into insights.
-      </p>
-      <div class="flex flex-wrap justify-center gap-3">
-        <button
-          @click="triggerSummary"
-          :disabled="isRefreshingSummary"
-          class="action-chip bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:from-indigo-400 hover:via-purple-400 hover:to-pink-400 text-white disabled:opacity-60"
-        >
-          <span class="text-lg">🧠</span>
-          <span>{{ isRefreshingSummary ? 'Refreshing summary…' : 'Generate Summary' }}</span>
-        </button>
-        <RouterLink
-          to="/talk-to-planner"
-          class="action-chip bg-transparent border border-indigo-400/60 text-indigo-200 hover:bg-indigo-500/10"
-        >
-          <span class="text-lg">💬</span>
-          <span>Talk to Planner</span>
-        </RouterLink>
-        <button
-          @click="goToProgress"
-          class="action-chip bg-transparent border border-slate-500/60 text-slate-200 hover:bg-slate-500/10"
-        >
-          <span class="text-lg">📊</span>
-          <span>View Progress</span>
-        </button>
+    <section class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4">
+      <div class="dashboard-card flex flex-col items-center gap-4 text-center">
+        <h3 class="text-base sm:text-lg font-semibold text-slate-100">✨ AI Quick Actions</h3>
+        <p class="text-xs sm:text-sm text-indigo-200/80 max-w-2xl">
+          Give your assistant a gentle nudge — reflect, plan, or dive deeper into insights.
+        </p>
+        <div class="flex flex-wrap justify-center gap-3">
+          <button
+            @click="triggerSummary"
+            :disabled="isRefreshingSummary"
+            class="action-chip bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:from-indigo-400 hover:via-purple-400 hover:to-pink-400 text-white disabled:opacity-60"
+          >
+            <span class="text-lg">🧠</span>
+            <span>{{ isRefreshingSummary ? 'Refreshing summary…' : 'Generate Summary' }}</span>
+          </button>
+          <RouterLink
+            to="/talk-to-planner"
+            class="action-chip bg-transparent border border-indigo-400/60 text-indigo-200 hover:bg-indigo-500/10"
+          >
+            <span class="text-lg">💬</span>
+            <span>Talk to Planner</span>
+          </RouterLink>
+          <button
+            @click="goToProgress"
+            class="action-chip bg-transparent border border-slate-500/60 text-slate-200 hover:bg-slate-500/10"
+          >
+            <span class="text-lg">📊</span>
+            <span>View Progress</span>
+          </button>
+        </div>
       </div>
     </section>
   </main>
@@ -1532,6 +1574,19 @@ onUnmounted(() => {
   box-shadow: inset 0 1px 12px rgba(255, 255, 255, 0.06);
 }
 
+.dashboard-section {
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (max-width: 768px) {
+  .dashboard-section {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    overflow-x: hidden;
+  }
+}
+
 .now-bar {
   box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.08);
 }
@@ -1557,14 +1612,4 @@ onUnmounted(() => {
   transform: translateY(6px);
 }
 
-.custom-scroll::-webkit-scrollbar {
-  width: 6px;
-}
-.custom-scroll::-webkit-scrollbar-thumb {
-  background-color: #4b5563;
-  border-radius: 9999px;
-}
-.custom-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
 </style>

@@ -56,7 +56,7 @@
 
       <!-- Split Panel -->
       <div
-        class="max-h-[65vh] overflow-y-auto flex flex-col lg:flex-row gap-8 text-gray-800 text-base leading-relaxed"
+        class="max-h-[65vh] overflow-y-auto flex flex-col lg:flex-row gap-8 text-gray-800 text-base leading-relaxed scrollbar-plan"
       >
         <!-- Quote Summary -->
         <div class="lg:w-2/3 space-y-6 pr-2">

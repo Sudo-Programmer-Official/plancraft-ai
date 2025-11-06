@@ -21,10 +21,10 @@
     </div>
 
     <!-- Links grid -->
-   <div
-    v-if="links.length"
-    class="flex gap-3 overflow-x-auto pb-2 custom-scroll"
-  >
+    <div
+      v-if="links.length"
+      class="flex gap-3 overflow-x-auto pb-2 scrollbar-plan"
+    >
     <a
       v-for="l in sortedLinks"
       :key="l.id"

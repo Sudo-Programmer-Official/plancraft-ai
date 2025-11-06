@@ -95,7 +95,7 @@
       </div>
 
       <!-- Nav links -->
-      <nav class="flex-1 mt-4 space-y-2 overflow-y-auto">
+      <nav class="flex-1 mt-4 space-y-2 overflow-y-auto scrollbar-plan">
         <RouterLink
           v-for="tab in tabs"
           :key="tab.name"
@@ -192,7 +192,7 @@
           </div>
 
           <!-- Navigation -->
-          <nav class="space-y-2 flex-1 overflow-y-auto">
+          <nav class="space-y-2 flex-1 overflow-y-auto scrollbar-plan">
             <RouterLink
               v-for="tab in tabs"
               :key="tab.name"
@@ -356,7 +356,7 @@
       </header>
 
       <!-- Dynamic content -->
-      <main class="p-6 flex-1 overflow-y-auto">
+      <main class="p-6 flex-1 overflow-y-auto scrollbar-plan">
         <RouterView />
       </main>
       <!-- Compact sticky footer -->

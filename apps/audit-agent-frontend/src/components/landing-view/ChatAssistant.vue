@@ -38,7 +38,7 @@
     <div class="flex justify-end">
       <el-button type="primary" :loading="loading" @click="sendMessage"> Ask Assistant </el-button>
     </div>
-    <div v-if="chatLog.length" class="mt-6 space-y-4 max-h-[40vh] overflow-y-auto pr-2">
+    <div v-if="chatLog.length" class="mt-6 space-y-4 max-h-[40vh] overflow-y-auto pr-2 scrollbar-plan">
       <div
         v-for="(msg, index) in chatLog"
         :key="index"

@@ -47,7 +47,7 @@
 
         <div class="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl shadow">
           <h2 class="font-semibold text-lg mb-2">🗂 Past Entries</h2>
-          <ul class="space-y-2 text-sm max-h-[300px] overflow-y-auto">
+          <ul class="space-y-2 text-sm max-h-[300px] overflow-y-auto scrollbar-plan">
             <li v-for="(item, index) in entries" :key="index" class="border-b pb-1">
               <div class="font-medium">{{ item.date }} - {{ item.mood }}</div>
               <div class="text-gray-500 dark:text-gray-400 truncate">{{ item.text }}</div>

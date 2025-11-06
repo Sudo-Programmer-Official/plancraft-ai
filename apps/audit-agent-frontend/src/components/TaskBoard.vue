@@ -47,7 +47,7 @@
     </div>
 
     <!-- Draggable tasks -->
-    <div class="max-h-96 overflow-y-auto custom-scroll pr-2">
+    <div class="max-h-96 overflow-y-auto pr-2 scrollbar-plan">
       <draggable
         v-model="tasks"
         item-key="id"

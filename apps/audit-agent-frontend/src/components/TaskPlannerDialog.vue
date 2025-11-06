@@ -1,20 +1,23 @@
 <template>
-  <el-dialog
-    v-model="internalOpen"
-    :title="task ? `✏️ Edit Task` : `📅 Plan for ${formattedDate}`"
-    :width="dialogWidth"
-    class="task-planner-dialog"
-    destroy-on-close
-    :style="{
-      background: 'linear-gradient(145deg, #1e1b4b, #312e81, #4c1d95)',
-      color: '#e2e8f0',
-      borderRadius: '0.5rem',
-      boxShadow: '0 8px 30px rgba(0,0,0,0.6)',
-      border: '1px solid rgba(255,255,255,0.08)',
-      backdropFilter: 'blur(12px)'
-    }"
-    @close="closeDialog"
-  >
+  <Teleport to="body">
+    <el-dialog
+      v-model="internalOpen"
+      :title="task ? `✏️ Edit Task` : `📅 Plan for ${formattedDate}`"
+      :width="dialogWidth"
+      class="task-planner-dialog"
+      modal-class="planner-overlay"
+      destroy-on-close
+      :lock-scroll="false"
+      :style="{
+        background: 'linear-gradient(145deg, #1e1b4b, #312e81, #4c1d95)',
+        color: '#e2e8f0',
+        borderRadius: '0.5rem',
+        boxShadow: '0 8px 30px rgba(0,0,0,0.6)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        backdropFilter: 'blur(12px)'
+      }"
+      @close="closeDialog"
+    >
     <!-- Date Picker -->
     <div class="mb-5">
       <label class="block text-sm text-slate-300 mb-1">Select Date</label>
@@ -158,7 +161,8 @@
         </el-button>
       </div>
     </template>
-  </el-dialog>
+    </el-dialog>
+  </Teleport>
 
   <!-- Local notification setup prompt -->
   <NotificationPrompt v-model="notifPromptOpen" />
@@ -238,11 +242,39 @@ function logTimeBrainDialog(event, payload) {
 
 const internalOpen = ref(props.open)
 
+let previousBodyOverflow = ''
+let bodyScrollLocked = false
+
+function setBodyScrollLocked(locked) {
+  if (typeof document === 'undefined') return
+  try {
+    const body = document.body
+    if (!body) return
+    if (locked) {
+      if (bodyScrollLocked) return
+      previousBodyOverflow = body.style.overflow || ''
+      body.style.overflow = 'hidden'
+      bodyScrollLocked = true
+    } else if (bodyScrollLocked) {
+      body.style.overflow = previousBodyOverflow
+      previousBodyOverflow = ''
+      bodyScrollLocked = false
+    }
+  } catch {
+    /* noop */
+  }
+}
+
 watch(() => props.open, (val) => {
   internalOpen.value = val
 })
 watch(internalOpen, (val) => {
+  setBodyScrollLocked(val)
   if (!val) emit('close')
+})
+onBeforeUnmount(() => setBodyScrollLocked(false))
+onMounted(() => {
+  if (internalOpen.value) setBodyScrollLocked(true)
 })
 const channelOptionIds = channelOptions.map(o => o.id)
 
@@ -354,7 +386,7 @@ onMounted(() => {
   window.addEventListener('resize', resizeHandler)
   onBeforeUnmount(() => window.removeEventListener('resize', resizeHandler))
 })
-const dialogWidth = computed(() => (screenWidth.value < 640 ? '90%' : '520px'))
+const dialogWidth = computed(() => (screenWidth.value < 640 ? '90vw' : '480px'))
 
 /* ---------------- Watchers ---------------- */
 watch(
@@ -988,6 +1020,29 @@ function appendDetails(text) {
 </style>
 
 <style lang="scss">
+.planner-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(10, 10, 20, 0.6);
+  backdrop-filter: blur(6px);
+  z-index: 2000;
+}
+
+.planner-overlay .el-overlay-dialog {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.planner-overlay .el-dialog {
+  margin: 0 !important;
+}
+
 /* Dialog background */
 .task-planner-dialog .el-dialog {
   background: linear-gradient(145deg, #1e1b4b, #312e81, #4c1d95);
@@ -995,12 +1050,7 @@ function appendDetails(text) {
   border-radius: 1rem;
   padding: 1rem;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
-
-  
 }
-
-
-
 /* Title */
 .task-planner-dialog .el-dialog__header {
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);

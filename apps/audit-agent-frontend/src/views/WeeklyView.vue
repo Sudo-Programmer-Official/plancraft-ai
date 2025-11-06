@@ -1,6 +1,6 @@
 <template>
   <div
-    class="min-h-screen bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900 text-white overflow-x-hidden"
+    class="min-h-screen bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900 text-white overflow-x-hidden overflow-y-auto scrollbar-plan"
   >
     <div class="max-w-4xl mx-auto px-4 sm:px-6 py-10 w-full">
       <header class="text-center mb-8">
@@ -61,7 +61,7 @@
           v-if="filteredTasks.length"
           name="fade-move"
           tag="ul"
-          class="space-y-3"
+          class="space-y-3 max-h-[420px] overflow-y-auto pr-1 scrollbar-plan"
         >
           <li
             v-for="task in filteredTasks"

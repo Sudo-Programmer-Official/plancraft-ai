@@ -1,6 +1,6 @@
 <template>
   <div
-    class="min-h-screen bg-gradient-to-br from-indigo-950 via-blue-900 to-blue-800 text-white"
+    class="min-h-screen bg-gradient-to-br from-indigo-950 via-blue-900 to-blue-800 text-white overflow-y-auto scrollbar-plan"
   >
     <div class="monthly-tasks max-w-5xl mx-auto px-4 sm:px-8 pt-10 pb-16 space-y-8">
       <header class="space-y-3">
@@ -92,7 +92,7 @@
           v-if="tasksForSelectedDay.length"
           name="fade-move"
           tag="ul"
-          class="space-y-4"
+          class="space-y-4 max-h-[430px] overflow-y-auto pr-1 scrollbar-plan"
         >
           <li
             v-for="task in tasksForSelectedDay"

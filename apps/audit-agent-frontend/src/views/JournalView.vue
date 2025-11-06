@@ -103,7 +103,7 @@
           <span class="text-sm text-indigo-400">({{ filteredLogs.length }})</span>
         </h2>
 
-        <ul class="space-y-4 max-h-[500px] overflow-y-auto pr-1">
+        <ul class="space-y-4 max-h-[500px] overflow-y-auto pr-1 scrollbar-plan">
           <li
             v-for="log in filteredLogs"
             :key="log.id"

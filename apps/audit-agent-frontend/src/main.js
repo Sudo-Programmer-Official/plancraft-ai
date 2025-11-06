@@ -1,6 +1,7 @@
 // Global styles
 import './assets/tailwind.scss'
 import './assets/theme.scss'
+import './assets/styles/scrollbar.css'
 import 'element-plus/dist/index.css'
 
 import { createApp } from 'vue'
