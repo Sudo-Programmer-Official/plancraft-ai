@@ -6,7 +6,7 @@
   <SetupPrompt v-else-if="showSetup" @done="showSetup = false" @close="showSetup = false" />
   <main
     v-else
-    class="bg-animated min-h-screen px-2 py-6 sm:px-4 md:px-6 space-y-6 lg:space-y-8 pb-12 transition-colors"
+    class="min-h-screen px-2 py-6 sm:px-4 md:px-6 space-y-6 lg:space-y-8 pb-12 transition-colors"
   >
     <GuestBanner :isGuest="authStore.guest" @login="redirectToLogin" />
 
@@ -1553,24 +1553,6 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.bg-animated {
-  background: linear-gradient(270deg, #1e1b4b, #312e81, #4c1d95);
-  background-size: 600% 600%;
-  animation: gradientShift 24s ease infinite;
-}
-
-@keyframes gradientShift {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
-
 .dashboard-card {
   background: linear-gradient(145deg, rgba(30, 27, 75, 0.88), rgba(49, 46, 129, 0.85), rgba(76, 29, 149, 0.82));
   border-radius: 1.25rem;
