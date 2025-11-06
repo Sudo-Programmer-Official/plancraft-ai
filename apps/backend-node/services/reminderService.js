@@ -114,6 +114,7 @@ function deriveReminderPrefsFromUser(data = {}) {
 function sanitizeReminderChannels(channels = [], scheduledDate, source = '') {
   const now = Date.now();
   const scheduledMs = scheduledDate instanceof Date ? scheduledDate.getTime() : NaN;
+  const fallback = DEFAULT_CHANNELS.slice(0, 2);
   const normalized = Array.from(
     new Set(
       (channels || [])
@@ -128,9 +129,7 @@ function sanitizeReminderChannels(channels = [], scheduledDate, source = '') {
     return scheduledMs - now > VOICE_CALL_MIN_LEAD_MS;
   });
 
-  const limited = filtered.slice(0, 2);
-  const fallback = DEFAULT_CHANNELS.slice(0, 2);
-  return limited.length ? limited : fallback;
+  return filtered.length ? filtered : fallback;
 }
 
 function normalizeReminderChannel(channel) {
