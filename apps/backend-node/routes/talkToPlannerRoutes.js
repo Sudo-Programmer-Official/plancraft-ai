@@ -84,8 +84,12 @@ Only include the JSON block when an action is required. Use IDs from the context
     const { text, actions } = extractActionsFromText(rawReply);
     const intent = detectIntentFromMessage(message);
     let actionQueue = Array.isArray(actions) ? actions.slice(0) : [];
+    let usedFallbackActions = false;
     if (!actionQueue.length && intent) {
       actionQueue = await buildFallbackActionsFromIntent(intent, message, context);
+      if (actionQueue.length) {
+        usedFallbackActions = true;
+      }
     }
     const executedActions = await executePlannerActions(userId, actionQueue, context);
     const primaryAction =
@@ -95,7 +99,11 @@ Only include the JSON block when an action is required. Use IDs from the context
       .filter((item) => item?.message && item.status !== "ignored")
       .map((item) => item.message);
     let replyText = text || rawReply || "";
-    if (actionSummaries.length) {
+    const hasCompletedFallbackAction =
+      usedFallbackActions && executedActions.some((item) => item.status === "completed");
+    if (hasCompletedFallbackAction && actionSummaries.length) {
+      replyText = actionSummaries.join("\n");
+    } else if (actionSummaries.length) {
       replyText = replyText
         ? `${replyText.trim()}\n\n${actionSummaries.join("\n")}`
         : actionSummaries.join("\n");
