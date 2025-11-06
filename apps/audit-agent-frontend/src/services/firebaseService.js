@@ -265,12 +265,32 @@ export async function addTaskToFirebase(task) {
 export async function updateTaskInFirebase(task) {
   console.log("updateTaskInFirebase called with task:", task);
   if (!task.id) throw new Error("Task missing Firestore ID")
+  const user = auth.currentUser
+  if (!user) {
+    handleAuthError({ code: 'unauthenticated', message: 'User not logged in' })
+    throw new Error('User not logged in')
+  }
   const { id, createdAt, ...updates } = task
   const docRef = doc(db, "tasks", id)
+  const justCompleted = updates.completed === true
   await safeAction(updateDoc(docRef, {
     ...updates,
     updatedAt: serverTimestamp(),
   }))
+  if (justCompleted) {
+    try {
+      console.log('[HabitTracker] frontend completion hook', { taskId: id })
+      await api.post('/habits/log-completion', {
+        userId: user.uid,
+        taskId: id,
+        completedAt: new Date().toISOString(),
+        timezone: updates.timezone || task.timezone || task.metadata?.timezone || null,
+        source: 'frontend_ui',
+      })
+    } catch (err) {
+      console.warn('[HabitTracker] frontend completion hook failed', err?.response?.data || err?.message || err)
+    }
+  }
 }
 
 /**

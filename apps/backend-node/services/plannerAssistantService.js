@@ -4,6 +4,7 @@ import timezone from "dayjs/plugin/timezone.js";
 import { db } from "./firebaseAdmin.js";
 import { handleTextReminder } from "./textHandler.js";
 import { createTask } from "./taskService.js";
+import { recordCompletion } from "./habitService.js";
 import { extractReminderTime as extractReminderTimeAI } from "./openaiService.js";
 
 dayjs.extend(utc);
@@ -355,7 +356,25 @@ async function completeTaskForUser(uid, payload = {}, context = {}) {
 
   try {
     const ref = db.collection("tasks").doc(String(task.id));
-    await ref.set({ completed: true, updatedAt: new Date() }, { merge: true });
+    const completedAt = new Date();
+    await ref.set({ completed: true, completedAt, updatedAt: completedAt }, { merge: true });
+    try {
+      console.log("[HabitTracker] planner completion hook", {
+        userId: uid,
+        taskId: task.id,
+      });
+      await recordCompletion(uid, task, {
+        completedAt,
+        timezone:
+          context?.profile?.timezone ||
+          context?.profile?.tz ||
+          context?.summary?.timezone ||
+          null,
+        source: "planner_assistant",
+      });
+    } catch (habitErr) {
+      console.warn("[PlannerAssistant] habit logging skipped", habitErr?.message || habitErr);
+    }
     return {
       status: "completed",
       type: "complete_task",
@@ -421,6 +440,8 @@ async function updateTaskForUser(uid, payload = {}, context = {}) {
   }
 
   const updates = {};
+  const wasCompleted = !!task.completed;
+  let completedAt = null;
   if (payload.title) updates.title = sanitizeString(payload.title, task.title).slice(0, 180);
   if (payload.details || payload.description) {
     updates.details = sanitizeString(
@@ -443,7 +464,13 @@ async function updateTaskForUser(uid, payload = {}, context = {}) {
   if (payload.channels) updates.reminderChannels = payload.channels;
   if (payload.reminderChannels) updates.reminderChannels = payload.reminderChannels;
 
-  if (payload.completed === true) updates.completed = true;
+  if (payload.completed === true) {
+    updates.completed = true;
+    if (!wasCompleted) {
+      completedAt = new Date();
+      updates.completedAt = completedAt;
+    }
+  }
   if (payload.completed === false) updates.completed = false;
 
   if (!Object.keys(updates).length) {
@@ -471,6 +498,27 @@ async function updateTaskForUser(uid, payload = {}, context = {}) {
   }
 
   const summary = describeUpdates(updates);
+
+  if (updates.completed === true && !wasCompleted && completedAt) {
+    try {
+      console.log("[HabitTracker] planner update hook", {
+        userId: uid,
+        taskId: task.id,
+      });
+      await recordCompletion(uid, task, {
+        completedAt,
+        timezone:
+          context?.profile?.timezone ||
+          context?.profile?.tz ||
+          context?.summary?.timezone ||
+          task?.timezone ||
+          null,
+        source: "planner_update",
+      });
+    } catch (habitErr) {
+      console.warn("[PlannerAssistant] habit logging (update) skipped", habitErr?.message || habitErr);
+    }
+  }
   return {
     status: "completed",
     type: "update_task",

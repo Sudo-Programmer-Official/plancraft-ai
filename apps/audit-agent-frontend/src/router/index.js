@@ -74,6 +74,7 @@ const router = createRouter({
         { path: 'monthly', name: 'monthly', component: () => import('@/views/MonthlyView.vue') },
         { path: 'journal', name: 'journal', component: () => import('@/views/JournalView.vue') },
         { path: 'reports', name: 'reports', component: () => import('@/views/ReportsView.vue') },
+        { path: 'habits', name: 'habits', component: () => import('@/views/HabitDashboard.vue') },
         { path: 'reminders', name: 'reminders', component: () => import('@/components/RemindersOverview.vue') },
         { path: 'talk-to-planner', name: 'talk-to-planner', component: () => import('@/views/TalkToPlanner.vue') },
         { path: 'today', name: 'today', component: () => import('@/views/TodayView.vue') },

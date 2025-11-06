@@ -102,6 +102,7 @@ import notifyRouter from "./routes/notifyRouter.js";
 import plannerRoutes from "./routes/plannerRoutes.js";
 import talkToPlannerRoutes from "./routes/talkToPlannerRoutes.js";
 import taskRoutes from "./routes/taskRoutes.js";
+import habitRoutes from "./routes/habitRoutes.js";
 import { processReminderBatches } from "./services/reminderService.js";
 
 dotenv.config();
@@ -255,6 +256,7 @@ app.use("/api/twilio", twilioRoutes);
 app.use("/api/planner", plannerRoutes);
 app.use("/api/talk", talkToPlannerRoutes);
 app.use("/api/tasks", taskRoutes);
+app.use("/api/habits", habitRoutes);
 // Mount Google routes (guarded internally by feature flag)
 app.use("/api", googleAuthRoutes);
 app.use("/api", googleCalendarRoutes);

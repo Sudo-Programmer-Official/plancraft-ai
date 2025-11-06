@@ -290,7 +290,8 @@ const audioCleanupMap = new WeakMap()
 const hasWebSpeech = supportsWebSpeech()
 let voiceRequestToken = 0
 const lastAutoSpokenMessageId = ref(null)
-const speechFallbackOptions = { rate: 1.05, pitch: 1, volume: 1 }
+const VOICE_PLAYBACK_RATE = Number(import.meta.env.VITE_ASSISTANT_VOICE_RATE || 0.92)
+const speechFallbackOptions = { rate: VOICE_PLAYBACK_RATE, pitch: 1, volume: 1 }
 
 if (typeof window !== 'undefined') {
   try {
@@ -428,6 +429,7 @@ async function speakAssistantMessage(message, options = {}) {
     if (result?.url) {
       stopVoicePlayback()
       const audio = new Audio(result.url)
+      audio.playbackRate = VOICE_PLAYBACK_RATE
       const handleCleanup = () => {
         audio.removeEventListener('ended', handleCleanup)
         audio.removeEventListener('error', handleError)

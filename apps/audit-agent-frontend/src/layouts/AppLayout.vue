@@ -498,6 +498,7 @@ const tabs = [
   { name: 'Journal', icon: '📝', path: '/journal' },
   { name: 'Reminders', icon: '🔔', path: '/reminders' },
   { name: 'Reports', icon: '📈', path: '/reports' },
+  { name: 'Habits', icon: '🏆', path: '/habits' },
 ]
 
 const aiQuickActions = [
