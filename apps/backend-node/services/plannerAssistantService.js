@@ -1,7 +1,30 @@
 import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc.js";
+import timezone from "dayjs/plugin/timezone.js";
 import { db } from "./firebaseAdmin.js";
 import { handleTextReminder } from "./textHandler.js";
 import { createTask } from "./taskService.js";
+import { extractReminderTime as extractReminderTimeAI } from "./openaiService.js";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+const DEFAULT_TIMEZONE = "UTC";
+const RELATIVE_UNIT_MAP = {
+  minute: "minute",
+  minutes: "minute",
+  min: "minute",
+  mins: "minute",
+  m: "minute",
+  hour: "hour",
+  hours: "hour",
+  hr: "hour",
+  hrs: "hour",
+  h: "hour",
+  day: "day",
+  days: "day",
+  d: "day",
+};
 
 function asIso(value) {
   try {
@@ -239,6 +262,36 @@ function resolveStatusFilter(token) {
   if (normalized === "done" || normalized === "completed" || normalized === "complete") return "completed";
   if (normalized === "all" || normalized === "any") return "all";
   return "open";
+}
+
+function deriveRelativeReminderIso(message, timezoneId, baseIso) {
+  if (!message) return null;
+  const normalized = String(message).toLowerCase();
+  if (!/\b(in|after)\s+\d+/.test(normalized)) return null;
+
+  const matches = Array.from(
+    normalized.matchAll(/\b(?:in|after)\s+(\d+)\s*(minute|minutes|min|mins|m|hour|hours|hr|hrs|h|day|days|d)\b/g),
+  );
+  if (!matches.length) return null;
+
+  const tz = timezoneId || DEFAULT_TIMEZONE;
+  let base = baseIso ? dayjs(baseIso) : dayjs();
+  if (!base.isValid()) base = dayjs();
+  let candidate = base.tz(tz);
+  matches.forEach((match) => {
+    const amount = Number.parseInt(match[1], 10);
+    const unitToken = match[2];
+    const unit = RELATIVE_UNIT_MAP[unitToken] || "minute";
+    if (Number.isFinite(amount) && amount > 0) {
+      candidate = candidate.add(amount, unit);
+    }
+  });
+  if (!candidate.isValid()) return null;
+  const baseTz = base.tz(tz);
+  if (candidate.isBefore(baseTz)) {
+    candidate = candidate.add(1, "minute");
+  }
+  return candidate.utc().toISOString();
 }
 
 async function lookupTask(uid, payload = {}, context = {}) {
@@ -578,7 +631,8 @@ export function extractActionsFromText(rawText) {
         actions: Array.isArray(parsed?.actions) ? parsed.actions : [],
       };
     } catch {
-      return { text: rawText.trim(), actions: [] };
+      const stripped = rawText.replace(/```[\s\S]*?```/g, "").trim();
+      return { text: stripped, actions: [] };
     }
   }
   let actions = [];
@@ -588,7 +642,7 @@ export function extractActionsFromText(rawText) {
   } catch (err) {
     console.warn("[PlannerAssistant] Failed to parse actions JSON", err?.message || err);
   }
-  const cleaned = rawText.replace(match[0], "").trim();
+  const cleaned = rawText.replace(/```[\s\S]*?```/g, "").trim();
   return { text: cleaned, actions };
 }
 
@@ -703,9 +757,15 @@ export function detectIntentFromMessage(message = "") {
   return null;
 }
 
-export function buildFallbackActionsFromIntent(intent, message = "", context = {}) {
+export async function buildFallbackActionsFromIntent(intent, message = "", context = {}) {
   const lower = String(message || "").toLowerCase();
   const tasks = Array.isArray(context?.tasks) ? context.tasks : [];
+  const timezoneId =
+    context?.profile?.timezone ||
+    context?.summary?.timezone ||
+    context?.profile?.preferences?.timezone ||
+    DEFAULT_TIMEZONE;
+  const nowIso = new Date().toISOString();
 
   if (intent === "get_tasks") {
     const payload = {};
@@ -721,6 +781,33 @@ export function buildFallbackActionsFromIntent(intent, message = "", context = {
     if (/sent|done/.test(lower)) payload.status = "sent";
     if (/upcoming|scheduled|pending/.test(lower)) payload.status = "scheduled";
     return [{ type: "get_reminders", payload }];
+  }
+
+  if (intent === "schedule_reminder") {
+    const reminderText = message?.trim() || "Reminder";
+    let scheduledIso = deriveRelativeReminderIso(reminderText, timezoneId, nowIso);
+    if (!scheduledIso) {
+      try {
+        scheduledIso = await extractReminderTimeAI(reminderText, {
+          nowISO: nowIso,
+          timezone: timezoneId,
+          timeContext: { plan_date: context?.summary?.planDate || context?.summary?.plan_date || null },
+        });
+      } catch (err) {
+        console.warn("[PlannerAssistant] fallback reminder time parse failed", err?.message || err);
+      }
+    }
+    if (!scheduledIso) return [];
+    return [
+      {
+        type: "schedule_reminder",
+        payload: {
+          text: reminderText,
+          scheduledTime: scheduledIso,
+          timezone: timezoneId,
+        },
+      },
+    ];
   }
 
   if (intent === "complete_task") {

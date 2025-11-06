@@ -196,6 +196,12 @@ import { useAuthStore } from '@/stores/authStore'
 import { ElMessage } from 'element-plus'
 import { recordAndSendToBackend } from '@/utils/backendRecorder'
 import { trackEvent } from '@/services/analytics'
+import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc'
+import timezone from 'dayjs/plugin/timezone'
+
+dayjs.extend(utc)
+dayjs.extend(timezone)
 
 const authStore = useAuthStore()
 
@@ -314,7 +320,7 @@ async function sendQuery(forcedInput = null) {
     const assistantMessage = {
       id: `assistant-${Date.now()}-${messageSeed.value++}`,
       sender: 'assistant',
-      text: response.reply || "I'm on it!",
+      text: sanitizeAssistantText(response.reply),
       actions: normalizeActions(suggestionsSource),
       results: normalizeResults(executedActions),
       intent: response.intent || null,
@@ -339,7 +345,7 @@ async function sendQuery(forcedInput = null) {
     messages.value.push({
       id: `assistant-error-${Date.now()}-${messageSeed.value++}`,
       sender: 'assistant',
-      text: fallback,
+      text: sanitizeAssistantText(fallback),
       actions: [],
       results: [],
     })
@@ -380,12 +386,13 @@ function normalizeResults(actions) {
   return actions.map((action, idx) => {
     const type = action?.type || action?.name || `action-${idx + 1}`
     const status = String(action?.status || 'completed').toLowerCase()
+    const message = formatResultMessage(action)
     return {
       id: `result-${Date.now()}-${idx}`,
       type,
       label: prettifyActionType(type),
       status,
-      message: action?.message || null,
+      message,
       payload: action?.payload || action || {},
     }
   })
@@ -395,6 +402,11 @@ function prettifyActionType(type) {
   return String(type || '')
     .replace(/[_-]+/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+function sanitizeAssistantText(text) {
+  if (!text) return ''
+  return String(text).replace(/```[\s\S]*?```/g, '').trim()
 }
 
 function runAction(_message, action) {
@@ -449,6 +461,29 @@ function describeReminderItem(reminder = {}) {
     parts.push(`via ${reminder.channels.join(', ')}`)
   }
   return parts.join(' · ')
+}
+
+function formatResultMessage(action = {}) {
+  const type = String(action?.type || action?.name || '').toLowerCase()
+  if (type === 'schedule_reminder') {
+    const payload = action?.payload || {}
+    const iso = payload.scheduledTime || payload.when || null
+    const tz = payload.timezone || payload.tz || (dayjs.tz && dayjs.tz.guess ? dayjs.tz.guess() : 'UTC')
+    const reminderLabel = payload.text || payload.title || payload.name || 'Reminder'
+    if (iso && dayjs(iso).isValid()) {
+      const local = dayjs.utc(iso).tz(tz)
+      if (local.isValid()) {
+        const channelList = Array.isArray(payload.channels) && payload.channels.length
+          ? ` via ${payload.channels.join(', ')}`
+          : ''
+        return `Scheduled reminder “${reminderLabel}” for ${local.format('ddd, MMM D • hh:mm A')} (${tz})${channelList}`
+      }
+    }
+  }
+  if (type === 'update_task' && action?.payload?.updates?.completed === true) {
+    return action?.message || 'Marked task complete.'
+  }
+  return action?.message || null
 }
 
 function handleVoiceTranscript(text, isFinal = false) {

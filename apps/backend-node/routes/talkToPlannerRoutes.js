@@ -85,7 +85,7 @@ Only include the JSON block when an action is required. Use IDs from the context
     const intent = detectIntentFromMessage(message);
     let actionQueue = Array.isArray(actions) ? actions.slice(0) : [];
     if (!actionQueue.length && intent) {
-      actionQueue = buildFallbackActionsFromIntent(intent, message, context);
+      actionQueue = await buildFallbackActionsFromIntent(intent, message, context);
     }
     const executedActions = await executePlannerActions(userId, actionQueue, context);
     const primaryAction =

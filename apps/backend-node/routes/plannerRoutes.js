@@ -69,7 +69,7 @@ You are PlanCraftAI, the user's trusted planner assistant. Always be precise, co
     const intent = detectIntentFromMessage(query)
     let actionQueue = Array.isArray(actions) ? actions.slice(0) : []
     if (!actionQueue.length && intent) {
-      actionQueue = buildFallbackActionsFromIntent(intent, query, context)
+      actionQueue = await buildFallbackActionsFromIntent(intent, query, context)
     }
     const executedActions = await executePlannerActions(userId, actionQueue, context)
 
