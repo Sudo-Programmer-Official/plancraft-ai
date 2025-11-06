@@ -261,6 +261,9 @@ async function sendQuery(forcedInput = null) {
       sender: 'assistant',
       text: response.reply || "I'm on it!",
       actions: normalizeActions(response.actions),
+      intent: response.intent || null,
+      meta: response.contextSummary || null,
+      raw: response.raw || null,
     }
     messages.value.push(assistantMessage)
   } catch (err) {

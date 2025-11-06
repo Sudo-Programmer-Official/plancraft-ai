@@ -56,18 +56,16 @@
     </div>
 
     <!-- Reminder Channels -->
-    <div class="mb-4">
-      <div class="flex items-center gap-3 mb-2">
+    <div class="mb-4 reminder-section">
+      <label class="reminder-toggle" :class="{ 'reminder-toggle--disabled': props.readonly || props.disableReminder }">
         <el-switch
           v-model="setReminder"
-          active-text="Set reminder"
           :disabled="props.readonly || props.disableReminder"
         />
-        <span class="text-xs text-slate-300">
-          Choose up to two instant alerts; email/SMS/voice are for scheduled reminders.
-        </span>
-      </div>
-      <div class="channel-toggle-grid">
+        <span class="reminder-toggle__label">Set reminder</span>
+      </label>
+
+      <div class="channel-icons">
         <el-tooltip
           v-for="option in channelOptions"
           :key="option.id"
@@ -76,20 +74,23 @@
           :content="option.label"
         >
           <button
-            class="channel-toggle"
+            class="channel-icon"
             type="button"
-            :disabled="props.readonly || props.disableReminder"
-            :class="{
-              'channel-toggle--active': isChannelSelected(option.id),
-              'channel-toggle--inactive': !isChannelSelected(option.id),
-              'channel-toggle--disabled': !setReminder
-            }"
+            :disabled="props.readonly || props.disableReminder || !setReminder"
+            :class="{ 'channel-icon--active': isChannelSelected(option.id) }"
             @click="toggleChannel(option.id)"
           >
-            <span class="text-lg leading-none">{{ option.icon }}</span>
+            <span aria-hidden="true">{{ option.icon }}</span>
           </button>
         </el-tooltip>
       </div>
+
+      <p
+        v-if="setReminder && !(props.readonly || props.disableReminder)"
+        class="hint text-xs text-gray-400 mt-2"
+      >
+        You’ll get a short message once created. Calls happen only when it’s reminder time.
+      </p>
     </div>
 
     <!-- Edit Mode: Details + Link -->
@@ -124,8 +125,8 @@
     </div>
 
     <!-- New Task: Voice + Generate -->
-    <div v-if="!props.task" class="flex gap-4 mb-6">
-      <VoiceRecorder @transcribed="handleTranscript" />
+    <div v-if="!props.task" class="task-dialog-actions">
+      <VoiceRecorder class="voice-recorder-block" @transcribed="handleTranscript" />
       <el-button
         type="success"
         @click="generateTasks"
@@ -984,38 +985,86 @@ function appendDetails(text) {
   color: rgba(255, 255, 255, 0.5) !important;
 }
 
-.channel-toggle-grid {
+.reminder-section {
   display: flex;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.reminder-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.reminder-toggle--disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.reminder-toggle__label {
+  font-size: 0.95rem;
+  color: rgba(226, 232, 240, 0.9);
+}
+
+.channel-icons {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   flex-wrap: wrap;
 }
 
-.channel-toggle {
+.channel-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  background: rgba(15, 23, 42, 0.4);
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(17, 24, 39, 0.45);
+  color: rgba(226, 232, 240, 0.9);
+  font-size: 1.1rem;
   transition: all 0.2s ease;
   cursor: pointer;
 }
 
-.channel-toggle--active {
+.channel-icon--active {
+  border-color: rgba(147, 197, 253, 0.8);
   background: rgba(59, 130, 246, 0.25);
-  border-color: rgba(59, 130, 246, 0.6);
-  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.35);
 }
 
-.channel-toggle--inactive {
-  opacity: 0.75;
-}
-
-.channel-toggle--disabled {
-  opacity: 0.4;
+.channel-icon:disabled {
+  opacity: 0.45;
   cursor: not-allowed;
+}
+
+.channel-icon:not(:disabled):hover {
+  transform: translateY(-1px);
+  border-color: rgba(147, 197, 253, 0.9);
+}
+
+.reminder-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: rgba(148, 163, 184, 0.85);
+}
+
+.task-dialog-actions {
+  display: flex;
+  gap: 1rem;
+  align-items: stretch;
+  margin-bottom: 1.5rem;
+}
+
+.voice-recorder-block {
+  display: flex;
+  align-items: stretch;
+}
+
+.voice-recorder-block :deep(.el-button) {
+  height: 100%;
 }
 </style>
 

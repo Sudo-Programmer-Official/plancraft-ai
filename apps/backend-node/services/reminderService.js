@@ -9,9 +9,7 @@ import utc from "dayjs/plugin/utc.js";
 import timezone from "dayjs/plugin/timezone.js";
 import { db } from "./firebaseAdmin.js";
 import { send as sendWhatsApp } from "./integrations/whatsappProvider.js";
-import { sendEmail } from "./integrations/emailProvider.js";
-import { sendPWA } from "./integrations/pwaProvider.js";
-import { sendSMSForUser, makeCallForUser } from "./twilioService.js";
+import { notifyReminderDue } from "./notificationService.js";
 import { formatLocalTime } from "../utils/timezone.js";
 import { extractTime } from "../utils/timeParser.js";
 
@@ -107,6 +105,16 @@ function sanitizeReminderChannels(channels = [], scheduledDate, source = '') {
   const limited = filtered.slice(0, 2);
   const fallback = DEFAULT_CHANNELS.slice(0, 2);
   return limited.length ? limited : fallback;
+}
+
+function normalizeReminderChannel(channel) {
+  if (!channel) return null;
+  const normalized = String(channel).trim().toLowerCase();
+  if (!normalized) return null;
+  if (normalized === 'voice_call' || normalized === 'voice-call') return 'voice';
+  if (normalized === 'push' || normalized === 'webpush' || normalized === 'web-push') return 'pwa';
+  if (normalized === 'text' || normalized === 'sms_text') return 'sms';
+  return normalized;
 }
 
 // Normalize any ISO-like input to a single UTC ISO string.
@@ -325,69 +333,50 @@ export async function sendReminder(reminder) {
 
   console.log(`[ReminderService:${source}] Executing reminder`, { id: reminder?.id, userId, task, when, channels, ts: new Date().toISOString() });
 
+  const normalizedChannels = Array.isArray(channels)
+    ? channels.map((c) => normalizeReminderChannel(c)).filter(Boolean)
+    : [];
+  const limitTo = normalizedChannels.length ? normalizedChannels : undefined;
+  const includeVoice = normalizedChannels.includes('voice');
+  const fallbackText = `⏰ Reminder: ${task} (${when})`;
+  const who = getSalutationToken(reminder);
+
+  const reminderPayload = {
+    id: reminder?.id || reminder?._id || null,
+    taskId: reminder?.taskId || null,
+    title: task,
+    scheduledTime: reminder?.scheduledTime || reminder?.remindAt || reminder?.remind_at || reminder?.time || null,
+    reminderTime: reminder?.reminderTime || null,
+    timezone: reminder?.timezone || null,
+  };
+
   try {
-    if (channels.includes("whatsapp")) {
-      try {
-        // Send via approved Meta template matching parameter count
-        const who = getSalutationToken(reminder);
-        const r = await sendWhatsApp(userId, {
-          template: "reminder_notification_2",
-          bodyVars: [who, task, when],
-          language: { code: "en_US" },
-        });
-        console.log("[ReminderService:delivery] WhatsApp ok (template)", { userId, id: reminder?.id, result: r });
-      } catch (e) {
-        const msg = e?.message || "";
-        const isTemplateMissing = msg.includes("132001") || msg.includes("Template name does not exist") || msg.includes("404");
-        if (isTemplateMissing) {
-          console.warn("[ReminderService:delivery] WhatsApp template missing, falling back to text mode:", msg);
-          try {
-            const r2 = await sendWhatsApp(userId, `⏰ Reminder: ${task} (${when})`);
-            console.log("[ReminderService:delivery] WhatsApp ok (fallback)", { userId, id: reminder?.id, result: r2 });
-          } catch (fallbackErr) {
-            console.error("[ReminderService:delivery] WhatsApp fallback failed:", fallbackErr?.message);
+    await notifyReminderDue(userId, [reminderPayload], {
+      limitTo,
+      includeVoice,
+      whatsappTemplate: normalizedChannels.includes('whatsapp')
+        ? {
+            template: "reminder_notification_2",
+            bodyVars: [who, task, when],
+            language: { code: "en_US" },
           }
-        } else {
-          console.error("[ReminderService:delivery] WhatsApp send failed (other error):", msg);
-        }
-      }
-    }
-
-    if (channels.includes("email")) {
-      try {
-        const r = await sendEmail(userId, task);
-        console.log("[ReminderService:delivery] Email ok", { userId, id: reminder?.id, result: r });
-      } catch (e) {
-        console.error("[ReminderService:delivery] Email send failed:", e?.message);
-      }
-    }
-
-    if (channels.includes("pwa")) {
-      try {
-        const r = await sendPWA(userId, task);
-        console.log("[ReminderService:delivery] PWA ok", { userId, id: reminder?.id, result: r });
-      } catch (e) {
-        console.error("[ReminderService:delivery] PWA send failed:", e?.message);
-      }
-    }
-
-    if (channels.includes("sms")) {
-      try {
-        const sid = await sendSMSForUser(userId, `⏰ Reminder: ${task} (${when})`);
-        console.log("[ReminderService:delivery] SMS ok", { userId, id: reminder?.id, sid });
-      } catch (e) {
-        console.error("[ReminderService:delivery] SMS send failed:", e?.message || e);
-      }
-    }
-
-    if (channels.includes("voice_call")) {
-      try {
-        const sid = await makeCallForUser(userId, `Reminder: ${task}. Scheduled for ${when}.`);
-        console.log("[ReminderService:delivery] Voice call ok", { userId, id: reminder?.id, sid });
-      } catch (e) {
-        console.error("[ReminderService:delivery] Voice call failed:", e?.message || e);
-      }
-    }
+        : null,
+      whatsappFallback: fallbackText,
+      voiceMessage: includeVoice ? `Reminder: ${task}. Scheduled for ${when}.` : null,
+      smsMessage: fallbackText,
+      subject: `PlanCraftAI Reminder • ${task}`,
+      pwa: {
+        title: 'Reminder due',
+        body: fallbackText,
+        data: {
+          type: 'reminder-due',
+          reminderId: reminder?.id || reminder?._id || null,
+          taskId: reminder?.taskId || null,
+        },
+      },
+    });
+  } catch (err) {
+    console.error("[ReminderService:delivery] notifyReminderDue failed", err?.message || err);
   } finally {
     await db.collection("reminders").doc(String(reminder.id || reminder._id || "")).set({ sentAt: new Date(), status: "sent" }, { merge: true });
   }

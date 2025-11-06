@@ -17,19 +17,23 @@ function normalizeHistory(history = []) {
 }
 
 export async function queryPlannerAssistant(query, options = {}) {
+  const text = typeof query === 'string' ? query : String(query || '')
   const payload = {
-    query,
+    message: text,
+    query: text,
     userId: options.userId,
     history: normalizeHistory(options.history),
   }
 
   try {
-    const res = await api.post('/planner/query', payload)
+    const res = await api.post('/talk/chat', payload)
     const data = res?.data || {}
     return {
-      reply: typeof data.reply === 'string' ? data.reply : '',
+      reply: typeof data.reply === 'string' && data.reply ? data.reply : typeof data.aiMessage === 'string' ? data.aiMessage : '',
       actions: Array.isArray(data.actions) ? data.actions : [],
-      contextSummary: data.contextSummary || null,
+      intent: data.intent || data.action || null,
+      contextSummary: data.contextSummary || data.context || null,
+      raw: data,
     }
   } catch (err) {
     const message =
