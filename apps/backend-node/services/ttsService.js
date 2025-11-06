@@ -12,6 +12,9 @@ const CACHE_DIR = path.resolve("temp/tts_cache");
 const DEFAULT_MODEL = process.env.TTS_MODEL || "gpt-4o-mini-tts";
 const DEFAULT_VOICE = process.env.TTS_VOICE || "alloy";
 const DEFAULT_FORMAT = (process.env.TTS_AUDIO_FORMAT || "mp3").toLowerCase();
+const DEFAULT_RATE = toFiniteNumber(process.env.TTS_SPEECH_RATE, 0.92);
+const DEFAULT_PITCH = toFiniteNumber(process.env.TTS_PITCH, 0);
+const DEFAULT_VOLUME = toFiniteNumber(process.env.TTS_VOLUME_GAIN_DB, 0);
 const MAX_CHAR_COUNT = Number(process.env.TTS_MAX_CHAR_COUNT || 600);
 const SUPPORTED_FORMATS = new Set(["mp3", "wav", "ogg"]);
 const inFlight = new Map();
@@ -26,9 +29,22 @@ function normalizeText(value) {
     .trim();
 }
 
-function buildCacheKey(text, { voice, model, format }) {
+function toFiniteNumber(value, fallback = null) {
+  if (value === undefined || value === null || value === "") return fallback;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : fallback;
+}
+
+function clamp(value, min, max) {
+  if (!Number.isFinite(value)) return value;
+  if (value < min) return min;
+  if (value > max) return max;
+  return value;
+}
+
+function buildCacheKey(text, { voice, model, format, rate, pitch, volume }) {
   const digest = crypto.createHash("sha1");
-  digest.update(`${voice}|${model}|${format}|${text}`);
+  digest.update(`${voice}|${model}|${format}|${rate ?? "default"}|${pitch ?? "default"}|${volume ?? "default"}|${text}`);
   return digest.digest("hex").slice(0, 32);
 }
 
@@ -64,10 +80,25 @@ export async function generateVoice(message, options = {}) {
   const voice = options.voice || DEFAULT_VOICE;
   const model = options.model || DEFAULT_MODEL;
   const format = sanitizeFormat(options.format);
+  const rate = clamp(
+    toFiniteNumber(options.rate, DEFAULT_RATE),
+    0.5,
+    1.25,
+  );
+  const pitch = clamp(toFiniteNumber(options.pitch, DEFAULT_PITCH), -10, 10);
+  const volume = clamp(toFiniteNumber(options.volume, DEFAULT_VOLUME), -10, 10);
+  const voiceSettings =
+    rate == null && pitch == null && volume == null
+      ? null
+      : {
+          speaking_rate: rate ?? undefined,
+          speaking_pitch: pitch ?? undefined,
+          volume_gain_db: volume ?? undefined,
+        };
   const effectiveText =
     MAX_CHAR_COUNT > 0 && text.length > MAX_CHAR_COUNT ? text.slice(0, MAX_CHAR_COUNT) : text;
 
-  const cacheKey = buildCacheKey(effectiveText, { voice, model, format });
+  const cacheKey = buildCacheKey(effectiveText, { voice, model, format, rate, pitch, volume });
   const fileName = `${cacheKey}.${format}`;
   const filePath = path.join(CACHE_DIR, fileName);
 
@@ -91,6 +122,7 @@ export async function generateVoice(message, options = {}) {
         voice,
         input: effectiveText,
         format,
+        ...(voiceSettings ? { voice_settings: voiceSettings } : {}),
       });
       const buffer = Buffer.from(await response.arrayBuffer());
       await writeFileAtomic(filePath, buffer);

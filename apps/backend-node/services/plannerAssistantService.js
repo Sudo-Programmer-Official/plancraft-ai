@@ -6,6 +6,7 @@ import { handleTextReminder } from "./textHandler.js";
 import { createTask } from "./taskService.js";
 import { recordCompletion } from "./habitService.js";
 import { extractReminderTime as extractReminderTimeAI } from "./openaiService.js";
+import { formatLocalTime } from "../utils/timezone.js";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -723,6 +724,7 @@ async function createTaskFromAction(uid, payload = {}) {
 async function scheduleReminderFromAction(uid, payload = {}) {
   const text = payload.text || payload.title || "";
   const scheduledTime = payload.scheduledTime || payload.when || null;
+  const timezoneId = payload.timezone || payload.tz || "UTC";
   if (!text || !scheduledTime) {
     return {
       status: "error",
@@ -735,14 +737,16 @@ async function scheduleReminderFromAction(uid, payload = {}) {
     const channels = Array.isArray(payload.channels) ? payload.channels : undefined;
     const reminder = await handleTextReminder(text, uid, channels, {
       scheduledTime,
-      timezone: payload.timezone || payload.tz || "UTC",
+      timezone: timezoneId,
       taskId: payload.taskId || null,
     });
+    const friendlyTime = formatLocalTime(scheduledTime, timezoneId) || scheduledTime;
+    const displayTimezone = timezoneId ? ` (${timezoneId})` : "";
     return {
       status: "completed",
       type: "schedule_reminder",
       payload,
-      message: `Scheduled reminder “${text}” for ${scheduledTime}`,
+      message: `Scheduled reminder “${text}” for ${friendlyTime}${displayTimezone}`,
       reminderId: reminder?.id || null,
     };
   } catch (err) {

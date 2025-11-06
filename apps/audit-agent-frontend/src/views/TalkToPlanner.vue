@@ -293,6 +293,14 @@ const lastAutoSpokenMessageId = ref(null)
 const VOICE_PLAYBACK_RATE = Number(import.meta.env.VITE_ASSISTANT_VOICE_RATE || 0.92)
 const speechFallbackOptions = { rate: VOICE_PLAYBACK_RATE, pitch: 1, volume: 1 }
 
+function formatTextForVoice(text) {
+  if (!text) return ''
+  const stripped = String(text)
+    .replace(/\s*\([A-Za-z0-9_\- ]+\/[A-Za-z0-9_\- ]+\)\s*$/, '')
+    .trim()
+  return stripped || ''
+}
+
 if (typeof window !== 'undefined') {
   try {
     const stored = localStorage.getItem(VOICE_PREF_KEY)
@@ -415,14 +423,15 @@ function playVoiceForMessage(message) {
 async function speakAssistantMessage(message, options = {}) {
   const { allowWhenMuted = false } = options
   if (!allowWhenMuted && !isVoiceOn.value) return
-  const text = String(message?.text || '').trim()
-  if (!text) return
+  const rawText = String(message?.text || '').trim()
+  const textForVoice = formatTextForVoice(rawText)
+  if (!textForVoice) return
 
   const token = ++voiceRequestToken
   voiceRequestingFor.value = message?.id || null
 
   try {
-    const result = await requestSpeechUrl(text)
+    const result = await requestSpeechUrl(textForVoice)
     if (token !== voiceRequestToken) return
     if (!allowWhenMuted && !isVoiceOn.value) return
 
@@ -441,7 +450,7 @@ async function speakAssistantMessage(message, options = {}) {
       const handleError = (err) => {
         handleCleanup()
         if (hasWebSpeech) {
-          speakWithWebSpeech(text, speechFallbackOptions)
+          speakWithWebSpeech(textForVoice, speechFallbackOptions)
         } else {
           console.warn('[TalkToPlanner] Audio playback failed', err)
         }
@@ -457,12 +466,12 @@ async function speakAssistantMessage(message, options = {}) {
         })
       }
     } else if (hasWebSpeech) {
-      speakWithWebSpeech(text, speechFallbackOptions)
+      speakWithWebSpeech(textForVoice, speechFallbackOptions)
     }
   } catch (err) {
     console.warn('[TalkToPlanner] Voice request failed', err)
     if (hasWebSpeech) {
-      speakWithWebSpeech(text, speechFallbackOptions)
+      speakWithWebSpeech(textForVoice, speechFallbackOptions)
     }
   } finally {
     if (token === voiceRequestToken) {
