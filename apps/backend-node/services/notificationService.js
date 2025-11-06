@@ -36,11 +36,12 @@ export async function sendNotification(userId, message, channel = 'all', options
 }
 
 const CHANNEL_ENV_FLAGS = {
-  whatsapp: isChannelEnabled(process.env.ENABLE_WHATSAPP),
-  email: isChannelEnabled(process.env.ENABLE_EMAIL),
-  pwa: process.env.ENABLE_PWA === undefined ? true : isChannelEnabled(process.env.ENABLE_PWA),
-  voice: isChannelEnabled(process.env.ENABLE_VOICE),
-  sms: isChannelEnabled(process.env.ENABLE_SMS),
+  // Channels default to enabled; set ENABLE_* env vars to "false" to disable at runtime.
+  whatsapp: resolveChannelFlag('ENABLE_WHATSAPP'),
+  email: resolveChannelFlag('ENABLE_EMAIL'),
+  pwa: resolveChannelFlag('ENABLE_PWA'),
+  voice: resolveChannelFlag('ENABLE_VOICE'),
+  sms: resolveChannelFlag('ENABLE_SMS'),
 }
 
 const ALL_CHANNELS = ['whatsapp', 'email', 'pwa', 'voice', 'sms']
@@ -49,6 +50,12 @@ function isChannelEnabled(flagValue) {
   if (flagValue === undefined || flagValue === null) return false
   const normalized = String(flagValue).toLowerCase()
   return normalized === 'true' || normalized === '1' || normalized === 'yes'
+}
+
+function resolveChannelFlag(envKey, defaultValue = true) {
+  const raw = process.env[envKey]
+  if (raw === undefined || raw === null || raw === '') return defaultValue
+  return isChannelEnabled(raw)
 }
 
 function normalizeChannelName(channel) {
