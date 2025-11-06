@@ -97,6 +97,7 @@ async function resolveUserChannels(userId, overrides, options = {}) {
   const includeVoice = options.includeVoice !== false
   const allowedSet = toNormalizedSet(options.allowed)
   const limitSet = toNormalizedSet(options.limitTo)
+  const returnContext = options.returnContext === true
   const requested = Array.isArray(overrides) ? overrides.map(normalizeChannelName).filter(Boolean) : []
   const prefs = await getUserPrefs(userId)
   const ctx = { includeVoice, allowedSet, limitSet, prefs }
@@ -118,7 +119,15 @@ async function resolveUserChannels(userId, overrides, options = {}) {
     channels = ['pwa']
   }
 
-  return Array.from(new Set(channels))
+  const unique = Array.from(new Set(channels))
+  if (returnContext) {
+    return {
+      channels: unique,
+      prefs,
+      requested,
+    }
+  }
+  return unique
 }
 
 function ensureArray(items) {
@@ -208,11 +217,13 @@ export async function notifyTaskCreated(userId, tasksInput = [], options = {}) {
   const message = options.message || buildGroupedMessage(title, tasks, { fallback: 'A new task is ready for you.' })
   const subject = options.subject || 'PlanCraftAI Update'
 
-  const channels = await resolveUserChannels(userId, options.channels, {
+  const channelResolution = await resolveUserChannels(userId, options.channels, {
     includeVoice: false,
     allowed: ['whatsapp', 'email', 'pwa'],
     limitTo: options.limitTo,
+    returnContext: true,
   })
+  const channels = channelResolution.channels
 
   const defaultPwaBody =
     tasks.length === 1
@@ -236,6 +247,15 @@ export async function notifyTaskCreated(userId, tasksInput = [], options = {}) {
   }
 
   const deliveries = []
+  try {
+    const titles = tasks.map((t) => t?.title).filter(Boolean)
+    const headline = titles.length
+      ? `${titles[0]}${titles.length > 1 ? ` (+${titles.length - 1})` : ''}`
+      : 'Task'
+    console.log(
+      `[Notify] Created: ${headline} | Channels=${JSON.stringify(channels)} | Prefs=${JSON.stringify(channelResolution.prefs)}`
+    )
+  } catch {}
   for (const channel of channels) {
     try {
       deliveries.push(await sendViaChannel(channel, userId, payload))
@@ -268,11 +288,13 @@ export async function notifyReminderDue(userId, itemsInput = [], options = {}) {
   const smsMessage = options.smsMessage || message.replace(/\*/g, '')
 
   const limitTo = options.limitTo
-  const channels = await resolveUserChannels(userId, options.channels, {
+  const channelResolution = await resolveUserChannels(userId, options.channels, {
     includeVoice,
     allowed: options.allowed || ALL_CHANNELS,
     limitTo,
+    returnContext: true,
   })
+  const channels = channelResolution.channels
 
   const payload = {
     message,
@@ -295,6 +317,15 @@ export async function notifyReminderDue(userId, itemsInput = [], options = {}) {
   }
 
   const deliveries = []
+  try {
+    const titles = reminders.map((t) => t?.title).filter(Boolean)
+    const headline = titles.length
+      ? `${titles[0]}${titles.length > 1 ? ` (+${titles.length - 1})` : ''}`
+      : 'Reminder'
+    console.log(
+      `[Notify] Reminder due: ${headline} | Channels=${JSON.stringify(channels)} | Prefs=${JSON.stringify(channelResolution.prefs)}`
+    )
+  } catch {}
   for (const channel of channels) {
     try {
       deliveries.push(await sendViaChannel(channel, userId, payload))

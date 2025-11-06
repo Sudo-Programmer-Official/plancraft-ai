@@ -86,7 +86,7 @@ async function fetchUpcomingReminders(uid, limit = 10) {
       reminders.push({
         id: doc.id,
         text: data.text || data.task || "",
-        scheduledTime: data.scheduledTime ? new Date(data.scheduledTime).toISOString() : null,
+        scheduledTime: asIso(data.scheduledTime),
         status: data.status || "scheduled",
         channels: data.channels || [],
         taskId: data.taskId || null,
@@ -107,7 +107,7 @@ async function fetchUpcomingReminders(uid, limit = 10) {
         reminders.push({
           id: doc.id,
           text: data.text || data.task || "",
-          scheduledTime: data.scheduledTime ? new Date(data.scheduledTime).toISOString() : null,
+          scheduledTime: asIso(data.scheduledTime),
           status: data.status || "scheduled",
           channels: data.channels || [],
           taskId: data.taskId || null,

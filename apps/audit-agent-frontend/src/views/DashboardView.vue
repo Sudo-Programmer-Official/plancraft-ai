@@ -1208,6 +1208,7 @@ async function handleSave(payload) {
   } else {
     const saved = await addTaskToFirebase(payload)
     payload.id = saved.id
+    if (saved?.__notifyMeta) payload.__notifyMeta = saved.__notifyMeta
   }
   await reloadDaily()
   closePlanner()
@@ -1376,7 +1377,18 @@ async function handleSaveAndSchedule(payload) {
     const uid = authStore?.user?.uid
     const taskId = payload?.id
     if (!uid || !taskId) return
+    const notifyMeta = payload.__notifyMeta || null
+    if (payload.__notifyMeta) delete payload.__notifyMeta
+    const scheduledByBackend = !!notifyMeta?.scheduled
     if (payload?.reminderTime) {
+      if (scheduledByBackend) {
+        try {
+          await fetchUsage()
+        } catch {
+          /* noop */
+        }
+        return
+      }
       const iso = buildLocalIso(payload.date, payload.reminderTime)
       const explicitChannels = Array.isArray(payload?.reminderChannels)
         ? payload.reminderChannels

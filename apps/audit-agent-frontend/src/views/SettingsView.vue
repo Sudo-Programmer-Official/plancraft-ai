@@ -543,16 +543,18 @@ async function saveSettings() {
     if (prefs.pwa) channels.push('pwa')
     if (prefs.whatsapp) channels.push('whatsapp')
     if (prefs.sms) channels.push('sms')
-    if (prefs.voice_call) channels.push('voice_call')
-    const notifications = {
-      email: !!prefs.email,
-      push: !!prefs.pwa,
-      whatsapp: !!prefs.whatsapp,
-      discord: !!prefs.discord,
-      // keep legacy aggregated flag for backward-compat
-      calls: !!(prefs.calls || prefs.sms || prefs.voice_call),
-      channels,
-    }
+  if (prefs.voice_call) channels.push('voice_call')
+  const notifications = {
+    email: !!prefs.email,
+    push: !!prefs.pwa,
+    whatsapp: !!prefs.whatsapp,
+    sms: !!prefs.sms,
+    discord: !!prefs.discord,
+    voice_call: !!prefs.voice_call,
+    // keep legacy aggregated flag for backward-compat
+    calls: !!(prefs.calls || prefs.sms || prefs.voice_call),
+    channels,
+  }
     const reminderDefaults = {
       enabled: channels.length > 0,
       channels,

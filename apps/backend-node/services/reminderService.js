@@ -28,6 +28,33 @@ const DEFAULT_CHANNELS = (ENV_DEFAULT_CHANNELS && ENV_DEFAULT_CHANNELS.length)
   : ['pwa', 'whatsapp'];
 const MAX_DELAY_MS = 24 * 60 * 60 * 1000;
 
+function coerceDateValue(input) {
+  if (!input && input !== 0) return null;
+  if (input instanceof Date) return Number.isNaN(input.getTime()) ? null : input;
+  if (typeof input?.toDate === "function") {
+    try {
+      const d = input.toDate();
+      return Number.isNaN(d.getTime()) ? null : d;
+    } catch {
+      return null;
+    }
+  }
+  if (typeof input?.seconds === "number") {
+    const d = new Date(input.seconds * 1000);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof input === "number") {
+    const d = new Date(input);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  try {
+    const d = new Date(input);
+    return Number.isNaN(d.getTime()) ? null : d;
+  } catch {
+    return null;
+  }
+}
+
 function deriveReminderPrefsFromUser(data = {}) {
   try {
     if (!data || typeof data !== 'object') {
@@ -97,7 +124,6 @@ function sanitizeReminderChannels(channels = [], scheduledDate, source = '') {
 
   const filtered = normalized.filter((c) => {
     if (c !== 'voice_call') return true;
-    if (source === 'planner' || source === 'task_create') return false;
     if (!Number.isFinite(scheduledMs)) return false;
     return scheduledMs - now > VOICE_CALL_MIN_LEAD_MS;
   });
@@ -446,4 +472,66 @@ export function queueReminder(rem) {
   } catch (e) {
     console.error("queueReminder error:", e);
   }
+}
+
+export async function processReminderBatches(options = {}) {
+  const now = new Date();
+  const lookbackMinutes = Number.isFinite(options.lookbackMinutes) ? options.lookbackMinutes : 5;
+  const horizonMinutes = Number.isFinite(options.horizonMinutes) ? options.horizonMinutes : 1;
+  const limit = Number.isFinite(options.limit) ? options.limit : 20;
+
+  const start = new Date(now.getTime() - lookbackMinutes * 60000);
+  const end = new Date(now.getTime() + horizonMinutes * 60000);
+
+  let snap;
+  try {
+    snap = await db
+      .collection("reminders")
+      .where("sentAt", "==", null)
+      .where("scheduledTime", ">=", start)
+      .where("scheduledTime", "<=", end)
+      .orderBy("scheduledTime", "asc")
+      .limit(limit)
+      .get();
+  } catch (err) {
+    console.warn("[ReminderService:worker] Primary batch query failed; falling back", err?.message || err);
+    snap = await db
+      .collection("reminders")
+      .where("scheduledTime", ">=", start)
+      .where("scheduledTime", "<=", end)
+      .orderBy("scheduledTime", "asc")
+      .limit(limit)
+      .get();
+  }
+
+  const pending = [];
+  snap.forEach((doc) => {
+    const data = doc.data() || {};
+    if (data?.sentAt) return;
+    if (data?.status && String(data.status).toLowerCase() === "sent") return;
+    pending.push({ id: doc.id, ...data });
+  });
+
+  if (!pending.length) return { processed: 0 };
+
+  for (const reminder of pending) {
+    try {
+      const scheduled = reminder?.scheduledTime
+        ? coerceDateValue(reminder.scheduledTime)
+        : null;
+      console.log(`[Worker] Sending reminder batch for ${reminder?.userId || "unknown"}`, {
+        id: reminder.id,
+        scheduled: scheduled?.toISOString?.() || reminder?.scheduledTime || null,
+      });
+      if (scheduled && scheduled.getTime() - now.getTime() > 60000) {
+        queueReminder(reminder);
+      } else {
+        await sendReminder(reminder);
+      }
+    } catch (err) {
+      console.error("[ReminderService:worker] Failed to process reminder", reminder?.id, err?.message || err);
+    }
+  }
+
+  return { processed: pending.length };
 }

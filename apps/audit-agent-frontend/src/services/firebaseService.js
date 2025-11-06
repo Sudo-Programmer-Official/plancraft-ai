@@ -17,6 +17,7 @@ import {
 import { signOut } from 'firebase/auth'
 import { ElMessageBox } from 'element-plus'
 import { toLocalDateKey } from "@/utils/dateHelper";
+import api from '@/services/api'
 import { db, auth } from '@/firebase/init'
 import { updateStreakOnEntry } from '@/services/streakService'
 
@@ -156,6 +157,31 @@ export async function fetchTasksBetween(startYMD, endYMD) {
 /**
  * ✅ Add a new task to Firestore
  */
+
+async function syncTaskNotification(userId, taskId, payload) {
+  try {
+    const res = await api.post('/tasks/announce', {
+      userId,
+      task: {
+        id: taskId,
+        title: payload.title,
+        details: payload.details,
+        date: payload.date,
+        reminderTime: payload.reminderTime ?? null,
+        scheduledTime: payload.scheduledTime ?? null,
+        reminderChannels: payload.reminderChannels ?? null,
+        channels: payload.channels ?? null,
+        timezone: payload.timezone ?? null,
+      },
+      schedule: payload.reminderTime != null || payload.scheduledTime != null,
+    })
+    return res?.data || null
+  } catch (err) {
+    console.warn('[TaskSync] notify failed', err?.response?.data || err?.message || err)
+    return null
+  }
+}
+
 export async function addTaskToFirebase(task) {
   const user = auth.currentUser;
   if (!user) {
@@ -214,8 +240,10 @@ export async function addTaskToFirebase(task) {
 
   const docRef = await safeAction(addDoc(tasksRef, payload));
 
+  const notifyMeta = await syncTaskNotification(user.uid, docRef.id, payload)
+
   // Return task with Firestore's doc ID
-  return { id: docRef.id, ...payload };
+  return { id: docRef.id, ...payload, __notifyMeta: notifyMeta };
 }
 
 /**

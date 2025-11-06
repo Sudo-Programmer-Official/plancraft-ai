@@ -58,6 +58,17 @@ OPENAI_TRANSCRIBE_FALLBACKS=gpt-4o-transcribe,whisper-1
 
 # Dev convenience: allow any origin or Vite IPs on port 5173
 ALLOW_DEV_ANY_ORIGIN=1
+
+# Notification channels (set to `true` to enable)
+ENABLE_WHATSAPP=true
+ENABLE_EMAIL=true
+ENABLE_PWA=true
+ENABLE_VOICE=true
+ENABLE_SMS=true
+
+# Twilio senders (required when voice / WhatsApp are enabled)
+TWILIO_WHATSAPP_NUMBER=whatsapp:+15551234567
+TWILIO_VOICE_NUMBER=+15557654321
 ```
 
 The server runs on port 4000 by default (see `apps/backend-node/index.js`).

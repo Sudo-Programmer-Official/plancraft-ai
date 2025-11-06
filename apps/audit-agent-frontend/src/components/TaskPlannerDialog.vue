@@ -89,7 +89,7 @@
         v-if="setReminder && !(props.readonly || props.disableReminder)"
         class="hint text-xs text-gray-400 mt-2"
       >
-        You’ll get a short message once created. Calls happen only when it’s reminder time.
+        Channels match your preferences (Settings → Notifications). Calls only when it’s reminder time.
       </p>
     </div>
 
@@ -303,7 +303,11 @@ function normalizeReminderPreferences(raw) {
         )
       )
     : []
-  const fallback = channels.length ? channels : ['pwa', 'whatsapp']
+  const fallback = channels.length
+    ? channels
+    : raw?.enabled === false
+      ? []
+      : ['pwa', 'whatsapp']
   const enabled = raw?.enabled !== undefined ? !!raw.enabled : fallback.length > 0
   return { enabled, channels: fallback }
 }
@@ -313,9 +317,13 @@ function applyReminderDefaults(source) {
   reminderPrefs.value = normalized
   setReminder.value = !!normalized.enabled
   const valid = normalized.channels.filter(ch => channelOptionIds.includes(ch))
-  allowedReminderChannels.value = valid.length
-    ? valid
-    : ['pwa', 'whatsapp'].filter(ch => channelOptionIds.includes(ch))
+  if (!normalized.enabled) {
+    allowedReminderChannels.value = []
+  } else if (valid.length) {
+    allowedReminderChannels.value = valid
+  } else {
+    allowedReminderChannels.value = ['pwa', 'whatsapp'].filter(ch => channelOptionIds.includes(ch))
+  }
 }
 
 function computeCreationChannels() {
@@ -396,12 +404,12 @@ watch(
     logTimeBrainDialog('visibility-change', { open: val })
     if (!val) {
       suppressAutoClose.value = false
+      reminderPrefsLoaded.value = false
       return
     }
-    await ensureReminderPreferences()
+    await ensureReminderPreferences(true)
     await ensureNotificationPrompt()
     if (!task.value) {
-      applyReminderDefaults(reminderPrefs.value)
       resetNewTaskState()
     }
   }
@@ -438,8 +446,11 @@ watch(reminderTime, val => {
 })
 watch(setReminder, enabled => {
   logTimeBrainDialog('set-reminder-toggle', { enabled })
+  const defaults = ['pwa', 'whatsapp'].filter(ch => channelOptionIds.includes(ch))
   if (enabled && !allowedReminderChannels.value.length)
-    allowedReminderChannels.value = ['pwa', 'whatsapp']
+    allowedReminderChannels.value = defaults
+  if (!enabled && allowedReminderChannels.value.length)
+    allowedReminderChannels.value = []
   reminderPrefs.value = {
     ...reminderPrefs.value,
     enabled,
@@ -454,15 +465,20 @@ watch(allowedReminderChannels, channels => {
         .filter(ch => channelOptionIds.includes(ch))
     )
   )
+  if (!normalized.length && setReminder.value) {
+    setReminder.value = false
+  } else if (normalized.length && !setReminder.value) {
+    setReminder.value = true
+  }
   reminderPrefs.value = {
     ...reminderPrefs.value,
     channels: normalized,
   }
 })
 
-async function ensureReminderPreferences() {
+async function ensureReminderPreferences(force = false) {
   try {
-    if (reminderPrefsLoaded.value) return
+    if (reminderPrefsLoaded.value && !force) return
     const uid = authStore?.user?.uid
     if (!uid) return
 

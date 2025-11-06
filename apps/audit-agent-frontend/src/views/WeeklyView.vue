@@ -192,6 +192,7 @@ async function handleSave(payload) {
   } else {
     const saved = await addTaskToFirebase(payload)
     payload.id = saved.id
+    if (saved?.__notifyMeta) payload.__notifyMeta = saved.__notifyMeta
   }
   await loadWeek()
   showPlanner.value = false
@@ -203,8 +204,15 @@ async function handleSaveAndSchedule(payload) {
     const uid = authStore?.user?.uid
     const taskId = payload?.id
     if (!uid || !taskId) return
+    const notifyMeta = payload.__notifyMeta || null
+    if (payload.__notifyMeta) delete payload.__notifyMeta
+    const scheduledByBackend = !!notifyMeta?.scheduled
 
     if (payload?.reminderTime) {
+      if (scheduledByBackend) {
+        try { await authStore.fetchUsage() } catch {}
+        return
+      }
       const iso = buildLocalIso(payload.date, payload.reminderTime)
       const prefs = userPrefs.value?.notifications || {}
       try { if (!hasNotificationSetup(prefs)) notifPromptOpen.value = true } catch {}

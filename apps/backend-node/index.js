@@ -100,6 +100,8 @@ import googleCalendarRoutes from "./routes/googleCalendarRoutes.js";
 import notifyRouter from "./routes/notifyRouter.js";
 import plannerRoutes from "./routes/plannerRoutes.js";
 import talkToPlannerRoutes from "./routes/talkToPlannerRoutes.js";
+import taskRoutes from "./routes/taskRoutes.js";
+import { processReminderBatches } from "./services/reminderService.js";
 
 dotenv.config();
 
@@ -250,6 +252,7 @@ app.use("/api/blogs", blogRoutes);
 app.use("/api/twilio", twilioRoutes);
 app.use("/api/planner", plannerRoutes);
 app.use("/api/talk", talkToPlannerRoutes);
+app.use("/api/tasks", taskRoutes);
 // Mount Google routes (guarded internally by feature flag)
 app.use("/api", googleAuthRoutes);
 app.use("/api", googleCalendarRoutes);
@@ -263,3 +266,11 @@ app.listen(PORT, () => {
 initScheduler().catch((err) => {
   console.error('❌ Failed to init scheduler', err)
 })
+
+const reminderWorkerIntervalMs = Number(process.env.REMINDER_WORKER_INTERVAL_MS || 60000);
+setInterval(() => {
+  processReminderBatches()
+    .catch((err) => console.error("[ReminderWorker] batch run failed", err?.message || err));
+}, reminderWorkerIntervalMs);
+
+processReminderBatches().catch((err) => console.error("[ReminderWorker] initial run failed", err?.message || err));

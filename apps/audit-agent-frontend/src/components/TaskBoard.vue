@@ -295,13 +295,18 @@ async function handleSave(payload) {
   } else {
     const saved = await addTaskToFirebase(payload)
     savedId = saved?.id || savedId
+    if (saved?.__notifyMeta) payload.__notifyMeta = saved.__notifyMeta
   }
 
   // Sync reminder after task is saved and we have an id
   try {
     const uid = authStore?.user?.uid
     if (uid && savedId) {
+      const notifyMeta = payload.__notifyMeta || null
+      if (payload.__notifyMeta) delete payload.__notifyMeta
+      const scheduledByBackend = !!notifyMeta?.scheduled
       if (payload?.reminderTime) {
+        if (scheduledByBackend) return
         const iso = buildLocalIso(payload.date, payload.reminderTime)
         const prefs = userPrefs.value?.notifications || {}
         await scheduleReminder(uid, savedId, payload.title, iso, prefs)

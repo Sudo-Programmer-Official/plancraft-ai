@@ -145,13 +145,18 @@ async function save() {
   } else {
     const saved = await addTaskToFirebase(form.value)
     form.value.id = saved.id // assign Firestore doc id
+    if (saved?.__notifyMeta) form.value.__notifyMeta = saved.__notifyMeta
   }
 
   try {
     const uid = authStore?.user?.uid
     if (uid && form.value.id) {
       const hasTime = !!form.value.reminderTime
+      const notifyMeta = form.value.__notifyMeta || null
+      if (form.value.__notifyMeta) delete form.value.__notifyMeta
+      const scheduledByBackend = !!notifyMeta?.scheduled
       if (hasTime) {
+        if (scheduledByBackend) return
         const iso = buildLocalIso(form.value.date, form.value.reminderTime)
         const prefs = userPrefs.value?.notifications || {}
         await scheduleReminder(uid, form.value.id, form.value.title, iso, prefs)

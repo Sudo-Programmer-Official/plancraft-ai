@@ -217,6 +217,37 @@ async function scrollToGroup(date) {
 
 function toJsDate(v) { try { return toJsDateUtil(v) } catch { return null } }
 
+function normalizeChannels(candidate) {
+  if (Array.isArray(candidate)) return candidate.filter(Boolean)
+  if (!candidate) return []
+  return [candidate].filter(Boolean)
+}
+
+function normalizeReminder(row) {
+  if (!row || typeof row !== 'object') return null
+  const whenRaw =
+    row.scheduledTime ??
+    row.when ??
+    row.time ??
+    row.remindAt ??
+    row.remind_at ??
+    row.whenUtc ??
+    row.whenISO ??
+    null
+
+  const dt = toJsDate(whenRaw)
+  if (!dt || Number.isNaN(dt.getTime())) return null
+
+  const status = String(row.status || '').toLowerCase() || 'scheduled'
+
+  return {
+    ...row,
+    status,
+    scheduledTime: dt.toISOString(),
+    channels: normalizeChannels(row.channels || row.channel),
+  }
+}
+
 function formatDualTime(iso) {
   const d = toJsDate(iso)
   if (!d) return ''
@@ -258,9 +289,10 @@ async function loadReminders() {
   try {
     const { data } = await api.get('/reminders', { params: { userId: uid } })
     const rows = Array.isArray(data?.items) ? data.items : []
-    logTimeBrainReminder('load-reminders:api', { rows: rows.length })
+    const normalizedRows = rows.map(normalizeReminder).filter(Boolean)
+    logTimeBrainReminder('load-reminders:api', { rows: rows.length, normalized: normalizedRows.length })
     const now = Date.now()
-    const upcoming = rows
+    const upcoming = normalizedRows
       .filter((r) => {
         const status = String(r?.status || '').toLowerCase()
         const dt = toJsDate(r?.scheduledTime)
