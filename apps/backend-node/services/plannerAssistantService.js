@@ -1,3 +1,4 @@
+import dayjs from "dayjs";
 import { db } from "./firebaseAdmin.js";
 import { handleTextReminder } from "./textHandler.js";
 import { createTask } from "./taskService.js";
@@ -182,6 +183,344 @@ async function fetchRecentNotes(uid, limit = 6) {
   }
 }
 
+function normalizeIdToken(value) {
+  if (value === undefined || value === null) return null;
+  const token = String(value).trim();
+  return token.length ? token : null;
+}
+
+function normalizeTitleToken(value) {
+  if (!value && value !== 0) return null;
+  return String(value).trim().toLowerCase();
+}
+
+function findTasksMatchingText(text, taskList = []) {
+  if (!text || !Array.isArray(taskList)) return [];
+  const haystack = String(text).toLowerCase();
+  if (!haystack) return [];
+  const significantTokens = new Set(
+    haystack
+      .replace(/[^a-z0-9\s]/gi, " ")
+      .split(/\s+/)
+      .filter((token) => token.length >= 3),
+  );
+
+  return taskList.filter((task) => {
+    const title = String(task?.title || "").toLowerCase().trim();
+    if (!title) return false;
+    if (haystack.includes(title)) return true;
+    const tokens = title.split(/\s+/).filter((token) => token.length >= 3);
+    if (!tokens.length) return false;
+    return tokens.some((token) => significantTokens.has(token));
+  });
+}
+
+function formatDateLabel(value) {
+  if (!value) return null;
+  try {
+    if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
+      const parsed = dayjs(value.trim());
+      if (parsed.isValid()) return parsed.format("MMM D");
+    }
+    const parsed = dayjs(value);
+    if (parsed.isValid()) return parsed.format("MMM D");
+  } catch {
+    /* noop */
+  }
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [y, m, d] = value.split("-");
+    return `${m}/${d}/${y}`;
+  }
+  return String(value);
+}
+
+function resolveStatusFilter(token) {
+  const normalized = normalizeTitleToken(token);
+  if (normalized === "done" || normalized === "completed" || normalized === "complete") return "completed";
+  if (normalized === "all" || normalized === "any") return "all";
+  return "open";
+}
+
+async function lookupTask(uid, payload = {}, context = {}) {
+  const id = normalizeIdToken(payload.taskId || payload.id);
+  const titleToken =
+    payload.title ||
+    payload.name ||
+    payload.task ||
+    payload.description ||
+    payload.label ||
+    null;
+
+  const tasks = Array.isArray(context?.tasks) ? context.tasks : [];
+  if (id) {
+    const fromContext = tasks.find((task) => String(task.id) === id);
+    if (fromContext) return fromContext;
+    try {
+      const snap = await db.collection("tasks").doc(id).get();
+      if (snap.exists) {
+        const data = snap.data() || {};
+        if (!data.userId || String(data.userId) !== String(uid)) return null;
+        return {
+          id,
+          title: data.title || "",
+          date: data.date || null,
+          completed: !!data.completed,
+          category: data.category || "Uncategorized",
+          reminderTime: data.reminderTime || null,
+          priority: data.priority || null,
+        };
+      }
+    } catch (err) {
+      console.warn("[PlannerAssistant] lookupTask by id failed", err?.message || err);
+    }
+  }
+
+  const normalizedTitle = normalizeTitleToken(titleToken);
+  if (!normalizedTitle) return null;
+
+  const directMatch = tasks.find((task) => normalizeTitleToken(task.title) === normalizedTitle);
+  if (directMatch) return directMatch;
+
+  const fuzzyMatch = tasks.find((task) =>
+    normalizeTitleToken(task.title)?.includes(normalizedTitle),
+  );
+  if (fuzzyMatch) return fuzzyMatch;
+
+  return null;
+}
+
+async function completeTaskForUser(uid, payload = {}, context = {}) {
+  const task = await lookupTask(uid, payload, context);
+  if (!task) {
+    return {
+      status: "error",
+      type: "complete_task",
+      payload,
+      message: "I couldn't find that task to mark complete.",
+    };
+  }
+
+  try {
+    const ref = db.collection("tasks").doc(String(task.id));
+    await ref.set({ completed: true, updatedAt: new Date() }, { merge: true });
+    return {
+      status: "completed",
+      type: "complete_task",
+      payload: { taskId: task.id, title: task.title },
+      message: `Marked “${task.title}” as complete.`,
+    };
+  } catch (err) {
+    console.error("[PlannerAssistant] completeTaskForUser failed", err?.message || err);
+    return {
+      status: "error",
+      type: "complete_task",
+      payload: { taskId: task.id, title: task.title },
+      message: err?.message || "Failed to mark task complete.",
+    };
+  }
+}
+
+function sanitizeString(value, fallback = "") {
+  if (typeof value !== "string") return fallback;
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : fallback;
+}
+
+function toYMD(value) {
+  try {
+    if (!value) return null;
+    if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
+      return value.trim();
+    }
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) {
+      const yyyy = date.getFullYear();
+      const mm = String(date.getMonth() + 1).padStart(2, "0");
+      const dd = String(date.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    }
+  } catch {
+    /* noop */
+  }
+  return null;
+}
+
+function describeUpdates(updates = {}) {
+  const labels = [];
+  if ("title" in updates) labels.push("title");
+  if ("details" in updates) labels.push("details");
+  if ("date" in updates) labels.push("date");
+  if ("reminderTime" in updates || "scheduledTime" in updates) labels.push("reminder");
+  if ("category" in updates) labels.push("category");
+  if ("completed" in updates) labels.push("status");
+  return labels.length ? labels.join(", ") : "task";
+}
+
+async function updateTaskForUser(uid, payload = {}, context = {}) {
+  const task = await lookupTask(uid, payload, context);
+  if (!task) {
+    return {
+      status: "error",
+      type: "update_task",
+      payload,
+      message: "I couldn't find the task you wanted to update.",
+    };
+  }
+
+  const updates = {};
+  if (payload.title) updates.title = sanitizeString(payload.title, task.title).slice(0, 180);
+  if (payload.details || payload.description) {
+    updates.details = sanitizeString(
+      payload.details || payload.description,
+      task.details || "",
+    ).slice(0, 1500);
+  }
+  if (payload.category || payload.categoryName) {
+    updates.category = sanitizeString(
+      payload.category || payload.categoryName,
+      task.category || "Uncategorized",
+    );
+  }
+  if (payload.priority) updates.priority = sanitizeString(payload.priority, task.priority || "");
+  const nextDate = toYMD(payload.date || payload.dueDate);
+  if (nextDate) updates.date = nextDate;
+  if (payload.reminderTime !== undefined) updates.reminderTime = payload.reminderTime || null;
+  if (payload.reminderAt) updates.reminderTime = payload.reminderAt;
+  if (payload.scheduledTime) updates.scheduledTime = payload.scheduledTime;
+  if (payload.channels) updates.reminderChannels = payload.channels;
+  if (payload.reminderChannels) updates.reminderChannels = payload.reminderChannels;
+
+  if (payload.completed === true) updates.completed = true;
+  if (payload.completed === false) updates.completed = false;
+
+  if (!Object.keys(updates).length) {
+    return {
+      status: "ignored",
+      type: "update_task",
+      payload: { taskId: task.id, title: task.title },
+      message: "I didn't spot any changes to apply to that task.",
+    };
+  }
+
+  updates.updatedAt = new Date();
+
+  const ref = db.collection("tasks").doc(String(task.id));
+  try {
+    await ref.set(updates, { merge: true });
+  } catch (err) {
+    console.error("[PlannerAssistant] updateTaskForUser failed", err?.message || err);
+    return {
+      status: "error",
+      type: "update_task",
+      payload: { taskId: task.id, updates },
+      message: err?.message || "Failed to update the task.",
+    };
+  }
+
+  const summary = describeUpdates(updates);
+  return {
+    status: "completed",
+    type: "update_task",
+    payload: { taskId: task.id, updates },
+    message: `Updated ${summary} for “${task.title}”.`,
+  };
+}
+
+function buildTaskSummary(tasks = [], options = {}) {
+  if (!Array.isArray(tasks) || !tasks.length) {
+    return options.emptyMessage || "No tasks to show right now.";
+  }
+  const lines = tasks.slice(0, options.limit || 5).map((task, idx) => {
+    const parts = [`${idx + 1}. ${task.title || "Untitled task"}`];
+    if (task.date) parts.push(`due ${formatDateLabel(task.date)}`);
+    if (task.completed) parts.push("✅ done");
+    if (!task.completed && task.reminderTime) parts.push(`⏰ ${task.reminderTime}`);
+    return parts.join(" — ");
+  });
+  return lines.join("\n");
+}
+
+async function getTasksForUser(uid, payload = {}, context = {}) {
+  const statusFilter = resolveStatusFilter(payload.status || payload.filter);
+  const limitRaw = Number(payload.limit) || 5;
+  const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 15) : 5;
+  const dateFilter = toYMD(payload.date || payload.dueDate || payload.forDate);
+
+  let tasks = Array.isArray(context?.tasks) && context.tasks.length
+    ? context.tasks.slice()
+    : await fetchRecentTasks(uid, 20);
+
+  if (statusFilter === "open") {
+    tasks = tasks.filter((task) => !task.completed);
+  } else if (statusFilter === "completed") {
+    tasks = tasks.filter((task) => task.completed);
+  }
+
+  if (dateFilter) {
+    tasks = tasks.filter((task) => toYMD(task.date) === dateFilter);
+  }
+
+  const sliced = tasks.slice(0, limit);
+  return {
+    status: "completed",
+    type: "get_tasks",
+    payload: { tasks: sliced, status: statusFilter, date: dateFilter || null },
+    message: buildTaskSummary(sliced, {
+      limit,
+      emptyMessage: dateFilter
+        ? "You have no tasks on that date."
+        : "No tasks match that filter yet.",
+    }),
+  };
+}
+
+function buildReminderSummary(reminders = [], options = {}) {
+  if (!Array.isArray(reminders) || !reminders.length) {
+    return options.emptyMessage || "No reminders are scheduled.";
+  }
+  const lines = reminders.slice(0, options.limit || 5).map((reminder, idx) => {
+    const parts = [`${idx + 1}. ${reminder.text || reminder.title || "Reminder"}`];
+    if (reminder.scheduledTime) parts.push(`for ${formatDateLabel(reminder.scheduledTime)}`);
+    if (Array.isArray(reminder.channels) && reminder.channels.length) {
+      parts.push(`via ${reminder.channels.join(", ")}`);
+    }
+    return parts.join(" — ");
+  });
+  return lines.join("\n");
+}
+
+async function getRemindersForUser(uid, payload = {}, context = {}) {
+  const limitRaw = Number(payload.limit) || 5;
+  const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 15) : 5;
+
+  let reminders =
+    Array.isArray(context?.reminders) && context.reminders.length
+      ? context.reminders.slice()
+      : await fetchUpcomingReminders(uid, 20);
+
+  if (payload.status) {
+    const statusToken = normalizeTitleToken(payload.status);
+    reminders = reminders.filter((reminder) => {
+      const status = normalizeTitleToken(reminder.status);
+      if (statusToken === "sent" || statusToken === "completed") {
+        return status === "sent" || status === "completed";
+      }
+      if (statusToken === "scheduled" || statusToken === "upcoming") {
+        return status === "scheduled" || status === "pending" || !status;
+      }
+      return true;
+    });
+  }
+
+  const sliced = reminders.slice(0, limit);
+  return {
+    status: "completed",
+    type: "get_reminders",
+    payload: { reminders: sliced },
+    message: buildReminderSummary(sliced, { limit, emptyMessage: "No reminders found." }),
+  };
+}
+
 export async function buildUserContext(uid) {
   const [profileSnap, tasks, reminders, reports, notes] = await Promise.all([
     db.collection("users").doc(String(uid)).get(),
@@ -314,7 +653,7 @@ async function scheduleReminderFromAction(uid, payload = {}) {
   }
 }
 
-export async function executePlannerActions(uid, actions = []) {
+export async function executePlannerActions(uid, actions = [], context = {}) {
   if (!Array.isArray(actions) || !actions.length) return [];
   const results = [];
   for (const raw of actions.slice(0, 5)) {
@@ -324,6 +663,14 @@ export async function executePlannerActions(uid, actions = []) {
         results.push(await createTaskFromAction(uid, raw?.payload || raw));
       } else if (type === "schedule_reminder") {
         results.push(await scheduleReminderFromAction(uid, raw?.payload || raw));
+      } else if (type === "complete_task") {
+        results.push(await completeTaskForUser(uid, raw?.payload || raw, context));
+      } else if (type === "update_task") {
+        results.push(await updateTaskForUser(uid, raw?.payload || raw, context));
+      } else if (type === "get_tasks") {
+        results.push(await getTasksForUser(uid, raw?.payload || raw, context));
+      } else if (type === "get_reminders") {
+        results.push(await getRemindersForUser(uid, raw?.payload || raw, context));
       } else {
         results.push({
           status: "ignored",
@@ -352,5 +699,44 @@ export function detectIntentFromMessage(message = "") {
   if (/(show|list|fetch|what).*task/.test(text)) return "get_tasks";
   if (/(document|file|report|pdf)/.test(text)) return "get_documents";
   if (/(journal|note|entry)/.test(text)) return "get_journal";
+  if (/(complete|finish|done|mark).*(task|them|all)/.test(text)) return "complete_task";
   return null;
+}
+
+export function buildFallbackActionsFromIntent(intent, message = "", context = {}) {
+  const lower = String(message || "").toLowerCase();
+  const tasks = Array.isArray(context?.tasks) ? context.tasks : [];
+
+  if (intent === "get_tasks") {
+    const payload = {};
+    if (/completed|done/.test(lower)) payload.status = "completed";
+    if (/all/.test(lower)) payload.status = "all";
+    if (/today|tonight/.test(lower)) payload.date = toYMD(new Date());
+    if (/tomorrow/.test(lower)) payload.date = toYMD(new Date(Date.now() + 86400000));
+    return [{ type: "get_tasks", payload }];
+  }
+
+  if (intent === "get_reminders") {
+    const payload = {};
+    if (/sent|done/.test(lower)) payload.status = "sent";
+    if (/upcoming|scheduled|pending/.test(lower)) payload.status = "scheduled";
+    return [{ type: "get_reminders", payload }];
+  }
+
+  if (intent === "complete_task") {
+    const pending = tasks.filter((task) => !task.completed);
+    if (!pending.length) return [];
+    let targets = findTasksMatchingText(lower, pending);
+    if (!targets.length && /(all|everything|today|for today)/.test(lower)) {
+      targets = pending;
+    }
+    return targets.length
+      ? targets.map((task) => ({
+          type: "update_task",
+          payload: { taskId: task.id, completed: true },
+        }))
+      : [];
+  }
+
+  return [];
 }

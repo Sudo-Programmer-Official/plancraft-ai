@@ -283,33 +283,33 @@
 
         <!-- Right Section -->
         <div class="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-          <!-- Notification Bell -->
-          <!-- Right Section -->
-          <!-- Notification Bell Wrapper -->
-          <div class="relative flex justify-end w-full sm:static sm:w-auto" ref="dropdownEl">
-            <button
-              @click="toggleNotifications"
-              class="relative bg-gray-800 hover:bg-gray-700 p-2 rounded-full transition min-w-[40px]"
-              aria-label="Notifications"
-              ref="bellEl"
-            >
-              🔔
-              <span
-                v-if="unreadCount > 0"
-                class="absolute -top-1 -right-1 bg-red-600 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full"
-              >
-                {{ unreadCount }}
-              </span>
-            </button>
-
-            <!-- Notification Dropdown -->
-            <NotificationDropdown
-              v-if="showNotifications"
-              :items="notifications"
-              :error="notificationsError"
-              @markAllRead="markAllRead"
-            />
-          </div>
+          <!-- Talk to Planner shortcut -->
+          <button
+            @click="goToTalkPlanner"
+            :class="[
+              'flex items-center justify-center rounded-full border p-2 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-400',
+              isOnTalkPlanner
+                ? 'bg-indigo-500/40 border-indigo-300 text-white'
+                : 'bg-indigo-500/15 border-indigo-400/50 text-indigo-200 hover:bg-indigo-500/25'
+            ]"
+            title="Talk to Planner"
+            aria-label="Talk to Planner"
+          >
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.8"
+                d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3z"
+              />
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.8"
+                d="M19 11a7 7 0 01-14 0m7 7v3m-4 0h8"
+              />
+            </svg>
+          </button>
 
           <!-- Upgrade Button / Pro Badge -->
           <div class="flex items-center gap-2 whitespace-nowrap">
@@ -388,16 +388,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, onUnmounted, computed } from 'vue'
 import { hasSubscription, registerPushSubscription } from '@/services/pushService'
 import NotificationBanner from '@/components/NotificationBanner.vue'
-import { onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { driver } from 'driver.js'
 import 'driver.js/dist/driver.css'
-import { watchNotificationsPublic } from '@/services/firebaseService'
-import NotificationDropdown from '@/components/NotificationDropdown.vue'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useAuthFlags } from '@/composables/useAuthFlags'
 import PlanSummaryModal from '@/components/PlanSummaryModal.vue'
@@ -447,37 +444,15 @@ const planOpen = ref(false)
 const profileSetupOpen = ref(false)
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 
 // Subscription state via store
 const subStore = useSubscriptionStore()
-const subscription = subStore.subscription
-const { isPremium, isGuest, isFreeUser } = useAuthFlags()
+const { isPremium, isGuest } = useAuthFlags()
 
-// Notifications
-const showNotifications = ref(false)
-const notifications = ref([])
-const notificationsError = ref(false)
-const unreadCount = ref(0)
-let unwatchNotes = null
-const dropdownEl = ref(null)
-const bellEl = ref(null)
-
-function toggleNotifications() {
-  showNotifications.value = !showNotifications.value
-}
-
-function onDocumentClick(e) {
-  if (!showNotifications.value) return
-  const target = e.target
-  const withinDropdown = dropdownEl.value?.contains?.(target)
-  const withinBell = bellEl.value?.contains?.(target)
-  if (!withinDropdown && !withinBell) showNotifications.value = false
-}
-
-function markAllRead() {
-  unreadCount.value = 0
-}
+const isOnTalkPlanner = computed(() => route.path === '/talk-to-planner')
+let upgradeHandler = null
 
 // Prompt for profile setup if incomplete
 watch(() => authStore.user?.uid, () => { maybePromptProfile() })
@@ -543,6 +518,17 @@ function trackUpgradeClick() {
   try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_UPGRADE_CLICK) } catch {}
 }
 
+function goToTalkPlanner() {
+  try {
+    if (route.path !== '/talk-to-planner') {
+      router.push('/talk-to-planner')
+    }
+    mobileMenu.value = false
+  } catch (err) {
+    console.warn('Failed to open Talk to Planner', err?.message || err)
+  }
+}
+
 onMounted(() => {
   const seenTour = localStorage.getItem('seenDashboardTour')
 
@@ -550,33 +536,23 @@ onMounted(() => {
     startTour()
     localStorage.setItem('seenDashboardTour', 'true')
   }
-  // Live notifications (public announcements via Firestore)
-  try {
-    unwatchNotes = watchNotificationsPublic((list) => {
-      notifications.value = Array.isArray(list) ? list : []
-      unreadCount.value = notifications.value.length
-    })
-  } catch (e) {
-    console.warn('Failed to subscribe notifications', e?.message || e)
-    notificationsError.value = true
-  }
   if (authStore.user?.uid) subStore.fetchStatus(authStore.user.uid)
   // Upgrade banner events
   try {
-    const handler = () => {
+    upgradeHandler = () => {
       showUpgrade.value = true
     }
-    window.addEventListener('upgrade-required', handler)
+    window.addEventListener('upgrade-required', upgradeHandler)
   } catch {}
-  document.addEventListener('click', onDocumentClick)
 })
 
 onUnmounted(() => {
-  document.removeEventListener('click', onDocumentClick)
-  if (unwatchNotes) unwatchNotes()
-  try {
-    window.removeEventListener('upgrade-required', () => {})
-  } catch {}
+  if (upgradeHandler) {
+    try {
+      window.removeEventListener('upgrade-required', upgradeHandler)
+    } catch {}
+    upgradeHandler = null
+  }
 })
 
 function startTour() {

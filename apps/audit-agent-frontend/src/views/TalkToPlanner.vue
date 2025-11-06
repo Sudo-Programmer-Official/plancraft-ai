@@ -52,7 +52,57 @@
             </div>
           </div>
           <div class="chat-text">
-            <p>{{ message.text }}</p>
+            <p v-if="message.text">{{ message.text }}</p>
+
+            <div v-if="message.results?.length" class="chat-results">
+              <div
+                v-for="result in message.results"
+                :key="result.id"
+                class="result-card"
+                :class="`result-${result.status}`"
+              >
+                <header class="result-header">
+                  <span class="result-status-icon">
+                    <span v-if="result.status === 'completed'">✅</span>
+                    <span v-else-if="result.status === 'error'">⚠️</span>
+                    <span v-else-if="result.status === 'pending'">⏳</span>
+                    <span v-else>ℹ️</span>
+                  </span>
+                  <span class="result-title">{{ result.label }}</span>
+                </header>
+
+                <p v-if="result.message" class="result-message">
+                  {{ result.message }}
+                </p>
+
+                <ul
+                  v-if="result.type === 'get_tasks' && result.payload?.tasks?.length"
+                  class="result-list"
+                >
+                  <li
+                    v-for="task in result.payload.tasks"
+                    :key="task.id || task.title"
+                    class="result-item"
+                  >
+                    {{ describeTaskItem(task) }}
+                  </li>
+                </ul>
+
+                <ul
+                  v-else-if="result.type === 'get_reminders' && result.payload?.reminders?.length"
+                  class="result-list"
+                >
+                  <li
+                    v-for="reminder in result.payload.reminders"
+                    :key="reminder.id || reminder.text"
+                    class="result-item"
+                  >
+                    {{ describeReminderItem(reminder) }}
+                  </li>
+                </ul>
+              </div>
+            </div>
+
             <div v-if="message.actions?.length" class="chat-actions">
               <button
                 v-for="action in message.actions"
@@ -243,6 +293,7 @@ async function sendQuery(forcedInput = null) {
     sender: 'user',
     text: query,
     actions: [],
+    results: [],
   }
 
   messages.value.push(userMessage)
@@ -256,16 +307,33 @@ async function sendQuery(forcedInput = null) {
       history,
     })
 
+    const executedActions = Array.isArray(response.actions) ? response.actions : []
+    const suggestionsSource =
+      (response.raw && response.raw.suggestions) || response.suggestions || []
+
     const assistantMessage = {
       id: `assistant-${Date.now()}-${messageSeed.value++}`,
       sender: 'assistant',
       text: response.reply || "I'm on it!",
-      actions: normalizeActions(response.actions),
+      actions: normalizeActions(suggestionsSource),
+      results: normalizeResults(executedActions),
       intent: response.intent || null,
       meta: response.contextSummary || null,
       raw: response.raw || null,
     }
     messages.value.push(assistantMessage)
+
+    const taskChangingTypes = new Set(['create_task', 'update_task', 'complete_task'])
+    const touchedTasks = executedActions.some((action) =>
+      taskChangingTypes.has(String(action?.type || '').toLowerCase()),
+    )
+    if (touchedTasks) {
+      try {
+        window.dispatchEvent(new CustomEvent('tasks:refresh-request'))
+      } catch (err) {
+        console.warn('[TalkToPlanner] failed to dispatch task refresh', err?.message || err)
+      }
+    }
   } catch (err) {
     const fallback = typeof err.message === 'string' ? err.message : 'Something went wrong.'
     messages.value.push({
@@ -273,6 +341,7 @@ async function sendQuery(forcedInput = null) {
       sender: 'assistant',
       text: fallback,
       actions: [],
+      results: [],
     })
   } finally {
     assistantThinking.value = false
@@ -282,6 +351,15 @@ async function sendQuery(forcedInput = null) {
 function normalizeActions(actions) {
   if (!Array.isArray(actions)) return []
   return actions.map((action, idx) => {
+    if (typeof action === 'string') {
+      return {
+        id: `${Date.now()}-${idx}`,
+        type: 'suggestion',
+        label: action,
+        payload: {},
+        status: 'suggestion',
+      }
+    }
     const label =
       action?.label ||
       action?.title ||
@@ -293,6 +371,22 @@ function normalizeActions(actions) {
       payload: action?.payload || {},
       status: action?.status || 'completed',
       message: action?.message || null,
+    }
+  })
+}
+
+function normalizeResults(actions) {
+  if (!Array.isArray(actions)) return []
+  return actions.map((action, idx) => {
+    const type = action?.type || action?.name || `action-${idx + 1}`
+    const status = String(action?.status || 'completed').toLowerCase()
+    return {
+      id: `result-${Date.now()}-${idx}`,
+      type,
+      label: prettifyActionType(type),
+      status,
+      message: action?.message || null,
+      payload: action?.payload || action || {},
     }
   })
 }
@@ -312,6 +406,49 @@ function runAction(_message, action) {
   if (action.message) {
     ElMessage.info(action.message)
   }
+}
+
+function formatDateLabel(value, options = {}) {
+  if (!value) return null
+  try {
+    const date = new Date(value)
+    if (!Number.isNaN(date.getTime())) {
+      const formatter = new Intl.DateTimeFormat(undefined, {
+        month: 'short',
+        day: 'numeric',
+        ...(options.includeTime
+          ? { hour: '2-digit', minute: '2-digit' }
+          : {}),
+      })
+      return formatter.format(date)
+    }
+  } catch {
+    /* noop */
+  }
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split('-')
+    return `${month}/${day}/${year}`
+  }
+  return typeof value === 'string' ? value : String(value)
+}
+
+function describeTaskItem(task = {}) {
+  const parts = [task.title || task.text || 'Untitled task']
+  if (task.date) parts.push(`due ${formatDateLabel(task.date)}`)
+  if (!task.completed && task.reminderTime) parts.push(`⏰ ${task.reminderTime}`)
+  if (task.completed) parts.push('✅ done')
+  return parts.join(' · ')
+}
+
+function describeReminderItem(reminder = {}) {
+  const parts = [reminder.text || reminder.title || 'Reminder']
+  if (reminder.scheduledTime) {
+    parts.push(`for ${formatDateLabel(reminder.scheduledTime, { includeTime: true })}`)
+  }
+  if (Array.isArray(reminder.channels) && reminder.channels.length) {
+    parts.push(`via ${reminder.channels.join(', ')}`)
+  }
+  return parts.join(' · ')
 }
 
 function handleVoiceTranscript(text, isFinal = false) {
@@ -546,6 +683,74 @@ onBeforeUnmount(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
+}
+
+.chat-results {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.result-card {
+  background: rgba(78, 44, 120, 0.25);
+  border: 1px solid rgba(126, 86, 180, 0.35);
+  border-left: 3px solid rgba(198, 126, 255, 0.8);
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  box-shadow: inset 0 0 20px rgba(120, 80, 180, 0.15);
+}
+
+.result-card.result-error {
+  border-left-color: rgba(255, 137, 137, 0.8);
+}
+
+.result-card.result-pending,
+.result-card.result-ignored {
+  border-left-color: rgba(255, 197, 110, 0.8);
+}
+
+.result-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: #f8f0ff;
+}
+
+.result-status-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.result-title {
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+}
+
+.result-message {
+  margin-top: 0.35rem;
+  font-size: 0.92rem;
+  color: rgba(239, 231, 255, 0.85);
+  line-height: 1.35;
+}
+
+.result-list {
+  margin-top: 0.6rem;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.35rem;
+  list-style: disc;
+}
+
+.result-item {
+  font-size: 0.9rem;
+  color: rgba(236, 229, 255, 0.85);
 }
 
 .action-chip {

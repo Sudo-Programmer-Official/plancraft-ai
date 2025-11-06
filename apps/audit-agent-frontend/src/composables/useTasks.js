@@ -16,6 +16,7 @@ import { resolveCategory } from '@/constants/taskCategories'
 // 🔗 Shared singleton state
 const tasks = ref([])
 let initialized = false
+let refreshListenerAttached = false
 
 export function useTasks() {
   const authStore = useAuthStore()
@@ -167,6 +168,16 @@ export function useTasks() {
 
   // 🔹 Only load once when app starts
   if (!initialized) loadTasks()
+  if (!refreshListenerAttached) {
+    try {
+      window.addEventListener('tasks:refresh-request', () => {
+        loadTasks().catch((err) => console.warn('[useTasks] refresh failed', err?.message || err))
+      })
+      refreshListenerAttached = true
+    } catch (err) {
+      console.warn('[useTasks] failed to attach refresh listener', err?.message || err)
+    }
+  }
 
   return {
     tasks,

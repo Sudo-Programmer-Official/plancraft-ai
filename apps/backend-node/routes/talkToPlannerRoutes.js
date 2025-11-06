@@ -6,6 +6,7 @@ import {
   extractActionsFromText,
   executePlannerActions,
   detectIntentFromMessage,
+  buildFallbackActionsFromIntent,
 } from "../services/plannerAssistantService.js";
 
 const router = express.Router();
@@ -19,7 +20,7 @@ router.post("/chat", async (req, res) => {
       return res.status(400).json({ error: "Missing message or userId" });
     }
 
-    const [context, historyMessages] = await Promise.all([
+    const [initialContext, historyMessages] = await Promise.all([
       buildUserContext(userId),
       Promise.resolve(
         Array.isArray(history)
@@ -31,18 +32,25 @@ router.post("/chat", async (req, res) => {
       ),
     ]);
 
+    let context = initialContext;
+
     const systemPrompt = `
 You are PlanCraftAI's Planner Assistant.
 You have access to a user's tasks, reminders, journal notes, and reports.
 Understand the intent, respond concisely, and when appropriate suggest next steps.
-When an actionable request is detected, append a JSON block in triple backticks describing the action.
-JSON schema:
+When an actionable request is detected, add a single JSON block in triple backticks describing the actions to run.
+Supported action types and payload hints:
+- create_task: { "title": string, "date": "YYYY-MM-DD", "details"?: string, "category"?: string, "reminderTime"?: "HH:mm", "channels"?: [] }
+- update_task: { "taskId": string, "title"?: string, "date"?: "YYYY-MM-DD", "reminderTime"?: "HH:mm", "completed"?: boolean }
+- complete_task: { "taskId": string }
+- schedule_reminder: { "text": string, "scheduledTime": ISO-8601 UTC, "timezone"?: string, "channels"?: [] }
+- get_tasks: { "status"?: "open" | "completed" | "all", "date"?: "YYYY-MM-DD", "limit"?: number }
+- get_reminders: { "status"?: "scheduled" | "sent", "limit"?: number }
+Example JSON:
 \`\`\`json
 {"actions":[{"type":"create_task","payload":{"title":"Call client","date":"2025-02-15"}}]}
 \`\`\`
-Supported types: create_task, schedule_reminder.
-Keep payloads minimal and include ISO timestamps or YYYY-MM-DD dates.
-If unsure, respond conversationally and ask clarifying questions.
+Only include the JSON block when an action is required. Use IDs from the context when referring to tasks or reminders, prefer concise replies, and ask follow-up questions when details are missing.
     `.trim();
 
     const contextSummary = {
@@ -74,20 +82,49 @@ If unsure, respond conversationally and ask clarifying questions.
     });
 
     const { text, actions } = extractActionsFromText(rawReply);
-    const executedActions = await executePlannerActions(userId, actions);
+    const intent = detectIntentFromMessage(message);
+    let actionQueue = Array.isArray(actions) ? actions.slice(0) : [];
+    if (!actionQueue.length && intent) {
+      actionQueue = buildFallbackActionsFromIntent(intent, message, context);
+    }
+    const executedActions = await executePlannerActions(userId, actionQueue, context);
     const primaryAction =
       executedActions.find((a) => a.status === "completed") || executedActions[0] || null;
 
-    const intent = detectIntentFromMessage(message);
-    const completed = executedActions.some((item) => item.status === "completed");
-    if (completed) {
+    const actionSummaries = executedActions
+      .filter((item) => item?.message && item.status !== "ignored")
+      .map((item) => item.message);
+    let replyText = text || rawReply || "";
+    if (actionSummaries.length) {
+      replyText = replyText
+        ? `${replyText.trim()}\n\n${actionSummaries.join("\n")}`
+        : actionSummaries.join("\n");
+    }
+
+    const shouldRefreshContext = executedActions.some(
+      (item) =>
+        item.status === "completed" &&
+        ["create_task", "update_task", "complete_task", "schedule_reminder"].includes(
+          String(item.type || "").toLowerCase(),
+        ),
+    );
+
+    if (shouldRefreshContext) {
+      try {
+        context = await buildUserContext(userId);
+      } catch (err) {
+        console.warn("[TalkToPlanner] context refresh failed", err?.message || err);
+      }
+    }
+
+    if (executedActions.some((item) => item.status === "completed")) {
       const summary = intent || primaryAction?.type || "unknown";
       console.log(`[PlannerBridge] Action executed: ${summary} | Notifications triggered`);
     }
 
     return res.json({
-      aiMessage: text || rawReply,
-      reply: text || rawReply,
+      aiMessage: replyText,
+      reply: replyText,
       intent: intent || primaryAction?.type || null,
       action: primaryAction?.type || intent || null,
       data: primaryAction || null,

@@ -5,6 +5,8 @@ import {
   buildUserContext,
   extractActionsFromText,
   executePlannerActions,
+  detectIntentFromMessage,
+  buildFallbackActionsFromIntent,
 } from "../services/plannerAssistantService.js"
 
 const router = express.Router()
@@ -18,7 +20,7 @@ router.post("/query", async (req, res) => {
       return res.status(400).json({ error: "Missing userId or query" })
     }
 
-    const context = await buildUserContext(userId)
+    let context = await buildUserContext(userId)
     const historyMessages = Array.isArray(history)
       ? history
           .slice(-10)
@@ -31,14 +33,19 @@ router.post("/query", async (req, res) => {
     const systemPrompt = `
 You are PlanCraftAI, the user's trusted planner assistant. Always be precise, concise, and proactive.
 
-- Provide helpful explanations referencing tasks, reminders, reports, and context.
-- Suggest next steps when relevant and surface key stats or insights.
-- When you need to perform an action (create a task, schedule a reminder, etc.), append a JSON block wrapped in triple backticks using the format:
+- Reference the provided context when sharing insights or recommendations.
+- When you need to perform an action, append a single JSON block wrapped in triple backticks.
+- Supported action types:
+  • create_task: { "title": string, "date": "YYYY-MM-DD", "details"?: string, "category"?: string, "reminderTime"?: "HH:mm" }
+  • update_task: { "taskId": string, "title"?: string, "date"?: "YYYY-MM-DD", "reminderTime"?: "HH:mm", "completed"?: boolean }
+  • complete_task: { "taskId": string }
+  • schedule_reminder: { "text": string, "scheduledTime": ISO-8601 UTC, "timezone"?: string, "channels"?: [] }
+  • get_tasks: { "status"?: "open" | "completed" | "all", "date"?: "YYYY-MM-DD", "limit"?: number }
+  • get_reminders: { "status"?: "scheduled" | "sent", "limit"?: number }
 \`\`\`json
 {"actions":[{"type":"create_task","payload":{"title":"Review invoices","date":"2025-01-15"}}]}
 \`\`\`
-- Supported action types: "create_task" and "schedule_reminder". Keep payloads minimal and include ISO timestamps or YYYY-MM-DD dates.
-- Only include actions when confident; the system executes them automatically.
+- Only include the JSON block when an action is required and rely on IDs from context whenever possible.
 `
 
     const contextString = JSON.stringify(context, null, 2).slice(0, 12000)
@@ -59,10 +66,38 @@ You are PlanCraftAI, the user's trusted planner assistant. Always be precise, co
     })
 
     const { text, actions } = extractActionsFromText(rawReply)
-    const executedActions = await executePlannerActions(userId, actions)
+    const intent = detectIntentFromMessage(query)
+    let actionQueue = Array.isArray(actions) ? actions.slice(0) : []
+    if (!actionQueue.length && intent) {
+      actionQueue = buildFallbackActionsFromIntent(intent, query, context)
+    }
+    const executedActions = await executePlannerActions(userId, actionQueue, context)
+
+    const actionSummaries = executedActions
+      .filter((item) => item?.message && item.status !== "ignored")
+      .map((item) => item.message)
+    const replyText =
+      actionSummaries.length && !text
+        ? actionSummaries.join("\n")
+        : [text || rawReply || "", actionSummaries.join("\n")].filter(Boolean).join("\n\n")
+
+    const shouldRefreshContext = executedActions.some(
+      (item) =>
+        item.status === "completed" &&
+        ["create_task", "update_task", "complete_task", "schedule_reminder"].includes(
+          String(item.type || "").toLowerCase(),
+        ),
+    )
+    if (shouldRefreshContext) {
+      try {
+        context = await buildUserContext(userId)
+      } catch (err) {
+        console.warn("[PlannerRoutes] context refresh failed", err?.message || err)
+      }
+    }
 
     return res.json({
-      reply: text || rawReply,
+      reply: replyText.trim(),
       actions: executedActions,
       contextSummary: {
         totalTasks: context.summary.totalTasks,

@@ -11,6 +11,22 @@ import { normalizeTemporalTasks } from '@/services/time_parser'
 dayjs.extend(utc)
 dayjs.extend(timezone)
 
+const RELATIVE_UNIT_MAP = {
+  minute: 'minute',
+  minutes: 'minute',
+  min: 'minute',
+  mins: 'minute',
+  m: 'minute',
+  hour: 'hour',
+  hours: 'hour',
+  hr: 'hour',
+  hrs: 'hour',
+  h: 'hour',
+  day: 'day',
+  days: 'day',
+  d: 'day',
+}
+
 // 🔹 Utility: safe response unwrap
 function safeGet(res, key, fallback = null) {
   return res?.data?.[key] ?? fallback;
@@ -149,6 +165,43 @@ export async function generateTasksFromText(text, options = {}) {
 /**
  * ✨ Extract reminder time (ISO) from freeform text
  */
+
+function resolveRelativeReminderIso(text, nowAnchor, timezoneGuess) {
+  if (!text) return null
+  const normalized = String(text).toLowerCase()
+  if (!/\bin\s+\d/.test(normalized)) return null
+
+  const matches = Array.from(normalized.matchAll(/(\d+)\s*(minute|minutes|min|mins|m|hour|hours|hr|hrs|h|day|days|d)\b/g))
+  if (!matches.length) return null
+
+  const base = (() => {
+    try {
+      if (nowAnchor) {
+        const candidate = dayjs.tz(nowAnchor, timezoneGuess)
+        if (candidate.isValid()) return candidate
+      }
+    } catch {}
+    return dayjs().tz(timezoneGuess)
+  })()
+  if (!base || !base.isValid()) return null
+
+  let candidate = base
+  matches.forEach((match) => {
+    const amount = Number.parseInt(match[1], 10)
+    const unitToken = match[2]
+    const unit = RELATIVE_UNIT_MAP[unitToken] || 'minute'
+    if (Number.isFinite(amount) && amount > 0) {
+      candidate = candidate.add(amount, unit)
+    }
+  })
+
+  if (!candidate.isValid() || candidate.isSame(base)) return null
+  if (candidate.isBefore(base)) {
+    candidate = candidate.add(1, 'minute')
+  }
+  return candidate.utc().toISOString()
+}
+
 export async function extractReminderTime(text, options = {}) {
   const trimmed = String(text ?? '').trim()
   if (!trimmed) return null
@@ -181,6 +234,17 @@ export async function extractReminderTime(text, options = {}) {
     if (now instanceof Date) return dayjs(now).tz(timezoneGuess).format('YYYY-MM-DDTHH:mm:ssZ')
     return contextBundle.context.now || dayjs().tz(timezoneGuess).format('YYYY-MM-DDTHH:mm:ssZ')
   })()
+
+  const relativeIso = resolveRelativeReminderIso(trimmed, nowAnchor, timezoneGuess)
+  if (relativeIso) {
+    logTimeBrain('extractReminderTime:relative-hit', {
+      label: debugLabel,
+      timezone: timezoneGuess,
+      now: nowAnchor,
+      iso: relativeIso,
+    })
+    return relativeIso
+  }
 
   const payload = {
     text: trimmed,
