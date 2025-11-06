@@ -353,7 +353,15 @@ export async function sendReminder(reminder) {
   const channels = Array.isArray(reminder?.channels) ? reminder.channels : [];
   const userId = String(reminder?.userId || "");
   const task = String(reminder?.task || "");
-  const when = reminder?.scheduledTime ? formatLocalTime(reminder.scheduledTime, reminder?.timezone || undefined) : "soon";
+  const scheduledDate =
+    coerceDateValue(
+      reminder?.scheduledTime ||
+        reminder?.remindAt ||
+        reminder?.remind_at ||
+        reminder?.time ||
+        null,
+    ) || null;
+  const when = scheduledDate ? formatLocalTime(scheduledDate, reminder?.timezone || undefined) : "soon";
   const source = reminder?.source || 'manual';
 
   console.log(`[ReminderService:${source}] Executing reminder`, { id: reminder?.id, userId, task, when, channels, ts: new Date().toISOString() });
@@ -370,7 +378,7 @@ export async function sendReminder(reminder) {
     id: reminder?.id || reminder?._id || null,
     taskId: reminder?.taskId || null,
     title: task,
-    scheduledTime: reminder?.scheduledTime || reminder?.remindAt || reminder?.remind_at || reminder?.time || null,
+    scheduledTime: scheduledDate ? scheduledDate.toISOString() : null,
     reminderTime: reminder?.reminderTime || null,
     timezone: reminder?.timezone || null,
   };
@@ -457,12 +465,30 @@ export function queueReminder(rem) {
 
     const fire = async () => {
       try {
-        const remaining = ts.getTime() - Date.now();
+        const snap = await db.collection("reminders").doc(id).get();
+        if (!snap.exists) {
+          console.warn("[ReminderService:scheduler] Reminder doc missing at send time", { id });
+          return;
+        }
+        const data = snap.data() || {};
+        if (data?.sentAt || (data?.status && String(data.status).toLowerCase() === "sent")) {
+          console.log(`[ReminderService:scheduler] Reminder ${id} already sent; skipping dispatch`);
+          return;
+        }
+
+        const scheduled =
+          coerceDateValue(data?.scheduledTime || data?.time || whenRaw) || ts;
+        if (!scheduled) {
+          console.warn("[ReminderService:scheduler] Unable to resolve scheduled date when firing", { id });
+          return;
+        }
+
+        const remaining = scheduled.getTime() - Date.now();
         if (remaining > 1000) {
           console.log(`[ReminderService:scheduler] Re-queuing reminder ${id}; ${Math.ceil(remaining / 60000)}m remaining`);
-          return queueReminder({ ...rem, id });
+          return queueReminder({ id, ...data });
         }
-        await sendReminder({ ...rem, id });
+        await sendReminder({ id, ...data });
       } catch (e) { console.error("sendReminder error:", e?.message); }
     };
 
