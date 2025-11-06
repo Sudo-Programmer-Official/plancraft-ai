@@ -810,6 +810,38 @@ export async function buildFallbackActionsFromIntent(intent, message = "", conte
     ];
   }
 
+  if (intent === "create_task") {
+    const base = dayjs().tz(timezoneId);
+    let due = base;
+    if (/tomorrow/.test(lower)) due = due.add(1, "day");
+    if (/next\s+week/.test(lower)) due = due.add(1, "week");
+    const weekdayMatch = lower.match(/next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)/);
+    if (weekdayMatch) {
+      const targetDow = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"].indexOf(weekdayMatch[1]);
+      let candidate = base.add(1, "day");
+      while (candidate.day() !== targetDow) candidate = candidate.add(1, "day");
+      due = candidate;
+    }
+
+    const title = (() => {
+      const stripped = message
+        ?.replace(/^[\s"]+|[\s"]+$/g, "")
+        .replace(/^(please\s+)?(create|add|make|set)\s+(me\s+)?(a\s+)?(new\s+)?task(\s+to)?/i, "")
+        .trim();
+      if (stripped) return stripped.charAt(0).toUpperCase() + stripped.slice(1);
+      return "New task";
+    })();
+
+    const payload = {
+      title,
+      details: message?.trim() || "",
+      date: due.format("YYYY-MM-DD"),
+      source: "planner-assistant",
+    };
+
+    return [{ type: "create_task", payload }];
+  }
+
   if (intent === "complete_task") {
     const pending = tasks.filter((task) => !task.completed);
     if (!pending.length) return [];
