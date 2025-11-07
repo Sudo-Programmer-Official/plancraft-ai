@@ -28,6 +28,72 @@ const RELATIVE_UNIT_MAP = {
   days: "day",
   d: "day",
 };
+const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+
+function extractTimeToken(text) {
+  if (!text) return { cleaned: text, time: null };
+  const timeRegex = /(?:at\s*)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i;
+  const match = text.match(timeRegex);
+  if (!match) return { cleaned: text, time: null };
+  let hour = Number(match[1] || 0);
+  const minute = Number(match[2] || 0);
+  const meridiem = match[3] || "";
+  if (/pm/i.test(meridiem) && hour < 12) hour += 12;
+  if (/am/i.test(meridiem) && hour === 12) hour = 0;
+  const hh = String(hour).padStart(2, "0");
+  const mm = String(minute).padStart(2, "0");
+  const cleaned = text.replace(match[0], "").trim();
+  return { cleaned: cleaned.replace(/\s+/g, " ").replace(/,\s*$/, "").trim(), time: `${hh}:${mm}` };
+}
+
+function resolveDateToken(text, timezoneId = DEFAULT_TIMEZONE) {
+  const lower = String(text || "").toLowerCase();
+  const base = dayjs().tz(timezoneId);
+  if (lower.includes("tomorrow")) return base.add(1, "day").format("YYYY-MM-DD");
+  const nextMatch = lower.match(/next\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday)/);
+  if (nextMatch) {
+    const target = WEEKDAYS.indexOf(nextMatch[1]);
+    let cursor = base.add(1, "day");
+    while (cursor.day() !== target) cursor = cursor.add(1, "day");
+    return cursor.format("YYYY-MM-DD");
+  }
+  for (const dayName of WEEKDAYS) {
+    if (lower.includes(dayName)) {
+      const target = WEEKDAYS.indexOf(dayName);
+      let cursor = base;
+      if (cursor.day() > target) cursor = cursor.add(1, "week");
+      while (cursor.day() !== target) cursor = cursor.add(1, "day");
+      return cursor.format("YYYY-MM-DD");
+    }
+  }
+  return base.format("YYYY-MM-DD");
+}
+
+function extractTaskListFromMessage(message, timezoneId = DEFAULT_TIMEZONE) {
+  if (!message) return [];
+  const lines = String(message)
+    .split(/\n|;/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const tasks = [];
+  const bulletRegex = /^(\d+[\).\s]|[-*•]\s+)/;
+  for (const line of lines) {
+    const cleanedLine = line.replace(bulletRegex, "").trim();
+    if (!cleanedLine) continue;
+    if (/^plan\s+my\s+day/i.test(cleanedLine)) continue;
+    if (/^let'?s\s+plan/i.test(cleanedLine)) continue;
+    if (/^thanks?/i.test(cleanedLine)) continue;
+    const { cleaned, time } = extractTimeToken(cleanedLine);
+    const title = (cleaned || cleanedLine).replace(/^[\-\d\.\s]+/, "").trim();
+    if (title.length < 3) continue;
+    tasks.push({
+      title,
+      reminderTime: time,
+      date: resolveDateToken(cleanedLine, timezoneId),
+    });
+  }
+  return tasks.length > 1 ? tasks : [];
+}
 
 function asIso(value) {
   try {
@@ -779,18 +845,80 @@ export function extractActionsFromText(rawText) {
 
 async function createTaskFromAction(uid, payload = {}) {
   try {
-    const task = await createTask(uid, payload, {
-      origin: "planner-assistant",
-      silent: payload.silent === true,
-      notificationOptions: { reason: "planner-assistant" },
-    });
+    const incoming = Array.isArray(payload.tasks) && payload.tasks.length ? payload.tasks : [payload];
+    const basePayload = { ...payload };
+    delete basePayload.tasks;
+
+    const created = [];
+    for (const entry of incoming) {
+      const candidate = { ...basePayload, ...entry };
+      if (!candidate.title) continue;
+      const task = await createTask(uid, candidate, {
+        origin: "planner-assistant",
+        silent: candidate.silent === true,
+        notificationOptions: { reason: "planner-assistant" },
+      });
+      console.log("[PlannerTask] taskCreated=✅", {
+        userId: uid,
+        taskId: task.id,
+        title: task.title,
+        date: task.date,
+      });
+      if (task?.scheduledReminder?.scheduledTime) {
+        console.log("[PlannerTask] reminderScheduled=✅", {
+          userId: uid,
+          taskId: task.id,
+          reminderTime: task.scheduledReminder.scheduledTime,
+        });
+      }
+      created.push(task);
+    }
+
+    if (!created.length) {
+      throw new Error("No tasks created from payload");
+    }
+
+    if (created.length === 1) {
+      const task = created[0];
+      return {
+        status: "completed",
+        type: "create_task",
+        label: payload.label || task.title,
+        taskId: task.id,
+        payload: {
+          ...payload,
+          id: task.id,
+          createdTasks: [
+            {
+              id: task.id,
+              title: task.title,
+              date: task.date,
+              reminderTime: task.reminderTime,
+              link: task.link || null,
+            },
+          ],
+        },
+        message: `Created task “${task.title}” for ${task.date}`,
+      };
+    }
+
+    const summaryLines = created.map((task) => `• ${task.title} (${task.date})`);
     return {
       status: "completed",
       type: "create_task",
-      label: payload.label || task.title,
-      taskId: task.id,
-      payload: { ...payload, id: task.id },
-      message: `Created task “${task.title}” for ${task.date}`,
+      label: `${created.length} tasks`,
+      taskIds: created.map((task) => task.id),
+      payload: {
+        ...payload,
+        createdTasks: created.map((task) => ({
+          id: task.id,
+          title: task.title,
+          date: task.date,
+          reminderTime: task.reminderTime,
+          link: task.link || null,
+        })),
+      },
+      message: `Created ${created.length} tasks:\n${summaryLines.join("\n")}`,
     };
   } catch (err) {
     console.error("[PlannerAssistant] createTaskFromAction failed", err?.message || err);
@@ -982,6 +1110,19 @@ export async function buildFallbackActionsFromIntent(intent, message = "", conte
       if (stripped) return stripped.charAt(0).toUpperCase() + stripped.slice(1);
       return "New task";
     })();
+
+    const parsedList = extractTaskListFromMessage(message, timezoneId);
+    if (parsedList.length) {
+      return parsedList.map((item) => ({
+        type: "create_task",
+        payload: {
+          title: item.title,
+          date: item.date || due.format("YYYY-MM-DD"),
+          reminderTime: item.reminderTime || null,
+          source: "planner-assistant",
+        },
+      }));
+    }
 
     const payload = {
       title,

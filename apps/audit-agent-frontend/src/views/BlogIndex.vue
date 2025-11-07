@@ -141,10 +141,19 @@ import { useBlogs } from '@/composables/useBlogs'
 import { useAuthStore } from '@/stores/authStore'
 import api from '@/services/api'
 import { ElMessage } from 'element-plus'
+import { useSeoMeta } from '@/composables/useSeoMeta'
 
 const { blogs, loading, fetchBlogs } = useBlogs(true)
 const authStore = useAuthStore()
 const router = useRouter()
+
+useSeoMeta({
+  title: 'Guides on AI Productivity, Planning, and Goal Tracking',
+  description:
+    'Read PlanCraft AI guides on AI productivity, mindful planning, habit tracking, and voice journaling best practices.',
+  keywords: ['AI productivity guides', 'PlanCraft AI blog', 'AI planner tips', 'goal tracking blog'],
+  pageLabel: 'Blog Index',
+})
 
 const isAdmin = computed(
   () => String(authStore?.user?.role || '').toLowerCase() === 'admin'

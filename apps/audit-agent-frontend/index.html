@@ -9,16 +9,17 @@
     />
 
     <!-- Page Title & Description -->
-    <title>PlanCraftAI – Peaceful Productivity with AI</title>
+    <title>PlanCraft AI – Peaceful Productivity with Voice Journaling and AI Task Management</title>
     <meta
       name="description"
-      content="PlanCraftAI helps you plan, journal, and reflect with voice journaling, AI-powered task planning, and mindful insights. Your personal productivity companion for a balanced life."
+      content="PlanCraft AI is the calm AI task manager for daily planning, voice journaling, smart reminders, and Google Calendar sync—everything you need for mindful productivity."
     />
     <meta
       name="keywords"
-      content="AI planner, daily tasks, productivity, journaling, AI task generator, mindful planning, time management, focus, self improvement, PlanCraftAI"
+      content="PlanCraft AI, AI task manager, AI daily planner, AI productivity app, AI journaling assistant, AI planner for goals, voice planning, AI reminders, Google Calendar integration"
     />
     <meta name="author" content="PlanCraftAI by Abhishek" />
+    <meta name="format-detection" content="telephone=no, address=no, email=no" />
 
     <!-- App Identity -->
     <meta name="application-name" content="PlanCraftAI" />
@@ -33,16 +34,23 @@
     <link rel="icon" href="/logo.png" type="image/png" />
     <link rel="apple-touch-icon" href="/logo.png" sizes="512x512" />
     <link rel="shortcut icon" href="/logo.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
 
     <!-- Open Graph (Social Sharing) -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://plancraftai.com" />
-    <meta property="og:title" content="PlanCraftAI – Plan, Reflect & Grow with AI" />
+    <meta
+      property="og:title"
+      content="PlanCraft AI – Peaceful Productivity with Voice Journaling and AI Task Management"
+    />
     <meta
       property="og:description"
-      content="Your AI-powered planner for mindful productivity. Create tasks, set reminders, and journal with your voice — all in one calm space."
+      content="PlanCraft AI blends AI task management, journaling, reminders, and Google Calendar sync so you can plan your day with your voice and stay in flow."
     />
     <meta property="og:image" content="https://plancraftai.com/logo.png" />
+    <meta property="og:image:alt" content="PlanCraft AI dashboard and voice journaling view" />
     <meta property="og:image:width" content="512" />
     <meta property="og:image:height" content="512" />
     <meta property="og:locale" content="en_US" />
@@ -52,11 +60,11 @@
     <meta name="twitter:site" content="@PlanCraftAI" />
     <meta
       name="twitter:title"
-      content="PlanCraftAI – Peaceful Productivity with Voice Journaling and AI"
+      content="PlanCraft AI – Peaceful Productivity with Voice Journaling and AI Task Management"
     />
     <meta
       name="twitter:description"
-      content="Pause, plan, and reflect with gentle voice journaling, smart tasks, and mindful insights guiding your daily flow."
+      content="Voice-powered AI planning, calm journaling, and calendar-aware reminders help you finish your day with clarity."
     />
     <meta name="twitter:image" content="https://plancraftai.com/logo.png" />
 
@@ -79,12 +87,17 @@
       {
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
-        "name": "PlanCraftAI",
-        "applicationCategory": "Productivity",
+        "name": "PlanCraft AI",
+        "applicationCategory": "ProductivityApplication",
+        "applicationSubCategory": "TaskManagementApplication",
         "operatingSystem": "Web, iOS, Android",
+        "softwareVersion": "1.0.0",
+        "screenshot": "https://plancraftai.com/logo.png",
+        "installUrl": "https://plancraftai.com/#install",
+        "downloadUrl": "https://plancraftai.com/",
         "logo": "https://plancraftai.com/logo.png",
         "url": "https://plancraftai.com",
-        "description": "PlanCraftAI helps you plan, journal, and reflect with AI-powered productivity tools.",
+        "description": "PlanCraft AI is a peaceful AI task manager with voice journaling, Google Calendar sync, and proactive reminders.",
         "creator": {
           "@type": "Person",
           "name": "Abhishek"
@@ -92,12 +105,25 @@
         "offers": {
           "@type": "Offer",
           "price": "0.00",
-          "priceCurrency": "USD"
+          "priceCurrency": "USD",
+          "availability": "https://schema.org/OnlineOnly"
         },
         "aggregateRating": {
           "@type": "AggregateRating",
           "ratingValue": "5.0",
           "ratingCount": "42"
+        },
+        "sameAs": [
+          "https://twitter.com/PlanCraftAI",
+          "https://www.linkedin.com/company/plancraftai"
+        ],
+        "potentialAction": {
+          "@type": "InstallAction",
+          "target": {
+            "@type": "EntryPoint",
+            "urlTemplate": "https://plancraftai.com/#install"
+          },
+          "name": "Install PlanCraft AI"
         }
       }
     </script>

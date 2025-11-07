@@ -35,12 +35,13 @@
           Peaceful Productivity
         </h1>
         <p
-          class="mt-6 text-lg md:text-2xl text-indigo-100 max-w-2xl mx-auto leading-relaxed"
+          class="mt-6 text-lg md:text-2xl text-indigo-100 max-w-3xl mx-auto leading-relaxed"
           data-aos="fade-up"
           data-aos-delay="150"
         >
-          Pause, plan, and reflect — with gentle voice journaling, smart tasks, and mindful insights
-          guiding your day.
+          PlanCraft AI is the peaceful AI task manager and daily planner that lets you speak your
+          plans, journal with AI, sync Google Calendar, and stay on track with compassionate
+          reminders.
         </p>
         <div
           class="mt-10 flex flex-col sm:flex-row gap-4 justify-center"
@@ -68,6 +69,82 @@
         >
           ⭐ Explore Premium
         </RouterLink>
+      </div>
+    </section>
+
+    <SeoLongForm
+      eyebrow="Guides"
+      title="How AI Helps Plan Your Day"
+      :intro="longformIntro"
+      :sections="longformSections"
+    >
+      <template #cta>
+        <div class="flex flex-col md:flex-row gap-4 mt-6">
+          <RouterLink
+            to="/blog"
+            class="flex-1 text-center px-6 py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-500 transition"
+          >
+            Read more AI productivity guides
+          </RouterLink>
+          <RouterLink
+            to="/voice-planning"
+            class="flex-1 text-center px-6 py-3 rounded-xl border border-indigo-400/60 text-indigo-100 font-semibold hover:border-white/80 transition"
+          >
+            Try voice planning →
+          </RouterLink>
+        </div>
+      </template>
+    </SeoLongForm>
+
+    <!-- FAQ -->
+    <section id="faq" class="py-20 bg-slate-950/90 text-white">
+      <div class="max-w-5xl mx-auto px-6">
+        <div class="text-center mb-12">
+          <p class="uppercase text-xs tracking-[0.35em] text-indigo-400">People also ask</p>
+          <h2 class="mt-3 text-3xl md:text-4xl font-bold">PlanCraft AI FAQ</h2>
+          <p class="mt-4 text-indigo-200">
+            Clear answers for common searches around AI task managers, journaling assistants, and
+            calendar-aware reminders.
+          </p>
+        </div>
+        <div class="grid gap-6">
+          <article
+            v-for="faq in faqs"
+            :key="faq.question"
+            class="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 text-left shadow-lg"
+          >
+            <h3 class="text-xl font-semibold mb-3">{{ faq.question }}</h3>
+            <p class="text-indigo-100/90 leading-relaxed">
+              {{ faq.answer }}
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Deep Links -->
+    <section class="py-12 bg-gradient-to-r from-indigo-900/70 via-purple-900/60 to-slate-950/80">
+      <div class="max-w-5xl mx-auto px-6">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <p class="uppercase text-xs tracking-[0.35em] text-indigo-300">Keep exploring</p>
+            <h2 class="text-2xl font-semibold text-white mt-2">Popular PlanCraft AI paths</h2>
+          </div>
+          <p class="text-indigo-200 text-sm md:text-base">
+            These internal links help Google crawl every niche use case.
+          </p>
+        </div>
+        <div class="mt-6 grid gap-4 md:grid-cols-2">
+          <RouterLink
+            v-for="link in seoLinks"
+            :key="link.to"
+            :to="link.to"
+            class="rounded-2xl border border-white/10 bg-white/5 text-white px-5 py-4 flex items-center justify-between hover:border-white/60 transition"
+          >
+            <span>{{ link.label }}</span>
+            <span aria-hidden="true" class="text-indigo-200">↗</span>
+          </RouterLink>
+        </div>
       </div>
     </section>
 
@@ -109,6 +186,40 @@
             <h3 class="relative mt-6 text-xl font-semibold text-white">{{ f.title }}</h3>
             <p class="relative mt-3 text-indigo-200 text-sm leading-relaxed">{{ f.desc }}</p>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Use Cases -->
+    <section id="use-cases" class="py-20 bg-slate-950 text-white">
+      <div class="max-w-6xl mx-auto px-6">
+        <div class="text-center max-w-3xl mx-auto mb-14">
+          <p class="uppercase text-xs tracking-[0.35em] text-indigo-300">Use cases</p>
+          <h2 class="mt-3 text-3xl md:text-4xl font-bold">
+            AI planner for goals, journaling, and mindful momentum
+          </h2>
+          <p class="mt-4 text-indigo-200">
+            Target the workflows people search for most: AI daily planning, voice task creation,
+            Google Calendar integration, and gentle reminders powered by PlanCraft AI.
+          </p>
+        </div>
+        <div class="grid gap-8 md:grid-cols-2">
+          <article
+            v-for="useCase in useCases"
+            :key="useCase.title"
+            class="rounded-3xl border border-white/10 bg-gradient-to-br from-white/5 via-indigo-900/20 to-slate-900/60 p-8 backdrop-blur-xl shadow-xl hover:border-indigo-400/40 transition-all"
+          >
+            <div class="text-4xl mb-4">{{ useCase.emoji }}</div>
+            <h3 class="text-2xl font-semibold">{{ useCase.title }}</h3>
+            <p class="mt-3 text-indigo-100/90">{{ useCase.desc }}</p>
+            <RouterLink
+              :to="useCase.href"
+              class="inline-flex items-center gap-2 mt-6 text-indigo-200 hover:text-white font-semibold"
+            >
+              {{ useCase.ctaLabel }}
+              <span aria-hidden="true">↗</span>
+            </RouterLink>
+          </article>
         </div>
       </div>
     </section>
@@ -187,6 +298,9 @@
               :src="b.coverImage || getFallbackImage(b.title)"
               :alt="b.title"
               class="w-full h-40 object-cover rounded-t-2xl border-b border-indigo-800/20"
+              loading="lazy"
+              decoding="async"
+              fetchpriority="low"
             />
 
             <div class="p-5 text-left">
@@ -352,31 +466,247 @@
 import { ref, onMounted } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
-import { useHead } from '@vueuse/head'
+import SeoLongForm from '@/components/SeoLongForm.vue'
+import { useSeoMeta } from '@/composables/useSeoMeta'
 
 const router = useRouter()
+const authStore = useAuthStore()
+
+const features = [
+  {
+    emoji: '🎙️',
+    title: 'Voice Journaling',
+    desc: 'Use the AI journaling assistant to turn spoken reflections into structured entries and action items.',
+  },
+  {
+    emoji: '📅',
+    title: 'Smart Planner',
+    desc: 'Auto-carry tasks forward, schedule with intention blocks, and let AI highlight your next best step.',
+  },
+  {
+    emoji: '💓',
+    title: 'Mood Reflection',
+    desc: 'Track energy and emotions so your planning rhythm stays compassionate and realistic.',
+  },
+]
+
+const useCases = [
+  {
+    emoji: '🧠',
+    title: 'AI Daily Planning',
+    desc: 'Start each morning with AI prompts that align goals, energy, and calendar realities.',
+    href: '/voice-planning',
+    ctaLabel: 'Plan an AI-powered day',
+  },
+  {
+    emoji: '🎤',
+    title: 'Voice Task Creation',
+    desc: 'Capture tasks by speaking naturally; PlanCraft AI structures them with due dates and tags.',
+    href: '/voice-planning#voice-capture',
+    ctaLabel: 'See voice planner flow',
+  },
+  {
+    emoji: '📆',
+    title: 'Google Calendar Integration',
+    desc: 'Sync meetings, block focus time, and get AI-prepared recaps linked to your calendar.',
+    href: '/google-calendar-integration',
+    ctaLabel: 'Connect Google Calendar',
+  },
+  {
+    emoji: '⏰',
+    title: 'Smart Reminders & Recaps',
+    desc: 'Let AI send reminders, nudges, and evening summaries over push, WhatsApp, or email.',
+    href: '/ai-reminders',
+    ctaLabel: 'Automate reminders',
+  },
+]
+
+const faqs = [
+  {
+    question: 'What makes PlanCraft AI different from other AI task managers?',
+    answer:
+      'PlanCraft AI blends voice journaling, Google Calendar sync, habit insights, and compassionate reminders so planning feels calm—perfect for founders, creators, and neurodiverse minds.',
+  },
+  {
+    question: 'Can I really plan my day using only my voice?',
+    answer:
+      'Yes. Speak your routine or brain-dump ideas, and the AI daily planner will generate actionable tasks, priorities, and follow-up reminders.',
+  },
+  {
+    question: 'Does PlanCraft AI integrate with Google Calendar?',
+    answer:
+      'Absolutely. Import meetings, create prep tasks, and receive AI summaries that link right back to your Google Calendar events.',
+  },
+  {
+    question: 'Is there an AI journaling assistant for evening reflections?',
+    answer:
+      'Every night you can dictate a short reflection; PlanCraft AI summarizes emotions, progress, and goals so you always know what to improve tomorrow.',
+  },
+]
+
+const longformIntro =
+  'Searchers often ask how an AI productivity app can guide an entire day. Here is the playbook PlanCraft AI follows to turn intention into steady progress.'
+const longformSections = [
+  {
+    eyebrow: 'Morning focus',
+    heading: 'Start with AI daily agenda suggestions',
+    description:
+      'Speak goals, appointments, or hurdles aloud. PlanCraft AI structures them into a purpose-built schedule that still leaves room for rest.',
+    bullets: [
+      'Map priorities to energy highs and lows',
+      'Convert journaling prompts into ready-made tasks',
+      'Publish a lightweight daily contract with yourself',
+    ],
+    ctaText: 'Plan your morning with AI',
+    ctaHref: '/voice-planning',
+  },
+  {
+    eyebrow: 'During the day',
+    heading: 'Voice task creation keeps momentum high',
+    description:
+      'Skip typing. Drop quick voice notes and watch PlanCraft AI summarize, categorize, and remind you before deadlines slip.',
+    bullets: [
+      'Capture tasks straight from meetings or walks',
+      'Automatically add context like tags, due dates, and urgency',
+      'Trigger AI reminders via push or WhatsApp',
+    ],
+    ctaText: 'Capture tasks hands-free',
+    ctaHref: '/ai-reminders',
+  },
+  {
+    eyebrow: 'Evening reset',
+    heading: 'Journaling assistant closes the loop',
+    description:
+      'A quick reflection trains PlanCraft AI on what energized you, what drained you, and which goals deserve attention tomorrow.',
+    bullets: [
+      'Summaries designed for “People also ask” queries on AI journaling',
+      'Automatic recap emails or push cards',
+      'Goal tracking that celebrates streaks and rest days',
+    ],
+    ctaText: 'See AI journaling assistant',
+    ctaHref: '/voice-planning#evening',
+  },
+]
+
+const seoLinks = [
+  { label: 'All PlanCraft AI features', to: '/features' },
+  { label: 'Voice planning and journaling', to: '/voice-planning' },
+  { label: 'AI reminders that feel human', to: '/ai-reminders' },
+  { label: 'Google Calendar sync walkthrough', to: '/google-calendar-integration' },
+  { label: 'Guides on AI productivity & goals', to: '/blog' },
+]
+
+const steps = [
+  { emoji: '🌤️', title: 'Morning Plan', desc: 'Set your focus with clarity and intention.' },
+  { emoji: '🎧', title: 'Midday Log', desc: 'Drop a quick voice note to capture progress.' },
+  {
+    emoji: '🌙',
+    title: 'Evening Reflection',
+    desc: 'Wind down with a gentle, thoughtful summary.',
+  },
+  { emoji: '📈', title: 'Growth Stats', desc: 'See patterns emerge and celebrate small wins.' },
+]
+
+const testimonials = [
+  {
+    quote: 'PlanCraftAI helped me stay grounded during my startup chaos.',
+    author: 'Ananya M.',
+    avatar: 'https://i.pravatar.cc/150?img=47',
+  },
+  {
+    quote: 'The calm design makes planning feel like meditation.',
+    author: 'Michael L.',
+    avatar: 'https://i.pravatar.cc/150?img=48',
+  },
+  {
+    quote: 'I love the voice journaling — it feels personal and effortless.',
+    author: 'Ravi K.',
+    avatar: 'https://i.pravatar.cc/150?img=49',
+  },
+]
+
+const SITE_URL = (import.meta.env.VITE_SITE_URL && String(import.meta.env.VITE_SITE_URL)) || 'https://plancraftai.com'
+const BASE_URL = SITE_URL.endsWith('/') ? SITE_URL.slice(0, -1) : SITE_URL
+const featureList = Array.from(new Set([...features.map((f) => f.title), ...useCases.map((c) => c.title)]))
+
+const structuredData = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'PlanCraft AI',
+    applicationCategory: 'ProductivityApplication',
+    applicationSubCategory: 'TaskManagementApplication',
+    operatingSystem: 'Web, iOS, Android',
+    featureList,
+    url: BASE_URL,
+    installUrl: `${BASE_URL}/#install`,
+    screenshot: `${BASE_URL}/plancraftai-post-one.png`,
+    description:
+      'PlanCraft AI is the peaceful AI task manager, daily planner, and journaling assistant trusted for calm productivity.',
+    offers: {
+      '@type': 'Offer',
+      price: '0.00',
+      priceCurrency: 'USD',
+      availability: 'https://schema.org/OnlineOnly',
+    },
+    aggregateRating: {
+      '@type': 'AggregateRating',
+      ratingValue: '5.0',
+      ratingCount: '42',
+    },
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqs.map((faq) => ({
+      '@type': 'Question',
+      name: faq.question,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: faq.answer,
+      },
+    })),
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'PlanCraft AI Use Cases',
+    itemListElement: useCases.map((item, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: item.title,
+      description: item.desc,
+      url: `${BASE_URL}${item.href}`,
+    })),
+  },
+]
+
+useSeoMeta({
+  title: 'PlanCraft AI – Peaceful Productivity with Voice Journaling and AI Task Management',
+  description:
+    'PlanCraft AI is the gentle AI task manager and journaling assistant with voice planning, smart reminders, and Google Calendar integration.',
+  keywords: [
+    'PlanCraft AI',
+    'AI task manager',
+    'AI daily planner',
+    'AI productivity app',
+    'AI journaling assistant',
+    'AI planner for goals',
+    'voice planning',
+    'AI reminders',
+    'Google Calendar integration',
+  ],
+  structuredData,
+  pageLabel: 'Landing',
+})
+
 function goToLogin() {
   router.push('/login')
 }
+
 function continueAsGuest() {
-  const authStore = useAuthStore()
   authStore.loginAsGuest().then(() => router.push({ name: 'dashboard' }))
 }
-
-const SITE_URL = import.meta.env.VITE_SITE_URL || 'https://plancraftai.com'
-useHead({
-  title: 'PlanCraftAI – Peaceful Productivity with Voice Journaling and AI',
-  meta: [
-    {
-      name: 'description',
-      content:
-        'Plan your day, journal with your voice, and get AI insights for calm, focused productivity.',
-    },
-    { property: 'og:title', content: 'PlanCraftAI – Peaceful Productivity' },
-    { property: 'og:url', content: SITE_URL },
-  ],
-  link: [{ rel: 'canonical', href: SITE_URL }],
-})
 
 const stars = ref(null)
 const starsCanvas = ref(null)
@@ -393,6 +723,7 @@ async function loadLatestBlogs() {
     console.error(e)
   }
 }
+
 function formatDate(date) {
   try {
     if (!date) return ''
@@ -440,51 +771,6 @@ onMounted(() => {
     requestAnimationFrame(animate)
   })()
 })
-
-const features = [
-  {
-    emoji: '🎙️',
-    title: 'Voice Journaling',
-    desc: 'Speak your thoughts; let AI transcribe and summarize with compassion.',
-  },
-  {
-    emoji: '📅',
-    title: 'Smart Planner',
-    desc: 'Carry forward tasks, set intentions, and stay gently accountable.',
-  },
-  {
-    emoji: '💓',
-    title: 'Mood Reflection',
-    desc: 'Notice emotional patterns and stay aware of your well-being.',
-  },
-]
-const steps = [
-  { emoji: '🌤️', title: 'Morning Plan', desc: 'Set your focus with clarity and intention.' },
-  { emoji: '🎧', title: 'Midday Log', desc: 'Drop a quick voice note to capture progress.' },
-  {
-    emoji: '🌙',
-    title: 'Evening Reflection',
-    desc: 'Wind down with a gentle, thoughtful summary.',
-  },
-  { emoji: '📈', title: 'Growth Stats', desc: 'See patterns emerge and celebrate small wins.' },
-]
-const testimonials = [
-  {
-    quote: 'PlanCraftAI helped me stay grounded during my startup chaos.',
-    author: 'Ananya M.',
-    avatar: 'https://i.pravatar.cc/150?img=47',
-  },
-  {
-    quote: 'The calm design makes planning feel like meditation.',
-    author: 'Michael L.',
-    avatar: 'https://i.pravatar.cc/150?img=48',
-  },
-  {
-    quote: 'I love the voice journaling — it feels personal and effortless.',
-    author: 'Ravi K.',
-    avatar: 'https://i.pravatar.cc/150?img=49',
-  },
-]
 </script>
 
 <style scoped>

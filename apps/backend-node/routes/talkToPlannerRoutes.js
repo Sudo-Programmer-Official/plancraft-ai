@@ -120,6 +120,10 @@ Only include the JSON block when an action is required. Use IDs from the context
     if (shouldRefreshContext) {
       try {
         context = await buildUserContext(userId);
+        console.log("[PlannerTask] uiUpdated=✅", {
+          userId,
+          tasks: Array.isArray(context?.tasks) ? context.tasks.length : 0,
+        });
       } catch (err) {
         console.warn("[TalkToPlanner] context refresh failed", err?.message || err);
       }

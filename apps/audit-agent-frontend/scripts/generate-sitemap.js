@@ -7,7 +7,7 @@
  * Works with Firebase Hosting / Vite / Netlify.
  */
 /* eslint-env node */
-import { writeFileSync, mkdirSync, existsSync } from "fs";
+import { writeFileSync, mkdirSync, existsSync, readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import https from "https";
@@ -15,16 +15,10 @@ import process from "process";
 import dotenv from "dotenv"
 dotenv.config({ path: ".env.production" }) // choose your env file
 
-
-// 🧩 Firebase SDK (for dynamic blog URLs)
-import { initializeApp } from "firebase/app";
-import { getFirestore, collection, getDocs } from "firebase/firestore";
 import admin from "firebase-admin";
-import { readFileSync } from "fs";
+import { getMarketingRoutes, getRestrictedPaths } from "../../../shared/seo/routes.js";
+import { buildSitemapXml, buildRobotsTxt } from "../../../shared/seo/generator.js";
 
-const firebaseConfig = {
-  projectId: "audit-agent-66451", // ✅ only projectId required for Firestore fetch
-};
 const serviceAccountPath = join(process.cwd(), "firebase-service-account.json");
 const serviceAccount = JSON.parse(readFileSync(serviceAccountPath, "utf8"));
 
@@ -50,7 +44,18 @@ const db = admin.firestore();
 async function getBlogSlugs() {
   try {
     const snap = await db.collection("blogs").get();
-    const slugs = snap.docs.map((d) => `/blog/${d.data()?.slug}`).filter(Boolean);
+    const slugs = snap.docs
+      .map((d) => {
+        const data = d.data() || {}
+        const slug = data.slug || d.id
+        if (!slug) return null
+        return {
+          path: `/blog/${slug}`,
+          changefreq: 'weekly',
+          priority: 0.82,
+        }
+      })
+      .filter(Boolean);
     console.log(`📝 Found ${slugs.length} blog posts`);
     return slugs;
   } catch (err) {
@@ -97,51 +102,20 @@ const SITE_URL = "https://plancraftai.com";
 // 🔹 Generate sitemap.xml
 // --------------------------------------------------
 async function generateSitemap() {
+  const marketingRoutes = getMarketingRoutes();
   const blogRoutes = await getBlogSlugs();
+  const sitemapRoutes = [...marketingRoutes, ...blogRoutes];
 
-  const staticRoutes = [
-    "/",
-    "/dashboard",
-    "/daily",
-    "/weekly",
-    "/monthly",
-    "/journal",
-    "/today",
-    "/planner",
-    "/timeline",
-    "/blog",
-    "/privacy-policy",
-    "/terms",
-    "/contact",
-  ];
+  const xml = buildSitemapXml({
+    baseUrl: SITE_URL,
+    routes: sitemapRoutes,
+  })
 
-  const routes = [...staticRoutes, ...blogRoutes];
-  const now = new Date().toISOString().slice(0, 10);
-
-  const urls = routes
-    .map((p) => {
-      const priority =
-        p === "/"
-          ? "1.0"
-          : p.startsWith("/blog/")
-          ? "0.8"
-          : "0.7";
-      return `  <url>
-    <loc>${SITE_URL}${p}</loc>
-    <lastmod>${now}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>${priority}</priority>
-  </url>`;
-    })
-    .join("\n");
-
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset 
-  xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-  xmlns:xhtml="http://www.w3.org/1999/xhtml"
->
-${urls}
-</urlset>`;
+  const robots = buildRobotsTxt({
+    allowPaths: marketingRoutes.map((r) => r.path),
+    disallowPaths: getRestrictedPaths(),
+    sitemapUrl: `${SITE_URL}/sitemap.xml`,
+  })
 
   // --------------------------------------------------
   // 🔹 Write output to /dist and /public
@@ -149,16 +123,18 @@ ${urls}
   const distDir = join(ROOT, "dist");
   if (!existsSync(distDir)) mkdirSync(distDir, { recursive: true });
   writeFileSync(join(distDir, "sitemap.xml"), xml);
+  writeFileSync(join(distDir, "robots.txt"), robots);
 
   const publicDir = join(ROOT, "public");
   try {
     if (!existsSync(publicDir)) mkdirSync(publicDir, { recursive: true });
     writeFileSync(join(publicDir, "sitemap.xml"), xml);
+    writeFileSync(join(publicDir, "robots.txt"), robots);
   } catch (err) {
     console.warn("⚠️ Could not write to /public:", err.message);
   }
 
-  console.log(`✅ sitemap.xml generated for ${routes.length} routes`);
+  console.log(`[SEO] sitemap generated for ${sitemapRoutes.length} routes`);
   await pingSearchEngines();
 }
 

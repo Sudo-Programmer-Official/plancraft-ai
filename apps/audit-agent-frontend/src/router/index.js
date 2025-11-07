@@ -32,6 +32,14 @@ const router = createRouter({
     { path: '/privacy', component: PrivacyPolicy },
     { path: '/terms', component: Terms },
     { path: '/contact', component: Contact },
+    { path: '/features', name: 'features', component: () => import('@/views/FeaturesView.vue') },
+    { path: '/voice-planning', name: 'voice-planning', component: () => import('@/views/VoicePlanningView.vue') },
+    { path: '/ai-reminders', name: 'ai-reminders', component: () => import('@/views/AiRemindersView.vue') },
+    {
+      path: '/google-calendar-integration',
+      name: 'google-calendar-integration',
+      component: () => import('@/views/CalendarIntegrationView.vue'),
+    },
 
     // ✅ Blog (public)
     {

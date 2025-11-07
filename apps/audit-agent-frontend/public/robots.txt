@@ -1,20 +1,35 @@
 User-agent: *
 
-# Allow key marketing pages
 Allow: /
+Allow: /features
+Allow: /voice-planning
+Allow: /ai-reminders
+Allow: /google-calendar-integration
+Allow: /blog
 Allow: /pricing
-Allow: /about
 Allow: /contact
 Allow: /privacy
+Allow: /privacy-policy
+Allow: /terms
+Allow: /data-deletion
+Allow: /help
 
-# Disallow private/app pages
 Disallow: /dashboard
+Disallow: /daily
+Disallow: /weekly
+Disallow: /monthly
+Disallow: /today
+Disallow: /planner
+Disallow: /timeline
+Disallow: /journal
+Disallow: /habits
+Disallow: /reports
 Disallow: /settings
-Disallow: /tasks
+Disallow: /subscription
+Disallow: /talk-to-planner
+Disallow: /reminders
+Disallow: /admin
 Disallow: /app
 Disallow: /profile
-Disallow: /admin
 
-# Point crawlers to the sitemap
 Sitemap: https://plancraftai.com/sitemap.xml
-
