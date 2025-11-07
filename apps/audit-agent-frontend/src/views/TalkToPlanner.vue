@@ -264,6 +264,8 @@ import { useAuthStore } from '@/stores/authStore'
 import { ElMessage } from 'element-plus'
 import { recordAndSendToBackend } from '@/utils/backendRecorder'
 import { trackEvent } from '@/services/analytics'
+import { auth } from '@/firebase/init'
+import { getAppToken } from '@/services/appTokenService'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
@@ -292,6 +294,8 @@ let voiceRequestToken = 0
 const lastAutoSpokenMessageId = ref(null)
 const VOICE_PLAYBACK_RATE = Number(import.meta.env.VITE_ASSISTANT_VOICE_RATE || 0.92)
 const speechFallbackOptions = { rate: VOICE_PLAYBACK_RATE, pitch: 1, volume: 1 }
+const API_BASE_ROOT = (import.meta.env.VITE_API_BASE_ROOT || '').trim()
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').trim()
 
 function formatTextForVoice(text) {
   if (!text) return ''
@@ -299,6 +303,108 @@ function formatTextForVoice(text) {
     .replace(/\s*\([A-Za-z0-9_\- ]+\/[A-Za-z0-9_\- ]+\)\s*$/, '')
     .trim()
   return stripped || ''
+}
+
+function resolveApiOrigin(source) {
+  if (!source) return null
+  try {
+    if (/^https?:\/\//i.test(source)) {
+      return new URL(source).origin
+    }
+    if (typeof window !== 'undefined') {
+      return new URL(source, window.location.origin).origin
+    }
+  } catch {}
+  return null
+}
+
+function resolveAudioAssetUrl(path) {
+  const target = String(path || '').trim()
+  if (!target) return ''
+  if (/^https?:\/\//i.test(target)) return target
+  const origin =
+    resolveApiOrigin(API_BASE_ROOT) ||
+    resolveApiOrigin(API_BASE_URL) ||
+    (typeof window !== 'undefined' ? window.location.origin : '')
+  if (!origin) return target
+  const safeOrigin = origin.replace(/\/+$/, '')
+  const safePath = target.startsWith('/') ? target : `/${target}`
+  return `${safeOrigin}${safePath}`
+}
+
+async function buildVoiceAuthHeaders() {
+  const headers = {}
+  let token = null
+  try {
+    if (auth?.currentUser) {
+      token = await auth.currentUser.getIdToken()
+    }
+  } catch {}
+  if (!token) {
+    token = authStore?.token || localStorage.getItem('token') || null
+  }
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  try {
+    const user = authStore?.user || JSON.parse(localStorage.getItem('user') || 'null') || {}
+    if (user.email) headers['x-user-email'] = user.email
+    if (user.uid) headers['x-user-id'] = user.uid
+    if (user.role) headers['x-user-role'] = user.role
+  } catch {}
+
+  try {
+    const appTok = getAppToken()
+    if (appTok) headers['x-app-token'] = appTok
+  } catch {}
+
+  try {
+    let tz = localStorage.getItem('user_timezone')
+    if (!tz || tz === 'UTC') {
+      tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+      localStorage.setItem('user_timezone', tz)
+    }
+    headers['x-user-tz'] = tz
+  } catch {
+    headers['x-user-tz'] = 'UTC'
+  }
+
+  try {
+    const lang = (navigator.language || 'en-US').toUpperCase()
+    const cc = (lang.split('-')[1] || 'US').toUpperCase()
+    headers['x-user-country'] = cc
+  } catch {
+    headers['x-user-country'] = 'US'
+  }
+
+  return headers
+}
+
+async function fetchAuthorizedAudioSource(url) {
+  const targetUrl = resolveAudioAssetUrl(url)
+  if (!targetUrl) throw new Error('Missing audio URL')
+  const headers = await buildVoiceAuthHeaders()
+  const response = await fetch(targetUrl, {
+    headers,
+    credentials: 'include',
+    mode: 'cors',
+  })
+  if (!response.ok) {
+    const error = new Error(`Audio fetch failed (${response.status})`)
+    error.status = response.status
+    throw error
+  }
+  const blob = await response.blob()
+  const objectUrl = URL.createObjectURL(blob)
+  return { objectUrl }
+}
+
+function revokeAudioBlob(audio) {
+  if (audio && audio.__objectUrl) {
+    try {
+      URL.revokeObjectURL(audio.__objectUrl)
+    } catch {}
+    audio.__objectUrl = null
+  }
 }
 
 if (typeof window !== 'undefined') {
@@ -437,11 +543,19 @@ async function speakAssistantMessage(message, options = {}) {
 
     if (result?.url) {
       stopVoicePlayback()
-      const audio = new Audio(result.url)
+      const audio = new Audio()
+      const { objectUrl } = await fetchAuthorizedAudioSource(result.url)
+      if (token !== voiceRequestToken) {
+        URL.revokeObjectURL(objectUrl)
+        return
+      }
+      audio.src = objectUrl
+      audio.__objectUrl = objectUrl
       audio.playbackRate = VOICE_PLAYBACK_RATE
       const handleCleanup = () => {
         audio.removeEventListener('ended', handleCleanup)
         audio.removeEventListener('error', handleError)
+        revokeAudioBlob(audio)
         audioCleanupMap.delete(audio)
         if (activeAudio.value === audio) {
           activeAudio.value = null
@@ -487,8 +601,13 @@ function stopVoicePlayback() {
       const cleanup = audioCleanupMap.get(audio)
       if (typeof cleanup === 'function') {
         cleanup()
+      } else {
+        audioCleanupMap.delete(audio)
+        revokeAudioBlob(audio)
+        if (activeAudio.value === audio) {
+          activeAudio.value = null
+        }
       }
-      audioCleanupMap.delete(audio)
       audio.pause()
       audio.currentTime = 0
     } catch {
