@@ -280,6 +280,55 @@ export async function notifyTaskCreated(userId, tasksInput = [], options = {}) {
   return deliveries
 }
 
+export async function sendCalendarDigestNotification(userId, createdTasks = []) {
+  const tasks = ensureArray(createdTasks).filter(Boolean)
+  if (!tasks.length) return null
+
+  const title =
+    tasks.length === 1
+      ? '📅 Added a meeting from your calendar'
+      : `📅 Added ${tasks.length} meetings from your calendar`
+
+  const message = buildGroupedMessage(title, tasks, {
+    fallback: 'Your meetings are ready in PlanCraftAI.',
+    closing: 'Tap to review and join.',
+  })
+
+  const channelResolution = await resolveUserChannels(userId, null, {
+    includeVoice: false,
+    allowed: ['whatsapp', 'email', 'pwa'],
+    returnContext: true,
+  })
+  const channels = channelResolution.channels
+
+  const payload = {
+    message,
+    subject: 'Calendar sync update',
+    whatsappPrimary: message,
+    whatsappFallback: message,
+    emailMessage: message.replace(/\n/g, '<br/>'),
+    pwa: {
+      title: 'Calendar Sync',
+      body:
+        tasks.length === 1
+          ? `${tasks[0].title || 'Meeting'} is on your list.`
+          : `${tasks.length} meetings were added to your plan.`,
+      data: { type: 'calendar_sync' },
+    },
+  }
+
+  const deliveries = []
+  for (const channel of channels) {
+    try {
+      deliveries.push(await sendViaChannel(channel, userId, payload))
+      console.log(`[Notify] Calendar digest sent via ${channel}`)
+    } catch (err) {
+      console.warn('[Notification] calendar digest failed', err?.message || err)
+    }
+  }
+  return deliveries
+}
+
 export async function notifyReminderDue(userId, itemsInput = [], options = {}) {
   const reminders = ensureArray(itemsInput)
   const includeVoice = options.includeVoice !== false

@@ -87,6 +87,12 @@
                       <span class="text-base leading-none">{{ categoryIcon(task.category) }}</span>
                       <span>{{ categoryLabel(task.category) }}</span>
                     </div>
+                    <span
+                      v-if="task?.source === 'google_calendar'"
+                      class="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full border border-indigo-500/40 text-indigo-200 bg-indigo-900/40"
+                    >
+                      Google
+                    </span>
                   </div>
                     <div class="flex items-center gap-2">
                     <a

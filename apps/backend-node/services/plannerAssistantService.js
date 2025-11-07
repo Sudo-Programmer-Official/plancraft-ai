@@ -7,6 +7,7 @@ import { createTask } from "./taskService.js";
 import { recordCompletion } from "./habitService.js";
 import { extractReminderTime as extractReminderTimeAI } from "./openaiService.js";
 import { formatLocalTime } from "../utils/timezone.js";
+import { listEventsForWindow, getNextMeeting } from "./externalEventsService.js";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -591,6 +592,76 @@ function buildReminderSummary(reminders = [], options = {}) {
   return lines.join("\n");
 }
 
+function buildMeetingSummary(meetings = [], options = {}) {
+  if (!Array.isArray(meetings) || !meetings.length) {
+    return options.emptyMessage || "No meetings found in that window.";
+  }
+  const limit = options.limit || 5;
+  const lines = meetings.slice(0, limit).map((meeting, idx) => {
+    const title = meeting.title || "Meeting";
+    const when = meeting.startTime ? formatLocalTime(meeting.startTime, meeting.timezone || meeting.tz) : null;
+    const join = meeting.joinUrl ? `Join: ${meeting.joinUrl}` : null;
+    const parts = [`${idx + 1}. ${title}`];
+    if (when) parts.push(`at ${when}`);
+    if (join) parts.push(join);
+    return parts.join(" — ");
+  });
+  return lines.join("\n");
+}
+
+async function getMeetingsForUser(uid, payload = {}, context = {}) {
+  const limitRaw = Number(payload.limit) || 5;
+  const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 10) : 5;
+  const windowHours = Number(payload.windowHours) || 24;
+  const windowStart = new Date().toISOString();
+  const windowEnd = dayjs().add(windowHours, "hour").toISOString();
+
+  let meetings = Array.isArray(context?.meetings) && context.meetings.length
+    ? context.meetings.slice()
+    : await listEventsForWindow(uid, "google_calendar", {
+        windowStart,
+        windowEnd,
+        statuses: ["confirmed", "tentative"],
+      });
+
+  meetings = meetings
+    .filter((meeting) => meeting.status !== "cancelled")
+    .sort((a, b) => new Date(a.startTime || 0) - new Date(b.startTime || 0));
+
+  const sliced = meetings.slice(0, limit);
+  return {
+    status: "completed",
+    type: "get_meetings",
+    payload: { meetings: sliced },
+    message: buildMeetingSummary(sliced, {
+      limit,
+      emptyMessage: "No meetings scheduled in that window.",
+    }),
+  };
+}
+
+async function joinNextMeetingForUser(uid) {
+  const meeting = await getNextMeeting(uid, "google_calendar");
+  if (!meeting) {
+    return {
+      status: "completed",
+      type: "join_meeting",
+      payload: null,
+      message: "You have no upcoming meetings with join links.",
+    };
+  }
+  const when = meeting.startTime ? formatLocalTime(meeting.startTime, meeting.timezone || meeting.tz) : null;
+  const join = meeting.joinUrl || meeting.htmlLink || null;
+  return {
+    status: "completed",
+    type: "join_meeting",
+    payload: { meeting },
+    message: join
+      ? `Your next meeting \"${meeting.title || "Meeting"}\" is at ${when || "the scheduled time"}. Join link: ${join}`
+      : `Your next meeting \"${meeting.title || "Meeting"}\" is at ${when || "the scheduled time"}, but no join link was provided.`,
+  };
+}
+
 async function getRemindersForUser(uid, payload = {}, context = {}) {
   const limitRaw = Number(payload.limit) || 5;
   const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 15) : 5;
@@ -624,12 +695,17 @@ async function getRemindersForUser(uid, payload = {}, context = {}) {
 }
 
 export async function buildUserContext(uid) {
-  const [profileSnap, tasks, reminders, reports, notes] = await Promise.all([
+  const [profileSnap, tasks, reminders, reports, notes, meetings] = await Promise.all([
     db.collection("users").doc(String(uid)).get(),
     fetchRecentTasks(uid),
     fetchUpcomingReminders(uid),
     fetchRecentReports(uid),
     fetchRecentNotes(uid),
+    listEventsForWindow(uid, "google_calendar", {
+      windowStart: new Date().toISOString(),
+      windowEnd: dayjs().add(24, "hour").toISOString(),
+      statuses: ["confirmed", "tentative"],
+    }),
   ]);
 
   const profile = profileSnap.exists ? profileSnap.data() || {} : {};
@@ -663,6 +739,12 @@ export async function buildUserContext(uid) {
     reminders,
     reports,
     notes,
+    meetings: Array.isArray(meetings)
+      ? meetings
+          .filter((meeting) => meeting.status !== "cancelled")
+          .sort((a, b) => new Date(a.startTime || 0) - new Date(b.startTime || 0))
+          .slice(0, 6)
+      : [],
   };
 }
 
@@ -777,6 +859,10 @@ export async function executePlannerActions(uid, actions = [], context = {}) {
         results.push(await getTasksForUser(uid, raw?.payload || raw, context));
       } else if (type === "get_reminders") {
         results.push(await getRemindersForUser(uid, raw?.payload || raw, context));
+      } else if (type === "get_meetings") {
+        results.push(await getMeetingsForUser(uid, raw?.payload || raw, context));
+      } else if (type === "join_meeting") {
+        results.push(await joinNextMeetingForUser(uid));
       } else {
         results.push({
           status: "ignored",
@@ -802,6 +888,8 @@ export function detectIntentFromMessage(message = "") {
   const text = String(message).toLowerCase();
   if (/create|add|new/.test(text) && /task/.test(text)) return "create_task";
   if (/remind|reminder|nudge|follow\s*up/.test(text)) return "schedule_reminder";
+  if (/join/.test(text) && /(meeting|call)/.test(text)) return "join_meeting";
+  if (/(meeting|calendar|schedule)/.test(text)) return "get_meetings";
   if (/(show|list|fetch|what).*task/.test(text)) return "get_tasks";
   if (/(document|file|report|pdf)/.test(text)) return "get_documents";
   if (/(journal|note|entry)/.test(text)) return "get_journal";
@@ -833,6 +921,17 @@ export async function buildFallbackActionsFromIntent(intent, message = "", conte
     if (/sent|done/.test(lower)) payload.status = "sent";
     if (/upcoming|scheduled|pending/.test(lower)) payload.status = "scheduled";
     return [{ type: "get_reminders", payload }];
+  }
+
+  if (intent === "get_meetings") {
+    const payload = {};
+    if (/tomorrow/.test(lower)) payload.windowHours = 36;
+    if (/next\s+week/.test(lower)) payload.windowHours = 24 * 7;
+    return [{ type: "get_meetings", payload }];
+  }
+
+  if (intent === "join_meeting") {
+    return [{ type: "join_meeting", payload: {} }];
   }
 
   if (intent === "schedule_reminder") {

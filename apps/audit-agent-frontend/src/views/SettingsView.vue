@@ -106,8 +106,8 @@
         </div>
 
         <!-- Google Calendar Card -->
-        <div class="mt-6 rounded-lg border border-white/10 bg-slate-900/40 p-4">
-          <div class="flex items-center justify-between">
+        <div class="mt-6 rounded-lg border border-white/10 bg-slate-900/40 p-4 space-y-3">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div class="font-semibold flex items-center gap-2">📆 Google Calendar
                 <span v-if="google.enabled" :class="['text-xs px-2 py-0.5 rounded', google.connected ? 'bg-emerald-700/50 text-emerald-200' : 'bg-yellow-700/40 text-yellow-200']">
@@ -115,7 +115,10 @@
                 </span>
                 <span v-else class="text-xs px-2 py-0.5 rounded bg-slate-700/50 text-slate-300">Disabled by server</span>
               </div>
-              <p class="text-xs text-slate-300 mt-1">Import meetings and show Join links in your tasks.</p>
+              <p class="text-xs text-slate-300 mt-1">
+                Import meetings and show Join links in your tasks.
+                <span v-if="googleLastSync">Last sync: {{ googleLastSync }}</span>
+              </p>
             </div>
             <div class="flex items-center gap-2">
               <button v-if="google.enabled && !google.connected && authStore.user" @click="connectGoogle"
@@ -123,6 +126,7 @@
                 Connect
               </button>
               <button v-if="google.connected" @click="syncNow" class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-sm">Sync Now</button>
+              <button v-if="google.connected" @click="disconnectGoogle" class="px-3 py-1.5 rounded bg-red-700/80 hover:bg-red-700 text-sm">Disconnect</button>
             </div>
           </div>
 
@@ -141,7 +145,7 @@
           <!-- Window + save -->
           <div v-if="google.connected" class="mt-3 flex items-center gap-3 flex-wrap">
             <label class="text-sm text-slate-300">Look-ahead window:</label>
-            <select v-model.number="google.windowDays" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm">
+            <select v-model.number="google.windowDays" @change="markDirty" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm">
               <option :value="7">7 days</option>
               <option :value="14">14 days</option>
               <option :value="30">30 days</option>
@@ -149,6 +153,28 @@
             </select>
             <button @click="saveSelection" class="px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-sm">Save Selection</button>
             <span v-if="google.status" class="text-xs text-slate-400">Status: {{ google.status }}</span>
+          </div>
+
+          <div v-if="google.enabled" class="pt-3 border-t border-white/5 space-y-3">
+            <label class="flex items-center gap-3 text-sm text-slate-200">
+              <input type="checkbox" v-model="meetingPrefs.autoCreate" @change="markDirty" class="accent-indigo-500" />
+              Auto-create tasks from calendar events
+            </label>
+            <div class="flex items-center gap-2 text-sm text-slate-200 flex-wrap">
+              <span>Default meeting reminder:</span>
+              <select
+                v-model.number="meetingPrefs.defaultReminderMinutes"
+                @change="markDirty"
+                class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm"
+              >
+                <option :value="5">5 minutes</option>
+                <option :value="10">10 minutes</option>
+                <option :value="15">15 minutes</option>
+                <option :value="30">30 minutes</option>
+                <option :value="60">1 hour</option>
+              </select>
+              <span class="text-xs text-slate-400">before each meeting</span>
+            </div>
           </div>
         </div>
       </section>
@@ -252,7 +278,7 @@ import { useAuthStore } from "@/stores/authStore"
 import { useRouter, useRoute } from "vue-router"
 import { ElMessage } from "element-plus"
 import { normalizePhone, guessCountryFromLocale } from '@/utils/phoneUtils'
-import { getGoogleStatus, getGoogleCalendars, saveGoogleCalendarSelection, triggerGoogleSyncNow, requestGoogleConnectUrl } from '@/stores/integrationsStore'
+import { getGoogleStatus, getGoogleCalendars, saveGoogleCalendarSelection, triggerGoogleSyncNow, requestGoogleConnectUrl, disconnectGoogleIntegration } from '@/stores/integrationsStore'
 import { getPreferences as apiGetPrefs, updatePreferences as apiUpdatePrefs, getIntegrations, updateIntegrations } from "@/services/settingsService"
 import { subscribeUserToPush } from "@/services/pwaService"
 import { useSubscriptionStore } from "@/stores/subscriptionStore"
@@ -264,6 +290,7 @@ import { getAuth, updateProfile, updateEmail, GoogleAuthProvider, reauthenticate
 import { db } from '@/firebase/init'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import AvatarUploader from '@/components/AvatarUploader.vue'
+import dayjs from 'dayjs'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -273,6 +300,18 @@ const { refresh: refreshPremium } = useIsPremium()
 const dirty = ref(false) // tracks unsaved changes
 const notificationsSection = ref(null)
 const highlightNotifications = ref(false)
+
+function markDirty() {
+  dirty.value = true
+}
+
+const DEFAULT_MEETING_REMINDER = Number(import.meta.env.VITE_CALENDAR_REMINDER_MINUTES || 10)
+
+function sanitizeReminderMinutes(value) {
+  const num = Number(value)
+  if (!Number.isFinite(num)) return DEFAULT_MEETING_REMINDER
+  return Math.min(Math.max(Math.round(num), 1), 24 * 60)
+}
 
 // Account profile state
 const auth = getAuth()
@@ -399,6 +438,12 @@ onMounted(async () => {
         email: resInts?.email || authStore.user.email || ''
       }
 
+      const meetingsPref = res?.meetings || {}
+      meetingPrefs.autoCreate = meetingsPref.autoCreateCalendarTasks !== false
+      meetingPrefs.defaultReminderMinutes = sanitizeReminderMinutes(
+        meetingsPref.defaultReminderMinutes ?? meetingsPref.defaultMeetingReminderMinutes ?? DEFAULT_MEETING_REMINDER,
+      )
+
       // Load profile fields and compute profile completion
       try {
         const u = auth.currentUser
@@ -453,7 +498,12 @@ const effectiveTwilioPhone = computed(() => {
 })
 
 // Google Calendar integration state and handlers
-const google = reactive({ enabled: true, connected: false, calendars: [], windowDays: 30, status: '', lastRun: null })
+const google = reactive({ enabled: true, connected: false, calendars: [], windowDays: 30, status: '', lastRun: null, accountEmail: '' })
+const meetingPrefs = reactive({ autoCreate: true, defaultReminderMinutes: DEFAULT_MEETING_REMINDER })
+const googleLastSync = computed(() => {
+  if (!google.lastRun) return null
+  try { return dayjs(google.lastRun).format('MMM D • hh:mm A') } catch { return google.lastRun }
+})
 async function connectGoogle() {
   try {
     if (!authStore.user?.uid) return
@@ -481,6 +531,7 @@ async function loadGoogle() {
     google.windowDays = Number(status?.sync?.windowDays || 30)
     google.status = status?.sync?.status || ''
     google.lastRun = status?.sync?.lastRun || null
+    google.accountEmail = status?.accountEmail || status?.token?.email || ''
     if (!google.connected) return
     const cals = await getGoogleCalendars(authStore.user.uid)
     google.calendars = Array.isArray(cals) ? cals : []
@@ -503,16 +554,42 @@ async function saveSelection() {
 async function syncNow() {
   try {
     if (!authStore.user?.uid) return
-    const ok = await triggerGoogleSyncNow(authStore.user.uid)
-    if (ok) ElMessage.success('Sync started')
-    else ElMessage.warning('Sync request not accepted')
+    const result = await triggerGoogleSyncNow(authStore.user.uid)
+    if (result?.ok) {
+      const stats = result.stats || {}
+      const summary = [
+        stats.eventsUpserted ? `${stats.eventsUpserted} events refreshed` : null,
+        stats.created ? `${stats.created} tasks added` : null,
+        stats.updated ? `${stats.updated} updated` : null,
+      ]
+        .filter(Boolean)
+        .join(', ')
+      ElMessage.success(summary || 'Calendar sync completed')
+      await loadGoogle()
+    } else {
+      ElMessage.warning('Sync request not accepted')
+    }
   } catch (e) {
     ElMessage.error(e?.response?.data?.error || 'Sync failed')
   }
 }
 
 function onSelectionChange() {
-  // placeholder to react to checkbox change; selection is persisted via Save Selection
+  markDirty()
+}
+
+async function disconnectGoogle() {
+  try {
+    if (!authStore.user?.uid) return
+    await disconnectGoogleIntegration(authStore.user.uid)
+    ElMessage.success('Google Calendar disconnected')
+    google.connected = false
+    google.calendars = []
+    google.status = 'disconnected'
+    google.lastRun = null
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.error || 'Failed to disconnect Google Calendar')
+  }
 }
 
 function handleLogout() {
@@ -559,14 +636,29 @@ async function saveSettings() {
       enabled: channels.length > 0,
       channels,
     }
+    const meetingSettingsPayload = {
+      autoCreateCalendarTasks: !!meetingPrefs.autoCreate,
+      defaultReminderMinutes: sanitizeReminderMinutes(meetingPrefs.defaultReminderMinutes),
+    }
     const toggles = integrationOptions.reduce((acc, i) => {
       acc[i.key] = !!i.selected
       return acc
     }, {})
 
-    await apiUpdatePrefs(authStore.user?.uid, { notifications, integrations: toggles, reminders: reminderDefaults })
+    await apiUpdatePrefs(authStore.user?.uid, {
+      notifications,
+      integrations: toggles,
+      reminders: reminderDefaults,
+      meetings: meetingSettingsPayload,
+    })
     await updateIntegrations(authStore.user?.uid, integrationEndpoints.value)
-    console.log("Settings saved:", { notifications, reminderDefaults, integrationToggles: toggles, integrationEndpoints: integrationEndpoints.value })
+    console.log("Settings saved:", {
+      notifications,
+      reminderDefaults,
+      meetings: meetingSettingsPayload,
+      integrationToggles: toggles,
+      integrationEndpoints: integrationEndpoints.value,
+    })
     ElMessage.success("✅ Settings saved successfully!")
     dirty.value = false // reset dirty flag
   } catch (error) {

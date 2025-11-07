@@ -1,6 +1,6 @@
 import cron from 'node-cron'
-import { getUserGoogleIntegration, ensureFreshAccessToken } from '../services/googleOAuth.js'
-import { syncSelectedCalendars } from '../services/googleCalendarService.js'
+import { getUserGoogleIntegration } from '../services/googleOAuth.js'
+import { syncGoogleAccount } from '../services/calendarSyncService.js'
 import { db } from '../services/firebaseAdmin.js'
 
 export function initGoogleCalendarSync() {
@@ -22,9 +22,11 @@ export function initGoogleCalendarSync() {
           const integ = (await getUserGoogleIntegration(uid)) || {}
           const selected = (integ?.calendars || []).filter((c) => !!c.selected)
           if (!selected.length) continue
-          const { tokens } = await ensureFreshAccessToken(uid)
-          const count = await syncSelectedCalendars(uid, tokens)
-          console.log(`[GoogleSync] user=${uid} synced=${count}`)
+          const stats = await syncGoogleAccount(uid)
+          console.log(
+            `[GoogleSync] user=${uid} events=${stats.eventsUpserted} ` +
+              `created=${stats.created || 0} updated=${stats.updated || 0} cancelled=${stats.cancelled || 0}`
+          )
         } catch (e) {
           console.warn(`[GoogleSync] user=${uid} failed:`, e?.message || e)
         }
@@ -35,4 +37,3 @@ export function initGoogleCalendarSync() {
   })
   console.log(`[GoogleSync] Registered cron job (${cadence})`)
 }
-

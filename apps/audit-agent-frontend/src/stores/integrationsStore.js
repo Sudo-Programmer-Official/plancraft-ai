@@ -20,7 +20,7 @@ export async function saveGoogleCalendarSelection(userId, selected, windowDays) 
 
 export async function triggerGoogleSyncNow(userId) {
   const { data } = await api.post('/google/sync/now', { userId })
-  return data?.ok === true
+  return data || {}
 }
 
 export function getGoogleConnectUrl(userId) {
@@ -42,4 +42,9 @@ export async function requestGoogleConnectUrl(userId) {
     headers: { Accept: 'application/json' },
   })
   return res?.data?.url
+}
+
+export async function disconnectGoogleIntegration(userId) {
+  const { data } = await api.delete('/google/calendars/disconnect', { data: { userId } })
+  return data?.ok === true
 }

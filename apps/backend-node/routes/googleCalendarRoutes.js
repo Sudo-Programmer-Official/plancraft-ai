@@ -1,7 +1,8 @@
 import express from 'express'
 import { requireAuth, ensureUserMatches } from '../middleware/auth.js'
-import { ensureFreshAccessToken, getUserGoogleIntegration, saveUserGoogleIntegration } from '../services/googleOAuth.js'
-import { listCalendars, syncSelectedCalendars } from '../services/googleCalendarService.js'
+import { ensureFreshAccessToken, getUserGoogleIntegration, saveUserGoogleIntegration, disconnectGoogleIntegration } from '../services/googleOAuth.js'
+import { listCalendars } from '../services/googleCalendarService.js'
+import { syncGoogleAccount } from '../services/calendarSyncService.js'
 
 const router = express.Router()
 const ENABLED = String(process.env.ENABLE_GOOGLE_CALENDAR || '').toLowerCase()
@@ -73,14 +74,25 @@ router.post('/google/sync/now', async (req, res) => {
     if (ENABLED !== '1' && ENABLED !== 'true') return res.status(503).json({ error: 'Google Calendar integration disabled' })
     const { userId } = req.body || {}
     if (!userId) return res.status(400).json({ error: 'Missing userId' })
-    const { tokens } = await ensureFreshAccessToken(String(userId))
-    const count = await syncSelectedCalendars(String(userId), tokens)
-    return res.json({ ok: true, synced: count })
+    const stats = await syncGoogleAccount(String(userId))
+    return res.json({ ok: true, stats })
   } catch (e) {
     console.error('POST /google/sync/now failed', e)
     return res.status(500).json({ error: e?.message || 'Sync failed' })
   }
 })
 
-export default router
+router.delete('/google/calendars/disconnect', async (req, res) => {
+  try {
+    if (ENABLED !== '1' && ENABLED !== 'true') return res.status(503).json({ error: 'Google Calendar integration disabled' })
+    const userId = String(req.body?.userId || req.query?.userId || req?.user?.uid || '')
+    if (!userId) return res.status(400).json({ error: 'Missing userId' })
+    await disconnectGoogleIntegration(userId)
+    return res.json({ ok: true })
+  } catch (e) {
+    console.error('DELETE /google/calendars/disconnect failed', e)
+    return res.status(500).json({ error: e?.message || 'Failed to disconnect Google Calendar' })
+  }
+})
 
+export default router

@@ -167,6 +167,27 @@
                     {{ describeReminderItem(reminder) }}
                   </li>
                 </ul>
+                <ul
+                  v-else-if="result.type === 'get_meetings' && result.payload?.meetings?.length"
+                  class="result-list"
+                >
+                  <li
+                    v-for="meeting in result.payload.meetings"
+                    :key="meeting.id || meeting.externalId || meeting.title"
+                    class="result-item flex flex-col gap-1"
+                  >
+                    <span>{{ describeMeetingItem(meeting) }}</span>
+                    <a
+                      v-if="meeting.joinUrl"
+                      :href="meeting.joinUrl"
+                      target="_blank"
+                      rel="noopener"
+                      class="text-xs text-indigo-300 hover:text-indigo-200 underline self-start"
+                    >
+                      ↗ Join meeting
+                    </a>
+                  </li>
+                </ul>
               </div>
             </div>
 
@@ -877,6 +898,15 @@ function describeReminderItem(reminder = {}) {
     parts.push(`via ${reminder.channels.join(', ')}`)
   }
   return parts.join(' · ')
+}
+
+function describeMeetingItem(meeting = {}) {
+  const parts = [meeting.title || meeting.summary || 'Meeting']
+  const when =
+    formatDateLabel(meeting.startTime, { includeTime: true }) ||
+    formatDateLabel(meeting.date, { includeTime: true })
+  if (when) parts.push(`at ${when}`)
+  return parts.join(' ')
 }
 
 function formatResultMessage(action = {}) {

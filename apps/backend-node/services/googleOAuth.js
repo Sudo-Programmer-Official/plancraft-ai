@@ -1,5 +1,8 @@
 import { db } from './firebaseAdmin.js'
 import crypto from 'crypto'
+import { removeIntegrationAccount } from './integrationAccountService.js'
+import { deleteExternalEventsForAccount } from './externalEventsService.js'
+import { upsertIntegrationAccount, updateIntegrationAccountTokens } from './integrationAccountService.js'
 
 const GOOGLE_OAUTH_BASE = 'https://accounts.google.com/o/oauth2/v2/auth'
 const TOKEN_URL = 'https://oauth2.googleapis.com/token'
@@ -181,6 +184,22 @@ export async function saveUserGoogleTokens(userId, tokens) {
     updatedAt: new Date(),
   }
   await saveUserGoogleIntegration(userId, merged)
+  try {
+    await upsertIntegrationAccount({
+      userId: String(userId),
+      provider: 'google_calendar',
+      accountId: 'primary',
+      accessToken: tokens?.access_token || null,
+      refreshToken: tokens?.refresh_token || integ?.token?.refresh_token || null,
+      tokenExpiry: tokens?.expiry_date || null,
+      metadata: {
+        calendars: merged.calendars || [],
+        sync: merged.sync || {},
+      },
+    })
+  } catch (err) {
+    console.warn('[GoogleOAuth] Failed to upsert integration account', err?.message || err)
+  }
   return merged
 }
 
@@ -195,6 +214,41 @@ export async function ensureFreshAccessToken(userId) {
     const refreshed = await refreshAccessToken(current.refresh_token)
     current = { ...current, ...refreshed }
     await saveUserGoogleTokens(userId, current)
+    try {
+      await updateIntegrationAccountTokens(userId, 'google_calendar', {
+        accountId: 'primary',
+        accessToken: current.access_token,
+        refreshToken: current.refresh_token,
+        tokenExpiry: current.expiry_date,
+      })
+    } catch {}
   }
   return { tokens: current, integration: integ }
+}
+
+export async function disconnectGoogleIntegration(userId) {
+  if (!userId) return
+  const payload = {
+    integrations: {
+      google: {
+        connected: false,
+        token: null,
+        calendars: [],
+        sync: { status: 'disconnected', perCal: {}, lastRun: null },
+        updatedAt: new Date(),
+      },
+    },
+    updatedAt: new Date(),
+  }
+  await db.collection('users').doc(String(userId)).set(payload, { merge: true })
+  try {
+    await removeIntegrationAccount(userId, 'google_calendar', 'primary')
+  } catch (err) {
+    console.warn('[GoogleOAuth] removeIntegrationAccount failed', err?.message || err)
+  }
+  try {
+    await deleteExternalEventsForAccount(userId, 'google_calendar', 'primary')
+  } catch (err) {
+    console.warn('[GoogleOAuth] deleteExternalEventsForAccount failed', err?.message || err)
+  }
 }

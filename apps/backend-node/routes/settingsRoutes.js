@@ -8,6 +8,12 @@ router.use(requireAuth, ensureUserMatches)
 
 const CHANNEL_ALLOW_LIST = ['email','pwa','whatsapp','sms','voice_call']
 
+function clampMinutes(value) {
+  const num = Number(value)
+  if (!Number.isFinite(num)) return null
+  return Math.min(Math.max(Math.round(num), 1), 24 * 60)
+}
+
 // POST /api/settings/updatePreferences
 router.post('/settings/updatePreferences', async (req, res) => {
   try {
@@ -30,6 +36,19 @@ router.post('/settings/updatePreferences', async (req, res) => {
     const reminderPayload = {}
     if (reminderPref?.enabled !== undefined) reminderPayload.enabled = !!reminderPref.enabled
     if (reminderChannels) reminderPayload.channels = reminderChannels
+
+    const meetingPref = preferences?.meetings || {}
+    const meetingPayload = {}
+    if (meetingPref?.autoCreateCalendarTasks !== undefined) {
+      meetingPayload.autoCreateCalendarTasks = !!meetingPref.autoCreateCalendarTasks
+    }
+    const defaultMinutes =
+      meetingPref?.defaultReminderMinutes ??
+      meetingPref?.defaultMeetingReminderMinutes
+    const clampedMinutes = clampMinutes(defaultMinutes)
+    if (clampedMinutes !== null) {
+      meetingPayload.defaultReminderMinutes = clampedMinutes
+    }
 
     await db.collection('users').doc(userId).set(
       {
@@ -54,6 +73,7 @@ router.post('/settings/updatePreferences', async (req, res) => {
             outlook: !!preferences?.integrations?.outlook,
             whatsapp: !!preferences?.integrations?.whatsapp,
           },
+          ...(Object.keys(meetingPayload).length ? { meetings: meetingPayload } : {}),
         },
         updatedAt: new Date(),
       },
