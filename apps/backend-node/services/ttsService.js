@@ -29,6 +29,29 @@ function normalizeText(value) {
     .trim();
 }
 
+function expandDateAbbreviations(text) {
+  if (!text) return "";
+  return text
+    .replace(/\bMon\b/g, "Monday")
+    .replace(/\bTue\b/g, "Tuesday")
+    .replace(/\bWed\b/g, "Wednesday")
+    .replace(/\bThu\b/g, "Thursday")
+    .replace(/\bFri\b/g, "Friday")
+    .replace(/\bSat\b/g, "Saturday")
+    .replace(/\bSun\b/g, "Sunday")
+    .replace(/\bJan\b/g, "January")
+    .replace(/\bFeb\b/g, "February")
+    .replace(/\bMar\b/g, "March")
+    .replace(/\bApr\b/g, "April")
+    .replace(/\bJun\b/g, "June")
+    .replace(/\bJul\b/g, "July")
+    .replace(/\bAug\b/g, "August")
+    .replace(/\bSep\b/g, "September")
+    .replace(/\bOct\b/g, "October")
+    .replace(/\bNov\b/g, "November")
+    .replace(/\bDec\b/g, "December");
+}
+
 function toFiniteNumber(value, fallback = null) {
   if (value === undefined || value === null || value === "") return fallback;
   const num = Number(value);
@@ -97,6 +120,7 @@ export async function generateVoice(message, options = {}) {
         };
   const effectiveText =
     MAX_CHAR_COUNT > 0 && text.length > MAX_CHAR_COUNT ? text.slice(0, MAX_CHAR_COUNT) : text;
+  const speakableText = expandDateAbbreviations(effectiveText);
 
   const cacheKey = buildCacheKey(effectiveText, { voice, model, format, rate, pitch, volume });
   const fileName = `${cacheKey}.${format}`;
@@ -120,7 +144,7 @@ export async function generateVoice(message, options = {}) {
       const response = await openai.audio.speech.create({
         model,
         voice,
-        input: effectiveText,
+        input: speakableText,
         format,
         ...(voiceSettings ? { voice_settings: voiceSettings } : {}),
       });

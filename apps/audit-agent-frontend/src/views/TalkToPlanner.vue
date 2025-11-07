@@ -296,6 +296,10 @@ const VOICE_PLAYBACK_RATE = Number(import.meta.env.VITE_ASSISTANT_VOICE_RATE || 
 const speechFallbackOptions = { rate: VOICE_PLAYBACK_RATE, pitch: 1, volume: 1 }
 const API_BASE_ROOT = (import.meta.env.VITE_API_BASE_ROOT || '').trim()
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').trim()
+const SILENT_AUDIO_DATA_URI =
+  'data:audio/wav;base64,UklGRpYDAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YXIDAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
+let voicePlaybackUnlocked = false
+let voiceUnlockPromise = null
 
 function formatTextForVoice(text) {
   if (!text) return ''
@@ -303,6 +307,59 @@ function formatTextForVoice(text) {
     .replace(/\s*\([A-Za-z0-9_\- ]+\/[A-Za-z0-9_\- ]+\)\s*$/, '')
     .trim()
   return stripped || ''
+}
+
+async function ensureVoicePlaybackUnlocked() {
+  if (voicePlaybackUnlocked || typeof window === 'undefined') return true
+  if (voiceUnlockPromise) {
+    try {
+      return await voiceUnlockPromise
+    } catch {
+      return false
+    }
+  }
+  voiceUnlockPromise = new Promise((resolve) => {
+    try {
+      const unlockAudio = new Audio()
+      unlockAudio.src = SILENT_AUDIO_DATA_URI
+      unlockAudio.muted = true
+      unlockAudio.playsInline = true
+
+      const cleanup = () => {
+        try {
+          unlockAudio.pause()
+          unlockAudio.removeAttribute('src')
+          unlockAudio.load()
+        } catch {}
+        unlockAudio.removeEventListener('ended', handleSuccess)
+        unlockAudio.removeEventListener('error', handleFailure)
+      }
+
+      const handleSuccess = () => {
+        cleanup()
+        voicePlaybackUnlocked = true
+        voiceUnlockPromise = null
+        resolve(true)
+      }
+
+      const handleFailure = () => {
+        cleanup()
+        voiceUnlockPromise = null
+        resolve(false)
+      }
+
+      const playPromise = unlockAudio.play()
+      if (playPromise && typeof playPromise.then === 'function') {
+        playPromise.then(handleSuccess).catch(handleFailure)
+      } else {
+        handleSuccess()
+      }
+    } catch {
+      voiceUnlockPromise = null
+      resolve(false)
+    }
+  })
+  return voiceUnlockPromise
 }
 
 function resolveApiOrigin(source) {
@@ -511,18 +568,19 @@ function clearChat() {
   stopVoicePlayback()
 }
 
-function sendMessage() {
-  if (!sendDisabled.value) {
-    sendQuery()
-  }
+async function sendMessage() {
+  if (sendDisabled.value) return
+  await ensureVoicePlaybackUnlocked()
+  sendQuery()
 }
 
 function toggleVoice() {
   isVoiceOn.value = !isVoiceOn.value
 }
 
-function playVoiceForMessage(message) {
+async function playVoiceForMessage(message) {
   if (!message || !message.text) return
+  await ensureVoicePlaybackUnlocked()
   speakAssistantMessage(message, { allowWhenMuted: true })
 }
 
@@ -532,6 +590,13 @@ async function speakAssistantMessage(message, options = {}) {
   const rawText = String(message?.text || '').trim()
   const textForVoice = formatTextForVoice(rawText)
   if (!textForVoice) return
+  const unlocked = await ensureVoicePlaybackUnlocked()
+  if (!unlocked && !allowWhenMuted) {
+    if (hasWebSpeech) {
+      speakWithWebSpeech(textForVoice, speechFallbackOptions)
+    }
+    return
+  }
 
   const token = ++voiceRequestToken
   voiceRequestingFor.value = message?.id || null
@@ -848,6 +913,7 @@ function handleVoiceTranscript(text, isFinal = false) {
 async function startRecording() {
   try {
     if (!isRecording.value) {
+      await ensureVoicePlaybackUnlocked()
       if (assistantThinking.value) {
         ElMessage.info('Wait for the planner to finish before recording again.')
         return

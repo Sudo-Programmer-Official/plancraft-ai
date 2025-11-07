@@ -59,29 +59,36 @@
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
           <div
             v-if="carryoverCount > 0"
-            class="dashboard-banner bg-amber-500/10 border-amber-400/30 text-amber-100 flex items-start justify-between gap-3"
+            class="move-card flex flex-col justify-between p-4 rounded-2xl bg-gradient-to-b from-[#431f64] to-[#291642] shadow-lg text-white space-y-3"
           >
-            <div class="flex items-center gap-3">
-              <span class="text-xl">🔄</span>
-              <div>
-                <p class="text-sm sm:text-base font-medium">
-                  {{ carryoverCount }} unfinished task{{ carryoverCount === 1 ? '' : 's' }} from today.
-                </p>
-                <p class="text-xs sm:text-sm opacity-80">
-                  Move a few forward so tomorrow starts lighter.
-                </p>
-              </div>
+            <div class="text-content">
+              <p class="text-xl font-semibold">
+                {{ carryoverCount }} unfinished task{{ carryoverCount === 1 ? '' : 's' }} from today.
+              </p>
+              <p class="text-sm text-gray-300 mt-1">
+                Move a few forward so tomorrow starts lighter.
+              </p>
             </div>
-            <div class="flex flex-shrink-0 items-center gap-2">
+
+            <div class="flex flex-col sm:flex-row gap-2">
               <button
-                @click="applyCarryover(3)"
-                class="px-3 py-1.5 rounded-lg bg-amber-500/90 hover:bg-amber-500 text-slate-900 text-xs font-semibold shadow-sm"
+                type="button"
+                class="flex-1 py-2 rounded-lg bg-gradient-to-r from-amber-400 to-yellow-500 font-semibold text-black hover:opacity-90 transition"
+                @click="applyCarryover(Math.min(3, carryoverCount))"
               >
                 Move {{ Math.min(3, carryoverCount) }}
               </button>
               <button
+                type="button"
+                class="flex-1 py-2 rounded-lg bg-gradient-to-r from-purple-900 to-purple-700 font-semibold text-white hover:opacity-90 transition"
+                @click="applyCarryover('all')"
+              >
+                Move All
+              </button>
+              <button
+                type="button"
+                class="px-4 py-2 rounded-lg border border-gray-500 font-semibold text-gray-300 hover:bg-gray-800 transition"
                 @click="ignoreCarryover()"
-                class="px-3 py-1.5 rounded-lg bg-black/40 hover:bg-black/50 text-amber-50 text-xs font-medium"
               >
                 Ignore
               </button>
@@ -1301,7 +1308,11 @@ async function applyCarryover(limit = 3) {
   try {
     const uid = authStore?.user?.uid
     if (!uid) return
-    await api.post('/carryover/apply', { userId: uid, limit })
+    const normalizedLimit =
+      limit === 'all'
+        ? Math.max(1, carryoverCount.value || 0)
+        : Math.max(1, Number(limit) || 1)
+    await api.post('/carryover/apply', { userId: uid, limit: normalizedLimit })
     await loadTasks()
     ElMessage({ message: 'Moved to tomorrow ✅', type: 'success', duration: 1600 })
   } catch (error) {
