@@ -1,35 +1,7 @@
 import admin from 'firebase-admin'
-import crypto from 'crypto'
 import '../services/firebaseAdmin.js' // ensure admin is initialized
 import { ensureUserProfile } from '../services/userService.js'
-
-function b64urlDecode(str) {
-  str = str.replace(/-/g, '+').replace(/_/g, '/')
-  const pad = str.length % 4
-  if (pad) str += '='.repeat(4 - pad)
-  return Buffer.from(str, 'base64').toString('utf8')
-}
-
-function verifyHS256Jwt(token, secret) {
-  try {
-    const [h, p, s] = String(token || '').split('.')
-    if (!h || !p || !s) return null
-    const data = `${h}.${p}`
-    const expected = crypto
-      .createHmac('sha256', secret)
-      .update(data)
-      .digest('base64')
-      .replace(/=/g, '')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-    if (expected !== s) return null
-    const payload = JSON.parse(b64urlDecode(p))
-    if (payload.exp && Math.floor(Date.now() / 1000) >= payload.exp) return null
-    return payload
-  } catch {
-    return null
-  }
-}
+import { verifyHS256 } from '../utils/jwt.js'
 
 export async function attachAuth(req, res, next) {
   try {
@@ -37,7 +9,7 @@ export async function attachAuth(req, res, next) {
     const appTok = req.headers['x-app-token']
     const secret = process.env.APP_JWT_SECRET
     if (secret && typeof appTok === 'string' && appTok.split('.').length === 3) {
-      const payload = verifyHS256Jwt(appTok, secret)
+      const payload = verifyHS256(appTok, secret)
       if (payload && payload.sub) {
         req.user = { uid: payload.sub, email: payload.email || null, source: 'app' }
         req.auth = { type: 'app', token: appTok, payload }

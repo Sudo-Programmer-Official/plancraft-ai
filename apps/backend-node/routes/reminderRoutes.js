@@ -73,7 +73,7 @@ router.use(requireAuth, ensureUserMatches)
 const upload = multer({ storage: multer.memoryStorage() })
 
 // Enforce free/pro usage policy for reminder creation (soft warning via header)
-router.use(['/text', '/batch'], planUsageMiddleware)
+router.use(['/text', '/batch', '/sync'], planUsageMiddleware)
 
 // POST /api/reminders/text
 router.post("/text", async (req, res) => {
@@ -133,8 +133,7 @@ router.post("/text", async (req, res) => {
   }
 })
 
-// POST /api/reminders/batch
-router.post("/batch", async (req, res) => {
+async function handleBatchRequest(req, res) {
   try {
     const { userId, reminders = [] } = req.body || {}
     if (!userId || !Array.isArray(reminders) || !reminders.length) {
@@ -276,7 +275,10 @@ router.post("/batch", async (req, res) => {
     console.error('[reminders/batch] failed', e)
     res.status(500).json({ error: 'Failed to schedule reminders' })
   }
-})
+}
+
+router.post("/batch", handleBatchRequest)
+router.post("/sync", handleBatchRequest)
 
 // POST /api/reminders/voice (multipart/form-data; field name 'audio')
 router.post("/voice", upload.single("audio"), planUsageMiddleware, async (req, res) => {

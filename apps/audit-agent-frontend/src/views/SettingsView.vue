@@ -126,6 +126,65 @@
           </button>
         </div>
 
+        <!-- GPT integration card -->
+        <div
+          ref="gptCardRef"
+          :class="[
+            'mt-6 rounded-lg border border-white/10 bg-slate-900/40 p-4 space-y-4 transition',
+            highlightGpt ? 'ring-2 ring-indigo-400 shadow-lg shadow-indigo-500/20' : ''
+          ]"
+        >
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div class="font-semibold flex items-center gap-2">
+                🤖 PlanCraft GPT
+                <span class="text-[10px] px-2 py-0.5 rounded bg-indigo-500/30 text-indigo-100 uppercase tracking-wide">Beta</span>
+              </div>
+              <p class="text-xs text-slate-300 mt-1">
+                Generate a short-lived link code and paste it inside ChatGPT to connect the PlanCraft GPT Actions.
+              </p>
+              <p v-if="gptLink.expiresAt" class="text-[11px] text-slate-400">
+                {{ gptLinkExpired ? 'Expired' : 'Expires' }} {{ gptLinkExpiryLabel }}
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                class="px-3 py-1.5 rounded bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm disabled:opacity-60"
+                :disabled="gptLink.loading || !authStore.user"
+                @click="generateGptCode"
+              >
+                {{ gptLink.loading ? 'Generating…' : gptLink.code ? 'Refresh Code' : 'Generate Code' }}
+              </button>
+              <button
+                v-if="gptLink.code"
+                class="px-3 py-1.5 rounded border border-indigo-500/50 text-indigo-100 hover:bg-indigo-500/10 text-sm disabled:opacity-40"
+                :disabled="gptLink.copied"
+                @click="copyGptCode"
+              >
+                {{ gptLink.copied ? 'Copied!' : 'Copy Code' }}
+              </button>
+            </div>
+          </div>
+          <div v-if="gptLink.code" class="rounded-lg border border-indigo-500/30 bg-slate-950/50 p-4 space-y-3">
+            <div>
+              <p class="text-xs text-slate-400 uppercase tracking-[0.2em]">Link Code</p>
+              <p class="text-3xl font-mono tracking-[0.25em] text-white break-all">{{ gptLink.code }}</p>
+            </div>
+            <ul class="list-decimal list-inside text-xs text-slate-300 space-y-1">
+              <li>Open ChatGPT and launch the PlanCraft AI GPT.</li>
+              <li>Say “Link my account” and paste this code when prompted.</li>
+              <li>Approve the connection to sync tasks, reminders, and journal entries.</li>
+            </ul>
+            <a :href="gptHelpUrl" target="_blank" rel="noreferrer" class="text-indigo-300 text-xs inline-flex items-center gap-1 hover:text-indigo-200">
+              Need help? <span aria-hidden="true">↗</span>
+            </a>
+          </div>
+          <p v-else class="text-xs text-slate-400">
+            Codes expire after a few minutes. Generate a fresh one whenever you want to connect ChatGPT.
+          </p>
+          <p v-if="gptLink.error" class="text-xs text-red-300">⚠️ {{ gptLink.error }}</p>
+        </div>
+
         <!-- Google Calendar Card -->
         <div class="mt-6 rounded-lg border border-white/10 bg-slate-900/40 p-4 space-y-3">
           <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -294,13 +353,14 @@
   <div id="reauth-recaptcha" style="position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;overflow:hidden" />
 </template>
 <script setup>
-import { reactive, ref, onMounted, computed, watch, onBeforeUnmount } from "vue"
+import { reactive, ref, onMounted, computed, watch, onBeforeUnmount, nextTick } from "vue"
 import { useAuthStore } from "@/stores/authStore"
 import { useRouter, useRoute } from "vue-router"
 import { ElMessage } from "element-plus"
 import { normalizePhone, guessCountryFromLocale } from '@/utils/phoneUtils'
 import { getGoogleStatus, getGoogleCalendars, saveGoogleCalendarSelection, triggerGoogleSyncNow, requestGoogleConnectUrl, disconnectGoogleIntegration } from '@/stores/integrationsStore'
 import { getPreferences as apiGetPrefs, updatePreferences as apiUpdatePrefs, getIntegrations, updateIntegrations, updateOnboardingStatus } from "@/services/settingsService"
+import { createGptLinkCode } from '@/services/gptService'
 import { subscribeUserToPush } from "@/services/pwaService"
 import { useSubscriptionStore } from "@/stores/subscriptionStore"
 import { isFeatureAllowed, getRemainingAI } from "@/services/planService"
@@ -468,6 +528,9 @@ onMounted(async () => {
           setTimeout(() => { highlightNotifications.value = false }, 1600)
         }, 150)
       }
+      if (route?.query?.gpt !== undefined) {
+        setTimeout(() => focusGptCard(true), 400)
+      }
     } catch {}
     if (authStore.user) {
       const res = await apiGetPrefs(authStore.user.uid)
@@ -544,6 +607,98 @@ const integrationOptions = reactive([
   { key: 'whatsapp', name: 'WhatsApp', icon: '📱', selected: false },
   { key: 'outlook', name: 'Outlook', icon: '📧', selected: false },
 ])
+
+const gptLink = reactive({
+  loading: false,
+  code: '',
+  expiresAt: null,
+  ttlMinutes: null,
+  copied: false,
+  error: '',
+})
+const gptHelpUrl = import.meta.env.VITE_GPT_HELP_URL || 'https://plancraftai.com/integrations/gpt'
+const gptCardRef = ref(null)
+const highlightGpt = ref(false)
+const gptDeepLinkActive = computed(() => !!route?.query?.gpt)
+const gptLinkExpiryLabel = computed(() => {
+  if (!gptLink.expiresAt) return ''
+  try {
+    return dayjs(gptLink.expiresAt).local().format('MMM D • h:mm A')
+  } catch {
+    return gptLink.expiresAt
+  }
+})
+const gptLinkExpired = computed(() => {
+  if (!gptLink.expiresAt) return false
+  return dayjs(gptLink.expiresAt).valueOf() <= Date.now()
+})
+let gptCopyTimer = null
+
+async function generateGptCode() {
+  if (!authStore.user?.uid) {
+    ElMessage.error('Please sign in to generate a link code')
+    return
+  }
+  gptLink.loading = true
+  gptLink.error = ''
+  try {
+    const result = await createGptLinkCode(authStore.user.uid)
+    gptLink.code = result?.code || ''
+    gptLink.expiresAt = result?.expiresAt || null
+    gptLink.ttlMinutes = result?.ttlMinutes || null
+    gptLink.copied = false
+    if (gptLink.code) {
+      ElMessage.success('GPT link code ready')
+    } else {
+      ElMessage.warning('No link code returned. Try again.')
+    }
+  } catch (e) {
+    const message = e?.response?.data?.error || e?.message || 'Failed to create link code'
+    gptLink.error = message
+    ElMessage.error(message)
+  } finally {
+    gptLink.loading = false
+  }
+}
+
+async function copyGptCode() {
+  if (!gptLink.code) return
+  try {
+    if (typeof navigator === 'undefined' || !navigator?.clipboard?.writeText) {
+      throw new Error('Clipboard unavailable')
+    }
+    await navigator.clipboard.writeText(gptLink.code)
+    if (gptCopyTimer) clearTimeout(gptCopyTimer)
+    gptLink.copied = true
+    gptCopyTimer = setTimeout(() => {
+      gptLink.copied = false
+    }, 2000)
+    ElMessage.success('Code copied to clipboard')
+  } catch (e) {
+    console.warn('Copy GPT code failed', e)
+    ElMessage.error('Unable to copy automatically. Please copy manually.')
+  }
+}
+
+function focusGptCard(autoGenerate = false) {
+  highlightGpt.value = true
+  nextTick(() => {
+    try {
+      gptCardRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    } catch {}
+  })
+  setTimeout(() => {
+    highlightGpt.value = false
+  }, 2000)
+  if (autoGenerate && !gptLink.code && !gptLink.loading) {
+    generateGptCode()
+  }
+  if (route?.query?.gpt !== undefined) {
+    const nextQuery = { ...route.query }
+    delete nextQuery.gpt
+    router.replace({ query: nextQuery }).catch(() => {})
+  }
+}
 
 // Delivery endpoints (per-channel identifiers)
 const integrationEndpoints = ref({
@@ -911,8 +1066,21 @@ watch(() => reauthOpen.value, (open) => {
   }
 })
 
+watch(
+  () => route.query?.gpt,
+  (val) => {
+    if (val !== undefined && val !== null) {
+      focusGptCard(false)
+    }
+  },
+)
+
 onBeforeUnmount(() => {
   clearResendCooldown()
+  if (gptCopyTimer) {
+    clearTimeout(gptCopyTimer)
+    gptCopyTimer = null
+  }
 })
 
 async function doGoogleReauth() {

@@ -36,6 +36,11 @@ const router = createRouter({
     { path: '/voice-planning', name: 'voice-planning', component: () => import('@/views/VoicePlanningView.vue') },
     { path: '/ai-reminders', name: 'ai-reminders', component: () => import('@/views/AiRemindersView.vue') },
     {
+      path: '/integrations/gpt',
+      name: 'gpt-connect',
+      component: () => import('@/views/GptConnectView.vue'),
+    },
+    {
       path: '/google-calendar-integration',
       name: 'google-calendar-integration',
       component: () => import('@/views/CalendarIntegrationView.vue'),

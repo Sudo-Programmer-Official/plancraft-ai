@@ -1,35 +1,9 @@
 import express from 'express'
-import crypto from 'crypto'
 import admin from 'firebase-admin'
 import '../services/firebaseAdmin.js' // ensure admin is initialized
+import { signHS256 } from '../utils/jwt.js'
 
 const router = express.Router()
-
-function base64url(input) {
-  return Buffer.from(input)
-    .toString('base64')
-    .replace(/=/g, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-}
-
-function signHS256(payloadObj, secret, ttlSec) {
-  const header = { alg: 'HS256', typ: 'JWT' }
-  const nowSec = Math.floor(Date.now() / 1000)
-  const payload = { iat: nowSec, ...payloadObj }
-  if (ttlSec && Number.isFinite(ttlSec)) payload.exp = nowSec + ttlSec
-  const encHeader = base64url(JSON.stringify(header))
-  const encPayload = base64url(JSON.stringify(payload))
-  const data = `${encHeader}.${encPayload}`
-  const sig = crypto
-    .createHmac('sha256', secret)
-    .update(data)
-    .digest('base64')
-    .replace(/=/g, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-  return `${data}.${sig}`
-}
 
 // POST /api/auth/refresh
 router.post('/refresh', async (req, res) => {

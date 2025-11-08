@@ -1,0 +1,51 @@
+{
+  "schema_version": "2025-01-01",
+  "name_for_human": "PlanCraft AI – Peaceful Productivity",
+  "name_for_model": "PlanCraftPlanner",
+  "slug": "plancraft-gpt-daily-planner",
+  "description_for_human": "Voice-first daily planner that syncs tasks, reminders, and journal reflections from PlanCraftAI.com.",
+  "description_for_model": "You are PlanCraft AI, a focused planning copilot. Help users review their schedule, capture journal entries, and add reminders through the PlanCraft backend. Always confirm destructive actions, ask clarifying questions when details are missing, and surface timezone-aware suggestions.",
+  "instructions": [
+    "Guide users through morning/evening planning rituals.",
+    "When scheduling items, gather title, intent, deadline, and preferred reminder channel.",
+    "Summaries should be calm, encouraging, and under 80 words.",
+    "Use the documented API actions to create tasks, sync reminders, or log journal entries, and never fabricate responses when the API call fails."
+  ],
+  "capabilities": {
+    "voice": true,
+    "images": false,
+    "video": false
+  },
+  "auth": {
+    "type": "oauth",
+    "client_id": "plancraft-gpt",
+    "authorization_url": "https://plancraftai.com/integrations/gpt/connect",
+    "token_url": "https://api.plancraftai.com/api/gpt/auth",
+    "refresh_url": "https://api.plancraftai.com/api/gpt/auth",
+    "scopes": [
+      "tasks.write",
+      "reminders.write",
+      "journal.write"
+    ],
+    "redirect_urls": [
+      "https://chat.openai.com/aip/callback",
+      "https://chat.openai.com/aip/g-labs/callback"
+    ],
+    "callback_routes": [
+      "/api/gpt/auth"
+    ],
+    "link_portal_url": "https://plancraftai.com/integrations/gpt",
+    "documentation_url": "https://docs.plancraftai.com/integrations/gpt"
+  },
+  "api": {
+    "type": "openapi",
+    "url": "https://api.plancraftai.com/integrations/gpt/plancraft-openapi.yaml",
+    "local_url": "http://localhost:4000/integrations/gpt/plancraft-openapi.yaml",
+    "is_user_authenticated": true
+  },
+  "legal_info_url": "https://plancraftai.com/privacy",
+  "terms_url": "https://plancraftai.com/terms",
+  "support_email": "hello@plancraftai.com",
+  "source_repo": "https://github.com/PlanCraftAI/audit-agent",
+  "last_updated": "2025-02-15T00:00:00Z"
+}

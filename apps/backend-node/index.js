@@ -74,6 +74,9 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
 
 import aiRoutes from "./routes/aiRoutes.js";
 import usageRoutes from "./routes/usageRoutes.js";
@@ -105,10 +108,16 @@ import taskRoutes from "./routes/taskRoutes.js";
 import habitRoutes from "./routes/habitRoutes.js";
 import { processReminderBatches } from "./services/reminderService.js";
 import seoRoutes from "./routes/seoRoutes.js";
+import gptRoutes from "./routes/gptRoutes.js";
+import journalRoutes from "./routes/journalRoutes.js";
 
 dotenv.config();
 
 const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const projectRoot = path.resolve(__dirname, "..", "..");
+const integrationsDir = path.join(projectRoot, "integrations");
 
 // Allow list of origins (extendable via CORS_ORIGINS env, comma-separated)
 const allowedOrigins = [
@@ -127,6 +136,7 @@ const allowedOrigins = [
   // ✅ Local development
   // ✅ Optional API subdomain (if backend runs separately)
   "https://api.plancraftai.com",
+  "https://chat.openai.com",
 ]
   .concat(
     (process.env.CORS_ORIGINS || "")
@@ -204,6 +214,11 @@ app.get('/api/stripe/webhook-health', (req, res) => {
 
 // JSON parser for all other routes
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+if (fs.existsSync(integrationsDir)) {
+  app.use("/integrations", express.static(integrationsDir));
+}
 
 // --- Google OAuth callbacks (public) ---
 // Mount BEFORE auth-required routers to avoid 401 from other routers' requireAuth middlewares
@@ -246,6 +261,7 @@ app.use("/api", stripeRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api", settingsRoutes);
 app.use("/api", integrationsRoutes);
+app.use("/api", gptRoutes);
 app.use("/api/reminders", reminderRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api", carryoverRoutes);
@@ -258,6 +274,7 @@ app.use("/api/planner", plannerRoutes);
 app.use("/api/talk", talkToPlannerRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/habits", habitRoutes);
+app.use("/api", journalRoutes);
 app.use("/", seoRoutes);
 // Mount Google routes (guarded internally by feature flag)
 app.use("/api", googleAuthRoutes);

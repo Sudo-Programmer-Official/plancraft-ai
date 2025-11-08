@@ -69,6 +69,17 @@ ENABLE_SMS=true
 # Twilio senders (required when voice / WhatsApp are enabled)
 TWILIO_WHATSAPP_NUMBER=whatsapp:+15551234567
 TWILIO_VOICE_NUMBER=+15557654321
+
+# Long-lived app/GPT tokens (required for GPT Actions + x-app-token auth)
+APP_JWT_SECRET=replace-me-with-long-random-string
+APP_JWT_TTL_DAYS=30
+
+# GPT Actions client
+GPT_ACTION_CLIENT_ID=plancraft-gpt
+GPT_ACTION_CLIENT_SECRET=super-secret-client-value
+GPT_LINK_CODE_TTL_MIN=10
+GPT_ACCESS_TOKEN_TTL_MIN=30
+GPT_REFRESH_TOKEN_TTL_DAYS=30
 ```
 
 The server runs on port 4000 by default (see `apps/backend-node/index.js`).
