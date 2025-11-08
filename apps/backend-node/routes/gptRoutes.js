@@ -77,9 +77,16 @@ router.post('/gpt/auth', async (req, res) => {
   const body = req.body || {}
   const grantType = normalizeGrantType(body.grant_type || body.grantType)
   const { clientId, clientSecret } = extractClientCredentials(req, body)
+  console.info('[GPTAuth] token request', {
+    grantType,
+    clientId,
+    hasBodySecret: !!pickField(body, ['client_secret', 'clientSecret', 'client-secret']),
+    hasBasicHeader: /\bbasic\s+/i.test(String(req.headers?.authorization || '')),
+  })
   try {
     validateClientCredentials(clientId, clientSecret)
   } catch (err) {
+    console.warn('[GPTAuth] invalid client credentials', { clientId, grantType })
     return oauthError(res, 'invalid_client', 401)
   }
 
@@ -88,6 +95,7 @@ router.post('/gpt/auth', async (req, res) => {
     if (!code) return oauthError(res, 'invalid_request')
     try {
       const { userId, metadata } = await consumeLinkCode(code)
+      console.info('[GPTAuth] authorization_code ok', { clientId, userId })
       const tokens = await issueTokenPairForUser(userId, { clientId, metadata })
       res.set('Cache-Control', 'no-store')
       res.set('Pragma', 'no-cache')
@@ -104,7 +112,7 @@ router.post('/gpt/auth', async (req, res) => {
       const isGrantIssue = codeMap.has(err?.message)
       const status = isGrantIssue ? 400 : err?.message === 'app_jwt_disabled' ? 503 : 500
       const label = isGrantIssue ? 'invalid_grant' : err?.message || 'server_error'
-      console.warn('[GPTAuth] authorization_code error', err?.message || err)
+      console.warn('[GPTAuth] authorization_code error', { clientId, message: err?.message })
       return oauthError(res, label, status)
     }
   }
@@ -114,6 +122,7 @@ router.post('/gpt/auth', async (req, res) => {
     if (!refreshToken) return oauthError(res, 'invalid_request')
     try {
       const tokens = await exchangeRefreshToken(refreshToken, { clientId })
+      console.info('[GPTAuth] refresh_token ok', { clientId, userId: tokens.userId })
       res.set('Cache-Control', 'no-store')
       res.set('Pragma', 'no-cache')
       return res.json({
@@ -127,7 +136,7 @@ router.post('/gpt/auth', async (req, res) => {
     } catch (err) {
       const label = err?.message === 'invalid_refresh_token' ? 'invalid_grant' : err?.message || 'server_error'
       const status = err?.message === 'invalid_refresh_token' ? 400 : err?.message === 'invalid_client' ? 401 : 500
-      console.warn('[GPTAuth] refresh_token error', err?.message || err)
+      console.warn('[GPTAuth] refresh_token error', { clientId, message: err?.message })
       return oauthError(res, label, status)
     }
   }
