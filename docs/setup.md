@@ -77,6 +77,8 @@ APP_JWT_TTL_DAYS=30
 # GPT Actions client
 GPT_ACTION_CLIENT_ID=plancraft-gpt
 GPT_ACTION_CLIENT_SECRET=super-secret-client-value
+# Optional: allow additional client IDs (comma-separated) so legacy tokens keep working during rotations.
+GPT_ACTION_CLIENT_ID_ALIASES=
 GPT_LINK_CODE_TTL_MIN=10
 GPT_ACCESS_TOKEN_TTL_MIN=30
 GPT_REFRESH_TOKEN_TTL_DAYS=30

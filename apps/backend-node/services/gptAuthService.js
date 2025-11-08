@@ -3,6 +3,13 @@ import { db } from './firebaseAdmin.js'
 import { signHS256 } from '../utils/jwt.js'
 
 const DEFAULT_CLIENT_ID = process.env.GPT_ACTION_CLIENT_ID || 'plancraft-gpt'
+// Support any legacy client IDs that should remain valid even if the primary ID was rotated.
+const CLIENT_ID_ALIAS_SET = new Set(
+  (process.env.GPT_ACTION_CLIENT_ID_ALIASES || '')
+    .split(',')
+    .map((entry) => (entry || '').trim())
+    .filter(Boolean)
+)
 const DEFAULT_SCOPE = 'gpt_action'
 const DEFAULT_AUDIENCE = 'plancraft_gpt_actions'
 const DEFAULT_LINK_TTL_MIN = Number(process.env.GPT_LINK_CODE_TTL_MIN || 10)
@@ -47,11 +54,11 @@ function getRefreshExpiryDate() {
 }
 
 export function validateClientCredentials(clientId, secret) {
-  const expectedId = DEFAULT_CLIENT_ID
   const expectedSecret = process.env.GPT_ACTION_CLIENT_SECRET
   const normalizedId = String(clientId || '').trim()
   const normalizedSecret = secret === undefined || secret === null ? null : String(secret)
-  if (!normalizedId || normalizedId !== expectedId) {
+  const isAllowedClientId = normalizedId && (normalizedId === DEFAULT_CLIENT_ID || CLIENT_ID_ALIAS_SET.has(normalizedId))
+  if (!isAllowedClientId) {
     throw new Error('invalid_client')
   }
   if (expectedSecret && normalizedSecret !== expectedSecret) {

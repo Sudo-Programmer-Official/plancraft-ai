@@ -34,7 +34,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 const statusMessage = ref('Verifying your session…')
 const error = ref('')
-const expectedClientId = import.meta.env.VITE_GPT_CLIENT_ID || 'plancraft-gpt'
+const expectedClientId = import.meta.env.VITE_GPT_CLIENT_ID || 'plancraft-gpt-client'
 
 function appendParams(base, params = {}) {
   try {
