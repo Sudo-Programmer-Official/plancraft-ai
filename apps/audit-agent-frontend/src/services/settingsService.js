@@ -27,3 +27,9 @@ export async function getReminderPreferences(userId) {
   const res = await api.get(`/settings/${userId}/reminder-preferences`)
   return res?.data || {}
 }
+
+export async function updateOnboardingStatus(userId, onboarding) {
+  if (!userId) throw new Error('Missing userId')
+  const res = await api.post('/settings/onboarding', { userId, onboarding })
+  return res?.data?.onboarding || {}
+}

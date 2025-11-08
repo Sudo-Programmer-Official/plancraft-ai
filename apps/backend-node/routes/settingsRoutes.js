@@ -14,6 +14,14 @@ function clampMinutes(value) {
   return Math.min(Math.max(Math.round(num), 1), 24 * 60)
 }
 
+function parseDateInput(value) {
+  if (value === null) return null
+  if (!value) return undefined
+  if (value instanceof Date) return value
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? undefined : date
+}
+
 // POST /api/settings/updatePreferences
 router.post('/settings/updatePreferences', async (req, res) => {
   try {
@@ -282,6 +290,62 @@ router.get('/settings/integrations', async (req, res) => {
   } catch (err) {
     console.error('❌ getIntegrations error:', err)
     res.status(500).json({ error: 'Failed to fetch integrations' })
+  }
+})
+
+router.post('/settings/onboarding', async (req, res) => {
+  try {
+    const { userId, onboarding } = req.body || {}
+    if (!userId) return res.status(400).json({ error: 'Missing userId' })
+    if (!onboarding || typeof onboarding !== 'object') {
+      return res.status(400).json({ error: 'Missing onboarding payload' })
+    }
+
+    const payload = {}
+    if (onboarding.completed !== undefined) payload.completed = !!onboarding.completed
+    if (onboarding.lastStep !== undefined) {
+      const step = Number(onboarding.lastStep)
+      payload.lastStep = Number.isFinite(step) ? step : 0
+    }
+    if (onboarding.showLaterUntil !== undefined) {
+      if (onboarding.showLaterUntil === null) payload.showLaterUntil = null
+      else {
+        const parsed = parseDateInput(onboarding.showLaterUntil)
+        if (parsed) payload.showLaterUntil = parsed
+      }
+    }
+
+    const dateFields = ['completedAt', 'startedAt', 'skippedAt', 'lastDeferredAt', 'replayRequestedAt']
+    dateFields.forEach((field) => {
+      if (onboarding[field] === undefined) return
+      if (onboarding[field] === null) {
+        payload[field] = null
+      } else {
+        const parsed = parseDateInput(onboarding[field])
+        if (parsed) payload[field] = parsed
+      }
+    })
+
+    if (!Object.keys(payload).length) {
+      return res.status(400).json({ error: 'No onboarding fields provided' })
+    }
+
+    payload.updatedAt = new Date()
+
+    await db.collection('users').doc(String(userId)).set(
+      {
+        preferences: {
+          onboarding: payload,
+        },
+        updatedAt: new Date(),
+      },
+      { merge: true }
+    )
+
+    res.json({ success: true, onboarding: payload })
+  } catch (err) {
+    console.error('❌ onboarding status update error:', err)
+    res.status(500).json({ error: 'Failed to update onboarding status' })
   }
 })
 

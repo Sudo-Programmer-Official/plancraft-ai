@@ -393,8 +393,6 @@ import { hasSubscription, registerPushSubscription } from '@/services/pushServic
 import NotificationBanner from '@/components/NotificationBanner.vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
-import { driver } from 'driver.js'
-import 'driver.js/dist/driver.css'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useAuthFlags } from '@/composables/useAuthFlags'
 import PlanSummaryModal from '@/components/PlanSummaryModal.vue'
@@ -531,12 +529,6 @@ function goToTalkPlanner() {
 }
 
 onMounted(() => {
-  const seenTour = localStorage.getItem('seenDashboardTour')
-
-  if (!seenTour) {
-    startTour()
-    localStorage.setItem('seenDashboardTour', 'true')
-  }
   if (authStore.user?.uid) subStore.fetchStatus(authStore.user.uid)
   // Upgrade banner events
   try {
@@ -557,95 +549,15 @@ onUnmounted(() => {
 })
 
 function startTour() {
-  // close mobile menu if open
   mobileMenu.value = false
-  const tour = driver({
-    animate: true,
-    opacity: 0.75,
-    padding: 8,
-    allowClose: true,
-    doneBtnText: 'Finish',
-    closeBtnText: '×',
-    nextBtnText: 'Next →',
-    prevBtnText: '← Back',
-    showProgress: true,
-    steps: [
-      {
-        element: '.daily-card',
-        popover: {
-          title: '📅 Daily Tasks',
-          description: 'Plan and track your tasks for today here.',
-          position: 'bottom',
-        },
-      },
-      {
-        element: '.quick-links-card',
-        popover: {
-          title: '🔗 Quick Links',
-          description: 'Save your frequently used websites or tools here.',
-          position: 'bottom',
-        },
-      },
-      {
-        element: '.weekly-card',
-        popover: {
-          title: '📆 Weekly Overview',
-          description: 'See what you’ve completed this week and upcoming tasks.',
-          position: 'left',
-        },
-      },
-      {
-        element: '.monthly-card',
-        popover: {
-          title: '🌙 Monthly Goals',
-          description: 'Track your long-term goals and progress here.',
-          position: 'left',
-        },
-      },
-      {
-        element: '.journal-card',
-        popover: {
-          title: '📖 Journal Snapshot',
-          description: 'Reflect daily and track your mood & streaks.',
-          position: 'top',
-        },
-      },
-      {
-        element: '.ai-card',
-        popover: {
-          title: '🤖 AI Insights',
-          description: 'AI analyzes your tasks and provides smart suggestions.',
-          position: 'top',
-        },
-      },
-      {
-        element: '.sidebar',
-        popover: {
-          title: '📂 Navigation',
-          description: 'Use the sidebar to navigate between different sections.',
-          position: 'right',
-        },
-      },
-      // {
-      //   element: 'header',
-      //   popover: {
-      //     title: '👤 User Profile',
-      //     description: 'Access your profile and logout from here.',
-      //     position: 'left'
-      //   }
-      // },
-      // {
-      //   element: '.footer',
-      //   popover: {
-      //     title: '❓ Help & Support',
-      //     description: 'Find links to privacy, terms, and contact information here.',
-      //     position: 'top'
-      //   }
-      // }
-    ],
-  })
-
-  tour.drive()
+  try {
+    if (typeof window === 'undefined') return
+    window.dispatchEvent(
+      new CustomEvent('pcai:onboarding:request', { detail: { source: 'sidebar-tour-button' } })
+    )
+  } catch (error) {
+    console.warn('Failed to trigger onboarding tour', error)
+  }
 }
 </script>
 

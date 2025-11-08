@@ -391,6 +391,68 @@
           </div>
         </div>
       </div>
+
+      <div class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 xl:col-span-2">
+        <div
+          class="dashboard-card calendar-sync-card space-y-4 bg-gradient-to-br from-indigo-900/70 via-purple-900/60 to-slate-900/70 border border-indigo-600/40 shadow-lg"
+        >
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div class="space-y-2">
+              <p class="text-[11px] uppercase tracking-[0.4em] text-indigo-300/80">Calendar Sync</p>
+              <h3 class="text-lg sm:text-xl font-semibold text-white">
+                Smart scheduling with Google Calendar
+              </h3>
+              <p class="text-sm text-indigo-100/80">
+                Connect once to auto-pull meetings, prep agendas, and hold buffer space.
+              </p>
+            </div>
+            <RouterLink
+              to="/google-calendar-integration"
+              class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm font-semibold text-indigo-50 border border-white/10 transition"
+            >
+              Connect calendar →
+            </RouterLink>
+          </div>
+          <ul class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-indigo-100/90">
+            <li class="px-3 py-2 rounded-2xl bg-slate-900/40 border border-white/5">🗓️ Auto-sync meetings</li>
+            <li class="px-3 py-2 rounded-2xl bg-slate-900/40 border border-white/5">✍️ Draft prep tasks</li>
+            <li class="px-3 py-2 rounded-2xl bg-slate-900/40 border border-white/5">🎯 Recommend focus blocks</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 xl:col-span-3">
+        <div
+          class="dashboard-card reminders-card space-y-4 bg-gradient-to-br from-amber-900/60 via-orange-900/50 to-slate-900/70 border border-amber-500/30 shadow-lg"
+        >
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <p class="text-[11px] uppercase tracking-[0.3em] text-amber-200/80">Reminders & Notifications</p>
+              <h3 class="text-lg sm:text-xl font-semibold text-white">Stay on track effortlessly</h3>
+              <p class="text-sm text-amber-100/80">
+                Choose WhatsApp, SMS, voice, or push nudges for every mission-critical task.
+              </p>
+            </div>
+            <RouterLink
+              to="/settings?tab=notifications"
+              class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm font-semibold text-amber-50 border border-white/10 transition"
+            >
+              Notification center →
+            </RouterLink>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm text-amber-100/90">
+            <div class="p-3 rounded-2xl bg-slate-900/40 border border-white/5">
+              🔔 Multi-channel reminders
+            </div>
+            <div class="p-3 rounded-2xl bg-slate-900/40 border border-white/5">
+              🕑 Gentle follow-ups if you snooze
+            </div>
+            <div class="p-3 rounded-2xl bg-slate-900/40 border border-white/5">
+              🎙️ Voice prompts + AI suggestions
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- Tier 3 · Analytics & Insights -->
@@ -633,7 +695,7 @@
           </button>
           <RouterLink
             to="/talk-to-planner"
-            class="action-chip bg-transparent border border-indigo-400/60 text-indigo-200 hover:bg-indigo-500/10"
+            class="action-chip talk-to-planner-entry bg-transparent border border-indigo-400/60 text-indigo-200 hover:bg-indigo-500/10"
           >
             <span class="text-lg">💬</span>
             <span>Talk to Planner</span>
@@ -648,6 +710,8 @@
         </div>
       </div>
     </section>
+
+    <!-- Onboarding tour temporarily disabled -->
   </main>
 </template>
 
@@ -666,8 +730,6 @@ import { useTasks } from '@/composables/useTasks'
 import { addTaskToFirebase, updateTaskInFirebase, fetchEntries } from '@/services/firebaseService'
 import QuickLinksCard from '@/components/QuickLinksCard.vue'
 import SetupPrompt from '@/components/SetupPrompt.vue'
-import { driver } from 'driver.js'
-import 'driver.js/dist/driver.css'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { reactivateSubscription } from '@/services/stripeService'
 import dayjs from 'dayjs'
@@ -678,7 +740,7 @@ import { trackLinkedInConversion } from '@/utils/ads'
 import { getReminderStatus, scheduleReminder } from '@/services/reminderService'
 import { listReports, generateReport } from '@/services/reportsService'
 import api from '@/services/api'
-import { getPreferences as getUserPreferences } from '@/services/settingsService'
+import { getPreferences as getUserPreferences, updateOnboardingStatus } from '@/services/settingsService'
 import { ElMessage, ElNotification } from 'element-plus'
 import { TASK_CATEGORY_FILTERS, getCategoryIcon, getCategoryColor, resolveCategory } from '@/constants/taskCategories'
 import { ensureDailyStreakState, getUserStreak } from '@/services/streakService'
@@ -764,6 +826,71 @@ const showSetup = ref(false)
 const reminderActiveByTask = ref({})
 const checkingAuth = ref(true)
 const userPrefs = ref({ notifications: {}, integrations: {} })
+const onboardingTourVisible = ref(false)
+const onboardingStatus = ref({
+  completed: false,
+  lastStep: 0,
+  showLaterUntil: null,
+  completedAt: null,
+})
+const onboardingSessionPlayed = ref(false)
+
+const onboardingSteps = computed(() => [
+  {
+    id: 'daily',
+    title: 'Daily Tasks',
+    description: 'Track, plan, and prioritize your day here 🧭',
+    selector: '.daily-card',
+    placement: 'right',
+    icon: '🧭',
+    aiTip: 'Say “Plan my day” and I’ll reorder this list based on energy + focus.',
+  },
+  {
+    id: 'calendar',
+    title: 'Calendar Sync',
+    description: 'Connect Google Calendar for smart scheduling 🗓️',
+    selector: '.calendar-sync-card',
+    placement: 'left',
+    icon: '🗓️',
+    aiTip: 'I’ll pull in meetings, prep agendas, and protect white space automatically.',
+  },
+  {
+    id: 'talk',
+    title: 'Talk to Planner',
+    description: 'Speak to your AI assistant — plan hands-free 🎙️',
+    selector: '.talk-to-planner-entry',
+    placement: 'bottom',
+    icon: '🎙️',
+    aiTip: 'Ask “Plan my next sprint” and I’ll capture tasks while you speak.',
+  },
+  {
+    id: 'weekly',
+    title: 'Weekly Overview',
+    description: 'Get insights on your progress and wins 📊',
+    selector: '.weekly-card',
+    placement: 'left',
+    icon: '📊',
+    aiTip: 'Need encouragement? Ask for a weekly recap or highlight reel.',
+  },
+  {
+    id: 'journal',
+    title: 'Journal',
+    description: 'Reflect on your thoughts, tasks, and gratitude 🪶',
+    selector: '.journal-card',
+    placement: 'top',
+    icon: '🪶',
+    aiTip: 'Speak your reflections — I’ll transcribe, summarize, and notice streaks.',
+  },
+  {
+    id: 'reminders',
+    title: 'Reminders & Notifications',
+    description: 'Stay on track effortlessly 🔔',
+    selector: '.reminders-card',
+    placement: 'top',
+    icon: '🔔',
+    aiTip: 'Turn on WhatsApp, SMS, or voice nudges whenever you need extra accountability.',
+  },
+])
 
 // Animated insights
 const defaultInsights = [
@@ -817,6 +944,164 @@ const journalStreak = computed(() => {
 
 const userStreak = ref(0)
 const displayStreak = computed(() => userStreak.value || journalStreak.value || 0)
+const ONBOARDING_SNOOZE_HOURS = 24
+let onboardingTimer = null
+
+function normalizeTimestamp(value) {
+  if (!value) return null
+  if (typeof value === 'string') return value
+  if (value instanceof Date) return value.toISOString()
+  if (typeof value?.toDate === 'function') {
+    try {
+      return value.toDate().toISOString()
+    } catch {
+      return null
+    }
+  }
+  if (typeof value?.seconds === 'number') {
+    try {
+      return dayjs.unix(value.seconds).toISOString()
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
+function syncOnboardingFromPreferences(pref = {}) {
+  let raw = {}
+  if (pref && Object.prototype.hasOwnProperty.call(pref, 'onboarding')) {
+    raw = pref.onboarding || {}
+  } else if (
+    Object.prototype.hasOwnProperty.call(pref || {}, 'completed') ||
+    Object.prototype.hasOwnProperty.call(pref || {}, 'showLaterUntil') ||
+    Object.prototype.hasOwnProperty.call(pref || {}, 'lastStep')
+  ) {
+    raw = pref || {}
+  }
+  onboardingStatus.value = {
+    completed: !!raw?.completed,
+    lastStep: Number(raw?.lastStep || 0),
+    showLaterUntil: normalizeTimestamp(raw?.showLaterUntil),
+    completedAt: normalizeTimestamp(raw?.completedAt),
+  }
+}
+
+function shouldLaunchOnboarding() {
+  if (!authStore.user?.uid) return false
+  if (onboardingStatus.value.completed) return false
+  if (onboardingStatus.value.showLaterUntil) {
+    try {
+      if (dayjs().isBefore(dayjs(onboardingStatus.value.showLaterUntil))) return false
+    } catch {
+      /* noop */
+    }
+  }
+  return true
+}
+
+function maybeLaunchOnboarding(reason = 'auto') {
+  if (!shouldLaunchOnboarding()) return
+  if (reason === 'auto' && onboardingSessionPlayed.value) return
+  onboardingSessionPlayed.value = true
+  const delay = reason === 'auto' ? 1200 : 200
+  if (typeof window === 'undefined') {
+    onboardingTourVisible.value = true
+    return
+  }
+  if (onboardingTimer) clearTimeout(onboardingTimer)
+  onboardingTimer = window.setTimeout(() => {
+    onboardingTourVisible.value = true
+    onboardingTimer = null
+  }, delay)
+}
+
+async function persistOnboardingStatus(patch = {}) {
+  if (!authStore.user?.uid) return
+  const payload = { ...patch }
+  if (payload.lastStep === undefined) payload.lastStep = onboardingStatus.value.lastStep || 0
+  const cleanPayload = {}
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value !== undefined) cleanPayload[key] = value
+  })
+  if (!Object.keys(cleanPayload).length) return
+  try {
+    await updateOnboardingStatus(authStore.user.uid, cleanPayload)
+    onboardingStatus.value = {
+      ...onboardingStatus.value,
+      ...cleanPayload,
+    }
+  } catch (error) {
+    console.warn('Failed to update onboarding status', error?.response?.data || error?.message || error)
+  }
+}
+
+function handleOnboardingStarted() {
+  persistOnboardingStatus({ startedAt: new Date().toISOString(), completed: false })
+}
+
+function handleOnboardingStep(evt) {
+  if (!evt?.step) return
+  onboardingStatus.value = {
+    ...onboardingStatus.value,
+    lastStep: evt.step,
+  }
+}
+
+async function handleOnboardingFinished() {
+  onboardingTourVisible.value = false
+  await persistOnboardingStatus({
+    completed: true,
+    completedAt: new Date().toISOString(),
+    showLaterUntil: null,
+  })
+}
+
+async function handleOnboardingSkipped() {
+  onboardingTourVisible.value = false
+  await persistOnboardingStatus({
+    completed: true,
+    skippedAt: new Date().toISOString(),
+  })
+}
+
+async function handleOnboardingLater() {
+  onboardingTourVisible.value = false
+  onboardingSessionPlayed.value = false
+  if (onboardingTimer) {
+    clearTimeout(onboardingTimer)
+    onboardingTimer = null
+  }
+  const snoozeUntil = dayjs().add(ONBOARDING_SNOOZE_HOURS, 'hour').toISOString()
+  await persistOnboardingStatus({
+    showLaterUntil: snoozeUntil,
+    completed: false,
+    lastDeferredAt: new Date().toISOString(),
+  })
+}
+
+function handleOnboardingReplayEvent() {
+  if (!authStore.user?.uid) return
+  onboardingTourVisible.value = false
+  onboardingSessionPlayed.value = false
+  maybeLaunchOnboarding('manual')
+  persistOnboardingStatus({
+    completed: false,
+    showLaterUntil: null,
+    replayRequestedAt: new Date().toISOString(),
+  })
+}
+
+async function bootstrapPreferences(uid) {
+  try {
+    const prefs = await getUserPreferences(uid)
+    userPrefs.value = prefs || { notifications: {}, integrations: {} }
+    syncOnboardingFromPreferences(prefs || {})
+    maybeLaunchOnboarding()
+  } catch (error) {
+    console.warn('Failed to load user prefs:', error)
+  }
+}
 
 const sortedDaily = computed(() =>
   [...dailyTasks.value].sort((a, b) =>
@@ -1287,6 +1572,13 @@ onMounted(() => {
 onUnmounted(() => {
   if (unsubscribe.value) unsubscribe.value()
   if (insightIntervalId.value) clearInterval(insightIntervalId.value)
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('pcai:onboarding:request', handleOnboardingReplayEvent)
+  }
+  if (onboardingTimer) {
+    clearTimeout(onboardingTimer)
+    onboardingTimer = null
+  }
 })
 
 async function redirectToLogin() {
@@ -1491,6 +1783,39 @@ watch(
   { immediate: true }
 )
 
+watch(
+  () => authStore?.user?.uid,
+  (uid) => {
+    if (!uid) {
+      userPrefs.value = { notifications: {}, integrations: {} }
+      onboardingStatus.value = {
+        completed: false,
+        lastStep: 0,
+        showLaterUntil: null,
+        completedAt: null,
+      }
+      onboardingTourVisible.value = false
+      onboardingSessionPlayed.value = false
+      return
+    }
+    bootstrapPreferences(uid)
+  },
+  { immediate: true }
+)
+
+watch(
+  () => authStore.user?.preferences?.onboarding,
+  (value) => {
+    if (!value) return
+    syncOnboardingFromPreferences(value)
+  },
+  { immediate: true }
+)
+
+watch(onboardingTourVisible, (visible) => {
+  if (visible) onboardingSessionPlayed.value = true
+})
+
 async function onReminderClick(task) {
   try {
     const uid = authStore?.user?.uid
@@ -1513,17 +1838,8 @@ onMounted(() => {
   } catch {
     checkingAuth.value = false
   }
-  try {
-    const uid = authStore?.user?.uid
-    if (uid) {
-      getUserPreferences(uid)
-        .then((res) => {
-          userPrefs.value = res || { notifications: {}, integrations: {} }
-        })
-        .catch((error) => console.warn('Failed to load user prefs:', error))
-    }
-  } catch {
-    /* noop */
+  if (typeof window !== 'undefined') {
+    window.addEventListener('pcai:onboarding:request', handleOnboardingReplayEvent)
   }
 })
 
