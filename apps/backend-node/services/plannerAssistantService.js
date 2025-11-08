@@ -95,6 +95,104 @@ function extractTaskListFromMessage(message, timezoneId = DEFAULT_TIMEZONE) {
   return tasks.length > 1 ? tasks : [];
 }
 
+function safeFormatInTimezone(value, timezoneId = DEFAULT_TIMEZONE) {
+  try {
+    const base = dayjs(value);
+    if (!base.isValid()) return null;
+    if (
+      timezoneId &&
+      typeof timezoneId === "string" &&
+      timezoneId.trim() &&
+      typeof base.tz === "function"
+    ) {
+      const shifted = base.tz(timezoneId, true);
+      if (shifted.isValid()) return shifted;
+    }
+    return base;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeDateToken(value, timezoneId = DEFAULT_TIMEZONE) {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+    const parsed = safeFormatInTimezone(trimmed, timezoneId);
+    return parsed ? parsed.format("YYYY-MM-DD") : null;
+  }
+  if (value instanceof Date) {
+    const parsed = safeFormatInTimezone(value, timezoneId);
+    return parsed ? parsed.format("YYYY-MM-DD") : null;
+  }
+  if (typeof value?.toDate === "function") {
+    try {
+      const parsed = safeFormatInTimezone(value.toDate(), timezoneId);
+      return parsed ? parsed.format("YYYY-MM-DD") : null;
+    } catch {
+      /* noop */
+    }
+  }
+  if (typeof value === "number") {
+    const parsed = safeFormatInTimezone(new Date(value), timezoneId);
+    return parsed ? parsed.format("YYYY-MM-DD") : null;
+  }
+  return null;
+}
+
+function resolveCandidateTimezone(candidate = {}, context = {}) {
+  const choices = [
+    candidate.timezone,
+    candidate.tz,
+    context?.profile?.timezone,
+    context?.profile?.tz,
+    context?.summary?.timezone,
+    context?.profile?.preferences?.timezone,
+  ];
+  for (const option of choices) {
+    if (typeof option === "string" && option.trim()) return option.trim();
+  }
+  return DEFAULT_TIMEZONE;
+}
+
+function ensureCandidateDate(candidate = {}, context = {}) {
+  const timezoneId = resolveCandidateTimezone(candidate, context);
+  if (!candidate.timezone) candidate.timezone = timezoneId;
+
+  const existing = normalizeDateToken(candidate.date, timezoneId);
+  if (existing) {
+    candidate.date = existing;
+    return candidate.date;
+  }
+
+  const fromDue = normalizeDateToken(candidate.dueDate || candidate.due_date, timezoneId);
+  if (fromDue) {
+    candidate.date = fromDue;
+    return candidate.date;
+  }
+
+  const planDate = normalizeDateToken(context?.summary?.planDate || context?.summary?.plan_date, timezoneId);
+  if (planDate) {
+    candidate.date = planDate;
+    return candidate.date;
+  }
+
+  const fromSchedule = normalizeDateToken(candidate.scheduledTime || candidate.when, timezoneId);
+  if (fromSchedule) {
+    candidate.date = fromSchedule;
+    return candidate.date;
+  }
+
+  try {
+    candidate.date = dayjs().tz(timezoneId).format("YYYY-MM-DD");
+  } catch {
+    candidate.date = dayjs().format("YYYY-MM-DD");
+  }
+  return candidate.date;
+}
+
 function asIso(value) {
   try {
     if (!value) return null;
@@ -284,6 +382,65 @@ function normalizeIdToken(value) {
 function normalizeTitleToken(value) {
   if (!value && value !== 0) return null;
   return String(value).trim().toLowerCase();
+}
+
+function normalizeTaskTitleKey(value) {
+  const token = normalizeTitleToken(value);
+  if (!token) return null;
+  return token.replace(/\s+/g, " ").trim();
+}
+
+function datesMatchLoose(left, right) {
+  const a = toYMD(left);
+  const b = toYMD(right);
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  return a === b;
+}
+
+function findTaskInListByKey(list = [], titleKey, dateKey) {
+  if (!Array.isArray(list) || !titleKey) return null;
+  return (
+    list.find((task) => {
+      const candidateKey = normalizeTaskTitleKey(task?.title);
+      if (!candidateKey || candidateKey !== titleKey) return false;
+      if (!dateKey) return true;
+      return datesMatchLoose(task?.date, dateKey);
+    }) || null
+  );
+}
+
+async function lookupDuplicateTask(uid, candidate = {}, knownTasks = []) {
+  const titleKey = normalizeTaskTitleKey(candidate?.title);
+  if (!titleKey) return null;
+
+  const dateKey = candidate?.date ? toYMD(candidate.date) : null;
+  const inMemory = findTaskInListByKey(knownTasks, titleKey, dateKey);
+  if (inMemory) return inMemory;
+
+  if (!dateKey) return null;
+
+  try {
+    const snap = await db
+      .collection("tasks")
+      .where("userId", "==", String(uid))
+      .where("date", "==", dateKey)
+      .limit(25)
+      .get();
+    let duplicate = null;
+    snap.forEach((doc) => {
+      if (duplicate) return;
+      const data = doc.data() || {};
+      const docKey = normalizeTaskTitleKey(data.title);
+      if (docKey && docKey === titleKey) {
+        duplicate = { id: doc.id, ...data };
+      }
+    });
+    return duplicate;
+  } catch (err) {
+    console.warn("[PlannerAssistant] duplicate lookup failed", err?.message || err);
+    return null;
+  }
 }
 
 function findTasksMatchingText(text, taskList = []) {
@@ -843,16 +1000,57 @@ export function extractActionsFromText(rawText) {
   return { text: cleaned, actions };
 }
 
-async function createTaskFromAction(uid, payload = {}) {
+async function createTaskFromAction(uid, payload = {}, context = {}) {
   try {
     const incoming = Array.isArray(payload.tasks) && payload.tasks.length ? payload.tasks : [payload];
     const basePayload = { ...payload };
     delete basePayload.tasks;
 
     const created = [];
+    const skipped = [];
+    const knownTasks = Array.isArray(context?.tasks) ? context.tasks.slice() : [];
+    const seenKeys = new Set();
+    const describeDate = (value) => {
+      if (!value) return null;
+      return formatDateLabel(value) || toYMD(value) || null;
+    };
+
     for (const entry of incoming) {
       const candidate = { ...basePayload, ...entry };
-      if (!candidate.title) continue;
+      const cleanedTitle = sanitizeString(candidate.title, "");
+      if (!cleanedTitle) {
+        skipped.push({ reason: "missing_title", original: candidate.title, date: candidate.date || null });
+        continue;
+      }
+      candidate.title = cleanedTitle;
+      ensureCandidateDate(candidate, context);
+
+      const titleKey = normalizeTaskTitleKey(candidate.title);
+      const dateKey = candidate.date ? toYMD(candidate.date) : null;
+      if (titleKey) {
+        const dedupeKey = `${titleKey}::${dateKey || "any"}`;
+        if (seenKeys.has(dedupeKey)) {
+          skipped.push({
+            reason: "duplicate_payload",
+            title: candidate.title,
+            date: candidate.date || null,
+          });
+          continue;
+        }
+        seenKeys.add(dedupeKey);
+      }
+
+      const existing = await lookupDuplicateTask(uid, { title: candidate.title, date: candidate.date }, knownTasks);
+      if (existing) {
+        skipped.push({
+          reason: "already_exists",
+          title: candidate.title,
+          date: candidate.date || null,
+          existingId: existing.id,
+        });
+        continue;
+      }
+
       const task = await createTask(uid, candidate, {
         origin: "planner-assistant",
         silent: candidate.silent === true,
@@ -872,14 +1070,45 @@ async function createTaskFromAction(uid, payload = {}) {
         });
       }
       created.push(task);
+      knownTasks.push(task);
+    }
+
+    const duplicateSkips = skipped.filter(
+      (item) => item.reason === "already_exists" || item.reason === "duplicate_payload",
+    );
+    const invalidSkips = skipped.filter((item) => item.reason === "missing_title");
+
+    let skipNote = "";
+    if (duplicateSkips.length === 1) {
+      const entry = duplicateSkips[0];
+      const when = describeDate(entry.date);
+      skipNote = when
+        ? `Skipped “${entry.title}” because it already exists for ${when}.`
+        : `Skipped “${entry.title}” because it already exists.`;
+    } else if (duplicateSkips.length > 1) {
+      skipNote = `Skipped ${duplicateSkips.length} tasks that were already on your list.`;
+    } else if (invalidSkips.length === 1) {
+      skipNote = "Skipped a task because it was missing a title.";
+    } else if (invalidSkips.length > 1) {
+      skipNote = `Skipped ${invalidSkips.length} tasks because they were missing titles.`;
     }
 
     if (!created.length) {
+      if (skipNote) {
+        return {
+          status: duplicateSkips.length ? "skipped" : "error",
+          type: "create_task",
+          label: payload.label || "Task creation",
+          payload,
+          message: skipNote,
+        };
+      }
       throw new Error("No tasks created from payload");
     }
 
     if (created.length === 1) {
       const task = created[0];
+      const baseMessage = `Created task “${task.title}” for ${task.date}`;
       return {
         status: "completed",
         type: "create_task",
@@ -898,11 +1127,13 @@ async function createTaskFromAction(uid, payload = {}) {
             },
           ],
         },
-        message: `Created task “${task.title}” for ${task.date}`,
+        message: skipNote ? `${baseMessage}\n${skipNote}` : baseMessage,
       };
     }
 
     const summaryLines = created.map((task) => `• ${task.title} (${task.date})`);
+    const messageParts = [`Created ${created.length} tasks:\n${summaryLines.join("\n")}`];
+    if (skipNote) messageParts.push(skipNote);
     return {
       status: "completed",
       type: "create_task",
@@ -918,7 +1149,7 @@ async function createTaskFromAction(uid, payload = {}) {
           link: task.link || null,
         })),
       },
-      message: `Created ${created.length} tasks:\n${summaryLines.join("\n")}`,
+      message: messageParts.join("\n\n"),
     };
   } catch (err) {
     console.error("[PlannerAssistant] createTaskFromAction failed", err?.message || err);
@@ -976,7 +1207,7 @@ export async function executePlannerActions(uid, actions = [], context = {}) {
     try {
       const type = String(raw?.type || raw?.name || "").toLowerCase();
       if (type === "create_task") {
-        results.push(await createTaskFromAction(uid, raw?.payload || raw));
+        results.push(await createTaskFromAction(uid, raw?.payload || raw, context));
       } else if (type === "schedule_reminder") {
         results.push(await scheduleReminderFromAction(uid, raw?.payload || raw));
       } else if (type === "complete_task") {
