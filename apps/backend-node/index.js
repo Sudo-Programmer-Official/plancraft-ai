@@ -105,6 +105,7 @@ import taskRoutes from "./routes/taskRoutes.js";
 import habitRoutes from "./routes/habitRoutes.js";
 import { processReminderBatches } from "./services/reminderService.js";
 import seoRoutes from "./routes/seoRoutes.js";
+import journalRoutes from "./routes/journalRoutes.js";
 
 dotenv.config();
 
@@ -258,6 +259,7 @@ app.use("/api/planner", plannerRoutes);
 app.use("/api/talk", talkToPlannerRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/habits", habitRoutes);
+app.use("/api/journal", journalRoutes);
 app.use("/", seoRoutes);
 // Mount Google routes (guarded internally by feature flag)
 app.use("/api", googleAuthRoutes);

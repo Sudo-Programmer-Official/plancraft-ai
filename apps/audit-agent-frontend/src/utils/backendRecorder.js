@@ -20,12 +20,25 @@ function getExt(mime) {
  */
 export async function recordAndSendToBackend(
   onResult,
-  { timeSliceMs = 4000, mode = "final", emitFinalResult = mode === "final" } = {}
+  {
+    timeSliceMs = 4000,
+    mode = "final",
+    emitFinalResult = mode === "final",
+    detectSilence = false,
+    silenceThreshold = 0.015,
+    silenceDurationMs = 2500,
+    onAutoStop,
+  } = {},
 ) {
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
 
   const mimeType = "audio/webm;codecs=opus" // force stable type
   const ext = getExt(mimeType)
+  const hasWindow = typeof window !== 'undefined'
+  const AudioContextClass = hasWindow
+    ? window.AudioContext || window.webkitAudioContext || null
+    : null
+  const canMonitorSilence = detectSilence && !!AudioContextClass
 
   const invokeCallback = async (text, isFinal) => {
     if (!text || typeof onResult !== "function") return
@@ -60,7 +73,105 @@ export async function recordAndSendToBackend(
     },
   })
 
-  recorder.startRecording()
+  let audioCtx = null
+  let analyser = null
+  let silenceRaf = null
+  let silenceStartedAt = null
+  let autoStopTriggered = false
+  let sampleBuffer = null
+
+  function stopSilenceMonitor() {
+    if (silenceRaf) {
+      cancelAnimationFrame(silenceRaf)
+      silenceRaf = null
+    }
+    silenceStartedAt = null
+    if (audioCtx) {
+      try {
+        audioCtx.close()
+      } catch {
+        /* noop */
+      }
+      audioCtx = null
+    }
+    analyser = null
+    sampleBuffer = null
+  }
+
+  function startSilenceMonitor() {
+    if (!canMonitorSilence) return
+    try {
+      audioCtx = new AudioContextClass()
+      analyser = audioCtx.createAnalyser()
+      analyser.fftSize = 2048
+      const source = audioCtx.createMediaStreamSource(stream)
+      source.connect(analyser)
+      sampleBuffer = new Float32Array(analyser.fftSize)
+      const byteBuffer = new Uint8Array(analyser.fftSize)
+      const useFloat = typeof analyser.getFloatTimeDomainData === 'function'
+
+      const readSamples = () => {
+        if (useFloat) {
+          analyser.getFloatTimeDomainData(sampleBuffer)
+        } else {
+          analyser.getByteTimeDomainData(byteBuffer)
+          for (let i = 0; i < byteBuffer.length; i += 1) {
+            sampleBuffer[i] = (byteBuffer[i] - 128) / 128
+          }
+        }
+      }
+
+      const checkSilence = () => {
+        readSamples()
+        let sumSquares = 0
+        for (let i = 0; i < sampleBuffer.length; i += 1) {
+          const sample = sampleBuffer[i] || 0
+          sumSquares += sample * sample
+        }
+        const rms = Math.sqrt(sumSquares / sampleBuffer.length) || 0
+        const now =
+          typeof performance !== 'undefined' && typeof performance.now === 'function'
+            ? performance.now()
+            : Date.now()
+        if (rms < silenceThreshold) {
+          if (!silenceStartedAt) {
+            silenceStartedAt = now
+          } else if (now - silenceStartedAt >= silenceDurationMs) {
+            stopSilenceMonitor()
+            if (!autoStopTriggered) {
+              autoStopTriggered = true
+              if (typeof onAutoStop === 'function') {
+                try {
+                  onAutoStop('silence')
+                } catch {
+                  /* noop */
+                }
+              }
+              if (recorder?._stop) {
+                recorder._stop().catch(() => {})
+              } else {
+                try {
+                  recorder.stopRecording()
+                } catch {
+                  /* noop */
+                }
+              }
+            }
+            return
+          }
+        } else {
+          silenceStartedAt = null
+        }
+        silenceRaf = requestAnimationFrame(checkSilence)
+      }
+
+      audioCtx.resume?.().catch(() => {})
+      silenceRaf = requestAnimationFrame(checkSilence)
+    } catch (err) {
+      console.warn('⚠️ Silence monitor unavailable', err?.message || err)
+      stopSilenceMonitor()
+    }
+  }
 
   // 🔹 Finalizer
   let stopped = false
@@ -71,6 +182,7 @@ export async function recordAndSendToBackend(
         return
       }
       stopped = true
+      stopSilenceMonitor()
       recorder.stopRecording(async () => {
         try {
           const shouldSendFinal = !skipFinalUpload && emitFinalResult
@@ -94,6 +206,9 @@ export async function recordAndSendToBackend(
         }
       })
     })
+
+  recorder.startRecording()
+  startSilenceMonitor()
 
   return recorder
 }

@@ -327,11 +327,13 @@ import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
 import { useSeoMeta } from '@/composables/useSeoMeta'
+import { useTasks } from '@/composables/useTasks'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
 
 const authStore = useAuthStore()
+const { loadTasks } = useTasks()
 
 useSeoMeta({
   title: 'Talk to PlanCraft AI | Conversational Task Manager & Voice Assistant',
@@ -870,6 +872,11 @@ async function sendQuery(forcedInput = null) {
       taskChangingTypes.has(String(action?.type || '').toLowerCase()),
     )
     if (touchedTasks) {
+      try {
+        await loadTasks()
+      } catch (err) {
+        console.warn('[TalkToPlanner] failed to refresh tasks store', err?.message || err)
+      }
       try {
         window.dispatchEvent(new CustomEvent('tasks:refresh-request'))
       } catch (err) {

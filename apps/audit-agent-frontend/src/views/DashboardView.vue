@@ -475,11 +475,47 @@
                 to="/journal"
                 class="inline-flex items-center text-xs px-3 py-1.5 rounded-lg font-semibold bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 text-white shadow-sm transition"
               >
-                Open Journal
+                {{ journalInsights?.suggestion?.cta || 'Open Journal' }}
               </router-link>
             </div>
           </div>
-          <div v-if="journalLogs.length" class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm sm:text-base">
+          <div v-if="journalInsights" class="space-y-4">
+            <div class="journal-insight-banner p-4 rounded-2xl border border-slate-700/60 bg-slate-900/60">
+              <p class="text-xs uppercase tracking-wide text-indigo-200 font-semibold">
+                {{ journalInsights.stats.todayJournaled ? 'Logged today' : 'No reflection yet today' }}
+              </p>
+              <p class="text-base sm:text-lg text-slate-100 font-semibold mt-1">
+                {{ journalInsights.suggestion.text }}
+              </p>
+              <div class="flex flex-wrap gap-3 text-xs text-slate-300 mt-3">
+                <span>🔥 {{ journalInsights.stats.streakDays }}-day streak</span>
+                <span>🗓 {{ journalInsights.stats.entriesThisWeek }} this week</span>
+                <span>
+                  🏷
+                  {{ journalInsights.stats.topCategory?.label || 'Reflection' }}
+                </span>
+              </div>
+              <div v-if="journalInsights.keywords?.length" class="journal-keywords mt-3">
+                <span v-for="word in journalInsights.keywords" :key="word">#{{ word }}</span>
+              </div>
+            </div>
+            <div
+              v-if="journalLastEntry"
+              class="journal-last-entry p-4 rounded-2xl border border-slate-800/80 bg-slate-900/60 flex items-start gap-3"
+            >
+              <div class="text-2xl shrink-0">{{ journalLastEntry.emoji }}</div>
+              <div>
+                <p class="text-xs text-slate-400">{{ journalLastEntry.label }}</p>
+                <p class="text-sm text-slate-100 mt-1">
+                  {{ journalLastEntry.preview }}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div
+            v-else-if="journalLogs.length"
+            class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm sm:text-base"
+          >
             <div class="p-3 rounded-xl bg-slate-900/70 border border-slate-800/80 text-center space-y-1">
               <p class="text-2xl">🔥</p>
               <p class="font-medium" :class="{ 'animate-pulse': displayStreak >= 1 }">
@@ -728,6 +764,7 @@ import { useAuthStore } from '@/stores/authStore'
 import TaskPlannerDialog from '@/components/TaskPlannerDialog.vue'
 import { useTasks } from '@/composables/useTasks'
 import { addTaskToFirebase, updateTaskInFirebase, fetchEntries } from '@/services/firebaseService'
+import { fetchJournalInsights as fetchJournalInsightsApi } from '@/services/journalService'
 import QuickLinksCard from '@/components/QuickLinksCard.vue'
 import SetupPrompt from '@/components/SetupPrompt.vue'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
@@ -814,6 +851,7 @@ const showPlanner = ref(false)
 const selectedTask = ref(null)
 const dailyList = ref(null)
 const journalLogs = ref([])
+const journalInsights = ref(null)
 const carryoverCount = ref(0)
 const latestReport = ref(null)
 const generatingWeekly = ref(false)
@@ -944,6 +982,18 @@ const journalStreak = computed(() => {
 
 const userStreak = ref(0)
 const displayStreak = computed(() => userStreak.value || journalStreak.value || 0)
+
+const journalLastEntry = computed(() => {
+  const entry = journalInsights.value?.lastEntry
+  if (!entry) return null
+  const created = entry.createdAt ? dayjs(entry.createdAt) : dayjs()
+  const preview = (entry.summary || entry.text || '').slice(0, 160)
+  return {
+    preview,
+    label: created.format('MMM D'),
+    emoji: entry.mood?.emoji || entry.categoryEmoji || '📝',
+  }
+})
 const ONBOARDING_SNOOZE_HOURS = 24
 let onboardingTimer = null
 
@@ -1254,6 +1304,14 @@ function goToProgress() {
   routerNav.push('/reports')
 }
 
+async function loadJournalInsights() {
+  try {
+    journalInsights.value = await fetchJournalInsightsApi()
+  } catch (err) {
+    console.warn('Failed to load journal insights', err?.message || err)
+  }
+}
+
 onMounted(async () => {
   try {
     const seen = localStorage.getItem('pcai_setup_done') === '1'
@@ -1266,6 +1324,7 @@ onMounted(async () => {
   }
 
   journalLogs.value = await fetchEntries()
+  await loadJournalInsights()
   try {
     const items = await listReports(1)
     latestReport.value = Array.isArray(items) ? items[0] : null
@@ -1931,6 +1990,31 @@ onUnmounted(() => {
 .slide-leave-to {
   opacity: 0;
   transform: translateY(6px);
+}
+
+.journal-insight-banner {
+  background: rgba(15, 23, 42, 0.6);
+  border-radius: 1.25rem;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+}
+
+.journal-keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.journal-keywords span {
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(79, 70, 229, 0.25);
+  font-size: 0.75rem;
+}
+
+.journal-last-entry {
+  border-radius: 1.25rem;
+  border: 1px dashed rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.45);
 }
 
 </style>
