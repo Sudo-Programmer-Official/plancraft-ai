@@ -246,9 +246,12 @@
       }"
     >
       <button
+        type="button"
         @click="startRecording"
         :class="['mic-btn', { active: micButtonActive }]"
         :title="micButtonTitle"
+        :aria-pressed="micButtonActive"
+        :aria-label="micButtonTitle"
       >
         <svg class="icon icon-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <path
@@ -277,18 +280,32 @@
         @keydown.enter="sendMessage"
       />
       <button
+        type="button"
         @click="sendMessage"
         class="send-btn"
         :disabled="sendDisabled"
-        title="Send message"
+        :title="sendDisabled ? 'Enter a message first' : 'Send message'"
+        :aria-label="sendDisabled ? 'Enter a message first' : 'Send message'"
       >
         <span v-if="assistantThinking" class="loader"></span>
-        <svg v-else class="icon icon-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <svg
+          v-else
+          class="icon icon-send"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+        >
           <path
             stroke-linecap="round"
             stroke-linejoin="round"
-            stroke-width="1.7"
-            d="M12 5l6 6m-6-6l-6 6m6-6v14"
+            stroke-width="1.6"
+            d="M4.5 11.4L20.2 4.3c.9-.4 1.8.5 1.3 1.4l-6.2 12.3c-.4.7-1.4.8-1.9.1l-2.8-3.9-4-1.2c-.8-.2-.9-1.3-.1-1.6Z"
+          />
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="1.6"
+            d="M10.6 13.3L20.5 5"
           />
         </svg>
       </button>
@@ -339,6 +356,7 @@ const hasSpeechRecognitionInput = Boolean(SpeechRecognitionClass)
 const SILENCE_TIMEOUT_MS = Number(import.meta.env.VITE_PLANNER_SILENCE_TIMEOUT_MS || 2500)
 const AUTO_RESTART_DELAY_MS = Number(import.meta.env.VITE_PLANNER_RESTART_DELAY_MS || 900)
 const BACKEND_TIMESLICE_MS = Number(import.meta.env.VITE_PLANNER_BACKEND_TIMESLICE_MS || 1400)
+const AUTO_IDLE_DISENGAGE_MS = Number(import.meta.env.VITE_PLANNER_IDLE_TIMEOUT_MS || 45000)
 const MIC_STATES = Object.freeze({
   idle: 'idle',
   listening: 'listening',
@@ -376,6 +394,7 @@ let speechRecognitionInstance = null
 let backendRecorderInstance = null
 let silenceTimerId = null
 let restartTimerId = null
+let idleDisengageTimerId = null
 let pendingSegmentText = ''
 let latestPreviewText = ''
 let keepListeningHot = false
@@ -1014,6 +1033,7 @@ function formatResultMessage(action = {}) {
 
 function handleVoiceTranscript(text) {
   if (!text) return
+  clearIdleDisengageTimer()
   inputText.value = text
 }
 
@@ -1049,6 +1069,7 @@ async function beginContinuousListening() {
   manualStopRequested = false
   clearSilenceTimer()
   clearRestartTimer()
+  clearIdleDisengageTimer()
   if (voiceEngine === 'web' && hasSpeechRecognitionInput) {
     startWebSpeechSession()
   } else {
@@ -1064,6 +1085,7 @@ async function stopRecording() {
   latestPreviewText = ''
   clearSilenceTimer()
   clearRestartTimer()
+  clearIdleDisengageTimer()
   if (voiceEngine === 'web') {
     if (speechRecognitionInstance) {
       try {
@@ -1107,6 +1129,35 @@ function clearRestartTimer() {
   if (restartTimerId) {
     clearTimeout(restartTimerId)
     restartTimerId = null
+  }
+}
+
+function clearIdleDisengageTimer() {
+  if (idleDisengageTimerId) {
+    clearTimeout(idleDisengageTimerId)
+    idleDisengageTimerId = null
+  }
+}
+
+function scheduleIdleDisengage() {
+  if (AUTO_IDLE_DISENGAGE_MS <= 0) return
+  if (typeof window === 'undefined') return
+  if (!keepListeningHot) return
+  clearIdleDisengageTimer()
+  idleDisengageTimerId = window.setTimeout(() => {
+    idleDisengageTimerId = null
+    autoDisengageAfterIdle()
+  }, AUTO_IDLE_DISENGAGE_MS)
+}
+
+async function autoDisengageAfterIdle() {
+  if (!keepListeningHot) return
+  try {
+    await stopRecording()
+  } catch (err) {
+    console.warn('[TalkToPlanner] auto mic stop failed', err)
+  } finally {
+    // ElMessage.info('Planner stopped listening after a short pause.')
   }
 }
 
@@ -1180,9 +1231,13 @@ async function processVoiceSegment(text) {
   const cleaned = String(text || '').trim()
   if (!cleaned) return
   handleVoiceTranscript(cleaned)
-  await sendQuery(cleaned)
-  trackEvent('Voice Transcribed', { length: cleaned.length })
-  inputText.value = ''
+  try {
+    await sendQuery(cleaned)
+    trackEvent('Voice Transcribed', { length: cleaned.length })
+  } finally {
+    inputText.value = ''
+    scheduleIdleDisengage()
+  }
 }
 
 function startWebSpeechSession() {
@@ -1328,6 +1383,7 @@ async function handleBackendResult(text, isFinal) {
 
 onBeforeUnmount(() => {
   stopVoicePlayback()
+  clearIdleDisengageTimer()
   stopRecording().catch(() => {})
 })
 </script>
@@ -1723,6 +1779,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 0.6rem;
+  flex-wrap: wrap;
   background: rgba(40, 35, 70, 0.8);
   border: 1px solid rgba(100, 100, 255, 0.15);
   border-radius: 2rem;
@@ -1739,10 +1796,12 @@ onBeforeUnmount(() => {
 
 .chat-input {
   flex-grow: 1;
+  min-width: 0;
   background: transparent;
   border: none;
   color: #ffffff;
   font-size: 1rem;
+  padding: 0.35rem 0.2rem;
   outline: none;
 }
 
@@ -1752,9 +1811,11 @@ onBeforeUnmount(() => {
 
 .mic-btn,
 .send-btn {
-  background: rgba(90, 70, 150, 0.3);
-  border: none;
-  color: #c4b5fd;
+  position: relative;
+  isolation: isolate;
+  background: rgba(90, 70, 150, 0.25);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  color: #e0e7ff;
   border-radius: 50%;
   width: 36px;
   height: 36px;
@@ -1763,6 +1824,35 @@ onBeforeUnmount(() => {
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
+  flex-shrink: 0;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 8px 18px rgba(13, 10, 30, 0.45);
+}
+
+.mic-btn::after,
+.send-btn::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  background: radial-gradient(circle at center, rgba(199, 210, 254, 0.35), rgba(76, 29, 149, 0));
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: -1;
+}
+
+.mic-btn:hover::after,
+.send-btn:hover::after,
+.mic-btn:focus-visible::after,
+.send-btn:focus-visible::after {
+  opacity: 1;
+}
+
+.mic-btn .icon,
+.send-btn .icon {
+  width: 18px;
+  height: 18px;
 }
 
 .mic-btn.active {
@@ -1777,6 +1867,17 @@ onBeforeUnmount(() => {
   background: rgba(140, 100, 255, 0.4);
   color: #ffffff;
   transform: translateY(-1px);
+}
+
+.send-btn {
+  background: linear-gradient(120deg, rgba(124, 58, 237, 0.5), rgba(14, 165, 233, 0.5));
+  border-color: rgba(165, 180, 252, 0.6);
+  color: #fdf4ff;
+}
+
+.send-btn:disabled {
+  background: rgba(90, 70, 150, 0.25);
+  border-color: rgba(148, 163, 184, 0.25);
 }
 
 .mic-btn:disabled,
@@ -1797,6 +1898,11 @@ onBeforeUnmount(() => {
   color: rgba(255, 255, 255, 0.72);
   font-size: 0.82rem;
   min-width: 130px;
+  max-width: 180px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   transition: background 0.2s ease, color 0.2s ease;
 }
 
@@ -1882,8 +1988,8 @@ onBeforeUnmount(() => {
   }
 }
 
-.icon-arrow {
-  transform: rotate(45deg);
+.icon-send path {
+  stroke: currentColor;
 }
 
 .toast-fade-enter-active,
@@ -1977,6 +2083,19 @@ onBeforeUnmount(() => {
 
   .chat-input {
     font-size: 0.95rem;
+  }
+}
+
+@media (max-width: 540px) {
+  .chat-input-bar {
+    padding: 0.75rem;
+  }
+
+  .mic-indicator {
+    order: 4;
+    width: 100%;
+    justify-content: center;
+    margin: 0.35rem 0 0;
   }
 }
 </style>
