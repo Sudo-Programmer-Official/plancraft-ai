@@ -25,6 +25,28 @@ function pickField(body, variants = []) {
   return ''
 }
 
+function extractClientCredentials(req, body) {
+  let clientId = pickField(body, ['client_id', 'clientId', 'clientID', 'client-id'])
+  let clientSecret = pickField(body, ['client_secret', 'clientSecret', 'client-secret'])
+
+  if ((!clientId || !clientSecret) && req?.headers?.authorization) {
+    const header = String(req.headers.authorization)
+    if (/^basic\s+/i.test(header)) {
+      const token = header.replace(/^basic\s+/i, '')
+      try {
+        const decoded = Buffer.from(token, 'base64').toString('utf8')
+        const [id, secret] = decoded.split(':')
+        if (!clientId && id) clientId = id
+        if (!clientSecret && secret !== undefined) clientSecret = secret
+      } catch (err) {
+        console.warn('[GPTAuth] failed to parse basic auth header', err?.message || err)
+      }
+    }
+  }
+
+  return { clientId, clientSecret }
+}
+
 function oauthError(res, code, status = 400, extra = {}) {
   res.set('Cache-Control', 'no-store')
   res.set('Pragma', 'no-cache')
@@ -54,8 +76,7 @@ router.post('/gpt/auth/link', requireAuth, ensureUserMatches, async (req, res) =
 router.post('/gpt/auth', async (req, res) => {
   const body = req.body || {}
   const grantType = normalizeGrantType(body.grant_type || body.grantType)
-  const clientId = pickField(body, ['client_id', 'clientId', 'clientID', 'client-id'])
-  const clientSecret = pickField(body, ['client_secret', 'clientSecret', 'client-secret'])
+  const { clientId, clientSecret } = extractClientCredentials(req, body)
   try {
     validateClientCredentials(clientId, clientSecret)
   } catch (err) {
