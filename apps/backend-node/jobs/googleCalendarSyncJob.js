@@ -2,6 +2,7 @@ import cron from 'node-cron'
 import { getUserGoogleIntegration } from '../services/googleOAuth.js'
 import { syncGoogleAccount } from '../services/calendarSyncService.js'
 import { db } from '../services/firebaseAdmin.js'
+import { normalizeCronSpec } from '../utils/cronSpec.js'
 
 export function initGoogleCalendarSync() {
   const enabled = String(process.env.ENABLE_GOOGLE_CALENDAR || '').toLowerCase()
@@ -9,7 +10,7 @@ export function initGoogleCalendarSync() {
     console.log('⏳ Google Calendar sync disabled (set ENABLE_GOOGLE_CALENDAR=1 to enable)')
     return
   }
-  const cadence = String(process.env.GCAL_SYNC_CRON || '*/5 * * * *')
+  const cadence = normalizeCronSpec(process.env.GCAL_SYNC_CRON, '*/5 * * * *')
   cron.schedule(cadence, async () => {
     try {
       console.log('[GoogleSync] Cron fired', new Date().toISOString())

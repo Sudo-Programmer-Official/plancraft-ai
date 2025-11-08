@@ -41,6 +41,11 @@ const router = createRouter({
       component: () => import('@/views/GptConnectView.vue'),
     },
     {
+      path: '/connect/oauth',
+      name: 'gpt-oauth',
+      component: () => import('@/views/GptOAuthBridge.vue'),
+    },
+    {
       path: '/google-calendar-integration',
       name: 'google-calendar-integration',
       component: () => import('@/views/CalendarIntegrationView.vue'),

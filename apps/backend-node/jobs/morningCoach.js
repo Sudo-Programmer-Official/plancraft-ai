@@ -2,6 +2,7 @@ import cron from "node-cron";
 import { db } from "../services/firebaseAdmin.js";
 import { getUserPrefs } from "../services/userPrefService.js";
 import { deliverVoiceCoach } from "../services/voiceCoachService.js";
+import { normalizeCronSpec } from "../utils/cronSpec.js";
 
 const USERS_COLLECTION = "users";
 
@@ -11,7 +12,7 @@ function isEnabled() {
 }
 
 function cronSpec() {
-  return process.env.MORNING_COACH_CRON || "0 14 * * *"; // default 14:00 UTC (~9am ET)
+  return normalizeCronSpec(process.env.MORNING_COACH_CRON, "0 14 * * *"); // default 14:00 UTC (~9am ET)
 }
 
 async function fetchUsers() {

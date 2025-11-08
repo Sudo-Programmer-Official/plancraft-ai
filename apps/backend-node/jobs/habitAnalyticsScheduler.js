@@ -1,5 +1,6 @@
 import cron from "node-cron";
 import { runHabitAnalytics } from "./habitAnalytics.js";
+import { normalizeCronSpec } from "../utils/cronSpec.js";
 
 function shouldEnable() {
   const raw = String(process.env.ENABLE_HABIT_ANALYTICS || "").trim().toLowerCase();
@@ -7,7 +8,7 @@ function shouldEnable() {
 }
 
 function cronSpec() {
-  return process.env.HABIT_ANALYTICS_CRON || "0 5 * * *";
+  return normalizeCronSpec(process.env.HABIT_ANALYTICS_CRON, "0 5 * * *");
 }
 
 export function initHabitAnalyticsScheduler() {
