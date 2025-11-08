@@ -147,7 +147,7 @@
                 {{ gptLinkExpired ? 'Expired' : 'Expires' }} {{ gptLinkExpiryLabel }}
               </p>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-wrap">
               <button
                 class="px-3 py-1.5 rounded bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm disabled:opacity-60"
                 :disabled="gptLink.loading || !authStore.user"
@@ -162,6 +162,13 @@
                 @click="copyGptCode"
               >
                 {{ gptLink.copied ? 'Copied!' : 'Copy Code' }}
+              </button>
+              <button
+                v-if="gptLink.code && gptLaunchUrl"
+                class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-sm text-white flex items-center gap-1"
+                @click="openChatGpt"
+              >
+                Open ChatGPT ↗
               </button>
             </div>
           </div>
@@ -617,6 +624,7 @@ const gptLink = reactive({
   error: '',
 })
 const gptHelpUrl = import.meta.env.VITE_GPT_HELP_URL || 'https://plancraftai.com/integrations/gpt'
+const gptLaunchUrl = import.meta.env.VITE_GPT_LAUNCH_URL || ''
 const gptCardRef = ref(null)
 const highlightGpt = ref(false)
 const gptDeepLinkActive = computed(() => !!route?.query?.gpt)
@@ -698,6 +706,11 @@ function focusGptCard(autoGenerate = false) {
     delete nextQuery.gpt
     router.replace({ query: nextQuery }).catch(() => {})
   }
+}
+
+function openChatGpt() {
+  if (!gptLaunchUrl) return
+  window.open(gptLaunchUrl, '_blank', 'noopener,noreferrer')
 }
 
 // Delivery endpoints (per-channel identifiers)
