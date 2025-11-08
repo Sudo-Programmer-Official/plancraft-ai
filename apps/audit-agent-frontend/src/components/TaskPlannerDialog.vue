@@ -245,6 +245,7 @@ const internalOpen = ref(props.open)
 
 let previousBodyOverflow = ''
 let bodyScrollLocked = false
+let reminderAutofillGuard = false
 
 function setBodyScrollLocked(locked) {
   if (typeof document === 'undefined') return
@@ -356,6 +357,7 @@ const subStore = useSubscriptionStore()
 const reminderPrefs = ref({ enabled: true, channels: ['pwa', 'whatsapp'] })
 const allowedReminderChannels = ref([])
 const reminderTime = ref('')
+const reminderAbsoluteIso = ref(null)
 const setReminder = ref(false)
 const input = ref('')
 const details = ref('')
@@ -438,11 +440,17 @@ watch(selectedDate, val => {
   logTimeBrainDialog('selected-date-change', { value: val })
   if (props.lockDate && props?.task?.date && val !== props.task.date)
     selectedDate.value = props.task.date
+  if (!reminderAutofillGuard) {
+    reminderAbsoluteIso.value = null
+  }
 })
 watch(reminderTime, val => {
   logTimeBrainDialog('reminder-time-change', { value: val, lock: props.disableReminder })
   if (props.disableReminder && props.task?.reminderTime && val !== props.task.reminderTime)
     reminderTime.value = props.task.reminderTime
+  if (!reminderAutofillGuard) {
+    reminderAbsoluteIso.value = null
+  }
 })
 watch(setReminder, enabled => {
   logTimeBrainDialog('set-reminder-toggle', { enabled })
@@ -454,6 +462,9 @@ watch(setReminder, enabled => {
   reminderPrefs.value = {
     ...reminderPrefs.value,
     enabled,
+  }
+  if (!enabled) {
+    reminderAbsoluteIso.value = null
   }
 })
 watch(allowedReminderChannels, channels => {
@@ -512,6 +523,7 @@ function resetNewTaskState() {
   details.value = ''
   link.value = ''
   reminderTime.value = ''
+  reminderAbsoluteIso.value = null
   if (!props.lockDate) selectedDate.value = normalizeDateInput(props.date)
   setReminder.value = !!reminderPrefs.value.enabled
   if (!allowedReminderChannels.value.length && reminderPrefs.value.channels.length) {
@@ -526,7 +538,26 @@ function hydrateFromTask(current) {
   link.value = current.link || ''
 
   if (current.date) selectedDate.value = normalizeDateInput(current.date)
-  reminderTime.value = current.reminderTime || ''
+  let reminderHydrated = false
+  if (current.scheduledTime) {
+    reminderHydrated = applyReminderIso(current.scheduledTime, {
+      allowDateChange: false,
+      timezoneOverride: current.timezone,
+    })
+  }
+  if (!reminderHydrated) {
+    reminderTime.value = current.reminderTime || ''
+    if (current.scheduledTime) {
+      try {
+        const parsed = dayjs(current.scheduledTime)
+        reminderAbsoluteIso.value = parsed.isValid() ? parsed.utc().toISOString() : null
+      } catch {
+        reminderAbsoluteIso.value = null
+      }
+    } else {
+      reminderAbsoluteIso.value = null
+    }
+  }
 
   const existingChannels = Array.isArray(current.reminderChannels)
     ? current.reminderChannels
@@ -578,8 +609,7 @@ async function tryPrefillReminder(task) {
 
     const iso = typeof st === 'string' ? st : st.toISOString?.() || String(st)
     const userTz = task?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
-    const local = dayjs.utc(iso).tz(userTz)
-    reminderTime.value = local.format('HH:mm')
+    applyReminderIso(iso, { allowDateChange: false, timezoneOverride: userTz })
   } catch (err) {
     console.warn('Prefill reminder failed', err)
     logTimeBrainDialog('prefill-reminder:error', { message: err?.message })
@@ -593,6 +623,49 @@ function buildLocalIso(ymd, hhmm) {
     ? tzCandidate
     : Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
   return toUtcIso(String(ymd || ''), String(hhmm || '00:00'), tz)
+}
+
+function applyReminderIso(isoInput, options = {}) {
+  const {
+    allowDateChange = !props.lockDate,
+    timezoneOverride,
+  } = options
+  if (!isoInput) return false
+  try {
+    const tzCandidate = timezoneOverride || getUserTimezone()
+    const tz = typeof tzCandidate === 'string' && tzCandidate.includes('/')
+      ? tzCandidate
+      : Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+    const sourceValue = (() => {
+      if (!isoInput && isoInput !== 0) return null
+      if (typeof isoInput?.toDate === 'function') {
+        try { return isoInput.toDate() } catch { return null }
+      }
+      if (typeof isoInput?.seconds === 'number') return new Date(isoInput.seconds * 1000)
+      if (typeof isoInput?._seconds === 'number') return new Date(isoInput._seconds * 1000)
+      return isoInput
+    })()
+    if (!sourceValue) return false
+    const parsed = dayjs(sourceValue)
+    if (!parsed.isValid()) return false
+    const local = parsed.tz(tz)
+    const normalizedIso = parsed.utc().toISOString()
+    reminderAutofillGuard = true
+    try {
+      reminderTime.value = local.format('HH:mm')
+      if (allowDateChange) {
+        selectedDate.value = normalizeDateInput(local.format('YYYY-MM-DD'))
+      }
+    } finally {
+      reminderAutofillGuard = false
+    }
+    reminderAbsoluteIso.value = normalizedIso
+    return true
+  } catch (err) {
+    reminderAutofillGuard = false
+    console.warn('applyReminderIso failed', err?.message || err)
+    return false
+  }
 }
 
 function toLocalDateTimeIso(dateStr, timeStr, tz) {
@@ -684,15 +757,8 @@ async function inferReminderTimeFromInput() {
     })
 
     if (!iso) return null
-    const parsed = dayjs(iso)
-    if (!parsed.isValid()) return null
-
-    const local = parsed.tz(tz)
-    reminderTime.value = local.format('HH:mm')
-    if (!props.lockDate) {
-      selectedDate.value = normalizeDateInput(local.format('YYYY-MM-DD'))
-    }
-    return iso
+    const applied = applyReminderIso(iso, { timezoneOverride: tz })
+    return applied ? iso : null
   } catch (err) {
     console.warn('Failed to infer reminder time from input', err?.message || err)
     return null
@@ -911,6 +977,10 @@ async function save() {
     reminderToSave = reminderTime.value || null
   }
 
+  const scheduledIso = reminderToSave
+    ? (reminderAbsoluteIso.value || buildLocalIso(dateToSave, reminderToSave))
+    : null
+
   const channelsToSave = setReminder.value ? computeReminderChannels() : []
 
   emit('saved', {
@@ -919,6 +989,7 @@ async function save() {
     details: details.value,
     date: dateToSave,
     reminderTime: reminderToSave,
+    scheduledTime: scheduledIso,
     reminderChannels: channelsToSave,
     channels: channelsToSave,
   })

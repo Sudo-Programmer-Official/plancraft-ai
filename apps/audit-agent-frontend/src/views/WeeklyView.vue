@@ -145,7 +145,7 @@ import TaskPlannerDialog from '@/components/TaskPlannerDialog.vue'
 import { toLocalDateKey as _toLocalDateKey } from '@/utils/dateHelper.js'
 import { updateTaskInFirebase, addTaskToFirebase } from '@/services/firebaseService.js'
 // import { authStore, userPrefs } from '@/stores/authStore.js'
-import { buildLocalIso } from '@/utils/timeHelper.js'
+import { resolveReminderIso } from '@/utils/timeHelper.js'
 import { scheduleReminder } from '@/services/reminderService.js'
 import api from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
@@ -213,7 +213,8 @@ async function handleSaveAndSchedule(payload) {
         try { await authStore.fetchUsage() } catch {}
         return
       }
-      const iso = buildLocalIso(payload.date, payload.reminderTime)
+      const iso = resolveReminderIso(payload)
+      if (!iso) return
       const prefs = userPrefs.value?.notifications || {}
       try { if (!hasNotificationSetup(prefs)) notifPromptOpen.value = true } catch {}
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone

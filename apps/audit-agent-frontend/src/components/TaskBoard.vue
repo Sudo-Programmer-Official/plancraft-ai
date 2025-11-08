@@ -224,6 +224,7 @@ import { getReminderStatus, scheduleReminder } from '@/services/reminderService'
 import api from '@/services/api'
 import { getPreferences as getUserPreferences } from '@/services/settingsService'
 import { TASK_CATEGORY_FILTERS, getCategoryIcon, getCategoryColor, resolveCategory } from '@/constants/taskCategories'
+import { resolveReminderIso } from '@/utils/timeHelper.js'
 
 const { tasks, loadTasks, toggleComplete, deleteTask, persistOrder } = useTasks()
 
@@ -278,18 +279,6 @@ function closePlanner() {
   selectedTask.value = null
 }
 
-function buildLocalIso(ymd, hhmm) {
-  try {
-    const [y, m, d] = String(ymd || '').split('-').map((n) => parseInt(n, 10))
-    const [hh, mm] = String(hhmm || '00:00').split(':').map((n) => parseInt(n, 10))
-    if (!y || !m || !d) throw new Error('invalid date parts')
-    const local = new Date(y, (m - 1), d, (hh || 0), (mm || 0), 0, 0)
-    return local.toISOString()
-  } catch {
-    return new Date().toISOString()
-  }
-}
-
 async function handleSave(payload) {
   if (Array.isArray(payload)) {
     await loadTasks()
@@ -313,7 +302,8 @@ async function handleSave(payload) {
       const scheduledByBackend = !!notifyMeta?.scheduled
       if (payload?.reminderTime) {
         if (scheduledByBackend) return
-        const iso = buildLocalIso(payload.date, payload.reminderTime)
+        const iso = resolveReminderIso(payload)
+        if (!iso) return
         const prefs = userPrefs.value?.notifications || {}
         await scheduleReminder(uid, savedId, payload.title, iso, prefs)
       } else {

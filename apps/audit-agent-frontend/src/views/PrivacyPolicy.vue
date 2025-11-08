@@ -51,19 +51,68 @@
         <li><strong>Mixpanel</strong> – usage analytics</li>
       </ul>
 
-      <h2 class="text-xl font-semibold mt-8 mb-4">5. Your Rights</h2>
+      <h2 class="text-xl font-semibold mt-8 mb-4">5. Google Calendar Data Usage</h2>
+      <div class="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-5 text-slate-100/90">
+        <div>
+          <p class="font-semibold text-lg mb-2 text-white">Description of Data Access</p>
+          <ul class="list-disc pl-6 space-y-1">
+            <li>PlanCraftAI requests read-only (<code>calendar.readonly</code>) permissions to view upcoming events, event times, and titles.</li>
+            <li>The app never modifies, deletes, or creates events on your Google Calendar.</li>
+          </ul>
+        </div>
+        <div>
+          <p class="font-semibold text-lg mb-2 text-white">Purpose of Access</p>
+          <ul class="list-disc pl-6 space-y-1">
+            <li>Calendar details only appear inside your AI-powered planner dashboard to highlight upcoming meetings and reminders.</li>
+            <li>They enable smarter scheduling suggestions, reminder timing, and summary insights tailored to your day.</li>
+          </ul>
+        </div>
+        <div>
+          <p class="font-semibold text-lg mb-2 text-white">Data Handling</p>
+          <ul class="list-disc pl-6 space-y-1">
+            <li>PlanCraftAI does not store, share, or sell Google Calendar data.</li>
+            <li>Information remains encrypted in transit and is only visible to the authenticated user during their active session.</li>
+            <li>No calendar data is transferred to any third-party systems outside PlanCraftAI infrastructure.</li>
+          </ul>
+        </div>
+        <div>
+          <p class="font-semibold text-lg mb-2 text-white">User Control</p>
+          <ul class="list-disc pl-6 space-y-1">
+            <li>You can revoke Google access at any time from your Google Account security settings.</li>
+            <li>Deleting your PlanCraftAI account immediately revokes and removes stored OAuth tokens that power synchronization.</li>
+          </ul>
+        </div>
+        <div>
+          <p class="font-semibold text-lg mb-2 text-white">Compliance Statement</p>
+          <p>PlanCraftAI adheres to the Google API Services User Data Policy, including the Limited Use requirements.</p>
+        </div>
+      </div>
+
+      <h2 class="text-xl font-semibold mt-8 mb-4">6. Your Rights</h2>
       <p class="mb-6">
         You may request to <strong>access, update, or delete</strong> your data at any time.  
         For data deletion, visit our <a href="/data-deletion" class="text-blue-400 underline">Data Deletion page</a>
         or email us at <a href="mailto:help@sudoprogrammer.com" class="text-blue-400 underline">help@sudoprogrammer.com</a>.
       </p>
 
-      <h2 class="text-xl font-semibold mt-8 mb-4">6. Contact Us</h2>
+      <h2 class="text-xl font-semibold mt-8 mb-4">7. Contact Us</h2>
       <ul class="list-disc pl-6 mt-2 space-y-1">
         <li>Email: <a href="mailto:support@plancraftai.com" class="text-blue-400 underline">support@plancraftai.com</a></li>
         <li>Support: <a href="mailto:help@sudoprogrammer.com" class="text-blue-400 underline">help@sudoprogrammer.com</a></li>
         <li>Website: <a href="https://sudoprogrammer.com" target="_blank" class="text-blue-400 underline">sudoprogrammer.com</a></li>
       </ul>
     </div>
+    <footer class="py-8 text-center text-sm text-indigo-200 bg-slate-950/80 border-t border-white/10">
+      <div class="max-w-4xl mx-auto px-6 space-y-2">
+        <p>
+          © {{ new Date().getFullYear() }} <strong>Sudo Programmer Inc.</strong> — PlanCraftAI · All rights reserved.
+        </p>
+        <div class="space-x-4">
+          <router-link to="/privacy" class="hover:underline">Privacy</router-link>
+          <router-link to="/terms" class="hover:underline">Terms</router-link>
+          <router-link to="/contact" class="hover:underline">Contact</router-link>
+        </div>
+      </div>
+    </footer>
   </div>
 </template>

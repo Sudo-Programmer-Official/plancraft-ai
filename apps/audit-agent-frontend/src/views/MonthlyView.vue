@@ -184,7 +184,7 @@ import { useTasks } from '@/composables/useTasks'
 import TaskPlannerDialog from '@/components/TaskPlannerDialog.vue'
 import { updateTaskInFirebase, addTaskToFirebase } from '@/services/firebaseService'
 // import { authStore, userPrefs } from '@/stores/authStore.js'
-import { buildLocalIso } from '@/utils/timeHelper.js'
+import { resolveReminderIso } from '@/utils/timeHelper.js'
 import { scheduleReminder } from '@/services/reminderService.js'
 import api from '@/services/api'
 import { ElMessage } from 'element-plus'
@@ -272,7 +272,8 @@ async function handleSaveAndSchedule(payload) {
         } catch {}
         return
       }
-      const iso = buildLocalIso(payload.date, payload.reminderTime)
+      const iso = resolveReminderIso(payload)
+      if (!iso) return
       const prefs = userPrefs.value?.notifications || {}
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
 

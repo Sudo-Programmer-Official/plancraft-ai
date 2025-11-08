@@ -27,4 +27,26 @@ function buildLocalIso(ymd, hhmm) {
     return new Date().toISOString()
   }
 }
-export { buildLocalIso }
+function normalizeScheduledIso(value) {
+  if (!value) return null
+  try {
+    const candidate = typeof value?.toDate === 'function' ? value.toDate() : value
+    const parsed = dayjs(candidate)
+    if (!parsed.isValid()) return null
+    return parsed.utc().toISOString()
+  } catch {
+    return null
+  }
+}
+
+function resolveReminderIso(source = {}) {
+  if (!source || typeof source !== 'object') return null
+  const fromScheduled = normalizeScheduledIso(source.scheduledTime)
+  if (fromScheduled) return fromScheduled
+  if (source.date && source.reminderTime) {
+    return buildLocalIso(source.date, source.reminderTime)
+  }
+  return null
+}
+
+export { buildLocalIso, resolveReminderIso }

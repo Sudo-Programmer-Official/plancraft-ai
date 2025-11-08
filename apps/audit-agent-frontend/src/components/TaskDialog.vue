@@ -71,6 +71,7 @@ import api from "@/services/api"
 import { useAuthStore } from "@/stores/authStore"
 import { getReminderStatus, scheduleReminder } from "@/services/reminderService"
 import { getPreferences as getUserPreferences } from "@/services/settingsService"
+import { resolveReminderIso } from '@/utils/timeHelper.js'
 
 const props = defineProps({
   task: { type: Object, default: null }
@@ -157,7 +158,8 @@ async function save() {
       const scheduledByBackend = !!notifyMeta?.scheduled
       if (hasTime) {
         if (scheduledByBackend) return
-        const iso = buildLocalIso(form.value.date, form.value.reminderTime)
+        const iso = resolveReminderIso(form.value)
+        if (!iso) return
         const prefs = userPrefs.value?.notifications || {}
         await scheduleReminder(uid, form.value.id, form.value.title, iso, prefs)
       } else if (!hasTime) {
@@ -177,18 +179,6 @@ async function save() {
 
   emit("saved")
   emit("close")
-}
-
-function buildLocalIso(ymd, hhmm) {
-  try {
-    const [y, m, d] = String(ymd || '').split('-').map((n) => parseInt(n, 10))
-    const [hh, mm] = String(hhmm || '00:00').split(':').map((n) => parseInt(n, 10))
-    if (!y || !m || !d) throw new Error('invalid date parts')
-    const local = new Date(y, (m - 1), d, (hh || 0), (mm || 0), 0, 0) // Local time
-    return local.toISOString() // Normalize to UTC for backend
-  } catch {
-    return new Date().toISOString()
-  }
 }
 
 async function prefillReminderTime(task) {
