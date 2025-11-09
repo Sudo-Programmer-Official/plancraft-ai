@@ -18,127 +18,176 @@
       }"
       @close="closeDialog"
     >
-    <!-- Date Picker -->
-    <div class="mb-5">
-      <label class="block text-sm text-slate-300 mb-1">Select Date</label>
-      <el-date-picker
-        v-model="selectedDate"
-        :disabled="props.readonly || props.lockDate"
-        type="date"
-        placeholder="Pick a day"
-        format="YYYY-MM-DD"
-        value-format="YYYY-MM-DD"
-        class="w-full"
-      />
-    </div>
+    <div class="planner-stack">
+      <section class="planner-card">
+        <div class="card-heading">
+          <div>
+            <p class="card-eyebrow">Plan basics</p>
+            <h3 class="card-title">Choose your day & reminder time</h3>
+          </div>
+        </div>
+        <div class="field-grid">
+          <div class="field">
+            <label class="field-label">Plan date</label>
+            <el-date-picker
+              v-model="selectedDate"
+              :disabled="props.readonly || props.lockDate"
+              type="date"
+              placeholder="Select a day"
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              class="w-full"
+            />
+          </div>
+          <div class="field">
+            <label class="field-label">Reminder time (optional)</label>
+            <el-time-picker
+              v-model="reminderTime"
+              placeholder="HH:mm"
+              :disabled="props.readonly || props.disableReminder"
+              format="HH:mm"
+              value-format="HH:mm"
+              class="w-full"
+            />
+          </div>
+        </div>
+      </section>
 
-    <!-- Title Input -->
-    <el-input
-      v-model="input"
-      type="textarea"
-      :rows="3"
-      placeholder="Speak or type your task..."
-      resize="none"
-      class="mb-5"
-    />
-
-    <!-- Reminder Time -->
-    <div class="mb-5">
-      <label class="block text-sm text-slate-300 mb-1">Reminder Time (optional)</label>
-      <el-time-picker
-        v-model="reminderTime"
-        placeholder="HH:mm"
-        :disabled="props.readonly || props.disableReminder"
-        format="HH:mm"
-        value-format="HH:mm"
-        class="w-full"
-      />
-    </div>
-
-    <!-- Reminder Channels -->
-    <div class="mb-4 reminder-section">
-      <label class="reminder-toggle" :class="{ 'reminder-toggle--disabled': props.readonly || props.disableReminder }">
-        <el-switch
-          v-model="setReminder"
-          :disabled="props.readonly || props.disableReminder"
+      <section class="planner-card">
+        <div class="card-heading">
+          <div>
+            <p class="card-eyebrow">Task idea</p>
+            <h3 class="card-title">What should we plan?</h3>
+          </div>
+        </div>
+        <el-input
+          v-model="input"
+          type="textarea"
+          :rows="3"
+          placeholder="Speak or type your task..."
+          resize="none"
+          class="mb-4"
         />
-        <span class="reminder-toggle__label">Set reminder</span>
-      </label>
-
-      <div class="channel-icons">
-        <el-tooltip
-          v-for="option in channelOptions"
-          :key="option.id"
-          effect="dark"
-          placement="top"
-          :content="option.label"
-        >
-          <button
-            class="channel-icon"
-            type="button"
-            :disabled="props.readonly || props.disableReminder || !setReminder"
-            :class="{ 'channel-icon--active': isChannelSelected(option.id) }"
-            @click="toggleChannel(option.id)"
+        <div v-if="!props.task" class="planner-voice-row">
+          <div class="planner-voice">
+            <label class="field-label">Dictate instead</label>
+            <VoiceRecorder
+              :autoCommit="true"
+              :disabled="loading"
+              :reset-trigger="plannerVoiceReset"
+              @transcribed="handleTranscript"
+            />
+          </div>
+          <el-button
+            @click="generateTasks"
+            :loading="loading"
+            :disabled="!input.trim() || !isFeatureAllowed({ plan: subStore.subscription.plan, role: authStore?.user?.role }, 'aiSplit')"
+            class="generate-btn"
           >
-            <span aria-hidden="true">{{ option.icon }}</span>
+            {{ loading ? '⏳ Generating...' : '+ Generate Tasks' }}
+          </el-button>
+        </div>
+      </section>
+
+      <section class="planner-card reminder-card" :class="{ 'reminder-card--collapsed': !reminderOptionsVisible }">
+        <div class="card-heading">
+          <div>
+            <p class="card-eyebrow">Reminder</p>
+            <h3 class="card-title">Keep me on track</h3>
+          </div>
+          <button
+            class="card-toggle"
+            type="button"
+            @click="reminderOptionsVisible = !reminderOptionsVisible"
+          >
+            <span>{{ reminderOptionsVisible ? 'Hide options' : 'Show options' }}</span>
+            <svg
+              class="card-toggle__icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+            >
+              <path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
           </button>
-        </el-tooltip>
-      </div>
+        </div>
+        <transition name="reminder-collapse">
+          <div v-show="reminderOptionsVisible">
+            <label class="reminder-toggle" :class="{ 'reminder-toggle--disabled': props.readonly || props.disableReminder }">
+              <el-switch
+                v-model="setReminder"
+                :disabled="props.readonly || props.disableReminder"
+              />
+              <span class="reminder-toggle__label">Set reminder</span>
+            </label>
+            <div class="channel-icons">
+              <el-tooltip
+                v-for="option in channelOptions"
+                :key="option.id"
+                effect="dark"
+                placement="top"
+                :content="option.label"
+              >
+                <button
+                  class="channel-icon"
+                  type="button"
+                  :disabled="props.readonly || props.disableReminder || !setReminder"
+                  :class="{ 'channel-icon--active': isChannelSelected(option.id) }"
+                  @click="toggleChannel(option.id)"
+                >
+                  <span aria-hidden="true">{{ option.icon }}</span>
+                </button>
+              </el-tooltip>
+            </div>
+            <p
+              v-if="setReminder && !(props.readonly || props.disableReminder)"
+              class="hint"
+            >
+              We’ll match your notification preferences. Calls only ring when it’s reminder time.
+            </p>
+          </div>
+        </transition>
+      </section>
 
-      <p
-        v-if="setReminder && !(props.readonly || props.disableReminder)"
-        class="hint text-xs text-gray-400 mt-2"
-      >
-        Channels match your preferences (Settings → Notifications). Calls only when it’s reminder time.
-      </p>
-    </div>
-
-    <!-- Edit Mode: Details + Link -->
-    <div v-if="props.task" class="mb-5 space-y-3">
-      <div>
-        <label class="block text-sm text-slate-300 mb-1">Details</label>
+      <section v-if="props.task" class="planner-card">
+        <div class="card-heading">
+          <div>
+            <p class="card-eyebrow">Extras</p>
+            <h3 class="card-title">Add details or link</h3>
+          </div>
+        </div>
         <el-input
           v-model="details"
           type="textarea"
           :rows="4"
           placeholder="Add more context or notes..."
           resize="none"
-          class="mb-3"
+          class="mb-4"
         />
-        <VoiceRecorder @transcribed="appendDetails" />
-      </div>
-
-      <div>
-        <label class="block text-sm text-slate-300 mb-1">Optional Link</label>
-        <el-input v-model="link" type="text" placeholder="https://example.com" clearable />
-        <div v-if="link" class="mt-1 text-xs">
-          <a
-            :href="link"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-indigo-400 hover:underline truncate inline-block max-w-full"
-          >
-            🔗 {{ displayLink }}
-          </a>
+        <div class="planner-voice">
+          <label class="field-label">Add via voice</label>
+          <VoiceRecorder
+            :disabled="props.readonly"
+            :reset-trigger="detailsVoiceReset"
+            @transcribed="appendDetails"
+          />
         </div>
-      </div>
-    </div>
-
-    <!-- New Task: Voice + Generate -->
-    <div v-if="!props.task" class="task-dialog-actions">
-      <VoiceRecorder class="voice-recorder-block" @transcribed="handleTranscript" />
-      <el-button
-        type="success"
-        @click="generateTasks"
-        :loading="loading"
-        :disabled="!input.trim() || !isFeatureAllowed({ plan: subStore.subscription.plan, role: authStore?.user?.role }, 'aiSplit')"
-        class="w-full sm:w-auto px-4 py-2 rounded-lg text-white font-medium shadow-md
-          bg-gradient-to-r from-emerald-700 via-teal-800 to-cyan-700
-          hover:from-emerald-800 hover:via-teal-900 hover:to-cyan-800
-          transition-all duration-300"
-      >
-        {{ loading ? '⏳ Generating...' : '+ Generate Tasks' }}
-      </el-button>
+        <div class="link-field">
+          <label class="field-label">Optional link</label>
+          <el-input v-model="link" type="text" placeholder="https://example.com" clearable />
+          <div v-if="link" class="link-preview">
+            <a
+              :href="link"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-indigo-400 hover:underline truncate inline-block max-w-full"
+            >
+              🔗 {{ displayLink }}
+            </a>
+          </div>
+        </div>
+      </section>
     </div>
 
     <!-- Footer Slot -->
@@ -210,12 +259,13 @@ const RELATIVE_HINT_PATTERN = /\b(in\s+\d+\s+\w+|after\s+\w+|before\s+\w+|later|
 const REMINDER_CHANNEL_ALLOW_LIST = ['pwa', 'whatsapp', 'email', 'sms', 'voice_call']
 const CREATION_CHANNELS = ['pwa', 'whatsapp']
 const channelOptions = [
-  { id: 'pwa', label: 'PWA Push (browser)', icon: '📳' },
-  { id: 'whatsapp', label: 'WhatsApp', icon: '💬' },
   { id: 'email', label: 'Email', icon: '📧' },
+  { id: 'pwa', label: 'Push (Browser)', icon: '📳' },
+  { id: 'whatsapp', label: 'WhatsApp', icon: '💬' },
   { id: 'sms', label: 'SMS', icon: '📲' },
   { id: 'voice_call', label: 'Voice Call', icon: '📞' },
 ]
+const DEFAULT_REMINDER_CHANNELS = ['email', 'pwa', 'whatsapp']
 const MAX_INSTANT_ALERTS = 2
 
 /* ---------------- Props / Emits ---------------- */
@@ -308,7 +358,7 @@ function normalizeReminderPreferences(raw) {
     ? channels
     : raw?.enabled === false
       ? []
-      : ['pwa', 'whatsapp']
+      : [...DEFAULT_REMINDER_CHANNELS]
   const enabled = raw?.enabled !== undefined ? !!raw.enabled : fallback.length > 0
   return { enabled, channels: fallback }
 }
@@ -323,7 +373,7 @@ function applyReminderDefaults(source) {
   } else if (valid.length) {
     allowedReminderChannels.value = valid
   } else {
-    allowedReminderChannels.value = ['pwa', 'whatsapp'].filter(ch => channelOptionIds.includes(ch))
+    allowedReminderChannels.value = DEFAULT_REMINDER_CHANNELS.filter(ch => channelOptionIds.includes(ch))
   }
 }
 
@@ -354,11 +404,14 @@ const tasks = computed(() => {
 
 const authStore = useAuthStore()
 const subStore = useSubscriptionStore()
-const reminderPrefs = ref({ enabled: true, channels: ['pwa', 'whatsapp'] })
+const reminderPrefs = ref({ enabled: true, channels: [...DEFAULT_REMINDER_CHANNELS] })
 const allowedReminderChannels = ref([])
 const reminderTime = ref('')
 const reminderAbsoluteIso = ref(null)
 const setReminder = ref(false)
+const reminderOptionsVisible = ref(false)
+const plannerVoiceReset = ref(0)
+const detailsVoiceReset = ref(0)
 const input = ref('')
 const details = ref('')
 const link = ref('')
@@ -454,7 +507,7 @@ watch(reminderTime, val => {
 })
 watch(setReminder, enabled => {
   logTimeBrainDialog('set-reminder-toggle', { enabled })
-  const defaults = ['pwa', 'whatsapp'].filter(ch => channelOptionIds.includes(ch))
+  const defaults = DEFAULT_REMINDER_CHANNELS.filter(ch => channelOptionIds.includes(ch))
   if (enabled && !allowedReminderChannels.value.length)
     allowedReminderChannels.value = defaults
   if (!enabled && allowedReminderChannels.value.length)
@@ -526,6 +579,8 @@ function resetNewTaskState() {
   reminderAbsoluteIso.value = null
   if (!props.lockDate) selectedDate.value = normalizeDateInput(props.date)
   setReminder.value = !!reminderPrefs.value.enabled
+  reminderOptionsVisible.value = false
+  plannerVoiceReset.value += 1
   if (!allowedReminderChannels.value.length && reminderPrefs.value.channels.length) {
     allowedReminderChannels.value = reminderPrefs.value.channels.filter(ch => channelOptionIds.includes(ch))
   }
@@ -536,6 +591,8 @@ function hydrateFromTask(current) {
   input.value = current.title || ''
   details.value = current.details || ''
   link.value = current.link || ''
+  plannerVoiceReset.value += 1
+  detailsVoiceReset.value += 1
 
   if (current.date) selectedDate.value = normalizeDateInput(current.date)
   let reminderHydrated = false
@@ -569,6 +626,7 @@ function hydrateFromTask(current) {
   }
 
   setReminder.value = existingChannels.length > 0 || !!current.reminderTime
+  reminderOptionsVisible.value = setReminder.value
 }
 
 /* ---------------- Prefill Reminder ---------------- */
@@ -743,16 +801,22 @@ async function inferReminderTimeFromInput() {
       ? tzCandidate
       : Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
 
-    const contextTasks = collectContextTasks(selectedDate.value, tz)
+    const planDateKey = normalizeDateInput(selectedDate.value, tz)
+    const contextTasks = collectContextTasks(planDateKey, tz)
     const lastTaskEnd = computeLastTaskEndIso(contextTasks, tz)
+    const todayKey = toLocalDateKey(new Date())
+    const planAnchor =
+      planDateKey === todayKey
+        ? new Date()
+        : dayjs.tz(`${planDateKey}T12:00:00`, tz).toDate()
 
     const iso = await extractReminderTime(raw, {
-      planDate: selectedDate.value,
+      planDate: planDateKey,
       timezone: tz,
       lastTaskEnd,
       existingTasks: contextTasks,
       userPreferences: reminderPrefs.value,
-      now: new Date(),
+      now: planAnchor,
       debugLabel: 'TaskPlannerDialog:manual-save',
     })
 
@@ -851,6 +915,8 @@ async function generateTasks() {
       (result?.revalidation || []).map(entry => [entry.task.sourceIndex, entry])
     )
 
+    let autoPlanDate = null
+    let autoReminderTime = null
     const resolved = []
     for (const item of result?.items || []) {
       let parsedLocal = item.parsedTimeLocal
@@ -871,13 +937,21 @@ async function generateTasks() {
         })
       }
 
-      const scheduledUtc = parsedLocal ? dayjs(parsedLocal).utc().toISOString() : null
+      let scheduledUtc = null
+      if (parsedLocal) {
+        const localMoment = dayjs.tz(parsedLocal, tz)
+        if (localMoment.isValid()) {
+          scheduledUtc = localMoment.utc().toISOString()
+          if (!autoPlanDate) autoPlanDate = localMoment.format('YYYY-MM-DD')
+          if (!autoReminderTime) autoReminderTime = localMoment.format('HH:mm')
+        }
+      }
       resolved.push({
         ...item,
         parsedTimeLocal: parsedLocal,
         scheduledTime: scheduledUtc,
         timezone: tz,
-        reminderTime: parsedLocal ? dayjs(parsedLocal).tz(tz).format('HH:mm') : null,
+        reminderTime: scheduledUtc ? dayjs.utc(scheduledUtc).tz(tz).format('HH:mm') : null,
       })
     }
 
@@ -903,6 +977,13 @@ async function generateTasks() {
         duration: 2500,
       })
       return
+    }
+
+    if (!props.lockDate && autoPlanDate) {
+      selectedDate.value = normalizeDateInput(autoPlanDate)
+    }
+    if (!reminderTime.value && autoReminderTime) {
+      reminderTime.value = autoReminderTime
     }
 
     const prepared = refined.map((task, idx) => ({
@@ -1033,20 +1114,23 @@ function toggleChannel(id) {
   allowedReminderChannels.value = Array.from(current)
 }
 
-function handleTranscript(text) {
-  const value = typeof text === 'string' ? text.trim() : ''
+function handleTranscript(result = {}) {
+  const value = typeof result?.text === 'string' ? result.text.trim() : ''
   if (!value) return
   input.value = value
   if (!setReminder.value && reminderPrefs.value.enabled) setReminder.value = true
   logTimeBrainDialog('transcription:title', { length: value.length })
+  plannerVoiceReset.value += 1
 }
 
-function appendDetails(text) {
-  const value = typeof text === 'string' ? text.trim() : ''
+function appendDetails(result = {}) {
+  const value = typeof result?.text === 'string' ? result.text.trim() : ''
   if (!value) return
   details.value = details.value ? `${details.value}\n${value}` : value
   logTimeBrainDialog('transcription:details', { length: value.length })
+  detailsVoiceReset.value += 1
 }
+
 </script>
 
 <style scoped>
@@ -1072,7 +1156,130 @@ function appendDetails(text) {
   color: rgba(255, 255, 255, 0.5) !important;
 }
 
-.reminder-section {
+.planner-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.planner-card {
+  padding: 1.1rem;
+  background: rgba(5, 8, 22, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.card-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 0.85rem;
+}
+
+.card-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.75rem;
+  color: rgba(148, 163, 184, 0.8);
+  margin: 0 0 0.2rem;
+}
+
+.card-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #f8fafc;
+}
+
+.card-subtitle {
+  margin: 0;
+  font-size: 0.9rem;
+  color: rgba(226, 232, 240, 0.75);
+}
+
+.card-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.85rem;
+  color: rgba(226, 232, 240, 0.85);
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.card-toggle:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #f8fafc;
+}
+
+.card-toggle__icon {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.2s ease;
+}
+
+.reminder-card--collapsed .card-toggle__icon {
+  transform: rotate(-90deg);
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.field-label {
+  display: block;
+  font-size: 0.9rem;
+  margin-bottom: 0.35rem;
+  color: rgba(226, 232, 240, 0.9);
+}
+
+.planner-voice-row {
+  display: flex;
+  gap: 1rem;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+
+.planner-voice {
+  flex: 1 1 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.planner-voice :deep(.voice-controller) {
+  width: 100%;
+}
+
+.generate-btn {
+  min-width: 180px;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  box-shadow: 0 15px 35px rgba(79, 70, 229, 0.35);
+  background: linear-gradient(120deg, #7c3aed, #0ea5e9);
+  border: none;
+  color: #fdf4ff;
+}
+
+.generate-btn:disabled {
+  opacity: 0.5;
+  box-shadow: none;
+}
+
+.generate-btn:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 38px rgba(79, 70, 229, 0.45);
+}
+
+.reminder-card {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -1132,26 +1339,30 @@ function appendDetails(text) {
   border-color: rgba(147, 197, 253, 0.9);
 }
 
-.reminder-hint {
+.hint {
   margin: 0;
   font-size: 0.78rem;
   color: rgba(148, 163, 184, 0.85);
 }
 
-.task-dialog-actions {
-  display: flex;
-  gap: 1rem;
-  align-items: stretch;
-  margin-bottom: 1.5rem;
+.reminder-collapse-enter-active,
+.reminder-collapse-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
-.voice-recorder-block {
-  display: flex;
-  align-items: stretch;
+.reminder-collapse-enter-from,
+.reminder-collapse-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
 }
 
-.voice-recorder-block :deep(.el-button) {
-  height: 100%;
+.link-field {
+  margin-top: 1rem;
+}
+
+.link-preview {
+  margin-top: 0.4rem;
+  font-size: 0.85rem;
 }
 </style>
 

@@ -23,6 +23,8 @@ export async function queryPlannerAssistant(query, options = {}) {
     query: text,
     userId: options.userId,
     history: normalizeHistory(options.history),
+    clientTimezone: options.clientTimezone,
+    clientNow: options.clientNow,
   }
 
   try {

@@ -15,11 +15,21 @@ router.use(requireAuth, ensureUserMatches);
 
 router.post("/chat", async (req, res) => {
   try {
-    const { message, userId, history = [] } = req.body || {};
+    const {
+      message,
+      userId,
+      history = [],
+      clientTimezone,
+      clientNow,
+    } = req.body || {};
     if (!userId || !message) {
       return res.status(400).json({ error: "Missing message or userId" });
     }
 
+    const clientNowIso =
+      typeof clientNow === "string" && clientNow
+        ? clientNow
+        : new Date().toISOString();
     const [initialContext, historyMessages] = await Promise.all([
       buildUserContext(userId),
       Promise.resolve(
@@ -32,7 +42,23 @@ router.post("/chat", async (req, res) => {
       ),
     ]);
 
-    let context = initialContext;
+    const timezoneOverride =
+      (typeof clientTimezone === "string" && clientTimezone.trim()) ||
+      initialContext?.profile?.timezone ||
+      initialContext?.profile?.tz ||
+      "UTC";
+
+    let context = {
+      ...initialContext,
+      profile: {
+        ...initialContext.profile,
+        timezone: timezoneOverride,
+      },
+      runtime: {
+        clientTimezone: timezoneOverride,
+        clientNow: clientNowIso,
+      },
+    };
 
     const systemPrompt = `
 You are PlanCraftAI's Planner Assistant.
@@ -119,7 +145,15 @@ Only include the JSON block when an action is required. Use IDs from the context
 
     if (shouldRefreshContext) {
       try {
-        context = await buildUserContext(userId);
+        const refreshed = await buildUserContext(userId);
+        context = {
+          ...refreshed,
+          profile: {
+            ...refreshed.profile,
+            timezone: context.runtime?.clientTimezone || refreshed.profile?.timezone || refreshed.profile?.tz || timezoneOverride,
+          },
+          runtime: { ...context.runtime },
+        };
         console.log("[PlannerTask] uiUpdated=✅", {
           userId,
           tasks: Array.isArray(context?.tasks) ? context.tasks.length : 0,

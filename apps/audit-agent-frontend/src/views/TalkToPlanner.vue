@@ -241,9 +241,9 @@
     <footer class="chat-input-bar chat-input-bar--with-recorder">
       <div class="voice-recorder-wrapper">
         <VoiceRecorder
+          :reset-trigger="voiceRecorderResetKey"
           :autoCommit="true"
           @transcribed="handleVoiceRecorderTranscribed"
-          @reRecord="handleVoiceRecorderReRecord"
           @state-change="handleVoiceRecorderStateChange"
           :disabled="assistantThinking"
         />
@@ -345,6 +345,7 @@ const MIC_STATES = Object.freeze({
 const micState = ref(MIC_STATES.idle)
 const voicePendingText = ref('')
 const voiceReadyToSend = computed(() => Boolean(voicePendingText.value?.trim()))
+const voiceRecorderResetKey = ref(0)
 const RECORDER_STATE_MAP = {
   recording: MIC_STATES.listening,
   processing: MIC_STATES.processing,
@@ -640,7 +641,11 @@ watch(
   },
 )
 
-const sendDisabled = computed(() => assistantThinking.value || !inputText.value.trim())
+const sendDisabled = computed(
+  () =>
+    assistantThinking.value ||
+    (!inputText.value.trim() && !voicePendingText.value.trim()),
+)
 
 function clearChat() {
   messages.value = [createWelcomeMessage(userDisplayName.value)]
@@ -648,16 +653,21 @@ function clearChat() {
   voiceRequestToken += 1
   voiceRequestingFor.value = null
   voicePendingText.value = ''
+  voiceRecorderResetKey.value += 1
   stopVoicePlayback()
 }
 
 async function sendMessage() {
-  if (sendDisabled.value) return
+  const pendingVoice = voicePendingText.value.trim()
+  const typedInput = inputText.value.trim()
+  const payload = typedInput || pendingVoice
+  if (!payload || assistantThinking.value) return
   await ensureVoicePlaybackUnlocked()
   try {
-    await sendQuery()
+    await sendQuery(payload)
   } finally {
     voicePendingText.value = ''
+    voiceRecorderResetKey.value += 1
     if (!keepListeningHot) {
       applyMicState(MIC_STATES.idle)
     }
@@ -814,9 +824,13 @@ async function sendQuery(forcedInput = null) {
 
   try {
     const history = historyForRequest(userMessageId)
+    const timezoneGuess =
+      Intl.DateTimeFormat?.().resolvedOptions?.().timeZone || dayjs.tz?.guess?.() || 'UTC'
     const response = await queryPlannerAssistant(query, {
       userId: userId.value,
       history,
+      clientTimezone: timezoneGuess,
+      clientNow: new Date().toISOString(),
     })
 
     const executedActions = Array.isArray(response.actions) ? response.actions : []
@@ -1209,7 +1223,7 @@ function stageVoiceResult(text) {
   const cleaned = String(text || '').trim()
   if (!cleaned) return
   voicePendingText.value = cleaned
-  inputText.value = cleaned
+  inputText.value = ''
   applyMicState(MIC_STATES.paused)
   scheduleIdleDisengage()
   keepListeningHot = false
@@ -1226,12 +1240,6 @@ function handleVoiceRecorderTranscribed({ text } = {}) {
   if (!cleaned) return
   stageVoiceResult(cleaned)
   ElMessage.success('Transcribed 🎤')
-}
-
-function handleVoiceRecorderReRecord() {
-  inputText.value = ''
-  voicePendingText.value = ''
-  applyMicState(MIC_STATES.idle)
 }
 
 function startWebSpeechSession() {
@@ -1791,7 +1799,9 @@ onBeforeUnmount(() => {
 
 .voice-recorder-wrapper {
   flex: 1 1 320px;
-  min-width: 260px;
+  min-width: 240px;
+  max-width: 480px;
+  display: flex;
 }
 
 .chat-input-row {

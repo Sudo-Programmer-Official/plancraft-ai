@@ -1162,10 +1162,17 @@ async function createTaskFromAction(uid, payload = {}, context = {}) {
   }
 }
 
-async function scheduleReminderFromAction(uid, payload = {}) {
-  const text = payload.text || payload.title || "";
-  const scheduledTime = payload.scheduledTime || payload.when || null;
-  const timezoneId = payload.timezone || payload.tz || "UTC";
+async function scheduleReminderFromAction(uid, payload = {}, context = {}) {
+  const text = sanitizeString(payload.text || payload.title || payload.message || "");
+  const scheduledTime = payload.scheduledTime || payload.when || payload.scheduled_at || null;
+  const timezoneId =
+    payload.timezone ||
+    payload.tz ||
+    context?.runtime?.clientTimezone ||
+    context?.profile?.timezone ||
+    context?.summary?.timezone ||
+    context?.profile?.preferences?.timezone ||
+    DEFAULT_TIMEZONE;
   if (!text || !scheduledTime) {
     return {
       status: "error",
@@ -1209,7 +1216,7 @@ export async function executePlannerActions(uid, actions = [], context = {}) {
       if (type === "create_task") {
         results.push(await createTaskFromAction(uid, raw?.payload || raw, context));
       } else if (type === "schedule_reminder") {
-        results.push(await scheduleReminderFromAction(uid, raw?.payload || raw));
+        results.push(await scheduleReminderFromAction(uid, raw?.payload || raw, context));
       } else if (type === "complete_task") {
         results.push(await completeTaskForUser(uid, raw?.payload || raw, context));
       } else if (type === "update_task") {
@@ -1259,19 +1266,22 @@ export function detectIntentFromMessage(message = "") {
 export async function buildFallbackActionsFromIntent(intent, message = "", context = {}) {
   const lower = String(message || "").toLowerCase();
   const tasks = Array.isArray(context?.tasks) ? context.tasks : [];
+  const runtimeTz = context?.runtime?.clientTimezone;
   const timezoneId =
+    runtimeTz ||
     context?.profile?.timezone ||
     context?.summary?.timezone ||
     context?.profile?.preferences?.timezone ||
     DEFAULT_TIMEZONE;
-  const nowIso = new Date().toISOString();
+  const nowIso = context?.runtime?.clientNow || new Date().toISOString();
 
   if (intent === "get_tasks") {
     const payload = {};
+    const clientNowDate = new Date(nowIso);
     if (/completed|done/.test(lower)) payload.status = "completed";
     if (/all/.test(lower)) payload.status = "all";
-    if (/today|tonight/.test(lower)) payload.date = toYMD(new Date());
-    if (/tomorrow/.test(lower)) payload.date = toYMD(new Date(Date.now() + 86400000));
+    if (/today|tonight/.test(lower)) payload.date = toYMD(clientNowDate);
+    if (/tomorrow/.test(lower)) payload.date = toYMD(new Date(clientNowDate.getTime() + 86400000));
     return [{ type: "get_tasks", payload }];
   }
 
@@ -1321,7 +1331,8 @@ export async function buildFallbackActionsFromIntent(intent, message = "", conte
   }
 
   if (intent === "create_task") {
-    const base = dayjs().tz(timezoneId);
+    let base = dayjs(nowIso).tz(timezoneId);
+    if (!base.isValid()) base = dayjs().tz(timezoneId);
     let due = base;
     if (/tomorrow/.test(lower)) due = due.add(1, "day");
     if (/next\s+week/.test(lower)) due = due.add(1, "week");
