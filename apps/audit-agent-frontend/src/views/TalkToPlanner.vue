@@ -2038,4 +2038,24 @@ onBeforeUnmount(() => {
     margin: 0.35rem 0 0;
   }
 }
+
+@media (max-width: 640px) {
+  .chat-input-bar--with-recorder {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .voice-recorder-wrapper {
+    min-width: 100%;
+  }
+
+  .chat-input-row {
+    width: 100%;
+  }
+
+  .voice-controller {
+    width: 100%;
+  }
+}
 </style>

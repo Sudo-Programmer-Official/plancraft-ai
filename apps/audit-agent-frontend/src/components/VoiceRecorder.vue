@@ -326,20 +326,26 @@ watch(
   color: rgba(255, 255, 255, 0.9);
   font-size: 0.95rem;
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  width: 100%;
 }
 
 .voice-controller__text p {
   margin: 0;
   width: 100%;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .voice-controller__text--active {
-  align-items: center;
+  align-items: flex-start;
 }
 
 .voice-controller__text--transcript {
-  justify-content: center;
-  text-align: center;
+  align-items: flex-start;
+  text-align: left;
 }
 
 .voice-controller__transcript {
