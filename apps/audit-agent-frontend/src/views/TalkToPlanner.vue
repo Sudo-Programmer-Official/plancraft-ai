@@ -405,6 +405,8 @@ let manualStopRequested = false
 let backendStopping = false
 let webStopping = false
 let voiceEngine = hasSpeechRecognitionInput ? 'web' : 'backend'
+let backendTranscriptHistory = []
+const MAX_PART_HISTORY = 8
 
 const VOICE_PREF_KEY = 'planner_voice_enabled'
 const DEFAULT_VOICE_ENABLED = true
@@ -1046,9 +1048,34 @@ function handleVoiceTranscript(text) {
   if (!text) return
   clearIdleDisengageTimer()
   latestPreviewText = text
-  if (!voiceReadyToSend.value) {
-    inputText.value = text
+}
+
+function mergeTranscriptParts(parts) {
+  const normalized = Array.isArray(parts)
+    ? parts
+        .map((value) => String(value || '').trim())
+        .filter(Boolean)
+        .slice(-MAX_PART_HISTORY)
+    : []
+  if (!normalized.length) return ''
+  let combined = normalized.pop()
+  for (const snippet of normalized) {
+    const snippetKey = normalizeComparisonText(snippet)
+    if (!snippetKey) continue
+    const combinedKey = normalizeComparisonText(combined)
+    if (!combinedKey.includes(snippetKey)) {
+      combined = `${snippet} ${combined}`.trim()
+    }
   }
+  return combined.trim()
+}
+
+function normalizeComparisonText(value) {
+  if (!value) return ''
+  return String(value)
+    .replace(/[^a-z0-9]+/gi, ' ')
+    .trim()
+    .toLowerCase()
 }
 
 async function startRecording() {
@@ -1080,6 +1107,7 @@ async function beginContinuousListening() {
   voicePendingText.value = ''
   latestPreviewText = ''
   pendingSegmentText = ''
+  backendTranscriptHistory = []
   keepListeningHot = true
   manualStopRequested = false
   clearSilenceTimer()
@@ -1118,6 +1146,7 @@ async function stopRecording() {
   }
   applyMicState(MIC_STATES.idle)
   isTranscribing.value = false
+  backendTranscriptHistory = []
 }
 
 function applyMicState(state) {
@@ -1226,6 +1255,7 @@ async function finalizeBackendSegment() {
   } finally {
     backendRecorderInstance = null
     backendStopping = false
+    backendTranscriptHistory = []
     if (keepListeningHot && !manualStopRequested) {
       applyMicState(MIC_STATES.paused)
       restartTimerId = window.setTimeout(() => {
@@ -1372,6 +1402,7 @@ async function startBackendSession() {
   if (!keepListeningHot || backendRecorderInstance) return
   clearRestartTimer()
   latestPreviewText = ''
+  backendTranscriptHistory = []
   try {
     backendRecorderInstance = await recordAndSendToBackend(handleBackendResult, {
       mode: 'live',
@@ -1392,11 +1423,15 @@ async function handleBackendResult(text, isFinal) {
   const snippet = String(text || '').trim()
   if (!snippet) return
   if (isFinal) {
+    const combined = mergeTranscriptParts([...backendTranscriptHistory, snippet])
+    backendTranscriptHistory = []
     latestPreviewText = ''
-    await processVoiceSegment(snippet)
+    await processVoiceSegment(combined || snippet)
   } else {
-    latestPreviewText = snippet
-    handleVoiceTranscript(snippet)
+    backendTranscriptHistory.push(snippet)
+    const combined = mergeTranscriptParts(backendTranscriptHistory)
+    latestPreviewText = combined
+    handleVoiceTranscript(combined)
     scheduleSilenceCheck()
   }
 }
