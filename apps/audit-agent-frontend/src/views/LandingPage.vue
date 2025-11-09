@@ -44,7 +44,7 @@
           reminders.
         </p>
         <div
-          class="mt-10 flex flex-col sm:flex-row gap-4 justify-center"
+          class="mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center"
           data-aos="zoom-in"
           data-aos-delay="250"
         >

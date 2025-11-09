@@ -26,7 +26,7 @@
       guiding your daily flow.
     </p>
     <div
-      class="mt-10 flex flex-col sm:flex-row gap-4 justify-center"
+      class="mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center"
       data-aos="zoom-in"
       data-aos-delay="250"
     >
@@ -38,7 +38,7 @@
       >
         🚀 Get Started
       </el-button>
-      <el-button size="large" plain aria-label="Continue as guest" @click="continueAsGuest">
+      <el-button size="large" class="guest" plain aria-label="Continue as guest" @click="continueAsGuest">
         🌿 Continue as Guest
       </el-button>
        <el-button
@@ -90,3 +90,12 @@ onMounted(() => {
   animate()
 })
 </script>
+
+<style scoped>
+/* Additional styles if needed */
+.guest {
+ @media screen and (max-width: 640px) {
+    margin-left: 0 !important;
+ }
+}
+</style>
