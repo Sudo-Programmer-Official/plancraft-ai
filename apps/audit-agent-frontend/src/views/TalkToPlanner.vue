@@ -238,77 +238,55 @@
       </TransitionGroup>
     </div>
 
-    <footer
-      class="chat-input-bar"
-      :class="{
-        'chat-input-bar--recording':
-          micState === MIC_STATES.listening || micState === MIC_STATES.processing,
-      }"
-    >
-      <button
-        type="button"
-        @click="startRecording"
-        :class="['mic-btn', { active: micButtonActive }]"
-        :title="micButtonTitle"
-        :aria-pressed="micButtonActive"
-        :aria-label="micButtonTitle"
-      >
-        <svg class="icon icon-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="1.6"
-            d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3z"
-          />
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="1.6"
-            d="M19 11a7 7 0 01-14 0m7 7v3m-4 0h8"
-          />
-        </svg>
-      </button>
-      <div class="mic-indicator" :class="micIndicatorClass">
-        <span class="mic-indicator__dot" aria-hidden="true"></span>
-        <span class="mic-indicator__label">{{ micStatusLabel }}</span>
+    <footer class="chat-input-bar chat-input-bar--with-recorder">
+      <div class="voice-recorder-wrapper">
+        <VoiceRecorder
+          :autoCommit="true"
+          @transcribed="handleVoiceRecorderTranscribed"
+          @reRecord="handleVoiceRecorderReRecord"
+          @state-change="handleVoiceRecorderStateChange"
+          :disabled="assistantThinking"
+        />
       </div>
-      <input
-        v-model="inputText"
-        :disabled="assistantThinking"
-        placeholder="Ask your planner..."
-        class="chat-input"
-        @keydown.enter="sendMessage"
-      />
-      <button
-        type="button"
-        @click="sendMessage"
-        class="send-btn"
-        :disabled="sendDisabled"
-        :title="sendDisabled ? 'Enter a message first' : 'Send message'"
-        :aria-label="sendDisabled ? 'Enter a message first' : 'Send message'"
-      >
-        <span v-if="assistantThinking" class="loader"></span>
-        <svg
-          v-else
-          class="icon icon-send"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
+      <div class="chat-input-row">
+        <input
+          v-model="inputText"
+          :disabled="assistantThinking"
+          placeholder="Ask your planner..."
+          class="chat-input"
+          @keydown.enter="sendMessage"
+        />
+        <button
+          type="button"
+          @click="sendMessage"
+          class="send-btn"
+          :disabled="sendDisabled"
+          :title="sendDisabled ? 'Enter a message first' : 'Send message'"
+          :aria-label="sendDisabled ? 'Enter a message first' : 'Send message'"
         >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="1.6"
-            d="M4.5 11.4L20.2 4.3c.9-.4 1.8.5 1.3 1.4l-6.2 12.3c-.4.7-1.4.8-1.9.1l-2.8-3.9-4-1.2c-.8-.2-.9-1.3-.1-1.6Z"
-          />
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="1.6"
-            d="M10.6 13.3L20.5 5"
-          />
-        </svg>
-      </button>
+          <span v-if="assistantThinking" class="loader"></span>
+          <svg
+            v-else
+            class="icon icon-send"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="1.6"
+              d="M4.5 11.4L20.2 4.3c.9-.4 1.8.5 1.3 1.4l-6.2 12.3c-.4.7-1.4.8-1.9.1l-2.8-3.9-4-1.2c-.8-.2-.9-1.3-.1-1.6Z"
+            />
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="1.6"
+              d="M10.6 13.3L20.5 5"
+            />
+          </svg>
+        </button>
+      </div>
     </footer>
   </div>
 </template>
@@ -318,8 +296,9 @@ import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { queryPlannerAssistant } from '@/services/plannerService'
 import { requestSpeechUrl, supportsWebSpeech, speakWithWebSpeech } from '@/services/ttsService'
 import { useAuthStore } from '@/stores/authStore'
-import { ElMessage } from 'element-plus'
 import { recordAndSendToBackend } from '@/utils/backendRecorder'
+import VoiceRecorder from '@/components/VoiceRecorder.vue'
+import { ElMessage } from 'element-plus'
 import { trackEvent } from '@/services/analytics'
 import { auth } from '@/firebase/init'
 import { getAppToken } from '@/services/appTokenService'
@@ -364,34 +343,15 @@ const MIC_STATES = Object.freeze({
   error: 'error',
 })
 const micState = ref(MIC_STATES.idle)
-const micIndicatorClass = computed(() => `mic-indicator--${micState.value}`)
-const micButtonActive = computed(() =>
-  [MIC_STATES.listening, MIC_STATES.processing, MIC_STATES.paused].includes(micState.value),
-)
 const voicePendingText = ref('')
 const voiceReadyToSend = computed(() => Boolean(voicePendingText.value?.trim()))
+const RECORDER_STATE_MAP = {
+  recording: MIC_STATES.listening,
+  processing: MIC_STATES.processing,
+  ready: MIC_STATES.paused,
+  idle: MIC_STATES.idle,
+}
 
-const micStatusLabel = computed(() => {
-  switch (micState.value) {
-    case MIC_STATES.listening:
-      return 'Listening'
-    case MIC_STATES.processing:
-      return 'Processing'
-    case MIC_STATES.paused:
-      return voiceReadyToSend.value ? 'Ready to send' : 'Ready'
-    case MIC_STATES.error:
-      return 'Mic blocked'
-    default:
-      return 'Tap to talk'
-  }
-})
-const micButtonTitle = computed(() => {
-  if (!micButtonActive.value) return 'Start voice input'
-  if (micState.value === MIC_STATES.processing) {
-    return 'Finishing your last thought...'
-  }
-  return 'Stop voice input'
-})
 let speechRecognitionInstance = null
 let backendRecorderInstance = null
 let silenceTimerId = null
@@ -1256,6 +1216,24 @@ function stageVoiceResult(text) {
   manualStopRequested = true
 }
 
+function handleVoiceRecorderStateChange(value) {
+  const next = RECORDER_STATE_MAP[value] || MIC_STATES.idle
+  applyMicState(next)
+}
+
+function handleVoiceRecorderTranscribed({ text } = {}) {
+  const cleaned = String(text || '').trim()
+  if (!cleaned) return
+  stageVoiceResult(cleaned)
+  ElMessage.success('Transcribed 🎤')
+}
+
+function handleVoiceRecorderReRecord() {
+  inputText.value = ''
+  voicePendingText.value = ''
+  applyMicState(MIC_STATES.idle)
+}
+
 function startWebSpeechSession() {
   if (!hasSpeechRecognitionInput) {
     voiceEngine = 'backend'
@@ -1802,6 +1780,32 @@ onBeforeUnmount(() => {
   box-shadow: 0 0 18px rgba(168, 85, 247, 0.4);
 }
 
+.chat-input-bar--with-recorder {
+  flex-wrap: wrap;
+  padding: 0.75rem;
+  background: rgba(15, 10, 30, 0.95);
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  box-shadow: 0 12px 32px rgba(12, 5, 25, 0.7);
+  gap: 1rem;
+}
+
+.voice-recorder-wrapper {
+  flex: 1 1 320px;
+  min-width: 260px;
+}
+
+.chat-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex: 1;
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
 .chat-input {
   flex-grow: 1;
   min-width: 0;
@@ -1819,23 +1823,20 @@ onBeforeUnmount(() => {
 
 .mic-btn,
 .send-btn {
-  position: relative;
-  isolation: isolate;
-  background: rgba(90, 70, 150, 0.25);
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  color: #e0e7ff;
-  border-radius: 50%;
-  width: 36px;
-  height: 36px;
+  padding: 0 1.3rem;
+  border-radius: 999px;
+  background: linear-gradient(120deg, #34d399, #10b981);
+  border: none;
+  color: #fff;
+  height: 42px;
+  min-width: 42px;
+  font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 8px 18px rgba(13, 10, 30, 0.45);
+  transition: opacity 0.2s ease;
+  box-shadow: 0 12px 24px rgba(16, 185, 129, 0.45);
 }
 
 .mic-btn::after,
@@ -1883,103 +1884,18 @@ onBeforeUnmount(() => {
   color: #fdf4ff;
 }
 
-.send-btn:disabled {
-  background: rgba(90, 70, 150, 0.25);
-  border-color: rgba(148, 163, 184, 0.25);
-}
+/* .send-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+} */
 
-.mic-btn:disabled,
+/* .mic-btn:disabled,
 .send-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
   transform: none;
-}
-
-.mic-indicator {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  margin: 0 0.85rem;
-  padding: 0.32rem 0.95rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 0.82rem;
-  min-width: 130px;
-  max-width: 180px;
-  flex-shrink: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: background 0.2s ease, color 0.2s ease;
-}
-
-.mic-indicator__dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: #a78bfa;
-  box-shadow: 0 0 10px rgba(167, 139, 250, 0.5);
-  animation: mic-breathe 1.6s ease-in-out infinite;
-}
-
-.mic-indicator__label {
-  font-weight: 500;
-  letter-spacing: 0.01em;
-}
-
-.mic-indicator--listening {
-  background: rgba(16, 185, 129, 0.2);
-  color: #c6f6d5;
-}
-
-.mic-indicator--listening .mic-indicator__dot {
-  background: #34d399;
-  box-shadow: 0 0 12px rgba(52, 211, 153, 0.8);
-  animation-duration: 1.1s;
-}
-
-.mic-indicator--processing {
-  background: rgba(251, 191, 36, 0.2);
-  color: #fde68a;
-}
-
-.mic-indicator--processing .mic-indicator__dot {
-  background: #fbbf24;
-  box-shadow: 0 0 12px rgba(251, 191, 36, 0.85);
-  animation-duration: 0.9s;
-}
-
-.mic-indicator--paused {
-  background: rgba(167, 139, 250, 0.18);
-  color: #ede9fe;
-}
-
-.mic-indicator--paused .mic-indicator__dot {
-  background: #c4b5fd;
-  animation-duration: 1.9s;
-}
-
-.mic-indicator--idle {
-  opacity: 0.65;
-}
-
-.mic-indicator--idle .mic-indicator__dot {
-  background: rgba(255, 255, 255, 0.35);
-  box-shadow: none;
-  animation: none;
-}
-
-.mic-indicator--error {
-  background: rgba(248, 113, 113, 0.2);
-  color: #fecaca;
-}
-
-.mic-indicator--error .mic-indicator__dot {
-  background: #f87171;
-  box-shadow: 0 0 10px rgba(248, 113, 113, 0.75);
-  animation: none;
-}
+} */
 
 @keyframes mic-breathe {
   0% {
