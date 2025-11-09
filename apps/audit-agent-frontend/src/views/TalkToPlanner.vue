@@ -355,7 +355,6 @@ const SpeechRecognitionClass =
 const hasSpeechRecognitionInput = Boolean(SpeechRecognitionClass)
 const SILENCE_TIMEOUT_MS = Number(import.meta.env.VITE_PLANNER_SILENCE_TIMEOUT_MS || 2500)
 const AUTO_RESTART_DELAY_MS = Number(import.meta.env.VITE_PLANNER_RESTART_DELAY_MS || 900)
-const BACKEND_TIMESLICE_MS = Number(import.meta.env.VITE_PLANNER_BACKEND_TIMESLICE_MS || 1400)
 const AUTO_IDLE_DISENGAGE_MS = Number(import.meta.env.VITE_PLANNER_IDLE_TIMEOUT_MS || 45000)
 const MIC_STATES = Object.freeze({
   idle: 'idle',
@@ -405,8 +404,6 @@ let manualStopRequested = false
 let backendStopping = false
 let webStopping = false
 let voiceEngine = hasSpeechRecognitionInput ? 'web' : 'backend'
-let backendTranscriptHistory = []
-const MAX_PART_HISTORY = 8
 
 const VOICE_PREF_KEY = 'planner_voice_enabled'
 const DEFAULT_VOICE_ENABLED = true
@@ -1050,33 +1047,6 @@ function handleVoiceTranscript(text) {
   latestPreviewText = text
 }
 
-function mergeTranscriptParts(parts) {
-  const normalized = Array.isArray(parts)
-    ? parts
-        .map((value) => String(value || '').trim())
-        .filter(Boolean)
-        .slice(-MAX_PART_HISTORY)
-    : []
-  if (!normalized.length) return ''
-  let combined = normalized.pop()
-  for (const snippet of normalized) {
-    const snippetKey = normalizeComparisonText(snippet)
-    if (!snippetKey) continue
-    const combinedKey = normalizeComparisonText(combined)
-    if (!combinedKey.includes(snippetKey)) {
-      combined = `${snippet} ${combined}`.trim()
-    }
-  }
-  return combined.trim()
-}
-
-function normalizeComparisonText(value) {
-  if (!value) return ''
-  return String(value)
-    .replace(/[^a-z0-9]+/gi, ' ')
-    .trim()
-    .toLowerCase()
-}
 
 async function startRecording() {
   try {
@@ -1107,7 +1077,6 @@ async function beginContinuousListening() {
   voicePendingText.value = ''
   latestPreviewText = ''
   pendingSegmentText = ''
-  backendTranscriptHistory = []
   keepListeningHot = true
   manualStopRequested = false
   clearSilenceTimer()
@@ -1140,13 +1109,12 @@ async function stopRecording() {
     webStopping = false
   } else if (backendRecorderInstance) {
     try {
-      await backendRecorderInstance._stop({ skipFinalUpload: true })
+      await backendRecorderInstance._stop()
     } catch {}
     backendRecorderInstance = null
   }
   applyMicState(MIC_STATES.idle)
   isTranscribing.value = false
-  backendTranscriptHistory = []
 }
 
 function applyMicState(state) {
@@ -1216,8 +1184,8 @@ function scheduleSilenceCheck() {
 
 function finalizeCurrentSegment() {
   if (!keepListeningHot || manualStopRequested) return
-  if (!latestPreviewText || !latestPreviewText.trim()) return
   if (voiceEngine === 'web') {
+    if (!latestPreviewText || !latestPreviewText.trim()) return
     finalizeWebSpeechSegment()
   } else {
     finalizeBackendSegment().catch((err) => {
@@ -1244,7 +1212,6 @@ function finalizeWebSpeechSegment() {
 
 async function finalizeBackendSegment() {
   if (!backendRecorderInstance || backendStopping) return
-  if (!latestPreviewText || !latestPreviewText.trim()) return
   backendStopping = true
   clearSilenceTimer()
   applyMicState(MIC_STATES.processing)
@@ -1255,7 +1222,6 @@ async function finalizeBackendSegment() {
   } finally {
     backendRecorderInstance = null
     backendStopping = false
-    backendTranscriptHistory = []
     if (keepListeningHot && !manualStopRequested) {
       applyMicState(MIC_STATES.paused)
       restartTimerId = window.setTimeout(() => {
@@ -1402,11 +1368,8 @@ async function startBackendSession() {
   if (!keepListeningHot || backendRecorderInstance) return
   clearRestartTimer()
   latestPreviewText = ''
-  backendTranscriptHistory = []
   try {
     backendRecorderInstance = await recordAndSendToBackend(handleBackendResult, {
-      mode: 'live',
-      timeSliceMs: BACKEND_TIMESLICE_MS,
       emitFinalResult: true,
     })
     voiceEngine = 'backend'
@@ -1422,18 +1385,8 @@ async function startBackendSession() {
 async function handleBackendResult(text, isFinal) {
   const snippet = String(text || '').trim()
   if (!snippet) return
-  if (isFinal) {
-    const combined = mergeTranscriptParts([...backendTranscriptHistory, snippet])
-    backendTranscriptHistory = []
-    latestPreviewText = ''
-    await processVoiceSegment(combined || snippet)
-  } else {
-    backendTranscriptHistory.push(snippet)
-    const combined = mergeTranscriptParts(backendTranscriptHistory)
-    latestPreviewText = combined
-    handleVoiceTranscript(combined)
-    scheduleSilenceCheck()
-  }
+  latestPreviewText = snippet
+  await processVoiceSegment(snippet)
 }
 
 onBeforeUnmount(() => {
