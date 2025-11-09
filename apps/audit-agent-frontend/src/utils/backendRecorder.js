@@ -1,6 +1,10 @@
 import RecordRTC from "recordrtc"
 import api from '@/services/api'
 
+const PRIMARY_MIME = "audio/webm;codecs=opus"
+const FALLBACK_MIME = "audio/ogg;codecs=opus"
+const VOICE_STOP_DELAY_MS = 400
+
 function getExt(mime) {
   if (!mime) return "wav"
   if (mime.includes("mp4") || mime.includes("aac") || mime.includes("m4a"))
@@ -10,6 +14,35 @@ function getExt(mime) {
   if (mime.includes("wav")) return "wav"
   if (mime.includes("webm")) return "webm"
   return "webm"
+}
+
+function resolveMimeType() {
+  const canUse = (type) =>
+    (typeof RecordRTC.isTypeSupported === "function" && RecordRTC.isTypeSupported(type)) ||
+    (typeof MediaRecorder !== "undefined" && typeof MediaRecorder.isTypeSupported === "function"
+      ? MediaRecorder.isTypeSupported(type)
+      : false)
+  if (canUse(PRIMARY_MIME)) return PRIMARY_MIME
+  if (canUse(FALLBACK_MIME)) return FALLBACK_MIME
+  return PRIMARY_MIME
+}
+
+function flushInternalRecorder(recorder) {
+  const internal =
+    (typeof recorder.getInternalRecorder === "function" && recorder.getInternalRecorder()) ||
+    recorder.recorder ||
+    recorder.internalRecorder
+  if (
+    internal &&
+    typeof internal.requestData === "function" &&
+    internal.state !== "inactive"
+  ) {
+    try {
+      internal.requestData()
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 /**
@@ -24,7 +57,7 @@ export async function recordAndSendToBackend(
 ) {
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
 
-  const mimeType = "audio/webm;codecs=opus" // force stable type
+  const mimeType = resolveMimeType()
   const ext = getExt(mimeType)
 
   const invokeCallback = async (text, isFinal) => {
@@ -71,28 +104,38 @@ export async function recordAndSendToBackend(
         return
       }
       stopped = true
-      recorder.stopRecording(async () => {
-        try {
-          const shouldSendFinal = !skipFinalUpload && emitFinalResult
-          if (shouldSendFinal) {
-            const blob = recorder.getBlob()
-            try {
-              const fd = new FormData()
-              fd.append("file", blob, `speech.${ext}`)
-              const res = await api.post("/transcribe", fd, {
-                headers: { "Content-Type": "multipart/form-data" },
-              })
-              const data = res?.data || {}
-              if (data?.text) await invokeCallback(data.text, true) // final result
-            } catch (err) {
-              console.error("❌ Final transcription failed", err)
+
+      const finalize = async () => {
+        flushInternalRecorder(recorder)
+        recorder.stopRecording(async () => {
+          try {
+            const shouldSendFinal = !skipFinalUpload && emitFinalResult
+            if (shouldSendFinal) {
+              const blob = recorder.getBlob()
+              try {
+                const fd = new FormData()
+                fd.append("file", blob, `speech.${ext}`)
+                const res = await api.post("/transcribe", fd, {
+                  headers: { "Content-Type": "multipart/form-data" },
+                })
+                const data = res?.data || {}
+                if (data?.text) await invokeCallback(data.text, true) // final result
+              } catch (err) {
+                console.error("❌ Final transcription failed", err)
+              }
             }
+          } finally {
+            stream.getTracks().forEach((t) => t.stop())
+            resolve()
           }
-        } finally {
-          stream.getTracks().forEach((t) => t.stop())
-          resolve()
-        }
-      })
+        })
+      }
+
+      if (VOICE_STOP_DELAY_MS > 0) {
+        setTimeout(finalize, VOICE_STOP_DELAY_MS)
+      } else {
+        finalize()
+      }
     })
 
   return recorder

@@ -3,6 +3,11 @@ import multer from "multer";
 import OpenAI from "openai";
 import { requireAuth } from "../middleware/auth.js";
 import { toFile } from "openai/uploads";
+import fs from "fs/promises";
+import path from "path";
+import { tmpdir } from "os";
+import { spawn } from "child_process";
+import ffmpegPath from "ffmpeg-static";
 
 const allowedOrigins = [
   "https://plancraftai.com",
@@ -69,6 +74,108 @@ function resolveModelList() {
   return list;
 }
 
+const SUPPORTED_AUDIO_TYPES = new Set([
+  "audio/webm",
+  "audio/wav",
+  "audio/mpeg",
+  "audio/mp3",
+  "audio/ogg",
+  "audio/oga",
+  "audio/mp4",
+  "audio/m4a",
+  "audio/aac",
+  "audio/flac",
+  "audio/x-wav",
+  "audio/x-m4a",
+]);
+
+const MIME_TO_EXTENSION = {
+  "audio/webm": "webm",
+  "audio/mp3": "mp3",
+  "audio/mpeg": "mp3",
+  "audio/m4a": "m4a",
+  "audio/mp4": "mp4",
+  "audio/ogg": "ogg",
+  "audio/oga": "oga",
+  "audio/wav": "wav",
+  "audio/x-wav": "wav",
+  "audio/x-m4a": "m4a",
+  "audio/aac": "m4a",
+  "audio/flac": "flac",
+};
+
+const MINIMUM_AUDIO_BYTES = 1024;
+
+async function normalizeAudioUpload(buffer, mimetype) {
+  if (!buffer || buffer.length < MINIMUM_AUDIO_BYTES) {
+    throw new Error("Uploaded audio file is too small or empty.");
+  }
+
+  const cleanedMime = (mimetype || "").split(";")[0].trim().toLowerCase();
+  if (cleanedMime && !SUPPORTED_AUDIO_TYPES.has(cleanedMime)) {
+    console.warn(`[transcribe] unsupported mimetype "${cleanedMime}", continuing anyway.`);
+  }
+
+  const fallbackName = `speech.${guessExtension(cleanedMime)}`;
+  if (!ffmpegPath) {
+    console.warn(`[transcribe] missing ffmpeg binary, sending original buffer.`);
+    return { buffer, filename: fallbackName };
+  }
+
+  try {
+    const converted = await transcodeToWav(buffer);
+    return { buffer: converted, filename: "speech.wav" };
+  } catch (err) {
+    console.warn(`[transcribe] ffmpeg re-encode failed (${err?.message || err}); sending original buffer.`);
+    return { buffer, filename: fallbackName };
+  }
+}
+
+function guessExtension(mimetype) {
+  if (!mimetype) return "webm";
+  return MIME_TO_EXTENSION[mimetype] || "webm";
+}
+
+async function transcodeToWav(inputBuffer) {
+  const tempDir = await fs.mkdtemp(path.join(tmpdir(), "transcribe-"));
+  const inputPath = path.join(tempDir, "input");
+  const outputPath = path.join(tempDir, "output.wav");
+
+  try {
+    await fs.writeFile(inputPath, inputBuffer);
+    await runFfmpeg(inputPath, outputPath);
+    return await fs.readFile(outputPath);
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
+}
+
+function runFfmpeg(inputPath, outputPath) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(ffmpegPath, [
+      "-y",
+      "-i",
+      inputPath,
+      "-ac",
+      "1",
+      "-ar",
+      "16000",
+      "-vn",
+      "-loglevel",
+      "error",
+      "-f",
+      "wav",
+      outputPath,
+    ]);
+
+    proc.once("error", reject);
+    proc.once("close", (code) => {
+      if (code === 0) return resolve();
+      reject(new Error(`ffmpeg exited with code ${code}`));
+    });
+  });
+}
+
 async function transcribeWithFallback(fileBuffer, filename) {
   const file = await toFile(fileBuffer, filename);
   const models = resolveModelList();
@@ -129,36 +236,19 @@ router.post("/transcribe", upload.single("file"), async (req, res) => {
         .json({ error: 'No audio file provided. Use field name "file".' });
     }
 
-    // 🔹 Normalize extension
-    // let ext = "wav"; // default
-    // const mime = req.file.mimetype || "";
-    // if (mime.includes("mp4") || mime.includes("aac")) ext = "m4a";
-    // else if (mime.includes("mpeg")) ext = "mp3";
-    // else if (mime.includes("ogg") || mime.includes("oga")) ext = "ogg";
-    // else if (mime.includes("webm")) ext = "webm"; // keep as fallback
-
-    // const safeName = `speech.${ext}`;
-    let ext = "wav"; // fallback
     const mime = req.file.mimetype || "";
+    const { buffer: normalizedBuffer, filename } = await normalizeAudioUpload(
+      req.file.buffer,
+      mime
+    );
 
-    // if (mime.includes("ogg") || mime.includes("oga")) {
-    //   ext = "webm"; // normalize to webm
-    // }
-
-    if (mime.includes("mp4") || mime.includes("aac") || mime.includes("m4a")) ext = "m4a";
-    else if (mime.includes("mpeg") || mime.includes("mp3")) ext = "mp3";
-    else if (mime.includes("ogg") || mime.includes("oga")) ext = "webm";
-    else if (mime.includes("webm")) ext = "webm";
-    else if (mime.includes("wav")) ext = "wav";
-    else if (mime.includes("flac")) ext = "flac"; // add just in case
-
-    const safeName = `speech.${ext}`;
-
-    console.log(`🎤 Received file -> mimetype: ${mime}, saved as: ${safeName}`);
+    console.log(
+      `🎤 Received file -> mimetype: ${mime}, normalized to: ${filename}`
+    );
 
     const { text, model } = await transcribeWithFallback(
-      req.file.buffer,
-      safeName
+      normalizedBuffer,
+      filename
     );
     res.json({ text, model });
   } catch (err) {

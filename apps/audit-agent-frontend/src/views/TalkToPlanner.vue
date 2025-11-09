@@ -369,6 +369,9 @@ const micIndicatorClass = computed(() => `mic-indicator--${micState.value}`)
 const micButtonActive = computed(() =>
   [MIC_STATES.listening, MIC_STATES.processing, MIC_STATES.paused].includes(micState.value),
 )
+const voicePendingText = ref('')
+const voiceReadyToSend = computed(() => Boolean(voicePendingText.value?.trim()))
+
 const micStatusLabel = computed(() => {
   switch (micState.value) {
     case MIC_STATES.listening:
@@ -376,7 +379,7 @@ const micStatusLabel = computed(() => {
     case MIC_STATES.processing:
       return 'Processing'
     case MIC_STATES.paused:
-      return 'Ready'
+      return voiceReadyToSend.value ? 'Ready to send' : 'Ready'
     case MIC_STATES.error:
       return 'Mic blocked'
     default:
@@ -685,13 +688,21 @@ function clearChat() {
   lastAutoSpokenMessageId.value = null
   voiceRequestToken += 1
   voiceRequestingFor.value = null
+  voicePendingText.value = ''
   stopVoicePlayback()
 }
 
 async function sendMessage() {
   if (sendDisabled.value) return
   await ensureVoicePlaybackUnlocked()
-  sendQuery()
+  try {
+    await sendQuery()
+  } finally {
+    voicePendingText.value = ''
+    if (!keepListeningHot) {
+      applyMicState(MIC_STATES.idle)
+    }
+  }
 }
 
 function toggleVoice() {
@@ -1034,7 +1045,10 @@ function formatResultMessage(action = {}) {
 function handleVoiceTranscript(text) {
   if (!text) return
   clearIdleDisengageTimer()
-  inputText.value = text
+  latestPreviewText = text
+  if (!voiceReadyToSend.value) {
+    inputText.value = text
+  }
 }
 
 async function startRecording() {
@@ -1063,6 +1077,7 @@ async function beginContinuousListening() {
     return
   }
   inputText.value = ''
+  voicePendingText.value = ''
   latestPreviewText = ''
   pendingSegmentText = ''
   keepListeningHot = true
@@ -1230,14 +1245,19 @@ async function finalizeBackendSegment() {
 async function processVoiceSegment(text) {
   const cleaned = String(text || '').trim()
   if (!cleaned) return
-  handleVoiceTranscript(cleaned)
-  try {
-    await sendQuery(cleaned)
-    trackEvent('Voice Transcribed', { length: cleaned.length })
-  } finally {
-    inputText.value = ''
-    scheduleIdleDisengage()
-  }
+  stageVoiceResult(cleaned)
+  trackEvent('Voice Transcribed', { length: cleaned.length })
+}
+
+function stageVoiceResult(text) {
+  const cleaned = String(text || '').trim()
+  if (!cleaned) return
+  voicePendingText.value = cleaned
+  inputText.value = cleaned
+  applyMicState(MIC_STATES.paused)
+  scheduleIdleDisengage()
+  keepListeningHot = false
+  manualStopRequested = true
 }
 
 function startWebSpeechSession() {
