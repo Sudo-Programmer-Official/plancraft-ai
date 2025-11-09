@@ -44,31 +44,31 @@
           reminders.
         </p>
         <div
-          class="mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center"
+          class="mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center w-full max-w-md mx-auto"
           data-aos="zoom-in"
           data-aos-delay="250"
         >
           <el-button
             type="primary"
             size="large"
-            class="!px-6 !py-3 !rounded-xl font-semibold hover:shadow-indigo-600/40"
+            class="w-full sm:w-auto !px-6 !py-3 !rounded-xl font-semibold hover:shadow-indigo-600/40"
             @click="goToLogin"
             >🚀 Get Started</el-button
           >
           <el-button
             size="large"
             plain
-            class="!px-6 !py-3 !rounded-xl font-semibold hover:bg-indigo-500/10"
+            class="guest-cta w-full sm:w-auto !px-6 !py-3 !rounded-xl font-semibold"
             @click="continueAsGuest"
             >🌿 Continue as Guest</el-button
           >
         </div>
-        <RouterLink
+        <!-- <RouterLink
           to="/subscription"
           class="inline-block mt-6 px-5 py-3 rounded-xl bg-black/20 text-white font-semibold hover:bg-black/30 transition"
         >
           ⭐ Explore Premium
-        </RouterLink>
+        </RouterLink> -->
       </div>
     </section>
 
@@ -799,5 +799,17 @@ onMounted(() => {
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+.guest-cta {
+  background: rgba(255, 255, 255, 0.9) !important;
+  color: #0f172a !important;
+  border: 1px solid rgba(15, 23, 42, 0.15) !important;
+  transition: opacity 0.2s ease, background 0.2s ease;
+}
+
+.guest-cta:hover {
+  background: rgba(255, 255, 255, 0.95) !important;
+  opacity: 0.88;
 }
 </style>

@@ -29,16 +29,26 @@
       class="mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center"
       data-aos="zoom-in"
       data-aos-delay="250"
+      class="mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center w-full max-w-md mx-auto"
+      data-aos="zoom-in"
+      data-aos-delay="250"
     >
       <el-button
         type="primary"
         size="large"
         aria-label="Log in to PlanCraftAI"
+        class="w-full sm:w-auto"
         @click="goToLogin"
       >
         🚀 Get Started
       </el-button>
-      <el-button size="large" class="guest" plain aria-label="Continue as guest" @click="continueAsGuest">
+      <el-button
+        size="large"
+        class="guest w-full sm:w-auto"
+        plain
+        aria-label="Continue as guest"
+        @click="continueAsGuest"
+      >
         🌿 Continue as Guest
       </el-button>
        <el-button
@@ -92,10 +102,15 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* Additional styles if needed */
 .guest {
- @media screen and (max-width: 640px) {
-    margin-left: 0 !important;
- }
+  background: rgba(255, 255, 255, 0.9) !important;
+  color: #0f172a !important;
+  border: 1px solid rgba(15, 23, 42, 0.15) !important;
+  transition: opacity 0.2s ease, background 0.2s ease;
+}
+
+.guest:hover {
+  background: rgba(255, 255, 255, 0.95) !important;
+  opacity: 0.88;
 }
 </style>
