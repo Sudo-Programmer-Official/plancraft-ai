@@ -34,7 +34,7 @@ function safeGet(res, key, fallback = null) {
 
 function logTimeBrain(event, payload) {
   try {
-    // eslint-disable-next-line no-console
+     
     console.log(`[TimeBrain][Service] ${event}`, payload)
   } catch {
     /* noop */
@@ -126,6 +126,7 @@ export async function generateTasksFromText(text, options = {}) {
     context: contextBundle.serialized,
     maxItems: maxItems ?? 6,
     timeContext: contextBundle.context,
+    now: contextBundle.context.now,
   }
 
   logTimeBrain('generateTasksFromText:request', {

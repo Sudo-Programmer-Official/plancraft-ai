@@ -13,7 +13,7 @@ const CONFIDENCE_THRESHOLD = 0.7
 
 function safeConsoleLog(message, payload) {
   try {
-    // eslint-disable-next-line no-console
+     
     console.log(`[TimeBrain][Parser] ${message}`, payload)
   } catch {
     /* noop */

@@ -39,7 +39,7 @@ router.post("/create", async (req, res) => {
 
 router.post("/announce", async (req, res) => {
   try {
-    const { userId, task, schedule = true, notificationOptions = {} } = req.body || {};
+    const { userId, task, schedule = true, notificationOptions = {}, clientNow } = req.body || {};
     if (!userId || !task) return res.status(400).json({ error: "Missing userId or task" });
 
     const base = toTaskPayload(task);
@@ -70,6 +70,7 @@ router.post("/announce", async (req, res) => {
       scheduled = await scheduleTaskReminder(userId, base, task, {
         source: "task_sync",
         timezone: task?.timezone || task?.tz,
+        clientNow,
         force: schedule === true,
       });
     }

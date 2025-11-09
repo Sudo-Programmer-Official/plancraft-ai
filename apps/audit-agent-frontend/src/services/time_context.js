@@ -16,7 +16,7 @@ const DEFAULT_PATTERN = 'balanced'
 
 function safeConsoleLog(message, payload) {
   try {
-    // eslint-disable-next-line no-console
+     
     console.log(`[TimeBrain][Context] ${message}`, payload)
   } catch {
     /* no-op */

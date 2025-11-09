@@ -238,17 +238,49 @@
       </TransitionGroup>
     </div>
 
-    <footer class="chat-input-bar chat-input-bar--with-recorder">
-      <div class="voice-recorder-wrapper">
-        <VoiceRecorder
-          :reset-trigger="voiceRecorderResetKey"
-          :autoCommit="true"
-          @transcribed="handleVoiceRecorderTranscribed"
-          @state-change="handleVoiceRecorderStateChange"
-          :disabled="assistantThinking"
-        />
-      </div>
+    <footer
+      class="chat-input-bar"
+      :class="{ 'chat-input-bar--recording': micActive }"
+    >
       <div class="chat-input-row">
+        <button
+          type="button"
+          class="mic-btn"
+          :class="{ active: micActive }"
+          :disabled="assistantThinking && !micActive"
+          :aria-pressed="micState === MIC_STATES.listening"
+          :title="micButtonLabel"
+          :aria-label="micButtonLabel"
+          @click="handleMicButton"
+        >
+          <span v-if="micState === MIC_STATES.processing" class="loader loader--tiny"></span>
+          <svg
+            v-else-if="micState === MIC_STATES.listening"
+            class="icon icon-stop"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <rect x="8" y="8" width="8" height="8" rx="2" />
+          </svg>
+          <svg
+            v-else
+            class="icon icon-mic"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+          >
+            <path
+              stroke-linecap="round"
+              d="M12 15.5a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v5.5a3 3 0 0 0 3 3Z"
+            />
+            <path d="M7.5 11.5V12a4.5 4.5 0 0 0 9 0v-.5" />
+            <path stroke-linecap="round" d="M12 16v3.5" />
+            <path stroke-linecap="round" d="M9.5 19.5h5" />
+          </svg>
+        </button>
         <input
           v-model="inputText"
           :disabled="assistantThinking"
@@ -297,7 +329,6 @@ import { queryPlannerAssistant } from '@/services/plannerService'
 import { requestSpeechUrl, supportsWebSpeech, speakWithWebSpeech } from '@/services/ttsService'
 import { useAuthStore } from '@/stores/authStore'
 import { recordAndSendToBackend } from '@/utils/backendRecorder'
-import VoiceRecorder from '@/components/VoiceRecorder.vue'
 import { ElMessage } from 'element-plus'
 import { trackEvent } from '@/services/analytics'
 import { auth } from '@/firebase/init'
@@ -325,7 +356,6 @@ const assistantThinking = ref(false)
 const inputText = ref('')
 const chatContainer = ref(null)
 const messageSeed = ref(0)
-const isRecording = ref(false)
 const isTranscribing = ref(false)
 const SpeechRecognitionClass =
   typeof window !== 'undefined'
@@ -343,16 +373,26 @@ const MIC_STATES = Object.freeze({
   error: 'error',
 })
 const micState = ref(MIC_STATES.idle)
-const voicePendingText = ref('')
-const voiceReadyToSend = computed(() => Boolean(voicePendingText.value?.trim()))
-const voiceRecorderResetKey = ref(0)
-const RECORDER_STATE_MAP = {
-  recording: MIC_STATES.listening,
-  processing: MIC_STATES.processing,
-  ready: MIC_STATES.paused,
-  idle: MIC_STATES.idle,
-}
-
+const micActive = computed(
+  () => micState.value === MIC_STATES.listening || micState.value === MIC_STATES.processing,
+)
+const micButtonLabel = computed(() => {
+  if (assistantThinking.value && !micActive.value) {
+    return 'Wait for the planner to finish'
+  }
+  switch (micState.value) {
+    case MIC_STATES.listening:
+      return 'Stop recording'
+    case MIC_STATES.processing:
+      return 'Finishing transcription'
+    case MIC_STATES.paused:
+      return 'Resume recording'
+    case MIC_STATES.error:
+      return 'Microphone unavailable'
+    default:
+      return 'Start recording'
+  }
+})
 let speechRecognitionInstance = null
 let backendRecorderInstance = null
 let silenceTimerId = null
@@ -641,37 +681,33 @@ watch(
   },
 )
 
-const sendDisabled = computed(
-  () =>
-    assistantThinking.value ||
-    (!inputText.value.trim() && !voicePendingText.value.trim()),
-)
+const sendDisabled = computed(() => assistantThinking.value || !inputText.value.trim())
 
 function clearChat() {
   messages.value = [createWelcomeMessage(userDisplayName.value)]
   lastAutoSpokenMessageId.value = null
   voiceRequestToken += 1
   voiceRequestingFor.value = null
-  voicePendingText.value = ''
-  voiceRecorderResetKey.value += 1
+  inputText.value = ''
   stopVoicePlayback()
+  stopRecording().catch(() => {})
 }
 
 async function sendMessage() {
-  const pendingVoice = voicePendingText.value.trim()
-  const typedInput = inputText.value.trim()
-  const payload = typedInput || pendingVoice
+  const payload = inputText.value.trim()
   if (!payload || assistantThinking.value) return
   await ensureVoicePlaybackUnlocked()
   try {
     await sendQuery(payload)
   } finally {
-    voicePendingText.value = ''
-    voiceRecorderResetKey.value += 1
     if (!keepListeningHot) {
       applyMicState(MIC_STATES.idle)
     }
   }
+}
+
+async function handleMicButton() {
+  await startRecording()
 }
 
 function toggleVoice() {
@@ -1047,8 +1083,6 @@ async function beginContinuousListening() {
     ElMessage.info('Wait for the planner to finish before recording again.')
     return
   }
-  inputText.value = ''
-  voicePendingText.value = ''
   latestPreviewText = ''
   pendingSegmentText = ''
   keepListeningHot = true
@@ -1094,7 +1128,6 @@ async function stopRecording() {
 function applyMicState(state) {
   if (micState.value === state) return
   micState.value = state
-  isRecording.value = state === MIC_STATES.listening
   if (state === MIC_STATES.processing) {
     isTranscribing.value = true
   } else if (state === MIC_STATES.idle || state === MIC_STATES.error) {
@@ -1222,24 +1255,12 @@ async function processVoiceSegment(text) {
 function stageVoiceResult(text) {
   const cleaned = String(text || '').trim()
   if (!cleaned) return
-  voicePendingText.value = cleaned
-  inputText.value = ''
+  const existing = inputText.value ? inputText.value.trim() : ''
+  inputText.value = existing ? `${existing} ${cleaned}`.trim() : cleaned
   applyMicState(MIC_STATES.paused)
   scheduleIdleDisengage()
   keepListeningHot = false
   manualStopRequested = true
-}
-
-function handleVoiceRecorderStateChange(value) {
-  const next = RECORDER_STATE_MAP[value] || MIC_STATES.idle
-  applyMicState(next)
-}
-
-function handleVoiceRecorderTranscribed({ text } = {}) {
-  const cleaned = String(text || '').trim()
-  if (!cleaned) return
-  stageVoiceResult(cleaned)
-  ElMessage.success('Transcribed 🎤')
 }
 
 function startWebSpeechSession() {
@@ -1788,22 +1809,6 @@ onBeforeUnmount(() => {
   box-shadow: 0 0 18px rgba(168, 85, 247, 0.4);
 }
 
-.chat-input-bar--with-recorder {
-  flex-wrap: wrap;
-  padding: 0.75rem;
-  background: rgba(15, 10, 30, 0.95);
-  border: 1px solid rgba(139, 92, 246, 0.4);
-  box-shadow: 0 12px 32px rgba(12, 5, 25, 0.7);
-  gap: 1rem;
-}
-
-.voice-recorder-wrapper {
-  flex: 1 1 320px;
-  min-width: 240px;
-  max-width: 480px;
-  display: flex;
-}
-
 .chat-input-row {
   display: flex;
   align-items: center;
@@ -1833,6 +1838,7 @@ onBeforeUnmount(() => {
 
 .mic-btn,
 .send-btn {
+  position: relative;
   padding: 0 1.3rem;
   border-radius: 999px;
   background: linear-gradient(120deg, #34d399, #10b981);

@@ -284,7 +284,7 @@ const task = computed(() => props.task || null)
 
 function logTimeBrainDialog(event, payload) {
   try {
-    // eslint-disable-next-line no-console
+     
     console.log(`[TimeBrain][Dialog] ${event}`, payload)
   } catch {
     /* noop */
@@ -877,6 +877,21 @@ function enrichTitle(task) {
   return chosen || 'Plan task'
 }
 
+function parseLocalMoment(value, tz) {
+  if (!value) return null
+  try {
+    const hasZone = /[zZ]|[+-]\d\d:?\d\d$/.test(String(value))
+    if (hasZone) {
+      const base = dayjs(value)
+      return base.isValid() ? base.tz(tz) : null
+    }
+    const parsed = dayjs.tz(value, tz, true)
+    return parsed.isValid() ? parsed : null
+  } catch {
+    return null
+  }
+}
+
 /* ---------------- Main Generator ---------------- */
 async function generateTasks() {
   if (!input.value.trim()) return
@@ -939,8 +954,8 @@ async function generateTasks() {
 
       let scheduledUtc = null
       if (parsedLocal) {
-        const localMoment = dayjs.tz(parsedLocal, tz)
-        if (localMoment.isValid()) {
+        const localMoment = parseLocalMoment(parsedLocal, tz)
+        if (localMoment && localMoment.isValid()) {
           scheduledUtc = localMoment.utc().toISOString()
           if (!autoPlanDate) autoPlanDate = localMoment.format('YYYY-MM-DD')
           if (!autoReminderTime) autoReminderTime = localMoment.format('HH:mm')
@@ -953,6 +968,14 @@ async function generateTasks() {
         timezone: tz,
         reminderTime: scheduledUtc ? dayjs.utc(scheduledUtc).tz(tz).format('HH:mm') : null,
       })
+    }
+
+    if (typeof result?.reminderTime === 'string') {
+      const reminderMoment = dayjs.utc(result.reminderTime).tz(tz)
+      if (reminderMoment.isValid()) {
+        if (!autoPlanDate) autoPlanDate = reminderMoment.format('YYYY-MM-DD')
+        if (!autoReminderTime) autoReminderTime = reminderMoment.format('HH:mm')
+      }
     }
 
     const seenKeys = new Set()

@@ -291,8 +291,9 @@ router.post("/tasks/summarize", async (req, res) => {
 // });
 router.post('/split-tasks', async (req, res) => {
   try {
-    const { text, maxItems = 6, context = '', timeContext = null } = req.body || {}
+    const { text, maxItems = 6, context = '', timeContext = null, now: clientNow } = req.body || {}
     const tz = (req.body && req.body.timezone) || req.headers['x-user-tz'] || 'UTC'
+    const nowIso = typeof clientNow === 'string' && clientNow ? clientNow : new Date().toISOString()
     if (!text || typeof text !== 'string') {
       return res.status(400).json({ error: "'text' is required" })
     }
@@ -352,7 +353,7 @@ router.post('/split-tasks', async (req, res) => {
     } catch {}
     // Attempt time extraction from the same input (non-fatal)
     let reminderTime = null
-    try { reminderTime = await extractReminderTime(text, { nowISO: new Date().toISOString(), timezone: tz, timeContext }) } catch {}
+    try { reminderTime = await extractReminderTime(text, { nowISO: nowIso, timezone: tz, timeContext }) } catch {}
     res.json({ tasks, reminderTime })
   } catch (error) {
     console.error('❌ Split Tasks API Error:', error)

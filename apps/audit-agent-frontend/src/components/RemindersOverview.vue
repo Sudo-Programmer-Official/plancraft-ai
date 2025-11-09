@@ -155,7 +155,7 @@ const authStore = useAuthStore()
 
 function logTimeBrainReminder(event, payload) {
   try {
-    // eslint-disable-next-line no-console
+     
     console.log(`[TimeBrain][Reminders] ${event}`, payload)
   } catch {
     /* noop */

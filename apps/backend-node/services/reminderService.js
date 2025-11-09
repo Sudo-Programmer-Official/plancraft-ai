@@ -206,6 +206,12 @@ export async function createReminderFromText(
   let parsed = null;
   let when = null;
   let parsedByAi = false;
+  const timezoneOverride = options?.timezone || "UTC";
+  const nowOverride =
+    options?.now && !Number.isNaN(new Date(options.now).getTime())
+      ? new Date(options.now)
+      : null;
+  const nowMs = nowOverride?.getTime() ?? Date.now();
 
   // Prefer concrete scheduledTime if provided (assumed already UTC or with zone)
   if (options?.scheduledTime) {
@@ -221,7 +227,7 @@ export async function createReminderFromText(
   // Quick natural-time parse before GPT (usually returns local, no zone)
   if (!parsed) {
     try {
-      const localTime = extractTime(text);
+      const localTime = extractTime(text, nowOverride || undefined);
       if (localTime) parsed = { task: text, time: localTime };
     } catch {}
   }
@@ -252,12 +258,12 @@ export async function createReminderFromText(
 
   // Fallback heuristic (+1h if GPT parse fails)
   if (!parsed || !parsed.task || !parsed.time) {
-    parsed = { task: text, time: new Date(Date.now() + 60 * 60 * 1000).toISOString() };
+    parsed = { task: text, time: new Date(nowMs + 60 * 60 * 1000).toISOString() };
   }
 
   // Normalize to UTC for storage. If time came from AI, treat it as user's local wall‑clock.
   if (!when) {
-    const tz = options?.timezone || "UTC";
+    const tz = timezoneOverride;
     const whenUtcIso = parsedByAi
       ? isoAsLocalWallToUtc(parsed.time, tz)
       : ensureUtcIso(parsed.time, tz) || new Date(parsed.time).toISOString();
@@ -267,7 +273,7 @@ export async function createReminderFromText(
     throw new Error("Parsed time invalid");
   }
 
-  const tzForUser = options?.timezone || null;
+  const tzForUser = timezoneOverride || null;
 
   // Resolve channels: provided list, else user preferences, else sane default
   let derivedPrefs = null

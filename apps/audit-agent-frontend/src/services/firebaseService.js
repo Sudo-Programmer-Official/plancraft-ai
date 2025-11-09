@@ -160,6 +160,7 @@ export async function fetchTasksBetween(startYMD, endYMD) {
 
 async function syncTaskNotification(userId, taskId, payload) {
   try {
+    const clientNow = new Date().toISOString()
     const res = await api.post('/tasks/announce', {
       userId,
       task: {
@@ -174,6 +175,7 @@ async function syncTaskNotification(userId, taskId, payload) {
         timezone: payload.timezone ?? null,
       },
       schedule: payload.reminderTime != null || payload.scheduledTime != null,
+      clientNow,
     })
     return res?.data || null
   } catch (err) {

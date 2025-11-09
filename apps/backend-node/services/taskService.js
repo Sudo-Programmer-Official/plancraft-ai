@@ -218,6 +218,7 @@ export async function scheduleTaskReminder(userId, task, payload = {}, options =
         timezone,
         taskId: task.id || payload.id || null,
         source: options.source || "task_create",
+        now: options.clientNow,
       }
     );
 
@@ -270,6 +271,7 @@ export async function createTask(userId, payload = {}, options = {}) {
     duration: Number.isFinite(payload.duration) ? payload.duration : null,
     scheduledTime: payload.scheduledTime || null,
     metadata,
+    timezone: payload.timezone || options.timezone || null,
     source: sanitizeString(payload.source || options.origin || "planner-assistant", "planner-assistant"),
     userId: uid,
     createdAt: now,
@@ -282,6 +284,7 @@ export async function createTask(userId, payload = {}, options = {}) {
   if (!doc.reminderChannels) delete doc.reminderChannels;
   if (!doc.priority) delete doc.priority;
   if (!doc.duration) delete doc.duration;
+  if (!doc.timezone) delete doc.timezone;
 
   const ref = await db.collection("tasks").add(doc);
   const task = { id: ref.id, ...doc };
