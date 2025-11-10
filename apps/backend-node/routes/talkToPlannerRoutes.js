@@ -21,6 +21,8 @@ router.post("/chat", async (req, res) => {
       history = [],
       clientTimezone,
       clientNow,
+      inputMode,
+      voicePreview,
     } = req.body || {};
     if (!userId || !message) {
       return res.status(400).json({ error: "Missing message or userId" });
@@ -57,6 +59,9 @@ router.post("/chat", async (req, res) => {
       runtime: {
         clientTimezone: timezoneOverride,
         clientNow: clientNowIso,
+        lastMessage: message,
+        inputMode: inputMode || null,
+        voiceSnippet: voicePreview || null,
       },
     };
 
@@ -67,6 +72,7 @@ Understand the intent, respond concisely, and when appropriate suggest next step
 When an actionable request is detected, add a single JSON block in triple backticks describing the actions to run.
 Supported action types and payload hints:
 - create_task: { "title": string, "date": "YYYY-MM-DD", "details"?: string, "category"?: string, "reminderTime"?: "HH:mm", "channels"?: [] }
+- create_goal: { "title": string, "description"?: string, "category"?: string, "targetDate"?: "YYYY-MM-DD", "milestones"?: [{ "title": string, "deadline"?: "YYYY-MM-DD" }] }
 - update_task: { "taskId": string, "title"?: string, "date"?: "YYYY-MM-DD", "reminderTime"?: "HH:mm", "completed"?: boolean }
 - complete_task: { "taskId": string }
 - schedule_reminder: { "text": string, "scheduledTime": ISO-8601 UTC, "timezone"?: string, "channels"?: [] }

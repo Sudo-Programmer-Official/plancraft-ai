@@ -8,6 +8,7 @@ import { recordCompletion } from "./habitService.js";
 import { extractReminderTime as extractReminderTimeAI } from "./openaiService.js";
 import { formatLocalTime } from "../utils/timezone.js";
 import { listEventsForWindow, getNextMeeting } from "./externalEventsService.js";
+import { createGoalViaService } from "./goalsClient.js";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -93,6 +94,122 @@ function extractTaskListFromMessage(message, timezoneId = DEFAULT_TIMEZONE) {
     });
   }
   return tasks.length > 1 ? tasks : [];
+}
+
+const GOAL_CATEGORY_HINTS = [
+  { value: "Health", regex: /(run|health|fitness|gym|workout|marathon|yoga|meditat)/i },
+  { value: "Finance", regex: /(save|budget|finance|money|debt|invest)/i },
+  { value: "Career", regex: /(career|promotion|business|client|startup|work)/i },
+  { value: "Learning", regex: /(learn|study|course|class|book|reading|school)/i },
+  { value: "Relationships", regex: /(family|relationship|partner|friends|community|social)/i },
+];
+
+function inferGoalCategoryFromText(text = "") {
+  for (const hint of GOAL_CATEGORY_HINTS) {
+    if (hint.regex.test(text)) return hint.value;
+  }
+  return "General";
+}
+
+function deriveGoalTitleFromMessage(message = "") {
+  if (!message) return "New Goal";
+  const trimmed = message.trim();
+  const goalMatch = trimmed.match(/goal(?: to| for)?\s+([^.!?]+)/i);
+  if (goalMatch?.[1]) {
+    const candidate = goalMatch[1].trim();
+    return candidate.charAt(0).toUpperCase() + candidate.slice(1);
+  }
+  const toMatch = trimmed.match(/to\s+([^.!?]+)/i);
+  if (toMatch?.[1]) {
+    const candidate = toMatch[1].trim();
+    return candidate.charAt(0).toUpperCase() + candidate.slice(1);
+  }
+  return trimmed.length > 80 ? `${trimmed.slice(0, 77)}...` : trimmed;
+}
+
+function defaultGoalTargetDate(timezoneId = DEFAULT_TIMEZONE) {
+  try {
+    return dayjs().tz(timezoneId).add(90, "day").startOf("day").toISOString();
+  } catch {
+    const fallback = new Date();
+    fallback.setDate(fallback.getDate() + 90);
+    return fallback.toISOString();
+  }
+}
+
+function extractGoalTargetDateFromMessage(message = "", timezoneId = DEFAULT_TIMEZONE, context = {}) {
+  if (!message) return null;
+  const isoMatch = message.match(/\d{4}-\d{2}-\d{2}/);
+  if (isoMatch) {
+    const iso = dayjs(isoMatch[0]);
+    if (iso.isValid()) return iso.tz(timezoneId, true).startOf("day").toISOString();
+  }
+
+  const byMatch = message.match(/by\s+([^.,;]+)/i);
+  if (byMatch?.[1]) {
+    const candidate = byMatch[1].trim();
+    const parsed = new Date(candidate);
+    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+  }
+
+  const relative = message.match(/in\s+(\d+)\s+(month|months|week|weeks|year|years)/i);
+  if (relative) {
+    const amount = Number(relative[1]);
+    const unitToken = relative[2].toLowerCase();
+    const unitMap = {
+      month: "month",
+      months: "month",
+      week: "week",
+      weeks: "week",
+      year: "year",
+      years: "year",
+    };
+    const unit = unitMap[unitToken] || "month";
+    try {
+      return dayjs().tz(timezoneId).add(amount, unit).startOf("day").toISOString();
+    } catch {
+      /* noop */
+    }
+  }
+
+  if (/next\s+year/i.test(message)) {
+    try {
+      return dayjs().tz(timezoneId).add(1, "year").startOf("month").toISOString();
+    } catch {
+      /* noop */
+    }
+  }
+
+  if (/end\s+of\s+(the\s+)?year/i.test(message)) {
+    try {
+      return dayjs().tz(timezoneId).endOf("year").toISOString();
+    } catch {
+      /* noop */
+    }
+  }
+
+  if (context?.summary?.planDate) {
+    try {
+      return dayjs(context.summary.planDate).tz(timezoneId).add(60, "day").toISOString();
+    } catch {
+      /* noop */
+    }
+  }
+
+  return null;
+}
+
+function buildGoalPayloadFromMessage(message = "", timezoneId = DEFAULT_TIMEZONE, context = {}) {
+  const description = String(message || "").trim();
+  const category = inferGoalCategoryFromText(description);
+  const targetDate = extractGoalTargetDateFromMessage(description, timezoneId, context) || defaultGoalTargetDate(timezoneId);
+  return {
+    title: deriveGoalTitleFromMessage(description),
+    description,
+    category,
+    targetDate,
+    autoPlan: true,
+  };
 }
 
 function safeFormatInTimezone(value, timezoneId = DEFAULT_TIMEZONE) {
@@ -224,6 +341,7 @@ async function fetchRecentTasks(uid, limit = 14) {
         category: data.category || "Uncategorized",
         reminderTime: data.reminderTime || null,
         priority: data.priority || null,
+        goalId: data.goalId || null,
         updatedAt: asIso(data.updatedAt) || asIso(data.createdAt),
       });
     });
@@ -650,6 +768,7 @@ function describeUpdates(updates = {}) {
   if ("reminderTime" in updates || "scheduledTime" in updates) labels.push("reminder");
   if ("category" in updates) labels.push("category");
   if ("completed" in updates) labels.push("status");
+  if ("goalId" in updates) labels.push("goal link");
   return labels.length ? labels.join(", ") : "task";
 }
 
@@ -688,6 +807,10 @@ async function updateTaskForUser(uid, payload = {}, context = {}) {
   if (payload.scheduledTime) updates.scheduledTime = payload.scheduledTime;
   if (payload.channels) updates.reminderChannels = payload.channels;
   if (payload.reminderChannels) updates.reminderChannels = payload.reminderChannels;
+  if (Object.prototype.hasOwnProperty.call(payload, "goalId")) {
+    const goalToken = sanitizeString(payload.goalId, "");
+    updates.goalId = goalToken || null;
+  }
 
   if (payload.completed === true) {
     updates.completed = true;
@@ -1162,6 +1285,65 @@ async function createTaskFromAction(uid, payload = {}, context = {}) {
   }
 }
 
+async function createGoalFromAction(uid, payload = {}, context = {}) {
+  try {
+    const timezoneId = resolveCandidateTimezone(payload, context);
+    const textSource =
+      payload.description ||
+      payload.details ||
+      payload.summary ||
+      payload.title ||
+      context?.runtime?.lastMessage ||
+      "";
+    const autoCategory = inferGoalCategoryFromText(textSource);
+    const goalBody = {
+      userId: uid,
+      title: payload.title || deriveGoalTitleFromMessage(textSource || "New Goal"),
+      description: textSource,
+      category: payload.category || autoCategory,
+      targetDate:
+        payload.targetDate ||
+        payload.deadline ||
+        extractGoalTargetDateFromMessage(textSource, timezoneId, context) ||
+        defaultGoalTargetDate(timezoneId),
+      milestones: Array.isArray(payload.milestones) ? payload.milestones : undefined,
+      linkedTasks: Array.isArray(payload.linkedTasks) ? payload.linkedTasks : undefined,
+      motivationNote: payload.motivationNote || payload.reason || "",
+      generateTasksForMilestones: payload.generateTasksForMilestones === true,
+      autoPlan: payload.autoPlan !== false,
+      useAiMilestones: payload.useAiMilestones !== false,
+      source: payload.source || "planner-assistant",
+      voiceContext: context?.runtime?.voiceSnippet || null,
+    };
+    if (!goalBody.description) goalBody.description = goalBody.title;
+
+    const goal = await createGoalViaService(goalBody, { userId: uid });
+    let friendlyDate = null;
+    if (goal?.targetDate) {
+      const parsed = dayjs(goal.targetDate);
+      friendlyDate = parsed.isValid() ? parsed.format("YYYY-MM-DD") : null;
+    }
+    const summaryLine = friendlyDate
+      ? `Goal “${goal.title}” locked for ${friendlyDate}.`
+      : `Goal “${goal.title}” is now active.`;
+    return {
+      status: "completed",
+      type: "create_goal",
+      goal,
+      payload,
+      message: summaryLine,
+    };
+  } catch (err) {
+    console.error("[PlannerAssistant] createGoalFromAction failed", err?.message || err);
+    return {
+      status: "error",
+      type: "create_goal",
+      payload,
+      message: err?.message || "Failed to create goal",
+    };
+  }
+}
+
 async function scheduleReminderFromAction(uid, payload = {}, context = {}) {
   const text = sanitizeString(payload.text || payload.title || payload.message || "");
   const scheduledTime = payload.scheduledTime || payload.when || payload.scheduled_at || null;
@@ -1215,6 +1397,8 @@ export async function executePlannerActions(uid, actions = [], context = {}) {
       const type = String(raw?.type || raw?.name || "").toLowerCase();
       if (type === "create_task") {
         results.push(await createTaskFromAction(uid, raw?.payload || raw, context));
+      } else if (type === "create_goal") {
+        results.push(await createGoalFromAction(uid, raw?.payload || raw, context));
       } else if (type === "schedule_reminder") {
         results.push(await scheduleReminderFromAction(uid, raw?.payload || raw, context));
       } else if (type === "complete_task") {
@@ -1254,6 +1438,9 @@ export function detectIntentFromMessage(message = "") {
   const text = String(message).toLowerCase();
   if (/create|add|new/.test(text) && /task/.test(text)) return "create_task";
   if (/remind|reminder|nudge|follow\s*up/.test(text)) return "schedule_reminder";
+  if (/(set|create|plan|start|build).*(goal|objective|mission)/.test(text) || /goal\s+to/.test(text)) {
+    return "create_goal";
+  }
   if (/join/.test(text) && /(meeting|call)/.test(text)) return "join_meeting";
   if (/(meeting|calendar|schedule)/.test(text)) return "get_meetings";
   if (/(show|list|fetch|what).*task/.test(text)) return "get_tasks";
@@ -1374,6 +1561,20 @@ export async function buildFallbackActionsFromIntent(intent, message = "", conte
     };
 
     return [{ type: "create_task", payload }];
+  }
+
+  if (intent === "create_goal") {
+    const payload = buildGoalPayloadFromMessage(message, timezoneId, context);
+    return [
+      {
+        type: "create_goal",
+        payload: {
+          ...payload,
+          useAiMilestones: true,
+          source: "planner-assistant",
+        },
+      },
+    ];
   }
 
   if (intent === "complete_task") {

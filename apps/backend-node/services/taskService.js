@@ -278,6 +278,21 @@ export async function createTask(userId, payload = {}, options = {}) {
     updatedAt: now,
   };
 
+  const linkedGoalId = sanitizeString(
+    payload.goalId ||
+      (typeof payload.goal === "object" ? payload.goal?.id || payload.goal?.goalId : null) ||
+      "",
+    "",
+  );
+  if (linkedGoalId) doc.goalId = linkedGoalId;
+  const linkedGoalTitle = sanitizeString(
+    payload.goalTitle || (typeof payload.goal === "object" ? payload.goal?.title : null) || "",
+    "",
+  );
+  if (linkedGoalTitle) doc.goalTitle = linkedGoalTitle;
+  const linkedGoalTarget = payload.goalTargetDate || payload.goal?.targetDate || null;
+  if (linkedGoalTarget) doc.goalTargetDate = linkedGoalTarget;
+
   if (!doc.link) delete doc.link;
   if (!doc.scheduledTime) delete doc.scheduledTime;
   if (!doc.reminderTime) delete doc.reminderTime;
@@ -285,6 +300,9 @@ export async function createTask(userId, payload = {}, options = {}) {
   if (!doc.priority) delete doc.priority;
   if (!doc.duration) delete doc.duration;
   if (!doc.timezone) delete doc.timezone;
+  if (!doc.goalId) delete doc.goalId;
+  if (!doc.goalTitle) delete doc.goalTitle;
+  if (!doc.goalTargetDate) delete doc.goalTargetDate;
 
   const ref = await db.collection("tasks").add(doc);
   const task = { id: ref.id, ...doc };

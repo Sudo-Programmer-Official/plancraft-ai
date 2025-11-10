@@ -20,6 +20,9 @@ function toTaskPayload(task = {}) {
     reminderChannels: Array.isArray(task.reminderChannels) ? task.reminderChannels : null,
     channels: Array.isArray(task.channels) ? task.channels : null,
     timezone: task.timezone || task.tz || null,
+    goalId: task.goalId || null,
+    goalTitle: task.goalTitle || null,
+    goalTargetDate: task.goalTargetDate || null,
     metadata: typeof task.metadata === "object" ? task.metadata : null,
   };
 }

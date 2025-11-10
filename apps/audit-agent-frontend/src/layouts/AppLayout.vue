@@ -495,6 +495,7 @@ const tabs = [
   { name: 'Monthly', icon: '🌙', path: '/monthly' },
   { name: 'Journal', icon: '📝', path: '/journal' },
   { name: 'Reminders', icon: '🔔', path: '/reminders' },
+  { name: 'Goals', icon: '🎯', path: '/goals' },
   { name: 'Reports', icon: '📈', path: '/reports' },
   { name: 'Habits', icon: '🏆', path: '/habits' },
 ]

@@ -98,6 +98,7 @@ const router = createRouter({
         { path: 'today', name: 'today', component: () => import('@/views/TodayView.vue') },
         { path: 'planner', name: 'planner', component: () => import('@/views/PlannerView.vue') },
         { path: 'timeline', name: 'timeline', component: () => import('@/views/TimelineView.vue') },
+        { path: 'goals', name: 'goals', component: () => import('@/views/GoalsView.vue') },
         { path: 'settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },
         { path: 'pricing', name: 'pricing', component: () => import('@/views/PricingView.vue') },
         { path: 'subscription', name: 'subscription', component: () => import('@/views/PricingView.vue') },

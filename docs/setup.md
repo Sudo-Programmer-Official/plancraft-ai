@@ -29,6 +29,9 @@ VITE_API_BASE_URL=http://localhost:4000/api/ai
 # Optional override for transcription endpoint base (maps to /api/transcribe)
 # If not set, code derives http://localhost:4000/api from VITE_API_BASE_URL
 # VITE_TRANSCRIBE_BASE_URL=http://localhost:4000/api
+
+# Optional dedicated Goals microservice base (defaults to /api/goals)
+# VITE_GOALS_API_BASE=http://localhost:4502/api/goals
 ```
 
 Firebase config lives in `src/firebase/init.js`. Adjust if needed for your own project.
@@ -46,6 +49,9 @@ npm run start   # or npm run dev with nodemon
 Environment vars (create `.env` in `apps/backend-node`):
 ```env
 NODE_ENV=development
+
+# Goals microservice endpoint used by planner actions
+GOALS_SERVICE_URL=http://localhost:4502/api/goals
 
 # OpenAI core (enhance/summarize/split)
 OPENAI_API_KEY=sk-...
@@ -85,6 +91,47 @@ GPT_REFRESH_TOKEN_TTL_DAYS=30
 ```
 
 The server runs on port 4000 by default (see `apps/backend-node/index.js`).
+
+### Goals Service (Goals microservice)
+Path: `apps/goals-service`
+
+This service owns goal CRUD, milestone generation, and task-linking logic. Run it alongside the main backend:
+
+```bash
+cd apps/goals-service
+npm i
+npm run start   # or npm run dev for watch mode
+```
+
+Environment vars (copy `.env.example` in the same folder):
+```env
+GOALS_SERVICE_PORT=4502
+GOALS_SERVICE_ALLOWED_ORIGINS=http://localhost:5173
+OPENAI_API_KEY=sk-...
+
+# Firebase Admin credentials (reuse the backend service account)
+FIREBASE_SERVICE_ACCOUNT=...json...
+# or point to the backend copy
+GOALS_FIREBASE_CREDENTIAL_PATH=../backend-node/firebase-service-account.json
+
+# Optional: auto-create tasks for milestones through the planner service
+GOALS_TASK_SERVICE_URL=http://localhost:4000/api/tasks/create
+
+# Optional: sync milestone reminders + push notifications
+GOALS_REMINDER_SERVICE_URL=http://localhost:4000/api/reminders/text
+# GOALS_REMINDER_SERVICE_TOKEN=internal-shared-secret
+VAPID_PUBLIC_KEY=your-pwa-public-key
+VAPID_PRIVATE_KEY=your-pwa-private-key
+VAPID_SUBJECT=mailto:you@example.com
+```
+
+🔗 **Wiring notes**
+- Backend → set `GOALS_SERVICE_URL=http://localhost:4502/api/goals` in `apps/backend-node/.env` so TalkToPlanner can create goals via voice.
+- Frontend → set `VITE_GOALS_API_BASE=http://localhost:4502/api/goals` (or rely on the default `/api/goals` when you proxy that path through your gateway).
+- Run all three servers (frontend, backend, goals) during development to see the full experience.
+- New endpoints (Phase 2):
+  - `GET /api/goals/summary` — aggregates totals, categories, upcoming milestones
+  - `POST /api/goals/reflect` + `GET /api/goals/reflect` — store & list weekly reflections
 
 ## Marketing: LinkedIn Campaign Enhancements
 
