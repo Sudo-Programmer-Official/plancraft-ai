@@ -1,0 +1,16 @@
+[
+  {
+    "platform": "reddit",
+    "message": "PlanCraftAI keeps me organized with adaptive daily plans. Curious if others struggle with planning overload?",
+    "subreddit": "Entrepreneur"
+  },
+  {
+    "platform": "linkedin",
+    "message": "AI workflows that plan, prioritize, and follow-up automatically. PlanCraftAI is hiring pilot teams!",
+    "tags": ["#AI", "#FutureOfWork"]
+  },
+  {
+    "platform": "twitter",
+    "message": "Built a marketing agent for PlanCraftAI that schedules posts with BullMQ + Firebase logging. 🚀"
+  }
+]

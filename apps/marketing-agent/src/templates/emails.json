@@ -1,0 +1,12 @@
+[
+  {
+    "subject": "Meet PlanCraftAI — your AI planning partner",
+    "message": "Hey {{name}},\\nPlanCraftAI organizes meetings, reminders, and focus blocks automatically. Ready to try it?",
+    "cta": "https://plancraftai.com"
+  },
+  {
+    "subject": "How teams automate planning",
+    "message": "We shipped a marketing agent that keeps LinkedIn, Reddit, and Twitter active safely. Want early access?",
+    "cta": "https://plancraftai.com/marketing-agent"
+  }
+]

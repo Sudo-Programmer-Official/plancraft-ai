@@ -1,0 +1,24 @@
+[
+  {
+    "platform": "linkedin",
+    "message": "PlanCraftAI automates daily planning so your team can focus on deep work.",
+    "tags": ["#AI", "#Productivity", "#SaaS"],
+    "mediaUrl": "https://plancraftai.com/assets/product-shot.png"
+  },
+  {
+    "platform": "reddit",
+    "message": "Just shipped PlanCraftAI, an AI planning copilot. Would love feedback from this community!",
+    "subreddit": "Productivity",
+    "tags": ["#ShowAndTell"]
+  },
+  {
+    "platform": "twitter",
+    "message": "PlanCraftAI keeps your OKRs on track with automated task timelines. ⚡️",
+    "tags": ["#AI", "#Automation"]
+  },
+  {
+    "platform": "facebook",
+    "message": "Entrepreneurs use PlanCraftAI to get their time back. Have you tried it yet?",
+    "mediaUrl": "https://plancraftai.com"
+  }
+]
