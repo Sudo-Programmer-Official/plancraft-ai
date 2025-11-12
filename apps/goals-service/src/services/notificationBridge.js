@@ -1,5 +1,5 @@
 import webpush from "web-push";
-import { db } from "../lib/firebaseAdmin.js";
+import { db } from "./firebaseAdmin.js";
 
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || "";
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || "";

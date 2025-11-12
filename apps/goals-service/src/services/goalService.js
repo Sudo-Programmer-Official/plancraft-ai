@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc.js";
 import timezone from "dayjs/plugin/timezone.js";
-import { db } from "../lib/firebaseAdmin.js";
+import { db } from "./firebaseAdmin.js";
 import {
   sanitizeMilestones,
   computeGoalProgress,

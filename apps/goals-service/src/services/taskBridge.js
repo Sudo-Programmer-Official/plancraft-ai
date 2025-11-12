@@ -1,5 +1,5 @@
 import fetch from "node-fetch";
-import { db, FieldValue } from "../lib/firebaseAdmin.js";
+import { db, FieldValue } from "./firebaseAdmin.js";
 
 const TASK_ENDPOINT = process.env.GOALS_TASK_SERVICE_URL || process.env.TASK_SERVICE_URL || "";
 const tasksCollection = () => db.collection("tasks");
