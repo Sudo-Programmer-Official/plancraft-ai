@@ -314,13 +314,13 @@
           </button>
 
           <!-- Feedback shortcut -->
-          <button
+          <!-- <button
             @click="openFeedback"
             class="hidden sm:flex items-center justify-center rounded-full border border-fuchsia-400/40 bg-fuchsia-500/15 p-2 text-fuchsia-100 transition hover:bg-fuchsia-500/30 focus:outline-none focus:ring-2 focus:ring-fuchsia-400"
             title="Share feedback"
           >
             💬
-          </button>
+          </button> -->
 
           <!-- Upgrade Button / Pro Badge -->
           <div class="flex items-center gap-2 whitespace-nowrap">
