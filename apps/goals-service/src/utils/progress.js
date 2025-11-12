@@ -92,7 +92,11 @@ export function sanitizeMilestones(list = []) {
         reminderScheduled: normalizeBool(milestone.reminderScheduled, false),
         reminderSyncedAt: milestone.reminderSyncedAt || null,
         timezone: milestone.timezone || null,
-        channels: Array.isArray(milestone.channels) ? milestone.channels : undefined,
+        channels: Array.isArray(milestone.channels)
+          ? milestone.channels
+              .map((channel) => (channel ? String(channel).trim() : null))
+              .filter(Boolean)
+          : null,
         taskId: milestone.taskId || null,
       };
     })
