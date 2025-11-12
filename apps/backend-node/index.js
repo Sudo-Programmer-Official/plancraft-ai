@@ -106,6 +106,7 @@ import plannerRoutes from "./routes/plannerRoutes.js";
 import talkToPlannerRoutes from "./routes/talkToPlannerRoutes.js";
 import taskRoutes from "./routes/taskRoutes.js";
 import habitRoutes from "./routes/habitRoutes.js";
+import feedbackRoutes from "./routes/feedbackRoutes.js";
 import { processReminderBatches } from "./services/reminderService.js";
 import seoRoutes from "./routes/seoRoutes.js";
 import gptRoutes from "./routes/gptRoutes.js";
@@ -274,6 +275,7 @@ app.use("/api/planner", plannerRoutes);
 app.use("/api/talk", talkToPlannerRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/habits", habitRoutes);
+app.use("/api/feedback", feedbackRoutes);
 app.use("/api", journalRoutes);
 app.use("/", seoRoutes);
 // Mount Google routes (guarded internally by feature flag)

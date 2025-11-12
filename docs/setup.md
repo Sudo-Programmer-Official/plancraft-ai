@@ -88,6 +88,9 @@ GPT_ACTION_CLIENT_ID_ALIASES=
 GPT_LINK_CODE_TTL_MIN=10
 GPT_ACCESS_TOKEN_TTL_MIN=30
 GPT_REFRESH_TOKEN_TTL_DAYS=30
+
+# Optional: forward user feedback to Slack
+FEEDBACK_SLACK_WEBHOOK=https://hooks.slack.com/services/XXXX/XXXX/XXXX
 ```
 
 The server runs on port 4000 by default (see `apps/backend-node/index.js`).

@@ -1,5 +1,7 @@
 <template>
   <NotificationBanner :user-id="currentUserId" />
+  <FeedbackPrompt />
+  <FeedbackDrawer />
   <div
     class="flex min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 text-white"
   >
@@ -311,6 +313,15 @@
             </svg>
           </button>
 
+          <!-- Feedback shortcut -->
+          <button
+            @click="openFeedback"
+            class="hidden sm:flex items-center justify-center rounded-full border border-fuchsia-400/40 bg-fuchsia-500/15 p-2 text-fuchsia-100 transition hover:bg-fuchsia-500/30 focus:outline-none focus:ring-2 focus:ring-fuchsia-400"
+            title="Share feedback"
+          >
+            💬
+          </button>
+
           <!-- Upgrade Button / Pro Badge -->
           <div class="flex items-center gap-2 whitespace-nowrap">
             <template v-if="isPremium">
@@ -391,9 +402,12 @@
 import { ref, onMounted, watch, onUnmounted, computed } from 'vue'
 import { hasSubscription, registerPushSubscription } from '@/services/pushService'
 import NotificationBanner from '@/components/NotificationBanner.vue'
+import FeedbackPrompt from '@/components/feedback/FeedbackPrompt.vue'
+import FeedbackDrawer from '@/components/feedback/FeedbackDrawer.vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
+import { useFeedbackStore } from '@/stores/feedbackStore'
 import { useAuthFlags } from '@/composables/useAuthFlags'
 import PlanSummaryModal from '@/components/PlanSummaryModal.vue'
 import ProfileSetup from '@/components/ProfileSetup.vue'
@@ -447,6 +461,7 @@ const authStore = useAuthStore()
 
 // Subscription state via store
 const subStore = useSubscriptionStore()
+const feedbackStore = useFeedbackStore()
 const { isPremium, isGuest } = useAuthFlags()
 
 const isOnTalkPlanner = computed(() => route.path === '/talk-to-planner')
@@ -529,8 +544,17 @@ function goToTalkPlanner() {
   }
 }
 
+function openFeedback() {
+  try {
+    feedbackStore.openDrawer({ route: route.name || route.path, source: 'header' })
+  } catch (err) {
+    console.warn('Failed to open feedback drawer', err?.message || err)
+  }
+}
+
 onMounted(() => {
   if (authStore.user?.uid) subStore.fetchStatus(authStore.user.uid)
+  feedbackStore.init()
   // Upgrade banner events
   try {
     upgradeHandler = () => {
