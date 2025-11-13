@@ -194,75 +194,104 @@
 
         <!-- Google Calendar Card -->
         <div class="mt-6 rounded-lg border border-white/10 bg-slate-900/40 p-4 space-y-3">
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div class="font-semibold flex items-center gap-2">📆 Google Calendar
-                <span v-if="google.enabled" :class="['text-xs px-2 py-0.5 rounded', google.connected ? 'bg-emerald-700/50 text-emerald-200' : 'bg-yellow-700/40 text-yellow-200']">
-                  {{ google.connected ? 'Connected' : 'Not Connected' }}
-                </span>
-                <span v-else class="text-xs px-2 py-0.5 rounded bg-slate-700/50 text-slate-300">Disabled by server</span>
+          <div v-if="googleLoading" class="space-y-4 animate-pulse">
+            <div class="h-5 w-40 bg-slate-800/60 rounded"></div>
+            <div class="h-4 w-3/4 bg-slate-800/40 rounded"></div>
+            <div class="h-10 bg-slate-800/50 rounded"></div>
+          </div>
+          <template v-else>
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div class="font-semibold flex items-center gap-2">📆 Google Calendar
+                  <span v-if="google.enabled" :class="['text-xs px-2 py-0.5 rounded', google.connected ? 'bg-emerald-700/50 text-emerald-200' : 'bg-yellow-700/40 text-yellow-200']">
+                    {{ google.connected ? 'Connected' : 'Not Connected' }}
+                  </span>
+                  <span v-else class="text-xs px-2 py-0.5 rounded bg-slate-700/50 text-slate-300">Disabled by server</span>
+                </div>
+                <p class="text-xs text-slate-300 mt-1">
+                  Import meetings and show Join links in your tasks.
+                  <span v-if="googleLastSync">Last sync: {{ googleLastSync }}</span>
+                </p>
               </div>
-              <p class="text-xs text-slate-300 mt-1">
-                Import meetings and show Join links in your tasks.
-                <span v-if="googleLastSync">Last sync: {{ googleLastSync }}</span>
-              </p>
-            </div>
-            <div class="flex items-center gap-2">
-              <button v-if="google.enabled && !google.connected && authStore.user" @click="connectGoogle"
-                 class="px-3 py-1.5 rounded bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm">
-                Connect
-              </button>
-              <button v-if="google.connected" @click="syncNow" class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-sm">Sync Now</button>
-              <button v-if="google.connected" @click="disconnectGoogle" class="px-3 py-1.5 rounded bg-red-700/80 hover:bg-red-700 text-sm">Disconnect</button>
-            </div>
-          </div>
-
-          <!-- Calendars selection -->
-          <div v-if="google.connected" class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <label v-for="cal in google.calendars" :key="cal.id" class="flex items-center gap-2 bg-slate-800/40 border border-slate-700/40 rounded p-2">
-              <input type="checkbox" v-model="cal.selected" @change="onSelectionChange" class="accent-indigo-500">
-              <div class="flex-1">
-                <div class="text-sm">{{ cal.summary || cal.id }}</div>
-                <div class="text-xs text-slate-400">{{ cal.timeZone || '—' }}</div>
+              <div class="flex items-center gap-2">
+                <button
+                  v-if="google.enabled && !google.connected && authStore.user"
+                  @click="connectGoogle"
+                  :disabled="googleLoading"
+                  class="px-3 py-1.5 rounded bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm disabled:opacity-50"
+                >
+                  Connect
+                </button>
+                <button
+                  v-if="google.connected"
+                  @click="syncNow"
+                  :disabled="googleSyncing"
+                  class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-sm flex items-center gap-2 disabled:opacity-60"
+                >
+                  <span
+                    v-if="googleSyncing"
+                    class="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin"
+                    aria-hidden="true"
+                  ></span>
+                  <span>{{ googleSyncing ? 'Syncing…' : 'Sync Now' }}</span>
+                </button>
+                <button
+                  v-if="google.connected"
+                  @click="disconnectGoogle"
+                  class="px-3 py-1.5 rounded bg-red-700/80 hover:bg-red-700 text-sm"
+                >
+                  Disconnect
+                </button>
               </div>
-              <span v-if="cal.primary" class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-700/50">primary</span>
-            </label>
-          </div>
+            </div>
 
-          <!-- Window + save -->
-          <div v-if="google.connected" class="mt-3 flex items-center gap-3 flex-wrap">
-            <label class="text-sm text-slate-300">Look-ahead window:</label>
-            <select v-model.number="google.windowDays" @change="markDirty" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm">
-              <option :value="7">7 days</option>
-              <option :value="14">14 days</option>
-              <option :value="30">30 days</option>
-              <option :value="60">60 days</option>
-            </select>
-            <button @click="saveSelection" class="px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-sm">Save Selection</button>
-            <span v-if="google.status" class="text-xs text-slate-400">Status: {{ google.status }}</span>
-          </div>
+            <!-- Calendars selection -->
+            <div v-if="google.connected" class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label v-for="cal in google.calendars" :key="cal.id" class="flex items-center gap-2 bg-slate-800/40 border border-slate-700/40 rounded p-2">
+                <input type="checkbox" v-model="cal.selected" @change="onSelectionChange" class="accent-indigo-500">
+                <div class="flex-1">
+                  <div class="text-sm">{{ cal.summary || cal.id }}</div>
+                  <div class="text-xs text-slate-400">{{ cal.timeZone || '—' }}</div>
+                </div>
+                <span v-if="cal.primary" class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-700/50">primary</span>
+              </label>
+            </div>
 
-          <div v-if="google.enabled" class="pt-3 border-t border-white/5 space-y-3">
-            <label class="flex items-center gap-3 text-sm text-slate-200">
-              <input type="checkbox" v-model="meetingPrefs.autoCreate" @change="markDirty" class="accent-indigo-500" />
-              Auto-create tasks from calendar events
-            </label>
-            <div class="flex items-center gap-2 text-sm text-slate-200 flex-wrap">
-              <span>Default meeting reminder:</span>
-              <select
-                v-model.number="meetingPrefs.defaultReminderMinutes"
-                @change="markDirty"
-                class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm"
-              >
-                <option :value="5">5 minutes</option>
-                <option :value="10">10 minutes</option>
-                <option :value="15">15 minutes</option>
-                <option :value="30">30 minutes</option>
-                <option :value="60">1 hour</option>
+            <!-- Window + save -->
+            <div v-if="google.connected" class="mt-3 flex items-center gap-3 flex-wrap">
+              <label class="text-sm text-slate-300">Look-ahead window:</label>
+              <select v-model.number="google.windowDays" @change="markDirty" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm">
+                <option :value="7">7 days</option>
+                <option :value="14">14 days</option>
+                <option :value="30">30 days</option>
+                <option :value="60">60 days</option>
               </select>
-              <span class="text-xs text-slate-400">before each meeting</span>
+              <button @click="saveSelection" class="px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-sm">Save Selection</button>
+              <span v-if="google.status" class="text-xs text-slate-400">Status: {{ google.status }}</span>
             </div>
-          </div>
+
+            <div v-if="google.enabled" class="pt-3 border-t border-white/5 space-y-3">
+              <label class="flex items-center gap-3 text-sm text-slate-200">
+                <input type="checkbox" v-model="meetingPrefs.autoCreate" @change="markDirty" class="accent-indigo-500" />
+                Auto-create tasks from calendar events
+              </label>
+              <div class="flex items-center gap-2 text-sm text-slate-200 flex-wrap">
+                <span>Default meeting reminder:</span>
+                <select
+                  v-model.number="meetingPrefs.defaultReminderMinutes"
+                  @change="markDirty"
+                  class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm"
+                >
+                  <option :value="5">5 minutes</option>
+                  <option :value="10">10 minutes</option>
+                  <option :value="15">15 minutes</option>
+                  <option :value="30">30 minutes</option>
+                  <option :value="60">1 hour</option>
+                </select>
+                <span class="text-xs text-slate-400">Adjust reminder lead time for meetings.</span>
+              </div>
+            </div>
+          </template>
         </div>
       </section>
 
@@ -737,6 +766,8 @@ const effectiveTwilioPhone = computed(() => {
 
 // Google Calendar integration state and handlers
 const google = reactive({ enabled: true, connected: false, calendars: [], windowDays: 30, status: '', lastRun: null, accountEmail: '' })
+const googleLoading = ref(true)
+const googleSyncing = ref(false)
 const meetingPrefs = reactive({ autoCreate: true, defaultReminderMinutes: DEFAULT_MEETING_REMINDER })
 const googleLastSync = computed(() => {
   if (!google.lastRun) return null
@@ -753,15 +784,18 @@ async function connectGoogle() {
   }
 }
 
-async function loadGoogle() {
+async function loadGoogle(options = {}) {
+  const suppressLoader = options?.suppressLoader === true
+  if (!suppressLoader) googleLoading.value = true
   try {
     if (!authStore.user?.uid) return
     let status
     try {
       status = await getGoogleStatus(authStore.user.uid)
     } catch (e) {
-      // if disabled server-side
       google.enabled = false
+      google.connected = false
+      google.calendars = []
       return
     }
     google.enabled = true
@@ -770,11 +804,16 @@ async function loadGoogle() {
     google.status = status?.sync?.status || ''
     google.lastRun = status?.sync?.lastRun || null
     google.accountEmail = status?.accountEmail || status?.token?.email || ''
-    if (!google.connected) return
+    if (!google.connected) {
+      google.calendars = []
+      return
+    }
     const cals = await getGoogleCalendars(authStore.user.uid)
     google.calendars = Array.isArray(cals) ? cals : []
   } catch (e) {
     console.warn('loadGoogle failed', e?.message || e)
+  } finally {
+    if (!suppressLoader) googleLoading.value = false
   }
 }
 
@@ -791,24 +830,27 @@ async function saveSelection() {
 
 async function syncNow() {
   try {
-    if (!authStore.user?.uid) return
+    if (!authStore.user?.uid || googleSyncing.value) return
+    googleSyncing.value = true
     const result = await triggerGoogleSyncNow(authStore.user.uid)
     if (result?.ok) {
       const stats = result.stats || {}
-      const summary = [
-        stats.eventsUpserted ? `${stats.eventsUpserted} events refreshed` : null,
-        stats.created ? `${stats.created} tasks added` : null,
-        stats.updated ? `${stats.updated} updated` : null,
-      ]
-        .filter(Boolean)
-        .join(', ')
-      ElMessage.success(summary || 'Calendar sync completed')
-      await loadGoogle()
+      const cleared = (stats.cancelled || 0) + (stats.deleted || 0)
+      const summaryParts = []
+      if (stats.created) summaryParts.push(`${stats.created} new`)
+      if (stats.updated) summaryParts.push(`${stats.updated} updated`)
+      if (cleared) summaryParts.push(`${cleared} cleared`)
+      if (stats.skipped) summaryParts.push(`${stats.skipped} unchanged`)
+      const label = summaryParts.length ? `Synced ${summaryParts.join(', ')}` : 'Calendar sync completed'
+      ElMessage.success(label)
+      await loadGoogle({ suppressLoader: true })
     } else {
       ElMessage.warning('Sync request not accepted')
     }
   } catch (e) {
     ElMessage.error(e?.response?.data?.error || 'Sync failed')
+  } finally {
+    googleSyncing.value = false
   }
 }
 

@@ -1,11 +1,13 @@
 import { db } from './firebaseAdmin.js'
 import crypto from 'crypto'
+import nodeFetch from 'node-fetch'
 import { removeIntegrationAccount } from './integrationAccountService.js'
 import { deleteExternalEventsForAccount } from './externalEventsService.js'
 import { upsertIntegrationAccount, updateIntegrationAccountTokens } from './integrationAccountService.js'
 
 const GOOGLE_OAUTH_BASE = 'https://accounts.google.com/o/oauth2/v2/auth'
 const TOKEN_URL = 'https://oauth2.googleapis.com/token'
+const fetchFn = typeof globalThis.fetch === 'function' ? globalThis.fetch.bind(globalThis) : nodeFetch
 
 export const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/calendar.readonly',
@@ -141,7 +143,7 @@ export async function exchangeCodeForTokens(code) {
     redirect_uri,
     grant_type: 'authorization_code',
   })
-  const resp = await fetch(TOKEN_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body })
+  const resp = await fetchFn(TOKEN_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body })
   if (!resp.ok) {
     const text = await resp.text().catch(() => '')
     dbg('exchangeCodeForTokens failed', { status: resp.status, text: text?.slice(0, 120) })
@@ -164,7 +166,7 @@ export async function refreshAccessToken(refresh_token) {
     client_secret,
     grant_type: 'refresh_token',
   })
-  const resp = await fetch(TOKEN_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body })
+  const resp = await fetchFn(TOKEN_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body })
   if (!resp.ok) {
     const text = await resp.text().catch(() => '')
     throw new Error(`Refresh failed: ${resp.status} ${text}`)

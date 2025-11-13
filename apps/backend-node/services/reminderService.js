@@ -309,6 +309,9 @@ export async function createReminderFromText(
     timezone: tzForUser,
     source: options?.source || 'reminder',
   };
+  if (options?.context && typeof options.context === 'object' && Object.keys(options.context).length) {
+    reminder.context = options.context;
+  }
 
   const logSource = options?.source || 'manual'
   console.log(`[ReminderService:${logSource}] Persisting reminder`, {
@@ -377,7 +380,13 @@ export async function sendReminder(reminder) {
     : [];
   const limitTo = normalizedChannels.length ? normalizedChannels : undefined;
   const includeVoice = normalizedChannels.includes('voice');
-  const fallbackText = `⏰ Reminder: ${task} (${when})`;
+  const context = reminder?.context && typeof reminder.context === 'object' ? reminder.context : {};
+  const locationLine = context.location ? `Where: ${context.location}` : null;
+  const meetingLink = context.meetingLink || context.joinUrl || context.link || null;
+  const eventLink = meetingLink ? null : (context.eventLink || context.calendarLink || null);
+  const linkLine = meetingLink ? `Join: ${meetingLink}` : eventLink ? `Open: ${eventLink}` : null;
+  const extras = [locationLine, linkLine].filter(Boolean).join(" • ");
+  const fallbackText = `⏰ Reminder: ${task} (${when})${extras ? `. ${extras}` : ""}`;
   const who = getSalutationToken(reminder);
 
   const reminderPayload = {
@@ -387,6 +396,8 @@ export async function sendReminder(reminder) {
     scheduledTime: scheduledDate ? scheduledDate.toISOString() : null,
     reminderTime: reminder?.reminderTime || null,
     timezone: reminder?.timezone || null,
+    context,
+    link: meetingLink || eventLink || null,
   };
 
   try {
@@ -404,6 +415,7 @@ export async function sendReminder(reminder) {
       voiceMessage: includeVoice ? `Reminder: ${task}. Scheduled for ${when}.` : null,
       smsMessage: fallbackText,
       subject: `PlanCraftAI Reminder • ${task}`,
+      message: fallbackText,
       pwa: {
         title: 'Reminder due',
         body: fallbackText,
@@ -411,6 +423,7 @@ export async function sendReminder(reminder) {
           type: 'reminder-due',
           reminderId: reminder?.id || reminder?._id || null,
           taskId: reminder?.taskId || null,
+          link: meetingLink || eventLink || null,
         },
       },
     });

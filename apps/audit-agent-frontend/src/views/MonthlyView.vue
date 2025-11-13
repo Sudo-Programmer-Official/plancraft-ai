@@ -124,8 +124,11 @@
                 {{ task.title }}
               </p>
 
-              <p v-if="task.details" class="text-sm text-slate-400 max-w-2xl">
-                {{ task.details }}
+              <p
+                v-if="formattedDetails(task)"
+                class="text-sm text-slate-400 max-w-2xl whitespace-pre-line"
+              >
+                {{ formattedDetails(task) }}
               </p>
             </div>
 
@@ -190,8 +193,10 @@ import api from '@/services/api'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/authStore'
 import { getCategoryIcon, getCategoryColor, resolveCategory } from '@/constants/taskCategories'
+import { describeTaskDetails } from '@/utils/taskDisplay'
 
 const { tasks, toggleComplete, loadTasksForRange } = useTasks()
+const formattedDetails = (task) => describeTaskDetails(task)
 
 const { authStore, userPrefs } = useAuthStore()
 

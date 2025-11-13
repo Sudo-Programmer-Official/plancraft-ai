@@ -219,6 +219,7 @@ export async function scheduleTaskReminder(userId, task, payload = {}, options =
         taskId: task.id || payload.id || null,
         source: options.source || "task_create",
         now: options.clientNow,
+        context: options.context || payload.context || null,
       }
     );
 

@@ -1,6 +1,7 @@
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc.js'
 import timezone from 'dayjs/plugin/timezone.js'
+import nodeFetch from 'node-fetch'
 import { db } from './firebaseAdmin.js'
 import { extractJoinLink } from '../utils/joinLink.js'
 import { ensureFreshAccessToken, getUserGoogleIntegration, saveUserGoogleIntegration } from './googleOAuth.js'
@@ -10,6 +11,7 @@ dayjs.extend(timezone)
 
 const CAL_LIST_URL = 'https://www.googleapis.com/calendar/v3/users/me/calendarList'
 const EVENTS_URL = (calId) => `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events`
+const fetchFn = typeof globalThis.fetch === 'function' ? globalThis.fetch.bind(globalThis) : nodeFetch
 
 function headers(tok) {
   return { Authorization: `Bearer ${tok?.access_token}`, 'Content-Type': 'application/json' }
@@ -23,7 +25,7 @@ function toYMD(d, tz) {
 }
 
 export async function listCalendars(uid, tokens) {
-  const resp = await fetch(CAL_LIST_URL, { headers: headers(tokens) })
+  const resp = await fetchFn(CAL_LIST_URL, { headers: headers(tokens) })
   if (resp.status === 401) throw new Error('Unauthorized with Google; reconnect')
   if (!resp.ok) throw new Error(`Failed to list calendars: ${resp.status}`)
   const json = await resp.json()
@@ -118,7 +120,7 @@ async function initialSync(uid, calendar, tokens, windowDays = 30) {
     orderBy: 'startTime',
     maxResults: '2500',
   })
-  const resp = await fetch(`${EVENTS_URL(calendar.id)}?${params.toString()}`, { headers: headers(tokens) })
+  const resp = await fetchFn(`${EVENTS_URL(calendar.id)}?${params.toString()}`, { headers: headers(tokens) })
   if (resp.status === 401) throw new Error('Unauthorized with Google; reconnect')
   if (!resp.ok) throw new Error(`events.list failed: ${resp.status}`)
   const json = await resp.json()
@@ -131,7 +133,7 @@ async function initialSync(uid, calendar, tokens, windowDays = 30) {
 
 async function incrementalSync(uid, calendar, tokens, syncToken) {
   const params = new URLSearchParams({ syncToken })
-  const resp = await fetch(`${EVENTS_URL(calendar.id)}?${params.toString()}`, { headers: headers(tokens) })
+  const resp = await fetchFn(`${EVENTS_URL(calendar.id)}?${params.toString()}`, { headers: headers(tokens) })
   if (resp.status === 401) throw new Error('Unauthorized with Google; reconnect')
   if (resp.status === 410) return { reset: true, nextSyncToken: null, count: 0 } // token invalidated; force full
   if (!resp.ok) throw new Error(`events.list (sync) failed: ${resp.status}`)
@@ -211,4 +213,3 @@ export async function syncSelectedCalendars(uid, tokens) {
   }
   return total
 }
-

@@ -178,8 +178,8 @@ function resolveRelativeReminderIso(text, nowAnchor, timezoneGuess) {
   const base = (() => {
     try {
       if (nowAnchor) {
-        const candidate = dayjs.tz(nowAnchor, timezoneGuess)
-        if (candidate.isValid()) return candidate
+        const candidate = dayjs(nowAnchor)
+        if (candidate.isValid()) return candidate.tz(timezoneGuess)
       }
     } catch {}
     return dayjs().tz(timezoneGuess)

@@ -90,7 +90,12 @@
                   Late<span v-if="lateDelay(task) !== null"> ({{ lateDelay(task) }}d)</span>
                 </span>
               </p>
-              <p v-if="task.details" class="text-sm text-gray-400">{{ task.details }}</p>
+              <p
+                v-if="formattedDetails(task)"
+                class="text-sm text-gray-400 whitespace-pre-line"
+              >
+                {{ formattedDetails(task) }}
+              </p>
             </div>
 
             <div class="flex items-center gap-3">
@@ -153,7 +158,9 @@ import { ElMessage } from 'element-plus'
 import { hasNotificationSetup } from '@/utils/notificationCheck'
 import NotificationPrompt from '@/components/NotificationPrompt.vue'
 import { TASK_CATEGORY_FILTERS, getCategoryIcon, getCategoryColor, resolveCategory } from '@/constants/taskCategories'
+import { describeTaskDetails } from '@/utils/taskDisplay'
 const { tasks, toggleComplete, loadTasksForRange } = useTasks()
+const formattedDetails = (task) => describeTaskDetails(task)
 const days = [
   { label: 'Mon', value: 0 },
   { label: 'Tue', value: 1 },

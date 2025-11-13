@@ -239,7 +239,19 @@
                           <span>{{ categoryLabel(task.category) }}</span>
                         </div>
                       </div>
-                      <small class="text-slate-400 text-xs">{{ task.date }}</small>
+                      <div class="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                        <small>{{ task.date }}</small>
+                        <a
+                          v-if="taskMeetingLink(task)"
+                          :href="taskMeetingLink(task).url"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-700/80 text-white hover:bg-emerald-800 transition text-[11px]"
+                          :title="taskMeetingLink(task).label"
+                        >
+                          🔗 {{ taskMeetingLink(task).label }}
+                        </a>
+                      </div>
                     </div>
                   </div>
                   <div class="flex items-center gap-2">
@@ -339,7 +351,19 @@
                       <span>{{ categoryLabel(task.category) }}</span>
                     </div>
                   </div>
-                  <small class="text-slate-400 text-xs">{{ task.date }}</small>
+                  <div class="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                    <small>{{ task.date }}</small>
+                    <a
+                      v-if="taskMeetingLink(task)"
+                      :href="taskMeetingLink(task).url"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-700/80 text-white hover:bg-emerald-800 transition text-[11px]"
+                      :title="taskMeetingLink(task).label"
+                    >
+                      🔗 {{ taskMeetingLink(task).label }}
+                    </a>
+                  </div>
                 </div>
               </li>
             </ul>
@@ -745,6 +769,7 @@ import { ElMessage, ElNotification } from 'element-plus'
 import { TASK_CATEGORY_FILTERS, getCategoryIcon, getCategoryColor, resolveCategory } from '@/constants/taskCategories'
 import { ensureDailyStreakState, getUserStreak } from '@/services/streakService'
 import { resolveReminderIso } from '@/utils/timeHelper.js'
+import { resolveTaskMeetingLink } from '@/utils/taskLinks'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -825,6 +850,7 @@ const dashboardCategory = ref('All')
 
 const showSetup = ref(false)
 const reminderActiveByTask = ref({})
+const taskMeetingLink = (task) => resolveTaskMeetingLink(task)
 const checkingAuth = ref(true)
 const userPrefs = ref({ notifications: {}, integrations: {} })
 const onboardingTourVisible = ref(false)

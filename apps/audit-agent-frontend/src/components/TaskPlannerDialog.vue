@@ -48,6 +48,7 @@
               format="HH:mm"
               value-format="HH:mm"
               class="w-full"
+              @change="onReminderTimeChange"
             />
           </div>
         </div>
@@ -268,6 +269,22 @@ const channelOptions = [
 const DEFAULT_REMINDER_CHANNELS = ['email', 'pwa', 'whatsapp']
 const MAX_INSTANT_ALERTS = 2
 
+function coerceText(value, fallback = '') {
+  if (typeof value === 'string') return value
+  if (value === null || value === undefined) return fallback
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  if (typeof value === 'object') {
+    if (typeof value.title === 'string') return value.title
+    if (typeof value.text === 'string') return value.text
+    if (typeof value.value === 'string') return value.value
+  }
+  return fallback
+}
+
+function assignText(targetRef, value, fallback = '') {
+  targetRef.value = coerceText(value, fallback)
+}
+
 /* ---------------- Props / Emits ---------------- */
 const props = defineProps({
   open: Boolean,
@@ -407,6 +424,7 @@ const subStore = useSubscriptionStore()
 const reminderPrefs = ref({ enabled: true, channels: [...DEFAULT_REMINDER_CHANNELS] })
 const allowedReminderChannels = ref([])
 const reminderTime = ref('')
+const reminderManuallyEdited = ref(false)
 const reminderAbsoluteIso = ref(null)
 const setReminder = ref(false)
 const reminderOptionsVisible = ref(false)
@@ -422,6 +440,16 @@ const suppressAutoClose = ref(false)
 const reminderPrefsLoaded = ref(false)
 const notificationChecked = ref(false)
 
+function getInputText() {
+  return coerceText(input.value)
+}
+
+function onReminderTimeChange() {
+  if (!reminderAutofillGuard) {
+    reminderManuallyEdited.value = true
+  }
+}
+
 const formattedDate = computed(() => {
   try {
     const base = parseLocalDateKey(selectedDate.value || normalizeDateInput(new Date()))
@@ -432,7 +460,7 @@ const formattedDate = computed(() => {
 })
 
 const displayLink = computed(() => {
-  const value = (link.value || '').trim()
+  const value = coerceText(link.value).trim()
   if (!value) return ''
   try {
     const url = new URL(value)
@@ -445,10 +473,16 @@ const displayLink = computed(() => {
 
 /* ---------------- Screen Size Reactive ---------------- */
 const screenWidth = ref(window.innerWidth)
+let resizeHandler = null
 onMounted(() => {
-  const resizeHandler = () => (screenWidth.value = window.innerWidth)
+  resizeHandler = () => (screenWidth.value = window.innerWidth)
   window.addEventListener('resize', resizeHandler)
-  onBeforeUnmount(() => window.removeEventListener('resize', resizeHandler))
+})
+onBeforeUnmount(() => {
+  if (resizeHandler) {
+    window.removeEventListener('resize', resizeHandler)
+    resizeHandler = null
+  }
 })
 const dialogWidth = computed(() => (screenWidth.value < 640 ? '90vw' : '480px'))
 
@@ -572,11 +606,12 @@ async function ensureNotificationPrompt() {
 
 function resetNewTaskState() {
   logTimeBrainDialog('reset-new-task-state', { reason: 'create-mode' })
-  input.value = ''
-  details.value = ''
-  link.value = ''
+  assignText(input, '')
+  assignText(details, '')
+  assignText(link, '')
   reminderTime.value = ''
   reminderAbsoluteIso.value = null
+  reminderManuallyEdited.value = false
   if (!props.lockDate) selectedDate.value = normalizeDateInput(props.date)
   setReminder.value = !!reminderPrefs.value.enabled
   reminderOptionsVisible.value = false
@@ -588,9 +623,10 @@ function resetNewTaskState() {
 
 function hydrateFromTask(current) {
   logTimeBrainDialog('hydrate-task', { id: current?.id, title: current?.title })
-  input.value = current.title || ''
-  details.value = current.details || ''
-  link.value = current.link || ''
+  assignText(input, current.title || '')
+  assignText(details, current.details || '')
+  assignText(link, current.link || '')
+  reminderManuallyEdited.value = false
   plannerVoiceReset.value += 1
   detailsVoiceReset.value += 1
 
@@ -711,6 +747,7 @@ function applyReminderIso(isoInput, options = {}) {
     reminderAutofillGuard = true
     try {
       reminderTime.value = local.format('HH:mm')
+      reminderManuallyEdited.value = false
       if (allowDateChange) {
         selectedDate.value = normalizeDateInput(local.format('YYYY-MM-DD'))
       }
@@ -748,7 +785,7 @@ function resolveTaskLocalEnd(task, tz, fallbackDate) {
   }
 
   if (task?.reminderTime && dateKey) {
-    const iso = toLocalDateTimeIso(normalizeDateInput(dateKey, zone), task.reminderTime, zone)
+    const iso = toLocalDateTimeIso(normalizeDateInput(dateKey), task.reminderTime, zone)
     if (iso) return iso
   }
 
@@ -763,15 +800,15 @@ function resolveTaskLocalEnd(task, tz, fallbackDate) {
 }
 
 function collectContextTasks(dateStr, tz) {
-  const normalizedDate = normalizeDateInput(dateStr, tz)
+  const normalizedDate = normalizeDateInput(dateStr)
   return tasks.value
-    .filter(t => normalizeDateInput(t?.date || normalizedDate, tz) === normalizedDate)
+    .filter(t => normalizeDateInput(t?.date || normalizedDate) === normalizedDate)
     .map(t => {
       const endsAt = resolveTaskLocalEnd(t, tz, normalizedDate)
       return {
         id: t.id,
         title: t.title,
-        date: normalizeDateInput(t?.date || normalizedDate, tz),
+        date: normalizeDateInput(t?.date || normalizedDate),
         reminderTime: t.reminderTime || null,
         scheduledTime: t.scheduledTime || null,
         timezone: t.timezone || tz,
@@ -793,7 +830,7 @@ function computeLastTaskEndIso(contextTasks, tz) {
 async function inferReminderTimeFromInput() {
   try {
     if (props.disableReminder || !setReminder.value) return null
-    const raw = input.value?.trim()
+    const raw = getInputText().trim()
     if (!raw) return null
 
     const tzCandidate = getUserTimezone()
@@ -801,14 +838,24 @@ async function inferReminderTimeFromInput() {
       ? tzCandidate
       : Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
 
-    const planDateKey = normalizeDateInput(selectedDate.value, tz)
+    const isRelativeHint = RELATIVE_HINT_PATTERN.test(raw)
+    const now = new Date()
+    const todayKey = toLocalDateKey(now)
+
+    const basePlanDate = normalizeDateInput(selectedDate.value)
+    let planDateKey = isRelativeHint ? todayKey : basePlanDate
+
     const contextTasks = collectContextTasks(planDateKey, tz)
     const lastTaskEnd = computeLastTaskEndIso(contextTasks, tz)
-    const todayKey = toLocalDateKey(new Date())
     const planAnchor =
       planDateKey === todayKey
-        ? new Date()
+        ? now
         : dayjs.tz(`${planDateKey}T12:00:00`, tz).toDate()
+
+    const inferenceNow = isRelativeHint ? now : planAnchor
+    if (isRelativeHint && !props.lockDate) {
+      selectedDate.value = normalizeDateInput(todayKey)
+    }
 
     const iso = await extractReminderTime(raw, {
       planDate: planDateKey,
@@ -816,7 +863,7 @@ async function inferReminderTimeFromInput() {
       lastTaskEnd,
       existingTasks: contextTasks,
       userPreferences: reminderPrefs.value,
-      now: planAnchor,
+      now: inferenceNow,
       debugLabel: 'TaskPlannerDialog:manual-save',
     })
 
@@ -894,7 +941,8 @@ function parseLocalMoment(value, tz) {
 
 /* ---------------- Main Generator ---------------- */
 async function generateTasks() {
-  if (!input.value.trim()) return
+  const currentInput = getInputText()
+  if (!currentInput.trim()) return
   loading.value = true
 
   const tzCandidate = getUserTimezone()
@@ -913,7 +961,7 @@ async function generateTasks() {
       lastTaskEnd,
     })
 
-    const result = await generateTasksFromText(input.value, {
+    const result = await generateTasksFromText(currentInput, {
       planDate: selectedDate.value,
       timezone: tz,
       lastTaskEnd,
@@ -1002,12 +1050,13 @@ async function generateTasks() {
       return
     }
 
-    if (!props.lockDate && autoPlanDate) {
-      selectedDate.value = normalizeDateInput(autoPlanDate)
-    }
-    if (!reminderTime.value && autoReminderTime) {
-      reminderTime.value = autoReminderTime
-    }
+  if (!props.lockDate && autoPlanDate) {
+    selectedDate.value = normalizeDateInput(autoPlanDate)
+  }
+  if (!reminderTime.value && autoReminderTime) {
+    reminderTime.value = autoReminderTime
+    reminderManuallyEdited.value = false
+  }
 
     const prepared = refined.map((task, idx) => ({
       title: task.finalTitle || task.title || `Task ${idx + 1}`,
@@ -1061,6 +1110,17 @@ async function generateTasks() {
 
 /* ---------------- Save Handler ---------------- */
 async function save() {
+  const rawText = getInputText().trim()
+  const shouldForceRelative =
+    !props.disableReminder &&
+    setReminder.value &&
+    RELATIVE_HINT_PATTERN.test(rawText) &&
+    !reminderManuallyEdited.value
+
+  if (shouldForceRelative) {
+    await inferReminderTimeFromInput()
+  }
+
   if (!props.disableReminder && setReminder.value && !reminderTime.value) {
     await inferReminderTimeFromInput()
     if (!reminderTime.value) {
@@ -1087,9 +1147,11 @@ async function save() {
 
   const channelsToSave = setReminder.value ? computeReminderChannels() : []
 
+  const safeTitle = getInputText() || props.task?.title || 'Untitled Task'
+
   emit('saved', {
     ...props.task,
-    title: input.value,
+    title: safeTitle,
     details: details.value,
     date: dateToSave,
     reminderTime: reminderToSave,
@@ -1103,7 +1165,7 @@ async function save() {
 
 /* ---------------- Close ---------------- */
 function closeDialog() {
-  logTimeBrainDialog('close-dialog', { inputLength: input.value.length })
+  logTimeBrainDialog('close-dialog', { inputLength: getInputText().length })
   emit('close')
 }
 
@@ -1140,7 +1202,7 @@ function toggleChannel(id) {
 function handleTranscript(result = {}) {
   const value = typeof result?.text === 'string' ? result.text.trim() : ''
   if (!value) return
-  input.value = value
+  assignText(input, value)
   if (!setReminder.value && reminderPrefs.value.enabled) setReminder.value = true
   logTimeBrainDialog('transcription:title', { length: value.length })
   plannerVoiceReset.value += 1

@@ -1,6 +1,8 @@
+import crypto from "crypto";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc.js";
 import timezone from "dayjs/plugin/timezone.js";
+import nodeFetch from "node-fetch";
 import { extractJoinLink } from "../../utils/joinLink.js";
 
 dayjs.extend(utc);
@@ -8,6 +10,7 @@ dayjs.extend(timezone);
 
 const GOOGLE_EVENTS_URL = (calendarId) =>
   `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`;
+const fetchFn = typeof globalThis.fetch === "function" ? globalThis.fetch.bind(globalThis) : nodeFetch;
 
 function authHeaders(accessToken) {
   return {
@@ -48,10 +51,28 @@ function getEventTimes(event) {
   };
 }
 
+function computeHashPayload(event, times, joinUrl) {
+  const entryPoints = Array.isArray(event?.conferenceData?.entryPoints)
+    ? event.conferenceData.entryPoints.map((p) => `${p.entryPointType}:${p.uri || p.label || ""}`).join("|")
+    : "";
+  const payload = [
+    event.summary || "",
+    event.description || "",
+    times.start || "",
+    times.end || "",
+    times.timeZone || "",
+    event.location || "",
+    joinUrl || "",
+    entryPoints,
+    event.status || "",
+  ].join("||");
+  return crypto.createHash("sha256").update(payload).digest("hex");
+}
+
 export async function fetchGoogleEvents(accessToken, calendar, { syncToken, windowDays = 30 } = {}) {
   const headers = authHeaders(accessToken);
   const params = syncToken ? new URLSearchParams({ syncToken }) : buildInitialParams(windowDays);
-  const resp = await fetch(`${GOOGLE_EVENTS_URL(calendar.id)}?${params.toString()}`, { headers });
+  const resp = await fetchFn(`${GOOGLE_EVENTS_URL(calendar.id)}?${params.toString()}`, { headers });
   if (resp.status === 401) throw new Error("Unauthorized with Google; reconnect");
   if (resp.status === 410 && syncToken) return { reset: true, events: [], nextSyncToken: null };
   if (!resp.ok) {
@@ -73,15 +94,23 @@ export function normalizeGoogleEvent(event, calendar) {
   const attendees = Array.isArray(event?.attendees)
     ? event.attendees.map((a) => ({ email: a.email, responseStatus: a.responseStatus }))
     : [];
+  const occurrenceKey =
+    event.recurringEventId && (event.originalStartTime?.dateTime || event.originalStartTime?.date)
+      ? `${event.recurringEventId}__${event.originalStartTime.dateTime || event.originalStartTime.date}`
+      : null;
+  const contentHash = computeHashPayload(event, times, joinUrl);
 
   return {
     externalId: event.id,
+    providerEventId: event.id,
+    occurrenceKey,
     calendarId: calendar.id,
     accountId: "primary",
     title: event.summary || "Meeting",
     description: event.description || "",
     location: event.location || "",
     joinUrl: joinUrl || event.hangoutLink || null,
+    eventUrl: event.htmlLink || null,
     startTime: times.start,
     endTime: times.end,
     timezone: times.timeZone || calendar.timeZone || null,
@@ -91,6 +120,10 @@ export function normalizeGoogleEvent(event, calendar) {
     raw: {
       htmlLink: event.htmlLink || null,
       organizer: event?.organizer || null,
+      recurringEventId: event.recurringEventId || null,
+      originalStartTime: event.originalStartTime || null,
+      conferenceData: event.conferenceData || null,
     },
+    contentHash,
   };
 }

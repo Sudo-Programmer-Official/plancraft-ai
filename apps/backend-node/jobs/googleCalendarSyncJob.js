@@ -26,7 +26,7 @@ export function initGoogleCalendarSync() {
           const stats = await syncGoogleAccount(uid)
           console.log(
             `[GoogleSync] user=${uid} events=${stats.eventsUpserted} ` +
-              `created=${stats.created || 0} updated=${stats.updated || 0} cancelled=${stats.cancelled || 0}`
+              `created=${stats.created || 0} updated=${stats.updated || 0} cancelled=${stats.cancelled || 0} deleted=${stats.deleted || 0} skipped=${stats.skipped || 0}`
           )
         } catch (e) {
           console.warn(`[GoogleSync] user=${uid} failed:`, e?.message || e)

@@ -96,14 +96,14 @@
                   </div>
                     <div class="flex items-center gap-2">
                     <a
-                      v-if="task?.join?.url"
-                      :href="task.join.url"
+                      v-if="meetingLink(task)"
+                      :href="meetingLink(task).url"
                       target="_blank"
                       rel="noopener noreferrer"
                       class="text-xs px-2 py-1 rounded bg-emerald-700 hover:bg-emerald-800 text-white"
-                      :title="`Join ${task?.join?.provider || 'meeting'}`"
+                      :title="meetingLink(task).label"
                     >
-                      Join
+                      {{ meetingLink(task).label }}
                     </a>
                     <span class="text-xs text-slate-400">{{ task.date }}</span>
                     <button
@@ -135,8 +135,8 @@
                 <!-- Expanded details -->
                 <transition name="fade">
                   <div v-if="expanded.has(task.id)" class="mt-3 space-y-3">
-                    <p v-if="task.details" class="text-sm text-slate-300">
-                      {{ task.details }}
+                    <p v-if="formattedDetails(task)" class="text-sm text-slate-300 whitespace-pre-line">
+                      {{ formattedDetails(task) }}
                     </p>
 
                     <!-- Meeting extras -->
@@ -225,6 +225,8 @@ import api from '@/services/api'
 import { getPreferences as getUserPreferences } from '@/services/settingsService'
 import { TASK_CATEGORY_FILTERS, getCategoryIcon, getCategoryColor, resolveCategory } from '@/constants/taskCategories'
 import { resolveReminderIso } from '@/utils/timeHelper.js'
+import { resolveTaskMeetingLink } from '@/utils/taskLinks'
+import { describeTaskDetails } from '@/utils/taskDisplay'
 
 const { tasks, loadTasks, toggleComplete, deleteTask, persistOrder } = useTasks()
 
@@ -241,6 +243,8 @@ const userPrefs = ref({ notifications: {}, integrations: {} })
 const authStore = useAuthStore()
 const categories = TASK_CATEGORY_FILTERS
 const activeCategory = ref('All')
+const formattedDetails = (task) => describeTaskDetails(task)
+const meetingLink = (task) => resolveTaskMeetingLink(task)
 
 const visibleTasks = computed(() => {
   if (activeCategory.value === 'All') return tasks.value

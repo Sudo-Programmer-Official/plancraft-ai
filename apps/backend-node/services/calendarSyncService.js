@@ -11,6 +11,7 @@ import {
 import { getCalendarAdapter } from "./calendarAdapters/index.js";
 import { createTask, scheduleTaskReminder } from "./taskService.js";
 import { sendCalendarDigestNotification } from "./notificationService.js";
+import { queueReminder } from "./reminderService.js";
 import { db } from "./firebaseAdmin.js";
 
 dayjs.extend(utc);
@@ -31,11 +32,24 @@ function log(...args) {
   } catch {}
 }
 
-function buildDetailsFromEvent(event) {
+function buildTaskTitle(event) {
+  const summary = (event.title || event.raw?.summary || "").trim();
+  const safeSummary = summary || "Untitled event";
+  const prefix = event.joinUrl ? "Meeting" : "Event";
+  return `${prefix}: ${safeSummary}`.trim();
+}
+
+function buildDetailsFromEvent(event, timing) {
   const parts = [];
   if (event.description) parts.push(event.description.trim());
-  if (event.location) parts.push(`Location: ${event.location}`);
-  if (event.joinUrl) parts.push(`Join link: ${event.joinUrl}`);
+
+  const meta = [];
+  if (timing?.localLabel) meta.push(`When: ${timing.localLabel}`);
+  if (event.location) meta.push(`Where: ${event.location}`);
+  if (event.joinUrl) meta.push(`Join: ${event.joinUrl}`);
+  if (event.eventUrl) meta.push(`Calendar: ${event.eventUrl}`);
+  if (meta.length) parts.push(meta.join("\n"));
+
   if (Array.isArray(event.attendees) && event.attendees.length) {
     const attendees = event.attendees
       .map((attendee) => attendee.email)
@@ -52,29 +66,45 @@ function buildDetailsFromEvent(event) {
 }
 
 function computeTimingFromEvent(event, meetingSettings = {}) {
-  const tz = event.timezone || "UTC";
-  let start = null;
-  try {
-    start = event.startTime ? dayjs(event.startTime).tz(tz) : null;
-  } catch {
-    start = null;
-  }
-  const date = start ? start.format("YYYY-MM-DD") : dayjs().tz(tz).format("YYYY-MM-DD");
-  const time = event.allDay || !start ? null : start.format("HH:mm");
-  const startIso = start ? start.toDate().toISOString() : event.startTime || null;
+  const tz = event.timezone || meetingSettings.userTimezone || "UTC";
   const offsetMinutes = Number.isFinite(event.reminderOffsetMinutes)
     ? event.reminderOffsetMinutes
     : meetingSettings?.defaultReminderMinutes ?? DEFAULT_REMINDER_MINUTES;
+
+  let startLocal = null;
+  if (event.startTime) {
+    try {
+      startLocal = dayjs(event.startTime).tz(tz);
+      if (!startLocal.isValid()) startLocal = null;
+    } catch {
+      startLocal = null;
+    }
+  }
+
+  const allDay = !!event.allDay;
+  const fallback = dayjs().tz(tz);
+  const date = startLocal ? startLocal.format("YYYY-MM-DD") : fallback.format("YYYY-MM-DD");
+  const time = allDay || !startLocal ? null : startLocal.format("HH:mm");
+  const localLabel = startLocal
+    ? allDay
+      ? `${startLocal.format("ddd, MMM D")} • All day`
+      : startLocal.format("ddd, MMM D • h:mm A")
+    : null;
+  const startIso = startLocal ? startLocal.utc().toISOString() : event.startTime || null;
   const reminderIso =
-    start && !event.allDay
-      ? start.subtract(offsetMinutes, "minute").toDate().toISOString()
+    startLocal && !allDay
+      ? startLocal.subtract(offsetMinutes, "minute").utc().toISOString()
       : null;
+
   return {
     date,
     time,
     startIso,
     reminderIso,
     timezone: tz,
+    localLabel,
+    allDay,
+    offsetMinutes,
   };
 }
 
@@ -85,7 +115,35 @@ async function fetchTaskById(taskId) {
   return { id: snap.id, ...(snap.data() || {}) };
 }
 
-async function cancelTaskFromEvent(task, event) {
+async function cancelRemindersForTask(taskId, provider) {
+  if (!taskId) return;
+  try {
+    const snap = await db
+      .collection("reminders")
+      .where("taskId", "==", taskId)
+      .where("source", "==", provider)
+      .get();
+    if (snap.empty) return;
+    const batch = db.batch();
+    const now = new Date();
+    snap.docs.forEach((doc) => {
+      batch.set(
+        doc.ref,
+        {
+          status: "cancelled",
+          updatedAt: now,
+          cancelledAt: now,
+        },
+        { merge: true },
+      );
+    });
+    await batch.commit();
+  } catch (err) {
+    console.warn("[CalendarSync] cancelRemindersForTask failed", err?.message || err);
+  }
+}
+
+async function cancelTaskFromEvent(task, event, provider) {
   if (!task) return;
   const metadata = {
     ...(task.metadata || {}),
@@ -106,12 +164,39 @@ async function cancelTaskFromEvent(task, event) {
       },
       { merge: true },
     );
+  await cancelRemindersForTask(task.id, provider);
 }
 
-async function ensureReminderForEvent(userId, task, timing, provider, force = false) {
-  if (!timing?.reminderIso || !task) return;
+async function ensureReminderForEvent(userId, task, timing, provider, context = {}, force = false) {
+  if (!timing?.reminderIso || !task) return null;
   try {
-    await scheduleTaskReminder(
+    const existingSnap = await db
+      .collection("reminders")
+      .where("taskId", "==", task.id)
+      .where("source", "==", provider)
+      .limit(1)
+      .get();
+
+    if (!existingSnap.empty) {
+      const doc = existingSnap.docs[0];
+      const docData = doc.data() || {};
+      const scheduledTime = new Date(timing.reminderIso);
+      const updates = {
+        task: task.title || docData.task || "Meeting",
+        scheduledTime,
+        timezone: timing.timezone,
+        status: "scheduled",
+        sentAt: null,
+        updatedAt: new Date(),
+      };
+      const hasContext = context && Object.keys(context).length;
+      if (hasContext) updates.context = context;
+      await doc.ref.set(updates, { merge: true });
+      queueReminder({ id: doc.id, ...docData, ...updates });
+      return { id: doc.id, ...docData, ...updates };
+    }
+
+    return await scheduleTaskReminder(
       userId,
       task,
       { scheduledTime: timing.reminderIso },
@@ -119,10 +204,12 @@ async function ensureReminderForEvent(userId, task, timing, provider, force = fa
         source: provider,
         timezone: timing.timezone,
         force: force === true,
+        context,
       },
     );
   } catch (err) {
     console.warn("[CalendarSync] scheduleTaskReminder failed", err?.message || err);
+    return null;
   }
 }
 
@@ -132,6 +219,8 @@ function buildTaskMetadata(event, timing, provider) {
     externalEvent: {
       provider,
       externalId: event.externalId,
+      providerEventId: event.providerEventId || event.externalId,
+      occurrenceKey: event.occurrenceKey || null,
       calendarId: event.calendarId,
       status: event.status,
       startTime: timing.startIso,
@@ -139,6 +228,10 @@ function buildTaskMetadata(event, timing, provider) {
       timezone: timing.timezone,
       allDay: !!event.allDay,
       joinUrl: event.joinUrl || null,
+      eventUrl: event.eventUrl || event.raw?.htmlLink || null,
+      location: event.location || null,
+      localLabel: timing.localLabel || null,
+      lastHash: event.lastHash || event.contentHash || null,
     },
   };
 }
@@ -146,12 +239,12 @@ function buildTaskMetadata(event, timing, provider) {
 async function createTaskFromEvent(userId, event, provider, meetingSettings = {}) {
   const timing = computeTimingFromEvent(event, meetingSettings);
   const payload = {
-    title: event.title || "Meeting",
-    details: buildDetailsFromEvent(event),
+    title: buildTaskTitle(event),
+    details: buildDetailsFromEvent(event, timing),
     category: "Meetings",
     date: timing.date,
     reminderTime: timing.time,
-    link: event.joinUrl || event.raw?.htmlLink || "",
+    link: event.joinUrl || event.eventUrl || event.raw?.htmlLink || "",
     metadata: buildTaskMetadata(event, timing, provider),
     source: provider,
   };
@@ -162,15 +255,22 @@ async function createTaskFromEvent(userId, event, provider, meetingSettings = {}
     skipReminder: true,
     timezone: timing.timezone,
   });
-  await ensureReminderForEvent(userId, task, timing, provider, true);
+  const reminderContext = {
+    meetingLink: event.joinUrl || null,
+    eventLink: event.eventUrl || event.raw?.htmlLink || null,
+    location: event.location || null,
+    localTime: timing.localLabel || null,
+  };
+  await ensureReminderForEvent(userId, task, timing, provider, reminderContext, true);
   return { task, timing };
 }
 
 async function updateTaskFromEvent(userId, task, event, provider, meetingSettings = {}) {
   const timing = computeTimingFromEvent(event, meetingSettings);
   const updates = {};
-  if (task.title !== (event.title || "Meeting")) updates.title = event.title || "Meeting";
-  const newDetails = buildDetailsFromEvent(event);
+  const desiredTitle = buildTaskTitle(event);
+  if ((task.title || "").trim() !== desiredTitle) updates.title = desiredTitle;
+  const newDetails = buildDetailsFromEvent(event, timing);
   if ((task.details || "") !== newDetails) updates.details = newDetails;
   const newDate = timing.date;
   if (task.date !== newDate) updates.date = newDate;
@@ -181,7 +281,7 @@ async function updateTaskFromEvent(userId, task, event, provider, meetingSetting
       updates.reminderTime = null;
     }
   }
-  const newLink = event.joinUrl || event.raw?.htmlLink || "";
+  const newLink = event.joinUrl || event.eventUrl || event.raw?.htmlLink || "";
   if ((task.link || "") !== newLink) {
     if (newLink) updates.link = newLink;
     else updates.link = null;
@@ -190,7 +290,13 @@ async function updateTaskFromEvent(userId, task, event, provider, meetingSetting
   updates.updatedAt = new Date();
   await db.collection("tasks").doc(task.id).set(updates, { merge: true });
   const mergedTask = { ...task, ...updates };
-  await ensureReminderForEvent(userId, mergedTask, timing, provider, true);
+  const reminderContext = {
+    meetingLink: event.joinUrl || null,
+    eventLink: event.eventUrl || event.raw?.htmlLink || null,
+    location: event.location || null,
+    localTime: timing.localLabel || null,
+  };
+  await ensureReminderForEvent(userId, mergedTask, timing, provider, reminderContext, true);
   return mergedTask;
 }
 
@@ -198,7 +304,7 @@ async function syncEventsToTasksFromStore(
   userId,
   { provider = "google_calendar", windowDays = DEFAULT_WINDOW_DAYS, meetingSettings = {} } = {},
 ) {
-  const stats = { created: 0, updated: 0, cancelled: 0 };
+  const stats = { created: 0, updated: 0, cancelled: 0, deleted: 0, skipped: 0 };
   const windowStart = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
   const windowEnd = new Date(Date.now() + windowDays * 24 * 60 * 60 * 1000).toISOString();
   const events = await listEventsForWindow(userId, provider, { windowStart, windowEnd });
@@ -208,38 +314,74 @@ async function syncEventsToTasksFromStore(
 
   for (const event of events) {
     try {
-      if (event.status === "cancelled") {
+      if (event.allDay) {
+        stats.skipped += 1;
+        continue;
+      }
+
+      if (event.status === "cancelled" || event.status === "deleted") {
         if (event.taskId) {
           const task = await fetchTaskById(event.taskId);
           if (task) {
-            await cancelTaskFromEvent(task, event);
-            stats.cancelled += 1;
+            await cancelTaskFromEvent(task, event, provider);
+            if (event.status === "deleted") stats.deleted += 1;
+            else stats.cancelled += 1;
           }
+        } else if (event.status === "deleted") {
+          stats.deleted += 1;
+        } else {
+          stats.cancelled += 1;
         }
         continue;
       }
 
       let task = event.taskId ? await fetchTaskById(event.taskId) : null;
       if (!task) {
-        if (!autoCreateTasks) continue;
+        if (!autoCreateTasks) {
+          stats.skipped += 1;
+          continue;
+        }
         const { task: newTask, timing } = await createTaskFromEvent(
           userId,
           event,
           provider,
           meetingSettings,
         );
-        await linkEventToTask(userId, provider, event.externalId, newTask.id);
+        await linkEventToTask(
+          userId,
+          provider,
+          event.externalId,
+          event.occurrenceKey || null,
+          newTask.id,
+          event.lastHash || event.contentHash || null,
+        );
         stats.created += 1;
         createdForDigest.push({
           title: newTask.title,
           date: newTask.date,
           reminderTime: newTask.reminderTime || timing.time || null,
           link: newTask.link || event.joinUrl || null,
+          localLabel: timing.localLabel || null,
         });
         continue;
       }
 
-      await updateTaskFromEvent(userId, task, event, provider, meetingSettings);
+      const requiresUpdate =
+        !event.taskHash || (event.lastHash && event.taskHash !== event.lastHash);
+      if (!requiresUpdate) {
+        stats.skipped += 1;
+        continue;
+      }
+
+      const updatedTask = await updateTaskFromEvent(userId, task, event, provider, meetingSettings);
+      await linkEventToTask(
+        userId,
+        provider,
+        event.externalId,
+        event.occurrenceKey || null,
+        updatedTask.id,
+        event.lastHash || event.contentHash || null,
+      );
       stats.updated += 1;
     } catch (err) {
       log(`task-sync user=${userId} event=${event.externalId} failed:`, err?.message || err);
@@ -275,6 +417,13 @@ export async function syncGoogleAccount(userId, options = {}) {
           meetingPref.defaultMeetingReminderMinutes ??
           DEFAULT_REMINDER_MINUTES,
       ) ?? DEFAULT_REMINDER_MINUTES,
+    userTimezone:
+      userData?.timezone ||
+      userData?.tz ||
+      userData?.profile?.timezone ||
+      userData?.preferences?.timezone ||
+      userData?.settings?.timezone ||
+      "UTC",
   };
 
   await upsertIntegrationAccount({

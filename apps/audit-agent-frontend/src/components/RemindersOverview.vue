@@ -98,6 +98,16 @@
               <div class="font-medium text-lg">{{ r.task || r.text || 'Reminder' }}</div>
               <div class="text-sm text-gray-300 mt-1">🕒 {{ formatDualTime(r.scheduledTime) }}</div>
               <div class="text-xs text-gray-500">{{ formatRelative(r.scheduledTime) }} • Channels: {{ (r.channels || []).join(', ') || '—' }}</div>
+              <div v-if="r.meetingLink" class="flex flex-wrap items-center gap-2 mt-2">
+                <a
+                  :href="r.meetingLink"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-xs px-2 py-1 rounded bg-emerald-700/20 border border-emerald-400/60 text-emerald-200 hover:bg-emerald-600/30 transition"
+                >
+                  🔗 {{ r.meetingLabel || 'Open link' }}
+                </a>
+              </div>
             </div>
 
             <div class="flex gap-3 justify-end sm:justify-center shrink-0">
@@ -135,6 +145,7 @@ import { useAuthFlags } from '@/composables/useAuthFlags'
 import { trackLinkedInConversion } from '@/utils/ads'
 import { useAuthStore } from '@/stores/authStore'
 import EmptyState from '@/components/EmptyState.vue'
+import { resolveReminderLink } from '@/utils/taskLinks'
 
 // Time setup
 dayjs.extend(utc)
@@ -240,11 +251,14 @@ function normalizeReminder(row) {
 
   const status = String(row.status || '').toLowerCase() || 'scheduled'
 
+  const linkInfo = resolveReminderLink(row)
   return {
     ...row,
     status,
     scheduledTime: dt.toISOString(),
     channels: normalizeChannels(row.channels || row.channel),
+    meetingLink: linkInfo?.url || null,
+    meetingLabel: linkInfo?.label || '',
   }
 }
 
