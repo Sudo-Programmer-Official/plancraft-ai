@@ -118,7 +118,9 @@ export async function buildConsentUrl(userId) {
 
 export async function exchangeCodeForTokens(code) {
   const client_id = getEnv('GOOGLE_CLIENT_ID')
+  console.log('client_id:', client_id);
   const client_secret = getEnv('GOOGLE_CLIENT_SECRET')
+  console.log('client_secret:', client_secret);
   const redirect_uri = getEnv('GOOGLE_REDIRECT_URI')
   if (!client_id || !client_secret || !redirect_uri) throw new Error('Missing Google OAuth credentials')
   const maskId = (s) => (s ? `${String(s).slice(0, 8)}…${String(s).slice(-6)}` : 'n/a')
