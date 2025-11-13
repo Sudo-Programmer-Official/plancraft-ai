@@ -21,9 +21,19 @@ function dbg(...args) {
   }
 }
 
+function cleanEnvValue(value) {
+  if (typeof value !== 'string') return ''
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  const first = trimmed[0]
+  const last = trimmed[trimmed.length - 1]
+  const isWrappedInQuotes = (first === '"' && last === '"') || (first === "'" && last === "'")
+  return isWrappedInQuotes && trimmed.length > 1 ? trimmed.slice(1, -1).trim() : trimmed
+}
+
 function getEnv(name, fallback = '') {
-  const v = process.env[name]
-  return typeof v === 'string' && v.trim() ? v.trim() : fallback
+  const cleaned = cleanEnvValue(process.env[name])
+  return cleaned || fallback
 }
 
 function b64url(buf) {
