@@ -41,6 +41,18 @@ function logTimeBrain(event, payload) {
   }
 }
 
+const TOAST_DEBOUNCE_MS = 8000
+let lastSummarizerWarningAt = 0
+
+function emitSummarizerTimeoutWarning() {
+  const now = Date.now()
+  if (now - lastSummarizerWarningAt < TOAST_DEBOUNCE_MS) return
+  lastSummarizerWarningAt = now
+  try {
+    ElMessage.warning('AI summarizer took too long. Try a shorter selection.')
+  } catch {}
+}
+
 /**
  * ✨ Journal Enhancer
  */
@@ -76,7 +88,7 @@ export async function summarizeTasks(tasks) {
     const msg = err?.response?.data || err?.message
     console.error("❌ Task Summarize API Error:", msg);
     if (err?.code === 'ECONNABORTED' || /timeout/i.test(String(msg))) {
-      try { ElMessage.warning('AI summarizer took too long. Try a shorter selection.'); } catch {}
+      emitSummarizerTimeoutWarning()
     }
     return {
       completedPct: 0,

@@ -323,7 +323,7 @@
           </button> -->
 
           <!-- Upgrade Button / Pro Badge -->
-          <div class="flex items-center gap-2 whitespace-nowrap">
+          <div v-if="authReady" class="flex items-center gap-2 whitespace-nowrap">
             <template v-if="isPremium">
               <el-tooltip content="You're on the Premium Plan!" placement="bottom">
                 <RouterLink
@@ -352,6 +352,11 @@
               </button>
             </template>
           </div>
+          <div
+            v-else
+            class="w-[88px] h-8 rounded-full bg-white/10 animate-pulse"
+            aria-hidden="true"
+          ></div>
 
           <!-- User Avatar -->
           <img
@@ -463,6 +468,7 @@ const authStore = useAuthStore()
 const subStore = useSubscriptionStore()
 const feedbackStore = useFeedbackStore()
 const { isPremium, isGuest } = useAuthFlags()
+const authReady = computed(() => !authStore.loading)
 
 const isOnTalkPlanner = computed(() => route.path === '/talk-to-planner')
 let upgradeHandler = null
