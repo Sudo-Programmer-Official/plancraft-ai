@@ -101,6 +101,8 @@ import { attachAuth } from "./middleware/auth.js";
 import twilioRoutes from "./routes/twilioRoutes.js";
 import googleAuthRoutes, { handleOAuthCallback } from "./routes/googleAuthRoutes.js";
 import googleCalendarRoutes from "./routes/googleCalendarRoutes.js";
+import calendarRoutes from "./routes/calendarRoutes.js";
+import outlookRoutes from "./routes/outlookRoutes.js";
 import notifyRouter from "./routes/notifyRouter.js";
 import plannerRoutes from "./routes/plannerRoutes.js";
 import talkToPlannerRoutes from "./routes/talkToPlannerRoutes.js";
@@ -281,6 +283,8 @@ app.use("/", seoRoutes);
 // Mount Google routes (guarded internally by feature flag)
 app.use("/api", googleAuthRoutes);
 app.use("/api", googleCalendarRoutes);
+app.use("/api", calendarRoutes);
+app.use("/api", outlookRoutes);
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {

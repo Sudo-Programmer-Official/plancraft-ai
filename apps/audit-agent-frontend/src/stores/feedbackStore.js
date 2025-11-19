@@ -20,6 +20,7 @@ export const useFeedbackStore = defineStore('feedback', () => {
     allowContact: false,
   })
   let promptTimer = null
+  let autoCloseTimer = null
 
   function init() {
     if (promptTimer || typeof window === 'undefined') return
@@ -58,6 +59,10 @@ export const useFeedbackStore = defineStore('feedback', () => {
   }
 
   function closeDrawer() {
+    if (autoCloseTimer) {
+      clearTimeout(autoCloseTimer)
+      autoCloseTimer = null
+    }
     drawerVisible.value = false
     submitSuccess.value = false
     errorMessage.value = ''
@@ -68,6 +73,7 @@ export const useFeedbackStore = defineStore('feedback', () => {
   }
 
   async function sendFeedback(userId, metadata = {}) {
+    if (submitting.value) return
     if (!userId) {
       errorMessage.value = 'Please sign in to share feedback.'
       return
@@ -90,6 +96,10 @@ export const useFeedbackStore = defineStore('feedback', () => {
       submitSuccess.value = true
       dismissPrompt()
       form.message = ''
+      const delay = 800 + Math.floor(Math.random() * 400)
+      autoCloseTimer = setTimeout(() => {
+        closeDrawer()
+      }, delay)
     } catch (err) {
       errorMessage.value = err?.response?.data?.error || err?.message || 'Failed to send feedback.'
     } finally {

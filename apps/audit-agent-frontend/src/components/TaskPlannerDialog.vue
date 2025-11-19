@@ -294,6 +294,7 @@ const props = defineProps({
   readonly: Boolean,
   lockDate: Boolean,
   disableReminder: Boolean,
+  prefill: { type: Object, default: null },
 })
 const emit = defineEmits(['close', 'saved'])
 
@@ -450,6 +451,24 @@ function onReminderTimeChange() {
   }
 }
 
+function applyPrefill(data) {
+  if (!data || typeof data !== 'object') return
+  if (typeof data.title === 'string') assignText(input, data.title)
+  if (typeof data.details === 'string') assignText(details, data.details)
+  if (typeof data.link === 'string') assignText(link, data.link)
+  if (typeof data.date === 'string') selectedDate.value = normalizeDateInput(data.date)
+  if (typeof data.reminderTime === 'string') reminderTime.value = data.reminderTime
+  if (Array.isArray(data.channels) && data.channels.length) {
+    allowedReminderChannels.value = data.channels
+  }
+  if (typeof data.setReminder === 'boolean') {
+    setReminder.value = data.setReminder
+  }
+  if (typeof data.prefillReminderIso === 'string') {
+    applyReminderIso(data.prefillReminderIso, { allowDateChange: true })
+  }
+}
+
 const formattedDate = computed(() => {
   try {
     const base = parseLocalDateKey(selectedDate.value || normalizeDateInput(new Date()))
@@ -531,6 +550,12 @@ watch(selectedDate, val => {
     reminderAbsoluteIso.value = null
   }
 })
+watch(
+  () => props.prefill,
+  (val) => {
+    if (!task.value) applyPrefill(val)
+  }
+)
 watch(reminderTime, val => {
   logTimeBrainDialog('reminder-time-change', { value: val, lock: props.disableReminder })
   if (props.disableReminder && props.task?.reminderTime && val !== props.task.reminderTime)
@@ -618,6 +643,9 @@ function resetNewTaskState() {
   plannerVoiceReset.value += 1
   if (!allowedReminderChannels.value.length && reminderPrefs.value.channels.length) {
     allowedReminderChannels.value = reminderPrefs.value.channels.filter(ch => channelOptionIds.includes(ch))
+  }
+  if (!task.value && props.prefill) {
+    applyPrefill(props.prefill)
   }
 }
 

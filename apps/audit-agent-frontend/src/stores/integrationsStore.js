@@ -48,3 +48,31 @@ export async function disconnectGoogleIntegration(userId) {
   const { data } = await api.delete('/google/calendars/disconnect', { data: { userId } })
   return data?.ok === true
 }
+
+// Outlook helpers
+export async function getOutlookStatus(userId) {
+  const { data } = await api.get('/outlook/status', { params: { userId } })
+  return data?.integration || {}
+}
+
+export async function requestOutlookConnectUrl(userId) {
+  try {
+    const user = auth?.currentUser
+    if (user?.getIdToken) await user.getIdToken(true)
+  } catch {}
+  const res = await api.get('/outlook/connect', {
+    params: { userId },
+    headers: { Accept: 'application/json' },
+  })
+  return res?.data?.url
+}
+
+export async function triggerOutlookSyncNow(userId) {
+  const { data } = await api.post('/outlook/sync/now', { userId })
+  return data || {}
+}
+
+export async function disconnectOutlookIntegration(userId) {
+  const { data } = await api.delete('/outlook/disconnect', { data: { userId } })
+  return data?.ok === true
+}

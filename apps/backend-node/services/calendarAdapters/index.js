@@ -1,9 +1,14 @@
 import { fetchGoogleEvents, normalizeGoogleEvent } from "./googleCalendarAdapter.js";
+import { fetchOutlookEvents, normalizeOutlookEvent } from "./outlookCalendarAdapter.js";
 
 const adapters = {
   google_calendar: {
     fetchEvents: fetchGoogleEvents,
     normalizeEvent: normalizeGoogleEvent,
+  },
+  outlook_calendar: {
+    fetchEvents: fetchOutlookEvents,
+    normalizeEvent: normalizeOutlookEvent,
   },
 };
 

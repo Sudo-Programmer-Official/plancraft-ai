@@ -21,6 +21,19 @@ const PROVIDER_LABELS = {
   calendar: 'Calendar',
 }
 
+const CALENDAR_PROVIDER_CODES = new Set(['googlecalendar', 'outlookcalendar', 'calendar'])
+
+export function providerLabelFromValue(rawProvider, { allowCalendarProviders = false } = {}) {
+  if (!rawProvider) return ''
+  const normalizedToken = String(rawProvider || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, '')
+  if (!allowCalendarProviders && CALENDAR_PROVIDER_CODES.has(normalizedToken)) return ''
+  if (PROVIDER_LABELS[normalizedToken]) return PROVIDER_LABELS[normalizedToken]
+  return String(rawProvider).replace(/[_-]/g, ' ').trim()
+}
+
 export function resolveTaskMeetingLink(task) {
   if (!task) return null
   const joinUrl =
@@ -28,24 +41,30 @@ export function resolveTaskMeetingLink(task) {
     coerceUrl(task?.join) ||
     coerceUrl(task?.meetingLink) ||
     null
-  const metadata = task?.metadata?.externalEvent || task?.metadata?.external || {}
+  const metadata = task?.metadata || {}
+  const externalMeta = metadata?.externalEvent || metadata?.external || {}
   const metadataJoin =
-    coerceUrl(metadata?.joinUrl) ||
-    coerceUrl(metadata?.meetingLink) ||
+    coerceUrl(externalMeta?.joinUrl) ||
+    coerceUrl(externalMeta?.meetingLink) ||
     null
   const metadataCalendar =
-    coerceUrl(metadata?.eventUrl) ||
-    coerceUrl(metadata?.htmlLink) ||
-    coerceUrl(metadata?.calendarLink) ||
+    coerceUrl(externalMeta?.eventUrl) ||
+    coerceUrl(externalMeta?.htmlLink) ||
+    coerceUrl(externalMeta?.calendarLink) ||
     null
   const fallbackLink = coerceUrl(task?.link) || coerceUrl(task?.htmlLink) || metadataCalendar
 
   const url = joinUrl || metadataJoin || fallbackLink
   if (!url) return null
 
-  const rawProvider = task?.join?.provider || metadata?.provider || ''
-  const normalized = rawProvider.toLowerCase().replace(/[\s_-]+/g, '')
-  const providerLabel = PROVIDER_LABELS[normalized] || (rawProvider ? rawProvider.replace(/[_-]/g, ' ') : '')
+  const rawProvider =
+    task?.join?.provider ||
+    metadata?.joinProvider ||
+    externalMeta?.joinProvider ||
+    metadata?.provider ||
+    externalMeta?.provider ||
+    ''
+  const providerLabel = providerLabelFromValue(rawProvider)
 
   let labelBase = 'Open link'
   if (joinUrl || metadataJoin) {
@@ -105,6 +124,15 @@ export function resolveReminderLink(reminder) {
     (typeof reminder.link === 'object' && typeof reminder.link?.label === 'string' && reminder.link.label) ||
     null
 
-  const label = labelFromCtx || (meetingUrl ? 'Join meeting' : 'Open link')
+  const rawProvider =
+    ctx.meetingProvider ||
+    ctx.meeting?.provider ||
+    reminder.meeting?.provider ||
+    ctx.provider ||
+    reminder.provider ||
+    ''
+  const providerLabel = providerLabelFromValue(rawProvider)
+  const label =
+    labelFromCtx || (meetingUrl ? (providerLabel ? `Join ${providerLabel}` : 'Join meeting') : 'Open link')
   return { url, label }
 }

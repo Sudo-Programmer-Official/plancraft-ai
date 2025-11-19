@@ -3,7 +3,7 @@ import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc.js";
 import timezone from "dayjs/plugin/timezone.js";
 import nodeFetch from "node-fetch";
-import { extractJoinLink } from "../../utils/joinLink.js";
+import { extractJoinLink, detectJoinProvider } from "../../utils/joinLink.js";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -90,7 +90,9 @@ export async function fetchGoogleEvents(accessToken, calendar, { syncToken, wind
 
 export function normalizeGoogleEvent(event, calendar) {
   const times = getEventTimes(event);
-  const joinUrl = extractJoinLink(event);
+  const joinInfo = extractJoinLink(event);
+  const joinUrl = joinInfo?.url || event.hangoutLink || null;
+  const joinProvider = joinInfo?.provider || detectJoinProvider(joinUrl) || null;
   const attendees = Array.isArray(event?.attendees)
     ? event.attendees.map((a) => ({ email: a.email, responseStatus: a.responseStatus }))
     : [];
@@ -105,11 +107,12 @@ export function normalizeGoogleEvent(event, calendar) {
     providerEventId: event.id,
     occurrenceKey,
     calendarId: calendar.id,
-    accountId: "primary",
+    accountId: calendar.accountId || "primary",
     title: event.summary || "Meeting",
     description: event.description || "",
     location: event.location || "",
-    joinUrl: joinUrl || event.hangoutLink || null,
+    joinUrl,
+    joinProvider,
     eventUrl: event.htmlLink || null,
     startTime: times.start,
     endTime: times.end,

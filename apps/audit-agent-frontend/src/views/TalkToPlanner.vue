@@ -196,7 +196,7 @@
                       rel="noopener"
                       class="text-xs text-indigo-300 hover:text-indigo-200 underline self-start"
                     >
-                      ↗ Join meeting
+                      ↗ {{ describeMeetingJoinLabel(meeting) }}
                     </a>
                   </li>
                 </ul>
@@ -337,6 +337,7 @@ import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
 import { useSeoMeta } from '@/composables/useSeoMeta'
+import { providerLabelFromValue } from '@/utils/taskLinks'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -1026,6 +1027,12 @@ function describeMeetingItem(meeting = {}) {
     formatDateLabel(meeting.date, { includeTime: true })
   if (when) parts.push(`at ${when}`)
   return parts.join(' ')
+}
+
+function describeMeetingJoinLabel(meeting = {}) {
+  if (!meeting?.joinUrl) return ''
+  const label = providerLabelFromValue(meeting.joinProvider)
+  return label ? `Join ${label}` : 'Join meeting'
 }
 
 function formatResultMessage(action = {}) {

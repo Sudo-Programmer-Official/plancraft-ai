@@ -286,6 +286,7 @@
             :date="selectedDate"
             :task="selectedTask"
             :edit-mode="!!selectedTask"
+            :prefill="meetingPrefill"
             @close="closePlanner"
             @saved="handleSaveAndSchedule"
           />
@@ -380,6 +381,81 @@
       >
         <div class="dashboard-card quick-links-card">
           <QuickLinksCard />
+        </div>
+      </div>
+
+      <div class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 xl:col-span-3">
+        <div class="dashboard-card upcoming-card space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 class="text-lg sm:text-xl font-semibold text-slate-100 flex items-center gap-2">
+                📅 Upcoming Meetings
+              </h3>
+              <p class="text-xs sm:text-sm text-indigo-200/80">
+                Google + Outlook combined in a single view.
+              </p>
+            </div>
+            <button
+              class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm text-white flex items-center gap-2 disabled:opacity-60"
+              :disabled="meetingsLoading"
+              @click="refreshMeetings"
+            >
+              <span v-if="meetingsLoading" class="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+              <span>{{ meetingsLoading ? 'Refreshing…' : 'Refresh' }}</span>
+            </button>
+          </div>
+          <p v-if="meetingsError" class="text-sm text-red-300">{{ meetingsError }}</p>
+          <div v-else-if="meetingsLoading" class="space-y-3">
+            <div v-for="n in 3" :key="`meeting-skel-${n}`" class="rounded-2xl bg-slate-900/60 border border-white/5 h-16 animate-pulse"></div>
+          </div>
+          <p v-else-if="!Object.keys(groupedMeetings).length" class="text-sm text-slate-300">
+            No meetings detected in the next couple days. Connect a calendar to see them here.
+          </p>
+          <div v-else class="space-y-5">
+            <div
+              v-for="(meetings, label) in groupedMeetings"
+              :key="label"
+              class="space-y-3"
+            >
+              <p class="text-xs uppercase tracking-[0.3em] text-slate-400">{{ label }}</p>
+              <ul class="space-y-3">
+                <li
+                  v-for="meeting in meetings"
+                  :key="meeting.id"
+                  class="rounded-2xl border border-white/10 bg-slate-900/60 p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                >
+                  <div class="space-y-1">
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm font-semibold text-white">{{ meeting.title }}</span>
+                      <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-200">
+                        {{ meetingProviderBadge(meeting) }}
+                      </span>
+                    </div>
+                    <p class="text-xs text-slate-300">{{ formatMeetingTimeRange(meeting) }}</p>
+                    <p v-if="meeting.location" class="text-xs text-slate-400">{{ meeting.location }}</p>
+                    <a
+                      v-if="meeting.joinUrl"
+                      :href="meeting.joinUrl"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="inline-flex items-center gap-1 text-xs text-emerald-300 hover:text-emerald-200"
+                      :title="meetingJoinLabel(meeting)"
+                    >
+                      🔗 {{ meetingJoinLabel(meeting) }}
+                    </a>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button
+                      class="px-3 py-1.5 rounded-lg bg-indigo-600/80 hover:bg-indigo-600 text-xs text-white"
+                      @click="jumpToMeeting(meeting)"
+                    >
+                      Jump to event
+                    </button>
+                  </div>
+                </li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -742,7 +818,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watchEffect, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { collection, onSnapshot, updateDoc, doc, query, where, serverTimestamp } from 'firebase/firestore'
+import { collection, onSnapshot, updateDoc, doc, query, where, serverTimestamp, getDoc } from 'firebase/firestore'
 import { db, auth } from '@/firebase/init'
 import { onAuthStateChanged } from 'firebase/auth'
 import { toLocalDateKey } from '@/utils/dateHelper'
@@ -769,7 +845,8 @@ import { ElMessage, ElNotification } from 'element-plus'
 import { TASK_CATEGORY_FILTERS, getCategoryIcon, getCategoryColor, resolveCategory } from '@/constants/taskCategories'
 import { ensureDailyStreakState, getUserStreak } from '@/services/streakService'
 import { resolveReminderIso } from '@/utils/timeHelper.js'
-import { resolveTaskMeetingLink } from '@/utils/taskLinks'
+import { resolveTaskMeetingLink, providerLabelFromValue } from '@/utils/taskLinks'
+import { fetchUpcomingMeetings } from '@/services/calendarService'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -778,6 +855,7 @@ const authStore = useAuthStore()
 const { isPremium, isGuest } = useAuthFlags()
 const routerNav = useRouter()
 const subStore = useSubscriptionStore()
+const UPCOMING_WINDOW_HOURS = 48
 
 const daysLeft = computed(() => {
   const d = subStore.subscription?.cancelAt
@@ -830,6 +908,101 @@ function goToUpgrade() {
   }
 }
 
+function meetingProviderBadge(meeting) {
+  return meeting.provider === 'outlook' ? '🟦 Outlook' : '🟥 Google'
+}
+
+function meetingJoinLabel(meeting) {
+  if (!meeting?.joinUrl) return ''
+  const label = providerLabelFromValue(meeting.joinProvider)
+  return label ? `Join ${label}` : 'Join meeting'
+}
+
+function formatMeetingTimeRange(meeting) {
+  try {
+    const tz = meeting.timezone || dayjs.tz.guess()
+    const start = dayjs(meeting.startTime).tz(tz)
+    const end = meeting.endTime ? dayjs(meeting.endTime).tz(tz) : null
+    if (!start.isValid()) return ''
+    if (meeting.allDay) return start.format('MMM D • All day')
+    const base = start.format('MMM D • h:mm A')
+    if (end?.isValid()) return `${base} – ${end.format('h:mm A')}`
+    return base
+  } catch {
+    return ''
+  }
+}
+
+function findTaskLocally(taskId) {
+  if (!taskId) return null
+  const all = [
+    ...(Array.isArray(dailyTasks.value) ? dailyTasks.value : []),
+    ...(Array.isArray(weeklyTasks.value) ? weeklyTasks.value : []),
+    ...(Array.isArray(monthlyTasks.value) ? monthlyTasks.value : []),
+  ]
+  return all.find((task) => String(task.id) === String(taskId)) || null
+}
+
+async function loadUpcomingMeetings() {
+  try {
+    if (!authStore.user?.uid) return
+    meetingsLoading.value = true
+    meetingsError.value = ''
+    const events = await fetchUpcomingMeetings(authStore.user.uid, { hours: UPCOMING_WINDOW_HOURS })
+    upcomingMeetings.value = events
+  } catch (e) {
+    meetingsError.value = e?.response?.data?.error || e?.message || 'Failed to load meetings'
+  } finally {
+    meetingsLoading.value = false
+  }
+}
+
+function refreshMeetings() {
+  loadUpcomingMeetings()
+}
+
+function buildMeetingPrefill(meeting) {
+  const tz = meeting.timezone || dayjs.tz.guess()
+  const start = dayjs(meeting.startTime).tz(tz)
+  const details = [meeting.location && `Location: ${meeting.location}`, meeting.description]
+    .filter(Boolean)
+    .join('\n\n')
+  return {
+    title: meeting.title || 'Meeting',
+    details,
+    date: start.isValid() ? start.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
+    reminderTime: meeting.allDay || !start.isValid() ? '' : start.format('HH:mm'),
+    link: meeting.joinUrl || meeting.eventUrl || '',
+    setReminder: !meeting.allDay,
+  }
+}
+
+async function jumpToMeeting(meeting) {
+  try {
+    if (meeting.taskId) {
+      let task = findTaskLocally(meeting.taskId)
+      if (!task) {
+        const snap = await getDoc(doc(db, 'tasks', meeting.taskId))
+        if (snap.exists()) {
+          task = { id: snap.id, ...(snap.data() || {}) }
+        }
+      }
+      if (task) {
+        selectedTask.value = { ...task, id: task.id || meeting.taskId }
+        meetingPrefill.value = null
+        showPlanner.value = true
+        return
+      }
+    }
+    meetingPrefill.value = buildMeetingPrefill(meeting)
+    selectedTask.value = null
+    showPlanner.value = true
+  } catch (err) {
+    console.warn('jumpToMeeting failed', err?.message || err)
+    ElMessage.error('Unable to open this meeting right now')
+  }
+}
+
 /* -------------- Tasks + Journal state -------------- */
 const { loadTasks } = useTasks()
 const aiSummary = ref(null)
@@ -853,6 +1026,10 @@ const reminderActiveByTask = ref({})
 const taskMeetingLink = (task) => resolveTaskMeetingLink(task)
 const checkingAuth = ref(true)
 const userPrefs = ref({ notifications: {}, integrations: {} })
+const upcomingMeetings = ref([])
+const meetingsLoading = ref(false)
+const meetingsError = ref('')
+const meetingPrefill = ref(null)
 const onboardingTourVisible = ref(false)
 const onboardingStatus = ref({
   completed: false,
@@ -861,6 +1038,25 @@ const onboardingStatus = ref({
   completedAt: null,
 })
 const onboardingSessionPlayed = ref(false)
+
+const groupedMeetings = computed(() => {
+  const groups = {}
+  upcomingMeetings.value.forEach((meeting) => {
+    if (!meeting?.startTime) return
+    const start = dayjs(meeting.startTime)
+    if (!start.isValid()) return
+    let label = 'Upcoming'
+    if (start.isSame(dayjs(), 'day')) label = 'Today'
+    else if (start.isSame(dayjs().add(1, 'day'), 'day')) label = 'Tomorrow'
+    else label = start.format('dddd, MMM D')
+    if (!groups[label]) groups[label] = []
+    groups[label].push(meeting)
+  })
+  Object.keys(groups).forEach((key) => {
+    groups[key].sort((a, b) => new Date(a.startTime || 0) - new Date(b.startTime || 0))
+  })
+  return groups
+})
 
 const onboardingSteps = computed(() => [
   {
@@ -1325,6 +1521,7 @@ onMounted(async () => {
   }
 
   buildRotatingInsights()
+  await loadUpcomingMeetings()
 })
 
 async function onGenerateWeekly() {
@@ -1430,6 +1627,14 @@ watch(
   }
 )
 
+watch(
+  () => authStore.user?.uid,
+  (uid) => {
+    if (uid) loadUpcomingMeetings()
+    else upcomingMeetings.value = []
+  }
+)
+
 function startTour() {
   const tour = driver({
     animate: true,
@@ -1511,6 +1716,7 @@ function openDialog(task) {
 function closePlanner() {
   showPlanner.value = false
   selectedTask.value = null
+  meetingPrefill.value = null
 }
 
 function reloadDaily() {
@@ -1531,6 +1737,7 @@ async function handleSave(payload) {
   }
   await reloadDaily()
   closePlanner()
+  await loadUpcomingMeetings()
   await nextTick()
   if (dailyList.value) dailyList.value.scrollTop = 0
 }

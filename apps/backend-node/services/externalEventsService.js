@@ -9,9 +9,10 @@ function sanitizeComponent(value, fallback) {
     .slice(0, 120);
 }
 
-function buildDocId(userId, provider, externalId, occurrenceKey) {
+function buildDocId(userId, provider, externalId, occurrenceKey, accountId = "default") {
   const base = [
     sanitizeComponent(provider, "provider"),
+    sanitizeComponent(accountId, "acct"),
     sanitizeComponent(userId, "user"),
     sanitizeComponent(externalId, "event"),
   ];
@@ -31,10 +32,16 @@ export function buildExternalEventKey(externalId, occurrenceKey) {
   return eventKey(externalId, occurrenceKey);
 }
 
-export async function findExternalEvent(userId, provider, externalId, occurrenceKey = null) {
+export async function findExternalEvent(userId, provider, externalId, occurrenceKey = null, accountId = "default") {
   if (!userId || !provider || !externalId) return null;
-  const docId = buildDocId(userId, provider, externalId, occurrenceKey);
-  const snap = await db.collection(COLLECTION).doc(docId).get();
+  const docId = buildDocId(userId, provider, externalId, occurrenceKey, accountId);
+  let snap = await db.collection(COLLECTION).doc(docId).get();
+  if (!snap.exists && accountId && accountId !== "default") {
+    const legacyId = buildDocId(userId, provider, externalId, occurrenceKey, "default");
+    snap = await db.collection(COLLECTION).doc(legacyId).get();
+    if (snap.exists) return { id: legacyId, ...(snap.data() || {}) };
+    return null;
+  }
   if (!snap.exists) return null;
   return { id: docId, ...(snap.data() || {}) };
 }
@@ -44,18 +51,28 @@ export async function upsertExternalEvent(userId, provider, event = {}) {
     throw new Error("userId, provider, and externalId are required");
   }
   const occurrenceKey = event.occurrenceKey || null;
-  const docId = buildDocId(userId, provider, event.externalId, occurrenceKey);
+  const accountId = event.accountId || "default";
+  const docId = buildDocId(userId, provider, event.externalId, occurrenceKey, accountId);
   const ref = db.collection(COLLECTION).doc(docId);
   let snap = await ref.get();
   let existing = snap.exists ? snap.data() || {} : {};
   if (!snap.exists && occurrenceKey) {
-    const legacyId = buildDocId(userId, provider, event.externalId, null);
+    const legacyId = buildDocId(userId, provider, event.externalId, null, accountId);
     const legacySnap = await db.collection(COLLECTION).doc(legacyId).get();
     if (legacySnap.exists) {
       existing = legacySnap.data() || {};
       try {
         await db.collection(COLLECTION).doc(legacyId).delete();
       } catch {}
+    } else if (accountId && accountId !== "default") {
+      const accountAgnosticId = buildDocId(userId, provider, event.externalId, occurrenceKey, "default");
+      const accountAgnosticSnap = await db.collection(COLLECTION).doc(accountAgnosticId).get();
+      if (accountAgnosticSnap.exists) {
+        existing = accountAgnosticSnap.data() || {};
+        try {
+          await db.collection(COLLECTION).doc(accountAgnosticId).delete();
+        } catch {}
+      }
     }
     snap = { exists: false };
   }
@@ -64,7 +81,7 @@ export async function upsertExternalEvent(userId, provider, event = {}) {
   const payload = {
     userId,
     provider,
-    accountId: event.accountId ?? existing.accountId ?? null,
+    accountId: event.accountId ?? existing.accountId ?? accountId ?? null,
     externalId: event.externalId,
     providerEventId: event.providerEventId || event.externalId,
     occurrenceKey,
@@ -73,6 +90,7 @@ export async function upsertExternalEvent(userId, provider, event = {}) {
     description: event.description ?? existing.description ?? "",
     location: event.location ?? existing.location ?? "",
     joinUrl: event.joinUrl ?? existing.joinUrl ?? null,
+    joinProvider: event.joinProvider ?? event.join?.provider ?? existing.joinProvider ?? null,
     eventUrl: event.eventUrl ?? existing.eventUrl ?? existing.raw?.htmlLink ?? null,
     startTime: event.startTime ?? existing.startTime ?? null,
     endTime: event.endTime ?? existing.endTime ?? null,
@@ -95,9 +113,9 @@ export async function upsertExternalEvent(userId, provider, event = {}) {
   return { id: docId, ...existing, ...payload };
 }
 
-export async function linkEventToTask(userId, provider, externalId, occurrenceKey, taskId, lastHash = null) {
+export async function linkEventToTask(userId, provider, externalId, occurrenceKey, taskId, lastHash = null, accountId = "default") {
   if (!userId || !provider || !externalId) return;
-  const docId = buildDocId(userId, provider, externalId, occurrenceKey);
+  const docId = buildDocId(userId, provider, externalId, occurrenceKey, accountId);
   const updates = {
     taskId,
     updatedAt: nowIso(),
@@ -106,8 +124,8 @@ export async function linkEventToTask(userId, provider, externalId, occurrenceKe
   await db.collection(COLLECTION).doc(docId).set(updates, { merge: true });
 }
 
-export async function markEventCancelled(userId, provider, externalId, occurrenceKey = null) {
-  const docId = buildDocId(userId, provider, externalId, occurrenceKey);
+export async function markEventCancelled(userId, provider, externalId, occurrenceKey = null, accountId = "default") {
+  const docId = buildDocId(userId, provider, externalId, occurrenceKey, accountId);
   await db.collection(COLLECTION).doc(docId).set(
     {
       status: "cancelled",
@@ -117,8 +135,8 @@ export async function markEventCancelled(userId, provider, externalId, occurrenc
   );
 }
 
-export async function markExternalEventDeleted(userId, provider, externalId, occurrenceKey = null) {
-  const docId = buildDocId(userId, provider, externalId, occurrenceKey);
+export async function markExternalEventDeleted(userId, provider, externalId, occurrenceKey = null, accountId = "default") {
+  const docId = buildDocId(userId, provider, externalId, occurrenceKey, accountId);
   await db.collection(COLLECTION).doc(docId).set(
     {
       status: "deleted",

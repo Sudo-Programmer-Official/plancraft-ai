@@ -2,12 +2,14 @@ import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc.js";
 import timezone from "dayjs/plugin/timezone.js";
 import { ensureFreshAccessToken, getUserGoogleIntegration, saveUserGoogleIntegration } from "./googleOAuth.js";
+import { ensureFreshOutlookToken, saveUserOutlookIntegration, getUserOutlookIntegration } from "./outlookOAuth.js";
 import { upsertIntegrationAccount, markIntegrationAccountSync } from "./integrationAccountService.js";
 import {
   upsertExternalEvent,
   listEventsForWindow,
   linkEventToTask,
 } from "./externalEventsService.js";
+import { detectJoinProvider } from "../utils/joinLink.js";
 import { getCalendarAdapter } from "./calendarAdapters/index.js";
 import { createTask, scheduleTaskReminder } from "./taskService.js";
 import { sendCalendarDigestNotification } from "./notificationService.js";
@@ -30,6 +32,29 @@ function log(...args) {
   try {
     console.log("[CalendarSync]", ...args);
   } catch {}
+}
+
+async function resolveMeetingSettings(userId) {
+  const userSnap = await db.collection("users").doc(String(userId)).get();
+  const userData = userSnap.exists ? userSnap.data() || {} : {};
+  const meetingPref = userData?.preferences?.meetings || {};
+  const reminderMinutes =
+    clampMinutes(
+      meetingPref.defaultReminderMinutes ??
+        meetingPref.defaultMeetingReminderMinutes ??
+        DEFAULT_REMINDER_MINUTES,
+    ) ?? DEFAULT_REMINDER_MINUTES;
+  return {
+    autoCreate: meetingPref.autoCreateCalendarTasks !== false,
+    defaultReminderMinutes: reminderMinutes,
+    userTimezone:
+      userData?.timezone ||
+      userData?.tz ||
+      userData?.profile?.timezone ||
+      userData?.preferences?.timezone ||
+      userData?.settings?.timezone ||
+      "UTC",
+  };
 }
 
 function buildTaskTitle(event) {
@@ -214,8 +239,17 @@ async function ensureReminderForEvent(userId, task, timing, provider, context = 
 }
 
 function buildTaskMetadata(event, timing, provider) {
+  const joinUrl = typeof event.joinUrl === "string" ? event.joinUrl : event.joinUrl?.url || null;
+  const eventUrl = typeof event.eventUrl === "string" ? event.eventUrl : event.eventUrl?.url || event.raw?.htmlLink || null;
+  const joinProvider =
+    event.joinProvider ||
+    event.join?.provider ||
+    detectJoinProvider(joinUrl) ||
+    detectJoinProvider(eventUrl) ||
+    null;
   return {
     origin: provider,
+    joinProvider,
     externalEvent: {
       provider,
       externalId: event.externalId,
@@ -227,8 +261,9 @@ function buildTaskMetadata(event, timing, provider) {
       endTime: event.endTime || null,
       timezone: timing.timezone,
       allDay: !!event.allDay,
-      joinUrl: event.joinUrl || null,
-      eventUrl: event.eventUrl || event.raw?.htmlLink || null,
+      joinUrl,
+      joinProvider,
+      eventUrl,
       location: event.location || null,
       localLabel: timing.localLabel || null,
       lastHash: event.lastHash || event.contentHash || null,
@@ -238,13 +273,26 @@ function buildTaskMetadata(event, timing, provider) {
 
 async function createTaskFromEvent(userId, event, provider, meetingSettings = {}) {
   const timing = computeTimingFromEvent(event, meetingSettings);
+  const joinUrl =
+    (typeof event.joinUrl === "string" ? event.joinUrl : event.joinUrl?.url) || null;
+  const eventLink =
+    (typeof event.eventUrl === "string" ? event.eventUrl : event.eventUrl?.url) ||
+    event.raw?.htmlLink ||
+    null;
+  const joinProvider =
+    event.joinProvider ||
+    event.join?.provider ||
+    detectJoinProvider(joinUrl) ||
+    detectJoinProvider(eventLink) ||
+    null;
   const payload = {
     title: buildTaskTitle(event),
     details: buildDetailsFromEvent(event, timing),
     category: "Meetings",
     date: timing.date,
     reminderTime: timing.time,
-    link: event.joinUrl || event.eventUrl || event.raw?.htmlLink || "",
+    link: joinUrl || eventLink || "",
+    join: joinUrl ? { url: joinUrl, provider: joinProvider } : null,
     metadata: buildTaskMetadata(event, timing, provider),
     source: provider,
   };
@@ -256,8 +304,9 @@ async function createTaskFromEvent(userId, event, provider, meetingSettings = {}
     timezone: timing.timezone,
   });
   const reminderContext = {
-    meetingLink: event.joinUrl || null,
-    eventLink: event.eventUrl || event.raw?.htmlLink || null,
+    meetingLink: joinUrl,
+    meetingProvider: joinProvider,
+    eventLink,
     location: event.location || null,
     localTime: timing.localLabel || null,
   };
@@ -267,6 +316,18 @@ async function createTaskFromEvent(userId, event, provider, meetingSettings = {}
 
 async function updateTaskFromEvent(userId, task, event, provider, meetingSettings = {}) {
   const timing = computeTimingFromEvent(event, meetingSettings);
+  const joinUrl =
+    (typeof event.joinUrl === "string" ? event.joinUrl : event.joinUrl?.url) || null;
+  const eventLink =
+    (typeof event.eventUrl === "string" ? event.eventUrl : event.eventUrl?.url) ||
+    event.raw?.htmlLink ||
+    null;
+  const joinProvider =
+    event.joinProvider ||
+    event.join?.provider ||
+    detectJoinProvider(joinUrl) ||
+    detectJoinProvider(eventLink) ||
+    null;
   const updates = {};
   const desiredTitle = buildTaskTitle(event);
   if ((task.title || "").trim() !== desiredTitle) updates.title = desiredTitle;
@@ -281,18 +342,24 @@ async function updateTaskFromEvent(userId, task, event, provider, meetingSetting
       updates.reminderTime = null;
     }
   }
-  const newLink = event.joinUrl || event.eventUrl || event.raw?.htmlLink || "";
+  const newLink = joinUrl || eventLink || "";
   if ((task.link || "") !== newLink) {
     if (newLink) updates.link = newLink;
     else updates.link = null;
+  }
+  const existingJoinUrl = task.join?.url || null;
+  const existingJoinProvider = task.join?.provider || null;
+  if (existingJoinUrl !== joinUrl || existingJoinProvider !== joinProvider) {
+    updates.join = joinUrl ? { url: joinUrl, provider: joinProvider } : null;
   }
   updates.metadata = buildTaskMetadata(event, timing, provider);
   updates.updatedAt = new Date();
   await db.collection("tasks").doc(task.id).set(updates, { merge: true });
   const mergedTask = { ...task, ...updates };
   const reminderContext = {
-    meetingLink: event.joinUrl || null,
-    eventLink: event.eventUrl || event.raw?.htmlLink || null,
+    meetingLink: joinUrl,
+    meetingProvider: joinProvider,
+    eventLink,
     location: event.location || null,
     localTime: timing.localLabel || null,
   };
@@ -354,6 +421,7 @@ async function syncEventsToTasksFromStore(
           event.occurrenceKey || null,
           newTask.id,
           event.lastHash || event.contentHash || null,
+          event.accountId || "default",
         );
         stats.created += 1;
         createdForDigest.push({
@@ -381,6 +449,7 @@ async function syncEventsToTasksFromStore(
         event.occurrenceKey || null,
         updatedTask.id,
         event.lastHash || event.contentHash || null,
+        event.accountId || "default",
       );
       stats.updated += 1;
     } catch (err) {
@@ -406,30 +475,13 @@ export async function syncGoogleAccount(userId, options = {}) {
   if (!adapter) throw new Error("No calendar adapter configured for Google Calendar");
 
   const { tokens, integration } = await ensureFreshAccessToken(userId);
-  const userSnap = await db.collection("users").doc(String(userId)).get();
-  const userData = userSnap.exists ? userSnap.data() || {} : {};
-  const meetingPref = userData?.preferences?.meetings || {};
-  const meetingSettings = {
-    autoCreate: meetingPref.autoCreateCalendarTasks !== false,
-    defaultReminderMinutes:
-      clampMinutes(
-        meetingPref.defaultReminderMinutes ??
-          meetingPref.defaultMeetingReminderMinutes ??
-          DEFAULT_REMINDER_MINUTES,
-      ) ?? DEFAULT_REMINDER_MINUTES,
-    userTimezone:
-      userData?.timezone ||
-      userData?.tz ||
-      userData?.profile?.timezone ||
-      userData?.preferences?.timezone ||
-      userData?.settings?.timezone ||
-      "UTC",
-  };
+  const accountKey = integration?.accountEmail || integration?.email || "primary";
+  const meetingSettings = await resolveMeetingSettings(userId);
 
   await upsertIntegrationAccount({
     userId,
     provider: "google_calendar",
-    accountId: "primary",
+    accountId: accountKey,
     accessToken: tokens?.access_token || null,
     refreshToken: tokens?.refresh_token || null,
     tokenExpiry: tokens?.expiry_date || null,
@@ -452,10 +504,14 @@ export async function syncGoogleAccount(userId, options = {}) {
   for (const calendar of calendars) {
     try {
       const syncToken = options.forceFull ? null : perCalSync?.[calendar.id]?.syncToken || null;
-      const result = await adapter.fetchEvents(tokens.access_token, calendar, {
-        windowDays,
-        syncToken,
-      });
+      const result = await adapter.fetchEvents(
+        tokens.access_token,
+        { ...calendar, accountId: accountKey },
+        {
+          windowDays,
+          syncToken,
+        },
+      );
       stats.calendars += 1;
       stats.eventsFetched += result.events.length;
       if (result.reset) {
@@ -473,7 +529,7 @@ export async function syncGoogleAccount(userId, options = {}) {
         syncToken: result.nextSyncToken || null,
         lastFullSync: perCalSync[calendar.id]?.lastFullSync || (syncToken ? perCalSync[calendar.id]?.lastFullSync : new Date().toISOString()),
       };
-      await markIntegrationAccountSync(userId, "google_calendar", calendar.id, {
+      await markIntegrationAccountSync(userId, "google_calendar", `${accountKey}:${calendar.id}`, {
         syncToken: result.nextSyncToken || null,
         status: "ok",
         lastSyncAt: new Date().toISOString(),
@@ -484,7 +540,7 @@ export async function syncGoogleAccount(userId, options = {}) {
         ...(perCalSync[calendar.id] || {}),
         error: err?.message || "sync_failed",
       };
-      await markIntegrationAccountSync(userId, "google_calendar", calendar.id, {
+      await markIntegrationAccountSync(userId, "google_calendar", `${accountKey}:${calendar.id}`, {
         syncToken: perCalSync[calendar.id]?.syncToken || null,
         status: "error",
       });
@@ -520,4 +576,68 @@ export async function syncMultipleGoogleAccounts(userIds = []) {
     }
   }
   return summary;
+}
+
+export async function syncOutlookAccount(userId, options = {}) {
+  const stats = {
+    eventsFetched: 0,
+    eventsUpserted: 0,
+  };
+  const adapter = getCalendarAdapter("outlook_calendar");
+  if (!adapter) throw new Error("No calendar adapter configured for Outlook");
+  const windowDays = options.windowDays || DEFAULT_WINDOW_DAYS;
+  const { tokens, integration } = await ensureFreshOutlookToken(userId);
+  const meetingSettings = await resolveMeetingSettings(userId);
+  const accountId = integration?.accountEmail || "default";
+
+  await upsertIntegrationAccount({
+    userId,
+    provider: "outlook_calendar",
+    accountId,
+    accountEmail: integration?.accountEmail || null,
+    accessToken: tokens?.access_token || null,
+    refreshToken: tokens?.refresh_token || null,
+    tokenExpiry: tokens?.expiry_date || null,
+    metadata: {
+      profile: integration?.profile || null,
+    },
+  });
+
+  const calendar = {
+    id: "primary",
+    accountId,
+    accountEmail: integration?.accountEmail || null,
+    timeZone: meetingSettings.userTimezone || "UTC",
+  };
+
+  const result = await adapter.fetchEvents(tokens.access_token, calendar, { windowDays });
+  stats.eventsFetched = result.events.length;
+  for (const ev of result.events) {
+    const normalized = adapter.normalizeEvent(ev, calendar);
+    normalized.accountId = calendar.accountId;
+    await upsertExternalEvent(userId, "outlook_calendar", normalized);
+    stats.eventsUpserted += 1;
+  }
+
+  await markIntegrationAccountSync(userId, "outlook_calendar", `${accountId}:${calendar.id}`, {
+    syncToken: null,
+    lastSyncAt: new Date().toISOString(),
+    status: "ok",
+  });
+
+  await saveUserOutlookIntegration(userId, {
+    ...(integration || {}),
+    connected: true,
+    status: "ok",
+    lastRun: dayjs().toISOString(),
+    token: integration?.token,
+  });
+
+  const taskStats = await syncEventsToTasksFromStore(userId, {
+    provider: "outlook_calendar",
+    windowDays,
+    meetingSettings,
+  });
+
+  return { ...stats, ...taskStats };
 }

@@ -21,6 +21,73 @@
           <button v-if="!isPremium" @click="upgradePlan" class="bg-gradient-to-r from-purple-500 to-pink-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-white shadow-lg hover:from-purple-600 hover:to-pink-700 transition text-sm sm:text-base">🚀 Upgrade</button>
           <el-button size="small" plain @click="planOpen=true" class="ml-2">View Plan Details</el-button>
         </div>
+
+        <!-- Outlook Calendar Card -->
+        <div class="mt-4 rounded-lg border border-white/10 bg-slate-900/40 p-4 space-y-3">
+          <div v-if="outlookLoading" class="space-y-4 animate-pulse">
+            <div class="h-5 w-40 bg-slate-800/60 rounded"></div>
+            <div class="h-4 w-2/3 bg-slate-800/40 rounded"></div>
+            <div class="h-10 bg-slate-800/50 rounded"></div>
+          </div>
+          <template v-else>
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div class="font-semibold flex items-center gap-2">
+                  📧 Outlook Calendar
+                  <span
+                    v-if="outlook.enabled"
+                    :class="[
+                      'text-xs px-2 py-0.5 rounded',
+                      outlook.connected ? 'bg-emerald-700/50 text-emerald-100' : 'bg-yellow-700/40 text-yellow-200'
+                    ]"
+                  >
+                    {{ outlook.connected ? 'Connected' : 'Not Connected' }}
+                  </span>
+                  <span v-else class="text-xs px-2 py-0.5 rounded bg-slate-700/50 text-slate-300">
+                    Disabled by server
+                  </span>
+                </div>
+                <p class="text-xs text-slate-300 mt-1">
+                  Pull Microsoft Outlook meetings so upcoming events stay synced with PlanCraft.
+                  <span v-if="outlookLastSync">Last sync: {{ outlookLastSync }}</span>
+                </p>
+                <p v-if="outlook.accountEmail" class="text-xs text-indigo-200 mt-1">
+                  Account: {{ outlook.accountEmail }}
+                </p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button
+                  v-if="outlook.enabled && !outlook.connected && authStore.user"
+                  @click="connectOutlook"
+                  :disabled="outlookLoading"
+                  class="px-3 py-1.5 rounded bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 text-white text-sm disabled:opacity-50"
+                >
+                  Connect
+                </button>
+                <button
+                  v-if="outlook.connected"
+                  @click="syncOutlookNow"
+                  :disabled="outlookSyncing"
+                  class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-sm flex items-center gap-2 disabled:opacity-60"
+                >
+                  <span
+                    v-if="outlookSyncing"
+                    class="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin"
+                    aria-hidden="true"
+                  ></span>
+                  <span>{{ outlookSyncing ? 'Syncing…' : 'Sync Now' }}</span>
+                </button>
+                <button
+                  v-if="outlook.connected"
+                  @click="disconnectOutlook"
+                  class="px-3 py-1.5 rounded bg-red-700/80 hover:bg-red-700 text-sm"
+                >
+                  Disconnect
+                </button>
+              </div>
+            </div>
+          </template>
+        </div>
       </section>
 
       <section class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10 max-w-md mx-auto sm:max-w-none">
@@ -371,9 +438,81 @@
         <div class="flex gap-2">
           <el-button @click="reauthOpen=false">Cancel</el-button>
           <el-button type="primary" :loading="reauthLoading" @click="verifyOtp">Verify</el-button>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+
+        <!-- Outlook Calendar Card -->
+        <div
+          v-if="shouldShowOutlookCard"
+          class="mt-4 rounded-lg border border-white/10 bg-slate-900/40 p-4 space-y-3"
+        >
+          <div v-if="outlookLoading" class="space-y-4 animate-pulse">
+            <div class="h-5 w-40 bg-slate-800/60 rounded"></div>
+            <div class="h-4 w-2/3 bg-slate-800/40 rounded"></div>
+            <div class="h-10 bg-slate-800/50 rounded"></div>
+          </div>
+          <template v-else>
+            <template v-if="outlook.enabled">
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div class="font-semibold flex items-center gap-2">
+                    📧 Outlook Calendar
+                    <span
+                      v-if="outlookStatusBadge"
+                      :class="['text-xs px-2 py-0.5 rounded', outlookStatusBadge.class]"
+                    >
+                      {{ outlookStatusBadge.label }}
+                    </span>
+                  </div>
+                  <p class="text-xs text-slate-300 mt-1">
+                    Bring Microsoft Outlook meetings into PlanCraft alongside Google.
+                    <span v-if="outlookLastSyncAgo" class="text-slate-400">Last synced {{ outlookLastSyncAgo }}</span>
+                  </p>
+                  <p v-if="outlook.accountEmail" class="text-xs text-indigo-200 mt-1">
+                    Account: {{ outlook.accountEmail }}
+                  </p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button
+                    v-if="!outlook.connected && authStore.user"
+                    @click="connectOutlook"
+                    :disabled="outlookLoading"
+                    class="px-3 py-1.5 rounded bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 text-white text-sm disabled:opacity-50"
+                  >
+                    Connect
+                  </button>
+                  <button
+                    v-if="outlook.connected"
+                    @click="syncOutlookNow"
+                    :disabled="outlookSyncing"
+                    class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-sm flex items-center gap-2 disabled:opacity-60"
+                  >
+                    <span
+                      v-if="outlookSyncing"
+                      class="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin"
+                      aria-hidden="true"
+                    ></span>
+                    <span>{{ outlookSyncing ? 'Syncing…' : 'Sync Now' }}</span>
+                  </button>
+                  <button
+                    v-if="outlook.connected"
+                    @click="disconnectOutlook"
+                    class="px-3 py-1.5 rounded bg-red-700/80 hover:bg-red-700 text-sm"
+                  >
+                    Disconnect
+                  </button>
+                </div>
+              </div>
+            </template>
+            <div
+              v-else
+              class="text-xs text-slate-300 bg-slate-800/50 border border-slate-700/40 rounded-md p-4"
+            >
+              Outlook calendar sync is coming soon. Reach out if you’d like early access.
+            </div>
+          </template>
+        </div>
     <div v-else-if="reauthMethod === 'google'" class="space-y-3">
       <p class="text-sm text-slate-300">We’ll open a Google sign-in popup to verify.</p>
       <div class="flex justify-between items-center">
@@ -394,7 +533,7 @@ import { useAuthStore } from "@/stores/authStore"
 import { useRouter, useRoute } from "vue-router"
 import { ElMessage } from "element-plus"
 import { normalizePhone, guessCountryFromLocale } from '@/utils/phoneUtils'
-import { getGoogleStatus, getGoogleCalendars, saveGoogleCalendarSelection, triggerGoogleSyncNow, requestGoogleConnectUrl, disconnectGoogleIntegration } from '@/stores/integrationsStore'
+import { getGoogleStatus, getGoogleCalendars, saveGoogleCalendarSelection, triggerGoogleSyncNow, requestGoogleConnectUrl, disconnectGoogleIntegration, getOutlookStatus, requestOutlookConnectUrl, triggerOutlookSyncNow, disconnectOutlookIntegration } from '@/stores/integrationsStore'
 import { getPreferences as apiGetPrefs, updatePreferences as apiUpdatePrefs, getIntegrations, updateIntegrations, updateOnboardingStatus } from "@/services/settingsService"
 import { createGptLinkCode } from '@/services/gptService'
 import { subscribeUserToPush } from "@/services/pwaService"
@@ -408,6 +547,9 @@ import { db } from '@/firebase/init'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import AvatarUploader from '@/components/AvatarUploader.vue'
 import dayjs from 'dayjs'
+import relativeTime from 'dayjs/plugin/relativeTime'
+
+dayjs.extend(relativeTime)
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -631,6 +773,7 @@ onMounted(async () => {
     console.warn('Failed to load preferences', e)
   }
   try { await loadGoogle() } catch {}
+  try { await loadOutlook() } catch {}
 })
 
 // Optional: auto-save debounce can be added later. For now, use Save button.
@@ -773,6 +916,32 @@ const googleLastSync = computed(() => {
   if (!google.lastRun) return null
   try { return dayjs(google.lastRun).format('MMM D • hh:mm A') } catch { return google.lastRun }
 })
+const outlook = reactive({ enabled: true, connected: false, status: '', lastRun: null, accountEmail: '' })
+const outlookLoading = ref(true)
+const outlookSyncing = ref(false)
+const outlookLastSync = computed(() => {
+  if (!outlook.lastRun) return null
+  try { return dayjs(outlook.lastRun).format('MMM D • hh:mm A') } catch { return outlook.lastRun }
+})
+const outlookLastSyncAgo = computed(() => {
+  if (!outlook.lastRun) return null
+  try { return dayjs(outlook.lastRun).fromNow() } catch { return null }
+})
+const showOutlookComingSoon = import.meta.env.VITE_SHOW_OUTLOOK_COMING_SOON === '1' || import.meta.env.DEV
+const shouldShowOutlookCard = computed(() => outlook.enabled || showOutlookComingSoon)
+const outlookStatusBadge = computed(() => {
+  if (!outlook.enabled) {
+    return showOutlookComingSoon
+      ? { label: 'Coming soon', class: 'bg-slate-700/60 text-slate-200' }
+      : null
+  }
+  const status = String(outlook.status || '').toLowerCase()
+  if (status === 'ok') return { label: 'OK', class: 'bg-emerald-600/40 text-emerald-100' }
+  if (status.includes('reconnect')) return { label: 'Needs reconnect', class: 'bg-yellow-600/40 text-yellow-100' }
+  if (status === 'error') return { label: 'Sync error', class: 'bg-red-600/40 text-red-100' }
+  if (status) return { label: status, class: 'bg-slate-700/40 text-slate-200' }
+  return null
+})
 async function connectGoogle() {
   try {
     if (!authStore.user?.uid) return
@@ -869,6 +1038,76 @@ async function disconnectGoogle() {
     google.lastRun = null
   } catch (e) {
     ElMessage.error(e?.response?.data?.error || 'Failed to disconnect Google Calendar')
+  }
+}
+
+async function loadOutlook() {
+  outlookLoading.value = true
+  try {
+    if (!authStore.user?.uid) return
+    let status
+    try {
+      status = await getOutlookStatus(authStore.user.uid)
+    } catch (e) {
+      outlook.enabled = false
+      outlook.connected = false
+      return
+    }
+    outlook.enabled = true
+    outlook.connected = !!status?.connected
+    outlook.status = status?.status || status?.sync?.status || ''
+    outlook.lastRun = status?.lastRun || status?.sync?.lastRun || null
+    outlook.accountEmail = status?.accountEmail || status?.profile?.userPrincipalName || ''
+  } catch (e) {
+    console.warn('loadOutlook failed', e?.message || e)
+  } finally {
+    outlookLoading.value = false
+  }
+}
+
+async function connectOutlook() {
+  try {
+    if (!authStore.user?.uid) return
+    const url = await requestOutlookConnectUrl(authStore.user.uid)
+    if (url) window.location.href = url
+    else ElMessage.error('Failed to get Outlook consent URL')
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.error || 'Failed to start Outlook connect')
+  }
+}
+
+async function syncOutlookNow() {
+  try {
+    if (!authStore.user?.uid || outlookSyncing.value) return
+    outlookSyncing.value = true
+    const result = await triggerOutlookSyncNow(authStore.user.uid)
+    if (result?.ok) {
+      const stats = result.stats || {}
+      const pieces = []
+      if (stats.created) pieces.push(`${stats.created} new`)
+      if (stats.updated) pieces.push(`${stats.updated} updated`)
+      if (stats.skipped) pieces.push(`${stats.skipped} unchanged`)
+      const label = pieces.length ? `Synced ${pieces.join(', ')}` : 'Calendar sync completed'
+      ElMessage.success(label)
+      await loadOutlook()
+    } else {
+      ElMessage.warning('Sync request not accepted')
+    }
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.error || 'Sync failed')
+  } finally {
+    outlookSyncing.value = false
+  }
+}
+
+async function disconnectOutlook() {
+  try {
+    if (!authStore.user?.uid) return
+    await disconnectOutlookIntegration(authStore.user.uid)
+    ElMessage.success('Outlook disconnected')
+    await loadOutlook()
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.error || 'Failed to disconnect Outlook')
   }
 }
 
