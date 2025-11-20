@@ -1,115 +1,133 @@
 <template>
-  <div class="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900">
-    <!-- Background animation -->
+  <div class="login-shell relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-b from-indigo-900 via-purple-900 to-slate-950">
     <div class="absolute inset-0">
-      <canvas ref="starsCanvas" class="w-full h-full"></canvas>
+      <canvas ref="starsCanvas" class="w-full h-full opacity-70"></canvas>
     </div>
 
-    <!-- Login card -->
-    <div class="relative z-10 bg-gray-900/60 backdrop-blur-lg rounded-2xl shadow-2xl p-10 w-full max-w-md text-center animate-fade-in">
-      <h1 class="text-3xl font-bold text-white mb-4">🌙 PlanCraftAI</h1>
-      <p class="text-gray-300 mb-8">Your AI-powered productivity companion</p>
+    <div class="relative z-10 w-full px-4 py-12 flex items-center justify-center">
+      <div class="relative w-full max-w-3xl">
+        <div class="login-glow" aria-hidden="true"></div>
+        <div class="login-card relative bg-slate-900/75 backdrop-blur-2xl border border-white/5 rounded-3xl shadow-2xl px-8 py-10 sm:px-12 sm:py-12 text-white animate-fade-in">
+          <div class="flex flex-col items-center text-center gap-5">
+            <img src="/logo-bg-remove.png" alt="PlanCraftAI" class="w-16 h-16 drop-shadow-lg" />
+            <div>
+              <p class="text-sm uppercase tracking-[0.35em] text-indigo-300/80">Welcome back</p>
+              <h1 class="text-3xl sm:text-4xl font-bold mt-2">PlanCraftAI</h1>
+              <p class="text-indigo-100/90 mt-2 text-base">Your AI-powered productivity companion</p>
+            </div>
+            <LoginFeatureSlider class="value-props" />
+          </div>
 
-      <!-- Off-screen reCAPTCHA anchor (must be mounted in DOM) -->
-      <div id="recaptcha-container" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;"></div>
+          <!-- Off-screen reCAPTCHA anchor (must be mounted in DOM) -->
+          <div id="recaptcha-container" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;"></div>
 
-      <!-- Login Buttons -->
-      <div class="space-y-4">
-        <button
-          @click="loginGoogle"
-          :disabled="authStore.loading"
-          class="w-full flex items-center justify-center gap-3 bg-white text-gray-800 px-5 py-3 rounded-xl font-medium shadow hover:shadow-lg transition"
-        >
-          <img src="https://www.svgrepo.com/show/355037/google.svg" alt="Google" class="w-5 h-5" />
-          Continue with Google
-        </button>
+          <div class="mt-10 space-y-4">
+            <button
+              @click="loginGoogle"
+              :disabled="authStore.loading"
+              class="w-full flex items-center justify-center gap-3 bg-white text-gray-900 px-6 py-4 rounded-2xl font-semibold shadow-lg hover:-translate-y-0.5 hover:shadow-2xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 disabled:opacity-70"
+            >
+              <img src="https://www.svgrepo.com/show/355037/google.svg" alt="Google" class="w-5 h-5" />
+              Continue with Google
+            </button>
 
-        <button
-          @click="loginGuest"
-          :disabled="authStore.loading"
-          class="w-full bg-indigo-600 text-white px-5 py-3 rounded-xl font-medium shadow hover:bg-indigo-700 transition"
-        >
-          Continue as Guest
-        </button>
-        
-        <!-- Email Login -->
-        <div class="pt-2 text-left">
-          <button
-            class="text-indigo-300 text-sm hover:text-indigo-200"
-            @click="showEmail = !showEmail"
-          >
-            {{ showEmail ? 'Hide' : 'Prefer email? Sign in with email' }}
-          </button>
-          <div v-if="showEmail" class="mt-3 space-y-3">
-            <input v-model="email" type="email" placeholder="Email" class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-400" />
-            <input v-model="password" type="password" placeholder="Password" class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-400" />
-            <div class="flex items-center justify-between text-sm">
-              <button @click="onLoginEmail" :disabled="authStore.loading" class="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 transition">
-                Sign In
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-1 text-xs sm:text-sm text-indigo-200/90">
+              <button class="auth-link" type="button" @click="showEmail = !showEmail">
+                {{ showEmail ? 'Hide email sign in' : 'Prefer email? Sign in with email' }}
               </button>
-              <button @click="onRegister" :disabled="authStore.loading" class="px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition">
-                Create account
+              <span class="hidden sm:inline text-indigo-300/60">•</span>
+              <button class="auth-link" type="button" @click="togglePhone()">
+                {{ showPhone ? 'Hide phone sign in' : 'Prefer phone? Sign in with OTP' }}
               </button>
             </div>
-            <button @click="onReset" class="text-xs text-indigo-300 hover:text-indigo-200">Forgot password?</button>
-            <div class="pt-3 border-t border-gray-800">
-              <div class="flex items-center justify-between text-sm">
-                <span class="text-indigo-200">Or get a magic link</span>
-                <button @click="onSendMagic" class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 transition">Send Link</button>
+
+            <div v-if="showEmail" class="auth-panel">
+              <h2 class="text-lg font-semibold text-white mb-3">Email access</h2>
+              <div class="space-y-3">
+                <input v-model="email" type="email" placeholder="Email" class="auth-input" />
+                <input v-model="password" type="password" placeholder="Password" class="auth-input" />
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 text-sm">
+                  <button @click="onLoginEmail" :disabled="authStore.loading" class="auth-action primary">
+                    Sign In
+                  </button>
+                  <button @click="onRegister" :disabled="authStore.loading" class="auth-action ghost">
+                    Create account
+                  </button>
+                </div>
+                <button @click="onReset" class="text-xs text-indigo-300 hover:text-indigo-200 transition text-left">
+                  Forgot password?
+                </button>
+                <div class="pt-3 border-t border-white/10">
+                  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between text-sm gap-2">
+                    <span class="text-indigo-100">Or get a magic link</span>
+                    <button @click="onSendMagic" class="auth-action ghost px-4 py-2">
+                      Send Link
+                    </button>
+                  </div>
+                  <p v-if="magicSent" class="text-xs text-green-300 mt-2">Magic link sent! Check your email.</p>
+                </div>
               </div>
-              <p v-if="magicSent" class="text-xs text-green-300 mt-2">Magic link sent! Check your email.</p>
+            </div>
+
+            <div v-if="showPhone" class="auth-panel">
+              <h2 class="text-lg font-semibold text-white mb-3">Phone OTP</h2>
+              <div class="space-y-3">
+                <input
+                  v-model="phone"
+                  type="tel"
+                  placeholder="+1 234 567 8901"
+                  class="auth-input"
+                />
+                <div v-if="!otpSent">
+                  <button
+                    @click="sendOtp"
+                    :disabled="sendingOtp || !phone"
+                    class="auth-action primary w-full disabled:opacity-60"
+                  >
+                    {{ sendingOtp ? 'Sending…' : 'Send OTP' }}
+                  </button>
+                </div>
+                <div v-else class="space-y-2">
+                  <input
+                    v-model="otp"
+                    type="text"
+                    inputmode="numeric"
+                    autocomplete="one-time-code"
+                    placeholder="Enter OTP"
+                    class="auth-input"
+                  />
+                  <button
+                    @click="verifyOtp"
+                    :disabled="verifyingOtp || !otp"
+                    class="auth-action primary w-full disabled:opacity-60"
+                  >
+                    {{ verifyingOtp ? 'Verifying…' : 'Verify & Sign In' }}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-        
-        <!-- Phone OTP Login -->
-        <div class="pt-4 text-left">
-          <button
-            class="text-indigo-300 text-sm hover:text-indigo-200"
-            @click="togglePhone()"
-          >
-            {{ showPhone ? 'Hide' : 'Prefer phone? Sign in with OTP' }}
-          </button>
-          <div v-if="showPhone" class="mt-3 space-y-3">
-            <input
-              v-model="phone"
-              type="tel"
-              placeholder="+1 234 567 8901"
-              class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-400"
-            />
-            <div v-if="!otpSent">
-              <button
-                @click="sendOtp"
-                :disabled="sendingOtp || !phone"
-                class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg transition disabled:opacity-60"
-              >
-                {{ sendingOtp ? 'Sending…' : 'Send OTP' }}
-              </button>
-            </div>
-            <div v-else class="space-y-2">
-              <input
-                v-model="otp"
-                type="text"
-                inputmode="numeric"
-                autocomplete="one-time-code"
-                placeholder="Enter OTP"
-                class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-400"
-              />
-              <button
-                @click="verifyOtp"
-                :disabled="verifyingOtp || !otp"
-                class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg transition disabled:opacity-60"
-              >
-                {{ verifyingOtp ? 'Verifying…' : 'Verify & Sign In' }}
-              </button>
+
+          <div class="mt-10 grid gap-3 sm:grid-cols-3 text-center text-xs sm:text-sm text-indigo-200/80">
+            <div
+              v-for="feature in featureHighlights"
+              :key="feature.label"
+              class="feature-pill flex flex-col items-center gap-1 px-3 py-3 rounded-2xl border border-white/5 bg-white/5"
+            >
+              <span class="text-lg">{{ feature.icon }}</span>
+              <p class="font-semibold text-white text-sm">{{ feature.label }}</p>
+              <p class="text-[11px] text-indigo-200/70">{{ feature.desc }}</p>
             </div>
           </div>
+
+          <p class="text-xs text-indigo-200/80 text-center mt-8">
+            Loved by students, founders, and busy professionals — trusted by 300+ planners.
+          </p>
+
+          <p v-if="authStore.loading" class="text-sm text-gray-300 mt-6 text-center">✨ Preparing your space...</p>
+          <GoogleAuthDiagnostic class="mt-6" />
         </div>
       </div>
-
-      <p v-if="authStore.loading" class="text-sm text-gray-400 mt-6">✨ Preparing your space...</p>
-      <!-- Dev-only diagnostics -->
-      <GoogleAuthDiagnostic />
     </div>
   </div>
 </template>
@@ -118,11 +136,27 @@
 import { ref, onMounted } from "vue"
 import { useRouter, useRoute } from "vue-router"
 import { useAuthStore } from "@/stores/authStore"
+import LoginFeatureSlider from '@/components/LoginFeatureSlider.vue'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const starsCanvas = ref(null)
+const featureHighlights = [
+  { icon: '🧠', label: 'Smart AI Task Planning', desc: 'Guided next steps' },
+  { icon: '🔔', label: 'Auto Reminders', desc: 'Call · Text · WhatsApp · Email' },
+  { icon: '📅', label: 'Calendar Sync', desc: 'Google + Outlook ready' },
+]
+
+if (route.query.guestFromLanding === '1') {
+  router.replace({
+    path: '/signup',
+    query: {
+      guest: '1',
+      guestFromLanding: '1',
+    },
+  })
+}
 
 import { trackLinkedInConversion } from '@/utils/ads'
 import { RecaptchaVerifier } from 'firebase/auth'
@@ -141,11 +175,6 @@ async function loginGoogle() {
     showPhone.value = true
     try { ElMessage.info('Google sign-in unavailable. Try phone OTP.') } catch {}
   }
-}
-
-async function loginGuest() {
-  await authStore.loginAsGuest()
-  if (authStore.user) redirectAfterLogin()
 }
 
 // Email auth
@@ -368,6 +397,115 @@ onMounted(async () => {
   }
 }
 .animate-fade-in {
+  animation: fade-in 0.8s ease forwards;
+}
+
+@keyframes glowPulse {
+  0% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 0.4;
+  }
+}
+
+.login-glow {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 80%;
+  height: 80%;
+  background: radial-gradient(circle at 50% 50%, rgba(167, 139, 250, 0.5), transparent 65%);
+  filter: blur(120px);
+  opacity: 0.5;
+  animation: glowPulse 6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.login-card {
+  position: relative;
+  z-index: 1;
+}
+
+.value-props {
   animation: fade-in 1s ease forwards;
+}
+
+.auth-panel {
+  margin-top: 1rem;
+  padding: 1.25rem;
+  border-radius: 1.25rem;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+}
+
+.auth-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 0.9rem;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.auth-input::placeholder {
+  color: rgba(226, 232, 240, 0.65);
+}
+
+.auth-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.9rem;
+  padding: 0.65rem 1.25rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.auth-action.primary {
+  background: linear-gradient(120deg, #a855f7, #6366f1);
+  color: white;
+  box-shadow: 0 10px 25px rgba(99, 102, 241, 0.35);
+}
+
+.auth-action.primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.auth-action.ghost {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(226, 232, 240, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.auth-link {
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: rgba(165, 180, 252, 0.4);
+  text-underline-offset: 4px;
+  transition: color 0.2s ease;
+}
+
+.auth-link:hover {
+  color: #c7d2fe;
+}
+
+.feature-pill {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 1.25rem;
+}
+
+@media (max-width: 640px) {
+  .auth-panel {
+    padding: 1rem;
+  }
 }
 </style>

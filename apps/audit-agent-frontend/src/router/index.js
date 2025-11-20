@@ -29,6 +29,7 @@ const router = createRouter({
     // ✅ Public routes
     { path: '/', name: 'landing', component: LandingPage },
     { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue') },
+    { path: '/signup', name: 'signup', component: () => import('@/views/GuestOnboarding.vue') },
     { path: '/privacy', component: PrivacyPolicy },
     { path: '/terms', component: Terms },
     { path: '/contact', component: Contact },
@@ -124,8 +125,8 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
 
-  // If navigating to login: only redirect away when fully signed-in (not guest)
-  if (to.path === '/login') {
+  // If navigating to login or signup: only redirect away when fully signed-in (not guest)
+  if (to.path === '/login' || to.path === '/signup') {
     try {
       const isGuest = authStore?.isGuest === true || authStore?.guest === true || authStore?.user?.mode === 'guest'
       if (authStore?.user && !isGuest) return next('/dashboard')

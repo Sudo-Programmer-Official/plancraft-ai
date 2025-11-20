@@ -19,24 +19,33 @@
               Your companion workspace
             </p>
             <div class="flex flex-wrap items-end gap-2">
-              <h1 class="text-2xl sm:text-3xl font-semibold text-slate-100">
-                {{ greetingHeadline }}
-              </h1>
+              <div class="greeting-headline-wrapper flex-1">
+                <transition name="greeting-fade" mode="out-in">
+                  <h1
+                    class="text-2xl sm:text-3xl font-semibold text-slate-100 w-full"
+                    :key="greetingHeadline"
+                  >
+                    {{ greetingHeadline }}
+                  </h1>
+                </transition>
+              </div>
               <span v-if="dailyTasks.length" class="text-indigo-200/90 text-sm sm:text-base">
                 Let’s craft an intentional day.
               </span>
             </div>
           </div>
 
-          <transition-group name="slide" tag="div">
-            <div
-              v-if="currentInsight"
-              :key="currentInsight"
-              class="text-indigo-200/90 text-sm sm:text-base max-w-2xl leading-relaxed"
-            >
-              {{ currentInsight }}
-            </div>
-          </transition-group>
+          <div class="insight-wrapper">
+            <transition-group name="slide" tag="div">
+              <div
+                v-if="currentInsight"
+                :key="currentInsight"
+                class="text-indigo-200/90 text-sm sm:text-base max-w-2xl leading-relaxed"
+              >
+                {{ currentInsight }}
+              </div>
+            </transition-group>
+          </div>
 
           <div
             class="now-bar rounded-xl bg-indigo-900/40 border border-indigo-700/40 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
@@ -761,6 +770,7 @@ import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
 import { useAuthFlags } from '@/composables/useAuthFlags'
 import { trackLinkedInConversion } from '@/utils/ads'
+import { trackGuestDashboardLoaded } from '@/services/analytics'
 import { getReminderStatus, scheduleReminder } from '@/services/reminderService'
 import { listReports, generateReport } from '@/services/reportsService'
 import api from '@/services/api'
@@ -770,6 +780,7 @@ import { TASK_CATEGORY_FILTERS, getCategoryIcon, getCategoryColor, resolveCatego
 import { ensureDailyStreakState, getUserStreak } from '@/services/streakService'
 import { resolveReminderIso } from '@/utils/timeHelper.js'
 import { resolveTaskMeetingLink } from '@/utils/taskLinks'
+import { seedGuestStarterTasks } from '@/utils/guestTasks'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -778,6 +789,9 @@ const authStore = useAuthStore()
 const { isPremium, isGuest } = useAuthFlags()
 const routerNav = useRouter()
 const subStore = useSubscriptionStore()
+const isFirstVisit = computed(() => isGuest.value && authStore?.user?.firstVisitInitialized !== true)
+const guestDashboardTracked = ref(false)
+const firstVisitSeeding = ref(false)
 
 const daysLeft = computed(() => {
   const d = subStore.subscription?.cancelAt
@@ -1824,6 +1838,48 @@ watch(onboardingTourVisible, (visible) => {
   if (visible) onboardingSessionPlayed.value = true
 })
 
+watch(
+  () => ({
+    uid: authStore.user?.uid,
+    pending: isFirstVisit.value,
+  }),
+  async ({ uid, pending }) => {
+    if (!uid || !pending || firstVisitSeeding.value) return
+    firstVisitSeeding.value = true
+    try {
+      await seedGuestStarterTasks(uid, { source: 'dashboard_bootstrap' })
+      authStore.user = {
+        ...(authStore.user || {}),
+        firstVisitInitialized: true,
+      }
+    } catch (error) {
+      console.warn('Starter tasks bootstrap failed', error?.response?.data || error?.message || error)
+    } finally {
+      firstVisitSeeding.value = false
+    }
+  },
+  { immediate: true }
+)
+
+watch(
+  () => ({
+    uid: authStore.user?.uid,
+    guest: isGuest.value,
+  }),
+  ({ uid, guest }) => {
+    if (!uid || !guest || guestDashboardTracked.value) return
+    guestDashboardTracked.value = true
+    try {
+      trackGuestDashboardLoaded({
+        starterTasksReady: authStore?.user?.firstVisitInitialized === true,
+      })
+    } catch (error) {
+      console.warn('guest_dashboard_loaded track failed', error?.message || error)
+    }
+  },
+  { immediate: true }
+)
+
 async function onReminderClick(task) {
   try {
     const uid = authStore?.user?.uid
@@ -1939,6 +1995,41 @@ onUnmounted(() => {
 .slide-leave-to {
   opacity: 0;
   transform: translateY(6px);
+}
+
+.greeting-headline-wrapper {
+  min-height: 3.25rem;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+@media (max-width: 640px) {
+  .greeting-headline-wrapper {
+    min-height: 2.6rem;
+  }
+}
+
+.greeting-fade-enter-active,
+.greeting-fade-leave-active {
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+.greeting-fade-enter-from,
+.greeting-fade-leave-to {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+.insight-wrapper {
+  min-height: 3.5rem;
+  display: flex;
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  .insight-wrapper {
+    min-height: 3rem;
+  }
 }
 
 </style>

@@ -465,12 +465,11 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
-import { useAuthStore } from '@/stores/authStore'
 import SeoLongForm from '@/components/SeoLongForm.vue'
 import { useSeoMeta } from '@/composables/useSeoMeta'
+import { trackGuestStartFromLanding } from '@/services/analytics'
 
 const router = useRouter()
-const authStore = useAuthStore()
 
 const features = [
   {
@@ -705,7 +704,12 @@ function goToLogin() {
 }
 
 function continueAsGuest() {
-  authStore.loginAsGuest().then(() => router.push({ name: 'dashboard' }))
+  try {
+    trackGuestStartFromLanding()
+  } catch {
+    /* analytics optional */
+  }
+  router.push({ path: '/login', query: { guestFromLanding: '1' } })
 }
 
 const stars = ref(null)

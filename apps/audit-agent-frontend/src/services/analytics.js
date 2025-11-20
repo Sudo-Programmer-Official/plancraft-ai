@@ -59,6 +59,29 @@ export function trackEvent(name, props = {}) {
   }
 }
 
+function guestPayload(props = {}) {
+  return {
+    flow: 'guest_onboarding',
+    ...props,
+  }
+}
+
+export function trackGuestStartFromLanding(props = {}) {
+  trackEvent('guest_start_from_landing', guestPayload(props))
+}
+
+export function trackGuestReachedSignup(props = {}) {
+  trackEvent('guest_reached_signup', guestPayload(props))
+}
+
+export function trackGuestCompletedOnboarding(props = {}) {
+  trackEvent('guest_completed_onboarding', guestPayload(props))
+}
+
+export function trackGuestDashboardLoaded(props = {}) {
+  trackEvent('guest_dashboard_loaded', guestPayload(props))
+}
+
 export function trackPageView(path) {
   trackEvent('Page View', { path: path || safePath() })
 }
@@ -96,6 +119,12 @@ export const Analytics = {
   track: trackEvent,
   page: trackPageView,
   bindRouter,
+  guest: {
+    startFromLanding: trackGuestStartFromLanding,
+    reachedSignup: trackGuestReachedSignup,
+    completedOnboarding: trackGuestCompletedOnboarding,
+    dashboardLoaded: trackGuestDashboardLoaded,
+  },
 }
 
 export default Analytics

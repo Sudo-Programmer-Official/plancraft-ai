@@ -25,6 +25,9 @@ export async function signInAsGuest() {
   await setDoc(doc(db, "users", user.uid), {
     createdAt: Date.now(),
     mode: "guest",
+    isGuest: true,
+    firstVisitInitialized: false,
+    profileComplete: false,
   });
   return user;
 }

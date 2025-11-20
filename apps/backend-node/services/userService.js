@@ -1,3 +1,4 @@
+import admin from 'firebase-admin'
 import { db } from './firebaseAdmin.js'
 
 // Returns an array of { id, email, name }
@@ -17,6 +18,11 @@ export async function ensureUserProfile(uid, data = {}) {
   if (!uid) throw new Error('ensureUserProfile: uid is required')
   const ref = db.collection('users').doc(String(uid))
   const snap = await ref.get()
+  const existing = snap.exists ? snap.data() : null
+  const isGuestProfile =
+    data?.isGuest === true ||
+    existing?.isGuest === true ||
+    existing?.mode === 'guest'
   if (!snap.exists) {
     const base = {
       ...data,
@@ -29,6 +35,17 @@ export async function ensureUserProfile(uid, data = {}) {
     await ref.set(base)
   } else {
     await ref.set({ updatedAt: new Date() }, { merge: true })
+  }
+
+  if (isGuestProfile && !existing?.firstVisitInitialized) {
+    await ref.set(
+      {
+        isGuest: true,
+        firstVisitInitialized: false,
+        createdAt: existing?.createdAt || admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    )
   }
   const fresh = await ref.get()
   return fresh.exists ? fresh.data() : null
