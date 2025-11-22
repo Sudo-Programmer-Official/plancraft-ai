@@ -65,35 +65,78 @@ export function resolveReminderLink(reminder) {
   const ctxRaw = reminder.context
   const ctx = ctxRaw && typeof ctxRaw === 'object' ? ctxRaw : {}
 
-  const meetingUrl =
-    coerceUrl(ctx.meetingLink) ||
-    coerceUrl(reminder.meetingLink) ||
-    coerceUrl(ctx.joinUrl) ||
-    coerceUrl(reminder.joinUrl) ||
-    coerceUrl(ctx.meeting?.joinUrl) ||
-    coerceUrl(reminder.meeting?.joinUrl) ||
-    coerceUrl(reminder.link) ||
-    coerceUrl(ctx.link) ||
-    null
+  const candidates = []
+  const pushCandidate = (raw, source, label) => {
+    const url = coerceUrl(raw)
+    if (!url) return
+    candidates.push({ url, source, label })
+  }
 
-  const fallbackUrl =
-    coerceUrl(ctx.eventLink) ||
-    coerceUrl(ctx.calendarLink) ||
-    coerceUrl(ctx.htmlLink) ||
-    coerceUrl(reminder.eventLink) ||
-    coerceUrl(reminder.calendarLink) ||
-    coerceUrl(reminder.htmlLink) ||
-    coerceUrl(reminder.meeting?.htmlLink) ||
-    null
+  // Explicit meeting/join links first
+  pushCandidate(ctx.meetingLink, 'ctx.meetingLink')
+  pushCandidate(reminder.meetingLink, 'reminder.meetingLink')
+  pushCandidate(ctx.joinUrl, 'ctx.joinUrl')
+  pushCandidate(reminder.joinUrl, 'reminder.joinUrl')
+  pushCandidate(ctx.meeting?.joinUrl, 'ctx.meeting.joinUrl')
+  pushCandidate(reminder.meeting?.joinUrl, 'reminder.meeting.joinUrl')
+  pushCandidate(ctx.meeting?.join?.url, 'ctx.meeting.join.url')
+  pushCandidate(reminder.meeting?.join?.url, 'reminder.meeting.join.url')
 
-  const extractedUrl = meetingUrl || fallbackUrl
-  const url =
-    typeof extractedUrl === 'string'
-      ? extractedUrl
-      : extractedUrl && typeof extractedUrl.toString === 'function'
-        ? extractedUrl.toString()
-        : null
-  if (!url) return null
+  // Generic link fields
+  pushCandidate(reminder.link, 'reminder.link')
+  pushCandidate(ctx.link, 'ctx.link')
+
+  // Calendar/event fallbacks
+  pushCandidate(ctx.eventLink, 'ctx.eventLink')
+  pushCandidate(ctx.calendarLink, 'ctx.calendarLink')
+  pushCandidate(ctx.htmlLink, 'ctx.htmlLink')
+  pushCandidate(reminder.eventLink, 'reminder.eventLink')
+  pushCandidate(reminder.calendarLink, 'reminder.calendarLink')
+  pushCandidate(reminder.htmlLink, 'reminder.htmlLink')
+  pushCandidate(reminder.meeting?.htmlLink, 'reminder.meeting.htmlLink')
+
+  if (!candidates.length) return null
+
+  const providerFromUrl = (rawUrl) => {
+    try {
+      const { hostname, pathname } = new URL(rawUrl)
+      const host = hostname.toLowerCase()
+      const path = (pathname || '').toLowerCase()
+      if (host.includes('meet.google.com')) return 'Google Meet'
+      if (host.includes('zoom.us') || host.includes('zoom.com')) return 'Zoom'
+      if (host.includes('teams.microsoft')) return 'Microsoft Teams'
+      if (host.includes('webex')) return 'Webex'
+      if (host.includes('whereby')) return 'Whereby'
+      if (host.includes('around.co')) return 'Around'
+      if (host.includes('ringcentral')) return 'RingCentral'
+      if (host.includes('chime.aws')) return 'Amazon Chime'
+      if (host.includes('calendly')) {
+        if (path.includes('cancel') || path.includes('cancellation') || path.includes('resched')) return 'Calendly-cancel'
+        return 'Calendly'
+      }
+      return ''
+    } catch {
+      return ''
+    }
+  }
+
+  const scoreCandidate = (c) => {
+    const provider = providerFromUrl(c.url)
+    if (provider === 'Calendly-cancel') return -5
+    if (provider === 'Calendly') return -2
+    if (provider === 'Google Meet') return 5
+    if (provider === 'Zoom') return 5
+    if (provider === 'Microsoft Teams') return 4
+    if (provider) return 3
+    return 1
+  }
+
+  const best = candidates
+    .map((c, idx) => ({ ...c, score: scoreCandidate(c), idx }))
+    .sort((a, b) => b.score - a.score || a.idx - b.idx)[0]
+
+  if (!best) return null
+  const providerLabel = providerFromUrl(best.url) || ''
 
   const labelFromCtx =
     (typeof ctx.meetingLabel === 'string' && ctx.meetingLabel) ||
@@ -105,6 +148,11 @@ export function resolveReminderLink(reminder) {
     (typeof reminder.link === 'object' && typeof reminder.link?.label === 'string' && reminder.link.label) ||
     null
 
-  const label = labelFromCtx || (meetingUrl ? 'Join meeting' : 'Open link')
-  return { url, label }
+  const label =
+    labelFromCtx ||
+    (providerLabel && providerLabel !== 'Calendly' && providerLabel !== 'Calendly-cancel'
+      ? `Join ${providerLabel}`
+      : 'Join meeting')
+
+  return { url: best.url, label }
 }
