@@ -104,6 +104,23 @@ if (isInApp) {
   window.location.href = '/inapp-fallback.html'
 }
 
+// 🧭 Keep canonical tag in sync with current route (prevents alternate/redirect warnings)
+try {
+  const ensureCanonical = (path) => {
+    const origin = window?.location?.origin
+    if (!origin) return
+    const href = `${origin}${path || '/'}`
+    let link = document.querySelector("link[rel='canonical']")
+    if (!link) {
+      link = document.createElement('link')
+      link.setAttribute('rel', 'canonical')
+      document.head.appendChild(link)
+    }
+    link.setAttribute('href', href)
+  }
+  router.afterEach((to) => ensureCanonical(to.fullPath || '/'))
+} catch {}
+
 // Mount app
 app.mount('#app')
 
