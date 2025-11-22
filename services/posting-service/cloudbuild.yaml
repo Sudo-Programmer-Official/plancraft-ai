@@ -1,0 +1,33 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-t", "$_AR_HOSTNAME/$PROJECT_ID/posting-service:$_TAG", "."]
+
+  - name: gcr.io/cloud-builders/docker
+    args: ["push", "$_AR_HOSTNAME/$PROJECT_ID/posting-service:$_TAG"]
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      [
+        "run","deploy","posting-service",
+        "--image","$_AR_HOSTNAME/$PROJECT_ID/posting-service:$_TAG",
+        "--region","us-central1",
+        "--platform","managed",
+        "--allow-unauthenticated=false",
+        "--min-instances","0",
+        "--max-instances","5",
+        "--cpu","1",
+        "--memory","512Mi",
+        "--port","8080",
+        "--set-env-vars","NODE_ENV=production,FIREBASE_PROJECT_ID=$$FIREBASE_PROJECT_ID,FIREBASE_CLIENT_EMAIL=$$FIREBASE_CLIENT_EMAIL,FIREBASE_PRIVATE_KEY=$$FIREBASE_PRIVATE_KEY,INSTAGRAM_APP_ID=$$INSTAGRAM_APP_ID,INSTAGRAM_APP_SECRET=$$INSTAGRAM_APP_SECRET,INSTAGRAM_PAGE_ID=$$INSTAGRAM_PAGE_ID,INSTAGRAM_ACCESS_TOKEN=$$INSTAGRAM_ACCESS_TOKEN,LINKEDIN_CLIENT_ID=$$LINKEDIN_CLIENT_ID,LINKEDIN_CLIENT_SECRET=$$LINKEDIN_CLIENT_SECRET,LINKEDIN_ORG_ID=$$LINKEDIN_ORG_ID,TWITTER_CLIENT_ID=$$TWITTER_CLIENT_ID,TWITTER_CLIENT_SECRET=$$TWITTER_CLIENT_SECRET,FB_PAGE_ACCESS_TOKEN=$$FB_PAGE_ACCESS_TOKEN,GCLOUD_PROJECT=$$PROJECT_ID"
+      ]
+
+images:
+  - "$_AR_HOSTNAME/$PROJECT_ID/posting-service:$_TAG"
+
+substitutions:
+  _AR_HOSTNAME: us-central1-docker.pkg.dev
+  _TAG: latest
+
+options:
+  logging: CLOUD_LOGGING_ONLY

@@ -7,6 +7,7 @@ import PrivacyPolicy from '@/views/PrivacyPolicy.vue'
 import Terms from '@/views/TermsOfService.vue'
 import Contact from '@/views/ContactForm.vue'
 import { useAuthStore } from '@/stores/authStore'
+import CreatorLayout from '@/layouts/CreatorLayout.vue'
 
 const getCurrentUser = () =>
   new Promise((resolve) => {
@@ -104,6 +105,21 @@ const router = createRouter({
         { path: 'pricing', name: 'pricing', component: () => import('@/views/PricingView.vue') },
         { path: 'subscription', name: 'subscription', component: () => import('@/views/PricingView.vue') },
         { path: 'help', name: 'help', component: () => import('@/views/HelpView.vue') },
+      ],
+    },
+
+    // ✅ Creator Mode workspace (isolated layout)
+    {
+      path: '/creator',
+      component: CreatorLayout,
+      meta: { requiresAuth: true },
+      children: [
+        { path: '', name: 'creator-home', component: () => import('@/views/creator/CreatorHome.vue') },
+        { path: 'calendar', name: 'creator-calendar', component: () => import('@/views/creator/CreatorCalendar.vue') },
+        { path: 'editor/:id', name: 'creator-editor', component: () => import('@/views/creator/CreatorEditor.vue') },
+        { path: 'repurpose', name: 'creator-repurpose', component: () => import('@/views/creator/CreatorRepurpose.vue') },
+        { path: 'preview/:id', name: 'creator-preview', component: () => import('@/views/creator/CreatorPreview.vue') },
+        { path: 'publish/:id', name: 'creator-publish', component: () => import('@/views/creator/CreatorPublish.vue') },
       ],
     },
 

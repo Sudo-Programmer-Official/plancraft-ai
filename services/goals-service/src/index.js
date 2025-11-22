@@ -4,7 +4,7 @@ import { createGoalsApp } from "./server.js";
 const envFile = process.env.GOALS_ENV_FILE || ".env";
 dotenv.config({ path: envFile });
 
-const PORT = Number(process.env.GOALS_SERVICE_PORT || process.env.PORT || 4502);
+const PORT = Number(process.env.GOALS_SERVICE_PORT || process.env.PORT || 8080);
 
 const app = createGoalsApp();
 

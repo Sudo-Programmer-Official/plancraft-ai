@@ -51,6 +51,7 @@ export function createGoalsApp() {
   app.get("/health", (req, res) => {
     res.json({ ok: true, service: "goals" });
   });
+  app.get("/healthz", (req, res) => res.status(200).json({ status: "ok" }));
 
   app.use("/api/goals", goalsRouter);
 

@@ -518,6 +518,7 @@ const tabs = [
   { name: 'Reminders', icon: '🔔', path: '/reminders' },
   { name: 'Goals', icon: '🎯', path: '/goals' },
   { name: 'Reports', icon: '📈', path: '/reports' },
+  { name: 'Creator Mode', icon: '🎬', path: '/creator' },
   { name: 'Habits', icon: '🏆', path: '/habits' },
 ]
 

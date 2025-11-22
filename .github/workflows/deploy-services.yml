@@ -1,0 +1,82 @@
+name: Deploy Microservices to App Runner
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: us-east-1
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: posting-service
+            path: services/posting-service
+            ecr_repo: posting-service
+            arn_secret: POSTING_SERVICE_ARN
+          - name: creator-service
+            path: services/creator-service
+            ecr_repo: creator-service
+            arn_secret: CREATOR_SERVICE_ARN
+          - name: goals-service
+            path: services/goals-service
+            ecr_repo: goals-service
+            arn_secret: GOALS_SERVICE_ARN
+          - name: ai-nlp-service
+            path: services/ai-nlp-service
+            ecr_repo: ai-nlp-service
+            arn_secret: AI_NLP_SERVICE_ARN
+          - name: growth-service
+            path: services/growth-service
+            ecr_repo: growth-service
+            arn_secret: GROWTH_SERVICE_ARN
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        run: |
+          aws ecr get-login-password --region "${AWS_REGION}" | docker login --username AWS --password-stdin "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+
+      - name: Build image
+        run: |
+          REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${{ matrix.ecr_repo }}"
+          docker build -t "${REPO}:latest" ${{ matrix.path }}
+
+      - name: Push image
+        run: |
+          REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${{ matrix.ecr_repo }}"
+          docker push "${REPO}:latest"
+
+      - name: Update App Runner service
+        run: |
+          REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${{ matrix.ecr_repo }}"
+          SERVICE_ARN="${{ secrets[matrix.arn_secret] }}"
+          if [ -z "$SERVICE_ARN" ]; then
+            echo "❗ Set secret ${{ matrix.arn_secret }} with the App Runner service ARN to enable updates."
+            exit 0
+          fi
+          aws apprunner update-service \
+            --service-arn "$SERVICE_ARN" \
+            --source-configuration ImageRepository="{ImageIdentifier=${REPO}:latest,ImageRepositoryType=ECR}"
+
+      - name: Summary
+        run: |
+          echo "Deployed ${{ matrix.name }} to App Runner (if ARN provided)."

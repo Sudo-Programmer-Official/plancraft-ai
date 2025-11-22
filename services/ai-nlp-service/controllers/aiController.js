@@ -1,0 +1,31 @@
+import { runLlm } from '../services/llmClient.js'
+import {
+  HOOK_TEMPLATE,
+  REPURPOSE_TEMPLATE,
+  REEL_SCRIPT_TEMPLATE,
+  STORY_FRAME_TEMPLATE,
+  LINKEDIN_POST_TEMPLATE,
+  TWEET_THREAD_TEMPLATE,
+  OUTREACH_TEMPLATE,
+} from '../services/aiTemplates.js'
+import { logAi } from '../firestore/aiLogsRepository.js'
+
+async function handle(type, template, req, res, next) {
+  try {
+    const input = req.body?.input || ''
+    const userId = req.user?.uid || 'anon'
+    const output = await runLlm(template, input)
+    try { await logAi({ userId, type, input, output }) } catch {}
+    res.json({ success: true, output })
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const generateHook = (req, res, next) => handle('hook', HOOK_TEMPLATE, req, res, next)
+export const generateRepurpose = (req, res, next) => handle('repurpose', REPURPOSE_TEMPLATE, req, res, next)
+export const generateReelScript = (req, res, next) => handle('reel_script', REEL_SCRIPT_TEMPLATE, req, res, next)
+export const generateStoryFrame = (req, res, next) => handle('story_frame', STORY_FRAME_TEMPLATE, req, res, next)
+export const generateLinkedInPost = (req, res, next) => handle('linkedin_post', LINKEDIN_POST_TEMPLATE, req, res, next)
+export const generateTweetThread = (req, res, next) => handle('tweet_thread', TWEET_THREAD_TEMPLATE, req, res, next)
+export const generateOutreachMessage = (req, res, next) => handle('outreach_message', OUTREACH_TEMPLATE, req, res, next)

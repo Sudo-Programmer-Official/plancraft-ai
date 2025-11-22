@@ -75,6 +75,8 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': 'http://localhost:4000',
+      '/creator-api': 'http://localhost:5005',
+      '/posting-api': 'http://localhost:5006',
     },
   },
   build: {

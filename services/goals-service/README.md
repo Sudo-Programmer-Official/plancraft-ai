@@ -27,3 +27,18 @@ The dev server defaults to `http://localhost:4502/api/goals`.
 - `GOALS_TASK_SERVICE_URL` (optional) → typically `http://localhost:4000/api/tasks/create`
 
 Configure `GOALS_SERVICE_ALLOWED_ORIGINS` to match any frontend origins (Vite dev server, production domain, etc.).
+
+## AWS App Runner Deployment
+1) Create an ECR repo for `goals-service` in `us-east-1`.
+2) `docker login` to ECR.
+3) Run `./scripts/deploy-goals-service-aws.sh` to build/tag/push `latest`.
+4) Create an App Runner service pointing to the ECR image:
+   - Region: `us-east-1`
+   - Port: `8080`
+   - CPU: 1 vCPU, Memory: 1 GB
+5) Set environment variables:
+   - NODE_ENV=production
+   - FIREBASE_PROJECT_ID
+   - FIREBASE_CLIENT_EMAIL
+   - FIREBASE_PRIVATE_KEY
+6) Health check endpoint: `/healthz`.
