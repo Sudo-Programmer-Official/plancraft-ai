@@ -1,6 +1,35 @@
 User-agent: *
-Allow: /
-Disallow: /admin
 
-# Keep SPA routes crawlable; auth gates hide member content after load.
+Allow: /
+Allow: /features
+Allow: /voice-planning
+Allow: /ai-reminders
+Allow: /google-calendar-integration
+Allow: /blog
+Allow: /pricing
+Allow: /contact
+Allow: /privacy
+Allow: /privacy-policy
+Allow: /terms
+Allow: /data-deletion
+Allow: /help
+
+Disallow: /dashboard
+Disallow: /daily
+Disallow: /weekly
+Disallow: /monthly
+Disallow: /today
+Disallow: /planner
+Disallow: /timeline
+Disallow: /journal
+Disallow: /habits
+Disallow: /reports
+Disallow: /settings
+Disallow: /subscription
+Disallow: /talk-to-planner
+Disallow: /reminders
+Disallow: /admin
+Disallow: /app
+Disallow: /profile
+
 Sitemap: https://plancraftai.com/sitemap.xml

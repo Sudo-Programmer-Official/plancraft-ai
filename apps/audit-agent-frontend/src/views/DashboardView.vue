@@ -18,18 +18,21 @@
             <p class="text-xs sm:text-sm uppercase tracking-widest text-indigo-300/80">
               Your companion workspace
             </p>
-            <div class="flex flex-wrap items-end gap-2">
-              <div class="greeting-headline-wrapper flex-1">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
+              <div class="greeting-headline-wrapper flex-1 min-w-0">
                 <transition name="greeting-fade" mode="out-in">
                   <h1
-                    class="text-2xl sm:text-3xl font-semibold text-slate-100 w-full"
+                    class="text-2xl sm:text-3xl font-semibold text-slate-100 w-full leading-tight"
                     :key="greetingHeadline"
                   >
                     {{ greetingHeadline }}
                   </h1>
                 </transition>
               </div>
-              <span v-if="dailyTasks.length" class="text-indigo-200/90 text-sm sm:text-base">
+              <span
+                v-if="dailyTasks.length"
+                class="text-indigo-200/90 text-sm sm:text-base sm:whitespace-nowrap"
+              >
                 Let’s craft an intentional day.
               </span>
             </div>
