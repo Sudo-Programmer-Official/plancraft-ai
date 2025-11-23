@@ -93,33 +93,18 @@ jobs:
           docker tag "${{ steps.vars.outputs.repo }}:latest" "${{ steps.vars.outputs.repo }}:cache"
           docker push "${{ steps.vars.outputs.repo }}:cache" || true
 
-      - name: Update App Runner service
+      # ---- simpler + YAML-safe deployment trigger ----
+      - name: Trigger App Runner deployment (pull latest image)
         continue-on-error: true
         shell: bash
         run: |
           SERVICE_ARN="${{ secrets[matrix.arn_secret] }}"
           if [ -z "$SERVICE_ARN" ]; then
-            echo "Skipping update: secret ${{ matrix.arn_secret }} not set."
+            echo "Skipping: secret ${{ matrix.arn_secret }} not set."
             exit 0
           fi
-
-          # Build JSON file safely (single quotes prevent interpolation)
-          cat > /tmp/source.json <<'EOF'
-{
-  "ImageRepository": {
-    "ImageIdentifier": "${{ steps.vars.outputs.repo }}:latest",
-    "ImageRepositoryType": "ECR",
-    "ImageConfiguration": {
-      "Port": "8080"
-    }
-  }
-}
-EOF
-
-          echo "Updating App Runner service: $SERVICE_ARN"
-          aws apprunner update-service \
-            --service-arn "$SERVICE_ARN" \
-            --source-configuration file:///tmp/source.json
+          echo "Starting deployment for $SERVICE_ARN"
+          aws apprunner start-deployment --service-arn "$SERVICE_ARN"
 
       - name: Summary
         run: |
@@ -128,5 +113,5 @@ EOF
           if [ -z "${{ secrets[matrix.arn_secret] }}" ]; then
             echo "App Runner ARN missing: ${{ matrix.arn_secret }}" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "App Runner update attempted for ARN secret: ${{ matrix.arn_secret }}" >> "$GITHUB_STEP_SUMMARY"
+            echo "App Runner deployment triggered for ARN secret: ${{ matrix.arn_secret }}" >> "$GITHUB_STEP_SUMMARY"
           fi
