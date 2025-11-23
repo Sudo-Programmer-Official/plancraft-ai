@@ -3,8 +3,7 @@ name: Deploy Microservices to App Runner
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
   deploy:
@@ -13,8 +12,9 @@ jobs:
       contents: read
       id-token: write
     env:
-      AWS_REGION: us-east-1
-      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      AWS_PAGER: ""                              # cleaner aws-cli output
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-west-2' }}
+
     strategy:
       fail-fast: false
       matrix:
@@ -51,32 +51,89 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to ECR
+      - name: Who am I (diagnostic)
         run: |
-          aws ecr get-login-password --region "${AWS_REGION}" | docker login --username AWS --password-stdin "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+          set -e
+          echo "Region: ${AWS_REGION}"
+          aws --version
+          echo "Caller identity:"
+          aws sts get-caller-identity
+          echo "Listing ECR repos (first 5):"
+          aws ecr describe-repositories --max-items 5 || true
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Compute image repo (from login registry)
+        id: img
+        run: |
+          echo "repo=${{ steps.login-ecr.outputs.registry }}/${{ matrix.ecr_repo }}" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure ECR repository exists
+        run: |
+          aws ecr describe-repositories --repository-names "${{ matrix.ecr_repo }}" >/dev/null 2>&1 || \
+          aws ecr create-repository --repository-name "${{ matrix.ecr_repo }}" >/dev/null
+
+      - name: Verify build context exists
+        run: |
+          set -e
+          test -d "${{ matrix.path }}" || { echo "Missing directory: ${{ matrix.path }}"; exit 1; }
+          if [ ! -f "${{ matrix.path }}/Dockerfile" ]; then
+            echo "Missing Dockerfile at: ${{ matrix.path }}/Dockerfile"
+            exit 1
+          fi
+
+      - name: Set tags
+        id: tags
+        run: |
+          echo "sha_tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Pull cache (best effort)
+        continue-on-error: true
+        run: |
+          docker pull "${{ steps.img.outputs.repo }}:cache" || true
 
       - name: Build image
         run: |
-          REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${{ matrix.ecr_repo }}"
-          docker build -t "${REPO}:latest" ${{ matrix.path }}
+          docker build \
+            --cache-from "${{ steps.img.outputs.repo }}:cache" \
+            -t "${{ steps.img.outputs.repo }}:latest" \
+            -t "${{ steps.img.outputs.repo }}:${{ steps.tags.outputs.sha_tag }}" \
+            ${{ matrix.path }}
 
       - name: Push image
         run: |
-          REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${{ matrix.ecr_repo }}"
-          docker push "${REPO}:latest"
+          docker push "${{ steps.img.outputs.repo }}:latest"
+          docker push "${{ steps.img.outputs.repo }}:${{ steps.tags.outputs.sha_tag }}"
 
-      - name: Update App Runner service
+      - name: Push cache tag (optional)
+        continue-on-error: true
         run: |
-          REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${{ matrix.ecr_repo }}"
+          docker tag "${{ steps.img.outputs.repo }}:latest" "${{ steps.img.outputs.repo }}:cache"
+          docker push "${{ steps.img.outputs.repo }}:cache" || true
+
+      - name: Trigger App Runner deployment (pull latest image)
+        continue-on-error: true
+        shell: bash
+        run: |
           SERVICE_ARN="${{ secrets[matrix.arn_secret] }}"
           if [ -z "$SERVICE_ARN" ]; then
-            echo "❗ Set secret ${{ matrix.arn_secret }} with the App Runner service ARN to enable updates."
+            echo "Skipping: secret ${{ matrix.arn_secret }} not set."
             exit 0
           fi
-          aws apprunner update-service \
-            --service-arn "$SERVICE_ARN" \
-            --source-configuration ImageRepository="{ImageIdentifier=${REPO}:latest,ImageRepositoryType=ECR}"
+          echo "Starting deployment for $SERVICE_ARN"
+          aws apprunner start-deployment --service-arn "$SERVICE_ARN"
 
       - name: Summary
         run: |
-          echo "Deployed ${{ matrix.name }} to App Runner (if ARN provided)."
+          {
+            echo "Service: ${{ matrix.name }}"
+            echo "Image repo: ${{ steps.img.outputs.repo }}"
+            echo "Tags pushed: latest, ${{ steps.tags.outputs.sha_tag }}"
+            if [ -z "${{ secrets[matrix.arn_secret] }}" ]; then
+              echo "App Runner ARN missing: ${{ matrix.arn_secret }}"
+            else
+              echo "App Runner deployment triggered for ARN secret: ${{ matrix.arn_secret }}"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
