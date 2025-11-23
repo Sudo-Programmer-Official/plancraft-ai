@@ -12,7 +12,7 @@ jobs:
       contents: read
       id-token: write
     env:
-      AWS_PAGER: ""                              # cleaner aws-cli output
+      AWS_PAGER: ""
       AWS_REGION: ${{ vars.AWS_REGION || 'us-west-2' }}
 
     strategy:
