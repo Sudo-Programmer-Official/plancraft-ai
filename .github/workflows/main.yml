@@ -87,7 +87,7 @@ jobs:
             echo "Skipping update: secret ${{ matrix.arn_secret }} not set."
             exit 0
           fi
-          cat > /tmp/source.json <<EOF
+          cat > /tmp/source.json <<'EOF'
 {
   "ImageRepository": {
     "ImageIdentifier": "${{ steps.vars.outputs.repo }}:latest",
