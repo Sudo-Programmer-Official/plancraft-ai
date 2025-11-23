@@ -1,17 +1,14 @@
-# syntax=docker/dockerfile:1
-
-FROM node:20-slim
-
-WORKDIR /app
+FROM node:20-slim AS base
+WORKDIR /usr/src/app
 ENV NODE_ENV=production
 
-# Install dependencies
+FROM base AS deps
 COPY package.json package-lock.json* pnpm-lock.yaml* ./
-RUN npm install --production
+RUN npm ci --omit=dev || npm install --production
 
-# Copy source
+FROM base AS runner
+COPY --from=deps /usr/src/app/node_modules ./node_modules
 COPY . .
 
-# Runtime port
 EXPOSE 8080
 CMD ["node", "server.js"]
