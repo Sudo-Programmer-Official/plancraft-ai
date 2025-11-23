@@ -3,6 +3,8 @@ import { publishFacebook } from '../platforms/facebook.js'
 import { publishLinkedIn } from '../platforms/linkedin.js'
 import { publishTwitter } from '../platforms/twitter.js'
 import { saveScheduled, fetchDue, markStatus } from '../firestore/scheduledPostsRepository.js'
+import { fetchDueMessages, markAsProcessed, markAsFailed } from '../firestore/scheduledMessagesRepository.js'
+import { handleJob } from './deliveryService.js'
 
 export async function publishImmediately(payload) {
   const handler = resolveHandler(payload.platform)
@@ -25,6 +27,23 @@ export async function processDue() {
     } catch (err) {
       await markStatus(item.id, 'failed', err.message)
       results.push({ id: item.id, status: 'failed', error: err.message })
+    }
+  }
+  return results
+}
+
+export async function runDueJobs() {
+  const now = new Date()
+  const due = await fetchDueMessages(now)
+  const results = []
+  for (const job of due) {
+    try {
+      await handleJob(job)
+      await markAsProcessed(job.id)
+      results.push({ id: job.id, status: 'sent' })
+    } catch (err) {
+      await markAsFailed(job.id, err?.message || 'send failed')
+      results.push({ id: job.id, status: 'failed', error: err?.message })
     }
   }
   return results

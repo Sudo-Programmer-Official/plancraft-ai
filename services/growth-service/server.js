@@ -2,6 +2,7 @@ import express from 'express'
 import cors from 'cors'
 import morgan from 'morgan'
 import growthRoutes from './routes/growthRoutes.js'
+import contactsRoutes from './routes/contactsRoutes.js'
 import { verifyAuth } from './utils/auth.js'
 import { errorHandler } from './utils/errorHandler.js'
 
@@ -19,6 +20,7 @@ app.use(morgan('dev'))
 app.get('/healthz', (_req, res) => res.status(200).json({ status: 'ok' }))
 
 app.use('/api/growth', verifyAuth, growthRoutes)
+app.use('/api/growth/contacts', verifyAuth, contactsRoutes)
 
 app.use(errorHandler)
 

@@ -8,6 +8,7 @@ import Terms from '@/views/TermsOfService.vue'
 import Contact from '@/views/ContactForm.vue'
 import { useAuthStore } from '@/stores/authStore'
 import CreatorLayout from '@/layouts/CreatorLayout.vue'
+import PublicLeaderLayout from '@/layouts/PublicLeaderLayout.vue'
 
 const getCurrentUser = () =>
   new Promise((resolve) => {
@@ -120,6 +121,24 @@ const router = createRouter({
         { path: 'repurpose', name: 'creator-repurpose', component: () => import('@/views/creator/CreatorRepurpose.vue') },
         { path: 'preview/:id', name: 'creator-preview', component: () => import('@/views/creator/CreatorPreview.vue') },
         { path: 'publish/:id', name: 'creator-publish', component: () => import('@/views/creator/CreatorPublish.vue') },
+      ],
+    },
+
+    // ✅ Leader Mode
+    {
+      path: '/leader',
+      component: PublicLeaderLayout,
+      meta: { requiresAuth: true },
+      children: [
+        { path: '', name: 'leader-dashboard', component: () => import('@/pages/leader/LeaderDashboard.vue') },
+        { path: 'events', name: 'leader-events', component: () => import('@/pages/leader/LeaderEvents.vue') },
+        { path: 'events/:id', name: 'leader-event-details', component: () => import('@/pages/leader/LeaderEventDetails.vue') },
+        { path: 'occasions', name: 'leader-occasions', component: () => import('@/pages/leader/LeaderOccasions.vue') },
+        { path: 'issues', name: 'leader-issues', component: () => import('@/pages/leader/LeaderIssues.vue') },
+        { path: 'issues/:id', name: 'leader-issue-details', component: () => import('@/pages/leader/LeaderIssueDetails.vue') },
+        { path: 'contacts', name: 'leader-contacts', component: () => import('@/pages/leader/LeaderContacts.vue') },
+        { path: 'maps', name: 'leader-maps', component: () => import('@/pages/leader/LeaderMaps.vue') },
+        { path: 'messages', name: 'leader-messages', component: () => import('@/pages/leader/LeaderMessages.vue') },
       ],
     },
 

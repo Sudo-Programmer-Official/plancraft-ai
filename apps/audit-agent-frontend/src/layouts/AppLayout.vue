@@ -519,6 +519,7 @@ const tabs = [
   { name: 'Goals', icon: '🎯', path: '/goals' },
   { name: 'Reports', icon: '📈', path: '/reports' },
   { name: 'Creator Mode', icon: '🎬', path: '/creator' },
+  { name: 'Leader Mode', icon: '👑', path: '/leader' },
   { name: 'Habits', icon: '🏆', path: '/habits' },
 ]
 

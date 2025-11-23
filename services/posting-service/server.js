@@ -3,6 +3,8 @@ import cors from 'cors'
 import morgan from 'morgan'
 import publishRoutes from './routes/publishRoutes.js'
 import authRoutes from './routes/authRoutes.js'
+import messageRoutes from './routes/messageRoutes.js'
+import schedulerRoutes from './routes/schedulerRoutes.js'
 import { errorHandler } from './utils/errorHandler.js'
 import { verifyAuth } from './utils/auth.js'
 
@@ -21,6 +23,8 @@ app.get('/healthz', (req, res) => res.status(200).json({ status: 'ok' }))
 
 app.use('/tokens', verifyAuth, authRoutes)
 app.use('/', verifyAuth, publishRoutes)
+app.use('/', verifyAuth, messageRoutes)
+app.use('/', verifyAuth, schedulerRoutes)
 
 app.use(errorHandler)
 
