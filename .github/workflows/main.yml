@@ -3,7 +3,7 @@ name: Deploy Microservices to App Runner
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [ feat/creator-mode ]
 
 jobs:
   deploy:
