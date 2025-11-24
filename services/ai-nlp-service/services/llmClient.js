@@ -3,6 +3,7 @@ import { logger } from '../utils/logger.js'
 import dotenv from 'dotenv'
 dotenv.config({ path: process.env.AI_NLP_ENV_FILE || '.env' })
 
+console.log('Using OpenAI API Key:', process.env.OPENAI_API_KEY)
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
