@@ -14,10 +14,18 @@ async function handle(type, template, req, res, next) {
   try {
     const input = req.body?.input || ''
     const userId = req.user?.uid || 'anon'
-    const output = await runLlm(template, input)
+    try {
+     const output = await runLlm(template, input)
+     console.log('LLM output:', output)
+    } catch (llmError) {
+     console.error('Error generating LLM output:', llmError)
+     throw llmError
+    }
+
     try { await logAi({ userId, type, input, output }) } catch {}
     res.json({ success: true, output })
   } catch (err) {
+    console.error('Error in AI controller:', err)
     next(err)
   }
 }
