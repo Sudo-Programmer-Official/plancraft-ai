@@ -1,17 +1,5 @@
 import admin from 'firebase-admin'
-
-let app
-function ensureApp() {
-  if (admin.apps.length) {
-    app = admin.apps[0]
-    return app
-  }
-  admin.initializeApp({
-    credential: admin.credential.applicationDefault(),
-  })
-  app = admin.app()
-  return app
-}
+import { ensureApp } from './firebase.js'
 
 export async function verifyAuth(req, res, next) {
   try {
