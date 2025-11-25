@@ -7,6 +7,7 @@ import {
   LINKEDIN_POST_TEMPLATE,
   TWEET_THREAD_TEMPLATE,
   OUTREACH_TEMPLATE,
+  EXTRACT_EVENT_TEMPLATE,
 } from '../services/aiTemplates.js'
 import { logAi } from '../firestore/aiLogsRepository.js'
 
@@ -37,3 +38,25 @@ export const generateStoryFrame = (req, res, next) => handle('story_frame', STOR
 export const generateLinkedInPost = (req, res, next) => handle('linkedin_post', LINKEDIN_POST_TEMPLATE, req, res, next)
 export const generateTweetThread = (req, res, next) => handle('tweet_thread', TWEET_THREAD_TEMPLATE, req, res, next)
 export const generateOutreachMessage = (req, res, next) => handle('outreach_message', OUTREACH_TEMPLATE, req, res, next)
+
+// OCR and structured event extraction (stub + LLM assisted)
+export async function ocrImage(req, res, next) {
+  try {
+    // For now, accept text directly or base64 image string and return stubbed text.
+    const text = req.body?.text || '(ocr-placeholder)'
+    res.json({ success: true, text })
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function extractEvent(req, res, next) {
+  try {
+    const input = req.body?.text || ''
+    const output = await runLlm(EXTRACT_EVENT_TEMPLATE, input || 'Extract event details from this text.')
+    try { await logAi({ userId: req.user?.uid || 'anon', type: 'extract_event', input, output }) } catch {}
+    res.json({ success: true, output })
+  } catch (err) {
+    next(err)
+  }
+}

@@ -7,10 +7,17 @@ import {
   generateLinkedInPost,
   generateTweetThread,
   generateOutreachMessage,
+  ocrImage,
+  extractEvent,
 } from '../controllers/aiController.js'
 
 const router = Router()
 
+// OCR and structured extraction
+router.post('/ocr', ocrImage)
+router.post('/extract-event', extractEvent)
+
+// Content generation
 router.post('/generate/hook', generateHook)
 router.post('/generate/repurpose', generateRepurpose)
 router.post('/generate/reel-script', generateReelScript)

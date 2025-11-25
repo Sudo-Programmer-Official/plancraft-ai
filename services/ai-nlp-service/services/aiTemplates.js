@@ -11,3 +11,18 @@ export const LINKEDIN_POST_TEMPLATE = `Write a LinkedIn post with a professional
 export const TWEET_THREAD_TEMPLATE = `Write a tweet thread of 5-8 tweets. Start with a strong hook, keep tweets scannable, and close with a CTA or question.`
 
 export const OUTREACH_TEMPLATE = `Write a concise outreach/investor message. Include a one-line value prop, a proof point, and a specific next step.`
+
+export const EXTRACT_EVENT_TEMPLATE = `Extract structured event details from the provided text. Return a concise JSON object with:
+{
+  "title": "",
+  "date": "",
+  "time": "",
+  "timezone": "",
+  "venue": "",
+  "address": "",
+  "lat": "",
+  "lng": "",
+  "attendees": [],
+  "notes": ""
+}
+If a field is unknown, return an empty string. Keep titles short.`

@@ -113,17 +113,86 @@ jobs:
           docker tag "${{ steps.img.outputs.repo }}:latest" "${{ steps.img.outputs.repo }}:cache"
           docker push "${{ steps.img.outputs.repo }}:cache" || true
 
-      - name: Trigger App Runner deployment (pull latest image)
+      - name: Update App Runner service (image + env sync)
         continue-on-error: true
         shell: bash
+        env:
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
+          FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          LOGGING_LEVEL: ${{ secrets.LOGGING_LEVEL || 'info' }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_MONTHLY_PRICE_ID: ${{ secrets.STRIPE_MONTHLY_PRICE_ID }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          STRIPE_SUCCESS_URL: ${{ secrets.STRIPE_SUCCESS_URL }}
+          STRIPE_CANCEL_URL: ${{ secrets.STRIPE_CANCEL_URL }}
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          SENDGRID_FROM_EMAIL: ${{ secrets.SENDGRID_FROM_EMAIL }}
+          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_PHONE_NUMBER: ${{ secrets.TWILIO_PHONE_NUMBER }}
+          TWILIO_MAX_CALLS_PER_DAY: ${{ secrets.TWILIO_MAX_CALLS_PER_DAY }}
+          TWILIO_DUPLICATE_WINDOW_MIN: ${{ secrets.TWILIO_DUPLICATE_WINDOW_MIN }}
+          META_WHATSAPP_BUSINESS_ID: ${{ secrets.META_WHATSAPP_BUSINESS_ID }}
+          META_WHATSAPP_PHONE_ID: ${{ secrets.META_WHATSAPP_PHONE_ID }}
+          META_WHATSAPP_TOKEN: ${{ secrets.META_WHATSAPP_TOKEN }}
+          WHATSAPP_PHONE_NUMBER_ID: ${{ secrets.WHATSAPP_PHONE_NUMBER_ID }}
+          WHATSAPP_TOKEN: ${{ secrets.WHATSAPP_TOKEN }}
+          NEEDS_OPENAI: ${{ matrix.needs_openai }}
         run: |
           SERVICE_ARN="${{ secrets[matrix.arn_secret] }}"
           if [ -z "$SERVICE_ARN" ]; then
             echo "Skipping: secret ${{ matrix.arn_secret }} not set."
             exit 0
           fi
-          echo "Starting deployment for $SERVICE_ARN"
-          aws apprunner start-deployment --service-arn "$SERVICE_ARN"
+          python - "$SERVICE_ARN" "${{ steps.img.outputs.repo }}" "$NEEDS_OPENAI" <<'PY'
+import json, os, sys
+service_arn, repo, needs_openai = sys.argv[1:]
+envs = [
+  {"Name":"NODE_ENV","Value":"production"},
+  {"Name":"FIREBASE_PROJECT_ID","Value":os.environ.get("FIREBASE_PROJECT_ID","")},
+  {"Name":"FIREBASE_CLIENT_EMAIL","Value":os.environ.get("FIREBASE_CLIENT_EMAIL","")},
+  {"Name":"FIREBASE_PRIVATE_KEY","Value":os.environ.get("FIREBASE_PRIVATE_KEY","")},
+]
+if needs_openai == "true":
+  if os.environ.get("OPENAI_API_KEY"):
+    envs.append({"Name":"OPENAI_API_KEY","Value":os.environ.get("OPENAI_API_KEY")})
+  envs.append({"Name":"LOGGING_LEVEL","Value":os.environ.get("LOGGING_LEVEL","info")})
+
+optional = [
+  "STRIPE_SECRET_KEY","STRIPE_MONTHLY_PRICE_ID","STRIPE_WEBHOOK_SECRET",
+  "STRIPE_SUCCESS_URL","STRIPE_CANCEL_URL",
+  "SENDGRID_API_KEY","SENDGRID_FROM_EMAIL",
+  "TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_PHONE_NUMBER",
+  "TWILIO_MAX_CALLS_PER_DAY","TWILIO_DUPLICATE_WINDOW_MIN",
+  "META_WHATSAPP_BUSINESS_ID","META_WHATSAPP_PHONE_ID","META_WHATSAPP_TOKEN",
+  "WHATSAPP_PHONE_NUMBER_ID","WHATSAPP_TOKEN",
+]
+for name in optional:
+  val = os.environ.get(name, "")
+  if val:
+    envs.append({"Name": name, "Value": val})
+
+envs = [e for e in envs if e["Value"]]
+config = {
+  "ImageRepository": {
+    "ImageIdentifier": f"{repo}:latest",
+    "ImageRepositoryType": "ECR",
+    "ImageConfiguration": {
+      "Port": "8080"
+    }
+  },
+  "Environment": {
+    "EnvironmentVariables": envs
+  }
+}
+with open("/tmp/source.json", "w", encoding="utf-8") as f:
+  json.dump(config, f)
+print("Wrote /tmp/source.json with env vars:", [e["Name"] for e in envs])
+PY
+          echo "Updating service $SERVICE_ARN"
+          aws apprunner update-service --service-arn "$SERVICE_ARN" --source-configuration file:///tmp/source.json
 
       - name: Summary
         run: |

@@ -11,6 +11,10 @@ async function authedHeaders() {
   return headers
 }
 
+function getNlpBase() {
+  return import.meta.env.VITE_NLP_API_BASE || (import.meta.env.VITE_AI_NLP_URL ? `${import.meta.env.VITE_AI_NLP_URL}/api/ai` : '/nlp-api')
+}
+
 export async function scheduleMessage(payload) {
   const headers = await authedHeaders()
   const { data } = await api.post('/posting-api/messages/schedule', payload, { headers })
@@ -19,21 +23,21 @@ export async function scheduleMessage(payload) {
 
 export async function ocrImage(formData) {
   const headers = await authedHeaders()
-  const url = (import.meta.env.VITE_NLP_API_BASE || '/nlp-api') + '/ocr'
+  const url = `${getNlpBase()}/ocr`
   const { data } = await axios.post(url, formData, { headers })
   return data
 }
 
 export async function extractEventDetails(payload) {
   const headers = await authedHeaders()
-  const url = (import.meta.env.VITE_NLP_API_BASE || '/nlp-api') + '/extract-event'
+  const url = `${getNlpBase()}/extract-event`
   const { data } = await axios.post(url, payload, { headers })
   return data
 }
 
 export async function generateWish(payload) {
   const headers = await authedHeaders()
-  const url = (import.meta.env.VITE_NLP_API_BASE || '/nlp-api') + '/generate-wish'
+  const url = `${getNlpBase()}/generate-wish`
   const { data } = await axios.post(url, payload, { headers })
   return data
 }
