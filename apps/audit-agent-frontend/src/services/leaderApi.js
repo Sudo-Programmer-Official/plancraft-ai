@@ -15,6 +15,15 @@ function getNlpBase() {
   return import.meta.env.VITE_NLP_API_BASE || (import.meta.env.VITE_AI_NLP_URL ? `${import.meta.env.VITE_AI_NLP_URL}/api/ai` : '/nlp-api')
 }
 
+function getGrowthBase() {
+  // Prefer explicit base, then service URL, finally dev proxy prefix
+  const direct = import.meta.env.VITE_GROWTH_API_BASE
+  if (direct) return direct.replace(/\/+$/, '')
+  const svc = import.meta.env.VITE_GROWTH_SERVICE_URL
+  if (svc) return `${svc.replace(/\/+$/, '')}/api/growth`
+  return '/growth-api'
+}
+
 export async function scheduleMessage(payload) {
   const headers = await authedHeaders()
   const { data } = await api.post('/posting-api/messages/schedule', payload, { headers })
@@ -44,14 +53,14 @@ export async function generateWish(payload) {
 
 export async function fetchContacts() {
   const headers = await authedHeaders()
-  const url = '/growth-api/contacts'
+  const url = `${getGrowthBase()}/contacts`
   const { data } = await api.get(url, { headers })
   return data?.contacts || []
 }
 
 export async function fetchGroups() {
   const headers = await authedHeaders()
-  const url = '/growth-api/contacts/groups'
+  const url = `${getGrowthBase()}/contacts/groups`
   const { data } = await api.get(url, { headers })
   return data?.groups || []
 }
