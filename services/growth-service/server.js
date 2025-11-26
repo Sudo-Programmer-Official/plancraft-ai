@@ -23,14 +23,23 @@ const allowAll = process.env.CORS_ALLOW_ALL !== '0'
 const allowedOrigins = Array.from(new Set([...baseOrigins, ...envOrigins]))
 
 const corsOptions = {
-  origin: (origin, callback) => {
-    if (allowAll || !origin) return callback(null, true)
-    if (allowedOrigins.includes(origin)) return callback(null, true)
-    // Allow subdomains of plancraftai.com
-    if (/\.plancraftai\.com$/.test(origin)) return callback(null, true)
-    return callback(new Error(`Origin not allowed: ${origin}`))
+  origin: (_origin, callback) => {
+    // App Runner + local dev: always allow
+    if (allowAll) return callback(null, true)
+    callback(null, true)
   },
   credentials: true,
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'x-app-token',
+    'x-user-country',
+    'x-user-email',
+    'x-user-id',
+    'x-user-role',
+    'x-user-tz',
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
 }
 app.use(cors(corsOptions))
 app.options('*', cors(corsOptions))
