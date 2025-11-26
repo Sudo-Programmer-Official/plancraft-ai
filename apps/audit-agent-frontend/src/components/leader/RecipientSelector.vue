@@ -13,11 +13,7 @@
       <div class="p-3 rounded-xl bg-slate-900/70 border border-slate-800 space-y-2">
         <div class="text-xs text-slate-400 uppercase tracking-wide">Contacts</div>
         <div class="space-y-1 max-h-48 overflow-y-auto">
-          <label
-            v-for="c in contacts"
-            :key="c.contactId"
-            class="flex items-center gap-2 text-sm text-slate-200 cursor-pointer"
-          >
+          <label v-for="c in contacts" :key="c.contactId || c.id" class="flex items-center gap-2 text-sm text-slate-200 cursor-pointer">
             <input type="checkbox" :value="c" v-model="selectedContactsInternal" />
             <span>{{ c.name }} <span class="text-slate-500 text-xs" v-if="c.tags?.length">({{ c.tags.join(', ') }})</span></span>
           </label>
@@ -26,11 +22,7 @@
       <div class="p-3 rounded-xl bg-slate-900/70 border border-slate-800 space-y-2">
         <div class="text-xs text-slate-400 uppercase tracking-wide">Groups</div>
         <div class="space-y-1 max-h-48 overflow-y-auto">
-          <label
-            v-for="g in groups"
-            :key="g.groupId"
-            class="flex items-center gap-2 text-sm text-slate-200 cursor-pointer"
-          >
+          <label v-for="g in groups" :key="g.groupId || g.id" class="flex items-center gap-2 text-sm text-slate-200 cursor-pointer">
             <input type="checkbox" :value="g" v-model="selectedGroupsInternal" />
             <span>{{ g.name }} <span class="text-slate-500 text-xs" v-if="g.tags?.length">({{ g.tags.join(', ') }})</span></span>
           </label>
@@ -45,7 +37,7 @@
 
 <script setup>
 import { ref, computed, watchEffect } from 'vue'
-import { fetchContacts, fetchGroups } from '@/services/leaderApi'
+import { listContacts, listGroups } from '@/services/leader/contacts'
 
 const emit = defineEmits(['update:contacts', 'update:groups', 'update:count'])
 
@@ -64,7 +56,7 @@ watchEffect(() => {
 
 async function loadData() {
   try {
-    const [c, g] = await Promise.all([fetchContacts(), fetchGroups()])
+    const [c, g] = await Promise.all([listContacts(), listGroups()])
     contacts.value = c || []
     groups.value = g || []
   } catch (e) {

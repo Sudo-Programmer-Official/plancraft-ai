@@ -21,24 +21,34 @@
         Use AI Voice (TODO)
       </button>
     </div>
-    <p v-if="audioUrl" class="text-xs text-emerald-300 break-all">Audio selected: {{ audioUrl }}</p>
+    <p v-if="uploading" class="text-xs text-slate-400">Uploading...</p>
+    <p v-else-if="audioUrl" class="text-xs text-emerald-300 break-all">Audio uploaded: {{ audioUrl }}</p>
     <p v-else class="text-xs text-slate-500">No audio selected.</p>
   </div>
 </template>
 
 <script setup>
 import { ref } from 'vue'
-// Placeholder: integrate Firebase upload logic where available.
+import { ElMessage } from 'element-plus'
+import { uploadVoiceMedia } from '@/services/leader/messages'
 
 const emit = defineEmits(['update:audioUrl'])
 const audioUrl = ref(null)
+const uploading = ref(false)
 
-function onFile(e) {
+async function onFile(e) {
   const file = e.target.files?.[0]
   if (!file) return
-  const blobUrl = URL.createObjectURL(file)
-  audioUrl.value = blobUrl
-  emit('update:audioUrl', blobUrl)
+  uploading.value = true
+  try {
+    const url = await uploadVoiceMedia(file)
+    audioUrl.value = url
+    emit('update:audioUrl', url)
+  } catch (err) {
+    ElMessage.error(err?.response?.data?.error || 'Upload failed')
+  } finally {
+    uploading.value = false
+  }
 }
 
 function clearAudio() {
