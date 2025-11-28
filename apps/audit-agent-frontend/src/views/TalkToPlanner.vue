@@ -886,9 +886,11 @@ async function sendQuery(forcedInput = null) {
     messages.value.push(assistantMessage)
 
     const taskChangingTypes = new Set(['create_task', 'update_task', 'complete_task'])
-    const touchedTasks = executedActions.some((action) =>
-      taskChangingTypes.has(String(action?.type || '').toLowerCase()),
-    )
+    const touchedTasks = executedActions.some((action) => {
+      const type = String(action?.type || '').toLowerCase()
+      if (taskChangingTypes.has(type)) return true
+      return type === 'schedule_reminder' && (!!action?.taskId || !!action?.payload?.taskId)
+    })
     if (touchedTasks) {
       try {
         window.dispatchEvent(new CustomEvent('tasks:refresh-request'))

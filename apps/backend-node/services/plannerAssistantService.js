@@ -1364,20 +1364,53 @@ async function scheduleReminderFromAction(uid, payload = {}, context = {}) {
     };
   }
   try {
+    let linkedTaskId = payload.taskId || null;
+    let createdTask = null;
+    if (!linkedTaskId && payload.createTask !== false) {
+      try {
+        const fromContext = findTaskInListByKey(context?.tasks || [], normalizeTaskTitleKey(text));
+        if (fromContext?.id) {
+          linkedTaskId = fromContext.id;
+        } else {
+          const scheduled = dayjs(scheduledTime).tz(timezoneId);
+          const taskDate = scheduled?.isValid?.() ? scheduled.format("YYYY-MM-DD") : null;
+          const reminderTimeToken = scheduled?.isValid?.() ? scheduled.format("HH:mm") : null;
+          createdTask = await createTask(uid, {
+            title: text,
+            date: taskDate,
+            reminderTime: reminderTimeToken,
+            scheduledTime,
+            timezone: timezoneId,
+            source: payload.source || "reminder_action",
+          }, {
+            origin: "reminder_action",
+            silent: true,
+            skipReminder: true, // avoid double-scheduling; we'll attach below
+            timezone: timezoneId,
+          });
+          linkedTaskId = createdTask?.id || null;
+        }
+      } catch (taskErr) {
+        console.warn("[PlannerAssistant] auto task creation for reminder failed", taskErr?.message || taskErr);
+      }
+    }
+
     const channels = Array.isArray(payload.channels) ? payload.channels : undefined;
     const reminder = await handleTextReminder(text, uid, channels, {
       scheduledTime,
       timezone: timezoneId,
-      taskId: payload.taskId || null,
+      taskId: linkedTaskId,
     });
     const friendlyTime = formatLocalTime(scheduledTime, timezoneId) || scheduledTime;
     const displayTimezone = timezoneId ? ` (${timezoneId})` : "";
     return {
       status: "completed",
       type: "schedule_reminder",
-      payload,
-      message: `Scheduled reminder “${text}” for ${friendlyTime}${displayTimezone}`,
+      payload: { ...payload, taskId: linkedTaskId },
+      message: `Scheduled reminder “${text}” for ${friendlyTime}${displayTimezone}${linkedTaskId ? " and added it to your tasks." : ""}`,
       reminderId: reminder?.id || null,
+      taskId: linkedTaskId,
+      createdTaskId: createdTask?.id || null,
     };
   } catch (err) {
     return {

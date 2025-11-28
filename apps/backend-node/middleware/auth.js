@@ -75,7 +75,11 @@ export function ensureUserMatches(req, res, next) {
       return next()
     }
     if (provided && provided !== uid) {
-      return res.status(403).json({ error: 'Forbidden: user mismatch' })
+      // To avoid guest/user drift issues, coerce to the authenticated uid
+      try { req.body = { ...b, userId: uid } } catch {}
+      try { req.query = { ...q, userId: uid } } catch {}
+      console.warn('[Auth] userId mismatch; coercing to token uid', { provided, uid })
+      return next()
     }
     return next()
   } catch (e) {

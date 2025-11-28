@@ -17,9 +17,44 @@ import { resolveCategory } from '@/constants/taskCategories'
 const tasks = ref([])
 let initialized = false
 let refreshListenerAttached = false
+const GUEST_LOCAL_KEY = 'pcai_guest_tasks_v1'
 
 export function useTasks() {
   const authStore = useAuthStore()
+  const isGuestMode = () =>
+    authStore?.isGuest === true ||
+    authStore?.guest === true ||
+    authStore?.user?.mode === 'guest' ||
+    !authStore?.user?.uid
+
+  function loadGuestTasksFromStorage() {
+    try {
+      const raw = localStorage.getItem(GUEST_LOCAL_KEY)
+      if (!raw) return []
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }
+
+  function persistGuestTasks(list) {
+    if (!isGuestMode()) return
+    try {
+      localStorage.setItem(GUEST_LOCAL_KEY, JSON.stringify(Array.isArray(list) ? list : []))
+    } catch {
+      /* noop */
+    }
+  }
+
+  function sortTasks(list) {
+    return (Array.isArray(list) ? list.slice() : []).sort((a, b) => {
+      if (a.completed !== b.completed) {
+        return a.completed - b.completed // incomplete first
+      }
+      return (b.createdAt || 0) - (a.createdAt || 0) // newest first
+    })
+  }
   /**
    * 🔄 Load tasks from Firestore for today (and current user)
    */
@@ -36,53 +71,68 @@ export function useTasks() {
   }
 
   async function loadTasks() {
-    const raw = await fetchTasksForToday()
-
-    // Ensure newest first + incomplete before complete
-    tasks.value = normalizeList(uniqueById(raw)).sort((a, b) => {
-      if (a.completed !== b.completed) {
-        return a.completed - b.completed // incomplete first
+    try {
+      const raw = await fetchTasksForToday()
+      tasks.value = sortTasks(normalizeList(uniqueById(raw)))
+      persistGuestTasks(tasks.value)
+      try { if (import.meta.env.DEV) console.log('[useTasks] loadTasks ids:', tasks.value.map(t => t.id)) } catch {}
+      initialized = true
+    } catch (err) {
+      if (isGuestMode()) {
+        tasks.value = sortTasks(normalizeList(uniqueById(loadGuestTasksFromStorage())))
+        initialized = true
+        console.warn('[useTasks] loadTasks (guest fallback)', err?.message || err)
+        return
       }
-      return (b.createdAt || 0) - (a.createdAt || 0) // newest first
-    })
-    try { if (import.meta.env.DEV) console.log('[useTasks] loadTasks ids:', tasks.value.map(t => t.id)) } catch {}
-
-    initialized = true
+      throw err
+    }
   }
 
   /**
    * Load tasks for a specific date (YYYY-MM-DD)
    */
   async function loadTasksForDate(dateStr) {
-    const raw = await fetchTasksByDate(dateStr)
-
-    tasks.value = normalizeList(uniqueById(raw)).sort((a, b) => {
-      if (a.completed !== b.completed) {
-        return a.completed - b.completed
+    try {
+      const raw = await fetchTasksByDate(dateStr)
+      tasks.value = sortTasks(normalizeList(uniqueById(raw)))
+      persistGuestTasks(tasks.value)
+      try { if (import.meta.env.DEV) console.log('[useTasks] loadTasksForDate ids:', tasks.value.map(t => t.id)) } catch {}
+      initialized = true
+    } catch (err) {
+      if (isGuestMode()) {
+        const filtered = loadGuestTasksFromStorage().filter((t) => t.date === dateStr)
+        tasks.value = sortTasks(normalizeList(uniqueById(filtered)))
+        initialized = true
+        console.warn('[useTasks] loadTasksForDate (guest fallback)', err?.message || err)
+        return
       }
-      return (b.createdAt || 0) - (a.createdAt || 0)
-    })
-    try { if (import.meta.env.DEV) console.log('[useTasks] loadTasksForDate ids:', tasks.value.map(t => t.id)) } catch {}
-
-    initialized = true
+      throw err
+    }
   }
 
   /**
    * Load tasks for a date range inclusive (YYYY-MM-DD)
    */
   async function loadTasksForRange(startYMD, endYMD) {
-    tasks.value = normalizeList(uniqueById(await fetchTasksBetween(startYMD, endYMD)))
-
-    // add sorting if needed
-    tasks.value.sort((a, b) => {
-      if (a.completed !== b.completed) {
-        return a.completed - b.completed // incomplete first
+    try {
+      tasks.value = sortTasks(
+        normalizeList(uniqueById(await fetchTasksBetween(startYMD, endYMD))),
+      )
+      persistGuestTasks(tasks.value)
+      try { if (import.meta.env.DEV) console.log('[useTasks] loadTasksForRange ids:', tasks.value.map(t => t.id)) } catch {}
+      initialized = true
+    } catch (err) {
+      if (isGuestMode()) {
+        const filtered = loadGuestTasksFromStorage().filter((t) => {
+          return (!startYMD || t.date >= startYMD) && (!endYMD || t.date <= endYMD)
+        })
+        tasks.value = sortTasks(normalizeList(uniqueById(filtered)))
+        initialized = true
+        console.warn('[useTasks] loadTasksForRange (guest fallback)', err?.message || err)
+        return
       }
-      return (b.createdAt || 0) - (a.createdAt || 0) // newest first
-    })
-    try { if (import.meta.env.DEV) console.log('[useTasks] loadTasksForRange ids:', tasks.value.map(t => t.id)) } catch {}
-
-    initialized = true
+      throw err
+    }
   }
 
   /**
@@ -102,18 +152,34 @@ export function useTasks() {
 
     const task = { ...baseTask, ...(newTask || {}) }
 
-    const saved = await addTaskToFirebase(task)
-    // Replace by id if exists; then put newest first
-    const normalized = { ...saved, category: resolveCategory(saved?.category) }
-    tasks.value = [normalized, ...tasks.value.filter(t => t.id !== normalized.id)]
-    try { if (import.meta.env.DEV) console.log('[useTasks] addTask ids:', tasks.value.map(t => t.id)) } catch {}
     try {
-      trackEvent('Task Created', {
-        source: newTask?.source || 'journal',
-        guest: !!authStore?.isGuest,
-      })
-    } catch (e) {
-      console.warn('analytics: Task Created track failed', e)
+      const saved = await addTaskToFirebase(task)
+      // Replace by id if exists; then put newest first
+      const normalized = { ...saved, category: resolveCategory(saved?.category) }
+      tasks.value = sortTasks([normalized, ...tasks.value.filter(t => t.id !== normalized.id)])
+      persistGuestTasks(tasks.value)
+      try { if (import.meta.env.DEV) console.log('[useTasks] addTask ids:', tasks.value.map(t => t.id)) } catch {}
+      try {
+        trackEvent('Task Created', {
+          source: newTask?.source || 'journal',
+          guest: !!authStore?.isGuest,
+        })
+      } catch (e) {
+        console.warn('analytics: Task Created track failed', e)
+      }
+    } catch (err) {
+      if (isGuestMode()) {
+        const localTask = {
+          ...task,
+          id: task.id || `guest-${Date.now()}`,
+          category: resolveCategory(task?.category),
+        }
+        tasks.value = sortTasks([localTask, ...tasks.value.filter(t => t.id !== localTask.id)])
+        persistGuestTasks(tasks.value)
+        console.warn('[useTasks] addTask stored locally (guest)', err?.message || err)
+        return
+      }
+      throw err
     }
   }
 
@@ -124,6 +190,7 @@ export function useTasks() {
     try {
       task.completed = !task.completed
       await updateTaskInFirebase(task)
+      persistGuestTasks(tasks.value)
       if (task.completed) {
         try {
           trackEvent('Task Completed', { taskId: task.id })
@@ -134,6 +201,9 @@ export function useTasks() {
     } catch (err) {
       console.error('Failed to toggle complete:', err)
       task.completed = !task.completed // rollback on error
+      if (isGuestMode()) {
+        persistGuestTasks(tasks.value)
+      }
     }
   }
 
@@ -146,6 +216,7 @@ export function useTasks() {
     task.logs.push(task.newLog.trim())
     task.newLog = ''
     await updateTaskInFirebase(task)
+    persistGuestTasks(tasks.value)
   }
 
   /**
@@ -156,6 +227,7 @@ export function useTasks() {
       task.order = index
       await updateTaskInFirebase(task)
     }
+    persistGuestTasks(tasks.value)
   }
 
   /**
@@ -164,6 +236,7 @@ export function useTasks() {
   async function deleteTask(task) {
     await deleteTaskFromFirebase(task.id)
     tasks.value = tasks.value.filter((t) => t.id !== task.id)
+    persistGuestTasks(tasks.value)
   }
 
   // 🔹 Only load once when app starts
