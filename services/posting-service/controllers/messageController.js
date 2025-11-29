@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { createScheduledMessages } from '../firestore/scheduledMessagesRepository.js'
+import { createScheduledMessages, fetchMessageStats } from '../firestore/scheduledMessagesRepository.js'
 import { handleJob } from '../services/deliveryService.js'
 
 const GROWTH_BASE = process.env.GROWTH_SERVICE_URL || 'http://growth-service'
@@ -82,6 +82,16 @@ export async function schedule(req, res, next) {
     const jobs = buildJobs(userId, payload, merged)
     const saved = await createScheduledMessages(userId, jobs)
     res.json({ success: true, scheduled: saved.length })
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function getMessageStats(req, res, next) {
+  try {
+    const userId = req.user?.uid || 'anon'
+    const stats = await fetchMessageStats(userId)
+    res.json({ success: true, ...stats })
   } catch (err) {
     next(err)
   }

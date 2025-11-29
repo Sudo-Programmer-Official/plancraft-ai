@@ -59,3 +59,33 @@ export async function markAsFailed(id, error) {
     { merge: true },
   )
 }
+
+export async function fetchMessageStats(userId) {
+  ensureApp()
+  const db = admin.firestore()
+  const query = userId
+    ? db.collection(COLLECTION).where('userId', '==', userId)
+    : db.collection(COLLECTION)
+
+  const snap = await query.get()
+  let total = 0
+  let pending = 0
+  let sent = 0
+  let failed = 0
+
+  snap.forEach((doc) => {
+    total += 1
+    const status = (doc.data()?.status || '').toLowerCase()
+    if (status === 'pending') pending += 1
+    else if (status === 'sent') sent += 1
+    else if (status === 'failed') failed += 1
+  })
+
+  return {
+    total,
+    pending,
+    sent,
+    failed,
+    scheduled: pending, // alias used by dashboard
+  }
+}
