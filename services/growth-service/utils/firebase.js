@@ -35,6 +35,7 @@ function loadServiceAccount() {
     try {
       const parsed = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
       if (parsed.private_key) parsed.private_key = normalizePrivateKey(parsed.private_key)
+      if (!parsed.project_id && process.env.FIREBASE_PROJECT_ID) parsed.project_id = process.env.FIREBASE_PROJECT_ID
       console.info('[growth-service] Using FIREBASE_SERVICE_ACCOUNT env for Firebase admin')
       return parsed
     } catch (err) {
@@ -46,6 +47,7 @@ function loadServiceAccount() {
   const fromFile = resolveCredentialFromFile(fallbackPath)
   if (fromFile) {
     if (fromFile.private_key) fromFile.private_key = normalizePrivateKey(fromFile.private_key)
+    if (!fromFile.project_id && process.env.FIREBASE_PROJECT_ID) fromFile.project_id = process.env.FIREBASE_PROJECT_ID
     console.info('[growth-service] Using credential file', fallbackPath)
     return fromFile
   }
@@ -69,6 +71,12 @@ function getCredential() {
   if (projectId && clientEmail && privateKey) {
     console.info('[growth-service] Using FIREBASE_PROJECT_ID / FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY env vars')
     return admin.credential.cert({ projectId, clientEmail, privateKey })
+  }
+
+  // Last resort: applicationDefault requires projectId
+  if (projectId) {
+    console.warn('[growth-service] Falling back to applicationDefault with projectId from env')
+    return admin.credential.applicationDefault()
   }
 
   throw new Error(
