@@ -23,6 +23,9 @@ import {
   deleteIssue,
   listIssueTimeline,
   addIssueTimelineEntry,
+  getEventsStats,
+  getUpcomingOccasions,
+  getRecentIssues,
 } from '../controllers/leaderController.js'
 
 const router = Router()
@@ -63,5 +66,10 @@ router.delete('/issues/:id', deleteIssue)
 // Issue timeline
 router.get('/issues/:id/timeline', listIssueTimeline)
 router.post('/issues/:id/timeline', addIssueTimelineEntry)
+
+// Legacy stats endpoints used by dashboard
+router.get('/events/stats', getEventsStats)
+router.get('/occasions/upcoming', getUpcomingOccasions)
+router.get('/issues/recent', getRecentIssues)
 
 export default router

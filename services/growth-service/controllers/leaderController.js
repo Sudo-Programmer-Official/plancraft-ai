@@ -59,6 +59,43 @@ export async function getOverview(req, res, next) {
   }
 }
 
+// Lightweight stats endpoints for legacy dashboard calls
+export async function getEventsStats(req, res, next) {
+  try {
+    const uid = requireUid(req)
+    const snap = await userCollection(uid, 'events').get()
+    const total = snap.size
+    const planned = snap.docs.filter((d) => (d.get('status') || 'planned') === 'planned').length
+    const done = snap.docs.filter((d) => (d.get('status') || '').toLowerCase() === 'done').length
+    res.json({ success: true, total, planned, done })
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function getUpcomingOccasions(req, res, next) {
+  try {
+    const uid = requireUid(req)
+    const today = new Date().toISOString().slice(0, 10)
+    const snap = await userCollection(uid, 'occasions').where('date', '>=', today).orderBy('date', 'asc').limit(10).get()
+    const occasions = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+    res.json({ success: true, occasions })
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function getRecentIssues(req, res, next) {
+  try {
+    const uid = requireUid(req)
+    const snap = await userCollection(uid, 'issues').orderBy('updatedAt', 'desc').limit(10).get()
+    const issues = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+    res.json({ success: true, issues })
+  } catch (err) {
+    next(err)
+  }
+}
+
 // ---------- CONTACTS ----------
 export async function listContacts(req, res, next) {
   try {
