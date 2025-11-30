@@ -26,6 +26,7 @@ import {
   getEventsStats,
   getUpcomingOccasions,
   getRecentIssues,
+  listLocations,
 } from '../controllers/leaderController.js'
 
 const router = Router()
@@ -71,5 +72,8 @@ router.post('/issues/:id/timeline', addIssueTimelineEntry)
 router.get('/events/stats', getEventsStats)
 router.get('/occasions/upcoming', getUpcomingOccasions)
 router.get('/issues/recent', getRecentIssues)
+
+// Locations (maps)
+router.get('/locations', listLocations)
 
 export default router

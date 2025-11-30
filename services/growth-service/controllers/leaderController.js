@@ -442,3 +442,15 @@ export async function addIssueTimelineEntry(req, res, next) {
     next(err)
   }
 }
+
+// ---------- LOCATIONS ----------
+export async function listLocations(req, res, next) {
+  try {
+    const uid = requireUid(req)
+    const snap = await userCollection(uid, 'locations').get()
+    const locations = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+    res.json({ success: true, locations })
+  } catch (err) {
+    next(err)
+  }
+}
