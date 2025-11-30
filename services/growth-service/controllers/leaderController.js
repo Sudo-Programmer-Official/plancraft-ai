@@ -7,6 +7,14 @@ function requireUid(req) {
   return uid
 }
 
+function dropUndefined(obj = {}) {
+  const cleaned = { ...obj }
+  Object.keys(cleaned).forEach((k) => {
+    if (cleaned[k] === undefined) delete cleaned[k]
+  })
+  return cleaned
+}
+
 // ---------- OVERVIEW ----------
 export async function getOverview(req, res, next) {
   try {
@@ -289,14 +297,14 @@ export async function listEvents(req, res, next) {
 export async function createEvent(req, res, next) {
   try {
     const uid = requireUid(req)
-    const data = req.body || {}
+    const data = dropUndefined(req.body || {})
     const col = userCollection(uid, 'events')
     const docRef = col.doc()
     const payload = {
       ownerId: uid,
       contactId: data.contactId || null,
       title: data.title || '',
-      start: data.start,
+      start: data.start || null,
       end: data.end || null,
       channel: data.channel || 'other',
       status: data.status || 'planned',
@@ -315,7 +323,7 @@ export async function updateEvent(req, res, next) {
   try {
     const uid = requireUid(req)
     const { id } = req.params
-    const updates = { ...(req.body || {}), updatedAt: serverTs() }
+    const updates = dropUndefined({ ...(req.body || {}), updatedAt: serverTs() })
     const docRef = userCollection(uid, 'events').doc(id)
     await docRef.set(updates, { merge: true })
     const snap = await docRef.get()
