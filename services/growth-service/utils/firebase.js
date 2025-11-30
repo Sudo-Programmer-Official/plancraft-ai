@@ -35,32 +35,45 @@ function loadServiceAccount() {
     try {
       const parsed = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
       if (parsed.private_key) parsed.private_key = normalizePrivateKey(parsed.private_key)
+      console.info('[growth-service] Using FIREBASE_SERVICE_ACCOUNT env for Firebase admin')
       return parsed
     } catch (err) {
       console.error('[growth-service] Invalid FIREBASE_SERVICE_ACCOUNT JSON', err?.message || err)
     }
   }
 
-  const fallbackPath = '../../../backend-node/firebase-service-account.json'
-  const fromFile = resolveCredentialFromFile(process.env.FIREBASE_CREDENTIAL_PATH || fallbackPath)
-  if (fromFile) return fromFile
+  const fallbackPath = process.env.FIREBASE_CREDENTIAL_PATH || '../../../backend-node/firebase-service-account.json'
+  const fromFile = resolveCredentialFromFile(fallbackPath)
+  if (fromFile) {
+    if (fromFile.private_key) fromFile.private_key = normalizePrivateKey(fromFile.private_key)
+    console.info('[growth-service] Using credential file', fallbackPath)
+    return fromFile
+  }
 
   return null
 }
 
 function getCredential() {
   const svc = loadServiceAccount()
-  if (svc) return admin.credential.cert(svc)
+  if (svc) {
+    return admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID || svc.project_id,
+      clientEmail: svc.client_email,
+      privateKey: svc.private_key,
+    })
+  }
 
   const projectId = process.env.FIREBASE_PROJECT_ID
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
   const privateKey = normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY)
   if (projectId && clientEmail && privateKey) {
+    console.info('[growth-service] Using FIREBASE_PROJECT_ID / FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY env vars')
     return admin.credential.cert({ projectId, clientEmail, privateKey })
   }
 
-  console.warn('[growth-service] Falling back to applicationDefault credentials')
-  return admin.credential.applicationDefault()
+  throw new Error(
+    '[growth-service] Firebase credentials missing: set FIREBASE_SERVICE_ACCOUNT or FIREBASE_PROJECT_ID/FIREBASE_CLIENT_EMAIL/FIREBASE_PRIVATE_KEY',
+  )
 }
 
 export function ensureApp() {
