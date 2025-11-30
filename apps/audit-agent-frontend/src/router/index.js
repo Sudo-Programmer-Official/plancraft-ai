@@ -49,6 +49,16 @@ const router = createRouter({
       component: () => import('@/views/GptOAuthBridge.vue'),
     },
     {
+      path: '/social/connect/success',
+      name: 'social-connect-success',
+      component: () => import('@/views/SocialConnectSuccess.vue'),
+    },
+    {
+      path: '/social/connect/error',
+      name: 'social-connect-error',
+      component: () => import('@/views/SocialConnectError.vue'),
+    },
+    {
       path: '/google-calendar-integration',
       name: 'google-calendar-integration',
       component: () => import('@/views/CalendarIntegrationView.vue'),

@@ -6,6 +6,9 @@ import authRoutes from './routes/authRoutes.js'
 import messageRoutes from './routes/messageRoutes.js'
 import schedulerRoutes from './routes/schedulerRoutes.js'
 import linkedinRoutes from './routes/linkedinRoutes.js'
+import instagramRoutes from './routes/instagramRoutes.js'
+import twitterRoutes from './routes/twitterRoutes.js'
+import socialRoutes from './routes/socialRoutes.js'
 import { errorHandler } from './utils/errorHandler.js'
 import { verifyAuth } from './utils/auth.js'
 
@@ -55,6 +58,9 @@ app.get('/healthz', (req, res) => res.status(200).json({ status: 'ok' }))
 
 // LinkedIn OAuth has mixed public/protected routes; auth applied per-route inside file
 app.use('/', linkedinRoutes)
+app.use('/', instagramRoutes)
+app.use('/', twitterRoutes)
+app.use('/', socialRoutes)
 app.use('/tokens', verifyAuth, authRoutes)
 app.use('/', verifyAuth, publishRoutes)
 app.use('/', verifyAuth, messageRoutes)

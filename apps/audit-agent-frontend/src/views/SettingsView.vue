@@ -295,6 +295,11 @@
         </div>
       </section>
 
+      <!-- Social Accounts -->
+      <div class="mt-8">
+        <SocialIntegrationPanel />
+      </div>
+
       <!-- Account -->
       <section class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10 max-w-md mx-auto sm:max-w-none">
         <h2 class="text-lg sm:text-xl font-semibold mb-4">👤 Account</h2>
@@ -397,6 +402,7 @@ import { normalizePhone, guessCountryFromLocale } from '@/utils/phoneUtils'
 import { getGoogleStatus, getGoogleCalendars, saveGoogleCalendarSelection, triggerGoogleSyncNow, requestGoogleConnectUrl, disconnectGoogleIntegration } from '@/stores/integrationsStore'
 import { getPreferences as apiGetPrefs, updatePreferences as apiUpdatePrefs, getIntegrations, updateIntegrations, updateOnboardingStatus } from "@/services/settingsService"
 import { createGptLinkCode } from '@/services/gptService'
+import SocialIntegrationPanel from '@/components/settings/SocialIntegrationPanel.vue'
 import { subscribeUserToPush } from "@/services/pwaService"
 import { useSubscriptionStore } from "@/stores/subscriptionStore"
 import { isFeatureAllowed, getRemainingAI } from "@/services/planService"
@@ -670,6 +676,7 @@ const gptLinkExpired = computed(() => {
   return dayjs(gptLink.expiresAt).valueOf() <= Date.now()
 })
 let gptCopyTimer = null
+
 
 async function generateGptCode() {
   if (!authStore.user?.uid) {
