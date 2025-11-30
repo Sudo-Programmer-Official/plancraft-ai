@@ -33,22 +33,11 @@ function resolveCredentialFromFile(candidatePath) {
 function loadServiceAccount() {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT
   if (raw) {
-    // Try base64 first
-    try {
-      const decoded = Buffer.from(raw, 'base64').toString('utf-8')
-      const parsed = JSON.parse(decoded)
-      if (parsed?.private_key) parsed.private_key = normalizePrivateKey(parsed.private_key)
-      if (!parsed?.project_id && process.env.FIREBASE_PROJECT_ID) parsed.project_id = process.env.FIREBASE_PROJECT_ID
-      console.info('[growth-service] Using FIREBASE_SERVICE_ACCOUNT env (base64 decoded)')
-      return parsed
-    } catch (_) {}
-
-    // Try raw JSON
     try {
       const parsed = JSON.parse(raw)
       if (parsed?.private_key) parsed.private_key = normalizePrivateKey(parsed.private_key)
       if (!parsed?.project_id && process.env.FIREBASE_PROJECT_ID) parsed.project_id = process.env.FIREBASE_PROJECT_ID
-      console.info('[growth-service] Using FIREBASE_SERVICE_ACCOUNT env (raw JSON)')
+      console.info('[growth-service] Using FIREBASE_SERVICE_ACCOUNT env')
       return parsed
     } catch (err) {
       console.error('[growth-service] Invalid FIREBASE_SERVICE_ACCOUNT env', err?.message || err)
