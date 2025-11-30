@@ -17,7 +17,16 @@ function fromServiceAccount() {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT
   if (!raw) return null
   try {
-    const json = typeof raw === 'string' ? JSON.parse(raw) : raw
+    let json = raw
+    // Try base64 decode if it looks encoded
+    if (typeof raw === 'string') {
+      try {
+        const decoded = Buffer.from(raw, 'base64').toString('utf-8')
+        json = JSON.parse(decoded)
+      } catch {
+        json = JSON.parse(raw)
+      }
+    }
     const projectId = json.project_id
     const clientEmail = json.client_email
     const privateKey = normalizePrivateKey(json.private_key)
