@@ -18,15 +18,19 @@ const baseOrigins = [
   'http://localhost:5173',
   'http://localhost:4173',
 ]
-// Default to permissive unless explicitly disabled
 const allowAll = process.env.CORS_ALLOW_ALL !== '0'
-const allowedOrigins = Array.from(new Set([...baseOrigins, ...envOrigins]))
+const appRunnerPattern = /\.awsapprunner\.com$/
+const plancraftPattern = /\.plancraftai\.com$/
 
 const corsOptions = {
   origin: (_origin, callback) => {
-    // App Runner + local dev: always allow
+    // Default: be permissive for App Runner + local dev unless explicitly disabled
     if (allowAll) return callback(null, true)
-    callback(null, true)
+    if (!_origin) return callback(null, true)
+    if ([...baseOrigins, ...envOrigins].includes(_origin)) return callback(null, true)
+    if (plancraftPattern.test(_origin)) return callback(null, true)
+    if (appRunnerPattern.test(_origin)) return callback(null, true)
+    return callback(new Error('Origin not allowed'))
   },
   credentials: true,
   allowedHeaders: [
@@ -38,8 +42,10 @@ const corsOptions = {
     'x-user-id',
     'x-user-role',
     'x-user-tz',
+    'x-request-id',
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  optionsSuccessStatus: 200,
 }
 app.use(cors(corsOptions))
 app.options('*', cors(corsOptions))

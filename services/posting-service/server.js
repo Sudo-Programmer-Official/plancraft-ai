@@ -5,6 +5,7 @@ import publishRoutes from './routes/publishRoutes.js'
 import authRoutes from './routes/authRoutes.js'
 import messageRoutes from './routes/messageRoutes.js'
 import schedulerRoutes from './routes/schedulerRoutes.js'
+import linkedinRoutes from './routes/linkedinRoutes.js'
 import { errorHandler } from './utils/errorHandler.js'
 import { verifyAuth } from './utils/auth.js'
 
@@ -19,12 +20,15 @@ const baseOrigins = [
   'http://localhost:4173',
 ]
 const allowAll = process.env.CORS_ALLOW_ALL !== '0'
+const appRunnerPattern = /\.awsapprunner\.com$/
+const plancraftPattern = /\.plancraftai\.com$/
 const corsOptions = {
   origin: (_origin, callback) => {
     if (allowAll) return callback(null, true)
     if (! _origin) return callback(null, true)
     if ([...baseOrigins, ...envOrigins].includes(_origin)) return callback(null, true)
-    if (/\.plancraftai\.com$/.test(_origin)) return callback(null, true)
+    if (plancraftPattern.test(_origin)) return callback(null, true)
+    if (appRunnerPattern.test(_origin)) return callback(null, true)
     return callback(new Error('Origin not allowed'))
   },
   credentials: true,
@@ -37,8 +41,10 @@ const corsOptions = {
     'x-user-id',
     'x-user-role',
     'x-user-tz',
+    'x-request-id',
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  optionsSuccessStatus: 200,
 }
 app.use(cors(corsOptions))
 app.options('*', cors(corsOptions))
@@ -47,6 +53,8 @@ app.use(morgan('dev'))
 
 app.get('/healthz', (req, res) => res.status(200).json({ status: 'ok' }))
 
+// LinkedIn OAuth has mixed public/protected routes; auth applied per-route inside file
+app.use('/', linkedinRoutes)
 app.use('/tokens', verifyAuth, authRoutes)
 app.use('/', verifyAuth, publishRoutes)
 app.use('/', verifyAuth, messageRoutes)
