@@ -28,9 +28,15 @@ function getCredential() {
   const fromJson = fromServiceAccount()
   if (fromJson) return fromJson
 
-  throw new Error(
-    'Firebase credentials missing: set FIREBASE_SERVICE_ACCOUNT (JSON string with private_key and client_email)',
-  )
+  const projectId = process.env.FIREBASE_PROJECT_ID
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
+  const privateKey = normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY)
+  if (projectId && clientEmail && privateKey) {
+    return admin.credential.cert({ projectId, clientEmail, privateKey })
+  }
+
+  console.warn('[growth-service] Falling back to applicationDefault credentials')
+  return admin.credential.applicationDefault()
 }
 
 export function ensureApp() {
