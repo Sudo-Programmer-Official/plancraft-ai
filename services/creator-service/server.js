@@ -3,6 +3,12 @@ import cors from 'cors'
 import morgan from 'morgan'
 import planRoutes from './routes/planRoutes.js'
 import aiRoutes from './routes/aiRoutes.js'
+import draftRoutes from './routes/draftRoutes.js'
+import calendarRoutes from './routes/calendarRoutes.js'
+import repurposeRoutes from './routes/repurposeRoutes.js'
+import editorRoutes from './routes/editorRoutes.js'
+import mediaRoutes from './routes/mediaRoutes.js'
+import publishRoutes from './routes/publishRoutes.js'
 import { errorHandler } from './utils/errorHandler.js'
 import { verifyAuth } from './utils/auth.js'
 
@@ -51,6 +57,12 @@ app.use(morgan('dev'))
 
 app.use('/creator/plan', verifyAuth, planRoutes)
 app.use('/creator/ai', verifyAuth, aiRoutes)
+app.use('/creator', verifyAuth, draftRoutes)
+app.use('/creator', verifyAuth, calendarRoutes)
+app.use('/creator', verifyAuth, repurposeRoutes)
+app.use('/creator', verifyAuth, editorRoutes)
+app.use('/creator', verifyAuth, mediaRoutes)
+app.use('/creator', verifyAuth, publishRoutes)
 
 app.use(errorHandler)
 
