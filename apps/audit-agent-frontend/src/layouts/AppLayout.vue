@@ -52,7 +52,7 @@
     <!-- Sidebar (desktop only) -->
     <aside
       class="hidden md:flex flex-col h-screen transition-all duration-300 bg-gray-950/70 backdrop-blur-xl"
-      :class="sidebarOpen ? 'w-64' : 'w-20'"
+      :class="sidebarOpen ? 'w-72' : 'w-20'"
     >
       <div class="flex-shrink-0 flex items-center justify-between p-4 border-b border-gray-700">
         <h1 v-if="sidebarOpen" class="text-lg font-bold">🌙 PlanCraftAI</h1>
@@ -61,71 +61,66 @@
           class="p-2 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 transition-colors"
           aria-label="Toggle sidebar"
         >
-          <svg
-            v-if="sidebarOpen"
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5 text-indigo-300"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <!-- Left Arrow -->
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M15 19l-7-7 7-7"
-            />
+          <svg v-if="sidebarOpen" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
           </svg>
-          <svg
-            v-else
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5 text-indigo-300"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <!-- Right Arrow -->
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M9 5l7 7-7 7"
-            />
+          <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
           </svg>
         </button>
       </div>
 
       <!-- Nav links -->
-      <nav class="flex-1 mt-4 space-y-2 overflow-y-auto scrollbar-plan">
-        <RouterLink
-          v-for="tab in tabs"
-          :key="tab.name"
-          :to="tab.path"
-          class="flex items-center gap-3 w-full p-3 rounded transition hover:bg-gray-800"
-          active-class="bg-indigo-600"
+      <nav class="flex-1 mt-4 space-y-3 overflow-y-auto scrollbar-plan px-2">
+        <div
+          v-for="group in navGroups"
+          :key="group.key"
+          class="rounded-lg"
         >
-          <span>{{ tab.icon }}</span>
-          <span v-if="sidebarOpen">{{ tab.name }}</span>
-        </RouterLink>
-        <div class="pt-4">
-          <p
-            v-if="sidebarOpen"
-            class="px-3 text-xs font-semibold uppercase tracking-widest text-slate-400/80"
+          <button
+            v-if="group.collapsible"
+            class="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold text-slate-200 rounded hover:bg-gray-800"
+            @click="toggleGroup(group.key)"
           >
-            AI Quick Actions
-          </p>
+            <span class="flex items-center gap-2">
+              <span>{{ group.icon }}</span>
+              <span v-if="sidebarOpen">{{ group.title }}</span>
+            </span>
+            <span v-if="sidebarOpen" class="text-xs text-slate-400">
+              {{ openGroups[group.key] ? '▾' : '▸' }}
+            </span>
+          </button>
+          <div v-else class="px-3 py-2 text-sm font-semibold text-slate-200 flex items-center gap-2">
+            <span>{{ group.icon }}</span>
+            <span v-if="sidebarOpen">{{ group.title }}</span>
+          </div>
+
+          <div v-show="!group.collapsible || openGroups[group.key]" class="mt-1 space-y-1">
+            <RouterLink
+              v-for="item in group.children"
+              :key="item.to"
+              :to="item.to"
+              class="flex items-center gap-3 w-full px-4 py-2 rounded transition hover:bg-gray-800 text-sm text-slate-200"
+              :class="{ 'bg-indigo-600': isActive(item.to) }"
+            >
+              <span>{{ item.icon }}</span>
+              <span v-if="sidebarOpen">{{ item.label }}</span>
+            </RouterLink>
+          </div>
         </div>
-        <RouterLink
-          v-for="tab in aiQuickActions"
-          :key="tab.name"
-          :to="tab.path"
-          class="flex items-center gap-3 w-full p-3 rounded transition hover:bg-gray-800"
-          active-class="bg-indigo-600"
-        >
-          <span>{{ tab.icon }}</span>
-          <span v-if="sidebarOpen">{{ tab.name }}</span>
-        </RouterLink>
+
+        <div class="pt-2 border-t border-gray-800/60 mt-4">
+          <RouterLink
+            v-for="item in systemLinks"
+            :key="item.to"
+            :to="item.to"
+            class="flex items-center gap-3 w-full px-3 py-2 rounded transition hover:bg-gray-800 text-sm text-slate-200"
+            :class="{ 'bg-indigo-600': isActive(item.to) }"
+          >
+            <span>{{ item.icon }}</span>
+            <span v-if="sidebarOpen">{{ item.label }}</span>
+          </RouterLink>
+        </div>
       </nav>
 
       <!-- Sidebar Footer: segmented actions -->
@@ -194,28 +189,43 @@
           </div>
 
           <!-- Navigation -->
-          <nav class="space-y-2 flex-1 overflow-y-auto scrollbar-plan">
-            <RouterLink
-              v-for="tab in tabs"
-              :key="tab.name"
-              :to="tab.path"
-              class="block px-3 py-2 rounded hover:bg-indigo-600"
-              @click="mobileMenu = false"
-            >
-              {{ tab.icon }} {{ tab.name }}
-            </RouterLink>
-            <p class="px-3 pt-4 pb-1 text-xs font-semibold uppercase tracking-widest text-slate-400/80">
-              AI Quick Actions
-            </p>
-            <RouterLink
-              v-for="tab in aiQuickActions"
-              :key="tab.name"
-              :to="tab.path"
-              class="block px-3 py-2 rounded hover:bg-indigo-600"
-              @click="mobileMenu = false"
-            >
-              {{ tab.icon }} {{ tab.name }}
-            </RouterLink>
+          <nav class="space-y-3 flex-1 overflow-y-auto scrollbar-plan">
+            <div v-for="group in navGroups" :key="group.key" class="rounded-lg">
+              <div
+                class="flex items-center justify-between px-3 py-2 text-sm font-semibold text-slate-200"
+                @click="toggleGroup(group.key)"
+              >
+                <span class="flex items-center gap-2">
+                  <span>{{ group.icon }}</span>
+                  <span>{{ group.title }}</span>
+                </span>
+                <span class="text-xs text-slate-400">
+                  {{ openGroups[group.key] ? '▾' : '▸' }}
+                </span>
+              </div>
+              <div v-show="openGroups[group.key]" class="mt-1 space-y-1">
+                <RouterLink
+                  v-for="item in group.children"
+                  :key="item.to"
+                  :to="item.to"
+                  class="block px-4 py-2 rounded hover:bg-indigo-600"
+                  @click="mobileMenu = false"
+                >
+                  {{ item.icon }} {{ item.label }}
+                </RouterLink>
+              </div>
+            </div>
+            <div class="pt-2 border-t border-gray-800/60 mt-4">
+              <RouterLink
+                v-for="item in systemLinks"
+                :key="item.to"
+                :to="item.to"
+                class="block px-3 py-2 rounded hover:bg-indigo-600"
+                @click="mobileMenu = false"
+              >
+                {{ item.icon }} {{ item.label }}
+              </RouterLink>
+            </div>
           </nav>
 
           <!-- Logout -->
@@ -404,7 +414,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, onUnmounted, computed } from 'vue'
+import { ref, onMounted, watch, onUnmounted, computed, reactive } from 'vue'
 import { hasSubscription, registerPushSubscription } from '@/services/pushService'
 import NotificationBanner from '@/components/NotificationBanner.vue'
 import FeedbackPrompt from '@/components/feedback/FeedbackPrompt.vue'
@@ -438,6 +448,9 @@ onMounted(() => {
   currentUserId.value = deriveUidFromStorage()
   window.addEventListener('storage', () => {
     currentUserId.value = deriveUidFromStorage()
+  })
+  navGroups.forEach((g) => {
+    openGroups[g.key] = g.defaultOpen ?? true
   })
   // Optional auto-registration if permission already granted
   setTimeout(async () => {
@@ -509,23 +522,83 @@ function onProfileSaved() {
   } catch {}
 }
 
-const tabs = [
-  { name: 'Dashboard', icon: '🏠', path: '/dashboard' },
-  { name: 'Daily', icon: '📅', path: '/daily' },
-  { name: 'Weekly', icon: '📆', path: '/weekly' },
-  { name: 'Monthly', icon: '🌙', path: '/monthly' },
-  { name: 'Journal', icon: '📝', path: '/journal' },
-  { name: 'Reminders', icon: '🔔', path: '/reminders' },
-  { name: 'Goals', icon: '🎯', path: '/goals' },
-  { name: 'Reports', icon: '📈', path: '/reports' },
-  { name: 'Creator Mode', icon: '🎬', path: '/creator' },
-  { name: 'Leader Mode', icon: '👑', path: '/leader' },
-  { name: 'Habits', icon: '🏆', path: '/habits' },
+function toggleGroup(key) {
+  openGroups[key] = !openGroups[key]
+}
+
+function isActive(path) {
+  return route.path.startsWith(path)
+}
+
+const navGroups = [
+  {
+    key: 'planning',
+    title: 'Planner',
+    icon: '📘',
+    collapsible: true,
+    defaultOpen: false,
+    children: [
+      { label: 'Dashboard', icon: '📊', to: '/dashboard' },
+      { label: 'Daily', icon: '🗓', to: '/daily' },
+      { label: 'Weekly', icon: '📅', to: '/weekly' },
+      { label: 'Monthly', icon: '📆', to: '/monthly' },
+      { label: 'Journal', icon: '📔', to: '/journal' },
+      { label: 'Reminders', icon: '🔔', to: '/reminders' },
+      { label: 'Goals', icon: '🎯', to: '/goals' },
+      { label: 'Reports', icon: '📈', to: '/reports' },
+      { label: 'Habits', icon: '🏆', to: '/habits' },
+    ],
+  },
+  {
+    key: 'creator',
+    title: 'Creator Mode',
+    icon: '🎨',
+    collapsible: true,
+    defaultOpen: false,
+    children: [
+      { label: 'Content Board', icon: '🏠', to: '/creator' },
+      { label: 'Calendar', icon: '📅', to: '/creator/calendar' },
+      { label: 'Repurpose', icon: '🔁', to: '/creator/repurpose' },
+      { label: 'Editor', icon: '✏️', to: '/creator/editor' },
+      { label: 'Publish', icon: '📤', to: '/creator/publish' },
+    ],
+  },
+  {
+    key: 'leader',
+    title: 'Leader Mode',
+    icon: '🧑‍💼',
+    collapsible: true,
+    defaultOpen: false,
+    children: [
+      { label: 'Events', icon: '🎉', to: '/leader/events' },
+      { label: 'Occasions', icon: '🎂', to: '/leader/occasions' },
+      { label: 'Messages', icon: '✉️', to: '/leader/messages' },
+      { label: 'Issues', icon: '🚨', to: '/leader/issues' },
+      { label: 'Contacts', icon: '👥', to: '/leader/contacts' },
+      { label: 'Maps', icon: '🗺', to: '/leader/maps' },
+    ],
+  },
+  {
+    key: 'ai',
+    title: 'AI Quick Actions',
+    icon: '🤖',
+    collapsible: true,
+    defaultOpen: false,
+    children: [
+      { label: 'Talk to Planner', icon: '🎤', to: '/talk-to-planner' },
+      { label: 'Quick Add', icon: '⚡', to: '/planner' },
+    ],
+  },
 ]
 
-const aiQuickActions = [
-  { name: 'Talk to Planner', icon: '🧠', path: '/talk-to-planner' },
+const systemLinks = [
+  { label: 'Settings', icon: '⚙️', to: '/settings' },
+  { label: 'Profile', icon: '👤', to: '/profile' },
+  { label: 'Billing', icon: '💳', to: '/subscription' },
+  { label: 'Workspaces', icon: '📦', to: '/workspaces' },
 ]
+
+const openGroups = reactive({})
 
 async function handleLogout() {
   await authStore.logout()

@@ -2,6 +2,54 @@ import admin from 'firebase-admin'
 
 let app
 
+function normalizePrivateKey(raw) {
+  if (!raw) return raw
+  let privateKey = raw
+  if (privateKey.includes('\\n')) privateKey = privateKey.replace(/\\n/g, '\n')
+  if (!/-----BEGIN PRIVATE KEY-----/.test(privateKey)) {
+    privateKey = `-----BEGIN PRIVATE KEY-----\n${privateKey}\n-----END PRIVATE KEY-----\n`
+  }
+  return privateKey
+}
+
+function fromServiceAccount() {
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT
+  if (!raw) return null
+  try {
+    const json = typeof raw === 'string' ? JSON.parse(raw) : raw
+    const projectId = json.project_id
+    const clientEmail = json.client_email
+    const privateKey = normalizePrivateKey(json.private_key)
+    if (projectId && clientEmail && privateKey) {
+      return admin.credential.cert({ projectId, clientEmail, privateKey })
+    }
+  } catch (err) {
+    console.warn('Failed to parse FIREBASE_SERVICE_ACCOUNT', err?.message || err)
+  }
+  return null
+}
+
+function getCredential() {
+  const fromJson = fromServiceAccount()
+  if (fromJson) return fromJson
+
+  const projectId = process.env.FIREBASE_PROJECT_ID
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
+  const privateKey = normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY)
+
+  if (projectId && clientEmail && privateKey) {
+    return admin.credential.cert({ projectId, clientEmail, privateKey })
+  }
+
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    return admin.credential.applicationDefault()
+  }
+
+  throw new Error(
+    'Firebase credentials missing: set FIREBASE_SERVICE_ACCOUNT or FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY or GOOGLE_APPLICATION_CREDENTIALS',
+  )
+}
+
 export function ensureApp() {
   if (app) return app
   if (admin.apps.length) {
@@ -9,7 +57,7 @@ export function ensureApp() {
     return app
   }
   admin.initializeApp({
-    credential: admin.credential.applicationDefault(),
+    credential: getCredential(),
   })
   app = admin.app()
   return app

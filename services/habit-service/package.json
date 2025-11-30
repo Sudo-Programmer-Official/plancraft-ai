@@ -1,0 +1,20 @@
+{
+  "name": "habit-service",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "worker": "node jobs/analyticsWorker.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "cors": "^2.8.5",
+    "dayjs": "^1.11.13",
+    "dotenv": "^16.5.0",
+    "express": "^4.19.2",
+    "firebase-admin": "^13.5.0",
+    "morgan": "^1.10.0"
+  }
+}
