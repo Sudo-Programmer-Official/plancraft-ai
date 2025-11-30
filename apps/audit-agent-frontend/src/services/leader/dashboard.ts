@@ -1,12 +1,12 @@
 import { growthClient, postingClient } from './http'
 
 export async function fetchEventsStats() {
-  const { data } = await growthClient.get('/events/stats')
+  const { data } = await growthClient.get('/leader/events/stats')
   return data
 }
 
 export async function fetchUpcomingOccasions() {
-  const { data } = await growthClient.get('/occasions/upcoming')
+  const { data } = await growthClient.get('/leader/occasions/upcoming')
   return data
 }
 
@@ -16,7 +16,7 @@ export async function fetchMessagesStats() {
 }
 
 export async function fetchRecentIssues() {
-  const { data } = await growthClient.get('/issues/recent')
+  const { data } = await growthClient.get('/leader/issues/recent')
   return data
 }
 

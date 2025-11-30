@@ -47,7 +47,7 @@ export async function deleteLeaderEvent(id: string) {
 }
 
 export async function fetchEventStats() {
-  const { data } = await growthClient.get('/events/stats')
+  const { data } = await growthClient.get('/leader/events/stats')
   return data
 }
 
