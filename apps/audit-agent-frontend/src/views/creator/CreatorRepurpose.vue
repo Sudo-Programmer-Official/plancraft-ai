@@ -6,8 +6,12 @@
         <h1 class="text-3xl font-bold mt-2">Repurpose Engine</h1>
         <p class="text-slate-400 text-sm">Input once, get platform-native variants.</p>
       </div>
-      <button class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold" @click="runRepurpose">
-        Run AI repurpose
+      <button
+        class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold disabled:opacity-60"
+        :disabled="loading"
+        @click="runRepurpose"
+      >
+        {{ loading ? 'Running…' : 'Run AI repurpose' }}
       </button>
     </header>
 
@@ -39,13 +43,16 @@
 
 <script setup>
 import { reactive, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import RepurposeActions from '@/components/creator/RepurposeActions.vue'
 import PlatformPreviewInstagram from '@/components/creator/PlatformPreviewInstagram.vue'
 import PlatformPreviewTwitter from '@/components/creator/PlatformPreviewTwitter.vue'
 import PlatformPreviewLinkedIn from '@/components/creator/PlatformPreviewLinkedIn.vue'
+import { runRepurpose as runRepurposeApi } from '@/services/creatorApi'
 
 const source = ref('')
 const selectedTarget = ref(null)
+const loading = ref(false)
 const output = reactive({
   ig_feed: { caption: 'Hook + CTA go here.', hashtags: ['plancraftai', 'calmplanning'] },
   twitter_thread: { tweets: ['Tweet 1', 'Tweet 2'] },
@@ -56,8 +63,28 @@ function setTarget(target) {
   selectedTarget.value = target
 }
 
-function runRepurpose() {
-  // Placeholder: call creator-service /creator/ai/repurpose
-  output.ig_feed.caption = `${source.value.slice(0, 120)}...`
+async function runRepurpose() {
+  loading.value = true
+  try {
+    const { variants } = await runRepurposeApi({
+      sourceContent: source.value,
+      targetFormats: selectedTarget.value ? [selectedTarget.value] : ['reel_script', 'linkedin_post', 'twitter_thread'],
+    })
+    ;(variants || []).forEach((variant) => {
+      const body = variant.body || variant.caption || ''
+      if (variant.type?.includes('twitter')) {
+        output.twitter_thread.tweets = body.split('\n').filter(Boolean)
+      } else if (variant.type?.includes('linkedin')) {
+        output.linkedin_post.content = body
+      } else {
+        output.ig_feed.caption = body
+      }
+    })
+    ElMessage.success('Repurposed with AI')
+  } catch (err) {
+    ElMessage.error(err?.response?.data?.error || 'Failed to repurpose')
+  } finally {
+    loading.value = false
+  }
 }
 </script>

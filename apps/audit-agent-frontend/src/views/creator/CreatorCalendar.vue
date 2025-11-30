@@ -25,15 +25,38 @@
 </template>
 
 <script setup>
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { fetchCreatorSlots } from '@/services/creatorApi'
+
 const router = useRouter()
-const items = [
-  { id: 'c1', date: 'Mon 10 AM', title: 'IG Reel: Calm focus', platform: 'Instagram Reel', variant: 'reel_script' },
-  { id: 'c2', date: 'Tue 9 AM', title: 'LinkedIn: Founder note', platform: 'LinkedIn', variant: 'linkedin_post' },
-  { id: 'c3', date: 'Wed 2 PM', title: 'Thread: Planner tips', platform: 'Twitter Thread', variant: 'twitter_thread' },
-]
+const items = ref([])
 
 function newSlot() {
   router.push('/creator/publish/new')
 }
+
+function formatWhen(date) {
+  if (!date) return 'Unscheduled'
+  const d = date instanceof Date ? date : new Date(date)
+  return d.toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' })
+}
+
+async function loadSlots() {
+  try {
+    const slots = await fetchCreatorSlots()
+    items.value = slots.map((slot) => ({
+      id: slot.id,
+      date: formatWhen(slot.scheduledAt),
+      title: slot.caption || slot.title || 'Scheduled post',
+      platform: slot.platform || 'platform',
+      variant: slot.variantType || slot.variantId || 'variant',
+    }))
+  } catch (err) {
+    ElMessage.error(err?.response?.data?.error || 'Failed to load slots')
+  }
+}
+
+onMounted(loadSlots)
 </script>

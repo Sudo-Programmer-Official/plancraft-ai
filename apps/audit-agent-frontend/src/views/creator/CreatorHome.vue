@@ -79,24 +79,30 @@
 </template>
 
 <script setup>
+import { onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { fetchCreatorBoard } from '@/services/creatorApi'
 
 const router = useRouter()
+const loading = ref(false)
+const drafts = ref([])
+const inspiration = ref([])
+const scheduled = ref([])
 
-const drafts = [
-  { id: 'd1', title: 'AI Planning Hook', summary: 'Hook + CTA for productivity reel.', platforms: ['IG', 'Reel'], updatedAt: '1h ago' },
-  { id: 'd2', title: 'LinkedIn post about calm productivity', summary: 'Positioning PlanCraft AI as mindful planner.', platforms: ['LinkedIn'], updatedAt: '3h ago' },
-]
-
-const inspiration = [
-  { title: 'Hook idea', tip: '“Your calendar is lying to you. Here’s how to reclaim mornings.”' },
-  { title: 'Thread starter', tip: '5 mistakes people make with AI planning tools.' },
-]
-
-const scheduled = [
-  { id: 's1', title: 'Launch teaser', platform: 'Instagram Feed', when: 'Tomorrow 9:00 AM', variant: 'ig_feed' },
-  { id: 's2', title: 'Founder note', platform: 'LinkedIn', when: 'Mon 8:30 AM', variant: 'linkedin_post' },
-]
+async function loadBoard() {
+  loading.value = true
+  try {
+    const data = await fetchCreatorBoard()
+    drafts.value = data.drafts || []
+    inspiration.value = data.inspiration || []
+    scheduled.value = data.scheduled || []
+  } catch (err) {
+    ElMessage.error(err?.response?.data?.error || 'Failed to load board')
+  } finally {
+    loading.value = false
+  }
+}
 
 function newCampaign() {
   router.push('/creator/editor/new')
@@ -107,6 +113,8 @@ function goRepurpose() {
 }
 
 function refreshInspiration() {
-  inspiration.push({ title: 'CTA', tip: 'Invite followers to book a calm planning session.' })
+  loadBoard()
 }
+
+onMounted(loadBoard)
 </script>

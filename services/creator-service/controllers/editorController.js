@@ -1,5 +1,6 @@
 import { proxyAi } from '../services/aiClient.js'
 import { saveContent } from '../firestore/contentRepository.js'
+import { createVariant, updateVariant } from '../firestore/variantsRepository.js'
 
 function uid(req) {
   const id = req.user?.uid
@@ -24,7 +25,10 @@ export async function saveEditorContent(req, res, next) {
   try {
     const userId = uid(req)
     const { id, ...payload } = req.body || {}
-    const content = await saveContent(userId, id || null, payload)
+    // Prefer variant documents; fallback to legacy content collection.
+    const content = id
+      ? await updateVariant(userId, id, payload)
+      : await createVariant(userId, { ...payload, status: payload.status || 'draft' })
     res.json({ success: true, content })
   } catch (err) {
     next(err)

@@ -7,13 +7,14 @@ export interface RecipientRef {
 }
 
 export interface MessageSchedulePayload {
-  channel: 'whatsapp' | 'sms' | 'voice_call' | string
-  mode: 'text' | 'voice' | 'text_and_voice' | string
+  channel: 'whatsapp' | 'sms' | 'voice_call' | 'email' | string
+  mode?: 'text' | 'voice' | 'text_and_voice' | string
   recipients?: RecipientRef[]
   groups?: RecipientRef[]
+  contactIds?: string[]
   message?: string | null
   audioUrl?: string | null
-  scheduleAt?: string
+  scheduledAt?: string
   context?: Record<string, any>
 }
 
@@ -49,7 +50,13 @@ export async function createMessageTemplate(payload: { title: string; body: stri
 }
 
 export async function scheduleLeaderMessage(payload: MessageSchedulePayload) {
-  const { data } = await postingClient.post('/messages/schedule', payload)
+  const { data } = await growthClient.post('/leader/messages', {
+    channel: payload.channel,
+    body: payload.message,
+    contactIds: payload.contactIds || payload.recipients?.map((r) => r.contactId || r.id) || [],
+    scheduledAt: payload.scheduledAt || payload.scheduleAt || new Date().toISOString(),
+    meta: payload.context || {},
+  })
   return data
 }
 

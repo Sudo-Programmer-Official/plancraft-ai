@@ -9,6 +9,7 @@ import repurposeRoutes from './routes/repurposeRoutes.js'
 import editorRoutes from './routes/editorRoutes.js'
 import mediaRoutes from './routes/mediaRoutes.js'
 import publishRoutes from './routes/publishRoutes.js'
+import boardRoutes from './routes/boardRoutes.js'
 import { errorHandler } from './utils/errorHandler.js'
 import { verifyAuth } from './utils/auth.js'
 
@@ -63,6 +64,7 @@ app.use('/creator', verifyAuth, repurposeRoutes)
 app.use('/creator', verifyAuth, editorRoutes)
 app.use('/creator', verifyAuth, mediaRoutes)
 app.use('/creator', verifyAuth, publishRoutes)
+app.use('/creator', verifyAuth, boardRoutes)
 
 app.use(errorHandler)
 

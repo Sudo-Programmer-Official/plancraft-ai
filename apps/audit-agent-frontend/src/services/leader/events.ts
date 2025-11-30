@@ -13,18 +13,32 @@ export interface LeaderEvent {
   updatedAt?: string
 }
 
-const mapEvent = (raw: any): LeaderEvent => ({
-  id: raw?.id || raw?._id || raw?.eventId,
-  title: raw?.title || raw?.name || 'Untitled event',
-  description: raw?.description || raw?.details || '',
-  date: raw?.date || raw?.when || raw?.startDate,
-  time: raw?.time || raw?.startTime,
-  location: raw?.location || raw?.place || '',
-  tags: raw?.tags || raw?.labels || [],
-  category: raw?.category,
-  createdAt: raw?.createdAt,
-  updatedAt: raw?.updatedAt,
-})
+const normalizePayload = (payload: LeaderEvent) => {
+  const datePart = payload?.date
+  const timePart = payload?.time || '00:00'
+  const start = payload?.start || (datePart ? new Date(`${datePart}T${timePart}`).toISOString() : undefined)
+  return {
+    ...payload,
+    start,
+    locationText: payload.location,
+  }
+}
+
+const mapEvent = (raw: any): LeaderEvent => {
+  const start = raw?.start ? new Date(raw.start) : null
+  return {
+    id: raw?.id || raw?._id || raw?.eventId,
+    title: raw?.title || raw?.name || 'Untitled event',
+    description: raw?.description || raw?.details || raw?.notes || '',
+    date: raw?.date || raw?.when || raw?.startDate || (start ? start.toISOString().slice(0, 10) : undefined),
+    time: raw?.time || raw?.startTime || (start ? start.toISOString().slice(11, 16) : undefined),
+    location: raw?.locationText || raw?.location || raw?.place || '',
+    tags: raw?.tags || raw?.labels || [],
+    category: raw?.category,
+    createdAt: raw?.createdAt,
+    updatedAt: raw?.updatedAt,
+  }
+}
 
 export async function listLeaderEvents(): Promise<LeaderEvent[]> {
   const { data } = await growthClient.get('/leader/events')
@@ -32,12 +46,12 @@ export async function listLeaderEvents(): Promise<LeaderEvent[]> {
 }
 
 export async function createLeaderEvent(payload: LeaderEvent): Promise<LeaderEvent> {
-  const { data } = await growthClient.post('/leader/events', payload)
+  const { data } = await growthClient.post('/leader/events', normalizePayload(payload))
   return mapEvent(data?.event || payload)
 }
 
 export async function updateLeaderEvent(id: string, payload: Partial<LeaderEvent>): Promise<LeaderEvent> {
-  const { data } = await growthClient.put(`/leader/events/${id}`, payload)
+  const { data } = await growthClient.put(`/leader/events/${id}`, normalizePayload(payload as LeaderEvent))
   return mapEvent(data?.event || { ...payload, id })
 }
 

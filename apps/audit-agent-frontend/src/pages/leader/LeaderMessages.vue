@@ -128,15 +128,19 @@ const templateSaving = ref(false)
 const status = ref('')
 
 async function submit() {
+  const contactIds = state.recipients.map((r) => r.contactId || r.id).filter(Boolean)
   const payload = {
     channel: state.channel,
-    mode: state.mode,
-    recipients: state.recipients.map((r) => ({ contactId: r.contactId || r.id })),
-    groups: state.groups.map((g) => ({ groupId: g.groupId || g.id })),
     message: state.message || null,
-    audioUrl: state.audioUrl || null,
-    scheduleAt: state.scheduleAt || new Date().toISOString(),
-    context: { reason: 'custom', note: null },
+    contactIds,
+    scheduledAt: state.scheduleAt || new Date().toISOString(),
+    context: {
+      reason: 'custom',
+      note: null,
+      mode: state.mode,
+      audioUrl: state.audioUrl || null,
+      groups: state.groups.map((g) => g.groupId || g.id),
+    },
   }
   saving.value = true
   status.value = ''

@@ -8,7 +8,13 @@
       </div>
       <div class="flex gap-2">
         <button class="px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm" @click="generateHook">AI Hook</button>
-        <button class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold" @click="saveDraft">Save</button>
+        <button
+          class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold disabled:opacity-60"
+          :disabled="saving"
+          @click="saveDraft"
+        >
+          {{ saving ? 'Saving…' : 'Save' }}
+        </button>
       </div>
     </header>
 
@@ -46,18 +52,23 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import EditorToolbar from '@/components/creator/EditorToolbar.vue'
 import RepurposeActions from '@/components/creator/RepurposeActions.vue'
 import PlatformPreviewInstagram from '@/components/creator/PlatformPreviewInstagram.vue'
 import PlatformPreviewLinkedIn from '@/components/creator/PlatformPreviewLinkedIn.vue'
-import { useRouter } from 'vue-router'
+import { fetchVariant, saveVariantDraft } from '@/services/creatorApi'
 
 const router = useRouter()
+const route = useRoute()
+const saving = ref(false)
 const form = reactive({
   title: '',
   narrative: '',
 })
+const variantId = route.params.id?.toString?.() || 'new'
 
 const toolbarActions = [
   { label: 'Hook', type: 'hook' },
@@ -74,11 +85,40 @@ function generateHook() {
   form.narrative += '\nAI Hook: Your calendar can be compassionate.'
 }
 
-function saveDraft() {
-  router.push('/creator')
+async function saveDraft() {
+  saving.value = true
+  try {
+    await saveVariantDraft(variantId === 'new' ? undefined : variantId, {
+      title: form.title,
+      body: form.narrative,
+      hook: form.narrative,
+      platform: 'instagram',
+      type: 'post',
+      status: 'draft',
+    })
+    ElMessage.success('Saved')
+    router.push('/creator')
+  } catch (err) {
+    ElMessage.error(err?.response?.data?.error || 'Failed to save')
+  } finally {
+    saving.value = false
+  }
 }
 
 function onRepurpose(target) {
   router.push({ path: '/creator/repurpose', query: { target } })
 }
+
+async function loadVariant() {
+  if (!variantId || variantId === 'new') return
+  try {
+    const variant = await fetchVariant(variantId)
+    form.title = variant?.title || ''
+    form.narrative = variant?.body || variant?.hook || ''
+  } catch (err) {
+    ElMessage.error(err?.response?.data?.error || 'Failed to load variant')
+  }
+}
+
+onMounted(loadVariant)
 </script>

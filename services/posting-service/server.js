@@ -9,6 +9,7 @@ import linkedinRoutes from './routes/linkedinRoutes.js'
 import instagramRoutes from './routes/instagramRoutes.js'
 import twitterRoutes from './routes/twitterRoutes.js'
 import socialRoutes from './routes/socialRoutes.js'
+import jobRoutes from './routes/jobRoutes.js'
 import { errorHandler } from './utils/errorHandler.js'
 import { verifyAuth } from './utils/auth.js'
 
@@ -64,6 +65,7 @@ app.use('/', socialRoutes)
 app.use('/tokens', verifyAuth, authRoutes)
 app.use('/', verifyAuth, publishRoutes)
 app.use('/', verifyAuth, messageRoutes)
+app.use('/', verifyAuth, jobRoutes)
 app.use('/', verifyAuth, schedulerRoutes)
 
 app.use(errorHandler)

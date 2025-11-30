@@ -6,8 +6,12 @@
         <h1 class="text-3xl font-bold mt-2">Publish & Schedule</h1>
         <p class="text-slate-400 text-sm">Choose platforms, variants, and timing.</p>
       </div>
-      <button class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold" @click="submit">
-        Publish / Schedule
+      <button
+        class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold disabled:opacity-60"
+        :disabled="submitting"
+        @click="submit"
+      >
+        {{ submitting ? 'Scheduling…' : 'Publish / Schedule' }}
       </button>
     </header>
 
@@ -62,14 +66,17 @@
 
 <script setup>
 import { reactive, ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
 import MediaUploadCard from '@/components/creator/MediaUploadCard.vue'
 import ScheduleSelector from '@/components/creator/ScheduleSelector.vue'
 import PlatformPreviewInstagram from '@/components/creator/PlatformPreviewInstagram.vue'
 import PlatformPreviewLinkedIn from '@/components/creator/PlatformPreviewLinkedIn.vue'
 import PlatformPreviewTwitter from '@/components/creator/PlatformPreviewTwitter.vue'
-import { useRouter } from 'vue-router'
+import { createCreatorSlot } from '@/services/creatorApi'
 
 const router = useRouter()
+const submitting = ref(false)
 const form = reactive({
   platform: 'instagram',
   variantKey: 'ig_feed',
@@ -82,8 +89,23 @@ function setFiles(list) {
   files.value = list
 }
 
-function submit() {
-  // Placeholder: call posting-service /publish
-  router.push('/creator')
+async function submit() {
+  submitting.value = true
+  try {
+    await createCreatorSlot({
+      platform: form.platform,
+      variantType: form.variantKey,
+      caption: form.caption,
+      mediaUrls: files.value.map((f) => f.url || f.downloadUrl).filter(Boolean),
+      scheduledAt: form.scheduleDate || new Date().toISOString(),
+      status: 'scheduled',
+    })
+    ElMessage.success('Scheduled')
+    router.push('/creator/calendar')
+  } catch (err) {
+    ElMessage.error(err?.response?.data?.error || 'Failed to schedule')
+  } finally {
+    submitting.value = false
+  }
 }
 </script>

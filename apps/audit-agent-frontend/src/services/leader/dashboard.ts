@@ -21,8 +21,8 @@ export async function fetchRecentIssues() {
 }
 
 export async function fetchLeaderSummary() {
-  const { data } = await growthClient.get('/leader/overview')
-  return data
+  const { data } = await growthClient.get('/leader/overview/stats')
+  return data?.stats || data?.overview || data
 }
 
 export async function fetchDashboardSnapshot() {

@@ -31,6 +31,48 @@ export async function saveCreatorPlan(id, payload) {
 }
 
 export async function runRepurpose(payload) {
-  const { data } = await creatorClient.post('/creator/ai/repurpose', payload)
+  const { data } = await creatorClient.post('/creator/repurpose', {
+    source: payload.sourceContent || payload.source,
+    formats: payload.targetFormats || payload.formats,
+  })
   return data
+}
+
+export async function fetchCreatorBoard() {
+  const { data } = await creatorClient.get('/creator/board')
+  return {
+    drafts: data?.drafts || data?.board?.drafts || [],
+    inspiration: data?.inspiration || data?.board?.inspiration || [],
+    scheduled: data?.scheduled || data?.board?.scheduled || [],
+  }
+}
+
+export async function fetchCreatorSlots(params = {}) {
+  const { data } = await creatorClient.get('/creator/slots', { params })
+  return data?.slots || []
+}
+
+export async function createCreatorSlot(payload) {
+  const { data } = await creatorClient.post('/creator/slots', payload)
+  return data?.slot || data
+}
+
+export async function fetchVariant(id) {
+  const { data } = await creatorClient.get(`/creator/variants/${id}`)
+  return data?.variant || data
+}
+
+export async function updateVariant(id, payload) {
+  const { data } = await creatorClient.patch(`/creator/variants/${id}`, payload)
+  return data?.variant || data
+}
+
+export async function recordCreatorMedia(payload) {
+  const { data } = await creatorClient.post('/creator/media', payload)
+  return data?.media || data
+}
+
+export async function saveVariantDraft(id, payload) {
+  const { data } = await creatorClient.post('/creator/editor/save', { id, ...payload })
+  return data?.content || data
 }

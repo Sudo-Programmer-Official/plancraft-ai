@@ -38,3 +38,12 @@ export async function scheduleMessage(payload) {
   })
   return handle(res)
 }
+
+export async function enqueuePostingJob(job) {
+  const res = await fetch(`${POSTING_BASE}/api/posting/jobs`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify(job || {}),
+  })
+  return handle(res)
+}
