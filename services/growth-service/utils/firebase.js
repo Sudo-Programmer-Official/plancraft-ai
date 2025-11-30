@@ -1,4 +1,10 @@
 import admin from 'firebase-admin'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 let app
 
@@ -12,21 +18,39 @@ function normalizePrivateKey(raw) {
   return privateKey
 }
 
-function fromServiceAccount() {
-  const raw = process.env.FIREBASE_SERVICE_ACCOUNT
-  if (!raw) return null
+function resolveCredentialFromFile(candidatePath) {
+  if (!candidatePath) return null
   try {
-    const json = typeof raw === 'string' ? JSON.parse(raw) : raw
-    return admin.credential.cert(json)
+    const absolute = path.resolve(__dirname, candidatePath)
+    if (!fs.existsSync(absolute)) return null
+    return JSON.parse(fs.readFileSync(absolute, 'utf-8'))
   } catch (err) {
-    console.warn('Failed to parse FIREBASE_SERVICE_ACCOUNT', err?.message || err)
+    console.error('[growth-service] Failed to read credential file', candidatePath, err?.message || err)
+    return null
   }
+}
+
+function loadServiceAccount() {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    try {
+      const parsed = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+      if (parsed.private_key) parsed.private_key = normalizePrivateKey(parsed.private_key)
+      return parsed
+    } catch (err) {
+      console.error('[growth-service] Invalid FIREBASE_SERVICE_ACCOUNT JSON', err?.message || err)
+    }
+  }
+
+  const fallbackPath = '../../../backend-node/firebase-service-account.json'
+  const fromFile = resolveCredentialFromFile(process.env.FIREBASE_CREDENTIAL_PATH || fallbackPath)
+  if (fromFile) return fromFile
+
   return null
 }
 
 function getCredential() {
-  const fromJson = fromServiceAccount()
-  if (fromJson) return fromJson
+  const svc = loadServiceAccount()
+  if (svc) return admin.credential.cert(svc)
 
   const projectId = process.env.FIREBASE_PROJECT_ID
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
