@@ -12,6 +12,18 @@ function matchesAppToken(req) {
   const headerToken = typeof req.headers['x-app-token'] === 'string' ? req.headers['x-app-token'].trim() : ''
   const authHeader = typeof req.headers.authorization === 'string' ? req.headers.authorization.trim() : ''
   const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
+  const match = !!serverToken && (headerToken === serverToken || bearerToken === serverToken);
+
+  if (!match) {
+    console.warn('[auth] token mismatch', {
+      hasServer: !!serverToken,
+      serverLen: serverToken.length,
+      hasHeader: !!headerToken,
+      headerLen: headerToken.length,
+      hasBearer: !!bearerToken,
+      bearerLen: bearerToken.length,
+    });
+  }
 
   return headerToken === serverToken || bearerToken === serverToken
 }
