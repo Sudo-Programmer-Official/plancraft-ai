@@ -17,12 +17,7 @@ function fromServiceAccount() {
   if (!raw) return null
   try {
     const json = typeof raw === 'string' ? JSON.parse(raw) : raw
-    const projectId = json.project_id
-    const clientEmail = json.client_email
-    const privateKey = normalizePrivateKey(json.private_key)
-    if (projectId && clientEmail && privateKey) {
-      return admin.credential.cert({ projectId, clientEmail, privateKey })
-    }
+    return admin.credential.cert(json)
   } catch (err) {
     console.warn('Failed to parse FIREBASE_SERVICE_ACCOUNT', err?.message || err)
   }
@@ -33,20 +28,8 @@ function getCredential() {
   const fromJson = fromServiceAccount()
   if (fromJson) return fromJson
 
-  const projectId = process.env.FIREBASE_PROJECT_ID
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
-  const privateKey = normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY)
-
-  if (projectId && clientEmail && privateKey) {
-    return admin.credential.cert({ projectId, clientEmail, privateKey })
-  }
-
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    return admin.credential.applicationDefault()
-  }
-
   throw new Error(
-    'Firebase credentials missing: set FIREBASE_SERVICE_ACCOUNT or FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY or GOOGLE_APPLICATION_CREDENTIALS',
+    'Firebase credentials missing: set FIREBASE_SERVICE_ACCOUNT (JSON string with private_key and client_email)',
   )
 }
 

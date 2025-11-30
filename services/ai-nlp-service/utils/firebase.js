@@ -1,6 +1,39 @@
 import admin from 'firebase-admin'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 let app
+
+function resolveCredentialFromFile(candidatePath) {
+  if (!candidatePath) return null
+  try {
+    const absolute = path.resolve(__dirname, candidatePath)
+    if (!fs.existsSync(absolute)) return null
+    return JSON.parse(fs.readFileSync(absolute, 'utf-8'))
+  } catch (err) {
+    console.error('[ai-nlp-service] Failed to read credential file', candidatePath, err?.message || err)
+    return null
+  }
+}
+
+function loadServiceAccount() {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    try {
+      return JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+    } catch (err) {
+      console.error('[ai-nlp-service] Invalid FIREBASE_SERVICE_ACCOUNT JSON', err?.message || err)
+    }
+  }
+
+  const fromExplicitPath = resolveCredentialFromFile(process.env.FIREBASE_CREDENTIAL_PATH)
+  if (fromExplicitPath) return fromExplicitPath
+
+  return null
+}
 
 function normalizePrivateKey(raw) {
   if (!raw) return raw
@@ -12,42 +45,19 @@ function normalizePrivateKey(raw) {
   return privateKey
 }
 
-function fromServiceAccount() {
-  const raw = process.env.FIREBASE_SERVICE_ACCOUNT
-  if (!raw) return null
-  try {
-    const json = typeof raw === 'string' ? JSON.parse(raw) : raw
-    const projectId = json.project_id
-    const clientEmail = json.client_email
-    const privateKey = normalizePrivateKey(json.private_key)
-    if (projectId && clientEmail && privateKey) {
-      return admin.credential.cert({ projectId, clientEmail, privateKey })
-    }
-  } catch (err) {
-    console.warn('Failed to parse FIREBASE_SERVICE_ACCOUNT', err?.message || err)
-  }
-  return null
-}
-
 function getCredential() {
-  const fromJson = fromServiceAccount()
-  if (fromJson) return fromJson
+  const svc = loadServiceAccount()
+  if (svc) return admin.credential.cert(svc)
 
   const projectId = process.env.FIREBASE_PROJECT_ID
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
   const privateKey = normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY)
-
   if (projectId && clientEmail && privateKey) {
     return admin.credential.cert({ projectId, clientEmail, privateKey })
   }
 
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    return admin.credential.applicationDefault()
-  }
-
-  throw new Error(
-    'Firebase credentials missing: set FIREBASE_SERVICE_ACCOUNT or FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY or GOOGLE_APPLICATION_CREDENTIALS',
-  )
+  console.warn('[ai-nlp-service] Falling back to applicationDefault credentials')
+  return admin.credential.applicationDefault()
 }
 
 export function ensureApp() {
