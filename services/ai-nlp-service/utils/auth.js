@@ -2,10 +2,14 @@ import admin from 'firebase-admin'
 import { ensureApp } from './firebase.js'
 
 function matchesAppToken(req) {
-  const serverToken = process.env.SERVICE_APP_TOKEN || process.env.APP_TOKEN || ''
+  const serverToken = (process.env.SERVICE_APP_TOKEN || process.env.APP_TOKEN || '').trim()
   if (!serverToken) return false
-  const incoming = req.headers['x-app-token']
-  return typeof incoming === 'string' && incoming === serverToken
+
+  const headerToken = typeof req.headers['x-app-token'] === 'string' ? req.headers['x-app-token'].trim() : ''
+  const authHeader = typeof req.headers.authorization === 'string' ? req.headers.authorization.trim() : ''
+  const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
+
+  return headerToken === serverToken || bearerToken === serverToken
 }
 
 export async function verifyAuth(req, res, next) {
