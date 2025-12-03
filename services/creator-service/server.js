@@ -14,6 +14,7 @@ import { errorHandler } from './utils/errorHandler.js'
 import { verifyAuth } from './utils/auth.js'
 
 const app = express()
+const basePaths = ['/creator', '/api/creator'] // support both direct and /api-prefixed calls
 
 const envOrigins =
   process.env.ALLOWED_ORIGINS?.split(',')?.map((o) => o.trim()).filter(Boolean) || []
@@ -56,15 +57,18 @@ app.options('*', cors(corsOptions))
 app.use(express.json({ limit: '2mb' }))
 app.use(morgan('dev'))
 
-app.use('/creator/plan', verifyAuth, planRoutes)
-app.use('/creator/ai', verifyAuth, aiRoutes)
-app.use('/creator', verifyAuth, draftRoutes)
-app.use('/creator', verifyAuth, calendarRoutes)
-app.use('/creator', verifyAuth, repurposeRoutes)
-app.use('/creator', verifyAuth, editorRoutes)
-app.use('/creator', verifyAuth, mediaRoutes)
-app.use('/creator', verifyAuth, publishRoutes)
-app.use('/creator', verifyAuth, boardRoutes)
+// Mount under both /creator and /api/creator to tolerate differing base paths in clients/gateways.
+basePaths.forEach((base) => {
+  app.use(`${base}/plan`, verifyAuth, planRoutes)
+  app.use(`${base}/ai`, verifyAuth, aiRoutes)
+  app.use(base, verifyAuth, draftRoutes)
+  app.use(base, verifyAuth, calendarRoutes)
+  app.use(base, verifyAuth, repurposeRoutes)
+  app.use(base, verifyAuth, editorRoutes)
+  app.use(base, verifyAuth, mediaRoutes)
+  app.use(base, verifyAuth, publishRoutes)
+  app.use(base, verifyAuth, boardRoutes)
+})
 
 app.use(errorHandler)
 
