@@ -1,12 +1,19 @@
 import api from '@/services/api'
 import { auth } from '@/firebase/init'
 import axios from 'axios'
+import { getAppToken } from '@/services/appTokenService'
 
 async function authedHeaders() {
   const headers = {}
   try {
     const token = await auth?.currentUser?.getIdToken?.()
     if (token) headers.Authorization = `Bearer ${token}`
+    const envAppToken =
+      import.meta.env.VITE_SERVICE_APP_TOKEN ||
+      import.meta.env.VITE_APP_TOKEN
+    if (envAppToken) headers['x-app-token'] = envAppToken
+    const cached = getAppToken()
+    if (cached) headers['x-app-token'] = cached
   } catch {}
   return headers
 }
