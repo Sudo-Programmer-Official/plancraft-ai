@@ -8,6 +8,7 @@ import { verifyAuth } from './utils/auth.js'
 import { errorHandler } from './utils/errorHandler.js'
 
 const app = express()
+const basePaths = ['/api/growth', '/growth'] // allow both /api/growth/* and /growth/*
 
 // 🌐 CORS: allow App Runner host + env overrides + localhost
 const envOrigins =
@@ -55,9 +56,11 @@ app.use(morgan('dev'))
 
 app.get('/healthz', (_req, res) => res.status(200).json({ status: 'ok' }))
 
-app.use('/api/growth', verifyAuth, growthRoutes)
-app.use('/api/growth/contacts', verifyAuth, contactsRoutes)
-app.use('/api/growth/leader', verifyAuth, leaderRoutes)
+basePaths.forEach((base) => {
+  app.use(base, verifyAuth, growthRoutes)
+  app.use(`${base}/contacts`, verifyAuth, contactsRoutes)
+  app.use(`${base}/leader`, verifyAuth, leaderRoutes)
+})
 
 app.use(errorHandler)
 
