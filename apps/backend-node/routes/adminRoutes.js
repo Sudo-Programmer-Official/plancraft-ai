@@ -26,6 +26,65 @@ router.post('/notifications', requireAdmin, (req, res) => {
   res.json(note)
 })
 
+// Admin: User feedback
+router.get('/feedback', requireAdmin, async (req, res) => {
+  const limit = Math.max(1, Math.min(100, parseInt(String(req.query.limit || '50'), 10)))
+  const after = req.query.after ? String(req.query.after) : null
+  try {
+    let ref = db.collection('feedback').orderBy('createdAt', 'desc')
+    if (after) {
+      const lastDoc = await db.collection('feedback').doc(after).get()
+      if (lastDoc.exists) ref = ref.startAfter(lastDoc)
+    }
+
+    const snap = await ref.limit(limit).get()
+    const rows = snap.docs.map((doc) => {
+      const data = doc.data() || {}
+      const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : (data.createdAt ? new Date(data.createdAt).toISOString() : null)
+      return {
+        id: doc.id,
+        userId: data.userId || null,
+        rating: data.rating ?? null,
+        type: data.type || 'general',
+        message: data.message || '',
+        context: data.context || {},
+        metadata: data.metadata || {},
+        locale: data.locale || null,
+        userAgent: data.userAgent || null,
+        createdAt,
+      }
+    })
+
+    // Enrich with user profile (best-effort)
+    const ids = [...new Set(rows.map((r) => r.userId).filter(Boolean))]
+    if (ids.length) {
+      try {
+        const snaps = await Promise.all(ids.map((uid) => db.collection('users').doc(String(uid)).get()))
+        const lookup = {}
+        snaps.forEach((d) => {
+          if (!d.exists) return
+          const u = d.data() || {}
+          lookup[d.id] = {
+            email: u.email || null,
+            name: u.name || u.displayName || null,
+            role: u.role || 'user',
+            plan: u.plan || 'free',
+          }
+        })
+        rows.forEach((row) => {
+          if (row.userId && lookup[row.userId]) row.user = lookup[row.userId]
+        })
+      } catch {}
+    }
+
+    const nextPage = snap.docs.length === limit ? snap.docs[snap.docs.length - 1].id : null
+    return res.json({ feedback: rows, nextPage, limit })
+  } catch (e) {
+    console.error('Admin feedback fetch failed', e)
+    return res.json({ feedback: dataStore.feedback || [], nextPage: null, limit })
+  }
+})
+
 // Admin: Users
 router.get('/users', requireAdmin, async (req, res) => {
   try {
