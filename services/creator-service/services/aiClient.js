@@ -22,7 +22,17 @@ const AI_BASE = resolveAiBase()
 const APP_TOKEN = process.env.SERVICE_APP_TOKEN || process.env.APP_TOKEN || ''
 
 export async function proxyAi(type, payload) {
-  const url = `${AI_BASE}/${type}`
+  const typeMap = {
+    repurpose: 'generate/repurpose',
+    hook: 'generate/hook',
+    reel_script: 'generate/reel-script',
+    story_frames: 'generate/story-frame',
+    thread: 'generate/tweet-thread',
+    linkedin_post: 'generate/linkedin-post',
+    outreach_message: 'generate/outreach-message',
+  }
+  const endpoint = typeMap[type] || type
+  const url = `${AI_BASE}/${endpoint}`
   logger.info(`Proxying AI call ${url}`)
   const res = await fetch(url, {
     method: 'POST',
