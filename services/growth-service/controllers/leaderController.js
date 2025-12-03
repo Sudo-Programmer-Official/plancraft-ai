@@ -755,7 +755,8 @@ export async function deleteIssue(req, res, next) {
 export async function listIssueTimeline(req, res, next) {
   try {
     const uid = requireUid(req)
-    const { id } = req.params
+    const id = req.params?.id || req.query?.issueId
+    if (!id) return res.status(400).json({ success: false, error: 'Missing issueId' })
     const snap = await userCollection(uid, 'issueTimelines')
       .where('issueId', '==', id)
       .orderBy('createdAt', 'asc')

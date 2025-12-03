@@ -83,6 +83,7 @@ router.put('/issues/:id', updateIssue)
 router.delete('/issues/:id', deleteIssue)
 
 // Issue timeline
+router.get('/issues/timeline', listIssueTimeline) // query param issueId
 router.get('/issues/:id/timeline', listIssueTimeline)
 router.post('/issues/:id/timeline', addIssueTimelineEntry)
 
