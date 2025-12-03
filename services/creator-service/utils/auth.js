@@ -1,18 +1,5 @@
 import admin from 'firebase-admin'
-
-let app
-function ensureApp() {
-  if (app) return app
-  if (admin.apps.length) {
-    app = admin.apps[0]
-    return app
-  }
-  admin.initializeApp({
-    credential: admin.credential.applicationDefault(),
-  })
-  app = admin.app()
-  return app
-}
+import { ensureApp } from './firebase.js'
 
 function matchesAppToken(req) {
   const serverToken = (process.env.SERVICE_APP_TOKEN || process.env.APP_TOKEN || '').trim()
@@ -21,8 +8,10 @@ function matchesAppToken(req) {
   const headerToken = typeof req.headers['x-app-token'] === 'string' ? req.headers['x-app-token'].trim() : ''
   const authHeader = typeof req.headers.authorization === 'string' ? req.headers.authorization.trim() : ''
   const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
+  const queryToken = typeof req.query?.appToken === 'string' ? req.query.appToken.trim() : ''
+  const bodyToken = typeof req.body?.appToken === 'string' ? req.body.appToken.trim() : ''
 
-  return headerToken === serverToken || bearerToken === serverToken
+  return [headerToken, bearerToken, queryToken, bodyToken].some((tok) => tok === serverToken)
 }
 
 export async function verifyAuth(req, res, next) {
