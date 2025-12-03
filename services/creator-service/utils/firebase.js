@@ -73,8 +73,12 @@ function getCredential() {
     return admin.credential.cert({ projectId, clientEmail, privateKey })
   }
 
-  console.warn('[creator-service] Falling back to applicationDefault credentials')
-  return admin.credential.applicationDefault()
+  if (projectId) {
+    console.warn('[creator-service] Falling back to applicationDefault credentials with projectId')
+    return admin.credential.applicationDefault()
+  }
+
+  throw new Error('[creator-service] Firebase credentials missing: set FIREBASE_SERVICE_ACCOUNT or FIREBASE_PROJECT_ID/FIREBASE_CLIENT_EMAIL/FIREBASE_PRIVATE_KEY')
 }
 
 export function ensureApp() {
@@ -85,6 +89,7 @@ export function ensureApp() {
   }
   admin.initializeApp({
     credential: getCredential(),
+    projectId: process.env.FIREBASE_PROJECT_ID || undefined,
   })
   app = admin.app()
   return app
