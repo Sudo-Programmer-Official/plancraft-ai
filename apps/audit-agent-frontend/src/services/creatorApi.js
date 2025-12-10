@@ -12,6 +12,20 @@ creatorClient.interceptors.request.use(async (config) => {
   try {
     const headers = await buildAuthHeaders()
     config.headers = { ...(config.headers || {}), ...headers }
+
+    // Also include appToken as query/body for services that accept it outside headers
+    const appToken = headers['x-app-token']
+    if (appToken) {
+      if (config.method?.toLowerCase() === 'get') {
+        config.params = { ...(config.params || {}), appToken }
+      } else {
+        if (config.data && typeof config.data === 'object' && !Array.isArray(config.data)) {
+          config.data = { appToken, ...config.data }
+        } else {
+          config.data = { appToken }
+        }
+      }
+    }
   } catch {}
   return config
 })
