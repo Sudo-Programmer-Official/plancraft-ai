@@ -7,10 +7,25 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 let app
+const projectIdEnv =
+  process.env.FIREBASE_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || null
+if (projectIdEnv && !process.env.GOOGLE_CLOUD_PROJECT) process.env.GOOGLE_CLOUD_PROJECT = projectIdEnv
+if (projectIdEnv && !process.env.GCLOUD_PROJECT) process.env.GCLOUD_PROJECT = projectIdEnv
+
+function decodeBase64Maybe(value) {
+  if (!value || typeof value !== 'string') return value
+  const base64ish = /^[A-Za-z0-9+/=]+$/.test(value) && value.length % 4 === 0
+  if (!base64ish) return value
+  try {
+    return Buffer.from(value, 'base64').toString('utf-8')
+  } catch {
+    return value
+  }
+}
 
 function normalizePrivateKey(raw) {
   if (!raw) return raw
-  let privateKey = raw
+  let privateKey = decodeBase64Maybe(raw) || raw
   if (privateKey.includes('\\n')) privateKey = privateKey.replace(/\\n/g, '\n')
   if (!/-----BEGIN PRIVATE KEY-----/.test(privateKey)) {
     privateKey = `-----BEGIN PRIVATE KEY-----\n${privateKey}\n-----END PRIVATE KEY-----\n`
@@ -38,7 +53,7 @@ function loadServiceAccount() {
       const decoded = Buffer.from(raw, 'base64').toString('utf-8')
       const parsed = JSON.parse(decoded)
       if (parsed?.private_key) parsed.private_key = normalizePrivateKey(parsed.private_key)
-      if (!parsed?.project_id && process.env.FIREBASE_PROJECT_ID) parsed.project_id = process.env.FIREBASE_PROJECT_ID
+      if (!parsed?.project_id && projectIdEnv) parsed.project_id = projectIdEnv
       console.info('[growth-service] Using FIREBASE_SERVICE_ACCOUNT env (base64 decoded)')
       return parsed
     } catch (_) {
@@ -48,7 +63,7 @@ function loadServiceAccount() {
     try {
       const parsed = JSON.parse(raw)
       if (parsed?.private_key) parsed.private_key = normalizePrivateKey(parsed.private_key)
-      if (!parsed?.project_id && process.env.FIREBASE_PROJECT_ID) parsed.project_id = process.env.FIREBASE_PROJECT_ID
+      if (!parsed?.project_id && projectIdEnv) parsed.project_id = projectIdEnv
       console.info('[growth-service] Using FIREBASE_SERVICE_ACCOUNT env (raw JSON)')
       return parsed
     } catch (err) {
@@ -60,7 +75,7 @@ function loadServiceAccount() {
   const fromFile = resolveCredentialFromFile(fallbackPath)
   if (fromFile) {
     if (fromFile.private_key) fromFile.private_key = normalizePrivateKey(fromFile.private_key)
-    if (!fromFile.project_id && process.env.FIREBASE_PROJECT_ID) fromFile.project_id = process.env.FIREBASE_PROJECT_ID
+    if (!fromFile.project_id && projectIdEnv) fromFile.project_id = projectIdEnv
     console.info('[growth-service] Using credential file', fallbackPath)
     return fromFile
   }
@@ -72,13 +87,13 @@ function getCredential() {
   const svc = loadServiceAccount()
   if (svc) {
     return admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID || svc.project_id,
+      projectId: projectIdEnv || svc.project_id,
       clientEmail: svc.client_email,
       privateKey: svc.private_key,
     })
   }
 
-  const projectId = process.env.FIREBASE_PROJECT_ID
+  const projectId = projectIdEnv
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
   const privateKey = normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY)
   if (projectId && clientEmail && privateKey) {

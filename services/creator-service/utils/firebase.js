@@ -13,9 +13,21 @@ const projectIdEnv =
 if (projectIdEnv && !process.env.GOOGLE_CLOUD_PROJECT) process.env.GOOGLE_CLOUD_PROJECT = projectIdEnv
 if (projectIdEnv && !process.env.GCLOUD_PROJECT) process.env.GCLOUD_PROJECT = projectIdEnv
 
+function decodeBase64Maybe(value) {
+  if (!value || typeof value !== 'string') return value
+  const base64ish = /^[A-Za-z0-9+/=]+$/.test(value) && value.length % 4 === 0
+  if (!base64ish) return value
+  try {
+    return Buffer.from(value, 'base64').toString('utf-8')
+  } catch {
+    return value
+  }
+}
+
 function normalizePrivateKey(raw) {
   if (!raw) return raw
-  let privateKey = raw
+  // Handle base64-encoded key blobs
+  let privateKey = decodeBase64Maybe(raw) || raw
   if (privateKey.includes('\\n')) privateKey = privateKey.replace(/\\n/g, '\n')
   if (!/-----BEGIN PRIVATE KEY-----/.test(privateKey)) {
     privateKey = `-----BEGIN PRIVATE KEY-----\n${privateKey}\n-----END PRIVATE KEY-----\n`
