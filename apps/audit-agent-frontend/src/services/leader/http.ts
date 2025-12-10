@@ -53,6 +53,7 @@ export async function buildAuthHeaders() {
   const headers: Record<string, string> = {}
   try {
     const envAppToken =
+      (import.meta.env.VITE_CREATOR_APP_TOKEN as string) ||
       (import.meta.env.VITE_GROWTH_SERVICE_APP_TOKEN as string) ||
       (import.meta.env.VITE_SERVICE_APP_TOKEN as string) ||
       (import.meta.env.VITE_APP_TOKEN as string)
