@@ -7,6 +7,11 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 let app
+const projectIdEnv =
+  process.env.FIREBASE_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || null
+// Ensure project id is available to Google libraries that rely on the env var
+if (projectIdEnv && !process.env.GOOGLE_CLOUD_PROJECT) process.env.GOOGLE_CLOUD_PROJECT = projectIdEnv
+if (projectIdEnv && !process.env.GCLOUD_PROJECT) process.env.GCLOUD_PROJECT = projectIdEnv
 
 function normalizePrivateKey(raw) {
   if (!raw) return raw
@@ -61,12 +66,12 @@ function loadServiceAccount() {
 function getCredential() {
   const svc = loadServiceAccount()
   if (svc) return admin.credential.cert({
-    projectId: process.env.FIREBASE_PROJECT_ID || svc.project_id,
+    projectId: projectIdEnv || svc.project_id,
     clientEmail: svc.client_email,
     privateKey: svc.private_key,
   })
 
-  const projectId = process.env.FIREBASE_PROJECT_ID
+  const projectId = projectIdEnv
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
   const privateKey = normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY)
   if (projectId && clientEmail && privateKey) {
@@ -89,7 +94,7 @@ export function ensureApp() {
   }
   admin.initializeApp({
     credential: getCredential(),
-    projectId: process.env.FIREBASE_PROJECT_ID || undefined,
+    projectId: projectIdEnv || undefined,
   })
   app = admin.app()
   return app
