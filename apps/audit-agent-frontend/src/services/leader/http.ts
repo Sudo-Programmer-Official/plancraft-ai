@@ -61,7 +61,9 @@ export async function buildAuthHeaders(opts: AuthHeaderOptions = {}) {
       (import.meta.env.VITE_GROWTH_SERVICE_APP_TOKEN as string) ||
       (import.meta.env.VITE_SERVICE_APP_TOKEN as string) ||
       (import.meta.env.VITE_APP_TOKEN as string)
-    if (envAppToken) headers['x-app-token'] = envAppToken
+    const cachedAppToken = getAppToken()
+    const appToken = envAppToken || cachedAppToken
+    if (appToken) headers['x-app-token'] = appToken
 
     const user = auth?.currentUser
     if (user) {
@@ -82,10 +84,7 @@ export async function buildAuthHeaders(opts: AuthHeaderOptions = {}) {
         }
       } catch {}
     }
-    try {
-      const tok = getAppToken()
-      if (tok) headers['x-app-token'] = tok
-    } catch {}
+    // Do not override env app token; cached app token is only used if env missing (handled above)
     try {
       let tz = localStorage.getItem('user_timezone')
       if (!tz) {
@@ -106,11 +105,7 @@ export async function buildAuthHeaders(opts: AuthHeaderOptions = {}) {
 
     // Fallback: if no bearer token was set but we have an app token, set it as bearer to satisfy services
     if (!headers.Authorization) {
-      const bearer =
-        headers['x-app-token'] ||
-        envAppToken ||
-        localStorage.getItem('token') ||
-        null
+      const bearer = headers['x-app-token'] || envAppToken || localStorage.getItem('token') || null
       if (bearer) headers.Authorization = `Bearer ${bearer}`
     }
   } catch {}
