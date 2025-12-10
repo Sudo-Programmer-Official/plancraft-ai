@@ -13,6 +13,9 @@ const SUMMARY_COLLECTION = "habit_summary";
 const USERS_COLLECTION = "users";
 
 const MIN_INTERVAL_HOURS = Number(process.env.VOICE_COACH_MIN_INTERVAL_HOURS || 18);
+const VERBOSE =
+  String(process.env.VOICE_COACH_VERBOSE || "").trim().toLowerCase() === "true" ||
+  String(process.env.DEBUG || "").toLowerCase().includes("voicecoach");
 
 function toneFromStrength(strength = 0) {
   const value = Number(strength);
@@ -121,23 +124,25 @@ export async function deliverVoiceCoach(userId, options = {}) {
     return { skipped: "flag_off" };
   }
 
+  const verbose = options.verbose || VERBOSE;
+
   const [summary, profile] = await Promise.all([
     loadHabitSummary(userId),
     loadUserProfile(userId),
   ]);
 
   if (!summary) {
-    console.log("[VoiceCoach] skipped (no summary)", { userId });
+    if (verbose) console.log("[VoiceCoach] skipped (no summary)", { userId });
     return { skipped: "no_summary" };
   }
 
   if (!shouldSend(summary) && options.force !== true) {
-    console.log("[VoiceCoach] skipped (recently sent)", { userId });
+    if (verbose) console.log("[VoiceCoach] skipped (recently sent)", { userId });
     return { skipped: "recent" };
   }
 
   if (!userAllowsVoice(profile) && options.force !== true) {
-    console.log("[VoiceCoach] skipped (user disabled voice)", { userId });
+    if (verbose) console.log("[VoiceCoach] skipped (user disabled voice)", { userId });
     return { skipped: "prefs" };
   }
 
@@ -157,7 +162,7 @@ export async function deliverVoiceCoach(userId, options = {}) {
   if (channels.voice !== false) {
     try {
       await makeCallForUser(userId, message, { userId, source: "voice_coach", bypassChecks: true });
-      console.log("[VoiceCoach] voice call queued", { userId });
+      if (verbose) console.log("[VoiceCoach] voice call queued", { userId });
     } catch (err) {
       console.error("[VoiceCoach] voice call failed", err?.message || err);
     }

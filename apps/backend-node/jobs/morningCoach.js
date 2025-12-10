@@ -28,22 +28,44 @@ async function runOnce() {
 
   const users = await fetchUsers();
   console.log(`[VoiceCoach] morning run for ${users.length} users`);
-  let processed = 0;
+  const stats = {
+    sent: 0,
+    skipped: {
+      opted_out: 0,
+      no_summary: 0,
+      recent: 0,
+      prefs: 0,
+      other: 0,
+    },
+  };
   for (const user of users) {
     try {
       const prefs = await getUserPrefs(user.id);
       if (!prefs.enable_voice) {
-        console.log("[VoiceCoach] user opted out", { userId: user.id });
+        stats.skipped.opted_out += 1;
         continue;
       }
-      await deliverVoiceCoach(user.id);
-      processed += 1;
+      const res = await deliverVoiceCoach(user.id, { verbose: false });
+      if (res?.sent) {
+        stats.sent += 1;
+      } else if (res?.skipped) {
+        if (stats.skipped.hasOwnProperty(res.skipped)) {
+          stats.skipped[res.skipped] += 1;
+        } else {
+          stats.skipped.other += 1;
+        }
+      }
     } catch (err) {
       console.error("[VoiceCoach] delivery failed", { userId: user.id, error: err?.message || err });
     }
   }
-  console.log(`[VoiceCoach] morning coach finished (sent=${processed})`);
-  return { processed };
+  const totalSkipped = Object.values(stats.skipped).reduce((sum, value) => sum + value, 0);
+  console.log("[VoiceCoach] morning coach finished", {
+    sent: stats.sent,
+    skipped: totalSkipped,
+    breakdown: stats.skipped,
+  });
+  return { processed: stats.sent, skipped: stats.skipped };
 }
 
 export function initMorningCoach() {
