@@ -103,6 +103,16 @@ export async function buildAuthHeaders(opts: AuthHeaderOptions = {}) {
     } catch {
       headers['x-user-country'] = 'US'
     }
+
+    // Fallback: if no bearer token was set but we have an app token, set it as bearer to satisfy services
+    if (!headers.Authorization) {
+      const bearer =
+        headers['x-app-token'] ||
+        envAppToken ||
+        localStorage.getItem('token') ||
+        null
+      if (bearer) headers.Authorization = `Bearer ${bearer}`
+    }
   } catch {}
   return headers
 }
