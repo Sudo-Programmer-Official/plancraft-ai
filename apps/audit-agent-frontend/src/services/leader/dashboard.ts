@@ -20,9 +20,20 @@ export async function fetchRecentIssues() {
   return data
 }
 
+const mapLeaderSummary = (data: any) => data?.stats || data?.overview || data
+
 export async function fetchLeaderSummary() {
-  const { data } = await growthClient.get('/leader/overview/stats')
-  return data?.stats || data?.overview || data
+  try {
+    const { data } = await growthClient.get('/leader/overview/stats')
+    return mapLeaderSummary(data)
+  } catch (error: any) {
+    // Older deployments only expose /leader/overview
+    if (error?.response?.status === 404) {
+      const { data } = await growthClient.get('/leader/overview')
+      return mapLeaderSummary(data)
+    }
+    throw error
+  }
 }
 
 export async function fetchDashboardSnapshot() {
