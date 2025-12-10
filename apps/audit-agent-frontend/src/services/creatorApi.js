@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { buildAuthHeaders } from '@/services/leader/http'
+import { refreshAppToken } from '@/services/appTokenService'
 
 const creatorBase = (import.meta.env.VITE_CREATOR_API_BASE || '/creator-api').replace(/\/+$/, '')
 const creatorClient = axios.create({
@@ -14,6 +15,26 @@ creatorClient.interceptors.request.use(async (config) => {
   } catch {}
   return config
 })
+
+creatorClient.interceptors.response.use(
+  (res) => res,
+  async (error) => {
+    const status = error?.response?.status
+    const original = error?.config || {}
+    if (status === 401 && !original._retry) {
+      try {
+        original._retry = true
+        await refreshAppToken()
+        const headers = await buildAuthHeaders({ forceRefresh: true })
+        original.headers = { ...(original.headers || {}), ...headers }
+        return creatorClient(original)
+      } catch (retryErr) {
+        return Promise.reject(retryErr)
+      }
+    }
+    return Promise.reject(error)
+  },
+)
 
 export async function fetchCreatorPlan(id) {
   if (!id) return {}

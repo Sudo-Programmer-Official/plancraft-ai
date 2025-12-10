@@ -5,6 +5,10 @@ import { getAppToken } from '@/services/appTokenService'
 
 type Service = 'growth' | 'goals' | 'posting' | 'creator' | 'nlp'
 
+type AuthHeaderOptions = {
+  forceRefresh?: boolean
+}
+
 const normalize = (url?: string | null) => (url ? url.replace(/\/+$/, '') : '')
 
 function resolveBase(service: Service): string {
@@ -49,7 +53,7 @@ function resolveBase(service: Service): string {
   }
 }
 
-export async function buildAuthHeaders() {
+export async function buildAuthHeaders(opts: AuthHeaderOptions = {}) {
   const headers: Record<string, string> = {}
   try {
     const envAppToken =
@@ -61,7 +65,7 @@ export async function buildAuthHeaders() {
 
     const user = auth?.currentUser
     if (user) {
-      const token = await user.getIdToken()
+      const token = await user.getIdToken(opts.forceRefresh || false)
       if (token) headers.Authorization = `Bearer ${token}`
       if (user.email) headers['x-user-email'] = user.email
       if (user.uid) headers['x-user-id'] = user.uid
