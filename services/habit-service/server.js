@@ -32,8 +32,20 @@ const corsOptions = {
     return callback(new Error("Origin not allowed"));
   },
   credentials: true,
-  allowedHeaders: (req, cb) =>
-    cb(null, req.header("Access-Control-Request-Headers") || "*"),
+  allowedHeaders: [
+    "*",
+    "Content-Type",
+    "Authorization",
+    "x-app-token",
+    "x-user-country",
+    "x-user-email",
+    "x-user-id",
+    "x-user-role",
+    "x-user-tz",
+    "x-request-id",
+    "x-service-token",
+    "x-workspace-id",
+  ],
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   optionsSuccessStatus: 200,
 };
