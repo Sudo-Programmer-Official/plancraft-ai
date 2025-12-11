@@ -36,17 +36,7 @@ export function createGoalsApp() {
     },
     credentials: true,
     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: [
-     "Content-Type",
-     "Authorization",
-     "x-user-id",
-     "x-user-email",
-     "x-request-id",
-     "x-app-token",
-     "x-user-role",
-     "x-user-tz",
-     "x-user-country"
-    ]
+    allowedHeaders: "*"
   };
 
   app.use(cors(corsOptions));
