@@ -36,7 +36,8 @@ export function createGoalsApp() {
     },
     credentials: true,
     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: "*"
+    allowedHeaders: (req, cb) =>
+      cb(null, req.header("Access-Control-Request-Headers") || "*")
   };
 
   app.use(cors(corsOptions));

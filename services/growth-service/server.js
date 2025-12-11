@@ -36,7 +36,8 @@ const corsOptions = {
   },
   credentials: true,
   // Allow all request headers so custom workspace/app tokens don't get blocked by preflight
-  allowedHeaders: '*',
+  allowedHeaders: (req, cb) =>
+    cb(null, req.header('Access-Control-Request-Headers') || '*'),
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   optionsSuccessStatus: 200,
 }
