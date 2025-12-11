@@ -33,8 +33,17 @@ export async function createOccasion(payload: Occasion): Promise<Occasion> {
 }
 
 export async function updateOccasion(id: string, payload: Partial<Occasion>): Promise<Occasion> {
-  const { data } = await growthClient.put(`/leader/occasions/${id}`, payload)
-  return mapOccasion(data?.occasion || { ...payload, id })
+  try {
+    const { data } = await growthClient.put(`/leader/occasions/${id}`, payload)
+    return mapOccasion(data?.occasion || { ...payload, id })
+  } catch (error: any) {
+    // Fallback for older deployments that only accept PATCH
+    if (error?.response?.status === 404) {
+      const { data } = await growthClient.patch(`/leader/occasions/${id}`, payload)
+      return mapOccasion(data?.occasion || { ...payload, id })
+    }
+    throw error
+  }
 }
 
 export async function deleteOccasion(id: string) {

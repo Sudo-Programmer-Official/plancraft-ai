@@ -34,7 +34,7 @@
               <p class="text-sm font-semibold">{{ draft.title }}</p>
               <p class="text-xs text-slate-400 mt-1 line-clamp-2">{{ draft.summary }}</p>
               <div class="mt-2 flex gap-2 text-[11px] text-slate-500">
-                <span>{{ draft.platforms.join(', ') }}</span>
+                <span>{{ (draft.platforms || []).join(', ') }}</span>
                 <span>•</span>
                 <span>{{ draft.updatedAt }}</span>
               </div>
