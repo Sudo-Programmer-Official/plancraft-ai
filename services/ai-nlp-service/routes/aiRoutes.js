@@ -13,12 +13,14 @@ import {
 import { summarizeWorkspace, workspaceInspiration } from '../controllers/workspaceController.js'
 import { deleteMemory, searchWorkspaceMemory, upsertMemory } from '../controllers/memoryController.js'
 import { getForwardPulse, getMemoryPulse, getTodayPulse } from '../controllers/pulseController.js'
+import { ingestImage } from '../controllers/captureController.js'
 
 const router = Router()
 
 // OCR and structured extraction
 router.post('/ocr', ocrImage)
 router.post('/extract-event', extractEvent)
+router.post('/workspace/ingest-image', ingestImage)
 
 // Workspace-aware AI
 router.post('/workspace/summary', summarizeWorkspace)
