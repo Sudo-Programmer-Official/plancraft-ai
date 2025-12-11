@@ -46,6 +46,7 @@ const corsOptions = {
     'x-user-id',
     'x-user-role',
     'x-user-tz',
+    'x-workspace-id',
     'x-request-id',
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -56,6 +57,12 @@ app.use(cors(corsOptions))
 app.options('*', cors(corsOptions))
 app.use(express.json({ limit: '2mb' }))
 app.use(morgan('dev'))
+
+app.get('/debug/workspace', verifyAuth, (req, res) => {
+  const workspaceId =
+    req.headers['x-workspace-id'] || req.query?.workspaceId || req.body?.workspaceId || null
+  res.json({ success: true, userId: req.user?.uid || null, workspaceId })
+})
 
 // Mount under both /creator and /api/creator to tolerate differing base paths in clients/gateways.
 basePaths.forEach((base) => {

@@ -8,9 +8,13 @@ function uid(req) {
   return id
 }
 
+function workspaceId(req) {
+  return req.headers['x-workspace-id'] || req.query?.workspaceId || req.body?.workspaceId || null
+}
+
 async function generate(type, req, res, next) {
   try {
-    const data = await proxyAi(type, req.body || {})
+    const data = await proxyAi(type, { ...(req.body || {}), workspaceId: workspaceId(req) })
     res.json({ success: true, ...data })
   } catch (err) {
     next(err)
@@ -24,11 +28,12 @@ export const generateCta = (req, res, next) => generate('cta', req, res, next)
 export async function saveEditorContent(req, res, next) {
   try {
     const userId = uid(req)
+    const wsId = workspaceId(req)
     const { id, ...payload } = req.body || {}
     // Prefer variant documents; fallback to legacy content collection.
     const content = id
-      ? await updateVariant(userId, id, payload)
-      : await createVariant(userId, { ...payload, status: payload.status || 'draft' })
+      ? await updateVariant(userId, id, { ...payload, workspaceId: wsId || payload.workspaceId || null })
+      : await createVariant(userId, { ...payload, workspaceId: wsId || payload.workspaceId || null, status: payload.status || 'draft' })
     res.json({ success: true, content })
   } catch (err) {
     next(err)

@@ -82,6 +82,13 @@ export const useAuthStore = defineStore('authStore', {
           } catch {}
         })
       } catch {}
+      try {
+        import('@/stores/workspaceStore').then((mod) => {
+          try {
+            mod.useWorkspaceStore().reset()
+          } catch {}
+        })
+      } catch {}
     },
 
     async refreshUser() {
@@ -151,6 +158,11 @@ export const useAuthStore = defineStore('authStore', {
             identifyUser(this.user)
             localStorage.setItem('user', JSON.stringify(this.user))
             localStorage.setItem('token', this.token)
+            try {
+              import('@/stores/workspaceStore').then((mod) => {
+                try { mod.useWorkspaceStore().init() } catch {}
+              })
+            } catch {}
             // Live profile sync from Firestore (name/email/plan/etc.)
             try {
               if (this._profileUnsub) { this._profileUnsub(); this._profileUnsub = null }

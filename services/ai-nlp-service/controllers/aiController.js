@@ -15,16 +15,13 @@ async function handle(type, template, req, res, next) {
   try {
     const input = req.body?.input || ''
     const userId = req.user?.uid || 'anon'
-    try {
-     const output = await runLlm(template, input)
-     console.log('LLM output:', output)
-    } catch (llmError) {
-     console.error('Error generating LLM output:', llmError)
-     throw llmError
-    }
+    const workspaceId =
+      req.headers['x-workspace-id'] || req.body?.workspaceId || req.query?.workspaceId || null
+    const output = await runLlm(template, input)
+    console.log('LLM output:', output)
 
-    try { await logAi({ userId, type, input, output }) } catch {}
-    res.json({ success: true, output })
+    try { await logAi({ userId, workspaceId, type, input, output }) } catch {}
+    res.json({ success: true, output, workspaceId })
   } catch (err) {
     console.error('Error in AI controller:', err)
     next(err)

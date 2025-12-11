@@ -10,6 +10,7 @@ const APP_TOKEN = process.env.SERVICE_APP_TOKEN || process.env.APP_TOKEN || ''
 function headers(extra = {}) {
   const h = { 'Content-Type': 'application/json', ...extra }
   if (APP_TOKEN) h['x-app-token'] = APP_TOKEN
+  if (extra.workspaceId) h['x-workspace-id'] = extra.workspaceId
   return h
 }
 
@@ -24,7 +25,7 @@ async function handle(res) {
 export async function publishNow(payload) {
   const res = await fetch(`${POSTING_BASE}/messages/send-now`, {
     method: 'POST',
-    headers: headers(),
+    headers: headers({ workspaceId: payload.workspaceId || payload.context?.workspaceId }),
     body: JSON.stringify(payload || {}),
   })
   return handle(res)
@@ -33,7 +34,7 @@ export async function publishNow(payload) {
 export async function scheduleMessage(payload) {
   const res = await fetch(`${POSTING_BASE}/messages/schedule`, {
     method: 'POST',
-    headers: headers(),
+    headers: headers({ workspaceId: payload.workspaceId || payload.context?.workspaceId }),
     body: JSON.stringify(payload || {}),
   })
   return handle(res)
@@ -42,7 +43,7 @@ export async function scheduleMessage(payload) {
 export async function enqueuePostingJob(job) {
   const res = await fetch(`${POSTING_BASE}/api/posting/jobs`, {
     method: 'POST',
-    headers: headers(),
+    headers: headers({ workspaceId: job.workspaceId || job.meta?.workspaceId }),
     body: JSON.stringify(job || {}),
   })
   return handle(res)

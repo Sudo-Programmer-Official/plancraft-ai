@@ -85,6 +85,11 @@ api.interceptors.request.use(async (config) => {
     } catch {
       config.headers['x-user-country'] = 'US'
     }
+    // Workspace context
+    try {
+      const workspaceId = localStorage.getItem('activeWorkspaceId')
+      if (workspaceId) config.headers['x-workspace-id'] = workspaceId
+    } catch {}
   } catch {}
   return config
 })

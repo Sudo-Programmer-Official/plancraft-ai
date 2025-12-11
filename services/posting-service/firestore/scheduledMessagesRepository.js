@@ -13,6 +13,7 @@ export async function createScheduledMessages(userId, jobs = []) {
     const data = {
       ...job,
       userId,
+      workspaceId: job.workspaceId || job.context?.workspaceId || null,
       jobId: ref.id,
       status: job.status || 'pending',
       createdAt: job.createdAt || new Date(),
@@ -60,12 +61,11 @@ export async function markAsFailed(id, error) {
   )
 }
 
-export async function fetchMessageStats(userId) {
+export async function fetchMessageStats(userId, workspaceId = null) {
   ensureApp()
   const db = admin.firestore()
-  const query = userId
-    ? db.collection(COLLECTION).where('userId', '==', userId)
-    : db.collection(COLLECTION)
+  let query = userId ? db.collection(COLLECTION).where('userId', '==', userId) : db.collection(COLLECTION)
+  query = workspaceId ? query.where('workspaceId', '==', workspaceId) : query.where('workspaceId', 'in', [null, ''])
 
   const snap = await query.get()
   let total = 0

@@ -1,5 +1,5 @@
 // src/composables/useTasks.js
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { trackEvent } from '@/services/analytics'
 import { useAuthStore } from '@/stores/authStore'
 import { toLocalDateKey } from '@/utils/dateHelper'
@@ -12,14 +12,17 @@ import {
   deleteTaskFromFirebase,
 } from '@/services/firebaseService'
 import { resolveCategory } from '@/constants/taskCategories'
+import { useWorkspaceStore } from '@/stores/workspaceStore'
 
 // 🔗 Shared singleton state
 const tasks = ref([])
 let initialized = false
 let refreshListenerAttached = false
+let workspaceWatchAttached = false
 
 export function useTasks() {
   const authStore = useAuthStore()
+  const workspaceStore = useWorkspaceStore()
   /**
    * 🔄 Load tasks from Firestore for today (and current user)
    */
@@ -176,6 +179,19 @@ export function useTasks() {
       refreshListenerAttached = true
     } catch (err) {
       console.warn('[useTasks] failed to attach refresh listener', err?.message || err)
+    }
+  }
+  if (!workspaceWatchAttached) {
+    try {
+      watch(
+        () => workspaceStore.activeWorkspaceId,
+        () => {
+          loadTasks().catch((err) => console.warn('[useTasks] workspace switch load failed', err?.message || err))
+        },
+      )
+      workspaceWatchAttached = true
+    } catch (err) {
+      console.warn('[useTasks] failed to attach workspace watcher', err?.message || err)
     }
   }
 

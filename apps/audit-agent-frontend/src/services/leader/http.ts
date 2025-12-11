@@ -2,6 +2,7 @@ import axios, { AxiosInstance } from 'axios'
 import { ElMessage } from 'element-plus'
 import { auth } from '@/firebase/init'
 import { getAppToken } from '@/services/appTokenService'
+import { useWorkspaceStore } from '@/stores/workspaceStore'
 
 type Service = 'growth' | 'goals' | 'posting' | 'creator' | 'nlp'
 
@@ -94,6 +95,14 @@ export async function buildAuthHeaders(opts: AuthHeaderOptions = {}) {
       headers['x-user-tz'] = tz || 'UTC'
     } catch {
       headers['x-user-tz'] = 'UTC'
+    }
+    try {
+      const workspaceStore = useWorkspaceStore()
+      const workspaceId = workspaceStore?.activeWorkspaceId || localStorage.getItem('activeWorkspaceId')
+      if (workspaceId) headers['x-workspace-id'] = workspaceId
+    } catch {
+      const workspaceId = localStorage.getItem('activeWorkspaceId')
+      if (workspaceId) headers['x-workspace-id'] = workspaceId
     }
     try {
       const lang = (navigator.language || 'en-US').toUpperCase()

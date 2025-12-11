@@ -44,6 +44,7 @@ const corsOptions = {
     'x-user-id',
     'x-user-role',
     'x-user-tz',
+    'x-workspace-id',
     'x-request-id',
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -55,6 +56,11 @@ app.use(express.json({ limit: '2mb' }))
 app.use(morgan('dev'))
 
 app.get('/healthz', (_req, res) => res.status(200).json({ status: 'ok' }))
+app.get('/debug/workspace', verifyAuth, (req, res) => {
+  const workspaceId =
+    req.headers['x-workspace-id'] || req.query?.workspaceId || req.body?.workspaceId || null
+  res.json({ success: true, userId: req.user?.uid || null, workspaceId })
+})
 
 basePaths.forEach((base) => {
   app.use(base, verifyAuth, growthRoutes)

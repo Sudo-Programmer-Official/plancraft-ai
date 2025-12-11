@@ -51,8 +51,17 @@ export async function createLeaderEvent(payload: LeaderEvent): Promise<LeaderEve
 }
 
 export async function updateLeaderEvent(id: string, payload: Partial<LeaderEvent>): Promise<LeaderEvent> {
-  const { data } = await growthClient.put(`/leader/events/${id}`, normalizePayload(payload as LeaderEvent))
-  return mapEvent(data?.event || { ...payload, id })
+  try {
+    const { data } = await growthClient.put(`/leader/events/${id}`, normalizePayload(payload as LeaderEvent))
+    return mapEvent(data?.event || { ...payload, id })
+  } catch (error: any) {
+    // Fallback for older deployments that only accept PATCH
+    if (error?.response?.status === 404) {
+      const { data } = await growthClient.patch(`/leader/events/${id}`, normalizePayload(payload as LeaderEvent))
+      return mapEvent(data?.event || { ...payload, id })
+    }
+    throw error
+  }
 }
 
 export async function deleteLeaderEvent(id: string) {

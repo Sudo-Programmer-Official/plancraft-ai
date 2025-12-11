@@ -190,7 +190,8 @@
 </template>
 
 <script setup>
-import { onMounted, ref, computed, reactive } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -201,6 +202,8 @@ import {
   suggestEventCopy,
 } from '@/services/leader/events'
 
+const router = useRouter()
+const route = useRoute()
 const events = ref([])
 const loading = ref(false)
 const showModal = ref(false)
@@ -241,6 +244,31 @@ const calendarDays = computed(() => {
 function formatDate(value) {
   if (!value) return ''
   return dayjs(value).format('MMM D, YYYY')
+}
+
+async function prefillFromQuery() {
+  const seed = typeof route.query.seed === 'string' ? route.query.seed : ''
+  if (!seed) return
+  form.title = typeof route.query.title === 'string' && route.query.title.trim().length
+    ? route.query.title
+    : seed.slice(0, 48) + (seed.length > 48 ? '…' : '')
+  form.description = seed
+  if (typeof route.query.category === 'string') form.tags = route.query.category
+  showModal.value = true
+  await nextTick()
+  try {
+    router.replace({
+      query: {
+        ...route.query,
+        seed: undefined,
+        title: undefined,
+        category: undefined,
+        napkin: undefined,
+      },
+    })
+  } catch {
+    /* noop */
+  }
 }
 
 function nextMonth() {
@@ -353,5 +381,8 @@ async function suggestAi() {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  prefillFromQuery()
+})
 </script>

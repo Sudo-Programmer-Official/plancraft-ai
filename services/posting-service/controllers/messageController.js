@@ -3,6 +3,9 @@ import { createScheduledMessages, fetchMessageStats } from '../firestore/schedul
 import { handleJob } from '../services/deliveryService.js'
 
 const GROWTH_BASE = process.env.GROWTH_SERVICE_URL || 'http://growth-service'
+function workspaceId(req) {
+  return req.headers['x-workspace-id'] || req.body?.workspaceId || req.query?.workspaceId || null
+}
 
 function mergeRecipients(direct = [], groupContacts = []) {
   const map = new Map()
@@ -36,6 +39,7 @@ function buildJobs(userId, payload, recipients) {
   const now = new Date()
   const jobs = recipients.map((rcpt) => ({
     userId,
+    workspaceId: payload.workspaceId || payload.context?.workspaceId || null,
     channel: payload.channel,
     mode: payload.mode,
     recipients: [rcpt],
@@ -52,11 +56,12 @@ function buildJobs(userId, payload, recipients) {
 export async function sendNow(req, res, next) {
   try {
     const userId = req.user?.uid || 'anon'
+    const wsId = workspaceId(req)
     const payload = req.body || {}
     const authHeader = req.headers.authorization || ''
-    const groupContacts = await resolveGroupContacts(payload.groups || [], { Authorization: authHeader })
+    const groupContacts = await resolveGroupContacts(payload.groups || [], { Authorization: authHeader, 'x-workspace-id': wsId || undefined })
     const merged = mergeRecipients(payload.recipients || [], groupContacts)
-    const jobs = buildJobs(userId, payload, merged)
+    const jobs = buildJobs(userId, { ...payload, workspaceId: wsId || payload.workspaceId }, merged)
     const results = []
     for (const job of jobs) {
       try {
@@ -75,11 +80,12 @@ export async function sendNow(req, res, next) {
 export async function schedule(req, res, next) {
   try {
     const userId = req.user?.uid || 'anon'
+    const wsId = workspaceId(req)
     const payload = req.body || {}
     const authHeader = req.headers.authorization || ''
-    const groupContacts = await resolveGroupContacts(payload.groups || [], { Authorization: authHeader })
+    const groupContacts = await resolveGroupContacts(payload.groups || [], { Authorization: authHeader, 'x-workspace-id': wsId || undefined })
     const merged = mergeRecipients(payload.recipients || [], groupContacts)
-    const jobs = buildJobs(userId, payload, merged)
+    const jobs = buildJobs(userId, { ...payload, workspaceId: wsId || payload.workspaceId }, merged)
     const saved = await createScheduledMessages(userId, jobs)
     res.json({ success: true, scheduled: saved.length })
   } catch (err) {
@@ -90,7 +96,7 @@ export async function schedule(req, res, next) {
 export async function getMessageStats(req, res, next) {
   try {
     const userId = req.user?.uid || 'anon'
-    const stats = await fetchMessageStats(userId)
+    const stats = await fetchMessageStats(userId, workspaceId(req))
     res.json({ success: true, ...stats })
   } catch (err) {
     next(err)

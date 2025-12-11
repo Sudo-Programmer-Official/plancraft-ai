@@ -8,13 +8,18 @@ function uid(req) {
   return id
 }
 
+function workspaceId(req) {
+  return req.headers['x-workspace-id'] || req.query?.workspaceId || req.body?.workspaceId || null
+}
+
 export async function getBoard(req, res, next) {
   try {
     const userId = uid(req)
+    const wsId = workspaceId(req)
     const [variants, slots, inspiration] = await Promise.all([
-      listVariants(userId),
-      listSlots(userId),
-      listInspiration(userId),
+      listVariants(userId, { workspaceId: wsId }),
+      listSlots(userId, { workspaceId: wsId }),
+      listInspiration(userId, wsId),
     ])
     const now = new Date()
     const drafts = variants.filter((v) => (v.status || 'draft') === 'draft')

@@ -20,6 +20,8 @@ export async function logAiOutput(entry) {
   const ref = db.collection('ai_outputs').doc()
   const data = {
     ...entry,
+    workspaceId: entry?.workspaceId ?? null,
+    userId: entry?.userId || 'anon',
     createdAt: entry?.createdAt || new Date(),
   }
   await ref.set(data)

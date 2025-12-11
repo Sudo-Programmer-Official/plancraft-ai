@@ -82,7 +82,7 @@
 import { onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { fetchCreatorBoard } from '@/services/creatorApi'
+import { fetchCreatorBoard, fetchCreatorSlots, fetchCreatorInspiration } from '@/services/creatorApi'
 
 const router = useRouter()
 const loading = ref(false)
@@ -90,13 +90,53 @@ const drafts = ref([])
 const inspiration = ref([])
 const scheduled = ref([])
 
+function fallbackInspiration() {
+  return [
+    { title: 'Founder spotlight', tip: 'Share a behind-the-scenes photo with 2–3 sentences on what you’re building this week.' },
+    { title: 'Customer win', tip: 'Post a short quote from a user and add one actionable takeaway for your audience.' },
+    { title: 'Teach a micro-skill', tip: 'Record a 30–60s clip showing a quick tip; turn the script into a LinkedIn post.' },
+    { title: 'Weekend preview', tip: 'Preview something you’re shipping next week with a CTA to follow for updates.' },
+  ]
+}
+
+function formatWhen(date) {
+  if (!date) return 'Unscheduled'
+  const d = date instanceof Date ? date : new Date(date)
+  return d.toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' })
+}
+
+async function loadInspiration() {
+  try {
+    const inspo = await fetchCreatorInspiration()
+    inspiration.value = Array.isArray(inspo) && inspo.length ? inspo : fallbackInspiration()
+  } catch {
+    inspiration.value = fallbackInspiration()
+  }
+}
+
 async function loadBoard() {
   loading.value = true
   try {
     const data = await fetchCreatorBoard()
     drafts.value = data.drafts || []
-    inspiration.value = data.inspiration || []
-    scheduled.value = data.scheduled || []
+    const baseInspo = data.inspiration?.length ? data.inspiration : await fetchCreatorInspiration()
+    inspiration.value = (baseInspo && baseInspo.length) ? baseInspo : fallbackInspiration()
+    scheduled.value = (data.scheduled || []).map((slot) => ({
+      ...slot,
+      when: formatWhen(slot.scheduledAt || slot.date),
+    }))
+
+    // Fallback: if board API returns no scheduled, pull directly from slots endpoint
+    if (!scheduled.value.length) {
+      const slots = await fetchCreatorSlots()
+      scheduled.value = slots.map((slot) => ({
+        id: slot.id,
+        title: slot.caption || slot.title || 'Scheduled post',
+        platform: slot.platform || 'platform',
+        variant: slot.variantType || slot.variantId || 'variant',
+        when: formatWhen(slot.scheduledAt || slot.date),
+      }))
+    }
   } catch (err) {
     ElMessage.error(err?.response?.data?.error || 'Failed to load board')
   } finally {
@@ -112,9 +152,12 @@ function goRepurpose() {
   router.push('/creator/repurpose')
 }
 
-function refreshInspiration() {
-  loadBoard()
+async function refreshInspiration() {
+  await loadInspiration()
 }
 
-onMounted(loadBoard)
+onMounted(async () => {
+  await loadBoard()
+  if (!inspiration.value.length) await loadInspiration()
+})
 </script>

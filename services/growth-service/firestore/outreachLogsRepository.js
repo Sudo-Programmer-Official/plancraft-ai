@@ -23,6 +23,7 @@ export async function logOutreach(entry) {
     input: entry.input || '',
     output: entry.output || '',
     channel: entry.channel || 'email',
+    workspaceId: entry.workspaceId ?? null,
     createdAt: new Date(),
   }
   await ref.set(data)

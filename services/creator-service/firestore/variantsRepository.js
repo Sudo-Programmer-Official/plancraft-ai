@@ -13,6 +13,7 @@ function baseVariant(uid, payload = {}, isNew = false) {
     status: payload.status || 'draft',
     sourceId: payload.sourceId || null,
     aiMeta: payload.aiMeta || payload.meta || null,
+    workspaceId: payload.workspaceId || null,
     createdAt: isNew ? serverTs() : undefined,
     updatedAt: serverTs(),
   })
@@ -27,20 +28,33 @@ export async function createVariant(uid, payload = {}) {
 
 export async function updateVariant(uid, id, payload = {}) {
   const ref = creatorCollection(uid, 'variants').doc(id)
-  const updates = baseVariant(uid, payload, false)
-  await ref.set(updates, { merge: true })
   const snap = await ref.get()
-  return { id: snap.id, ...snap.data() }
+  if (!snap.exists) return null
+  const existing = snap.data() || {}
+  if (payload.workspaceId && existing.workspaceId && existing.workspaceId !== payload.workspaceId) {
+    return null
+  }
+  const updates = baseVariant(uid, { ...payload, workspaceId: payload.workspaceId ?? existing.workspaceId ?? null }, false)
+  await ref.set(updates, { merge: true })
+  const refreshed = await ref.get()
+  return { id: refreshed.id, ...refreshed.data() }
 }
 
-export async function getVariant(uid, id) {
+export async function getVariant(uid, id, workspaceId = null) {
   const snap = await creatorCollection(uid, 'variants').doc(id).get()
   if (!snap.exists) return null
-  return { id: snap.id, ...snap.data() }
+  const data = snap.data() || {}
+  if (workspaceId && data.workspaceId && data.workspaceId !== workspaceId) return null
+  return { id: snap.id, ...data }
 }
 
 export async function listVariants(uid, opts = {}) {
-  const snap = await creatorCollection(uid, 'variants').orderBy('updatedAt', 'desc').limit(200).get()
+  const col = creatorCollection(uid, 'variants')
+  const wsId = opts.workspaceId || null
+  const query = wsId
+    ? col.where('workspaceId', '==', wsId).orderBy('updatedAt', 'desc').limit(200)
+    : col.where('workspaceId', 'in', [null, '']).orderBy('updatedAt', 'desc').limit(200)
+  const snap = await query.get()
   const variants = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
   if (opts.status) {
     const target = Array.isArray(opts.status) ? opts.status : [opts.status]
@@ -49,10 +63,10 @@ export async function listVariants(uid, opts = {}) {
   return variants
 }
 
-export async function createVariantsFromMap(uid, variants = {}) {
+export async function createVariantsFromMap(uid, variants = {}, workspaceId = null) {
   const saved = []
   for (const value of Object.values(variants)) {
-    const variant = await createVariant(uid, value)
+    const variant = await createVariant(uid, { ...value, workspaceId })
     saved.push(variant)
   }
   return saved

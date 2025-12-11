@@ -18,6 +18,7 @@ export async function saveJob(job = {}) {
   const data = {
     ...job,
     jobId: job.jobId || ref.id,
+    workspaceId: job.workspaceId || job.meta?.workspaceId || null,
     status: job.status || 'pending',
     scheduledAt,
     createdAt: job.createdAt ? toDate(job.createdAt) : now,

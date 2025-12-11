@@ -8,6 +8,34 @@ function requireUid(req) {
   return uid
 }
 
+function workspaceId(req) {
+  return (
+    req.headers['x-workspace-id'] ||
+    req.query?.workspaceId ||
+    req.body?.workspaceId ||
+    null
+  )
+}
+
+function attachWorkspace(payload = {}, wsId = null) {
+  if (wsId === undefined) return payload
+  return { ...payload, workspaceId: wsId || null }
+}
+
+function filterByWorkspace(list = [], wsId = null) {
+  if (!wsId) return list
+  return list.filter((item) => item?.workspaceId === wsId)
+}
+
+async function snapWithWorkspace(col, wsId, orderByField = null, orderDir = 'desc', limitCount = null) {
+  let query = col
+  if (wsId) query = query.where('workspaceId', '==', wsId)
+  else query = query.where('workspaceId', 'in', [null, ''])
+  if (orderByField) query = query.orderBy(orderByField, orderDir)
+  if (limitCount) query = query.limit(limitCount)
+  return query.get()
+}
+
 function dropUndefined(obj = {}) {
   return sanitizeForFirestore(obj)
 }
@@ -61,6 +89,7 @@ function serializeEvent(id, data = {}) {
 export async function getOverview(req, res, next) {
   try {
     const uid = requireUid(req)
+    const wsId = workspaceId(req)
     const contactsCol = userCollection(uid, 'contacts')
     const occasionsCol = userCollection(uid, 'occasions')
     const eventsCol = userCollection(uid, 'events')
@@ -68,11 +97,11 @@ export async function getOverview(req, res, next) {
     const messagesCol = userCollection(uid, 'messages')
 
     const [contactsSnap, occasionsSnap, eventsSnap, issuesSnap, messagesSnap] = await Promise.all([
-      contactsCol.get(),
-      occasionsCol.get(),
-      eventsCol.get(),
-      issuesCol.get(),
-      messagesCol.get(),
+      snapWithWorkspace(contactsCol, wsId),
+      snapWithWorkspace(occasionsCol, wsId),
+      snapWithWorkspace(eventsCol, wsId),
+      snapWithWorkspace(issuesCol, wsId),
+      snapWithWorkspace(messagesCol, wsId),
     ])
 
     const now = new Date()
@@ -80,24 +109,29 @@ export async function getOverview(req, res, next) {
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
     const horizon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
 
-    const eventsThisMonth = eventsSnap.docs.filter((d) => {
-      const s = mapDateField(d.get('start')) || mapDateField(d.get('startDateTime'))
+    const eventsData = eventsSnap.docs.map((d) => ({ id: d.id, ...d.data() }))
+    const occasionsData = occasionsSnap.docs.map((d) => ({ id: d.id, ...d.data() }))
+    const issuesData = issuesSnap.docs.map((d) => ({ id: d.id, ...d.data() }))
+    const messagesData = messagesSnap.docs.map((d) => ({ id: d.id, ...d.data() }))
+
+    const eventsThisMonth = filterByWorkspace(eventsData, wsId).filter((d) => {
+      const s = mapDateField(d.start) || mapDateField(d.startDateTime)
       return s && s >= startOfMonth && s < endOfMonth
     }).length
 
-    const upcomingOccasions = occasionsSnap.docs.filter((d) => {
-      const next = mapDateField(d.get('nextOccurrence')) || mapDateField(d.get('date'))
+    const upcomingOccasions = filterByWorkspace(occasionsData, wsId).filter((d) => {
+      const next = mapDateField(d.nextOccurrence) || mapDateField(d.date)
       return next && next >= now && next <= horizon
     }).length
 
-    const openIssues = issuesSnap.docs.filter((d) => {
-      const status = (d.get('status') || '').toLowerCase()
+    const openIssues = filterByWorkspace(issuesData, wsId).filter((d) => {
+      const status = (d.status || '').toLowerCase()
       return status !== 'closed' && status !== 'resolved'
     }).length
 
-    const scheduledMessages = messagesSnap.docs.filter((d) => {
-      const status = (d.get('status') || '').toLowerCase()
-      const scheduled = mapDateField(d.get('scheduledAt'))
+    const scheduledMessages = filterByWorkspace(messagesData, wsId).filter((d) => {
+      const status = (d.status || '').toLowerCase()
+      const scheduled = mapDateField(d.scheduledAt)
       return status === 'queued' || (!!scheduled && scheduled >= now)
     }).length
 
@@ -126,7 +160,8 @@ export async function getOverview(req, res, next) {
 export async function getEventsStats(req, res, next) {
   try {
     const uid = requireUid(req)
-    const snap = await userCollection(uid, 'events').get()
+    const wsId = workspaceId(req)
+    const snap = await snapWithWorkspace(userCollection(uid, 'events'), wsId)
     const total = snap.size
     const planned = snap.docs.filter((d) => (d.get('status') || 'planned') === 'planned').length
     const done = snap.docs.filter((d) => (d.get('status') || '').toLowerCase() === 'done').length
@@ -139,10 +174,11 @@ export async function getEventsStats(req, res, next) {
 export async function getUpcomingOccasions(req, res, next) {
   try {
     const uid = requireUid(req)
+    const wsId = workspaceId(req)
     const windowDays = Number.parseInt(req.query.windowDays || '30', 10)
     const now = new Date()
     const horizon = new Date(now.getTime() + windowDays * 24 * 60 * 60 * 1000)
-    const snap = await userCollection(uid, 'occasions').orderBy('nextOccurrence', 'asc').limit(50).get()
+    const snap = await snapWithWorkspace(userCollection(uid, 'occasions'), wsId, 'nextOccurrence', 'asc', 50)
     const occasions = snap.docs
       .map((d) => ({ id: d.id, ...d.data() }))
       .filter((o) => {
@@ -158,8 +194,9 @@ export async function getUpcomingOccasions(req, res, next) {
 export async function getRecentIssues(req, res, next) {
   try {
     const uid = requireUid(req)
-    const snap = await userCollection(uid, 'issues').orderBy('updatedAt', 'desc').limit(10).get()
-    const issues = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+    const wsId = workspaceId(req)
+    const snap = await snapWithWorkspace(userCollection(uid, 'issues'), wsId, 'updatedAt', 'desc', 10)
+    const issues = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((i) => !wsId || !i.workspaceId || i.workspaceId === wsId)
     res.json({ success: true, issues })
   } catch (err) {
     next(err)
@@ -170,7 +207,8 @@ export async function getRecentIssues(req, res, next) {
 export async function listContacts(req, res, next) {
   try {
     const uid = requireUid(req)
-    const snap = await userCollection(uid, 'contacts').orderBy('createdAt', 'desc').get()
+    const wsId = workspaceId(req)
+    const snap = await snapWithWorkspace(userCollection(uid, 'contacts'), wsId, 'createdAt', 'desc')
     const contacts = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
     res.json({ success: true, contacts })
   } catch (err) {
@@ -181,10 +219,11 @@ export async function listContacts(req, res, next) {
 export async function createContact(req, res, next) {
   try {
     const uid = requireUid(req)
+    const wsId = workspaceId(req)
     const data = req.body || {}
     const col = userCollection(uid, 'contacts')
     const docRef = col.doc()
-    const payload = sanitizeForFirestore({
+    const payload = sanitizeForFirestore(attachWorkspace({
       ownerId: uid,
       name: data.name || '',
       email: data.email || null,
@@ -196,7 +235,7 @@ export async function createContact(req, res, next) {
       timezone: data.timezone || null,
       createdAt: serverTs(),
       updatedAt: serverTs(),
-    })
+    }, wsId))
     await docRef.set(payload)
     res.status(201).json({ success: true, contact: { id: docRef.id, ...payload } })
   } catch (err) {
@@ -207,8 +246,9 @@ export async function createContact(req, res, next) {
 export async function updateContact(req, res, next) {
   try {
     const uid = requireUid(req)
+    const wsId = workspaceId(req)
     const { id } = req.params
-    const updates = sanitizeForFirestore({ ...(req.body || {}), updatedAt: serverTs() })
+    const updates = sanitizeForFirestore(attachWorkspace({ ...(req.body || {}), updatedAt: serverTs() }, wsId))
     const docRef = userCollection(uid, 'contacts').doc(id)
     await docRef.set(updates, { merge: true })
     const snap = await docRef.get()
@@ -221,8 +261,9 @@ export async function updateContact(req, res, next) {
 export async function deleteContact(req, res, next) {
   try {
     const uid = requireUid(req)
+    const wsId = workspaceId(req)
     const { id } = req.params
-    await userCollection(uid, 'contacts').doc(id).delete()
+    await userCollection(uid, 'contacts').doc(id).set({ deleted: true, workspaceId: wsId || null, updatedAt: serverTs() }, { merge: true })
     res.json({ success: true })
   } catch (err) {
     next(err)
@@ -233,7 +274,8 @@ export async function deleteContact(req, res, next) {
 export async function listContactGroups(req, res, next) {
   try {
     const uid = requireUid(req)
-    const snap = await userCollection(uid, 'contactGroups').orderBy('createdAt', 'desc').get()
+    const wsId = workspaceId(req)
+    const snap = await snapWithWorkspace(userCollection(uid, 'contactGroups'), wsId, 'createdAt', 'desc')
     const groups = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
     res.json({ success: true, groups })
   } catch (err) {
@@ -244,17 +286,18 @@ export async function listContactGroups(req, res, next) {
 export async function createContactGroup(req, res, next) {
   try {
     const uid = requireUid(req)
+    const wsId = workspaceId(req)
     const data = req.body || {}
     const col = userCollection(uid, 'contactGroups')
     const docRef = col.doc()
-    const payload = sanitizeForFirestore({
+    const payload = sanitizeForFirestore(attachWorkspace({
       ownerId: uid,
       name: data.name || '',
       description: data.description || null,
       memberIds: data.memberIds || data.contactIds || [],
       createdAt: serverTs(),
       updatedAt: serverTs(),
-    })
+    }, wsId))
     await docRef.set(payload)
     res.status(201).json({ success: true, group: { id: docRef.id, ...payload } })
   } catch (err) {
@@ -265,8 +308,9 @@ export async function createContactGroup(req, res, next) {
 export async function updateContactGroup(req, res, next) {
   try {
     const uid = requireUid(req)
+    const wsId = workspaceId(req)
     const { id } = req.params
-    const updates = sanitizeForFirestore({ ...(req.body || {}), updatedAt: serverTs() })
+    const updates = sanitizeForFirestore(attachWorkspace({ ...(req.body || {}), updatedAt: serverTs() }, wsId))
     const docRef = userCollection(uid, 'contactGroups').doc(id)
     await docRef.set(updates, { merge: true })
     const snap = await docRef.get()
@@ -279,8 +323,9 @@ export async function updateContactGroup(req, res, next) {
 export async function deleteContactGroup(req, res, next) {
   try {
     const uid = requireUid(req)
+    const wsId = workspaceId(req)
     const { id } = req.params
-    await userCollection(uid, 'contactGroups').doc(id).delete()
+    await userCollection(uid, 'contactGroups').doc(id).set({ deleted: true, workspaceId: wsId || null, updatedAt: serverTs() }, { merge: true })
     res.json({ success: true })
   } catch (err) {
     next(err)
@@ -291,7 +336,8 @@ export async function deleteContactGroup(req, res, next) {
 export async function listOccasions(req, res, next) {
   try {
     const uid = requireUid(req)
-    const snap = await userCollection(uid, 'occasions').orderBy('nextOccurrence', 'asc').get()
+    const wsId = workspaceId(req)
+    const snap = await snapWithWorkspace(userCollection(uid, 'occasions'), wsId, 'nextOccurrence', 'asc')
     const occasions = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
     res.json({ success: true, occasions })
   } catch (err) {
@@ -302,13 +348,14 @@ export async function listOccasions(req, res, next) {
 export async function createOccasion(req, res, next) {
   try {
     const uid = requireUid(req)
+    const wsId = workspaceId(req)
     const data = req.body || {}
     const col = userCollection(uid, 'occasions')
     const docRef = col.doc()
     const month = data.month || (data.date ? new Date(data.date).getMonth() + 1 : null)
     const day = data.day || (data.date ? new Date(data.date).getDate() : null)
     const next = computeNextOccurrence(month, day)
-    const payload = sanitizeForFirestore({
+    const payload = sanitizeForFirestore(attachWorkspace({
       ownerId: uid,
       contactId: data.contactId || null,
       type: data.type || 'other',
@@ -320,7 +367,7 @@ export async function createOccasion(req, res, next) {
       note: data.note || data.notes || null,
       createdAt: serverTs(),
       updatedAt: serverTs(),
-    })
+    }, wsId))
     await docRef.set(payload)
     res.status(201).json({ success: true, occasion: { id: docRef.id, ...payload } })
   } catch (err) {
@@ -331,18 +378,19 @@ export async function createOccasion(req, res, next) {
 export async function updateOccasion(req, res, next) {
   try {
     const uid = requireUid(req)
+    const wsId = workspaceId(req)
     const { id } = req.params
     const data = req.body || {}
     const month = data.month || (data.date ? new Date(data.date).getMonth() + 1 : undefined)
     const day = data.day || (data.date ? new Date(data.date).getDate() : undefined)
     const next = computeNextOccurrence(month, day)
-    const updates = sanitizeForFirestore({
+    const updates = sanitizeForFirestore(attachWorkspace({
       ...data,
       month,
       day,
       nextOccurrence: next ? admin.firestore.Timestamp.fromDate(next) : undefined,
       updatedAt: serverTs(),
-    })
+    }, wsId))
     const docRef = userCollection(uid, 'occasions').doc(id)
     await docRef.set(updates, { merge: true })
     const snap = await docRef.get()
@@ -355,8 +403,9 @@ export async function updateOccasion(req, res, next) {
 export async function deleteOccasion(req, res, next) {
   try {
     const uid = requireUid(req)
+    const wsId = workspaceId(req)
     const { id } = req.params
-    await userCollection(uid, 'occasions').doc(id).delete()
+    await userCollection(uid, 'occasions').doc(id).set({ deleted: true, workspaceId: wsId || null, updatedAt: serverTs() }, { merge: true })
     res.json({ success: true })
   } catch (err) {
     next(err)
@@ -367,13 +416,13 @@ export async function deleteOccasion(req, res, next) {
 export async function listEvents(req, res, next) {
   try {
     const uid = requireUid(req)
+    const wsId = workspaceId(req)
     const { start, end, from, to, thisMonth } = req.query
     const now = new Date()
     const fromDate = thisMonth ? new Date(now.getFullYear(), now.getMonth(), 1) : parseDate(start || from)
     const toDate = thisMonth ? new Date(now.getFullYear(), now.getMonth() + 1, 1) : parseDate(end || to)
-    const snap = await userCollection(uid, 'events').orderBy('startDateTime', 'desc').limit(400).get()
-    const events = snap.docs
-      .map((d) => serializeEvent(d.id, d.data() || {}))
+    const snap = await snapWithWorkspace(userCollection(uid, 'events'), wsId, 'startDateTime', 'desc', 400)
+    const events = filterByWorkspace(snap.docs.map((d) => serializeEvent(d.id, d.data() || {})), wsId)
       .filter((evt) => {
         const s = mapDateField(evt.start) || mapDateField(evt.startDateTime)
         if (fromDate && s && s < fromDate) return false
@@ -389,6 +438,7 @@ export async function listEvents(req, res, next) {
 export async function createEvent(req, res, next) {
   try {
     const uid = requireUid(req)
+    const wsId = workspaceId(req)
     const data = dropUndefined(req.body || {})
     const col = userCollection(uid, 'events')
     const docRef = col.doc()
@@ -396,7 +446,7 @@ export async function createEvent(req, res, next) {
     const startTimezone = data.start?.timezone || data.timezone || 'UTC'
     const endDate = parseDate(data.end?.dateTime || data.endDate || data.end)
     const endTimezone = data.end?.timezone || data.timezone || startTimezone
-    const payload = sanitizeForFirestore({
+    const payload = sanitizeForFirestore(attachWorkspace({
       ownerId: uid,
       contactIds: data.contactIds || (data.contactId ? [data.contactId] : []),
       contactId: data.contactId || null,
@@ -422,7 +472,7 @@ export async function createEvent(req, res, next) {
       status: data.status || 'planned',
       createdAt: serverTs(),
       updatedAt: serverTs(),
-    })
+    }, wsId))
     await docRef.set(payload)
 
     console.info('[leader] event created', {
@@ -443,8 +493,9 @@ export async function createEvent(req, res, next) {
 export async function updateEvent(req, res, next) {
   try {
     const uid = requireUid(req)
+    const wsId = workspaceId(req)
     const { id } = req.params
-    const updates = sanitizeForFirestore({
+    const updates = sanitizeForFirestore(attachWorkspace({
       ...(req.body || {}),
       start: req.body?.start?.dateTime
         ? { dateTime: req.body.start.dateTime, timezone: req.body.start.timezone || req.body.timezone || 'UTC' }
@@ -459,7 +510,7 @@ export async function updateEvent(req, res, next) {
       endTimezone: req.body?.end?.timezone || req.body?.timezone,
       endTimestamp: toTimestamp(req.body?.end?.dateTime || req.body?.end || req.body?.endDate),
       updatedAt: serverTs(),
-    })
+    }, wsId))
     const docRef = userCollection(uid, 'events').doc(id)
     await docRef.set(updates, { merge: true })
     const snap = await docRef.get()
@@ -472,8 +523,9 @@ export async function updateEvent(req, res, next) {
 export async function deleteEvent(req, res, next) {
   try {
     const uid = requireUid(req)
+    const wsId = workspaceId(req)
     const { id } = req.params
-    await userCollection(uid, 'events').doc(id).delete()
+    await userCollection(uid, 'events').doc(id).set({ deleted: true, workspaceId: wsId || null, updatedAt: serverTs() }, { merge: true })
     res.json({ success: true })
   } catch (err) {
     next(err)
@@ -497,9 +549,12 @@ function resolveRecipient(channel, data = {}, contact = null) {
 export async function listMessages(req, res, next) {
   try {
     const uid = requireUid(req)
+    const wsId = workspaceId(req)
     const { eventId } = req.query || {}
-    let query = userCollection(uid, 'messages').orderBy('createdAt', 'desc').limit(100)
+    let query = userCollection(uid, 'messages')
+    query = wsId ? query.where('workspaceId', '==', wsId) : query.where('workspaceId', 'in', [null, ''])
     if (eventId) query = query.where('eventId', '==', eventId)
+    query = query.orderBy('createdAt', 'desc').limit(100)
     const snap = await query.get()
     const messages = snap.docs.map((d) => {
       const data = d.data() || {}
@@ -519,7 +574,8 @@ export async function listMessages(req, res, next) {
 export async function getRecentMessages(req, res, next) {
   try {
     const uid = requireUid(req)
-    const snap = await userCollection(uid, 'messages').orderBy('createdAt', 'desc').limit(20).get()
+    const wsId = workspaceId(req)
+    const snap = await snapWithWorkspace(userCollection(uid, 'messages'), wsId, 'createdAt', 'desc', 20)
     const messages = snap.docs.map((d) => {
       const data = d.data() || {}
       const scheduledAt = mapDateField(data.scheduledAt)
@@ -538,6 +594,7 @@ export async function getRecentMessages(req, res, next) {
 export async function createMessage(req, res, next) {
   try {
     const uid = requireUid(req)
+    const wsId = workspaceId(req)
     const data = req.body || {}
     const contactIds = Array.isArray(data.contactIds)
       ? data.contactIds
@@ -550,7 +607,7 @@ export async function createMessage(req, res, next) {
     const to = resolveRecipient(channel, data, primaryContact)
     const col = userCollection(uid, 'messages')
     const docRef = col.doc()
-    const payload = sanitizeForFirestore({
+    const payload = sanitizeForFirestore(attachWorkspace({
       ownerId: uid,
       contactIds,
       eventId: data.eventId || null,
@@ -565,7 +622,7 @@ export async function createMessage(req, res, next) {
       createdAt: serverTs(),
       updatedAt: serverTs(),
       meta: data.meta || {},
-    })
+    }, wsId))
     await docRef.set(payload)
 
     let job = null
@@ -585,6 +642,7 @@ export async function createMessage(req, res, next) {
           leaderId: uid,
           occasionId: payload.occasionId || null,
           eventId: payload.eventId || null,
+          workspaceId: wsId || null,
           messageId: `leaders/${uid}/messages/${docRef.id}`,
         },
       }
@@ -621,11 +679,12 @@ export async function createMessage(req, res, next) {
 export async function updateMessage(req, res, next) {
   try {
     const uid = requireUid(req)
+    const wsId = workspaceId(req)
     const { id } = req.params
-    const updates = sanitizeForFirestore({
+    const updates = sanitizeForFirestore(attachWorkspace({
       ...(req.body || {}),
       updatedAt: serverTs(),
-    })
+    }, wsId))
     const docRef = userCollection(uid, 'messages').doc(id)
     await docRef.set(updates, { merge: true })
     const snap = await docRef.get()
@@ -638,10 +697,14 @@ export async function updateMessage(req, res, next) {
 export async function sendMessageNow(req, res, next) {
   try {
     const uid = requireUid(req)
+    const wsId = workspaceId(req)
     const { id } = req.params
     const snap = await userCollection(uid, 'messages').doc(id).get()
     if (!snap.exists) return res.status(404).json({ success: false, error: 'Message not found' })
     const data = snap.data() || {}
+    if (wsId && data.workspaceId && data.workspaceId !== wsId) {
+      return res.status(403).json({ success: false, error: 'Wrong workspace' })
+    }
     const channel = data.channel || 'sms'
     const scheduled = new Date()
     const jobBody = {
@@ -659,6 +722,7 @@ export async function sendMessageNow(req, res, next) {
         leaderId: uid,
         occasionId: data.occasionId || null,
         eventId: data.eventId || null,
+        workspaceId: wsId || data.workspaceId || null,
         messageId: `leaders/${uid}/messages/${id}`,
       },
     }
@@ -690,7 +754,8 @@ export async function sendMessageNow(req, res, next) {
 export async function listIssues(req, res, next) {
   try {
     const uid = requireUid(req)
-    const snap = await userCollection(uid, 'issues').orderBy('createdAt', 'desc').limit(200).get()
+    const wsId = workspaceId(req)
+    const snap = await snapWithWorkspace(userCollection(uid, 'issues'), wsId, 'createdAt', 'desc', 200)
     const issues = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
     res.json({ success: true, issues })
   } catch (err) {
@@ -701,10 +766,11 @@ export async function listIssues(req, res, next) {
 export async function createIssue(req, res, next) {
   try {
     const uid = requireUid(req)
+    const wsId = workspaceId(req)
     const data = req.body || {}
     const col = userCollection(uid, 'issues')
     const docRef = col.doc()
-    const payload = sanitizeForFirestore({
+    const payload = sanitizeForFirestore(attachWorkspace({
       ownerId: uid,
       contactId: data.contactId || null,
       eventId: data.eventId || null,
@@ -715,7 +781,7 @@ export async function createIssue(req, res, next) {
       createdAt: serverTs(),
       updatedAt: serverTs(),
       lastActivityAt: serverTs(),
-    })
+    }, wsId))
     await docRef.set(payload)
     res.status(201).json({ success: true, issue: { id: docRef.id, ...payload } })
   } catch (err) {
@@ -726,12 +792,13 @@ export async function createIssue(req, res, next) {
 export async function updateIssue(req, res, next) {
   try {
     const uid = requireUid(req)
+    const wsId = workspaceId(req)
     const { id } = req.params
-    const updates = sanitizeForFirestore({
+    const updates = sanitizeForFirestore(attachWorkspace({
       ...(req.body || {}),
       updatedAt: serverTs(),
       lastActivityAt: serverTs(),
-    })
+    }, wsId))
     const docRef = userCollection(uid, 'issues').doc(id)
     await docRef.set(updates, { merge: true })
     const snap = await docRef.get()
@@ -744,8 +811,9 @@ export async function updateIssue(req, res, next) {
 export async function deleteIssue(req, res, next) {
   try {
     const uid = requireUid(req)
+    const wsId = workspaceId(req)
     const { id } = req.params
-    await userCollection(uid, 'issues').doc(id).delete()
+    await userCollection(uid, 'issues').doc(id).set({ deleted: true, workspaceId: wsId || null, updatedAt: serverTs() }, { merge: true })
     res.json({ success: true })
   } catch (err) {
     next(err)
@@ -755,12 +823,13 @@ export async function deleteIssue(req, res, next) {
 export async function listIssueTimeline(req, res, next) {
   try {
     const uid = requireUid(req)
+    const wsId = workspaceId(req)
     const id = req.params?.id || req.query?.issueId
     if (!id) return res.status(400).json({ success: false, error: 'Missing issueId' })
-    const snap = await userCollection(uid, 'issueTimelines')
-      .where('issueId', '==', id)
-      .orderBy('createdAt', 'asc')
-      .get()
+    let q = userCollection(uid, 'issueTimelines').where('issueId', '==', id)
+    q = wsId ? q.where('workspaceId', '==', wsId) : q.where('workspaceId', 'in', [null, ''])
+    q = q.orderBy('createdAt', 'asc')
+    const snap = await q.get()
     const entries = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
     res.json({ success: true, entries })
   } catch (err) {
@@ -771,27 +840,25 @@ export async function listIssueTimeline(req, res, next) {
 export async function addIssueTimelineEntry(req, res, next) {
   try {
     const uid = requireUid(req)
+    const wsId = workspaceId(req)
     const { id } = req.params
     const data = req.body || {}
     const col = userCollection(uid, 'issueTimelines')
     const docRef = col.doc()
-    const payload = {
+    const payload = attachWorkspace({
       ownerId: uid,
       issueId: id,
       type: data.type || 'note',
       message: data.message || '',
       createdAt: serverTs(),
       meta: data.meta || {},
-    }
+    }, wsId)
     await docRef.set(payload)
 
-    await userCollection(uid, 'issues').doc(id).set(
-      {
-        lastActivityAt: serverTs(),
-        updatedAt: serverTs(),
-      },
-      { merge: true },
-    )
+    await userCollection(uid, 'issues').doc(id).set(attachWorkspace({
+      lastActivityAt: serverTs(),
+      updatedAt: serverTs(),
+    }, wsId), { merge: true })
 
     res.status(201).json({ success: true, entry: { id: docRef.id, ...payload } })
   } catch (err) {
@@ -803,9 +870,9 @@ export async function addIssueTimelineEntry(req, res, next) {
 export async function listLocations(req, res, next) {
   try {
     const uid = requireUid(req)
-    const snap = await userCollection(uid, 'events').orderBy('start', 'desc').limit(200).get()
-    const locations = snap.docs
-      .map((d) => ({ id: d.id, ...d.data() }))
+    const wsId = workspaceId(req)
+    const snap = await snapWithWorkspace(userCollection(uid, 'events'), wsId, 'start', 'desc', 200)
+    const locations = filterByWorkspace(snap.docs.map((d) => ({ id: d.id, ...d.data() })), wsId)
       .filter((evt) => evt.locationText || evt.locationGeo)
       .map((evt) => ({
         id: evt.id,

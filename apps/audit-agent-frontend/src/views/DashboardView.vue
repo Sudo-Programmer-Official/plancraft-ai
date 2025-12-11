@@ -754,7 +754,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watchEffect, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { collection, onSnapshot, updateDoc, doc, query, where, serverTimestamp } from 'firebase/firestore'
+import { collection, onSnapshot, updateDoc, doc, query, where, serverTimestamp, getDocs } from 'firebase/firestore'
 import { db, auth } from '@/firebase/init'
 import { onAuthStateChanged } from 'firebase/auth'
 import { toLocalDateKey } from '@/utils/dateHelper'
@@ -778,6 +778,7 @@ import { getReminderStatus, scheduleReminder } from '@/services/reminderService'
 import { listReports, generateReport } from '@/services/reportsService'
 import api from '@/services/api'
 import { getPreferences as getUserPreferences, updateOnboardingStatus } from '@/services/settingsService'
+import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { ElMessage, ElNotification } from 'element-plus'
 import { TASK_CATEGORY_FILTERS, getCategoryIcon, getCategoryColor, resolveCategory } from '@/constants/taskCategories'
 import { ensureDailyStreakState, getUserStreak } from '@/services/streakService'
@@ -790,6 +791,8 @@ dayjs.extend(timezone)
 
 const authStore = useAuthStore()
 const { isPremium, isGuest } = useAuthFlags()
+const workspaceStore = useWorkspaceStore()
+const activeWorkspaceId = computed(() => workspaceStore.activeWorkspaceId)
 const routerNav = useRouter()
 const subStore = useSubscriptionStore()
 const isFirstVisit = computed(() => isGuest.value && authStore?.user?.firstVisitInitialized !== true)
@@ -1572,45 +1575,75 @@ const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0)
 
 const unsubscribe = ref(null)
 
-onMounted(() => {
-  onAuthStateChanged(auth, (user) => {
-    if (!user) {
-      dailyTasks.value = []
-      weeklyTasks.value = []
-      monthlyTasks.value = []
-      if (unsubscribe.value) unsubscribe.value()
-      return
-    }
-    const tasksQuery = query(collection(db, 'tasks'), where('userId', '==', user.uid))
-    if (unsubscribe.value) unsubscribe.value()
-    try {
-      unsubscribe.value = onSnapshot(tasksQuery, (snapshot) => {
-        const userTasks = snapshot.docs.map((docSnap) => {
-          const data = docSnap.data()
-          return {
-            id: docSnap.id,
-            ...data,
-            category: resolveCategory(data?.category),
-            date: typeof data.date === 'string' ? data.date : toYMD(data.date?.toDate?.() || data.date),
-          }
-        })
-        dailyTasks.value = userTasks.filter((t) => t.date === toYMD(today))
-        try {
-          carryoverCount.value = dailyTasks.value.filter((t) => t.is_carryover === true && t.completed === false).length
-        } catch {
-          carryoverCount.value = 0
-        }
-        const weekDays = ymdRange(startOfWeek, endOfWeek)
-        weeklyTasks.value = userTasks.filter((t) => weekDays.includes(t.date))
-        const monthDays = ymdRange(startOfMonth, endOfMonth)
-        monthlyTasks.value = userTasks.filter((t) => monthDays.includes(t.date))
-        buildRotatingInsights()
-      })
-    } catch (error) {
-      console.warn('Live tasks listener failed; falling back to one-time load', error?.message || error)
-      loadTasks().catch(() => {})
+function tasksCollection(user) {
+  const wsId = activeWorkspaceId.value
+  if (user && wsId) return collection(db, 'users', user.uid, 'workspaces', wsId, 'tasks')
+  return collection(db, 'tasks')
+}
+
+function handleTaskSnapshot(snapshot) {
+  const userTasks = snapshot.docs.map((docSnap) => {
+    const data = docSnap.data()
+    return {
+      id: docSnap.id,
+      ...data,
+      category: resolveCategory(data?.category),
+      date: typeof data.date === 'string' ? data.date : toYMD(data.date?.toDate?.() || data.date),
     }
   })
+  dailyTasks.value = userTasks.filter((t) => t.date === toYMD(today))
+  try {
+    carryoverCount.value = dailyTasks.value.filter((t) => t.is_carryover === true && t.completed === false).length
+  } catch {
+    carryoverCount.value = 0
+  }
+  const weekDays = ymdRange(startOfWeek, endOfWeek)
+  weeklyTasks.value = userTasks.filter((t) => weekDays.includes(t.date))
+  const monthDays = ymdRange(startOfMonth, endOfMonth)
+  monthlyTasks.value = userTasks.filter((t) => monthDays.includes(t.date))
+  buildRotatingInsights()
+}
+
+async function attachTaskListener(user) {
+  if (unsubscribe.value) unsubscribe.value()
+  if (!user) {
+    dailyTasks.value = []
+    weeklyTasks.value = []
+    monthlyTasks.value = []
+    return
+  }
+  const tasksQuery = query(tasksCollection(user), where('userId', '==', user.uid))
+  try {
+    unsubscribe.value = onSnapshot(tasksQuery, async (snapshot) => {
+      if (!snapshot.size && activeWorkspaceId.value) {
+        try {
+          const fallbackSnap = await getDocs(query(collection(db, 'tasks'), where('userId', '==', user.uid)))
+          if (fallbackSnap.size) {
+            handleTaskSnapshot(fallbackSnap)
+            return
+          }
+        } catch (err) {
+          console.warn('Workspace tasks fallback failed', err?.message || err)
+        }
+      }
+      handleTaskSnapshot(snapshot)
+    })
+  } catch (error) {
+    console.warn('Live tasks listener failed; falling back to one-time load', error?.message || error)
+    loadTasks().catch(() => {})
+  }
+}
+
+onMounted(() => {
+  onAuthStateChanged(auth, (user) => {
+    checkingAuth.value = false
+    attachTaskListener(user)
+  })
+})
+
+watch(activeWorkspaceId, () => {
+  const user = auth.currentUser
+  if (user) attachTaskListener(user)
 })
 
 onUnmounted(() => {

@@ -6,9 +6,13 @@ function uid(req) {
   return id
 }
 
+function workspaceId(req) {
+  return req.headers['x-workspace-id'] || req.query?.workspaceId || req.body?.workspaceId || null
+}
+
 export async function fetchVariant(req, res, next) {
   try {
-    const variant = await getVariant(uid(req), req.params.id)
+    const variant = await getVariant(uid(req), req.params.id, workspaceId(req))
     if (!variant) return res.status(404).json({ success: false, error: 'Variant not found' })
     res.json({ success: true, variant })
   } catch (err) {
@@ -18,7 +22,8 @@ export async function fetchVariant(req, res, next) {
 
 export async function patchVariant(req, res, next) {
   try {
-    const variant = await updateVariant(uid(req), req.params.id, req.body || {})
+    const variant = await updateVariant(uid(req), req.params.id, { ...(req.body || {}), workspaceId: workspaceId(req) })
+    if (!variant) return res.status(404).json({ success: false, error: 'Variant not found' })
     res.json({ success: true, variant })
   } catch (err) {
     next(err)

@@ -43,8 +43,17 @@ export async function createContact(payload: LeaderContact) {
 }
 
 export async function updateContact(id: string, payload: Partial<LeaderContact>) {
-  const { data } = await growthClient.put(`/leader/contacts/${id}`, payload)
-  return mapContact(data?.contact || { ...payload, id })
+  try {
+    const { data } = await growthClient.put(`/leader/contacts/${id}`, payload)
+    return mapContact(data?.contact || { ...payload, id })
+  } catch (error: any) {
+    // Fallback for older deployments that only accept PATCH
+    if (error?.response?.status === 404) {
+      const { data } = await growthClient.patch(`/leader/contacts/${id}`, payload)
+      return mapContact(data?.contact || { ...payload, id })
+    }
+    throw error
+  }
 }
 
 export async function deleteContact(id: string) {

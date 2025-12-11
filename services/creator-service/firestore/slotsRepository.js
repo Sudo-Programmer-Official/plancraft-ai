@@ -7,8 +7,12 @@ function toTimestamp(value) {
   return Number.isNaN(d.getTime()) ? null : admin.firestore.Timestamp.fromDate(d)
 }
 
-export async function listSlots(uid, { from, to } = {}) {
-  const snap = await creatorCollection(uid, 'slots').orderBy('scheduledAt', 'asc').limit(200).get()
+export async function listSlots(uid, { from, to, workspaceId } = {}) {
+  const baseCol = creatorCollection(uid, 'slots')
+  const query = workspaceId
+    ? baseCol.where('workspaceId', '==', workspaceId).orderBy('scheduledAt', 'asc').limit(200)
+    : baseCol.where('workspaceId', 'in', [null, '']).orderBy('scheduledAt', 'asc').limit(200)
+  const snap = await query.get()
   const slots = snap.docs.map((d) => {
     const data = d.data() || {}
     const scheduledAt = data.scheduledAt?.toDate ? data.scheduledAt.toDate() : data.scheduledAt || null
@@ -47,6 +51,7 @@ export async function createSlot(uid, payload = {}) {
     scheduledAt: toTimestamp(payload.scheduledAt || payload.scheduleAt),
     createdAt: serverTs(),
     updatedAt: serverTs(),
+    workspaceId: payload.workspaceId || null,
   })
   await ref.set(data)
   return { id: ref.id, ...data }
@@ -54,12 +59,19 @@ export async function createSlot(uid, payload = {}) {
 
 export async function updateSlot(uid, id, payload = {}) {
   const ref = creatorCollection(uid, 'slots').doc(id)
+  const snap = await ref.get()
+  if (!snap.exists) return null
+  const existing = snap.data() || {}
+  if (payload.workspaceId && existing.workspaceId && existing.workspaceId !== payload.workspaceId) {
+    return null
+  }
   const updates = sanitizeForFirestore({
     ...payload,
+    workspaceId: payload.workspaceId ?? existing.workspaceId ?? null,
     scheduledAt: toTimestamp(payload.scheduledAt || payload.scheduleAt),
     updatedAt: serverTs(),
   })
   await ref.set(updates, { merge: true })
-  const snap = await ref.get()
-  return { id: snap.id, ...snap.data() }
+  const refreshed = await ref.get()
+  return { id: refreshed.id, ...refreshed.data() }
 }

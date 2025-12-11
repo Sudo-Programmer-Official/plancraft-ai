@@ -34,13 +34,15 @@ export async function proxyAi(type, payload) {
   const endpoint = typeMap[type] || type
   const url = `${AI_BASE}/${endpoint}`
   logger.info(`Proxying AI call ${url}`)
+  const workspaceId = payload?.workspaceId || null
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(APP_TOKEN ? { 'x-app-token': APP_TOKEN } : {}),
+      ...(workspaceId ? { 'x-workspace-id': workspaceId } : {}),
     },
-    body: JSON.stringify(payload || {}),
+    body: JSON.stringify(workspaceId === undefined ? payload || {} : { ...(payload || {}), workspaceId }),
   })
   if (!res.ok) {
     const text = await res.text()

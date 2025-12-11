@@ -100,7 +100,7 @@ async function submit() {
       scheduledAt: form.scheduleDate || new Date().toISOString(),
       status: 'scheduled',
     })
-    ElMessage.success('Scheduled')
+    ElMessage.success('Scheduled and queued for posting')
     router.push('/creator/calendar')
   } catch (err) {
     ElMessage.error(err?.response?.data?.error || 'Failed to schedule')

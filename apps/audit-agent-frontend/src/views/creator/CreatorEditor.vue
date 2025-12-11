@@ -109,6 +109,19 @@ function onRepurpose(target) {
   router.push({ path: '/creator/repurpose', query: { target } })
 }
 
+function prefillFromSeed() {
+  if (variantId !== 'new') return
+  const seed = typeof route.query.seed === 'string' ? route.query.seed : ''
+  if (!seed) return
+  if (!form.narrative) form.narrative = seed
+  if (!form.title) {
+    const suggested = typeof route.query.title === 'string' && route.query.title.trim().length
+      ? route.query.title
+      : seed.slice(0, 64) + (seed.length > 64 ? '…' : '')
+    form.title = suggested
+  }
+}
+
 async function loadVariant() {
   if (!variantId || variantId === 'new') return
   try {
@@ -120,5 +133,8 @@ async function loadVariant() {
   }
 }
 
-onMounted(loadVariant)
+onMounted(() => {
+  prefillFromSeed()
+  loadVariant()
+})
 </script>

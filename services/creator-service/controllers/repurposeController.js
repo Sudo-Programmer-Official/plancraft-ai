@@ -8,17 +8,23 @@ function uid(req) {
   return id
 }
 
+function workspaceId(req) {
+  return req.headers['x-workspace-id'] || req.query?.workspaceId || req.body?.workspaceId || null
+}
+
 export async function runRepurpose(req, res, next) {
   try {
     const userId = uid(req)
+    const wsId = workspaceId(req)
     const payload = req.body || {}
     const aiPayload = {
       sourceContent: payload.source || payload.sourceContent || '',
       targetFormats: payload.formats || payload.targetFormats || ['linkedin_post', 'twitter_thread'],
+      workspaceId: wsId,
     }
     const data = await proxyAi('repurpose', aiPayload)
     const variants = data?.variants || data || {}
-    const saved = await createVariantsFromMap(userId, variants)
+    const saved = await createVariantsFromMap(userId, variants, wsId)
     res.json({ success: true, variants: saved })
   } catch (err) {
     next(err)
@@ -28,8 +34,9 @@ export async function runRepurpose(req, res, next) {
 export async function saveRepurpose(req, res, next) {
   try {
     const userId = uid(req)
+    const wsId = workspaceId(req)
     const variants = req.body?.variants || {}
-    const saved = await createVariantsFromMap(userId, variants)
+    const saved = await createVariantsFromMap(userId, variants, wsId)
     // Keep legacy drafts for inspiration
     const drafts = []
     for (const [variant, content] of Object.entries(variants)) {
@@ -38,7 +45,7 @@ export async function saveRepurpose(req, res, next) {
         type: content?.type || variant,
         body: content?.body || content?.text || '',
         variant,
-      })
+      }, wsId)
       drafts.push(draft)
     }
     res.json({ success: true, saved, drafts })

@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { buildAuthHeaders } from '@/services/leader/http'
+import { buildAuthHeaders, nlpClient } from '@/services/leader/http'
 import { refreshAppToken } from '@/services/appTokenService'
 
 const creatorBase = (import.meta.env.VITE_CREATOR_API_BASE || '/creator-api').replace(/\/+$/, '')
@@ -24,6 +24,18 @@ creatorClient.interceptors.request.use(async (config) => {
         } else {
           config.data = { appToken }
         }
+      }
+    }
+    const workspaceId =
+      headers['x-workspace-id'] ||
+      (typeof localStorage !== 'undefined' ? localStorage.getItem('activeWorkspaceId') : null)
+    if (workspaceId) {
+      if (config.method?.toLowerCase() === 'get') {
+        config.params = { ...(config.params || {}), workspaceId }
+      } else if (config.data && typeof config.data === 'object' && !Array.isArray(config.data)) {
+        config.data = { workspaceId, ...config.data }
+      } else if (workspaceId) {
+        config.data = { workspaceId }
       }
     }
   } catch {}
@@ -90,6 +102,50 @@ export async function fetchCreatorSlots(params = {}) {
 export async function createCreatorSlot(payload) {
   const { data } = await creatorClient.post('/creator/slots', payload)
   return data?.slot || data
+}
+
+export async function updateCreatorSlot(id, payload) {
+  const { data } = await creatorClient.patch(`/creator/slots/${id}`, payload)
+  return data?.slot || data
+}
+
+export async function fetchCreatorInspiration(count = 6) {
+  try {
+    const { data } = await nlpClient.post('/workspace/inspiration', { count })
+    const items = data?.ideas || data?.items || []
+    if (Array.isArray(items) && items.length) {
+      return items.map((idea) => ({
+        title: idea.title || 'Idea',
+        tip: idea.summary || idea.suggestion || idea.tip || '',
+        platforms: idea.platforms || [],
+      }))
+    }
+  } catch (err) {
+    // Fall through to other sources
+  }
+
+  try {
+    const { data } = await creatorClient.get('/creator/inspiration')
+    const items = data?.notes || data?.inspiration || data?.items || []
+    if (Array.isArray(items) && items.length) return items
+  } catch (err) {
+    // Fallback: use NLP service to generate quick prompts
+  }
+
+  try {
+    const prompt =
+      'Provide 5 concise social content ideas for a founder or creator. Return as bullet-style lines, no numbering.'
+    const { data } = await nlpClient.post('/generate/outreach-message', { input: prompt })
+    const text = data?.output || data?.text || data?.message || ''
+    return text
+      .split('\n')
+      .map((line) => line.replace(/^[\\-\\*\\d\\.\\s]+/, '').trim())
+      .filter(Boolean)
+      .slice(0, 5)
+      .map((tip) => ({ title: tip.split('.')[0] || 'Idea', tip }))
+  } catch {
+    return []
+  }
 }
 
 export async function fetchVariant(id) {

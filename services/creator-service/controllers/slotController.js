@@ -7,6 +7,10 @@ function uid(req) {
   return id
 }
 
+function workspaceId(req) {
+  return req.headers['x-workspace-id'] || req.query?.workspaceId || req.body?.workspaceId || null
+}
+
 function serializeSlot(slot) {
   const scheduledAt =
     slot?.scheduledAt && slot.scheduledAt.toDate ? slot.scheduledAt.toDate() : slot?.scheduledAt || null
@@ -18,7 +22,7 @@ function serializeSlot(slot) {
 
 export async function listSlotsController(req, res, next) {
   try {
-    const slots = await listSlots(uid(req), { from: req.query.from, to: req.query.to })
+    const slots = await listSlots(uid(req), { from: req.query.from, to: req.query.to, workspaceId: workspaceId(req) })
     res.json({ success: true, slots: slots.map(serializeSlot) })
   } catch (err) {
     next(err)
@@ -39,7 +43,7 @@ async function queuePostingJob(userId, slot) {
       caption: slot.caption || '',
       mediaUrls: slot.mediaUrls || [],
     },
-    meta: { createdBy: userId, source: 'creator' },
+    meta: { createdBy: userId, source: 'creator', workspaceId: slot.workspaceId || null },
   }
   try {
     return await enqueuePostingJob(job)
@@ -52,7 +56,7 @@ async function queuePostingJob(userId, slot) {
 export async function createSlotController(req, res, next) {
   try {
     const userId = uid(req)
-    const slot = await createSlot(userId, req.body || {})
+    const slot = await createSlot(userId, { ...(req.body || {}), workspaceId: workspaceId(req) })
     const job = await queuePostingJob(userId, slot)
     res.status(201).json({ success: true, slot: serializeSlot(slot), job })
   } catch (err) {
@@ -63,7 +67,8 @@ export async function createSlotController(req, res, next) {
 export async function updateSlotController(req, res, next) {
   try {
     const userId = uid(req)
-    const slot = await updateSlot(userId, req.params.id, req.body || {})
+    const slot = await updateSlot(userId, req.params.id, { ...(req.body || {}), workspaceId: workspaceId(req) })
+    if (!slot) return res.status(404).json({ success: false, error: 'Slot not found' })
     const job = await queuePostingJob(userId, slot)
     res.json({ success: true, slot: serializeSlot(slot), job })
   } catch (err) {

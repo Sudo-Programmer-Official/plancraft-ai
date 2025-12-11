@@ -1,9 +1,14 @@
 import { proxyAi } from '../services/aiClient.js'
 import { logAiOutput } from '../firestore/aiOutputsRepository.js'
 
+function workspaceId(req) {
+  return req.headers['x-workspace-id'] || req.query?.workspaceId || req.body?.workspaceId || null
+}
+
 async function handle(type, req, res, next) {
   try {
-    const payload = req.body || {}
+    const wsId = workspaceId(req)
+    const payload = { ...(req.body || {}), workspaceId: wsId }
     const data = await proxyAi(type, payload)
     try {
       await logAiOutput({
@@ -11,6 +16,7 @@ async function handle(type, req, res, next) {
         output: data,
         type,
         userId: req.user?.uid,
+        workspaceId: wsId,
       })
     } catch {}
     res.json({ success: true, ...data })

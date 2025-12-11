@@ -5,6 +5,32 @@
       <p class="text-gray-400">Here’s your focus for today, {{ todayDate }}</p>
     </header>
 
+    <section class="bg-slate-900/70 border border-slate-800 p-5 rounded-xl shadow space-y-3">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div class="text-left">
+          <p class="text-xs uppercase tracking-[0.25em] text-indigo-200/70">AI assist</p>
+          <h2 class="text-lg font-semibold text-slate-100">Plan my day</h2>
+          <p class="text-xs text-slate-400">Workspace-aware suggestions using your tasks and events.</p>
+        </div>
+        <button
+          class="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition disabled:opacity-60"
+          :disabled="planning"
+          @click="planMyDay"
+        >
+          <span v-if="planning" class="loader-dot" aria-hidden="true"></span>
+          <span>{{ planning ? 'Generating…' : 'AI Plan My Day' }}</span>
+        </button>
+      </div>
+      <div class="text-sm text-slate-200 bg-slate-950/60 border border-slate-800 rounded-lg px-3 py-2 space-y-2">
+        <p v-if="planning" class="text-slate-400">Pulling tasks and events…</p>
+        <ul v-else-if="aiPlanLines.length" class="space-y-1 list-disc list-inside marker:text-indigo-300">
+          <li v-for="(line, idx) in aiPlanLines" :key="idx">{{ line }}</li>
+        </ul>
+        <p v-else class="text-slate-400">Let AI propose your top priorities and time blocks.</p>
+        <p v-if="planError" class="text-rose-300 text-xs">{{ planError }}</p>
+      </div>
+    </section>
+
     <!-- Focus Tasks -->
     <section class="bg-indigo-600/20 p-6 rounded-xl shadow">
       <h2 class="text-xl font-semibold mb-3">🎯 Top 3 Focus Tasks</h2>
@@ -46,20 +72,20 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { collection, onSnapshot, updateDoc, doc } from 'firebase/firestore'
-import { db } from '@/firebase/init'
+import { computed, onMounted, ref } from 'vue'
+import { useTasks } from '@/composables/useTasks'
+import { askWorkspaceSummary } from '@/services/workspaceAiService'
+import { useWorkspaceStore } from '@/stores/workspaceStore'
 
 const todayDate = new Date().toLocaleDateString()
-const today = new Date().toISOString().split('T')[0]
-const tasks = ref([])
+const { tasks, loadTasks, toggleComplete } = useTasks()
+const workspaceStore = useWorkspaceStore()
+const aiPlan = ref('')
+const planError = ref('')
+const planning = ref(false)
 
 onMounted(() => {
-  const tasksCol = collection(db, 'tasks')
-  onSnapshot(tasksCol, (snapshot) => {
-    const all = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-    tasks.value = all.filter(t => t.date === today)
-  })
+  loadTasks().catch(() => {})
 })
 
 const focusTasks = computed(() => tasks.value.slice(0, 3))
@@ -69,8 +95,52 @@ const completedCount = computed(() => tasks.value.filter(t => t.completed).lengt
 const progressBarWidth = computed(() =>
   totalCount.value ? `${(completedCount.value / totalCount.value) * 100}%` : '0%'
 )
+const aiPlanLines = computed(() =>
+  aiPlan.value
+    ? aiPlan.value
+        .split(/\n+/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+    : [],
+)
 
-async function toggleComplete(task) {
-  await updateDoc(doc(db, 'tasks', task.id), { completed: !task.completed })
+async function planMyDay() {
+  planning.value = true
+  planError.value = ''
+  try {
+    const workspaceId = workspaceStore?.activeWorkspaceId || null
+    if (!workspaceId) {
+      planError.value = 'Select a workspace first.'
+      planning.value = false
+      return
+    }
+    const { answer } = await askWorkspaceSummary({
+      workspaceId,
+      question: 'Help me plan my day based on my tasks and events. Suggest the top 3 tasks and time blocks.',
+    })
+    aiPlan.value = answer || ''
+  } catch (err) {
+    planError.value =
+      err?.response?.data?.error || err?.message || 'Failed to generate a plan for your day.'
+  } finally {
+    planning.value = false
+  }
 }
 </script>
+
+<style scoped>
+.loader-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: white;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+</style>

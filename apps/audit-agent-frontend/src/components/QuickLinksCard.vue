@@ -1,196 +1,173 @@
 <template>
-  <section class="bg-gray-900/80 rounded-xl p-4 sm:p-6 shadow-lg">
-    <div class="flex items-center justify-between mb-3">
-      <h3 class="font-semibold">🔗 Quick Links</h3>
-      <!-- <el-button
-        size="small"
-        type="primary"
-        class="bg-gradient-to-r from-pink-500 to-indigo-600 border-0 shadow-md hover:from-pink-600 hover:to-indigo-700 rounded-full"
-        @click="open = true"
-      >
-        + Add
-      </el-button> -->
-      <button
-  @click="open = true"
-  class="text-sm px-4 py-1 rounded-full font-semibold text-white shadow-md
-         bg-gradient-to-r from-pink-500 to-indigo-600
-         hover:from-pink-600 hover:to-indigo-700 transition"
->
-  + Add
-</button>
+  <section class="bg-gray-900/80 rounded-xl p-4 sm:p-6 shadow-lg border border-white/5">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+      <div>
+        <p class="text-[11px] uppercase tracking-[0.3em] text-indigo-300/70">Quick Links</p>
+        <h3 class="text-lg font-semibold text-white">Starred essentials</h3>
+      </div>
+      <div class="flex items-center gap-2">
+        <router-link
+          to="/links"
+          class="px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-800/80 border border-slate-700 hover:border-indigo-400 text-indigo-100 transition"
+        >
+          View All ({{ links.length }})
+        </router-link>
+        <button
+          @click="openEditor()"
+          class="px-3 py-1.5 rounded-full text-xs font-semibold text-white bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 shadow-md transition"
+        >
+          + Add Link
+        </button>
+      </div>
     </div>
 
-    <!-- Links grid -->
-    <div
-      v-if="links.length"
-      class="flex gap-3 overflow-x-auto pb-2 scrollbar-plan"
-    >
-    <a
-      v-for="l in sortedLinks"
-      :key="l.id"
-      :href="l.url"
-      target="_blank"
-      @click="touch(l)"
-      class="flex-shrink-0 w-48 rounded-lg border border-white/10 p-3 bg-slate-900/50 hover:bg-slate-800/60 transition"
-    >
-      <div class="flex items-center justify-between">
-        <span class="text-xl">{{ l.icon || '🔗' }}</span>
-        <span v-if="l.pinned" class="text-xs text-amber-300">★</span>
-      </div>
-      <p class="mt-2 text-sm font-medium line-clamp-2">{{ l.title || l.url }}</p>
-      <p class="text-xs text-slate-400 truncate">{{ l.url }}</p>
-    </a>
-  </div>
-    <p v-else class="text-slate-400 text-sm">No links yet. Add the pages you open daily.</p>
+    <p class="text-slate-400 text-sm mb-3">Top starred links for this workspace.</p>
 
-    <!-- Add/Edit Dialog -->
-    <el-dialog
-      v-model="open"
-      :title="editing ? 'Edit Link' : 'Add Link'"
-      :width="dialogWidth"
-       :style="{
-      background: 'linear-gradient(145deg, #1e1b4b, #312e81, #4c1d95)',
-      color: '#e2e8f0',
-      borderRadius: '0.5rem',
-      boxShadow: '0 8px 30px rgba(0,0,0,0.6)',
-      border: '1px solid rgba(255,255,255,0.08)',
-      backdropFilter: 'blur(12px)'
-    }"
-      class="quick-links-dialog"
-    >
-      <div class="space-y-3">
-        <el-input v-model="form.title" placeholder="Title" />
-        <el-input v-model="form.url" placeholder="https://…" required />
-        <div class="flex gap-2">
-          <el-input v-model="form.tagsRaw" placeholder="tags, comma-separated" />
-          <el-input v-model="form.icon" placeholder="🔗" class="w-20 text-center" />
+    <div v-if="featuredLinks.length" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <article
+        v-for="link in featuredLinks"
+        :key="link.id"
+        class="group relative rounded-xl border border-white/10 bg-slate-900/70 hover:border-indigo-400/60 transition p-3"
+      >
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2 truncate">
+            <span class="text-xl">{{ link.icon || '🔗' }}</span>
+            <div class="truncate">
+              <p class="text-sm font-semibold text-white truncate">{{ link.title || link.url }}</p>
+              <a
+                :href="link.url"
+                target="_blank"
+                rel="noopener noreferrer"
+                @click="() => touchLink(link.id)"
+                class="text-xs text-indigo-200/80 hover:text-indigo-100 underline underline-offset-2 truncate block"
+              >
+                {{ link.url }}
+              </a>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              class="text-amber-300 hover:text-amber-200 transition"
+              :title="link.starred ? 'Unstar' : 'Star'"
+              @click="() => toggleStar(link)"
+            >
+              {{ link.starred ? '★' : '☆' }}
+            </button>
+            <button
+              class="text-slate-300 hover:text-white transition opacity-0 group-hover:opacity-100"
+              title="Edit"
+              @click="openEditor(link)"
+            >
+              ✎
+            </button>
+          </div>
         </div>
-        <el-checkbox v-model="form.pinned">Pinned</el-checkbox>
-      </div>
-      <template #footer>
-        <div class="flex justify-end gap-2">
-          <el-button @click="close" class="bg-gray-700 text-white">Cancel</el-button>
-          <el-button type="primary" class="px-4 ml-0-custom py-2 rounded-lg text-white font-medium shadow-md
-        bg-gradient-to-r from-emerald-700 via-teal-800 to-cyan-700
-        hover:from-emerald-800 hover:via-teal-900 hover:to-cyan-800
-        transition-all duration-300 [text-shadow:_0_1px_2px_rgba(0,0,0,0.6)]" @click="save">Save</el-button>
+        <div class="mt-2 flex items-center justify-between text-[11px] text-slate-400">
+          <span class="px-2 py-0.5 rounded-full bg-slate-800/80 border border-slate-700">
+            {{ link.category || 'General' }}
+          </span>
+          <span v-if="link.lastUsedAt" class="text-slate-500">Recently opened</span>
         </div>
-      </template>
-    </el-dialog>
+      </article>
+    </div>
+    <p v-else class="text-slate-400 text-sm">No starred links yet. Add your daily go-tos.</p>
+
+    <LinkEditorModal
+      :open="modalOpen"
+      :link="editingLink"
+      :categories="categories"
+      @close="closeEditor"
+      @save="handleSave"
+    />
   </section>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { ElButton, ElDialog, ElInput, ElCheckbox } from 'element-plus'
-import { getLinks, addLink, updateLink } from '@/services/firebaseService'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import LinkEditorModal from '@/components/LinkEditorModal.vue'
+import {
+  addLink,
+  getLinks,
+  updateLink,
+  watchLinks,
+  watchLinkCategories,
+  touchLink as touchLinkService,
+} from '@/services/firebaseService'
+import { useWorkspaceStore } from '@/stores/workspaceStore'
 
 const links = ref([])
-const open = ref(false)
-const editing = ref(null)
-const form = ref({ title: '', url: '', tagsRaw: '', pinned: false, icon: '🔗' })
-const screenWidth = ref(window.innerWidth)
+const categories = ref([])
+const modalOpen = ref(false)
+const editingLink = ref(null)
+const stopLinks = ref(null)
+const stopCategories = ref(null)
+const workspaceStore = useWorkspaceStore()
+const activeWorkspaceId = computed(() => workspaceStore.activeWorkspaceId)
 
-window.addEventListener('resize', () => {
-  screenWidth.value = window.innerWidth
+const featuredLinks = computed(() => {
+  const starred = links.value.filter((l) => l.starred).slice(0, 3)
+  const remainder = links.value.filter((l) => !l.starred).slice(0, 3 - starred.length)
+  return [...starred, ...remainder]
 })
 
-const dialogWidth = computed(() => (screenWidth.value < 640 ? '90%' : '520px'))
-
-onMounted(async () => {
+async function hydrateLinks() {
+  try {
+    stopLinks.value?.()
+    stopCategories.value?.()
+  } catch {}
   links.value = await getLinks()
-})
-
-const sortedLinks = computed(() =>
-  [...links.value].sort((a, b) => b.pinned - a.pinned || a.order - b.order),
-)
-
-function close() {
-  open.value = false
-  editing.value = null
-  form.value = { title: '', url: '', tagsRaw: '', pinned: false, icon: '🔗' }
+  stopLinks.value = watchLinks((list) => {
+    links.value = list
+  })
+  stopCategories.value = watchLinkCategories((cats) => {
+    categories.value = cats
+  })
 }
 
-async function save() {
-  const payload = {
-    title: form.value.title?.trim(),
-    url: form.value.url?.trim(),
-    tags: form.value.tagsRaw
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean),
-    pinned: !!form.value.pinned,
-    icon: form.value.icon || '🔗',
-  }
-  if (editing.value) {
-    await updateLink(editing.value.id, payload)
-    Object.assign(editing.value, payload)
+onMounted(() => {
+  hydrateLinks()
+})
+
+watch(activeWorkspaceId, () => {
+  hydrateLinks()
+})
+
+onBeforeUnmount(() => {
+  try {
+    stopLinks.value?.()
+    stopCategories.value?.()
+  } catch {}
+})
+
+function openEditor(link = null) {
+  editingLink.value = link
+  modalOpen.value = true
+}
+
+function closeEditor() {
+  modalOpen.value = false
+  editingLink.value = null
+}
+
+async function handleSave(payload) {
+  if (editingLink.value) {
+    await updateLink(editingLink.value.id, payload)
   } else {
     const created = await addLink(payload)
-    links.value.unshift(created)
+    links.value = [created, ...links.value]
   }
-  close()
+  closeEditor()
 }
 
-async function touch(link) {
+async function toggleStar(link) {
+  await updateLink(link.id, { starred: !link.starred })
+}
+
+async function touchLink(id) {
   try {
-    await updateLink(link.id, { lastUsedAt: Date.now() })
+    await touchLinkService(id)
   } catch {
-    // ignore
+    /* ignore */
   }
 }
 </script>
-
-<style lang="scss">
-/* Dark themed Quick Links dialog */
-.quick-links-dialog .el-dialog {
-  background: linear-gradient(145deg, #1e1b4b, #312e81, #4c1d95);
-  color: #e2e8f0;
-  border-radius: 1rem;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
-}
-
-/* Header */
-.quick-links-dialog .el-dialog__header {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-.quick-links-dialog .el-dialog__title {
-  color: #f1f5f9 !important;
-  font-weight: 600;
-}
-
-/* Inputs */
-.quick-links-dialog .el-input__wrapper {
-  background-color: rgba(255, 255, 255, 0.1) !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
-  border-radius: 0.5rem !important;
-  box-shadow: none !important;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
-}
-.quick-links-dialog .el-input__inner {
-  color: #f8fafc !important;
-  background: transparent !important;
-}
-.quick-links-dialog .el-input__inner::placeholder {
-  color: rgba(255, 255, 255, 0.5) !important;
-}
-
-/* Checkbox */
-.quick-links-dialog .el-checkbox__label {
-  color: #f1f5f9 !important;
-}
-
-/* Footer */
-.quick-links-dialog .el-dialog__footer {
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.quick-links-dialog .el-dialog__header {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  color: #f8fafc;
-  font-weight: 600;
-  .el-dialog__title {
-    color: #f1f5f9 !important;
-  }
-}
-</style>

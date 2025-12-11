@@ -13,6 +13,7 @@ export async function saveMedia(uid, payload = {}) {
     height: payload.height || null,
     slotId: payload.slotId || null,
     variantId: payload.variantId || null,
+    workspaceId: payload.workspaceId || null,
     createdAt: serverTs(),
     updatedAt: serverTs(),
   })

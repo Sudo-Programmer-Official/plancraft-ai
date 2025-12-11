@@ -70,6 +70,53 @@
         </button>
       </div>
 
+      <!-- Workspace switcher -->
+      <div class="px-3 pb-3 border-b border-gray-800/70">
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2 min-w-0">
+            <div class="w-9 h-9 rounded-lg bg-indigo-500/20 border border-indigo-400/40 flex items-center justify-center text-lg">
+              {{ activeWorkspace?.icon || '📦' }}
+            </div>
+            <div v-if="sidebarOpen" class="min-w-0">
+              <p class="text-[11px] uppercase tracking-[0.25em] text-slate-500">Workspace</p>
+              <p class="text-sm font-semibold truncate">{{ activeWorkspace?.name || 'Personal' }}</p>
+            </div>
+          </div>
+          <button
+            class="p-2 rounded-lg bg-slate-900/70 border border-slate-800 hover:border-indigo-400 transition"
+            @click="workspaceMenuOpen = !workspaceMenuOpen"
+            aria-label="Change workspace"
+          >
+            <span v-if="workspaceMenuOpen">▲</span>
+            <span v-else>▼</span>
+          </button>
+        </div>
+        <div
+          v-if="workspaceMenuOpen"
+          class="mt-2 space-y-1"
+        >
+          <button
+            v-for="ws in workspaceStore.workspaces"
+            :key="ws.id"
+            class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm border border-slate-800 hover:border-indigo-400 transition"
+            :class="{ 'bg-indigo-600/20 border-indigo-400/60': ws.id === activeWorkspaceId }"
+            @click="selectWorkspace(ws.id)"
+          >
+            <span>{{ ws.icon || '📦' }}</span>
+            <span v-if="sidebarOpen" class="truncate">{{ ws.name }}</span>
+          </button>
+          <RouterLink
+            to="/workspaces"
+            class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-indigo-200 hover:text-white bg-slate-900/70 border border-slate-800 hover:border-indigo-400 transition"
+            @click="workspaceMenuOpen = false"
+          >
+            <span>➕</span>
+            <span v-if="sidebarOpen" class="truncate">Manage workspaces</span>
+            <span v-else>➕</span>
+          </RouterLink>
+        </div>
+      </div>
+
       <!-- Nav links -->
       <nav class="flex-1 mt-4 space-y-3 overflow-y-auto scrollbar-plan px-2">
         <div
@@ -127,7 +174,7 @@
       <div class="flex-shrink-0 mt-auto pb-4 px-3">
         <div
           class="grid gap-1 bg-gray-900/60 border border-gray-800 rounded-lg p-1"
-          :class="[authStore.user?.role === 'admin' ? 'grid-cols-5' : 'grid-cols-4']"
+          :class="[authStore.user?.role === 'admin' ? 'grid-cols-7' : 'grid-cols-6']"
         >
           <button
             @click="startTour"
@@ -141,6 +188,18 @@
             class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
             title="Settings"
             >⚙️</RouterLink
+          >
+          <RouterLink
+            to="/profile"
+            class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
+            title="Profile"
+            >👤</RouterLink
+          >
+          <RouterLink
+            to="/subscription"
+            class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
+            title="Billing"
+            >💳</RouterLink
           >
           <RouterLink
             v-if="authStore.user?.role === 'admin'"
@@ -186,6 +245,26 @@
           <div class="flex justify-between items-center mb-6">
             <h1 class="text-lg font-bold">🌙 PlanCraftAI</h1>
             <button @click="mobileMenu = false" class="p-2 rounded hover:bg-gray-800">✖️</button>
+          </div>
+
+          <div class="mb-4">
+            <p class="text-xs text-slate-400 mb-1">Workspace</p>
+            <select
+              v-model="selectedWorkspaceId"
+              class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100"
+              @change="selectWorkspace(selectedWorkspaceId)"
+            >
+              <option v-for="ws in workspaceStore.workspaces" :key="ws.id" :value="ws.id">
+                {{ ws.icon || '📦' }} {{ ws.name }}
+              </option>
+            </select>
+            <RouterLink
+              to="/workspaces"
+              class="mt-2 inline-flex items-center gap-2 text-xs text-indigo-200"
+              @click="mobileMenu = false"
+            >
+              ➕ Manage workspaces
+            </RouterLink>
           </div>
 
           <!-- Navigation -->
@@ -237,9 +316,9 @@
             Logout
           </button> -->
           <div class="p-4 border-t border-gray-800">
-            <!-- Grouped card: Settings | Tour | Logout -->
+            <!-- Grouped card: Settings | Tour | Profile | Billing | Help | Logout -->
             <div
-              class="grid grid-cols-3 gap-1 bg-gray-900/60 border border-gray-800 rounded-lg p-1"
+              class="grid grid-cols-6 gap-1 bg-gray-900/60 border border-gray-800 rounded-lg p-1"
             >
               <RouterLink
                 to="/settings"
@@ -248,6 +327,20 @@
                 title="Settings"
                 >⚙️</RouterLink
               >
+              <RouterLink
+                to="/profile"
+                @click="mobileMenu = false"
+                class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
+                title="Profile"
+                >👤</RouterLink
+              >
+              <RouterLink
+                to="/subscription"
+                @click="mobileMenu = false"
+                class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
+                title="Billing"
+                >💳</RouterLink
+              >
               <button
                 @click="startTour"
                 class="text-xs py-2 rounded-md hover:bg-gray-800 transition"
@@ -255,6 +348,13 @@
               >
                 ❔
               </button>
+              <RouterLink
+                to="/help"
+                @click="mobileMenu = false"
+                class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
+                title="Help"
+                >💬</RouterLink
+              >
               <button
                 v-if="authStore.isLoggedIn"
                 @click="handleLogout"
@@ -429,6 +529,7 @@ import ProfileSetup from '@/components/ProfileSetup.vue'
 import { db } from '@/firebase/init'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { trackLinkedInConversion } from '@/utils/ads'
+import { useWorkspaceStore } from '@/stores/workspaceStore'
 const currentUserId = ref(null)
 
 function deriveUidFromStorage() {
@@ -476,18 +577,42 @@ const profileSetupOpen = ref(false)
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const workspaceStore = useWorkspaceStore()
+const workspaceMenuOpen = ref(false)
+const selectedWorkspaceId = ref(null)
 
 // Subscription state via store
 const subStore = useSubscriptionStore()
 const feedbackStore = useFeedbackStore()
 const { isPremium, isGuest } = useAuthFlags()
 const authReady = computed(() => !authStore.loading)
+const activeWorkspace = computed(() => workspaceStore.activeWorkspace || {})
+const activeWorkspaceId = computed(() => workspaceStore.activeWorkspaceId)
 
 const isOnTalkPlanner = computed(() => route.path === '/talk-to-planner')
 let upgradeHandler = null
 
-// Prompt for profile setup if incomplete
-watch(() => authStore.user?.uid, () => { maybePromptProfile() })
+// Prompt for profile setup if incomplete + hydrate workspace store
+watch(
+  () => authStore.user?.uid,
+  (uid) => {
+    maybePromptProfile()
+    if (uid) {
+      workspaceStore.init()
+    } else {
+      workspaceStore.reset()
+    }
+  },
+  { immediate: true },
+)
+
+watch(
+  () => workspaceStore.activeWorkspaceId,
+  (val) => {
+    selectedWorkspaceId.value = val
+  },
+  { immediate: true },
+)
 
 async function maybePromptProfile() {
   try {
@@ -522,6 +647,18 @@ function onProfileSaved() {
   } catch {}
 }
 
+async function selectWorkspace(id) {
+  if (!id) return
+  selectedWorkspaceId.value = id
+  workspaceMenuOpen.value = false
+  mobileMenu.value = false
+  try {
+    await workspaceStore.setActive(id)
+  } catch (err) {
+    console.warn('Workspace switch failed', err?.message || err)
+  }
+}
+
 function toggleGroup(key) {
   openGroups[key] = !openGroups[key]
 }
@@ -544,6 +681,7 @@ const navGroups = [
       { label: 'Monthly', icon: '📆', to: '/monthly' },
       { label: 'Journal', icon: '📔', to: '/journal' },
       { label: 'Reminders', icon: '🔔', to: '/reminders' },
+      { label: 'Quick Links', icon: '🔗', to: '/links' },
       { label: 'Goals', icon: '🎯', to: '/goals' },
       { label: 'Reports', icon: '📈', to: '/reports' },
       { label: 'Habits', icon: '🏆', to: '/habits' },
@@ -586,15 +724,13 @@ const navGroups = [
     defaultOpen: false,
     children: [
       { label: 'Talk to Planner', icon: '🎤', to: '/talk-to-planner' },
-      { label: 'Quick Add', icon: '⚡', to: '/planner' },
+      { label: 'Quick Add', icon: '⚡', to: '/quick-add' },
+      { label: 'Napkin', icon: '🧾', to: '/napkin' },
     ],
   },
 ]
 
 const systemLinks = [
-  { label: 'Settings', icon: '⚙️', to: '/settings' },
-  { label: 'Profile', icon: '👤', to: '/profile' },
-  { label: 'Billing', icon: '💳', to: '/subscription' },
   { label: 'Workspaces', icon: '📦', to: '/workspaces' },
 ]
 

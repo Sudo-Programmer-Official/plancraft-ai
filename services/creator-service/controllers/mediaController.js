@@ -17,9 +17,13 @@ function uid(req) {
   return id
 }
 
+function workspaceId(req) {
+  return req.headers['x-workspace-id'] || req.query?.workspaceId || req.body?.workspaceId || null
+}
+
 export async function recordMedia(req, res, next) {
   try {
-    const media = await saveMedia(uid(req), req.body || {})
+    const media = await saveMedia(uid(req), { ...(req.body || {}), workspaceId: workspaceId(req) })
     res.status(201).json({ success: true, media })
   } catch (err) {
     next(err)

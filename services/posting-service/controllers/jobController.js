@@ -9,6 +9,9 @@ export async function listPostingJobs(req, res, next) {
     let query = db.collection('posting_jobs')
     if (req.query.uid) query = query.where('uid', '==', req.query.uid)
     if (req.query.source) query = query.where('source', '==', req.query.source)
+    if (req.headers['x-workspace-id']) {
+      query = query.where('workspaceId', '==', req.headers['x-workspace-id'])
+    }
     const snap = await query.orderBy('scheduledAt', 'desc').limit(100).get()
     const jobs = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
     res.json({ success: true, jobs })
@@ -20,6 +23,7 @@ export async function listPostingJobs(req, res, next) {
 export async function createPostingJob(req, res, next) {
   try {
     const payload = req.body || {}
+    const workspaceId = req.headers['x-workspace-id'] || payload.workspaceId || null
     validateJob(payload)
     const job = await enqueueJob({
       ...payload,
@@ -28,6 +32,7 @@ export async function createPostingJob(req, res, next) {
         ...(payload.meta || {}),
         createdBy: payload.meta?.createdBy || req.user?.uid || 'unknown',
       },
+      workspaceId,
     })
     res.status(201).json({ success: true, job })
   } catch (err) {
