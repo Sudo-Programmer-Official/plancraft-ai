@@ -1,4 +1,10 @@
 import { buildAuthUrl, decodeState, exchangeCodeForToken, fetchProfile, storeLinkedInTokens } from '../services/linkedinService.js'
+import {
+  buildAuthUrl as buildIgAuthUrl,
+  decodeState as decodeIgState,
+  handleInstagramCallback,
+  storeInstagramTokens,
+} from '../services/instagramService.js'
 import { getTokensByUser, saveUserTokens } from '../firestore/tokensRepository.js'
 import admin from 'firebase-admin'
 import { ensureApp } from '../utils/firebase.js'
@@ -11,9 +17,14 @@ export async function socialConnect(req, res, next) {
     if (!userId) return res.status(401).json({ success: false, error: 'Missing user id' })
     const { provider } = req.params
     const returnTo = req.query.returnTo || req.body?.returnTo || null
+    const workspaceId = req.headers['x-workspace-id'] || req.query?.workspaceId || req.body?.workspaceId || null
     if (!PROVIDERS.includes(provider)) return res.status(400).json({ success: false, error: 'Unsupported provider' })
     if (provider === 'linkedin') {
       const url = buildAuthUrl(userId, returnTo)
+      return res.json({ success: true, url })
+    }
+    if (provider === 'instagram') {
+      const url = buildIgAuthUrl(userId, workspaceId, returnTo)
       return res.json({ success: true, url })
     }
     return res.status(200).json({ success: false, requiresConnect: true, message: 'Connect flow not yet enabled for this provider.' })
@@ -24,18 +35,31 @@ export async function socialConnect(req, res, next) {
 
 export async function socialCallback(req, res) {
   const { provider } = req.params
-  if (provider !== 'linkedin') return res.status(400).json({ success: false, error: 'Unsupported provider' })
   try {
-    const { code, state, error: oauthError } = req.query
+    const { code, state, error: oauthError, page_id: pageId } = req.query
     if (oauthError) return res.status(400).json({ success: false, error: oauthError })
-    const parsed = decodeState(state)
-    if (!parsed?.uid) return res.status(401).json({ success: false, error: 'invalid_state' })
-    if (!code) return res.status(400).json({ success: false, error: 'missing_code' })
 
-    const tokenPayload = await exchangeCodeForToken(code)
-    const profile = await fetchProfile(tokenPayload.access_token)
-    await storeLinkedInTokens(parsed.uid, tokenPayload, profile)
-    return res.json({ success: true, provider, profile })
+    if (provider === 'linkedin') {
+      const parsed = decodeState(state)
+      if (!parsed?.uid) return res.status(401).json({ success: false, error: 'invalid_state' })
+      if (!code) return res.status(400).json({ success: false, error: 'missing_code' })
+
+      const tokenPayload = await exchangeCodeForToken(code)
+      const profile = await fetchProfile(tokenPayload.access_token)
+      await storeLinkedInTokens(parsed.uid, tokenPayload, profile)
+      return res.json({ success: true, provider, profile })
+    }
+
+    if (provider === 'instagram') {
+      const parsed = decodeIgState(state)
+      if (!parsed?.uid) return res.status(401).json({ success: false, error: 'invalid_state' })
+      if (!code) return res.status(400).json({ success: false, error: 'missing_code' })
+      const tokenObj = await handleInstagramCallback(code, pageId || null)
+      await storeInstagramTokens(parsed.uid, parsed.workspaceId || null, tokenObj)
+      return res.json({ success: true, provider, meta: tokenObj.meta })
+    }
+
+    return res.status(400).json({ success: false, error: 'Unsupported provider' })
   } catch (err) {
     return res.status(400).json({ success: false, error: err?.message || 'callback_failed' })
   }

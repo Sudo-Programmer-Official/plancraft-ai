@@ -36,7 +36,8 @@ export async function startInstagramAuth(req, res, next) {
     const userId = req.user?.uid
     if (!userId) return res.status(401).json({ success: false, error: 'Missing user id' })
     const returnTo = req.query.returnTo || req.body?.returnTo || null
-    const url = buildAuthUrl(userId, returnTo)
+    const workspaceId = req.headers['x-workspace-id'] || req.query?.workspaceId || req.body?.workspaceId || null
+    const url = buildAuthUrl(userId, workspaceId, returnTo)
     console.info('[instagram] auth_url_generated', { userId, hasReturnTo: !!returnTo })
     res.json({ success: true, url })
   } catch (err) {
@@ -59,8 +60,8 @@ export async function handleInstagramAuthCallback(req, res) {
     if (!code) return respondError(req, res, 400, 'missing_code')
 
     const tokenObj = await handleInstagramCallback(code, pageId || null)
-    await storeInstagramTokens(parsed.uid, tokenObj)
-    console.info('[instagram] token_exchanged', { userId: parsed.uid, pageId: tokenObj.meta?.pageId })
+    await storeInstagramTokens(parsed.uid, parsed.workspaceId || null, tokenObj)
+    console.info('[instagram] token_exchanged', { userId: parsed.uid, workspaceId: parsed.workspaceId || null, pageId: tokenObj.meta?.pageId })
 
     const redirectTarget = parsed.returnTo || SUCCESS_REDIRECT
     return sendRedirect(res, redirectTarget, { status: 'success', provider: 'instagram' })
@@ -75,9 +76,10 @@ export async function postInstagram(req, res, next) {
     const userId = req.user?.uid
     if (!userId) return res.status(401).json({ success: false, error: 'Missing user id' })
     const { caption, mediaUrl, isVideo } = req.body || {}
-    await ensureInstagramAccess(userId)
-    const result = await postInstagramContent({ userId, caption, mediaUrl, isVideo })
-    console.info('[instagram] post_published', { userId, hasMedia: !!mediaUrl, resultId: result?.id || null })
+    const workspaceId = req.headers['x-workspace-id'] || req.query?.workspaceId || req.body?.workspaceId || null
+    await ensureInstagramAccess(userId, workspaceId)
+    const result = await postInstagramContent({ userId, workspaceId, caption, mediaUrl, isVideo })
+    console.info('[instagram] post_published', { userId, workspaceId, hasMedia: !!mediaUrl, resultId: result?.id || null })
     res.json({ success: true, result })
   } catch (err) {
     next(err)

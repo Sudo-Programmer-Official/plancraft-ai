@@ -50,10 +50,15 @@ export function decodeState(state) {
   }
 }
 
-export function buildAuthUrl(userId, returnTo) {
+export function buildAuthUrl(userId, workspaceId, returnTo) {
   requireEnv()
   if (!userId) throw new Error('Missing user id for Instagram auth')
-  const state = encodeState({ uid: userId, ts: Date.now(), returnTo: returnTo || null })
+  const state = encodeState({
+    uid: userId,
+    workspaceId: workspaceId || null,
+    ts: Date.now(),
+    returnTo: returnTo || null,
+  })
   const redirectParam = encodeURIComponent(REDIRECT_URI)
   const scopeParam = encodeURIComponent(SCOPES)
   return `${FB_OAUTH}?client_id=${APP_ID}&redirect_uri=${redirectParam}&scope=${scopeParam}&response_type=code&state=${state}`
@@ -139,7 +144,7 @@ export async function handleInstagramCallback(code, requestedPageId) {
   }
 }
 
-export async function storeInstagramTokens(userId, tokenObj) {
+export async function storeInstagramTokens(userId, workspaceId, tokenObj) {
   const instagram = {
     accessToken: tokenObj.accessToken,
     refreshToken: tokenObj.refreshToken || null,
@@ -148,12 +153,12 @@ export async function storeInstagramTokens(userId, tokenObj) {
     meta: tokenObj.meta || null,
     updatedAt: new Date().toISOString(),
   }
-  await saveUserTokens(userId, { instagram })
+  await saveUserTokens(userId, { instagram }, workspaceId || null)
   return instagram
 }
 
-export async function getInstagramTokens(userId) {
-  const tokens = await getTokensByUser(userId)
+export async function getInstagramTokens(userId, workspaceId = null) {
+  const tokens = await getTokensByUser(userId, workspaceId || null)
   return tokens?.instagram || null
 }
 
@@ -164,8 +169,8 @@ function isExpired(iso) {
   return ts <= Date.now()
 }
 
-export async function ensureInstagramAccess(userId) {
-  const tokens = await getInstagramTokens(userId)
+export async function ensureInstagramAccess(userId, workspaceId = null) {
+  const tokens = await getInstagramTokens(userId, workspaceId)
   if (!tokens?.accessToken) throw new Error('Instagram not connected for this user')
   // Long-lived tokens cannot be refreshed via API; require re-auth on expiry
   if (isExpired(tokens.expiresAt)) throw new Error('Instagram token expired, please reconnect')
@@ -194,8 +199,8 @@ async function publishMedia(igBusinessId, accessToken, creationId) {
   return data
 }
 
-export async function postInstagramContent({ userId, caption, mediaUrl, isVideo = false }) {
-  const tokens = await ensureInstagramAccess(userId)
+export async function postInstagramContent({ userId, workspaceId = null, caption, mediaUrl, isVideo = false }) {
+  const tokens = await ensureInstagramAccess(userId, workspaceId)
   const igBusinessId = tokens.meta?.igBusinessId
   if (!igBusinessId) throw new Error('Instagram business account id missing')
   if (!mediaUrl) throw new Error('Instagram mediaUrl is required (photo or video)')

@@ -43,17 +43,31 @@ function decryptPayload(docData) {
   }
 }
 
-export async function getTokensByUser(userId) {
+async function readDoc(path) {
   ensureApp()
   const db = admin.firestore()
-  const snap = await db.collection('user_social_tokens').doc(userId).get()
+  const snap = await db.doc(path).get()
   const data = snap.exists ? snap.data() : {}
   return decryptPayload(data)
 }
 
-export async function saveUserTokens(userId, payload) {
+async function writeDoc(path, payload) {
   ensureApp()
   const db = admin.firestore()
   const enc = encryptPayload(payload)
-  await db.collection('user_social_tokens').doc(userId).set(enc, { merge: false })
+  await db.doc(path).set(enc, { merge: false })
+}
+
+export async function getTokensByUser(userId, workspaceId = null) {
+  if (workspaceId) {
+    return readDoc(`user_social_tokens/${userId}/workspaces/${workspaceId}`)
+  }
+  return readDoc(`user_social_tokens/${userId}`)
+}
+
+export async function saveUserTokens(userId, payload, workspaceId = null) {
+  if (workspaceId) {
+    return writeDoc(`user_social_tokens/${userId}/workspaces/${workspaceId}`, payload)
+  }
+  return writeDoc(`user_social_tokens/${userId}`, payload)
 }
