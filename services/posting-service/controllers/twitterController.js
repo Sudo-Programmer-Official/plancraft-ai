@@ -38,9 +38,10 @@ export async function startTwitterAuth(req, res, next) {
     const userId = req.user?.uid
     if (!userId) return res.status(401).json({ success: false, error: 'Missing user id' })
     const returnTo = req.query.returnTo || req.body?.returnTo || null
-    const url = buildAuthUrl(userId, returnTo)
-    console.info('[twitter] auth_url_generated', { userId, hasReturnTo: !!returnTo })
-    res.json({ success: true, url })
+    const workspaceId = req.headers['x-workspace-id'] || req.query?.workspaceId || req.body?.workspaceId || null
+    const url = buildAuthUrl(userId, workspaceId, returnTo)
+    console.info('[twitter] auth_url_generated', { userId, workspaceId, hasReturnTo: !!returnTo })
+    res.json({ success: true, url, authUrl: url })
   } catch (err) {
     next(err)
   }
@@ -62,8 +63,8 @@ export async function handleTwitterCallback(req, res) {
 
     const tokenPayload = await exchangeCodeForToken(code, parsed.cv)
     const profile = await fetchTwitterProfile(tokenPayload.access_token)
-    await storeTwitterTokens(parsed.uid, tokenPayload, profile, null)
-    console.info('[twitter] token_exchanged', { userId: parsed.uid, handle: profile?.username })
+    await storeTwitterTokens(parsed.uid, parsed.workspaceId || null, tokenPayload, profile, null)
+    console.info('[twitter] token_exchanged', { userId: parsed.uid, workspaceId: parsed.workspaceId || null, handle: profile?.username })
 
     const redirectTarget = parsed.returnTo || SUCCESS_REDIRECT
     return sendRedirect(res, redirectTarget, { status: 'success', provider: 'twitter' })
@@ -91,9 +92,10 @@ export async function postTwitter(req, res, next) {
     const userId = req.user?.uid
     if (!userId) return res.status(401).json({ success: false, error: 'Missing user id' })
     const { text } = req.body || {}
-    await ensureTwitterAccess(userId)
-    const result = await postTweet({ userId, text })
-    console.info('[twitter] post_published', { userId, tweetId: result?.data?.id })
+    const workspaceId = req.headers['x-workspace-id'] || req.query?.workspaceId || req.body?.workspaceId || null
+    await ensureTwitterAccess(userId, workspaceId)
+    const result = await postTweet({ userId, workspaceId, text })
+    console.info('[twitter] post_published', { userId, workspaceId, tweetId: result?.data?.id })
     res.json({ success: true, result })
   } catch (err) {
     next(err)

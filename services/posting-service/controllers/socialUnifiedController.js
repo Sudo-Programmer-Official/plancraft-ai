@@ -5,6 +5,13 @@ import {
   handleInstagramCallback,
   storeInstagramTokens,
 } from '../services/instagramService.js'
+import {
+  buildAuthUrl as buildTwitterAuthUrl,
+  decodeState as decodeTwitterState,
+  exchangeCodeForToken as exchangeTwitterCode,
+  fetchTwitterProfile,
+  storeTwitterTokens,
+} from '../services/twitterService.js'
 import { getTokensByUser, saveUserTokens } from '../firestore/tokensRepository.js'
 import admin from 'firebase-admin'
 import { ensureApp } from '../utils/firebase.js'
@@ -26,6 +33,10 @@ export async function socialConnect(req, res, next) {
     if (provider === 'instagram') {
       const url = buildIgAuthUrl(userId, workspaceId, returnTo)
       return res.json({ success: true, url })
+    }
+    if (provider === 'twitter') {
+      const url = buildTwitterAuthUrl(userId, workspaceId, returnTo)
+      return res.json({ success: true, url, authUrl: url })
     }
     return res.status(200).json({ success: false, requiresConnect: true, message: 'Connect flow not yet enabled for this provider.' })
   } catch (err) {
@@ -57,6 +68,16 @@ export async function socialCallback(req, res) {
       const tokenObj = await handleInstagramCallback(code, pageId || null)
       await storeInstagramTokens(parsed.uid, parsed.workspaceId || null, tokenObj)
       return res.json({ success: true, provider, meta: tokenObj.meta })
+    }
+
+    if (provider === 'twitter') {
+      const parsed = decodeTwitterState(state)
+      if (!parsed?.uid || !parsed?.cv) return res.status(401).json({ success: false, error: 'invalid_state' })
+      if (!code) return res.status(400).json({ success: false, error: 'missing_code' })
+      const tokenPayload = await exchangeTwitterCode(code, parsed.cv)
+      const profile = await fetchTwitterProfile(tokenPayload.access_token)
+      await storeTwitterTokens(parsed.uid, parsed.workspaceId || null, tokenPayload, profile, null)
+      return res.json({ success: true, provider, meta: profile })
     }
 
     return res.status(400).json({ success: false, error: 'Unsupported provider' })

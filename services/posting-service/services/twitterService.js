@@ -59,12 +59,18 @@ function codeChallengeFromVerifier(verifier) {
   return base64UrlEncode(hash)
 }
 
-export function buildAuthUrl(userId, returnTo) {
+export function buildAuthUrl(userId, workspaceId, returnTo) {
   requireEnv()
   if (!userId) throw new Error('Missing user id for Twitter auth')
   const codeVerifier = generateCodeVerifier()
   const codeChallenge = codeChallengeFromVerifier(codeVerifier)
-  const state = encodeState({ uid: userId, ts: Date.now(), returnTo: returnTo || null, cv: codeVerifier })
+  const state = encodeState({
+    uid: userId,
+    workspaceId: workspaceId || null,
+    ts: Date.now(),
+    returnTo: returnTo || null,
+    cv: codeVerifier,
+  })
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: CLIENT_ID,
@@ -120,7 +126,7 @@ function parseExpiry(seconds) {
   return new Date(Date.now() + ms).toISOString()
 }
 
-export async function storeTwitterTokens(userId, tokenPayload, profile, existing) {
+export async function storeTwitterTokens(userId, workspaceId, tokenPayload, profile, existing) {
   const twitter = {
     accessToken: tokenPayload.access_token,
     refreshToken: tokenPayload.refresh_token || existing?.refreshToken || null,
@@ -133,12 +139,12 @@ export async function storeTwitterTokens(userId, tokenPayload, profile, existing
     },
     updatedAt: new Date().toISOString(),
   }
-  await saveUserTokens(userId, { twitter })
+  await saveUserTokens(userId, { twitter }, workspaceId || null)
   return twitter
 }
 
-export async function getTwitterTokens(userId) {
-  const tokens = await getTokensByUser(userId)
+export async function getTwitterTokens(userId, workspaceId = null) {
+  const tokens = await getTokensByUser(userId, workspaceId || null)
   return tokens?.twitter || null
 }
 
@@ -149,20 +155,20 @@ function isExpired(iso) {
   return ts <= Date.now()
 }
 
-export async function ensureTwitterAccess(userId) {
-  let tokens = await getTwitterTokens(userId)
+export async function ensureTwitterAccess(userId, workspaceId = null) {
+  let tokens = await getTwitterTokens(userId, workspaceId)
   if (!tokens?.accessToken) throw new Error('Twitter not connected for this user')
   if (!isExpired(tokens.expiresAt)) return tokens
   if (!tokens.refreshToken) throw new Error('Twitter token expired, please reconnect')
   const refreshed = await refreshAccessToken(tokens.refreshToken)
   const profile = tokens.meta || null
-  tokens = await storeTwitterTokens(userId, refreshed, profile, tokens)
+  tokens = await storeTwitterTokens(userId, workspaceId, refreshed, profile, tokens)
   return tokens
 }
 
-export async function postTweet({ userId, text }) {
+export async function postTweet({ userId, workspaceId = null, text }) {
   if (!text) throw new Error('Tweet text is required')
-  const tokens = await ensureTwitterAccess(userId)
+  const tokens = await ensureTwitterAccess(userId, workspaceId)
   const { data } = await axios.post(
     `${API}/2/tweets`,
     { text },
