@@ -169,6 +169,7 @@ const corsOptions = {
     "x-user-country",
     "x-requested-with",
     "x-app-token",
+    "x-workspace-id",
   ],
   credentials: true,
   preflightContinue: false,
@@ -195,7 +196,11 @@ app.use((req, res, next) => {
       res.header('Access-Control-Allow-Credentials', 'true')
       res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS,PATCH')
       const reqHeaders = req.headers['access-control-request-headers']
-      res.header('Access-Control-Allow-Headers', reqHeaders || 'Content-Type, Authorization, X-User-Email, X-User-Id, X-User-Role, X-User-Tz, X-User-Country, X-Requested-With, X-App-Token')
+      res.header(
+        'Access-Control-Allow-Headers',
+        reqHeaders ||
+          'Content-Type, Authorization, X-User-Email, X-User-Id, X-User-Role, X-User-Tz, X-User-Country, X-Requested-With, X-App-Token, X-Workspace-Id',
+      )
       return res.sendStatus(204)
     }
   }

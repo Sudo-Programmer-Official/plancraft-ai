@@ -131,7 +131,10 @@
           >
             <span class="flex items-center gap-2">
               <span>{{ group.icon }}</span>
-              <span v-if="sidebarOpen">{{ group.title }}</span>
+              <span v-if="sidebarOpen" class="flex items-center gap-2">
+                <span>{{ group.title }}</span>
+                <span v-if="group.beta" class="beta-pill">Beta</span>
+              </span>
             </span>
             <span v-if="sidebarOpen" class="text-xs text-slate-400">
               {{ openGroups[group.key] ? '▾' : '▸' }}
@@ -139,7 +142,10 @@
           </button>
           <div v-else class="px-3 py-2 text-sm font-semibold text-slate-200 flex items-center gap-2">
             <span>{{ group.icon }}</span>
-            <span v-if="sidebarOpen">{{ group.title }}</span>
+            <span v-if="sidebarOpen" class="flex items-center gap-2">
+              <span>{{ group.title }}</span>
+              <span v-if="group.beta" class="beta-pill">Beta</span>
+            </span>
           </div>
 
           <div v-show="!group.collapsible || openGroups[group.key]" class="mt-1 space-y-1">
@@ -188,12 +194,6 @@
             class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
             title="Settings"
             >⚙️</RouterLink
-          >
-          <RouterLink
-            to="/profile"
-            class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
-            title="Profile"
-            >👤</RouterLink
           >
           <RouterLink
             to="/subscription"
@@ -691,6 +691,7 @@ const navGroups = [
     key: 'creator',
     title: 'Creator Mode',
     icon: '🎨',
+    beta: true,
     collapsible: true,
     defaultOpen: false,
     children: [
@@ -705,6 +706,7 @@ const navGroups = [
     key: 'leader',
     title: 'Leader Mode',
     icon: '🧑‍💼',
+    beta: true,
     collapsible: true,
     defaultOpen: false,
     children: [
@@ -819,5 +821,16 @@ function startTour() {
 }
 .animate-pulse-slow {
   animation: pulseSlow 2s ease-in-out infinite;
+}
+
+.beta-pill {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #c7d2fe;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 </style>

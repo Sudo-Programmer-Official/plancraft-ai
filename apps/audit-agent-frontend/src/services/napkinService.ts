@@ -98,13 +98,13 @@ function currentWorkspaceId() {
 
 function napkinCollection(uid: string, workspaceId?: string | null) {
   const wsId = workspaceId !== undefined ? workspaceId : currentWorkspaceId()
-  if (uid && wsId) return collection(db, 'users', uid, 'workspaces', wsId, 'napkin', 'items')
+  if (uid && wsId) return collection(db, 'users', uid, 'workspaces', wsId, 'napkin')
   return collection(db, 'napkin', uid, 'items')
 }
 
 function napkinDoc(uid: string, id: string, workspaceId?: string | null) {
   const wsId = workspaceId !== undefined ? workspaceId : currentWorkspaceId()
-  if (uid && wsId) return doc(db, 'users', uid, 'workspaces', wsId, 'napkin', 'items', id)
+  if (uid && wsId) return doc(db, 'users', uid, 'workspaces', wsId, 'napkin', id)
   return doc(db, 'napkin', uid, 'items', id)
 }
 

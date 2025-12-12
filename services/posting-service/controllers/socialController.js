@@ -1,9 +1,13 @@
 import { getTokensByUser, saveUserTokens } from '../firestore/tokensRepository.js'
+import admin from 'firebase-admin'
+import { ensureApp } from '../utils/firebase.js'
 
 export async function getSocialStatus(req, res, next) {
   try {
     const userId = req.user?.uid
     if (!userId) return res.status(401).json({ success: false, error: 'Missing user id' })
+    const workspaceId =
+      req.headers['x-workspace-id'] || req.query?.workspaceId || req.body?.workspaceId || null
     const tokens = await getTokensByUser(userId)
     const map = {}
     ;['linkedin', 'instagram', 'twitter', 'whatsapp'].forEach((key) => {
@@ -15,7 +19,15 @@ export async function getSocialStatus(req, res, next) {
         expiresAt: t?.expiresAt || null,
       }
     })
-    res.json({ success: true, accounts: map })
+    let enabledSocials = {}
+    if (workspaceId) {
+      ensureApp()
+      const db = admin.firestore()
+      const ref = db.doc(`users/${userId}/workspaces/${workspaceId}`)
+      const snap = await ref.get()
+      enabledSocials = snap.exists ? snap.data()?.enabledSocials || {} : {}
+    }
+    res.json({ success: true, accounts: map, enabledSocials })
   } catch (err) {
     next(err)
   }

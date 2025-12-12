@@ -885,57 +885,57 @@ const onboardingSessionPlayed = ref(false)
 const onboardingSteps = computed(() => [
   {
     id: 'daily',
-    title: 'Daily Tasks',
-    description: 'Track, plan, and prioritize your day here 🧭',
+    title: 'Daily Focus',
+    description: 'Your home for today’s priorities, streaks, and AI-assisted ordering 🧭',
     selector: '.daily-card',
     placement: 'right',
     icon: '🧭',
-    aiTip: 'Say “Plan my day” and I’ll reorder this list based on energy + focus.',
+    aiTip: 'Say “Plan my day” — I’ll reorder with your energy, streaks, and memory-aware context.',
   },
   {
     id: 'calendar',
-    title: 'Calendar Sync',
-    description: 'Connect Google Calendar for smart scheduling 🗓️',
+    title: 'Calendar Guardrails',
+    description: 'Connect Google Calendar to auto-protect deep work and prep 🗓️',
     selector: '.calendar-sync-card',
     placement: 'left',
     icon: '🗓️',
-    aiTip: 'I’ll pull in meetings, prep agendas, and protect white space automatically.',
+    aiTip: 'I’ll pull meetings, prep agendas, and block white space before it disappears.',
   },
   {
     id: 'talk',
     title: 'Talk to Planner',
-    description: 'Speak to your AI assistant — plan hands-free 🎙️',
+    description: 'Hands-free planning; speak tasks or ideas and I route them 🎙️',
     selector: '.talk-to-planner-entry',
     placement: 'bottom',
     icon: '🎙️',
-    aiTip: 'Ask “Plan my next sprint” and I’ll capture tasks while you speak.',
+    aiTip: 'Ask “Plan my next sprint” and I’ll capture, tag, and set reminders automatically.',
   },
   {
     id: 'weekly',
-    title: 'Weekly Overview',
-    description: 'Get insights on your progress and wins 📊',
+    title: 'Weekly / Monthly Pulse',
+    description: 'Zoom out for insights, wins, and carryovers 📊',
     selector: '.weekly-card',
     placement: 'left',
     icon: '📊',
-    aiTip: 'Need encouragement? Ask for a weekly recap or highlight reel.',
+    aiTip: 'Ask for a recap — I’ll use your tasks, journal, and captures to build a highlight reel.',
   },
   {
     id: 'journal',
-    title: 'Journal',
-    description: 'Reflect on your thoughts, tasks, and gratitude 🪶',
+    title: 'Journal 2.0',
+    description: 'Voice + text + scan-to-plan — all in one reflective space 🪶',
     selector: '.journal-card',
     placement: 'top',
     icon: '🪶',
-    aiTip: 'Speak your reflections — I’ll transcribe, summarize, and notice streaks.',
+    aiTip: 'Speak or scan scribbles; I’ll transcribe, summarize, and track your streaks.',
   },
   {
     id: 'reminders',
-    title: 'Reminders & Notifications',
-    description: 'Stay on track effortlessly 🔔',
+    title: 'Reminders & Nudges',
+    description: 'WhatsApp, SMS, email, or voice reminders with smart timing 🔔',
     selector: '.reminders-card',
     placement: 'top',
     icon: '🔔',
-    aiTip: 'Turn on WhatsApp, SMS, or voice nudges whenever you need extra accountability.',
+    aiTip: 'Turn on nudges for critical tasks; I’ll avoid meeting conflicts automatically.',
   },
 ])
 
@@ -1048,19 +1048,8 @@ function shouldLaunchOnboarding() {
 }
 
 function maybeLaunchOnboarding(reason = 'auto') {
-  if (!shouldLaunchOnboarding()) return
-  if (reason === 'auto' && onboardingSessionPlayed.value) return
-  onboardingSessionPlayed.value = true
-  const delay = reason === 'auto' ? 1200 : 200
-  if (typeof window === 'undefined') {
-    onboardingTourVisible.value = true
-    return
-  }
-  if (onboardingTimer) clearTimeout(onboardingTimer)
-  onboardingTimer = window.setTimeout(() => {
-    onboardingTourVisible.value = true
-    onboardingTimer = null
-  }, delay)
+  // Tour temporarily disabled; keep function as no-op for now
+  return
 }
 
 async function persistOnboardingStatus(patch = {}) {
@@ -1128,15 +1117,8 @@ async function handleOnboardingLater() {
 }
 
 function handleOnboardingReplayEvent() {
-  if (!authStore.user?.uid) return
-  onboardingTourVisible.value = false
-  onboardingSessionPlayed.value = false
-  maybeLaunchOnboarding('manual')
-  persistOnboardingStatus({
-    completed: false,
-    showLaterUntil: null,
-    replayRequestedAt: new Date().toISOString(),
-  })
+  // Tour temporarily disabled
+  return
 }
 
 async function bootstrapPreferences(uid) {

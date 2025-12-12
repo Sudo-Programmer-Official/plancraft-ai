@@ -14,6 +14,7 @@ import { summarizeWorkspace, workspaceInspiration } from '../controllers/workspa
 import { deleteMemory, searchWorkspaceMemory, upsertMemory } from '../controllers/memoryController.js'
 import { getForwardPulse, getMemoryPulse, getTodayPulse } from '../controllers/pulseController.js'
 import { ingestImage } from '../controllers/captureController.js'
+import { orchestrate } from '../controllers/orchestrateController.js'
 
 const router = Router()
 
@@ -26,6 +27,9 @@ router.post('/workspace/ingest-image', ingestImage)
 router.post('/workspace/summary', summarizeWorkspace)
 router.post('/workspace/inspiration', workspaceInspiration)
 router.post('/workspace/search', searchWorkspaceMemory)
+
+// Orchestrator
+router.post('/orchestrate', orchestrate)
 
 // Vector memory maintenance
 router.post('/memory/upsert', upsertMemory)

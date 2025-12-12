@@ -59,6 +59,18 @@
           </button>
           <span v-if="card.readonly" class="text-xs text-slate-300">No action required.</span>
         </div>
+        <div
+          v-if="card.workspaceToggle"
+          class="flex items-center gap-2 text-xs text-slate-300"
+        >
+          <input
+            type="checkbox"
+            class="accent-indigo-500 h-4 w-4"
+            :checked="card.workspaceEnabled"
+            @change="card.onToggle?.(($event.target as HTMLInputElement).checked)"
+          />
+          <span>Enable for this workspace</span>
+        </div>
         <p v-if="card.error" class="text-xs text-red-300">⚠️ {{ card.error }}</p>
       </div>
     </div>
@@ -69,9 +81,18 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/authStore'
-import { getSocialStatus, getLinkedInAuthUrl, getInstagramAuthUrl, getTwitterAuthUrl, disconnectSocial } from '@/services/social'
+import {
+  getSocialStatus,
+  getLinkedInAuthUrl,
+  getInstagramAuthUrl,
+  getTwitterAuthUrl,
+  disconnectSocial,
+  setSocialEnabled,
+} from '@/services/social'
+import { useWorkspaceStore } from '@/stores/workspaceStore'
 
 const authStore = useAuthStore()
+const workspaceStore = useWorkspaceStore()
 const loading = ref(false)
 const state = reactive({
   linkedin: { connected: false, meta: null as any, busy: false, error: '' },
@@ -79,6 +100,11 @@ const state = reactive({
   twitter: { connected: false, meta: null as any, busy: false, error: '' },
   whatsapp: { connected: true, meta: null as any, busy: false, error: '' },
   updatedAt: null as string | null,
+  enabled: {
+    linkedin: false,
+    instagram: false,
+    twitter: false,
+  } as Record<string, boolean>,
 })
 
 const lastUpdatedLabel = computed(() => {
@@ -89,13 +115,18 @@ const lastUpdatedLabel = computed(() => {
 async function loadStatus() {
   loading.value = true
   try {
-    const accounts = await getSocialStatus()
+    const resp = await getSocialStatus(workspaceStore.activeWorkspaceId)
+    const accounts = resp?.accounts || resp || {}
+    const enabled = resp?.enabledSocials || {}
     state.linkedin.connected = !!accounts?.linkedin?.connected
     state.linkedin.meta = accounts?.linkedin?.meta || null
     state.instagram.connected = !!accounts?.instagram?.connected
     state.instagram.meta = accounts?.instagram?.meta || null
     state.twitter.connected = !!accounts?.twitter?.connected
     state.twitter.meta = accounts?.twitter?.meta || null
+    state.enabled.linkedin = !!enabled.linkedin
+    state.enabled.instagram = !!enabled.instagram
+    state.enabled.twitter = !!enabled.twitter
     state.updatedAt = new Date().toISOString()
   } catch (e) {
     console.warn('Load social status failed', e)
@@ -171,6 +202,18 @@ async function doDisconnect(platform: 'linkedin' | 'instagram' | 'twitter') {
   }
 }
 
+async function toggleWorkspace(provider: 'linkedin' | 'instagram' | 'twitter', enabled: boolean) {
+  try {
+    const wsId = workspaceStore.activeWorkspaceId
+    if (!wsId) throw new Error('Select a workspace first')
+    await setSocialEnabled(wsId, provider, enabled)
+    state.enabled[provider] = enabled
+    ElMessage.success(`${provider} ${enabled ? 'enabled' : 'disabled'} for this workspace`)
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || e?.message || 'Failed to update workspace setting')
+  }
+}
+
 const cards = computed(() => {
   return [
     {
@@ -186,6 +229,9 @@ const cards = computed(() => {
       connectLabel: 'Connect LinkedIn',
       onConnect: connectLinkedIn,
       onDisconnect: state.linkedin.connected ? () => doDisconnect('linkedin') : null,
+      workspaceToggle: true,
+      workspaceEnabled: state.enabled.linkedin,
+      onToggle: (enabled: boolean) => toggleWorkspace('linkedin', enabled),
     },
     {
       key: 'instagram',
@@ -200,6 +246,9 @@ const cards = computed(() => {
       connectLabel: 'Connect via Facebook',
       onConnect: connectInstagram,
       onDisconnect: state.instagram.connected ? () => doDisconnect('instagram') : null,
+      workspaceToggle: true,
+      workspaceEnabled: state.enabled.instagram,
+      onToggle: (enabled: boolean) => toggleWorkspace('instagram', enabled),
     },
     {
       key: 'twitter',
@@ -214,6 +263,9 @@ const cards = computed(() => {
       connectLabel: 'Connect Twitter/X',
       onConnect: connectTwitter,
       onDisconnect: state.twitter.connected ? () => doDisconnect('twitter') : null,
+      workspaceToggle: true,
+      workspaceEnabled: state.enabled.twitter,
+      onToggle: (enabled: boolean) => toggleWorkspace('twitter', enabled),
     },
     {
       key: 'whatsapp',
