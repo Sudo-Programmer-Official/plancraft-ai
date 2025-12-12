@@ -79,6 +79,28 @@
           <button class="text-slate-400 hover:text-white" @click="closeModal">✕</button>
         </div>
         <div class="grid sm:grid-cols-2 gap-3">
+          <div class="sm:col-span-2 rounded-lg border border-indigo-500/30 bg-indigo-500/10 p-3 space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <div>
+                <p class="text-xs uppercase tracking-wide text-indigo-200">Scan card / message</p>
+                <p class="text-[11px] text-indigo-100/80">Camera or upload to fill this occasion.</p>
+              </div>
+              <input ref="fileInput" type="file" accept="image/*" capture="environment" class="hidden" @change="onScanFile" />
+              <button
+                class="px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold disabled:opacity-60"
+                :disabled="captureLoading"
+                @click="triggerScan"
+              >
+                {{ captureLoading ? 'Processing…' : 'Scan card' }}
+              </button>
+            </div>
+            <div class="flex items-center gap-3 text-xs text-indigo-100">
+              <span v-if="captureConfidence" class="px-2 py-1 rounded bg-emerald-500/10 border border-emerald-400/40 text-emerald-100">
+                Detected from scan ({{ Math.round(captureConfidence * 100) }}% confident)
+              </span>
+              <span v-if="captureError" class="text-rose-200">{{ captureError }}</span>
+            </div>
+          </div>
           <label class="space-y-1 text-sm text-slate-200">
             Name
             <input
@@ -175,6 +197,7 @@ import {
   scheduleOccasion,
 } from '@/services/leader/occasions'
 import { listContacts, listGroups } from '@/services/leader/contacts'
+import { nlpClient } from '@/services/leader/http'
 
 const occasions = ref([])
 const loading = ref(false)
@@ -185,6 +208,10 @@ const showModal = ref(false)
 const editing = ref(null)
 const contacts = ref([])
 const groups = ref([])
+const captureLoading = ref(false)
+const captureError = ref('')
+const captureConfidence = ref(null)
+const fileInput = ref(null)
 const form = reactive({
   name: '',
   type: 'birthday',
@@ -204,6 +231,8 @@ function resetForm() {
   editing.value = null
   form.contactId = ''
   form.groupId = ''
+  captureError.value = ''
+  captureConfidence.value = null
 }
 
 function formatDate(value) {
@@ -224,6 +253,8 @@ function openEdit(o) {
   form.tags = (o.tags || []).join(', ')
   form.contactId = o.contactId || ''
   form.groupId = o.groupId || ''
+  captureError.value = ''
+  captureConfidence.value = null
   showModal.value = true
 }
 
@@ -291,6 +322,42 @@ async function aiPreviewFromModal() {
     ElMessage.error(e?.response?.data?.error || 'AI preview failed')
   } finally {
     aiLoading.value = false
+  }
+}
+
+function triggerScan() {
+  captureError.value = ''
+  fileInput.value?.click()
+}
+
+async function onScanFile(event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+  captureError.value = ''
+  captureLoading.value = true
+  captureConfidence.value = null
+  try {
+    const reader = new FileReader()
+    const dataUrl = await new Promise((resolve, reject) => {
+      reader.onload = () => resolve(reader.result)
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+    const { data } = await nlpClient.post('/workspace/ingest-image?mode=occasion', { image: dataUrl })
+    if (data?.occasion) {
+      form.name = data.occasion.name || form.name
+      form.type = data.occasion.type || form.type
+      form.date = data.occasion.date || form.date
+      if (!form.message && data.occasion.messageHint) form.message = data.occasion.messageHint
+      captureConfidence.value = data.occasion.confidence || data.occasion.dateConfidence || null
+    } else {
+      captureError.value = 'No occasion detected. Try again.'
+    }
+  } catch (e) {
+    captureError.value = e?.response?.data?.error || e?.message || 'Failed to scan image'
+  } finally {
+    captureLoading.value = false
+    if (event?.target?.value) event.target.value = ''
   }
 }
 

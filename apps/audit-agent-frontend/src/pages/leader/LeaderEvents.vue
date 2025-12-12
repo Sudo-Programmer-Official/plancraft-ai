@@ -99,7 +99,17 @@
               </div>
             </div>
             <p class="text-sm text-slate-300 line-clamp-2">{{ event.description || 'No description yet.' }}</p>
-            <p class="text-xs text-slate-500" v-if="event.location">📍 {{ event.location }}</p>
+            <div class="flex items-center justify-between text-xs text-slate-500" v-if="event.location">
+              <span>📍 {{ event.location }}</span>
+              <a
+                :href="mapLink(event.location)"
+                target="_blank"
+                rel="noopener"
+                class="text-indigo-300 hover:text-indigo-100"
+              >
+                Open maps
+              </a>
+            </div>
             <div class="flex flex-wrap gap-1">
               <span v-for="tag in event.tags || []" :key="tag" class="text-[10px] px-2 py-1 rounded bg-slate-800 text-slate-300 border border-slate-700">
                 {{ tag }}
@@ -120,6 +130,29 @@
           <button class="text-slate-400 hover:text-white" @click="closeModal">✕</button>
         </div>
         <div class="grid sm:grid-cols-2 gap-3">
+          <div class="sm:col-span-2 rounded-lg border border-indigo-500/30 bg-indigo-500/10 p-3 space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <div>
+                <p class="text-xs uppercase tracking-wide text-indigo-200">Scan invite / poster</p>
+                <p class="text-[11px] text-indigo-100/80">Use your camera or upload to auto-fill this event.</p>
+              </div>
+              <input ref="fileInput" type="file" accept="image/*" capture="environment" class="hidden" @change="onScanFile" />
+              <button
+                class="px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold disabled:opacity-60"
+                :disabled="captureLoading"
+                @click="triggerScan"
+              >
+                {{ captureLoading ? 'Processing…' : capturePreview ? 'Re-scan' : 'Scan invite' }}
+              </button>
+            </div>
+            <div class="flex items-center gap-3 text-xs text-indigo-100">
+              <span v-if="capturePreview" class="px-2 py-1 rounded bg-white/10 border border-white/10">Image attached</span>
+              <span v-if="captureConfidence" class="px-2 py-1 rounded bg-emerald-500/10 border border-emerald-400/40 text-emerald-100">
+                Detected from scan ({{ Math.round(captureConfidence * 100) }}% confident)
+              </span>
+              <span v-if="captureError" class="text-rose-200">{{ captureError }}</span>
+            </div>
+          </div>
           <label class="space-y-1 text-sm text-slate-200">
             Title
             <input
@@ -201,6 +234,7 @@ import {
   deleteLeaderEvent,
   suggestEventCopy,
 } from '@/services/leader/events'
+import { nlpClient } from '@/services/leader/http'
 
 const router = useRouter()
 const route = useRoute()
@@ -210,6 +244,11 @@ const showModal = ref(false)
 const saving = ref(false)
 const aiLoading = ref(false)
 const currentMonth = ref(dayjs())
+const captureLoading = ref(false)
+const captureError = ref('')
+const capturePreview = ref('')
+const captureConfidence = ref(null)
+const fileInput = ref(null)
 const form = reactive({
   id: null,
   title: '',
@@ -244,6 +283,11 @@ const calendarDays = computed(() => {
 function formatDate(value) {
   if (!value) return ''
   return dayjs(value).format('MMM D, YYYY')
+}
+
+function mapLink(location) {
+  if (!location) return '#'
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`
 }
 
 async function prefillFromQuery() {
@@ -287,6 +331,9 @@ function resetForm(date) {
   form.time = '09:00'
   form.location = ''
   form.tags = ''
+  capturePreview.value = ''
+  captureError.value = ''
+  captureConfidence.value = null
 }
 
 function openCreate(date) {
@@ -378,6 +425,49 @@ async function suggestAi() {
     ElMessage.error(e?.response?.data?.error || 'AI suggestion failed')
   } finally {
     aiLoading.value = false
+  }
+}
+
+function triggerScan() {
+  captureError.value = ''
+  fileInput.value?.click()
+}
+
+async function onScanFile(event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+  captureError.value = ''
+  captureLoading.value = true
+  capturePreview.value = ''
+  captureConfidence.value = null
+  try {
+    const reader = new FileReader()
+    const dataUrl = await new Promise((resolve, reject) => {
+      reader.onload = () => resolve(reader.result)
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+    capturePreview.value = typeof dataUrl === 'string' ? dataUrl : ''
+    const { data } = await nlpClient.post('/workspace/ingest-image?mode=event', { image: dataUrl })
+    if (data?.event) {
+      form.title = data.event.title || form.title
+      form.date = data.event.date || form.date
+      form.time = data.event.startTime || form.time
+      form.location = data.event.locationText || form.location
+      form.description = data.event.notes || form.description
+      captureConfidence.value = data.event.confidence || null
+    } else if (Array.isArray(data?.items) && data.items.length) {
+      const first = data.items.find((it) => it.type === 'event') || data.items[0]
+      form.title = first?.title || form.title
+      form.description = first?.description || form.description
+    } else {
+      captureError.value = 'No event detected. Please try again.'
+    }
+  } catch (e) {
+    captureError.value = e?.response?.data?.error || e?.message || 'Failed to scan image'
+  } finally {
+    captureLoading.value = false
+    if (event?.target?.value) event.target.value = ''
   }
 }
 
