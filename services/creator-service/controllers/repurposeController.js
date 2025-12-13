@@ -22,7 +22,7 @@ export async function runRepurpose(req, res, next) {
       targetFormats: payload.formats || payload.targetFormats || ['linkedin_post', 'twitter_thread'],
       workspaceId: wsId,
     }
-    const data = await proxyAi('repurpose', aiPayload)
+    const data = await proxyAi('repurpose', aiPayload, { headers: req.headers })
     const variants = data?.variants || data || {}
     const saved = await createVariantsFromMap(userId, variants, wsId)
     res.json({ success: true, variants: saved })

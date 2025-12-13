@@ -21,7 +21,7 @@ function resolveAiBase() {
 const AI_BASE = resolveAiBase()
 const APP_TOKEN = process.env.SERVICE_APP_TOKEN || process.env.APP_TOKEN || ''
 
-export async function proxyAi(type, payload) {
+export async function proxyAi(type, payload, options = {}) {
   const typeMap = {
     repurpose: 'generate/repurpose',
     hook: 'generate/hook',
@@ -35,11 +35,18 @@ export async function proxyAi(type, payload) {
   const url = `${AI_BASE}/${endpoint}`
   logger.info(`Proxying AI call ${url}`)
   const workspaceId = payload?.workspaceId || null
+  const callerHeaders = options.headers || {}
+  const forwardedAuth = callerHeaders.authorization || callerHeaders.Authorization || null
+  const forwardedAppToken =
+    callerHeaders['x-app-token'] || callerHeaders['X-App-Token'] || callerHeaders['x-app_token'] || null
+
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(APP_TOKEN ? { 'x-app-token': APP_TOKEN } : {}),
+      ...(forwardedAppToken ? { 'x-app-token': forwardedAppToken } : {}),
+      ...(forwardedAuth ? { Authorization: forwardedAuth } : {}),
       ...(workspaceId ? { 'x-workspace-id': workspaceId } : {}),
     },
     body: JSON.stringify(workspaceId === undefined ? payload || {} : { ...(payload || {}), workspaceId }),
