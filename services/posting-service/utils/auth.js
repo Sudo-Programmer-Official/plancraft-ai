@@ -30,6 +30,11 @@ function matchesAppToken(req) {
 
 export async function verifyAuth(req, res, next) {
   try {
+    // Public OAuth callbacks must bypass auth; Meta will not send auth headers
+    if (/instagram\/callback/i.test(req.path || '')) {
+      return next()
+    }
+
     // Allow trusted app-token (for server-to-server / preview environments)
     if (matchesAppToken(req)) {
       req.user = { uid: 'app-token', via: 'app-token' }
