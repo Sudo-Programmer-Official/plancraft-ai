@@ -10,6 +10,7 @@ import editorRoutes from './routes/editorRoutes.js'
 import mediaRoutes from './routes/mediaRoutes.js'
 import publishRoutes from './routes/publishRoutes.js'
 import boardRoutes from './routes/boardRoutes.js'
+import validationRoutes from './routes/validationRoutes.js'
 import { errorHandler } from './utils/errorHandler.js'
 import { verifyAuth } from './utils/auth.js'
 
@@ -76,6 +77,7 @@ basePaths.forEach((base) => {
   app.use(base, verifyAuth, mediaRoutes)
   app.use(base, verifyAuth, publishRoutes)
   app.use(base, verifyAuth, boardRoutes)
+  app.use(base, verifyAuth, validationRoutes)
 })
 
 app.use(errorHandler)

@@ -87,6 +87,7 @@ const router = createRouter({
         { path: '', name: 'AdminDashboard', component: () => import('@/views/admin/AdminDashboard.vue') },
         { path: 'features', name: 'AdminFeatures', component: () => import('@/views/admin/AdminFeatures.vue') },
         { path: 'notifications', name: 'AdminNotifications', component: () => import('@/views/admin/AdminNotifications.vue') },
+        { path: 'retention', name: 'AdminRetention', component: () => import('@/views/admin/AdminRetention.vue') },
         { path: 'feedback', name: 'AdminFeedback', component: () => import('@/views/admin/AdminFeedback.vue') },
         { path: 'users', name: 'AdminUsers', component: () => import('@/views/admin/AdminUsers.vue') },
         { path: 'payments', name: 'AdminPayments', component: () => import('@/views/admin/AdminPayments.vue') },

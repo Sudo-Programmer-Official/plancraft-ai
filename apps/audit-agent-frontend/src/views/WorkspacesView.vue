@@ -417,6 +417,14 @@
           </select>
         </label>
 
+        <div
+          v-if="inviteEmailStatus === 'failed'"
+          class="text-xs text-amber-100 bg-amber-500/10 border border-amber-400/40 rounded-lg px-3 py-2"
+        >
+          Email failed — copy the invite link below and share directly.
+          <span v-if="inviteEmailError">({{ inviteEmailError }})</span>
+        </div>
+
         <div v-if="inviteLink" class="text-xs text-slate-200 bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2 flex items-center justify-between gap-2">
           <span class="truncate">{{ inviteLink }}</span>
           <button
@@ -489,6 +497,8 @@ const inviteOpen = ref(false)
 const inviteSending = ref(false)
 const inviteForm = reactive({ email: '', role: 'editor' })
 const inviteLink = ref(null)
+const inviteEmailStatus = ref(null)
+const inviteEmailError = ref('')
 const memberBusy = reactive({})
 
 const colorPresets = [
@@ -636,6 +646,8 @@ function openInviteModal(ws = null) {
   inviteForm.email = ''
   inviteForm.role = 'editor'
   inviteLink.value = null
+  inviteEmailStatus.value = null
+  inviteEmailError.value = ''
   inviteOpen.value = true
 }
 
@@ -648,12 +660,22 @@ async function sendInvite() {
     ElMessage.error('Enter an email to invite')
     return
   }
+  inviteEmailStatus.value = null
+  inviteEmailError.value = ''
+  inviteLink.value = null
   inviteSending.value = true
   try {
-    const { invite, link } = await sendWorkspaceInvite(activeWorkspaceId.value, inviteForm)
+    const { invite, link, emailStatus, emailError } = await sendWorkspaceInvite(
+      activeWorkspaceId.value,
+      inviteForm,
+    )
     inviteLink.value = link || null
+    inviteEmailStatus.value = emailStatus || invite?.emailStatus || null
+    inviteEmailError.value = emailError || invite?.emailError || ''
     if (invite) invites.value = [...invites.value.filter((i) => i.id !== invite.id), invite]
-    if (link) {
+    if (inviteEmailStatus.value === 'failed') {
+      ElMessage.warning('Email failed — copy the invite link below.')
+    } else if (link) {
       try {
         await navigator.clipboard.writeText(link)
         ElMessage.success('Invite link copied')

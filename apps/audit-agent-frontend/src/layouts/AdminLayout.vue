@@ -10,6 +10,7 @@
         <RouterLink class="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-800" to="/admin">🧭 <span>Dashboard</span></RouterLink>
         <RouterLink class="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-800" to="/admin/features">🚀 <span>Features</span></RouterLink>
         <RouterLink class="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-800" to="/admin/notifications">🔔 <span>Notifications</span></RouterLink>
+        <RouterLink class="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-800" to="/admin/retention">📩 <span>Retention</span></RouterLink>
         <RouterLink class="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-800" to="/admin/feedback">💬 <span>Feedback</span></RouterLink>
         <RouterLink class="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-800" to="/admin/users">👤 <span>Users</span></RouterLink>
         <RouterLink class="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-800" to="/admin/payments">💳 <span>Payments</span></RouterLink>
@@ -34,6 +35,7 @@
           <RouterLink class="block px-3 py-2 rounded hover:bg-gray-800" to="/admin" @click="mobileOpen=false">Dashboard</RouterLink>
           <RouterLink class="block px-3 py-2 rounded hover:bg-gray-800" to="/admin/features" @click="mobileOpen=false">Features</RouterLink>
           <RouterLink class="block px-3 py-2 rounded hover:bg-gray-800" to="/admin/notifications" @click="mobileOpen=false">Notifications</RouterLink>
+          <RouterLink class="block px-3 py-2 rounded hover:bg-gray-800" to="/admin/retention" @click="mobileOpen=false">Retention</RouterLink>
           <RouterLink class="block px-3 py-2 rounded hover:bg-gray-800" to="/admin/feedback" @click="mobileOpen=false">Feedback</RouterLink>
           <RouterLink class="block px-3 py-2 rounded hover:bg-gray-800" to="/admin/users" @click="mobileOpen=false">Users</RouterLink>
           <RouterLink class="block px-3 py-2 rounded hover:bg-gray-800" to="/admin/payments" @click="mobileOpen=false">Payments</RouterLink>

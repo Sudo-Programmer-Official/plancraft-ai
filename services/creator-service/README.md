@@ -7,6 +7,7 @@ Purpose: manage creator plans (ContentCampaign) and proxy AI generation via ai-n
 - `PUT /creator/plan/:id` – update campaign
 - `GET /creator/plan/:id` – fetch campaign
 - `POST /creator/ai/hook|repurpose|reel-script|story-frames|thread|linkedin-post` – AI helpers
+- `POST /creator/posts/validate` – validate canonical draft for platform readiness
 
 ## Dev
 ```
@@ -30,5 +31,8 @@ See `.env.example`. Requires Firebase Admin credentials and AI service URL.
    - FIREBASE_PROJECT_ID
    - FIREBASE_CLIENT_EMAIL
    - FIREBASE_PRIVATE_KEY
-   - AI_NLP_SERVICE_URL
+   - AI_NLP_SERVICE_URL (base of ai-nlp-service, e.g., https://<ai-service>/api/ai)
+   - SERVICE_APP_TOKEN (shared secret; must match ai-nlp-service)
+   - APP_TOKEN (same value as SERVICE_APP_TOKEN for backward compatibility)
+   - CORS_ALLOW_ALL=1 (optional; keep 0 to lock down origins)
 6) Health check endpoint: `/healthz`.

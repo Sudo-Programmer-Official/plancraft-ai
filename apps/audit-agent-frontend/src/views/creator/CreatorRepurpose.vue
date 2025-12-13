@@ -25,6 +25,7 @@
           placeholder="Paste script, article, or notes to repurpose..."
         />
         <RepurposeActions @repurpose="setTarget" />
+        <MediaPanel v-model="draft.media" :draftSnapshot="draft" />
       </div>
 
       <div class="lg:col-span-2 space-y-4">
@@ -36,9 +37,27 @@
             <span class="px-2 py-1 rounded-full border" :class="socials.linkedin.connected ? 'border-emerald-400/60 text-emerald-100 bg-emerald-500/10' : 'border-slate-700 text-slate-400'">LinkedIn: {{ socials.linkedin.connected ? 'Connected' : 'Not connected' }}</span>
           </div>
           <div class="grid md:grid-cols-2 gap-4">
-            <PlatformPreviewInstagram :caption="output.ig_feed.caption" :hashtags="output.ig_feed.hashtags" />
-            <PlatformPreviewTwitter :tweets="output.twitter_thread.tweets" />
-            <PlatformPreviewLinkedIn :content="output.linkedin_post.content" />
+            <PlatformPreviewInstagram
+              :caption="instagramPreview.caption"
+              :hashtags="instagramPreview.hashtags"
+              :media="draft.media"
+              :warnings="warnings.instagram"
+              :connected="socials.instagram.connected"
+            />
+            <PlatformPreviewTwitter
+              :tweets="twitterPreview.tweets"
+              :media="draft.media"
+              :warnings="warnings.twitter"
+              :connected="socials.twitter.connected"
+            />
+            <PlatformPreviewLinkedIn
+              :title="draft.text.title"
+              :content="linkedInPreview.body"
+              :link="firstLink"
+              :media="draft.media"
+              :warnings="warnings.linkedin"
+              :connected="socials.linkedin.connected"
+            />
           </div>
         </section>
       </div>
@@ -47,23 +66,28 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import RepurposeActions from '@/components/creator/RepurposeActions.vue'
 import PlatformPreviewInstagram from '@/components/creator/PlatformPreviewInstagram.vue'
 import PlatformPreviewTwitter from '@/components/creator/PlatformPreviewTwitter.vue'
 import PlatformPreviewLinkedIn from '@/components/creator/PlatformPreviewLinkedIn.vue'
+import MediaPanel from '@/components/creator/MediaPanel.vue'
 import { runRepurpose as runRepurposeApi } from '@/services/creatorApi'
 import { getSocialStatus } from '@/services/social'
+import {
+  adaptForInstagram,
+  adaptForLinkedIn,
+  adaptForTwitter,
+  createEmptyDraft,
+  validateDraftClient,
+} from '@/services/creator/draftModel'
 
 const source = ref('')
 const selectedTarget = ref(null)
 const loading = ref(false)
-const output = reactive({
-  ig_feed: { caption: 'Hook + CTA go here.', hashtags: ['plancraftai', 'calmplanning'] },
-  twitter_thread: { tweets: ['Tweet 1', 'Tweet 2'] },
-  linkedin_post: { content: 'LinkedIn body goes here.' },
-})
+const draft = reactive(createEmptyDraft())
+const warnings = reactive({ instagram: [], twitter: [], linkedin: [] })
 const socials = reactive({
   linkedin: { connected: false },
   instagram: { connected: false },
@@ -86,11 +110,15 @@ async function runRepurpose() {
     ;(variants || []).forEach((variant) => {
       const body = variant.body || variant.caption || ''
       if (variant.type?.includes('twitter')) {
-        output.twitter_thread.tweets = body.split('\n').filter(Boolean)
+        draft.text.body = body
+        source.value = body
       } else if (variant.type?.includes('linkedin')) {
-        output.linkedin_post.content = body
+        draft.text.title = variant.title || draft.text.title
+        draft.text.body = body
+        source.value = body
       } else {
-        output.ig_feed.caption = body
+        draft.text.body = body
+        source.value = body
       }
     })
     ElMessage.success('Repurposed with AI')
@@ -116,4 +144,28 @@ async function loadSocials() {
     console.warn('Failed to load social status', err?.message || err)
   }
 }
+
+const instagramPreview = computed(() => adaptForInstagram(draft))
+const twitterPreview = computed(() => adaptForTwitter(draft))
+const linkedInPreview = computed(() => adaptForLinkedIn(draft))
+const firstLink = computed(() => draft.links?.[0] || null)
+
+watch(
+  () => draft,
+  () => {
+    const localWarnings = validateDraftClient(draft)
+    warnings.instagram = [...localWarnings.instagram]
+    warnings.twitter = [...localWarnings.twitter]
+    warnings.linkedin = [...localWarnings.linkedin]
+  },
+  { deep: true, immediate: true },
+)
+
+watch(
+  () => source.value,
+  (val) => {
+    draft.text.body = val
+  },
+  { immediate: true },
+)
 </script>

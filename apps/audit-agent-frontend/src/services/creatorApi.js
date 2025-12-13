@@ -81,6 +81,9 @@ export async function runRepurpose(payload) {
   const { data } = await creatorClient.post('/creator/repurpose', {
     source: payload.sourceContent || payload.source,
     formats: payload.targetFormats || payload.formats,
+    media: payload.media || [],
+    links: payload.links || [],
+    tags: payload.tags || {},
   })
   return data
 }
@@ -166,4 +169,27 @@ export async function recordCreatorMedia(payload) {
 export async function saveVariantDraft(id, payload) {
   const { data } = await creatorClient.post('/creator/editor/save', { id, ...payload })
   return data?.content || data
+}
+
+export async function uploadMediaUrl(urlOrDataUrl) {
+  const { data } = await creatorClient.post('/creator/media/upload', { url: urlOrDataUrl, dataUrl: urlOrDataUrl })
+  return data
+}
+
+export async function validateDraft(draft) {
+  const { data } = await creatorClient.post('/creator/posts/validate', { draft })
+  return data
+}
+
+export async function generateAiImages(payload) {
+  const body = {
+    prompt: payload.prompt,
+    style: payload.style,
+    aspect: payload.aspect,
+    count: payload.count,
+    platform: payload.platform,
+    workspaceId: payload.workspaceId,
+  }
+  const { data } = await nlpClient.post('/images/generate', body)
+  return data
 }

@@ -15,6 +15,9 @@ pnpm dev
 - FIREBASE_PRIVATE_KEY
 - LOGGING_LEVEL
 - NODE_ENV
+- SERVICE_APP_TOKEN (shared secret; must match creator-service APP_TOKEN)
+- APP_TOKEN (same value as SERVICE_APP_TOKEN for backward compatibility)
+- CORS_ALLOW_ALL=1 (optional; set 0 to restrict to allowlist)
 
 ## Routes (POST under /api/ai)
 - /generate/hook
@@ -24,5 +27,6 @@ pnpm dev
 - /generate/linkedin-post
 - /generate/tweet-thread
 - /generate/outreach-message
+- /images/generate (AI image generation)
 
 Health: `GET /healthz`

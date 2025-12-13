@@ -15,6 +15,7 @@ import { deleteMemory, searchWorkspaceMemory, upsertMemory } from '../controller
 import { getForwardPulse, getMemoryPulse, getTodayPulse } from '../controllers/pulseController.js'
 import { ingestImage } from '../controllers/captureController.js'
 import { orchestrate } from '../controllers/orchestrateController.js'
+import { generateAiImages } from '../controllers/imageController.js'
 
 const router = Router()
 
@@ -48,5 +49,6 @@ router.post('/generate/story-frame', generateStoryFrame)
 router.post('/generate/linkedin-post', generateLinkedInPost)
 router.post('/generate/tweet-thread', generateTweetThread)
 router.post('/generate/outreach-message', generateOutreachMessage)
+router.post('/images/generate', generateAiImages)
 
 export default router

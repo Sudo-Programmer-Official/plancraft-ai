@@ -34,7 +34,10 @@ aws apprunner create-service \\
           "FIREBASE_PROJECT_ID": "<fill>",
           "FIREBASE_CLIENT_EMAIL": "<fill>",
           "FIREBASE_PRIVATE_KEY": "<fill>",
-          "AI_NLP_SERVICE_URL": "<fill>"
+          "AI_NLP_SERVICE_URL": "<fill>",
+          "SERVICE_APP_TOKEN": "<shared-token>",
+          "APP_TOKEN": "<shared-token>",
+          "CORS_ALLOW_ALL": "1"
         }
       }
     },
@@ -52,4 +55,7 @@ FIREBASE_PROJECT_ID=
 FIREBASE_CLIENT_EMAIL=
 FIREBASE_PRIVATE_KEY=
 AI_NLP_SERVICE_URL=
+SERVICE_APP_TOKEN=
+APP_TOKEN=
+CORS_ALLOW_ALL=1
 EOF

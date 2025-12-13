@@ -31,6 +31,9 @@
           <p class="text-xs text-slate-400">
             Sent to: {{ invite?.email || 'your email' }} · Expires {{ formatDate(invite?.expires_at) }}
           </p>
+          <p v-if="inviter?.name || inviter?.email" class="text-xs text-slate-400">
+            Invited by: {{ inviter?.name || inviter?.email }}
+          </p>
         </div>
 
         <div v-if="accepted" class="text-emerald-200 text-sm bg-emerald-500/10 border border-emerald-400/40 rounded-xl p-3">
@@ -39,7 +42,7 @@
         <div v-else class="space-y-3">
           <button
             class="w-full px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
-            :disabled="acceptLoading || !isAuthenticated || invite?.status === 'expired'"
+            :disabled="acceptLoading || !isAuthenticated || inviteInactive"
             @click="handleAccept"
           >
             {{ isAuthenticated ? (acceptLoading ? 'Joining…' : 'Accept invite') : 'Sign in to accept' }}
@@ -51,8 +54,15 @@
           >
             Continue to login
           </button>
+          <button
+            v-if="!isAuthenticated"
+            class="w-full px-4 py-3 rounded-xl border border-slate-700 text-sm font-semibold hover:border-indigo-300/60"
+            @click="goToSignup"
+          >
+            Create an account
+          </button>
           <p class="text-xs text-slate-400">
-            We’ll switch your active workspace once you accept. Only admins can invite or remove members.
+            We’ll switch your active workspace once you accept. Only admins can invite or remove members. If you sign in first, we’ll bring you back here automatically.
           </p>
         </div>
       </div>
@@ -76,12 +86,17 @@ const workspaceStore = useWorkspaceStore()
 const token = computed(() => route.params?.token)
 const invite = ref(null)
 const workspace = ref(null)
+const inviter = ref(null)
 const loading = ref(true)
 const acceptLoading = ref(false)
 const error = ref('')
 const accepted = ref(false)
 
 const isAuthenticated = computed(() => !!authStore?.user)
+const inviteInactive = computed(() => {
+  const status = String(invite.value?.status || '').toLowerCase()
+  return ['expired', 'revoked', 'accepted'].includes(status)
+})
 
 onMounted(() => {
   loadInvite()
@@ -99,9 +114,11 @@ async function loadInvite() {
     const data = await getInviteDetails(token.value)
     invite.value = data?.invite || null
     workspace.value = data?.workspace || null
-    if (invite.value?.status === 'expired') {
-      error.value = 'This invite has expired.'
-    }
+    inviter.value = data?.inviter || null
+    const status = String(invite.value?.status || '').toLowerCase()
+    if (status === 'expired') error.value = 'This invite has expired.'
+    else if (status === 'revoked') error.value = 'This invite was revoked.'
+    else if (status === 'accepted') error.value = 'This invite was already accepted.'
   } catch (err) {
     error.value = err?.response?.data?.error || err?.message || 'Invite not found'
   } finally {
@@ -134,7 +151,17 @@ async function handleAccept() {
 }
 
 function goToLogin() {
+  try {
+    localStorage.setItem('postLoginRedirect', route.fullPath)
+  } catch {}
   router.push({ path: '/login', query: { redirect: route.fullPath } })
+}
+
+function goToSignup() {
+  try {
+    localStorage.setItem('postLoginRedirect', route.fullPath)
+  } catch {}
+  router.push({ path: '/signup', query: { redirect: route.fullPath } })
 }
 
 function roleLabel(role) {

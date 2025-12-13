@@ -50,13 +50,66 @@ function normalizeMemberDoc(doc) {
   };
 }
 
+function normalizeInviteDoc(doc) {
+  if (!doc?.exists) return null;
+  const data = doc.data() || {};
+  const emailLower = data.emailLower || (data.email ? String(data.email).toLowerCase() : null);
+  return {
+    id: doc.id,
+    workspaceId: data.workspaceId || null,
+    email: data.email || emailLower || null,
+    emailLower: emailLower || null,
+    role: data.role || "viewer",
+    token: data.token || null,
+    hashedToken: data.hashedToken || null,
+    invitedBy: data.invitedBy || data.invitedByUid || null,
+    invitedByUid: data.invitedByUid || data.invitedBy || null,
+    expires_at: normalizeDate(data.expires_at || data.expiresAt),
+    status: data.status || "pending",
+    created_at: normalizeDate(data.created_at || data.createdAt),
+    accepted_at: normalizeDate(data.accepted_at || data.acceptedAt),
+    acceptedBy: data.acceptedBy || data.acceptedByUid || null,
+    emailStatus: data.emailStatus || null,
+    emailError: data.emailError || null,
+    revoked_at: normalizeDate(data.revoked_at || data.revokedAt),
+    revokedBy: data.revokedBy || null,
+  };
+}
+
 function generateInviteToken() {
   return crypto.randomBytes(32).toString("hex");
+}
+
+function hashToken(token) {
+  if (!token) return null;
+  return crypto.createHash("sha256").update(String(token)).digest("hex");
 }
 
 function memberRef(workspaceId, userId) {
   const key = `${workspaceId}_${userId}`;
   return db.collection(WORKSPACE_MEMBERS_COLLECTION).doc(key);
+}
+
+function userMembershipRef(userId, workspaceId) {
+  return db.collection("users").doc(String(userId)).collection("memberships").doc(String(workspaceId));
+}
+
+async function mirrorUserMembership(workspaceId, userId, payload = {}) {
+  if (!workspaceId || !userId) return;
+  const ref = userMembershipRef(userId, workspaceId);
+  await ref.set(
+    {
+      workspaceId,
+      userId,
+      role: payload.role || "viewer",
+      status: payload.status || "active",
+      invitedBy: payload.invitedBy || null,
+      email: payload.email || null,
+      joined_at: payload.joined_at || payload.joinedAt || new Date(),
+      updated_at: new Date(),
+    },
+    { merge: true },
+  );
 }
 
 export function isValidWorkspaceRole(role) {
@@ -125,6 +178,12 @@ export async function createWorkspace({
     },
     { merge: true },
   );
+  await mirrorUserMembership(ref.id, ownerId, {
+    role: "admin",
+    invitedBy: ownerId,
+    status: "active",
+    joined_at: now,
+  });
 
   return workspace;
 }
@@ -169,6 +228,20 @@ export async function listUserWorkspaces(userId) {
     .get();
 
   let memberships = snap.docs.map((doc) => normalizeMemberDoc(doc)).filter(Boolean);
+
+  // Fast-read mirror fallback
+  if (!memberships.length) {
+    const mirrorSnap = await db
+      .collection("users")
+      .doc(String(userId))
+      .collection("memberships")
+      .where("status", "==", "active")
+      .limit(500)
+      .get();
+    if (!mirrorSnap.empty) {
+      memberships = mirrorSnap.docs.map((doc) => normalizeMemberDoc(doc)).filter(Boolean);
+    }
+  }
 
   // Legacy migration: if no memberships yet, seed from user-scoped workspaces
   if (!memberships.length) {
@@ -300,6 +373,13 @@ export async function setWorkspaceMemberRole(workspaceId, userId, role, extra = 
     },
     { merge: true },
   );
+  await mirrorUserMembership(workspaceId, userId, {
+    role,
+    status: extra.status || "active",
+    invitedBy: extra.invitedBy || null,
+    email: extra.email || null,
+    joined_at: extra.joined_at || extra.joinedAt || now,
+  });
   const snap = await memberRef(workspaceId, userId).get();
   return normalizeMemberDoc(snap);
 }
@@ -316,6 +396,11 @@ export async function removeWorkspaceMember(workspaceId, userId) {
     },
     { merge: true },
   );
+  await mirrorUserMembership(workspaceId, userId, {
+    status: "removed",
+    role: "viewer",
+    joined_at: now,
+  });
   return true;
 }
 
@@ -331,56 +416,61 @@ export async function createWorkspaceInvite({
   const normalizedRole = String(role || "").toLowerCase();
   if (!isValidWorkspaceRole(normalizedRole)) throw new Error("Invalid role");
   const token = generateInviteToken();
+  const hashedToken = hashToken(token);
   const now = new Date();
   const expires_at = new Date(now.getTime() + expiresInDays * 24 * 60 * 60 * 1000);
+  const emailLower = String(email).trim().toLowerCase();
   const ref = db.collection(WORKSPACE_INVITES_COLLECTION).doc();
   await ref.set({
     workspaceId,
-    email: String(email).trim().toLowerCase(),
+    email: emailLower,
+    emailLower,
     role: normalizedRole,
     token,
+    hashedToken,
     invitedBy: invitedBy || null,
+    invitedByUid: invitedBy || null,
     expires_at,
     status: "pending",
     created_at: now,
+    emailStatus: "pending",
   });
   return {
     id: ref.id,
     workspaceId,
-    email: String(email).trim().toLowerCase(),
+    email: emailLower,
+    emailLower,
     role: normalizedRole,
     token,
+    hashedToken,
     invitedBy: invitedBy || null,
     expires_at,
     status: "pending",
     created_at: now,
+    emailStatus: "pending",
   };
 }
 
 export async function getInviteByToken(token) {
   if (!token) return null;
-  const snap = await db
-    .collection(WORKSPACE_INVITES_COLLECTION)
-    .where("token", "==", token)
-    .limit(1)
-    .get();
-  if (snap.empty) return null;
+  const hashedToken = hashToken(token);
+  const collection = db.collection(WORKSPACE_INVITES_COLLECTION);
+  let snap = hashedToken
+    ? await collection.where("hashedToken", "==", hashedToken).limit(1).get()
+    : null;
+  if (!snap || snap.empty) {
+    snap = await collection.where("token", "==", token).limit(1).get();
+  }
+  if (!snap || snap.empty) return null;
   const doc = snap.docs[0];
-  const data = doc.data() || {};
-  return {
-    id: doc.id,
-    workspaceId: data.workspaceId || null,
-    email: data.email || null,
-    role: data.role || "viewer",
-    token: data.token || null,
-    invitedBy: data.invitedBy || null,
-    expires_at: normalizeDate(data.expires_at),
-    status: data.status || "pending",
-    created_at: normalizeDate(data.created_at),
-    accepted_at: normalizeDate(data.accepted_at),
-    acceptedBy: data.acceptedBy || null,
-    revoked_at: normalizeDate(data.revoked_at),
-  };
+  const invite = normalizeInviteDoc(doc);
+  if (!invite) return null;
+  const expired = invite.expires_at && invite.expires_at.getTime() < Date.now();
+  if (expired && invite.status === "pending") {
+    await doc.ref.set({ status: "expired", updated_at: new Date() }, { merge: true });
+    invite.status = "expired";
+  }
+  return invite;
 }
 
 export async function listWorkspaceInvites(workspaceId, statuses = ["pending"]) {
@@ -392,22 +482,19 @@ export async function listWorkspaceInvites(workspaceId, statuses = ["pending"]) 
     .where("status", "in", statusList)
     .limit(200)
     .get();
-  return snap.docs.map((doc) => {
-    const data = doc.data() || {};
-    return {
-      id: doc.id,
-      workspaceId: data.workspaceId || null,
-      email: data.email || null,
-      role: data.role || "viewer",
-      token: data.token || null,
-      invitedBy: data.invitedBy || null,
-      expires_at: normalizeDate(data.expires_at),
-      status: data.status || "pending",
-      created_at: normalizeDate(data.created_at),
-      accepted_at: normalizeDate(data.accepted_at),
-      acceptedBy: data.acceptedBy || null,
-    };
-  });
+
+  const invites = [];
+  for (const doc of snap.docs) {
+    const invite = normalizeInviteDoc(doc);
+    if (!invite) continue;
+    const expired = invite.expires_at && invite.expires_at.getTime() < Date.now();
+    if (expired && invite.status === "pending") {
+      await doc.ref.set({ status: "expired", updated_at: new Date() }, { merge: true });
+      invite.status = "expired";
+    }
+    invites.push(invite);
+  }
+  return invites;
 }
 
 export async function acceptInviteToken(token, user) {
@@ -417,6 +504,7 @@ export async function acceptInviteToken(token, user) {
   const invite = await getInviteByToken(token);
   if (!invite) throw new Error("Invite not found");
   if (invite.status === "revoked" || invite.status === "expired") throw new Error("Invite is no longer valid");
+  if (invite.status === "accepted") throw new Error("Invite already accepted");
   if (invite.expires_at && invite.expires_at.getTime() < Date.now()) {
     await db.collection(WORKSPACE_INVITES_COLLECTION).doc(invite.id).set(
       { status: "expired", updated_at: new Date() },
@@ -428,7 +516,7 @@ export async function acceptInviteToken(token, user) {
   if (!workspace) throw new Error("Workspace not found");
 
   // Enforce email match when available to avoid token leakage
-  const inviteEmail = String(invite.email || "").trim().toLowerCase();
+  const inviteEmail = String(invite.emailLower || invite.email || "").trim().toLowerCase();
   const userEmail = String(user.email || "").trim().toLowerCase();
   if (inviteEmail && userEmail && inviteEmail !== userEmail) {
     throw new Error("Invite is addressed to a different email");
@@ -439,8 +527,8 @@ export async function acceptInviteToken(token, user) {
   const roleToApply = existing?.status === "active" && existing.role ? existing.role : invite.role || "editor";
 
   await setWorkspaceMemberRole(invite.workspaceId, user.uid, roleToApply, {
-    invitedBy: invite.invitedBy || user.uid,
-    email: invite.email || userEmail || null,
+    invitedBy: invite.invitedByUid || invite.invitedBy || user.uid,
+    email: invite.emailLower || invite.email || userEmail || null,
     joined_at: existing?.joined_at || now,
     status: "active",
   });
@@ -450,13 +538,52 @@ export async function acceptInviteToken(token, user) {
       status: "accepted",
       accepted_at: now,
       acceptedBy: user.uid,
+      acceptedByUid: user.uid,
+      email: invite.emailLower || invite.email || userEmail || null,
       updated_at: now,
     },
     { merge: true },
   );
+  try {
+    console.info("[WorkspaceInvite] accepted", {
+      workspaceId: invite.workspaceId,
+      token: `${String(token).slice(0, 6)}…`,
+      userId: user.uid,
+    });
+  } catch {}
 
   return {
     workspace,
     role: roleToApply,
   };
+}
+
+export async function revokeInviteToken(token, revokedBy) {
+  if (!token) throw new Error("token is required");
+  const invite = await getInviteByToken(token);
+  if (!invite) throw new Error("Invite not found");
+  const now = new Date();
+  await db.collection(WORKSPACE_INVITES_COLLECTION).doc(invite.id).set(
+    {
+      status: "revoked",
+      revoked_at: now,
+      revokedBy: revokedBy || null,
+      updated_at: now,
+    },
+    { merge: true },
+  );
+  return { ...invite, status: "revoked", revoked_at: now, revokedBy: revokedBy || null };
+}
+
+export async function updateInviteEmailStatus(inviteId, status, error = null, providerStatus = null) {
+  if (!inviteId) return null;
+  await db.collection(WORKSPACE_INVITES_COLLECTION).doc(String(inviteId)).set(
+    {
+      emailStatus: status || null,
+      emailError: error || null,
+      emailProviderStatus: providerStatus || null,
+      updated_at: new Date(),
+    },
+    { merge: true },
+  );
 }

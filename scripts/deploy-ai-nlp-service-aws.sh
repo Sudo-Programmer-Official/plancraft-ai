@@ -35,7 +35,10 @@ aws apprunner create-service \\
           "FIREBASE_CLIENT_EMAIL": "<fill>",
           "FIREBASE_PRIVATE_KEY": "<fill>",
           "OPENAI_API_KEY": "<fill>",
-          "LOGGING_LEVEL": "info"
+          "LOGGING_LEVEL": "info",
+          "SERVICE_APP_TOKEN": "<shared-token>",
+          "APP_TOKEN": "<shared-token>",
+          "CORS_ALLOW_ALL": "1"
         }
       }
     },
@@ -54,4 +57,7 @@ FIREBASE_CLIENT_EMAIL=
 FIREBASE_PRIVATE_KEY=
 OPENAI_API_KEY=
 LOGGING_LEVEL=info
+SERVICE_APP_TOKEN=
+APP_TOKEN=
+CORS_ALLOW_ALL=1
 EOF
