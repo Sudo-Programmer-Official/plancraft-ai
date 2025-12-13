@@ -30,8 +30,14 @@ function matchesAppToken(req) {
 
 export async function verifyAuth(req, res, next) {
   try {
-    // Public OAuth callbacks must bypass auth; Meta will not send auth headers
-    if (/instagram\/callback/i.test(req.path || '')) {
+    // Public OAuth callbacks must bypass auth; Meta will not send auth headers.
+    // Normalize against originalUrl to tolerate proxy rewrites (/oauth/instagram/callback, /auth/instagram/callback, /social/instagram/callback).
+    const path = String(req.originalUrl || req.path || '').toLowerCase()
+    if (
+      path.includes('/oauth/instagram/callback') ||
+      path.includes('/auth/instagram/callback') ||
+      path.includes('/social/instagram/callback')
+    ) {
       return next()
     }
 

@@ -4,7 +4,7 @@
       <div class="w-10 h-10 rounded-full bg-slate-700" />
       <div class="flex-1">
         <p class="text-sm font-semibold">Twitter Preview</p>
-        <p class="text-xs text-slate-400">Thread</p>
+        <p class="text-xs text-slate-400">{{ tweets.length > 1 ? 'Thread' : 'Tweet' }}</p>
       </div>
       <span class="text-xs px-2 py-1 rounded-full border" :class="connected ? 'border-emerald-400/60 text-emerald-100 bg-emerald-500/10' : 'border-slate-700 text-slate-400'">
         {{ connected ? 'Ready' : 'Mock' }}
@@ -13,9 +13,23 @@
     <div class="p-4 space-y-4 text-sm leading-relaxed">
       <div v-for="(tweet, idx) in tweets" :key="idx" class="pb-3 border-b border-slate-800 last:border-0 space-y-2">
         <p class="whitespace-pre-line">{{ tweet }}</p>
-        <div v-if="media?.length && idx === 0" class="rounded-xl overflow-hidden border border-slate-700 bg-slate-800">
-          <img v-if="media[0].type === 'image'" :src="media[0].url" class="w-full h-44 object-cover" />
-          <video v-else class="w-full h-44 object-cover" :src="media[0].url" muted />
+        <div v-if="displayMedia.length && idx === 0" class="space-y-2">
+          <div class="text-[11px] text-slate-400 font-medium">
+            Media{{ tweets.length > 1 ? ' (Tweet 1)' : '' }}
+          </div>
+          <div v-if="isVideo" class="rounded-xl overflow-hidden border border-slate-700 bg-slate-800">
+            <video class="w-full h-48 object-cover" :src="displayMedia[0].url" muted />
+          </div>
+          <div v-else class="grid grid-cols-2 gap-2">
+            <div
+              v-for="(item, mIdx) in displayMedia.slice(0, 4)"
+              :key="item.id || mIdx"
+              class="rounded-lg overflow-hidden border border-slate-700 bg-slate-800"
+              :class="displayMedia.length === 1 ? 'col-span-2' : ''"
+            >
+              <img :src="item.url" class="w-full h-40 object-cover" />
+            </div>
+          </div>
         </div>
         <div class="text-[11px] text-slate-500 flex items-center gap-2">
           <span>Tweet {{ idx + 1 }}</span>
@@ -33,10 +47,23 @@
   </template>
 
 <script setup>
-defineProps({
+import { computed } from 'vue'
+
+const props = defineProps({
   tweets: { type: Array, default: () => [] },
   media: { type: Array, default: () => [] },
+  attachments: { type: Array, default: () => [] },
   warnings: { type: Array, default: () => [] },
   connected: { type: Boolean, default: false },
 })
+
+const displayMedia = computed(() => {
+  const list = props.attachments?.length ? props.attachments : props.media
+  return list.map((item) => ({
+    ...item,
+    type: item.type || item.kind || 'image',
+  }))
+})
+
+const isVideo = computed(() => displayMedia.value[0]?.type === 'video')
 </script>

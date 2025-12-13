@@ -13,9 +13,9 @@
     <div class="p-4 space-y-3">
       <p v-if="title" class="text-sm font-semibold">{{ title }}</p>
       <p class="whitespace-pre-line leading-relaxed text-sm">{{ content }}</p>
-      <div v-if="media?.length" class="rounded-xl border border-slate-200 bg-slate-50 overflow-hidden">
-        <img v-if="media[0].type === 'image'" :src="media[0].url" class="w-full h-48 object-cover" />
-        <video v-else class="w-full h-48 object-cover" :src="media[0].url" muted />
+      <div v-if="displayMedia?.length" class="rounded-xl border border-slate-200 bg-slate-50 overflow-hidden">
+        <img v-if="displayMedia[0].type === 'image'" :src="displayMedia[0].url" class="w-full h-48 object-cover" />
+        <video v-else class="w-full h-48 object-cover" :src="displayMedia[0].url" muted />
       </div>
       <div v-else class="rounded-xl border border-slate-200 bg-slate-50 h-36 flex items-center justify-center text-slate-400 text-sm">
         Add media or a link preview
@@ -50,6 +50,7 @@ const props = defineProps({
   content: { type: String, default: '' },
   link: { type: Object, default: null },
   media: { type: Array, default: () => [] },
+  attachments: { type: Array, default: () => [] },
   warnings: { type: Array, default: () => [] },
   connected: { type: Boolean, default: false },
 })
@@ -61,5 +62,13 @@ const linkHost = computed(() => {
   } catch {
     return 'link'
   }
+})
+
+const displayMedia = computed(() => {
+  const list = props.attachments?.length ? props.attachments : props.media
+  return list.map((item) => ({
+    ...item,
+    type: item.type || item.kind || 'image',
+  }))
 })
 </script>

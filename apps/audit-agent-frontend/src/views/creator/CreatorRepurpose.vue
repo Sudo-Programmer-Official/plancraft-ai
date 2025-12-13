@@ -41,12 +41,14 @@
               :caption="instagramPreview.caption"
               :hashtags="instagramPreview.hashtags"
               :media="draft.media"
+              :attachments="attachments"
               :warnings="warnings.instagram"
               :connected="socials.instagram.connected"
             />
             <PlatformPreviewTwitter
               :tweets="twitterPreview.tweets"
               :media="draft.media"
+              :attachments="attachments"
               :warnings="warnings.twitter"
               :connected="socials.twitter.connected"
             />
@@ -55,6 +57,7 @@
               :content="linkedInPreview.body"
               :link="firstLink"
               :media="draft.media"
+              :attachments="attachments"
               :warnings="warnings.linkedin"
               :connected="socials.linkedin.connected"
             />
@@ -149,6 +152,17 @@ const instagramPreview = computed(() => adaptForInstagram(draft))
 const twitterPreview = computed(() => adaptForTwitter(draft))
 const linkedInPreview = computed(() => adaptForLinkedIn(draft))
 const firstLink = computed(() => draft.links?.[0] || null)
+const attachments = computed(() =>
+  (draft.media || []).map((m) => ({
+    id: m.id || m.url || String(Math.random()),
+    kind: m.type === 'video' ? 'video' : 'image',
+    url: m.url,
+    thumbUrl: m.thumbnailUrl || m.thumbnail || null,
+    width: m.width || undefined,
+    height: m.height || undefined,
+    mime: m.mime || m.contentType || undefined,
+  })),
+)
 
 watch(
   () => draft,

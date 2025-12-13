@@ -19,24 +19,24 @@
         {{ hashtags.map((h) => `#${h.replace('#','')}`).join(' ') }}
       </div>
       <div class="w-full h-64 rounded-xl bg-slate-800 flex items-center justify-center text-slate-100 text-sm relative overflow-hidden">
-        <template v-if="media?.length">
+        <template v-if="displayMedia?.length">
           <img
-            v-if="media[0].type === 'image'"
-            :src="media[0].url"
+            v-if="displayMedia[0].type === 'image'"
+            :src="displayMedia[0].url"
             class="absolute inset-0 w-full h-full object-cover"
-            :alt="media[0].type"
+            :alt="displayMedia[0].type"
           />
           <video
             v-else
             class="absolute inset-0 w-full h-full object-cover"
-            :src="media[0].url"
+            :src="displayMedia[0].url"
             muted
             loop
             playsinline
           />
           <div class="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
             <span
-              v-for="(dot, idx) in media.length"
+              v-for="(dot, idx) in displayMedia.length"
               :key="idx"
               class="w-2 h-2 rounded-full"
               :class="idx === 0 ? 'bg-white' : 'bg-white/40'"
@@ -58,11 +58,22 @@
 </template>
 
 <script setup>
-defineProps({
+import { computed } from 'vue'
+
+const props = defineProps({
   caption: { type: String, default: '' },
   hashtags: { type: Array, default: () => [] },
   media: { type: Array, default: () => [] },
+  attachments: { type: Array, default: () => [] },
   warnings: { type: Array, default: () => [] },
   connected: { type: Boolean, default: false },
+})
+
+const displayMedia = computed(() => {
+  const list = props.attachments?.length ? props.attachments : props.media
+  return list.map((item) => ({
+    ...item,
+    type: item.type || item.kind || 'image',
+  }))
 })
 </script>
