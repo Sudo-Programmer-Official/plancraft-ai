@@ -89,7 +89,8 @@ router.post("/workspaces/:workspaceId/invite", requireAuth, requireWorkspaceRole
       process.env.VITE_APP_URL ||
       process.env.PUBLIC_URL ||
       "";
-    const inviteLink = baseUrl ? `${baseUrl.replace(/\\/$/, "")}/invite/${invite.token}` : null;
+    const normalizedBaseUrl = baseUrl ? baseUrl.replace(/\/+$/, "") : "";
+    const inviteLink = normalizedBaseUrl ? `${normalizedBaseUrl}/invite/${invite.token}` : null;
     return res.status(201).json({ invite, link: inviteLink });
   } catch (err) {
     console.error("[WorkspaceRoutes] invite failed", err?.message || err);
