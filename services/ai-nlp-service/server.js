@@ -56,7 +56,10 @@ app.get('/debug/workspace', verifyAuth, (req, res) => {
   res.json({ success: true, userId: req.user?.uid || null, workspaceId })
 })
 
-app.use('/api/ai', verifyAuth, aiRoutes)
+// Support multiple base paths to tolerate different gateway rewrites (/api/ai, /ai, /api)
+['/api/ai', '/ai', '/api/ai/', '/api'].forEach((base) => {
+  app.use(base, verifyAuth, aiRoutes)
+})
 
 app.use(errorHandler)
 
