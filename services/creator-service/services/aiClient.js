@@ -1,24 +1,22 @@
 import fetch from 'node-fetch'
 import { logger } from '../utils/logger.js'
 
-function resolveAiBase() {
-  const raw =
-    process.env.AI_NLP_SERVICE_URL ||
-    process.env.AI_NLP_URL ||
-    process.env.NLP_SERVICE_URL ||
-    process.env.NLP_API_BASE ||
-    ''
-  if (raw) {
-    const base = raw.replace(/\/+$/, '')
-    // If caller already provided full path (e.g., https://.../api/ai), respect it
-    if (/\/api\/ai$/.test(base)) return base
-    return `${base}/api/ai`
+function resolveAiBaseStrict() {
+  const raw = (process.env.AI_NLP_SERVICE_URL || '').trim()
+  if (!raw) {
+    throw new Error('AI_NLP_SERVICE_URL is not configured for creator-service')
   }
-  // Local default
-  return 'http://localhost:5001/api/ai'
+  return raw.replace(/\/+$/, '')
 }
 
-const AI_BASE = resolveAiBase()
+// Fail fast if required env vars are missing
+['SERVICE_APP_TOKEN', 'AI_NLP_SERVICE_URL'].forEach((key) => {
+  if (!process.env[key]) {
+    throw new Error(`Missing required env var: ${key}`)
+  }
+})
+
+const AI_BASE = resolveAiBaseStrict()
 const APP_TOKEN = process.env.SERVICE_APP_TOKEN || process.env.APP_TOKEN || ''
 
 export async function proxyAi(type, payload, options = {}) {
