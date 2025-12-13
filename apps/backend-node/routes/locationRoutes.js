@@ -11,9 +11,9 @@ import { requireWorkspaceRole } from "../middleware/workspace.js";
 
 const router = express.Router();
 
-router.use(requireAuth, requireWorkspaceRole(["viewer", "editor", "admin"]));
+const authWorkspace = [requireAuth, requireWorkspaceRole(["viewer", "editor", "admin"])];
 
-router.post("/geocode", async (req, res) => {
+router.post("/geocode", authWorkspace, async (req, res) => {
   try {
     const { query, bbox = null } = req.body || {};
     if (!query || !String(query).trim()) {
@@ -41,7 +41,7 @@ router.post("/geocode", async (req, res) => {
   }
 });
 
-router.get("/locations", async (req, res) => {
+router.get("/locations", authWorkspace, async (req, res) => {
   try {
     const { bbox, zoom = null, limit = 100, workspaceId = null } = req.query || {};
     const parsedBBox = normalizeBBox(bbox);
