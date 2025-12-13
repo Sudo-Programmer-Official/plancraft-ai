@@ -2,6 +2,7 @@ import express from 'express'
 import cors from 'cors'
 import morgan from 'morgan'
 import aiRoutes from './routes/aiRoutes.js'
+import { generateAiImages } from './controllers/imageController.js'
 import { verifyAuth } from './utils/auth.js'
 import { errorHandler } from './utils/errorHandler.js'
 
@@ -60,6 +61,10 @@ app.get('/debug/workspace', verifyAuth, (req, res) => {
 ['/api/ai', '/ai', '/api/ai/', '/api', '/'].forEach((base) => {
   app.use(base, verifyAuth, aiRoutes)
 })
+// Explicit aliases to survive any path rewriting that forwards the full path
+app.post('/api/ai/images/generate', verifyAuth, generateAiImages)
+app.post('/ai/images/generate', verifyAuth, generateAiImages)
+app.post('/images/generate', verifyAuth, generateAiImages)
 
 app.use(errorHandler)
 
