@@ -5,9 +5,9 @@ import { getTokensByUser, saveUserTokens } from '../firestore/tokensRepository.j
 const FB_OAUTH = 'https://www.facebook.com/v18.0/dialog/oauth'
 const GRAPH = 'https://graph.facebook.com/v18.0'
 
-const APP_ID = process.env.INSTAGRAM_APP_ID || process.env.META_APP_ID || ''
-const APP_SECRET = process.env.INSTAGRAM_APP_SECRET || process.env.META_APP_SECRET || ''
-const REDIRECT_URI = process.env.INSTAGRAM_REDIRECT_URL || ''
+const META_APP_ID = (process.env.META_APP_ID || '').trim()
+const META_APP_SECRET = (process.env.META_APP_SECRET || '').trim()
+const REDIRECT_URI = (process.env.INSTAGRAM_REDIRECT_URL || '').trim()
 const SCOPES =
   process.env.INSTAGRAM_SCOPES ||
   'instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement'
@@ -16,13 +16,17 @@ const STATE_SECRET =
   process.env.OAUTH_STATE_SECRET ||
   process.env.SERVICE_APP_TOKEN ||
   process.env.APP_TOKEN ||
+  process.env.META_APP_SECRET ||
   process.env.INSTAGRAM_APP_SECRET ||
   'oauth-state-secret'
 const STATE_TTL_MS = (Number(process.env.OAUTH_STATE_TTL_SECONDS || '900') || 900) * 1000
 
 function requireEnv() {
-  if (!APP_ID || !APP_SECRET || !REDIRECT_URI) {
-    throw new Error('Instagram OAuth not configured. Set INSTAGRAM_APP_ID, INSTAGRAM_APP_SECRET, INSTAGRAM_REDIRECT_URL')
+  if (!META_APP_ID || !META_APP_SECRET || !REDIRECT_URI) {
+    throw new Error('Instagram OAuth not configured. Set META_APP_ID, META_APP_SECRET, INSTAGRAM_REDIRECT_URL')
+  }
+  if (!/^\d+$/.test(META_APP_ID)) {
+    throw new Error('Invalid META_APP_ID: must be numeric')
   }
 }
 
@@ -52,6 +56,7 @@ export function decodeState(state) {
 
 export function buildAuthUrl(userId, workspaceId, returnTo) {
   requireEnv()
+  console.log('[Instagram OAuth] Using META_APP_ID for Facebook OAuth:', META_APP_ID)
   if (!userId) throw new Error('Missing user id for Instagram auth')
   const state = encodeState({
     uid: userId,
@@ -61,14 +66,14 @@ export function buildAuthUrl(userId, workspaceId, returnTo) {
   })
   const redirectParam = encodeURIComponent(REDIRECT_URI)
   const scopeParam = encodeURIComponent(SCOPES)
-  return `${FB_OAUTH}?client_id=${APP_ID}&redirect_uri=${redirectParam}&scope=${scopeParam}&response_type=code&state=${state}`
+  return `${FB_OAUTH}?client_id=${META_APP_ID}&redirect_uri=${redirectParam}&scope=${scopeParam}&response_type=code&state=${state}`
 }
 
 async function exchangeCodeForShortLived(code) {
   const { data } = await axios.get(`${GRAPH}/oauth/access_token`, {
     params: {
-      client_id: APP_ID,
-      client_secret: APP_SECRET,
+      client_id: META_APP_ID,
+      client_secret: META_APP_SECRET,
       redirect_uri: REDIRECT_URI,
       code,
     },
@@ -80,8 +85,8 @@ async function exchangeForLongLived(shortToken) {
   const { data } = await axios.get(`${GRAPH}/oauth/access_token`, {
     params: {
       grant_type: 'fb_exchange_token',
-      client_id: APP_ID,
-      client_secret: APP_SECRET,
+      client_id: META_APP_ID,
+      client_secret: META_APP_SECRET,
       fb_exchange_token: shortToken,
     },
   })

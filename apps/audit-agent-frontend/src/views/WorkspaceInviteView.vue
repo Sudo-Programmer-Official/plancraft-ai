@@ -1,0 +1,156 @@
+<template>
+  <div class="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center px-4 py-10 text-slate-50">
+    <div class="w-full max-w-xl rounded-3xl border border-slate-800 bg-slate-900/70 p-6 md:p-8 space-y-5 shadow-2xl shadow-indigo-950/30">
+      <p class="text-xs uppercase tracking-[0.3em] text-indigo-300/80">Workspace invite</p>
+      <div class="flex items-center gap-3">
+        <div class="w-12 h-12 rounded-2xl bg-indigo-500/15 border border-indigo-400/30 flex items-center justify-center text-2xl">
+          {{ workspace?.icon || '📦' }}
+        </div>
+        <div>
+          <h1 class="text-2xl font-semibold">
+            {{ workspace?.name ? `Join ${workspace.name}` : 'Checking invite…' }}
+          </h1>
+          <p class="text-sm text-slate-400">
+            Access and permissions are scoped strictly to this workspace.
+          </p>
+        </div>
+      </div>
+
+      <div v-if="loading" class="text-sm text-slate-300">Verifying your invite…</div>
+      <div v-else-if="error" class="text-sm text-rose-200 bg-rose-500/10 border border-rose-500/30 rounded-xl p-3">
+        {{ error }}
+      </div>
+      <div v-else class="space-y-4">
+        <div class="rounded-xl bg-slate-800/60 border border-slate-700 p-4 space-y-2">
+          <div class="flex items-center justify-between">
+            <p class="text-sm text-slate-100">You’ve been invited to {{ workspace?.name || 'this workspace' }}</p>
+            <span class="px-2 py-1 text-[11px] rounded-full border border-indigo-400/40 bg-indigo-500/10 text-indigo-100">
+              {{ roleLabel(invite?.role) }}
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">
+            Sent to: {{ invite?.email || 'your email' }} · Expires {{ formatDate(invite?.expires_at) }}
+          </p>
+        </div>
+
+        <div v-if="accepted" class="text-emerald-200 text-sm bg-emerald-500/10 border border-emerald-400/40 rounded-xl p-3">
+          You’re in! We switched you to {{ workspace?.name || 'this workspace' }}.
+        </div>
+        <div v-else class="space-y-3">
+          <button
+            class="w-full px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
+            :disabled="acceptLoading || !isAuthenticated || invite?.status === 'expired'"
+            @click="handleAccept"
+          >
+            {{ isAuthenticated ? (acceptLoading ? 'Joining…' : 'Accept invite') : 'Sign in to accept' }}
+          </button>
+          <button
+            v-if="!isAuthenticated"
+            class="w-full px-4 py-3 rounded-xl border border-slate-700 text-sm font-semibold hover:border-indigo-300/60"
+            @click="goToLogin"
+          >
+            Continue to login
+          </button>
+          <p class="text-xs text-slate-400">
+            We’ll switch your active workspace once you accept. Only admins can invite or remove members.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { getInviteDetails, acceptInvite } from '@/services/workspaceService'
+import { useAuthStore } from '@/stores/authStore'
+import { useWorkspaceStore } from '@/stores/workspaceStore'
+
+const route = useRoute()
+const router = useRouter()
+const authStore = useAuthStore()
+const workspaceStore = useWorkspaceStore()
+
+const token = computed(() => route.params?.token)
+const invite = ref(null)
+const workspace = ref(null)
+const loading = ref(true)
+const acceptLoading = ref(false)
+const error = ref('')
+const accepted = ref(false)
+
+const isAuthenticated = computed(() => !!authStore?.user)
+
+onMounted(() => {
+  loadInvite()
+})
+
+async function loadInvite() {
+  if (!token.value) {
+    error.value = 'Missing invite token'
+    loading.value = false
+    return
+  }
+  loading.value = true
+  error.value = ''
+  try {
+    const data = await getInviteDetails(token.value)
+    invite.value = data?.invite || null
+    workspace.value = data?.workspace || null
+    if (invite.value?.status === 'expired') {
+      error.value = 'This invite has expired.'
+    }
+  } catch (err) {
+    error.value = err?.response?.data?.error || err?.message || 'Invite not found'
+  } finally {
+    loading.value = false
+  }
+}
+
+async function handleAccept() {
+  if (!isAuthenticated.value) {
+    goToLogin()
+    return
+  }
+  if (!token.value) return
+  acceptLoading.value = true
+  error.value = ''
+  try {
+    const result = await acceptInvite(token.value)
+    accepted.value = true
+    await workspaceStore.refresh()
+    if (result?.workspace?.id) {
+      await workspaceStore.setActive(result.workspace.id)
+    }
+    ElMessage.success(`You're now part of ${result?.workspace?.name || 'this workspace'}`)
+    setTimeout(() => router.push('/dashboard'), 500)
+  } catch (err) {
+    error.value = err?.response?.data?.error || err?.message || 'Failed to accept invite'
+  } finally {
+    acceptLoading.value = false
+  }
+}
+
+function goToLogin() {
+  router.push({ path: '/login', query: { redirect: route.fullPath } })
+}
+
+function roleLabel(role) {
+  const normalized = String(role || '').toLowerCase()
+  if (normalized === 'admin') return 'Admin'
+  if (normalized === 'editor') return 'Editor'
+  return 'Viewer'
+}
+
+function formatDate(value) {
+  try {
+    if (!value) return 'soon'
+    const date = typeof value?.toDate === 'function' ? value.toDate() : new Date(value)
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  } catch {
+    return 'soon'
+  }
+}
+</script>

@@ -1,11 +1,21 @@
 <template>
-  <el-dialog v-model="internalOpen" title="Plan Summary" :width="dialogWidth" @close="onClose">
-    <div class="space-y-4 text-slate-800">
-      <p><strong>Current plan:</strong> {{ planKey }}</p>
+  <el-dialog
+    v-model="internalOpen"
+    title="Plan Summary"
+    :width="dialogWidth"
+    class="plan-summary-dialog"
+    :style="dialogStyle"
+    @close="onClose"
+  >
+    <div class="space-y-4 text-slate-100">
+      <p class="text-sm sm:text-base">
+        <strong class="text-indigo-100">Current plan:</strong>
+        <span class="ml-1 text-slate-50">{{ planKey }}</span>
+      </p>
 
       <div>
-        <p class="font-medium">Usage today</p>
-        <ul class="text-sm text-slate-600">
+        <p class="font-medium text-slate-50">Usage today</p>
+        <ul class="text-sm text-slate-200 space-y-1">
           <li>AI generations: {{ usage.today.aiGenerations }} / {{ planKey === 'PREMIUM' ? '∞' : limits.aiGenerations }}</li>
           <li>Reminders: {{ usage.today.reminders }} / {{ planKey === 'PREMIUM' ? '∞' : limits.remindersPerDay }}</li>
         </ul>
@@ -40,6 +50,15 @@ import { PLANS } from '@/services/planService'
 const props = defineProps({ open: { type: Boolean, default: false } })
 const emit = defineEmits(['close'])
 
+const dialogStyle = Object.freeze({
+  background: 'linear-gradient(145deg, #1e1b4b, #312e81, #4c1d95)',
+  color: '#e2e8f0',
+  borderRadius: '0.5rem',
+  boxShadow: '0 8px 30px rgba(0,0,0,0.6)',
+  border: '1px solid rgba(255,255,255,0.08)',
+  backdropFilter: 'blur(12px)',
+})
+
 const internalOpen = ref(props.open)
 watch(() => props.open, v => internalOpen.value = v)
 
@@ -67,5 +86,18 @@ function track() {
 </script>
 
 <style scoped>
+.plan-summary-dialog :deep(.el-dialog__header) {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+}
 
+.plan-summary-dialog :deep(.el-dialog__title) {
+  color: #e2e8f0;
+  letter-spacing: 0.03em;
+  font-weight: 700;
+}
+
+.plan-summary-dialog :deep(.el-dialog__body) {
+  background: transparent;
+}
 </style>

@@ -38,6 +38,7 @@ const router = createRouter({
     { path: '/features', name: 'features', component: () => import('@/views/FeaturesView.vue') },
     { path: '/voice-planning', name: 'voice-planning', component: () => import('@/views/VoicePlanningView.vue') },
     { path: '/ai-reminders', name: 'ai-reminders', component: () => import('@/views/AiRemindersView.vue') },
+    { path: '/invite/:token', name: 'workspace-invite', component: () => import('@/views/WorkspaceInviteView.vue') },
     {
       path: '/integrations/gpt',
       name: 'gpt-connect',

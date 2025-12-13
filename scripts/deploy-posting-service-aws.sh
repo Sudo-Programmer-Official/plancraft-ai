@@ -32,7 +32,7 @@ cat <<'EOF'
 App Runner create/update (run after push):
 aws apprunner create-service \
   --service-name posting-service \
-  --source-configuration "ImageRepository={ImageIdentifier=${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/posting-service:latest,ImageRepositoryType=ECR,ImageConfiguration={Port=8080,RuntimeEnvironmentVariables={NODE_ENV=production,FIREBASE_PROJECT_ID=<fill>,FIREBASE_CLIENT_EMAIL=<fill>,FIREBASE_PRIVATE_KEY=<fill>,INSTAGRAM_APP_ID=<fill>,INSTAGRAM_APP_SECRET=<fill>,INSTAGRAM_PAGE_ID=<fill>,INSTAGRAM_ACCESS_TOKEN=<fill>,LINKEDIN_CLIENT_ID=<fill>,LINKEDIN_CLIENT_SECRET=<fill>,LINKEDIN_ORG_ID=<fill>,TWITTER_CLIENT_ID=<fill>,TWITTER_CLIENT_SECRET=<fill>,FB_PAGE_ACCESS_TOKEN=<fill>}}}" \
+  --source-configuration "ImageRepository={ImageIdentifier=${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/posting-service:latest,ImageRepositoryType=ECR,ImageConfiguration={Port=8080,RuntimeEnvironmentVariables={NODE_ENV=production,FIREBASE_PROJECT_ID=<fill>,FIREBASE_CLIENT_EMAIL=<fill>,FIREBASE_PRIVATE_KEY=<fill>,META_APP_ID=<fill>,META_APP_SECRET=<fill>,INSTAGRAM_REDIRECT_URL=<fill>,INSTAGRAM_SCOPES=instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement,INSTAGRAM_APP_ID=<fill>,INSTAGRAM_APP_SECRET=<fill>,INSTAGRAM_PAGE_ID=<fill>,INSTAGRAM_ACCESS_TOKEN=<fill>,LINKEDIN_CLIENT_ID=<fill>,LINKEDIN_CLIENT_SECRET=<fill>,LINKEDIN_ORG_ID=<fill>,TWITTER_CLIENT_ID=<fill>,TWITTER_CLIENT_SECRET=<fill>,FB_PAGE_ACCESS_TOKEN=<fill>}}}" \
   --instance-configuration Cpu=1 vCPU,Memory=1 GB \
   --region us-east-1
 
@@ -40,6 +40,10 @@ Required environment variables (App Runner):
 FIREBASE_PROJECT_ID=
 FIREBASE_CLIENT_EMAIL=
 FIREBASE_PRIVATE_KEY=
+META_APP_ID=
+META_APP_SECRET=
+INSTAGRAM_REDIRECT_URL=
+INSTAGRAM_SCOPES=instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement
 INSTAGRAM_APP_ID=
 INSTAGRAM_APP_SECRET=
 INSTAGRAM_PAGE_ID=

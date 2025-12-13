@@ -103,8 +103,12 @@ export const useWorkspaceStore = defineStore('workspaceStore', () => {
   async function updateWorkspace(id, patch) {
     const uid = auth?.currentUser?.uid
     if (!uid || !id) return
-    await updateWorkspaceMeta(uid, id, patch)
-    workspaces.value = workspaces.value.map((ws) => (ws.id === id ? { ...ws, ...patch } : ws))
+    const updated = await updateWorkspaceMeta(uid, id, patch)
+    if (updated) {
+      workspaces.value = workspaces.value.map((ws) => (ws.id === id ? { ...ws, ...updated } : ws))
+    } else {
+      workspaces.value = workspaces.value.map((ws) => (ws.id === id ? { ...ws, ...patch } : ws))
+    }
   }
 
   function reset() {
@@ -118,11 +122,13 @@ export const useWorkspaceStore = defineStore('workspaceStore', () => {
   const activeWorkspace = computed(() =>
     workspaces.value.find((ws) => ws.id === activeWorkspaceId.value) || null,
   )
+  const activeWorkspaceRole = computed(() => activeWorkspace.value?.role || 'viewer')
 
   return {
     workspaces,
     activeWorkspaceId,
     activeWorkspace,
+    activeWorkspaceRole,
     loading,
     error,
     hydrated,

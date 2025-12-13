@@ -2,7 +2,8 @@ import axios from 'axios'
 import crypto from 'crypto'
 import { getTokensByUser, saveUserTokens } from '../firestore/tokensRepository.js'
 
-const API = 'https://api.twitter.com'
+const AUTH_BASE = 'https://twitter.com'
+const API_BASE = 'https://api.twitter.com'
 const CLIENT_ID = process.env.TWITTER_CLIENT_ID || ''
 const CLIENT_SECRET = process.env.TWITTER_CLIENT_SECRET || ''
 const REDIRECT_URI = process.env.TWITTER_REDIRECT_URL || ''
@@ -80,13 +81,13 @@ export function buildAuthUrl(userId, workspaceId, returnTo) {
     code_challenge: codeChallenge,
     code_challenge_method: 'S256',
   })
-  return `${API}/i/oauth2/authorize?${params.toString()}`
+  return `${AUTH_BASE}/i/oauth2/authorize?${params.toString()}`
 }
 
 async function tokenRequest(params) {
-  const body = new URLSearchParams(params)
+  const body = new URLSearchParams({ ...params, client_id: CLIENT_ID })
   const basic = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64')
-  const { data } = await axios.post(`${API}/2/oauth2/token`, body.toString(), {
+  const { data } = await axios.post(`${API_BASE}/2/oauth2/token`, body.toString(), {
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
       Authorization: `Basic ${basic}`,
@@ -108,12 +109,11 @@ export async function refreshAccessToken(refreshToken) {
   return tokenRequest({
     grant_type: 'refresh_token',
     refresh_token: refreshToken,
-    client_id: CLIENT_ID,
   })
 }
 
 export async function fetchTwitterProfile(accessToken) {
-  const { data } = await axios.get(`${API}/2/users/me`, {
+  const { data } = await axios.get(`${API_BASE}/2/users/me`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   })
   return data?.data || null
@@ -170,7 +170,7 @@ export async function postTweet({ userId, workspaceId = null, text }) {
   if (!text) throw new Error('Tweet text is required')
   const tokens = await ensureTwitterAccess(userId, workspaceId)
   const { data } = await axios.post(
-    `${API}/2/tweets`,
+    `${API_BASE}/2/tweets`,
     { text },
     { headers: { Authorization: `Bearer ${tokens.accessToken}` } },
   )

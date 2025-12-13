@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "nodemon index.js",
     "start": "node index.js",
-    "postinstall": "rm -rf node_modules/pdf-parse/test"
+    "postinstall": "rm -rf node_modules/pdf-parse/test",
+    "migrate:locations": "node jobs/locationMigration.js"
   },
   "dependencies": {
     "@sendgrid/mail": "^8.1.6",

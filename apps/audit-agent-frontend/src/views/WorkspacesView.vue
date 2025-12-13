@@ -17,6 +17,13 @@
             Refresh
           </button>
           <button
+            v-if="canManageMembers && activeWorkspaceId"
+            class="px-4 py-2 rounded-lg border border-indigo-400/60 bg-indigo-500/10 hover:bg-indigo-500/20 text-sm font-semibold text-indigo-100"
+            @click="openInviteModal()"
+          >
+            Share workspace
+          </button>
+          <button
             class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold shadow-lg shadow-indigo-900/40"
             @click="openCreate"
           >
@@ -95,6 +102,13 @@
                   {{ activeWorkspaceId === ws.id ? 'Current workspace' : 'Switch here' }}
                 </button>
                 <button
+                  v-if="ws.role === 'admin'"
+                  class="px-3 py-2 rounded-lg border border-indigo-300/60 text-sm text-indigo-100 hover:bg-indigo-600/10"
+                  @click="openInviteModal(ws)"
+                >
+                  Members
+                </button>
+                <button
                   class="px-3 py-2 rounded-lg border border-slate-700 text-sm hover:border-indigo-400"
                   @click="editWorkspace(ws)"
                 >
@@ -138,6 +152,128 @@
           </button>
         </aside>
       </section>
+
+      <section id="workspace-members" class="pb-8">
+        <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 space-y-4">
+          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div>
+              <p class="text-xs uppercase tracking-[0.3em] text-indigo-300/80">Members</p>
+              <h2 class="text-xl font-semibold text-slate-100">
+                Access for {{ activeWorkspace?.name || 'your workspace' }}
+              </h2>
+              <p class="text-sm text-slate-400">
+                Only admins can invite or remove members. Roles stay scoped to this workspace.
+              </p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button
+                class="px-3 py-2 rounded-lg border border-slate-700 text-sm hover:border-indigo-300/60 disabled:opacity-50"
+                :disabled="membersLoading || !activeWorkspaceId"
+                @click="loadMembers()"
+              >
+                Refresh members
+              </button>
+              <button
+                v-if="canManageMembers"
+                class="px-3 py-2 rounded-lg bg-indigo-600 text-sm font-semibold hover:bg-indigo-500 disabled:opacity-60"
+                :disabled="!activeWorkspaceId"
+                @click="openInviteModal()"
+              >
+                Invite
+              </button>
+            </div>
+          </div>
+
+          <div v-if="!activeWorkspaceId" class="text-slate-400 text-sm border border-dashed border-slate-700 rounded-xl p-4">
+            Select a workspace to manage its members.
+          </div>
+          <div v-else>
+            <div v-if="membersError" class="text-rose-200 text-sm bg-rose-500/10 border border-rose-500/30 rounded-xl p-3">
+              {{ membersError }}
+            </div>
+            <div v-else-if="membersLoading" class="text-slate-300 text-sm border border-slate-800 rounded-xl p-3 bg-slate-900/60">
+              Loading members…
+            </div>
+            <div v-else class="space-y-3">
+              <div
+                v-for="member in members"
+                :key="member.userId"
+                class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-slate-800 rounded-xl p-3 bg-slate-900/60"
+              >
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-sm font-semibold uppercase text-indigo-100">
+                    {{ (member.name || member.email || 'M').slice(0, 2) }}
+                  </div>
+                  <div>
+                    <p class="font-semibold text-slate-100">
+                      {{ member.name || member.email || 'Member' }}
+                      <span v-if="member.userId === currentUserId" class="text-xs text-emerald-300 ml-1">(You)</span>
+                    </p>
+                    <p class="text-xs text-slate-400">
+                      {{ member.email || 'No email on file' }}
+                    </p>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span class="px-2 py-1 rounded-full text-[11px] bg-indigo-500/15 border border-indigo-400/40 text-indigo-100">
+                    {{ roleLabel(member.role) }}
+                  </span>
+                  <template v-if="canManageMembers && member.userId !== currentUserId">
+                    <select
+                      class="bg-slate-900 border border-slate-700 text-sm rounded-lg px-2 py-1 text-slate-100"
+                      :disabled="memberBusy[member.userId]"
+                      :value="member.role"
+                      @change="changeRole(member, $event.target.value)"
+                    >
+                      <option value="viewer">Viewer</option>
+                      <option value="editor">Editor</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                    <button
+                      class="text-sm px-2 py-1 rounded-lg border border-slate-700 text-slate-300 hover:border-rose-400 hover:text-rose-200 disabled:opacity-60"
+                      :disabled="memberBusy[member.userId]"
+                      @click="removeWorkspaceMember(member)"
+                    >
+                      Remove
+                    </button>
+                  </template>
+                </div>
+              </div>
+              <div v-if="!members.length" class="text-slate-400 text-sm border border-dashed border-slate-700 rounded-xl p-3">
+                No members yet. Invite teammates to collaborate.
+              </div>
+            </div>
+
+            <div v-if="!membersError && !membersLoading && canManageMembers" class="mt-6 space-y-2">
+              <div class="flex items-center justify-between">
+                <p class="text-sm text-slate-300 font-medium">Pending invites</p>
+                <span class="text-xs text-slate-400">{{ invites.length }} waiting</span>
+              </div>
+              <div class="space-y-2">
+                <div
+                  v-for="invite in invites"
+                  :key="invite.id"
+                  class="border border-slate-800 rounded-lg px-3 py-2 bg-slate-900/60 flex items-center justify-between"
+                >
+                  <div>
+                    <p class="text-sm text-slate-100">{{ invite.email }}</p>
+                    <p class="text-xs text-slate-400">
+                      Role: {{ roleLabel(invite.role) }} · Expires
+                      {{ formatDate(invite.expires_at || invite.expiresAt) }}
+                    </p>
+                  </div>
+                  <span class="text-[11px] px-2 py-1 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-100">
+                    {{ invite.status || 'pending' }}
+                  </span>
+                </div>
+                <div v-if="!invites.length" class="text-slate-500 text-sm border border-dashed border-slate-700 rounded-lg px-3 py-2">
+                  No pending invites.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
 
     <el-dialog
@@ -146,6 +282,7 @@
       :close-on-click-modal="false"
       class="workspace-dialog"
       modal-class="workspace-dialog-overlay"
+      :style="dialogChrome"
     >
       <template #header>
         <div class="space-y-1">
@@ -242,18 +379,101 @@
         </div>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="inviteOpen"
+      width="420px"
+      :close-on-click-modal="false"
+      class="workspace-dialog"
+      modal-class="workspace-dialog-overlay"
+      :style="dialogChrome"
+    >
+      <template #header>
+        <div class="space-y-1">
+          <p class="text-xs uppercase tracking-[0.3em] text-indigo-400">Invite to {{ activeWorkspace?.name || 'workspace' }}</p>
+          <h3 class="text-lg font-semibold text-slate-100">Add a teammate by email</h3>
+        </div>
+      </template>
+
+      <div class="space-y-4">
+        <label class="block">
+          <span class="text-sm text-slate-200">Email</span>
+          <input
+            v-model="inviteForm.email"
+            type="email"
+            class="mt-1 w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+            placeholder="teammate@example.com"
+          />
+        </label>
+        <label class="block">
+          <span class="text-sm text-slate-200">Role</span>
+          <select
+            v-model="inviteForm.role"
+            class="mt-1 w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-100 focus:border-indigo-400 focus:outline-none"
+          >
+            <option value="viewer">Viewer (read-only)</option>
+            <option value="editor">Editor (create & update)</option>
+            <option value="admin">Admin (manage members)</option>
+          </select>
+        </label>
+
+        <div v-if="inviteLink" class="text-xs text-slate-200 bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2 flex items-center justify-between gap-2">
+          <span class="truncate">{{ inviteLink }}</span>
+          <button
+            class="px-2 py-1 rounded-md border border-indigo-400/60 text-indigo-100 text-xs hover:bg-indigo-600/10"
+            @click="copyInviteLink()"
+          >
+            Copy
+          </button>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <button
+            class="px-3 py-2 rounded-lg border border-slate-700 text-sm hover:border-slate-500"
+            @click="inviteOpen = false"
+          >
+            Cancel
+          </button>
+          <button
+            class="px-4 py-2 rounded-lg bg-indigo-600 text-sm font-semibold hover:bg-indigo-500 disabled:opacity-60"
+            :disabled="inviteSending || !inviteForm.email"
+            @click="sendInvite"
+          >
+            {{ inviteSending ? 'Sending…' : 'Send invite' }}
+          </button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
+import { useAuthStore } from '@/stores/authStore'
+import {
+  fetchWorkspaceMembers,
+  removeMember,
+  sendWorkspaceInvite,
+  updateMemberRole,
+} from '@/services/workspaceService'
 
 const workspaceStore = useWorkspaceStore()
+const authStore = useAuthStore()
 const createOpen = ref(false)
 const saving = ref(false)
 const editingId = ref(null)
+const dialogChrome = Object.freeze({
+  background: 'linear-gradient(145deg, #1e1b4b, #312e81, #4c1d95)',
+  color: '#e2e8f0',
+  borderRadius: '0.5rem',
+  boxShadow: '0 8px 30px rgba(0,0,0,0.6)',
+  border: '1px solid rgba(255,255,255,0.08)',
+  backdropFilter: 'blur(12px)',
+})
 const form = reactive({
   name: '',
   icon: '📦',
@@ -261,6 +481,15 @@ const form = reactive({
   description: '',
   workspaceType: 'personal',
 })
+const members = ref([])
+const invites = ref([])
+const membersLoading = ref(false)
+const membersError = ref('')
+const inviteOpen = ref(false)
+const inviteSending = ref(false)
+const inviteForm = reactive({ email: '', role: 'editor' })
+const inviteLink = ref(null)
+const memberBusy = reactive({})
 
 const colorPresets = [
   { value: 'indigo', class: 'bg-indigo-500/30 border-indigo-300/60', label: 'Indigo' },
@@ -282,6 +511,9 @@ const workspaces = computed(() => workspaceStore.workspaces || [])
 const activeWorkspaceId = computed(() => workspaceStore.activeWorkspaceId)
 const activeWorkspace = computed(() => workspaceStore.activeWorkspace || {})
 const canSave = computed(() => !!form.name && form.name.trim().length > 1)
+const activeRole = computed(() => workspaceStore.activeWorkspaceRole || 'viewer')
+const canManageMembers = computed(() => activeRole.value === 'admin')
+const currentUserId = computed(() => authStore?.user?.uid || null)
 
 function typeLabel(value) {
   const found = workspaceTypes.find((t) => t.value === value)
@@ -291,6 +523,33 @@ function typeLabel(value) {
 onMounted(() => {
   workspaceStore.init()
 })
+
+watch(
+  () => workspaceStore.activeWorkspaceId,
+  (id) => {
+    if (!id) {
+      members.value = []
+      invites.value = []
+      return
+    }
+    loadMembers(id)
+  },
+  { immediate: true },
+)
+
+watch(
+  () => activeRole.value,
+  (role) => {
+    if (!workspaces.value.length) return
+    if (role === 'admin' && activeWorkspaceId.value) {
+      loadMembers(activeWorkspaceId.value)
+    } else if (role !== 'admin') {
+      members.value = []
+      invites.value = []
+      membersError.value = role ? 'Only admins can view members for this workspace.' : ''
+    }
+  },
+)
 
 function openCreate() {
   editingId.value = null
@@ -331,6 +590,131 @@ async function saveWorkspace() {
     ElMessage.error(err?.message || 'Failed to save workspace')
   } finally {
     saving.value = false
+  }
+}
+
+async function loadMembers(id = null) {
+  const workspaceId = id || activeWorkspaceId.value
+  if (!workspaceId) return
+  if (!workspaces.value.length) return
+  if (activeRole.value !== 'admin') {
+    members.value = []
+    invites.value = []
+    membersError.value = 'Only admins can view members for this workspace.'
+    return
+  }
+  membersLoading.value = true
+  membersError.value = ''
+  try {
+    const { members: list, invites: pending } = await fetchWorkspaceMembers(workspaceId)
+    members.value = list || []
+    invites.value = pending || []
+  } catch (err) {
+    members.value = []
+    invites.value = []
+    const status = err?.response?.status
+    if (status === 403) {
+      membersError.value = 'You need to be an admin to view members for this workspace.'
+    } else if (status === 400) {
+      membersError.value = err?.response?.data?.error || 'workspaceId is required'
+    } else {
+      membersError.value = err?.response?.data?.error || err?.message || 'Failed to load members'
+    }
+  } finally {
+    membersLoading.value = false
+  }
+}
+
+function openInviteModal(ws = null) {
+  if (activeRole.value !== 'admin') {
+    ElMessage.error('Only admins can invite members')
+    return
+  }
+  if (ws?.id && ws.id !== activeWorkspaceId.value) {
+    switchWorkspace(ws.id)
+  }
+  inviteForm.email = ''
+  inviteForm.role = 'editor'
+  inviteLink.value = null
+  inviteOpen.value = true
+}
+
+async function sendInvite() {
+  if (!activeWorkspaceId.value) {
+    ElMessage.error('Select a workspace first')
+    return
+  }
+  if (!inviteForm.email) {
+    ElMessage.error('Enter an email to invite')
+    return
+  }
+  inviteSending.value = true
+  try {
+    const { invite, link } = await sendWorkspaceInvite(activeWorkspaceId.value, inviteForm)
+    inviteLink.value = link || null
+    if (invite) invites.value = [...invites.value.filter((i) => i.id !== invite.id), invite]
+    if (link) {
+      try {
+        await navigator.clipboard.writeText(link)
+        ElMessage.success('Invite link copied')
+      } catch {
+        ElMessage.success('Invite created')
+      }
+    } else {
+      ElMessage.success('Invite sent')
+    }
+    await loadMembers()
+  } catch (err) {
+    ElMessage.error(err?.response?.data?.error || err?.message || 'Failed to send invite')
+  } finally {
+    inviteSending.value = false
+  }
+}
+
+async function copyInviteLink(link = null) {
+  const value = link || inviteLink.value
+  if (!value) return
+  try {
+    await navigator.clipboard.writeText(value)
+    ElMessage.success('Invite link copied')
+  } catch {
+    ElMessage.success('Invite link ready')
+  }
+}
+
+async function changeRole(member, role) {
+  if (!activeWorkspaceId.value || !member?.userId) return
+  if (member.userId === currentUserId.value) {
+    ElMessage.error('You cannot change your own role')
+    return
+  }
+  memberBusy[member.userId] = true
+  try {
+    const updated = await updateMemberRole(activeWorkspaceId.value, member.userId, role)
+    members.value = members.value.map((m) => (m.userId === member.userId ? { ...m, ...updated } : m))
+    ElMessage.success('Role updated')
+  } catch (err) {
+    ElMessage.error(err?.response?.data?.error || err?.message || 'Failed to update role')
+  } finally {
+    memberBusy[member.userId] = false
+  }
+}
+
+async function removeWorkspaceMember(member) {
+  if (!activeWorkspaceId.value || !member?.userId) return
+  if (member.userId === currentUserId.value) {
+    ElMessage.error('You cannot remove yourself')
+    return
+  }
+  memberBusy[member.userId] = true
+  try {
+    await removeMember(activeWorkspaceId.value, member.userId)
+    members.value = members.value.filter((m) => m.userId !== member.userId)
+    ElMessage.success('Member removed')
+  } catch (err) {
+    ElMessage.error(err?.response?.data?.error || err?.message || 'Failed to remove member')
+  } finally {
+    memberBusy[member.userId] = false
   }
 }
 
@@ -380,6 +764,13 @@ function workspaceCardClass(ws) {
   const hover = 'hover:border-indigo-400/80 hover:shadow-lg hover:shadow-indigo-900/30'
   return `${base[color] || base.indigo} ${hover}`
 }
+
+function roleLabel(role) {
+  const normalized = String(role || '').toLowerCase()
+  if (normalized === 'editor') return 'Editor'
+  if (normalized === 'admin') return 'Admin'
+  return 'Viewer'
+}
 </script>
 
 <style scoped>
@@ -391,12 +782,12 @@ function workspaceCardClass(ws) {
 }
 
 :global(.workspace-dialog .el-dialog) {
-  background: radial-gradient(circle at 20% 20%, #0f172a 0%, #0b1220 40%, #0b1020 100%);
-  color: #e5e7eb;
-  border-radius: 18px;
-  border: 1px solid rgba(99, 102, 241, 0.35);
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(14px);
+  background: linear-gradient(145deg, #1e1b4b, #312e81, #4c1d95);
+  color: #e2e8f0;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(12px);
 }
 
 :global(.workspace-dialog .el-dialog__header) {

@@ -27,7 +27,11 @@ Configure provider keys in `.env.example`.
      - FIREBASE_PROJECT_ID
      - FIREBASE_CLIENT_EMAIL
      - FIREBASE_PRIVATE_KEY
-     - INSTAGRAM_APP_ID
+     - META_APP_ID (Facebook/Meta App ID for OAuth)
+     - META_APP_SECRET
+     - INSTAGRAM_REDIRECT_URL
+     - INSTAGRAM_SCOPES (optional override)
+     - INSTAGRAM_APP_ID (Graph-only; not used for OAuth)
      - INSTAGRAM_APP_SECRET
      - INSTAGRAM_PAGE_ID
      - INSTAGRAM_ACCESS_TOKEN
