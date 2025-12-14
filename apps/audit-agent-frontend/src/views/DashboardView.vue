@@ -1557,9 +1557,7 @@ const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0)
 
 const unsubscribe = ref(null)
 
-function tasksCollection(user) {
-  const wsId = activeWorkspaceId.value
-  if (user && wsId) return collection(db, 'users', user.uid, 'workspaces', wsId, 'tasks')
+function tasksCollection() {
   return collection(db, 'tasks')
 }
 
@@ -1571,6 +1569,7 @@ function handleTaskSnapshot(snapshot) {
       ...data,
       category: resolveCategory(data?.category),
       date: typeof data.date === 'string' ? data.date : toYMD(data.date?.toDate?.() || data.date),
+      createdAt: data.createdAt?.toMillis?.() || data.createdAt || 0,
     }
   })
   dailyTasks.value = userTasks.filter((t) => t.date === toYMD(today))
@@ -1594,20 +1593,16 @@ async function attachTaskListener(user) {
     monthlyTasks.value = []
     return
   }
-  const tasksQuery = query(tasksCollection(user), where('userId', '==', user.uid))
+  const wsId = activeWorkspaceId.value
+  if (!wsId) {
+    dailyTasks.value = []
+    weeklyTasks.value = []
+    monthlyTasks.value = []
+    return
+  }
+  const tasksQuery = query(tasksCollection(), where('workspaceId', '==', wsId))
   try {
     unsubscribe.value = onSnapshot(tasksQuery, async (snapshot) => {
-      if (!snapshot.size && activeWorkspaceId.value) {
-        try {
-          const fallbackSnap = await getDocs(query(collection(db, 'tasks'), where('userId', '==', user.uid)))
-          if (fallbackSnap.size) {
-            handleTaskSnapshot(fallbackSnap)
-            return
-          }
-        } catch (err) {
-          console.warn('Workspace tasks fallback failed', err?.message || err)
-        }
-      }
       handleTaskSnapshot(snapshot)
     })
   } catch (error) {
