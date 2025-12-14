@@ -33,7 +33,10 @@ export const useWorkspaceStore = defineStore('workspaceStore', () => {
     const uid = auth?.currentUser?.uid
     if (uid && id) {
       try {
-        await touchWorkspaceOpened(uid, id)
+        const ws = workspaces.value.find((w) => w.id === id)
+        if (ws?.role === 'admin') {
+          await touchWorkspaceOpened(uid, id)
+        }
       } catch {}
     }
   }
