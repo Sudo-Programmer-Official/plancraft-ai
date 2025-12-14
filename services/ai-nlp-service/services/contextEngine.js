@@ -281,10 +281,12 @@ export async function fetchNapkin(userId, workspaceId, options = {}) {
   }
 
   if (workspaceId) {
-    await queryNapkin(`users/${userId}/workspaces/${workspaceId}/napkin/items`)
+    // napkin entries live in the workspace-scoped "napkin" collection
+    await queryNapkin(`users/${userId}/workspaces/${workspaceId}/napkin`)
   }
   if (!notes.length) {
-    await queryNapkin(`napkin/${userId}/items`)
+    // fallback to user-level napkin collection
+    await queryNapkin(`napkin/${userId}`)
   }
 
   const scoped = filterByWorkspace(notes, workspaceId)

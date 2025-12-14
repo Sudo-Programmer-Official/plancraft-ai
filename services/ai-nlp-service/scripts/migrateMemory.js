@@ -41,7 +41,7 @@ async function main() {
   const db = admin.firestore()
   const basePath = ['users', userId, 'workspaces', workspaceId]
 
-  const napkinSnap = await fetchCollection(db, [...basePath, 'napkin', 'items'], 120)
+  const napkinSnap = await fetchCollection(db, [...basePath, 'napkin'], 120)
   const draftsSnap = await fetchCollection(db, [...basePath, 'drafts'], 80)
   const tasksSnap = await fetchCollection(db, [...basePath, 'tasks'], 120)
   const eventsSnap = await fetchCollection(db, ['leaders', userId, 'events'], 120)

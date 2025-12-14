@@ -93,7 +93,7 @@
                 <p class="text-xs text-slate-400">{{ doc.source || 'paste' }}</p>
               </div>
               <span :class="['px-2 py-1 rounded-full text-xs font-semibold', statusClass(doc.status)]">
-                {{ doc.status }}
+                {{ statusLabel(doc.status) }}
               </span>
             </div>
             <div class="flex flex-wrap items-center gap-2 text-xs text-slate-300">
@@ -239,6 +239,7 @@ const fileInput = ref(null)
 
 const uploadBusy = ref(false)
 const processBusy = ref('')
+const autoProcessingDocId = ref('')
 const generating = ref(false)
 const savingTasks = ref(false)
 const proposals = ref([])
@@ -317,17 +318,52 @@ function subscribeDocs() {
   }
 }
 
+function upsertLocalDoc(partial) {
+  if (!partial?.id) return
+  const idx = docs.value.findIndex((d) => d.id === partial.id)
+  if (idx >= 0) {
+    docs.value[idx] = { ...docs.value[idx], ...partial }
+  } else {
+    docs.value.unshift({
+      id: partial.id,
+      title: partial.title || 'Untitled document',
+      source: partial.source || 'upload',
+      status: partial.status || 'processing',
+      processedChunks: partial.processedChunks || 0,
+      totalChunks: partial.totalChunks || 0,
+      updatedAt: new Date(),
+      error: null,
+    })
+  }
+}
+
+function statusLabel(status) {
+  if (status === 'ready') return 'Ready'
+  if (status === 'processing') return 'Processing…'
+  if (status === 'uploaded') return 'Uploaded'
+  if (status === 'failed') return 'Failed'
+  return status || 'processing'
+}
+
 async function submitPaste() {
   if (!activeWorkspaceId.value || !canWrite.value) return
   uploadBusy.value = true
   try {
-    await uploadKnowledgeText({
+    const result = await uploadKnowledgeText({
       workspaceId: activeWorkspaceId.value,
       title: title.value,
       text: text.value,
       source: 'paste',
     })
-    ElMessage.success('Document saved. Click Process to chunk and embed.')
+    if (result?.docId) {
+      upsertLocalDoc({ id: result.docId, title: title.value, source: 'paste', status: 'processing' })
+    }
+    await autoProcess(result)
+    if (result?.status === 'failed') {
+      ElMessage.error(result?.error || 'Document failed validation')
+    } else {
+      ElMessage.success('Document saved. Processing will start automatically.')
+    }
     text.value = ''
   } catch (err) {
     const msg = err?.response?.data?.error || err?.message || 'Failed to upload'
@@ -351,8 +387,16 @@ async function submitFile() {
     fd.append('workspaceId', activeWorkspaceId.value)
     fd.append('title', title.value || selectedFile.value.name)
     fd.append('source', 'upload')
-    await uploadKnowledgeFile(fd)
-    ElMessage.success('File uploaded. Click Process to chunk and embed.')
+    const result = await uploadKnowledgeFile(fd)
+    if (result?.docId) {
+      upsertLocalDoc({ id: result.docId, title: title.value || selectedFile.value.name, source: 'upload', status: 'processing' })
+    }
+    await autoProcess(result)
+    if (result?.status === 'failed') {
+      ElMessage.error(result?.error || 'Document failed validation')
+    } else {
+      ElMessage.success('File uploaded. Processing will start automatically.')
+    }
     selectedFile.value = null
     try {
       if (fileInput.value) fileInput.value.value = ''
@@ -368,6 +412,7 @@ async function submitFile() {
 async function triggerProcess(doc) {
   if (!doc?.id || !canWrite.value) return
   processBusy.value = doc.id
+  upsertLocalDoc({ id: doc.id, status: 'processing', error: null })
   try {
     await processKnowledgeDoc(doc.id, activeWorkspaceId.value)
     ElMessage.success('Processing started')
@@ -376,6 +421,23 @@ async function triggerProcess(doc) {
     ElMessage.error(msg)
   } finally {
     processBusy.value = ''
+  }
+}
+
+async function autoProcess(result) {
+  const docId = result?.docId || result?.id
+  if (!docId || result?.status === 'failed') return
+  autoProcessingDocId.value = docId
+  processBusy.value = docId
+  upsertLocalDoc({ id: docId, status: 'processing', error: null })
+  try {
+    await processKnowledgeDoc(docId, activeWorkspaceId.value)
+  } catch (err) {
+    const msg = err?.response?.data?.error || err?.message || 'Failed to start processing'
+    ElMessage.error(msg)
+  } finally {
+    if (processBusy.value === docId) processBusy.value = ''
+    autoProcessingDocId.value = ''
   }
 }
 

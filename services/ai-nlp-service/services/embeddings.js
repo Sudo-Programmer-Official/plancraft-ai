@@ -4,6 +4,7 @@ import { logger } from '../utils/logger.js'
 
 dotenv.config({ path: process.env.AI_NLP_ENV_FILE || '.env' })
 
+// Default to a broadly available model; override via OPENAI_EMBED_MODEL if needed
 const EMBEDDING_MODEL = process.env.OPENAI_EMBED_MODEL || 'text-embedding-3-small'
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 

@@ -6,12 +6,58 @@
       <p class="text-indigo-300">Manage your notifications, integrations, and account preferences.</p>
     </header>
 
-    <main class="max-w-4xl mx-auto space-y-10 px-1">
-      <KnowledgePanel />
-      <ProposalInbox />
+    <main class="max-w-6xl mx-auto space-y-8 px-1">
+      <!-- Settings navigation -->
+      <div class="bg-white/5 border border-white/10 rounded-2xl p-4 shadow-lg">
+        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div v-for="group in tabGroups" :key="group.id" class="space-y-2">
+            <p class="text-xs uppercase tracking-[0.2em] text-slate-300">{{ group.label }}</p>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="tab in group.tabs"
+                :key="tab.id"
+                type="button"
+                :class="[
+                  'px-3 py-1.5 rounded-lg text-sm border transition',
+                  activeTab === tab.id
+                    ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg'
+                    : 'bg-slate-900/40 border-slate-700 text-slate-200 hover:border-slate-500'
+                ]"
+                @click="setActiveTab(tab.id)"
+              >
+                {{ tab.label }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-show="activeTab === 'workspace-knowledge'">
+        <KnowledgePanel />
+      </div>
+
+      <div v-show="activeTab === 'workspace-proposals'">
+        <ProposalInbox />
+      </div>
+
+      <section
+        v-show="activeTab === 'workspace-policies'"
+        class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10"
+      >
+        <h2 class="text-lg sm:text-xl font-semibold mb-2">🛡️ Policies</h2>
+        <p class="text-sm text-indigo-200">
+          Approval and action policies live here. Manage auto-approve/reject rules, admin-only approvals, and two-approver flags.
+        </p>
+        <p class="text-sm text-slate-300 mt-3">
+          Coming soon to UI — policies are already enforced server-side. Ask an admin to adjust workspace policies in the backend for now.
+        </p>
+      </section>
 
       <!-- Plan status and usage -->
-      <section class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10 max-w-md mx-auto sm:max-w-none">
+      <section
+        v-show="activeTab === 'billing-subscription'"
+        class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10 max-w-md mx-auto sm:max-w-none"
+      >
         <h2 class="text-lg sm:text-xl font-semibold mb-2">🌟 Subscription</h2>
         <p class="text-sm text-indigo-200">Current plan: <strong>{{ currentPlanLabel.toUpperCase() }}</strong></p>
         <p class="text-sm text-gray-300 mt-2">
@@ -26,7 +72,10 @@
         </div>
       </section>
 
-      <section class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10 max-w-md mx-auto sm:max-w-none">
+      <section
+        v-show="activeTab === 'help-onboarding'"
+        class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10 max-w-md mx-auto sm:max-w-none"
+      >
         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h2 class="text-lg sm:text-xl font-semibold mb-2">🎬 Onboarding Walkthrough</h2>
@@ -47,8 +96,26 @@
         </div>
       </section>
 
+      <section
+        v-show="activeTab === 'account-profile'"
+        class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10"
+      >
+        <h2 class="text-lg sm:text-xl font-semibold mb-2">🙋 Profile</h2>
+        <p class="text-sm text-indigo-200">Profile editing lives in your account menu. A dedicated editor will arrive here soon.</p>
+        <p class="text-sm text-slate-300 mt-2">Signed in as: <strong>{{ authStore.user?.email || 'Unknown user' }}</strong></p>
+      </section>
+
+      <section
+        v-show="activeTab === 'account-preferences'"
+        class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10"
+      >
+        <h2 class="text-lg sm:text-xl font-semibold mb-2">⚙️ Preferences</h2>
+        <p class="text-sm text-indigo-200">Workspace-specific preferences (theme, locale, AI persona) will be managed here soon.</p>
+      </section>
+
       <!-- Notification Preferences -->
       <section
+        v-show="activeTab === 'account-notifications'"
         ref="notificationsSection"
         :class="['bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10 max-w-md mx-auto sm:max-w-none',
                  highlightNotifications ? 'ring-2 ring-indigo-400' : '']"
@@ -113,8 +180,19 @@
         </div>
       </section>
 
+      <section
+        v-show="activeTab === 'account-social'"
+        class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10"
+      >
+        <h2 class="text-lg sm:text-xl font-semibold mb-2">🌐 Social Accounts</h2>
+        <p class="text-sm text-indigo-200">Connect LinkedIn, GitHub, and other accounts to sync ownership context. Social linking UI will land here.</p>
+      </section>
+
       <!-- Integrations -->
-      <section class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10 max-w-md mx-auto sm:max-w-none">
+      <section
+        v-show="activeTab === 'workspace-integrations'"
+        class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10 max-w-md mx-auto sm:max-w-none"
+      >
         <h2 class="text-lg sm:text-xl font-semibold mb-4">🔗 Integrations</h2>
         <p class="text-sm text-indigo-200 mb-4">Connect your favorite platforms to sync tasks and reminders.</p>
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -425,6 +503,45 @@ const router = useRouter()
 const route = useRoute()
 const subStore = useSubscriptionStore()
 const { refresh: refreshPremium } = useIsPremium()
+
+const tabGroups = [
+  {
+    id: 'workspace',
+    label: 'Workspace',
+    tabs: [
+      { id: 'workspace-knowledge', label: 'Knowledge' },
+      { id: 'workspace-proposals', label: 'Impact & Proposals' },
+      { id: 'workspace-policies', label: 'Policies' },
+      { id: 'workspace-integrations', label: 'Integrations' },
+    ],
+  },
+  {
+    id: 'account',
+    label: 'Account',
+    tabs: [
+      { id: 'account-profile', label: 'Profile' },
+      { id: 'account-preferences', label: 'Preferences' },
+      { id: 'account-notifications', label: 'Notifications' },
+      { id: 'account-social', label: 'Social' },
+    ],
+  },
+  {
+    id: 'billing',
+    label: 'Billing',
+    tabs: [{ id: 'billing-subscription', label: 'Subscription & Usage' }],
+  },
+  {
+    id: 'help',
+    label: 'Help',
+    tabs: [{ id: 'help-onboarding', label: 'Onboarding & Walkthrough' }],
+  },
+]
+
+const activeTab = ref(route.query?.tab || 'workspace-knowledge')
+
+function setActiveTab(id) {
+  activeTab.value = id
+}
 const dirty = ref(false) // tracks unsaved changes
 const notificationsSection = ref(null)
 const highlightNotifications = ref(false)
