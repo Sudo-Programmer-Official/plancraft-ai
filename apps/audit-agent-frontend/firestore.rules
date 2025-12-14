@@ -176,6 +176,15 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // workspace policies (proposal-level)
+    match /workspace_policies/{id} {
+      allow read: if isAdmin() || (resource.data.workspaceId is string && isActiveMember(resource.data.workspaceId));
+      allow create, update: if isSignedIn()
+        && request.resource.data.workspaceId is string
+        && hasWorkspaceRole(request.resource.data.workspaceId, ['owner', 'admin']);
+      allow delete: if false;
+    }
+
     // audit log (append-only)
     match /audit_log/{id} {
       allow read: if isAdmin() || (resource.data.workspaceId is string && isActiveMember(resource.data.workspaceId));

@@ -9,6 +9,7 @@ import {
 } from "../controllers/knowledgeController.js";
 import { changeImpactHandler } from "../controllers/changeImpactController.js";
 import { impactFeedbackHandler } from "../controllers/impactFeedbackController.js";
+import { listPoliciesHandler, upsertPolicyHandler } from "../controllers/policyController.js";
 import {
   createProposalHandler,
   approveProposalHandler,
@@ -50,6 +51,20 @@ router.get(
   requireAuth,
   requireWorkspaceRole(READ_ROLES),
   searchKnowledgeHandler,
+);
+
+router.get(
+  "/knowledge/policies",
+  requireAuth,
+  requireWorkspaceRole(["admin", "editor"]),
+  listPoliciesHandler,
+);
+
+router.post(
+  "/knowledge/policies",
+  requireAuth,
+  requireWorkspaceRole(["admin", "editor"], { skipWorkspaceLoad: true }),
+  upsertPolicyHandler,
 );
 
 router.post(

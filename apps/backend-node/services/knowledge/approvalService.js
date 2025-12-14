@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { db } from "../firebaseAdmin.js";
 import { getWorkspaceMembership } from "../workspaceService.js";
 import { createTask } from "../taskService.js";
+import { evaluatePolicies } from "./policyService.js";
 
 const PROPOSALS = "impact_proposals";
 const APPROVALS = "proposal_approvals";
@@ -74,25 +75,68 @@ export async function createProposal({ workspaceId, source, impacts, note, userI
   await ensureWorkspaceMember(workspaceId, userId, ["admin", "editor"]);
   const nowTs = now();
   const ref = db.collection(PROPOSALS).doc();
+
+  let policyEval = { decision: null, policyFlags: { requiresTwoApprovals: false, requiresAdminApproval: false }, appliedPolicyIds: [] };
+  try {
+    policyEval = await evaluatePolicies({ workspaceId, source, impacts, note });
+  } catch (err) {
+    // Policy evaluation failures should not block creation
+    policyEval = { decision: null, policyFlags: { requiresTwoApprovals: false, requiresAdminApproval: false }, appliedPolicyIds: [] };
+  }
+
+  let status = "pending";
+  if (policyEval.decision === "auto_reject") status = "rejected";
+  if (policyEval.decision === "auto_approve") status = "approved";
+
   const payload = {
     workspaceId,
     source: { type: source?.type, refId: source?.refId },
     impacts: Array.isArray(impacts) ? impacts : [],
-    status: "pending",
+    status,
     note: note || null,
     createdBy: userId,
     createdAt: nowTs,
     updatedAt: nowTs,
+    policyFlags: policyEval.policyFlags || { requiresTwoApprovals: false, requiresAdminApproval: false },
+    policyDecision: policyEval.decision || null,
+    policyAppliedIds: policyEval.appliedPolicyIds || [],
   };
+
   await ref.set(payload);
+
   await db.collection(AUDIT).add({
     workspaceId,
     actorId: userId,
     eventType: "proposal_created",
     ref: { proposalId: ref.id },
-    meta: null,
+    meta: { policyDecision: payload.policyDecision, policyFlags: payload.policyFlags, policies: payload.policyAppliedIds },
     createdAt: now(),
   });
+
+  if (payload.policyDecision === "auto_reject") {
+    await db.collection(AUDIT).add({
+      workspaceId,
+      actorId: userId,
+      eventType: "proposal_policy_auto_reject",
+      ref: { proposalId: ref.id },
+      meta: { policies: payload.policyAppliedIds },
+      createdAt: now(),
+    });
+  }
+
+  if (payload.policyDecision === "auto_approve") {
+    await db.collection(AUDIT).add({
+      workspaceId,
+      actorId: userId,
+      eventType: "proposal_policy_auto_approve",
+      ref: { proposalId: ref.id },
+      meta: { policies: payload.policyAppliedIds },
+      createdAt: now(),
+    });
+    // auto-approval still only prepares actions; execution is manual
+    await upsertActionsForProposal({ id: ref.id, ...payload }, userId);
+  }
+
   return { id: ref.id, ...payload };
 }
 
@@ -202,45 +246,124 @@ async function upsertActionsForProposal(proposal, userId) {
 
 export async function approveProposal({ proposalId, userId, approve, note }) {
   const proposalRef = db.collection(PROPOSALS).doc(proposalId);
-  const snap = await proposalRef.get();
-  if (!snap.exists) throw new Error("Proposal not found");
-  const proposal = snap.data() || {};
-  await ensureWorkspaceMember(proposal.workspaceId, userId, ["admin", "editor"]);
-  if (proposal.status !== "pending") {
-    const err = new Error("Proposal already decided");
-    err.status = 409;
-    throw err;
-  }
-  const nowTs = now();
-  await proposalRef.set(
-    {
-      status: approve ? "approved" : "rejected",
-      updatedAt: nowTs,
-    },
-    { merge: true },
-  );
   const approvalRef = db.collection(APPROVALS).doc();
-  await approvalRef.set({
-    workspaceId: proposal.workspaceId,
-    proposalId,
-    approverId: userId,
-    status: approve ? "approved" : "rejected",
-    approvedAt: nowTs,
-    note: note || null,
+
+  let finalStatus = null;
+  let waitingForSecond = false;
+  let proposalData = null;
+
+  const nowTs = now();
+
+  await db.runTransaction(async (tx) => {
+    const proposalSnap = await tx.get(proposalRef);
+    if (!proposalSnap.exists) throw new Error("Proposal not found");
+    const proposal = proposalSnap.data() || {};
+    proposalData = { id: proposalId, ...proposal };
+
+    const requiresAdmin = proposal.policyFlags?.requiresAdminApproval === true;
+    const allowedRoles = requiresAdmin ? ["admin"] : ["admin", "editor"];
+    await ensureWorkspaceMember(proposal.workspaceId, userId, allowedRoles);
+
+    if (proposal.status !== "pending") {
+      const err = new Error("Proposal already decided");
+      err.status = 409;
+      throw err;
+    }
+
+    // Gather existing approvals for two-approver flows
+    const approvalsSnap = await tx.get(
+      db.collection(APPROVALS).where("proposalId", "==", proposalId),
+    );
+    const existingApprovers = new Set(
+      approvalsSnap.docs
+        .map((d) => (d.data() || {}).approverId)
+        .filter(Boolean),
+    );
+
+    if (existingApprovers.has(userId)) {
+      const err = new Error("Already approved by this user");
+      err.status = 409;
+      throw err;
+    }
+
+    const requiresTwo = proposal.policyFlags?.requiresTwoApprovals === true;
+
+    if (approve) {
+      const totalApprovals = existingApprovers.size + 1;
+      const meetsThreshold = !requiresTwo || totalApprovals >= 2;
+
+      // Record this approval
+      tx.set(approvalRef, {
+        workspaceId: proposal.workspaceId,
+        proposalId,
+        approverId: userId,
+        status: "approved",
+        approvedAt: nowTs,
+        note: note || null,
+      });
+
+      if (meetsThreshold) {
+        tx.set(
+          proposalRef,
+          {
+            status: "approved",
+            updatedAt: nowTs,
+          },
+          { merge: true },
+        );
+        finalStatus = "approved";
+      } else {
+        // Still pending while waiting for second approval
+        tx.set(
+          proposalRef,
+          {
+            status: "pending",
+            updatedAt: nowTs,
+          },
+          { merge: true },
+        );
+        finalStatus = "pending";
+        waitingForSecond = true;
+      }
+    } else {
+      // Rejection path
+      tx.set(
+        proposalRef,
+        {
+          status: "rejected",
+          updatedAt: nowTs,
+        },
+        { merge: true },
+      );
+
+      tx.set(approvalRef, {
+        workspaceId: proposal.workspaceId,
+        proposalId,
+        approverId: userId,
+        status: "rejected",
+        approvedAt: nowTs,
+        note: note || null,
+      });
+      finalStatus = "rejected";
+    }
   });
+
+  // Audit outside transaction
   await db.collection(AUDIT).add({
-    workspaceId: proposal.workspaceId,
+    workspaceId: proposalData.workspaceId,
     actorId: userId,
     eventType: approve ? "proposal_approved" : "proposal_rejected",
     ref: { proposalId },
-    meta: null,
+    meta: { waitingForSecond },
     createdAt: now(),
   });
 
-  if (approve) {
-    await upsertActionsForProposal({ id: proposalId, ...proposal }, userId);
+  // Only generate actions on final approval
+  if (finalStatus === "approved") {
+    await upsertActionsForProposal(proposalData, userId);
   }
-  return { status: approve ? "approved" : "rejected" };
+
+  return { status: finalStatus, waitingForSecond };
 }
 
 export async function listActionsForProposal(proposalId, userId) {
