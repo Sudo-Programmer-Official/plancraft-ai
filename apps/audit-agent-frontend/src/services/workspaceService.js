@@ -92,8 +92,15 @@ export async function sendWorkspaceInvite(workspaceId, payload) {
 
 export async function getInviteDetails(token) {
   if (!token) throw new Error('Missing token')
-  const { data } = await api.get(`/invites/${token}`)
-  return data
+  // Prefer public endpoint to avoid auth requirement for lookup
+  try {
+    const { data } = await api.get(`/public/invites/${token}`)
+    return data
+  } catch (err) {
+    // fallback for environments without /public prefix
+    const { data } = await api.get(`/invites/${token}`)
+    return data
+  }
 }
 
 export async function acceptInvite(token) {

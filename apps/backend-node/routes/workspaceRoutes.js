@@ -254,6 +254,7 @@ async function inviteLookupHandler(req, res) {
     const status = expired && invite.status === "pending" ? "expired" : invite.status;
     const safeInvite = sanitizeInvite({ ...invite, status });
     return res.json({
+      valid: !["expired", "revoked"].includes(status),
       invite: safeInvite,
       workspace: workspace
         ? { id: workspace.id, name: workspace.name, icon: workspace.icon, theme: workspace.theme }
@@ -310,6 +311,7 @@ async function inviteRevokeHandler(req, res) {
 
 router.get("/workspaces/invites/:token", inviteLookupHandler);
 router.get("/invites/:token", inviteLookupHandler);
+router.get("/public/invites/:token", inviteLookupHandler);
 
 router.post("/workspaces/invites/:token/accept", requireAuth, inviteAcceptHandler);
 router.post("/invites/:token/accept", requireAuth, inviteAcceptHandler);

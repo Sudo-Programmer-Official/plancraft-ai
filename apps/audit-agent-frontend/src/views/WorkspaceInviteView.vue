@@ -40,27 +40,33 @@
           You’re in! We switched you to {{ workspace?.name || 'this workspace' }}.
         </div>
         <div v-else class="space-y-3">
-          <button
-            class="w-full px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
-            :disabled="acceptLoading || !isAuthenticated || inviteInactive"
-            @click="handleAccept"
-          >
-            {{ isAuthenticated ? (acceptLoading ? 'Joining…' : 'Accept invite') : 'Sign in to accept' }}
-          </button>
-          <button
-            v-if="!isAuthenticated"
-            class="w-full px-4 py-3 rounded-xl border border-slate-700 text-sm font-semibold hover:border-indigo-300/60"
-            @click="goToLogin"
-          >
-            Continue to login
-          </button>
-          <button
-            v-if="!isAuthenticated"
-            class="w-full px-4 py-3 rounded-xl border border-slate-700 text-sm font-semibold hover:border-indigo-300/60"
-            @click="goToSignup"
-          >
-            Create an account
-          </button>
+          <template v-if="emailMismatch">
+            <div class="text-sm text-amber-100 bg-amber-500/10 border border-amber-400/40 rounded-xl p-3">
+              You’re signed in as {{ userEmail || 'another account' }}, but this invite is for {{ invitedEmail || 'a different email' }}.
+            </div>
+            <button
+              class="w-full px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold"
+              @click="switchAccount"
+            >
+              Switch account to join
+            </button>
+          </template>
+          <template v-else>
+            <button
+              class="w-full px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
+              :disabled="acceptLoading || inviteInactive"
+              @click="isAuthenticated ? handleAccept() : goToLogin()"
+            >
+              {{ isAuthenticated ? (acceptLoading ? 'Joining…' : 'Accept invite') : 'Sign in to join' }}
+            </button>
+            <button
+              v-if="!isAuthenticated"
+              class="w-full px-4 py-3 rounded-xl border border-slate-700 text-sm font-semibold hover:border-indigo-300/60"
+              @click="goToSignup"
+            >
+              Create an account
+            </button>
+          </template>
           <p class="text-xs text-slate-400">
             We’ll switch your active workspace once you accept. Only admins can invite or remove members. If you sign in first, we’ll bring you back here automatically.
           </p>
@@ -93,6 +99,9 @@ const error = ref('')
 const accepted = ref(false)
 
 const isAuthenticated = computed(() => !!authStore?.user)
+const userEmail = computed(() => authStore?.user?.email || '')
+const invitedEmail = computed(() => (invite.value?.email || invite.value?.emailLower || '').toString().toLowerCase())
+const emailMismatch = computed(() => isAuthenticated.value && invitedEmail.value && userEmail.value.toLowerCase() !== invitedEmail.value)
 const inviteInactive = computed(() => {
   const status = String(invite.value?.status || '').toLowerCase()
   return ['expired', 'revoked', 'accepted'].includes(status)
@@ -107,9 +116,10 @@ watch(
     authed: isAuthenticated.value,
     inviteLoaded: !loading.value && !!invite.value,
     inactive: inviteInactive.value,
+    mismatch: emailMismatch.value,
   }),
   (state) => {
-    if (state.authed && state.inviteLoaded && !state.inactive && !accepted.value && !acceptLoading.value) {
+    if (state.authed && state.inviteLoaded && !state.inactive && !state.mismatch && !accepted.value && !acceptLoading.value) {
       handleAccept({ auto: true })
     }
   },
@@ -128,6 +138,9 @@ async function loadInvite() {
     invite.value = data?.invite || null
     workspace.value = data?.workspace || null
     inviter.value = data?.inviter || null
+    if (data?.invite?.email && !invitedEmail.value && typeof data.invite.email === 'string') {
+      // normalize computed later
+    }
     const status = String(invite.value?.status || '').toLowerCase()
     if (status === 'expired') error.value = 'This invite has expired.'
     else if (status === 'revoked') error.value = 'This invite was revoked.'
@@ -158,8 +171,13 @@ async function handleAccept(options = {}) {
     ElMessage.success(`You're now part of ${result?.workspace?.name || 'this workspace'}`)
     await router.push('/workspaces')
   } catch (err) {
-    if (auto && (err?.response?.status === 410 || err?.response?.status === 404)) {
+    const status = err?.response?.status
+    if (status === 403 && String(err?.response?.data?.error || '').toLowerCase().includes('different email')) {
+      error.value = 'Invite is addressed to a different email'
+    } else if (auto && (status === 410 || status === 404)) {
       error.value = err?.response?.data?.error || err?.message || 'Invite not available'
+    } else if (status === 401) {
+      error.value = 'Sign in to accept this invite.'
     } else {
       error.value = err?.response?.data?.error || err?.message || 'Failed to accept invite'
     }
@@ -172,14 +190,21 @@ function goToLogin() {
   try {
     localStorage.setItem('postLoginRedirect', route.fullPath)
   } catch {}
-  router.push({ path: '/login', query: { redirect: route.fullPath } })
+  router.push({ path: '/login', query: { redirect: route.fullPath, email: invitedEmail.value || undefined } })
 }
 
 function goToSignup() {
   try {
     localStorage.setItem('postLoginRedirect', route.fullPath)
   } catch {}
-  router.push({ path: '/signup', query: { redirect: route.fullPath } })
+  router.push({ path: '/signup', query: { redirect: route.fullPath, email: invitedEmail.value || undefined } })
+}
+
+async function switchAccount() {
+  try {
+    await authStore.signOut?.()
+  } catch {}
+  goToLogin()
 }
 
 function roleLabel(role) {
