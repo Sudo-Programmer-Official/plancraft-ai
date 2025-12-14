@@ -135,6 +135,8 @@ export async function seedGuestStarterTasks(uid, options = {}) {
           reminderTone: options.reminderTone || null,
           energyRhythm: options.energyRhythm || null,
         },
+        createdBy: uid,
+        workspaceId: options.workspaceId || null,
       })
       created += 1
     } catch (error) {

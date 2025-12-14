@@ -499,6 +499,8 @@ async function commitCapture() {
       title: item.title,
       details: item.description,
       source: 'capture',
+      createdBy: authStore.user?.uid || null,
+      workspaceId: workspaceStore.activeWorkspaceId || null,
     })
   }
   ElNotification({ title: 'Created', message: `Added ${selected.length} tasks from scan.`, type: 'success' })

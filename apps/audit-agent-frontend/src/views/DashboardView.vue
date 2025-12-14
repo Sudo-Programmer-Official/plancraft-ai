@@ -1865,7 +1865,7 @@ watch(
     if (!uid || !pending || firstVisitSeeding.value) return
     firstVisitSeeding.value = true
     try {
-      await seedGuestStarterTasks(uid, { source: 'dashboard_bootstrap' })
+      await seedGuestStarterTasks(uid, { source: 'dashboard_bootstrap', workspaceId: workspaceStore.activeWorkspaceId })
       authStore.user = {
         ...(authStore.user || {}),
         firstVisitInitialized: true,

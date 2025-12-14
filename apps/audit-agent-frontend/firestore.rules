@@ -14,6 +14,31 @@ service cloud.firestore {
       return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'superadmin'];
     }
 
+    function memberDocId(workspaceId, uid) {
+      return workspaceId + "_" + uid;
+    }
+
+    // Workspace membership lookup (workspace_members collection; id = `${workspaceId}_${uid}`)
+    function workspaceMembership(workspaceId) {
+      if (!isSignedIn() || workspaceId == null) return null;
+      return get(/databases/$(database)/documents/workspace_members/$(memberDocId(workspaceId, request.auth.uid))).data;
+    }
+
+    function isActiveMember(workspaceId) {
+      return isSignedIn()
+        && workspaceId is string
+        && exists(/databases/$(database)/documents/workspace_members/$(memberDocId(workspaceId, request.auth.uid)))
+        && workspaceMembership(workspaceId).status == 'active';
+    }
+
+    function hasWorkspaceRole(workspaceId, roles) {
+      return isActiveMember(workspaceId) && workspaceMembership(workspaceId).role in roles;
+    }
+
+    function isLegacyPersonalTask(data) {
+      return !(data.workspaceId is string) && data.userId == request.auth.uid;
+    }
+
     // users/{uid}
     match /users/{uid} {
       // Allow users to read/update their own profile; admins can read/update all
@@ -28,10 +53,36 @@ service cloud.firestore {
       allow read, write: if isUser(uid) || isAdmin();
     }
 
-    // tasks — owned by user via `userId` field
+    // tasks — shared per workspace (workspaceId required), legacy fallback to user-owned
     match /tasks/{taskId} {
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow read, update, delete: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
+      // CREATE: must target a workspace and be editor/admin; createdBy must be caller
+      allow create: if isSignedIn()
+        && request.resource.data.workspaceId is string
+        && hasWorkspaceRole(request.resource.data.workspaceId, ['owner', 'admin', 'editor'])
+        && request.resource.data.createdBy == request.auth.uid;
+
+      // READ: workspace member (any role) OR legacy personal task owner OR admin
+      allow read: if
+        isAdmin()
+        || (resource.data.workspaceId is string && isActiveMember(resource.data.workspaceId))
+        || isLegacyPersonalTask(resource.data);
+
+      // UPDATE: workspace admin/editor OR legacy personal task owner OR admin
+      // Immutable: workspaceId and createdBy cannot change
+      allow update: if
+        (
+          isAdmin()
+          || (resource.data.workspaceId is string && hasWorkspaceRole(resource.data.workspaceId, ['owner', 'admin', 'editor']))
+          || isLegacyPersonalTask(resource.data)
+        )
+        && request.resource.data.workspaceId == resource.data.workspaceId
+        && request.resource.data.createdBy == resource.data.createdBy;
+
+      // DELETE: admin, or workspace owner/admin, or legacy owner
+      allow delete: if
+        isAdmin()
+        || (resource.data.workspaceId is string && hasWorkspaceRole(resource.data.workspaceId, ['owner', 'admin']))
+        || isLegacyPersonalTask(resource.data);
     }
 
     // journalEntries — owned by user via `userId` field

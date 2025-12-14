@@ -297,6 +297,7 @@ export async function addTaskToFirebase(task) {
       : toLocalDateKey(new Date()), // YYYY-MM-DD
     order: task?.order ?? 0,
     userId: user.uid,
+    createdBy: user.uid,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   }
