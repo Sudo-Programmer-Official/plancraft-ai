@@ -231,9 +231,19 @@ onMounted(loadData)
 
 <style scoped>
 .card {
-  @apply relative bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-lg shadow-xl;
+  position: relative;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.35);
 }
 .label {
-  @apply text-xs uppercase tracking-wide text-slate-300/80 mb-1;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(226, 232, 240, 0.8);
+  margin-bottom: 0.25rem;
 }
 </style>
