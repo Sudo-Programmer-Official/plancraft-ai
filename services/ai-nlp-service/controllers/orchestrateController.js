@@ -2,6 +2,9 @@ import { buildWorkspaceContext, searchWorkspaceMemory } from '../services/contex
 import { classifyIntent, buildOrchestrationPrompt, parseDecision } from '../services/orchestrator.js'
 import { runLlm } from '../services/llmClient.js'
 import { logAiEvent } from '../firestore/aiLogsRepository.js'
+import { ensureApp } from '../utils/firebase.js'
+import admin from 'firebase-admin'
+import { knowledgeSearch } from '../services/knowledgeSearch.js'
 
 /**
  * POST /api/ai/orchestrate
@@ -15,6 +18,8 @@ export async function orchestrate(req, res, next) {
     const source = req.body?.source || 'planner'
     const input = req.body?.input || {}
     const text = input.text || ''
+    const useKnowledge = req.body?.useKnowledge !== false
+    const docId = req.body?.docId || req.query?.docId || null
 
     if (!workspaceId) return res.status(400).json({ success: false, error: 'workspaceId required' })
     if (!text && !input.voiceUrl)
@@ -45,12 +50,24 @@ export async function orchestrate(req, res, next) {
     }
     if (memoryHits.length) context.memoryHits = memoryHits
 
+    let knowledgeHits = []
+    const knowledgeIntents = ['plan', 'recall', 'reflect', 'team', 'req_to_tasks', 'change_impact']
+    if (useKnowledge && knowledgeIntents.includes(intent)) {
+      try {
+        const knowledgeResult = await knowledgeSearch(workspaceId, text || input.voiceUrl || '', 6, docId)
+        knowledgeHits = knowledgeResult?.items || []
+      } catch (err) {
+        console.warn('[Orchestrate] knowledge search failed', err?.message || err)
+      }
+    }
+
     const { systemPrompt, userPrompt } = buildOrchestrationPrompt({
       intent,
       source,
       inputText: text,
       context,
       memory: memoryHits,
+      knowledge: knowledgeHits,
     })
 
     const llmText = await runLlm(systemPrompt, userPrompt)
@@ -65,11 +82,27 @@ export async function orchestrate(req, res, next) {
           intent,
           memoryUsed: !!memoryHits.length,
           memoryCount: memoryHits.length,
+          knowledgeUsed: !!knowledgeHits.length,
+          knowledgeCount: knowledgeHits.length,
           tasksOpen: context.tasks?.open?.length || 0,
           tasksUpcoming: context.tasks?.upcoming?.length || 0,
           tasksOverdue: context.tasks?.overdue?.length || 0,
         },
       })
+    } catch {}
+    try {
+      if (knowledgeHits.length) {
+        ensureApp()
+        const db = admin.firestore()
+        await db.collection('knowledge_usage_logs').add({
+          workspaceId,
+          userId,
+          type: 'orchestrator_snippets',
+          intent,
+          hits: knowledgeHits.length,
+          createdAt: new Date(),
+        })
+      }
     } catch {}
 
     res.json({
@@ -77,10 +110,12 @@ export async function orchestrate(req, res, next) {
       intent,
       contextUsed: {
         memory: memoryHits.length,
+        knowledge: knowledgeHits.length,
         tasks: (context.tasks?.open || []).length + (context.tasks?.upcoming || []).length + (context.tasks?.overdue || []).length,
       },
       response: decision,
       raw: llmText,
+      knowledgeHits,
     })
   } catch (err) {
     next(err)

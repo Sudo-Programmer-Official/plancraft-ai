@@ -4,6 +4,13 @@ import timezone from "dayjs/plugin/timezone.js";
 import { db } from "./firebaseAdmin.js";
 import { notifyTaskCreated } from "./notificationService.js";
 import { createReminderFromText } from "./reminderService.js";
+import {
+  ensureTaskNode,
+  ensureDocNode,
+  ensureChunkNode,
+  createEdgeIfMissing,
+  ensureRequirementNode,
+} from "./knowledge/graphWriter.js";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -337,6 +344,80 @@ export async function createTask(userId, payload = {}, options = {}) {
     } catch (err) {
       console.error("[TaskService] sendTaskNotification failed", err?.message || err);
     }
+  }
+
+  // Fire-and-forget graph population (V2.2)
+  try {
+    await ensureTaskNode({
+      workspaceId,
+      taskId: ref.id,
+      title: task.title,
+      createdBy: uid,
+    });
+    const sourceRefs = Array.isArray(metadata?.sourceRefs) ? metadata.sourceRefs : [];
+    const requirementId = metadata?.requirementId || null;
+    if (requirementId) {
+      await ensureRequirementNode({
+        workspaceId,
+        requirementId,
+        text: metadata?.requirementText || metadata?.requirementTitle || null,
+        createdBy: uid,
+      });
+      const reqNodeId = `req_${requirementId}`;
+      const taskNodeId = `task_${ref.id}`;
+      await createEdgeIfMissing({
+        workspaceId,
+        fromNodeId: taskNodeId,
+        toNodeId: reqNodeId,
+        relationType: "implements",
+        confidence: 0.7,
+      });
+      const firstDoc = sourceRefs.find((r) => r?.docId);
+      if (firstDoc?.docId) {
+        const docNodeId = firstDoc.docId;
+        await ensureDocNode({ workspaceId, docId: docNodeId, title: null, source: "doc" });
+        await createEdgeIfMissing({
+          workspaceId,
+          fromNodeId: reqNodeId,
+          toNodeId: docNodeId,
+          relationType: "derived_from",
+          confidence: Number(firstDoc.score) || 0.5,
+        });
+      }
+    }
+    if (sourceRefs.length) {
+      const taskNodeId = `task_${ref.id}`;
+      for (const refEntry of sourceRefs) {
+        if (!refEntry) continue;
+        const docId = refEntry.docId || null;
+        const chunkId = refEntry.chunkId || null;
+        const targetNodeId = chunkId ? `chunk_${chunkId}` : docId;
+        if (!targetNodeId) continue;
+        if (chunkId) {
+          await ensureChunkNode({
+            workspaceId,
+            chunkId,
+            docId: docId || null,
+            heading: refEntry.heading || null,
+          });
+        } else if (docId) {
+          await ensureDocNode({ workspaceId, docId, title: null, source: "doc" });
+        }
+        await createEdgeIfMissing({
+          workspaceId,
+          fromNodeId: taskNodeId,
+          toNodeId: targetNodeId,
+          relationType: "derived_from",
+          confidence: Number(refEntry.score) || 0.5,
+          metadata: {
+            docId,
+            chunkId,
+          },
+        });
+      }
+    }
+  } catch (err) {
+    console.warn("[TaskService] graph population skipped", err?.message || err);
   }
 
   return scheduledReminder

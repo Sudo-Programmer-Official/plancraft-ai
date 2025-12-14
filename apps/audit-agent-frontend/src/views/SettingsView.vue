@@ -7,6 +7,9 @@
     </header>
 
     <main class="max-w-4xl mx-auto space-y-10 px-1">
+      <KnowledgePanel />
+      <ProposalInbox />
+
       <!-- Plan status and usage -->
       <section class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10 max-w-md mx-auto sm:max-w-none">
         <h2 class="text-lg sm:text-xl font-semibold mb-2">🌟 Subscription</h2>
@@ -407,6 +410,8 @@ import { subscribeUserToPush } from "@/services/pwaService"
 import { useSubscriptionStore } from "@/stores/subscriptionStore"
 import { isFeatureAllowed, getRemainingAI } from "@/services/planService"
 import PlanSummaryModal from "@/components/PlanSummaryModal.vue"
+import KnowledgePanel from "@/components/KnowledgePanel.vue"
+import ProposalInbox from "@/components/ProposalInbox.vue"
 import { useIsPremium } from "@/composables/useIsPremium"
 import { trackLinkedInConversion } from '@/utils/ads'
 import { getAuth, updateProfile, updateEmail, GoogleAuthProvider, reauthenticateWithPopup, RecaptchaVerifier, PhoneAuthProvider, reauthenticateWithCredential } from 'firebase/auth'

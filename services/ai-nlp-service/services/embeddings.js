@@ -17,3 +17,17 @@ export async function embedText(text) {
   if (!vector.length) logger.error('[embeddings] empty vector returned')
   return vector
 }
+
+export async function embedTexts(texts = []) {
+  if (!Array.isArray(texts) || !texts.length) return []
+  const inputs = texts.map((t) => (t == null ? '' : String(t))).map((t) => t.slice(0, 8000))
+  const resp = await client.embeddings.create({
+    model: EMBEDDING_MODEL,
+    input: inputs,
+  })
+  const vectors = Array.isArray(resp?.data) ? resp.data.map((d) => d?.embedding || []) : []
+  if (vectors.length !== inputs.length) {
+    logger.error('[embeddings] embeddings length mismatch', { expected: inputs.length, got: vectors.length })
+  }
+  return vectors
+}

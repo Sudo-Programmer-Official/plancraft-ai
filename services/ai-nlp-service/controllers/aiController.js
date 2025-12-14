@@ -10,6 +10,7 @@ import {
   EXTRACT_EVENT_TEMPLATE,
 } from '../services/aiTemplates.js'
 import { logAi } from '../firestore/aiLogsRepository.js'
+import { embedTexts } from '../services/embeddings.js'
 
 async function handle(type, template, req, res, next) {
   try {
@@ -53,6 +54,19 @@ export async function extractEvent(req, res, next) {
     const output = await runLlm(EXTRACT_EVENT_TEMPLATE, input || 'Extract event details from this text.')
     try { await logAi({ userId: req.user?.uid || 'anon', type: 'extract_event', input, output }) } catch {}
     res.json({ success: true, output })
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function embedTextsHandler(req, res, next) {
+  try {
+    const texts = req.body?.texts
+    if (!Array.isArray(texts) || !texts.length) {
+      return res.status(400).json({ success: false, error: 'texts[] is required' })
+    }
+    const embeddings = await embedTexts(texts)
+    res.json({ success: true, embeddings })
   } catch (err) {
     next(err)
   }

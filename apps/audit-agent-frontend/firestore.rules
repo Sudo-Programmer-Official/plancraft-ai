@@ -109,6 +109,82 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // workspace_docs — uploaded/pasted knowledge sources
+    match /workspace_docs/{docId} {
+      allow read: if isAdmin() || (resource.data.workspaceId is string && isActiveMember(resource.data.workspaceId));
+      allow create: if isSignedIn()
+        && request.resource.data.workspaceId is string
+        && hasWorkspaceRole(request.resource.data.workspaceId, ['owner', 'admin', 'editor'])
+        && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if isSignedIn()
+        && resource.data.workspaceId is string
+        && hasWorkspaceRole(resource.data.workspaceId, ['owner', 'admin', 'editor']);
+      allow delete: if false;
+    }
+
+    // workspace_doc_chunks — chunked knowledge (write via backend only)
+    match /workspace_doc_chunks/{chunkId} {
+      allow read: if isAdmin() || (resource.data.workspaceId is string && isActiveMember(resource.data.workspaceId));
+      allow create, update: if isSignedIn()
+        && request.resource.data.workspaceId is string
+        && hasWorkspaceRole(request.resource.data.workspaceId, ['owner', 'admin', 'editor']);
+      allow delete: if false;
+    }
+
+    // knowledge graph nodes
+    match /workspace_knowledge_nodes/{nodeId} {
+      allow read: if isAdmin() || (resource.data.workspaceId is string && isActiveMember(resource.data.workspaceId));
+      allow create, update: if isSignedIn()
+        && request.resource.data.workspaceId is string
+        && hasWorkspaceRole(request.resource.data.workspaceId, ['owner', 'admin', 'editor']);
+      allow delete: if false;
+    }
+
+    // knowledge graph edges
+    match /workspace_knowledge_edges/{edgeId} {
+      allow read: if isAdmin() || (resource.data.workspaceId is string && isActiveMember(resource.data.workspaceId));
+      allow create, update: if isSignedIn()
+        && request.resource.data.workspaceId is string
+        && hasWorkspaceRole(request.resource.data.workspaceId, ['owner', 'admin', 'editor']);
+      allow delete: if false;
+    }
+
+    // impact proposals
+    match /impact_proposals/{id} {
+      allow read: if isAdmin() || (resource.data.workspaceId is string && isActiveMember(resource.data.workspaceId));
+      allow create, update: if isSignedIn()
+        && request.resource.data.workspaceId is string
+        && hasWorkspaceRole(request.resource.data.workspaceId, ['owner', 'admin', 'editor']);
+      allow delete: if false;
+    }
+
+    // proposal approvals
+    match /proposal_approvals/{id} {
+      allow read: if isAdmin() || (resource.data.workspaceId is string && isActiveMember(resource.data.workspaceId));
+      allow create, update: if isSignedIn()
+        && request.resource.data.workspaceId is string
+        && hasWorkspaceRole(request.resource.data.workspaceId, ['owner', 'admin', 'editor']);
+      allow delete: if false;
+    }
+
+    // approval actions
+    match /approval_actions/{id} {
+      allow read: if isAdmin() || (resource.data.workspaceId is string && isActiveMember(resource.data.workspaceId));
+      allow create, update: if isSignedIn()
+        && request.resource.data.workspaceId is string
+        && hasWorkspaceRole(request.resource.data.workspaceId, ['owner', 'admin', 'editor']);
+      allow delete: if false;
+    }
+
+    // audit log (append-only)
+    match /audit_log/{id} {
+      allow read: if isAdmin() || (resource.data.workspaceId is string && isActiveMember(resource.data.workspaceId));
+      allow create: if isSignedIn()
+        && request.resource.data.workspaceId is string
+        && hasWorkspaceRole(request.resource.data.workspaceId, ['owner', 'admin', 'editor']);
+      allow update, delete: if false;
+    }
+
     // Deny everything else by default
     match /{document=**} {
       allow read, write: if false;

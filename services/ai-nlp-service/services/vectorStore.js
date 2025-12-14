@@ -16,9 +16,10 @@ async function getIndex() {
   return index
 }
 
-export async function upsertEmbeddings(items = []) {
+export async function upsertEmbeddings(items = [], opts = {}) {
   if (!items.length) return
   const idx = await getIndex()
+  const target = opts.namespace ? idx.namespace(opts.namespace) : idx
   const records = items.map((it) => ({
     id: it.id,
     values: it.embedding,
@@ -32,15 +33,20 @@ export async function upsertEmbeddings(items = []) {
       tags: it.metadata?.tags || [],
       createdAt: it.metadata?.createdAt || null,
       sourcePath: it.metadata?.sourcePath || '',
+      docId: it.metadata?.docId || null,
+      chunkId: it.metadata?.chunkId || it.id || null,
+      chunkIndex: it.metadata?.chunkIndex ?? null,
+      heading: it.metadata?.heading || null,
     },
   }))
-  await idx.upsert(records)
+  await target.upsert(records)
 }
 
-export async function deleteEmbeddings(ids = []) {
+export async function deleteEmbeddings(ids = [], opts = {}) {
   if (!ids.length) return
   const idx = await getIndex()
-  await idx.deleteMany(ids)
+  const target = opts.namespace ? idx.namespace(opts.namespace) : idx
+  await target.deleteMany(ids)
 }
 
 export async function searchSimilar(queryEmbedding, opts = {}) {
@@ -54,7 +60,8 @@ export async function searchSimilar(queryEmbedding, opts = {}) {
     filter.type = { $in: opts.types }
   }
 
-  const res = await idx.query({
+  const target = opts.namespace ? idx.namespace(opts.namespace) : idx
+  const res = await target.query({
     topK,
     vector: queryEmbedding,
     filter,
@@ -75,6 +82,10 @@ export async function searchSimilar(queryEmbedding, opts = {}) {
       tags: m.metadata?.tags,
       createdAt: m.metadata?.createdAt,
       sourcePath: m.metadata?.sourcePath,
+      docId: m.metadata?.docId,
+      chunkId: m.metadata?.chunkId || m.id,
+      chunkIndex: m.metadata?.chunkIndex,
+      heading: m.metadata?.heading,
     },
   }))
 }

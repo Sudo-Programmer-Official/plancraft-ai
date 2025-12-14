@@ -7,6 +7,8 @@ export async function classifyIntent(text = '', source = 'planner') {
   const value = (text || '').toLowerCase()
   if (source === 'journal') return 'reflect'
   if (source === 'scan') return 'scan_followup'
+  if (/requirement|acceptance criteria|spec|prd|turn .*into tasks/i.test(value)) return 'req_to_tasks'
+  if (/impact|change|breaks|regression|risk|delta/i.test(value)) return 'change_impact'
   if (/remember|recall|where did|did we/i.test(value)) return 'recall'
   if (/what should i do|plan my day|priority|focus/i.test(value)) return 'plan'
   if (/create|add|make|schedule/i.test(value)) return 'create'
@@ -16,7 +18,7 @@ export async function classifyIntent(text = '', source = 'planner') {
   return FALLBACK_INTENT
 }
 
-export function buildOrchestrationPrompt({ intent, source, inputText, context, memory }) {
+export function buildOrchestrationPrompt({ intent, source, inputText, context, memory, knowledge }) {
   const systemPrompt = [
     'You are PlanCraft AI Planner. You are the single brain; do not defer to other bots.',
     'Use workspace context and optional memory to reason.',
@@ -42,6 +44,14 @@ export function buildOrchestrationPrompt({ intent, source, inputText, context, m
     .map((m) => `- [${m.type}] ${m.title || m.preview}`)
     .join('\n')
 
+  const knowledgeSection = (knowledge || [])
+    .map((k, idx) => {
+      const snippet = String(k.text || '').slice(0, 600)
+      const prefix = k.metadata?.heading ? `${k.metadata.heading}: ` : ''
+      return `- [${idx + 1}] ${prefix}${snippet}`
+    })
+    .join('\n')
+
   const userPrompt = [
     `Intent: ${intent}`,
     `Source: ${source}`,
@@ -62,6 +72,9 @@ export function buildOrchestrationPrompt({ intent, source, inputText, context, m
     '',
     'Relevant Workspace Memory:',
     memorySection || 'none',
+    '',
+    'Relevant knowledge snippets:',
+    knowledgeSection || 'none',
     '',
     'Respond with JSON only. Do not include markdown. Keep message concise and actionable.',
   ].join('\n')

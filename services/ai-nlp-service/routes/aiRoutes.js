@@ -9,6 +9,7 @@ import {
   generateOutreachMessage,
   ocrImage,
   extractEvent,
+  embedTextsHandler,
 } from '../controllers/aiController.js'
 import { summarizeWorkspace, workspaceInspiration } from '../controllers/workspaceController.js'
 import { deleteMemory, searchWorkspaceMemory, upsertMemory } from '../controllers/memoryController.js'
@@ -31,6 +32,7 @@ router.post('/workspace/search', searchWorkspaceMemory)
 
 // Orchestrator
 router.post('/orchestrate', orchestrate)
+router.post('/embed', embedTextsHandler)
 
 // Vector memory maintenance
 router.post('/memory/upsert', upsertMemory)
