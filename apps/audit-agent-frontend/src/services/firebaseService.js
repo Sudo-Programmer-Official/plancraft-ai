@@ -38,18 +38,13 @@ function currentWorkspaceId() {
   }
 }
 
-function resolveTasksRef(userId) {
-  const wsId = currentWorkspaceId()
-  if (userId && wsId) return collection(db, 'users', userId, 'workspaces', wsId, 'tasks')
+function resolveTasksRef() {
+  // Shared task collection keyed by workspaceId
   return tasksRef
 }
 
-function taskDocRefs(userId, taskId) {
-  const refs = []
-  const wsId = currentWorkspaceId()
-  if (userId && wsId) refs.push(doc(db, 'users', userId, 'workspaces', wsId, 'tasks', taskId))
-  refs.push(doc(db, 'tasks', taskId))
-  return refs
+function taskDocRef(taskId) {
+  return doc(db, 'tasks', taskId)
 }
 
 function mapTaskDoc(docSnap) {
@@ -156,24 +151,28 @@ export async function fetchTasksForToday() {
   if (!user) return [];
 
   const today = toLocalDateKey(new Date()); // YYYY-MM-DD local
+  const wsId = currentWorkspaceId()
+  if (!wsId) return []
 
-  const scopedTasks = resolveTasksRef(user.uid)
+  const scopedTasks = resolveTasksRef()
   const q = query(
     scopedTasks,
-    where("userId", "==", user.uid),
+    where("workspaceId", "==", wsId),
     where("date", "==", today),
     orderBy("order", "asc")
   );
 
   let snapshot = await safeAction(getDocs(q));
-  if (!snapshot.size && scopedTasks !== tasksRef) {
-    const fallback = query(
-      tasksRef,
+  if (!snapshot.size) {
+    // Legacy personal tasks without workspaceId
+    const legacy = query(
+      scopedTasks,
+      where('workspaceId', '==', null),
       where('userId', '==', user.uid),
       where('date', '==', today),
       orderBy('order', 'asc'),
     )
-    snapshot = await safeAction(getDocs(fallback))
+    snapshot = await safeAction(getDocs(legacy))
   }
   return snapshot.docs.map(mapTaskDoc);
 }
@@ -184,22 +183,25 @@ export async function fetchTasksForToday() {
 export async function fetchTasksByDate(dateStr) {
   const user = auth.currentUser;
   if (!user) return [];
-  const scopedTasks = resolveTasksRef(user.uid)
+  const wsId = currentWorkspaceId()
+  if (!wsId) return []
+  const scopedTasks = resolveTasksRef()
   const qy = query(
     scopedTasks,
-    where('userId', '==', user.uid),
+    where('workspaceId', '==', wsId),
     where('date', '==', dateStr),
     orderBy('order', 'asc'),
   )
   let snap = await safeAction(getDocs(qy))
-  if (!snap.size && scopedTasks !== tasksRef) {
-    const fallback = query(
-      tasksRef,
+  if (!snap.size) {
+    const legacy = query(
+      scopedTasks,
+      where('workspaceId', '==', null),
       where('userId', '==', user.uid),
       where('date', '==', dateStr),
       orderBy('order', 'asc'),
     )
-    snap = await safeAction(getDocs(fallback))
+    snap = await safeAction(getDocs(legacy))
   }
   return snap.docs.map(mapTaskDoc)
 }
@@ -210,26 +212,29 @@ export async function fetchTasksByDate(dateStr) {
 export async function fetchTasksBetween(startYMD, endYMD) {
   const user = auth.currentUser;
   if (!user) return [];
-  const scopedTasks = resolveTasksRef(user.uid)
+  const wsId = currentWorkspaceId()
+  if (!wsId) return []
+  const scopedTasks = resolveTasksRef()
   const qy = query(
     scopedTasks,
-    where('userId', '==', user.uid),
+    where('workspaceId', '==', wsId),
     where('date', '>=', startYMD),
     where('date', '<=', endYMD),
     orderBy('date', 'asc'),
     orderBy('order', 'asc'),
   )
   let snap = await safeAction(getDocs(qy))
-  if (!snap.size && scopedTasks !== tasksRef) {
-    const fallback = query(
-      tasksRef,
+  if (!snap.size) {
+    const legacy = query(
+      scopedTasks,
+      where('workspaceId', '==', null),
       where('userId', '==', user.uid),
       where('date', '>=', startYMD),
       where('date', '<=', endYMD),
       orderBy('date', 'asc'),
       orderBy('order', 'asc'),
     )
-    snap = await safeAction(getDocs(fallback))
+    snap = await safeAction(getDocs(legacy))
   }
   return snap.docs.map(mapTaskDoc)
 }
@@ -274,6 +279,8 @@ export async function addTaskToFirebase(task) {
     handleAuthError({ code: 'unauthenticated', message: 'User not logged in' })
     throw new Error("User not logged in");
   }
+  const wsId = currentWorkspaceId()
+  if (!wsId) throw new Error('No active workspace selected')
 
   // Prepare safe payload
   const payload = {
@@ -324,8 +331,8 @@ export async function addTaskToFirebase(task) {
   }
   if ('meta' in task) payload.timeMeta = task.meta || null
 
-  const scopedTasks = resolveTasksRef(user.uid)
-  payload.workspaceId = currentWorkspaceId() || null
+  const scopedTasks = resolveTasksRef()
+  payload.workspaceId = wsId
   const docRef = await safeAction(addDoc(scopedTasks, payload));
 
   const notifyMeta = await syncTaskNotification(user.uid, docRef.id, payload)
@@ -358,23 +365,16 @@ export async function updateTaskInFirebase(task) {
     handleAuthError({ code: 'unauthenticated', message: 'User not logged in' })
     throw new Error('User not logged in')
   }
+  const wsId = currentWorkspaceId()
+  if (!wsId) throw new Error('No active workspace selected')
   const { id, createdAt, ...updates } = task
   const justCompleted = updates.completed === true
-  updates.workspaceId = updates.workspaceId || currentWorkspaceId() || null
-  let lastError = null
-  for (const ref of taskDocRefs(user.uid, id)) {
-    try {
-      await safeAction(updateDoc(ref, {
-        ...updates,
-        updatedAt: serverTimestamp(),
-      }))
-      lastError = null
-      break
-    } catch (err) {
-      lastError = err
-    }
-  }
-  if (lastError) throw lastError
+  updates.workspaceId = updates.workspaceId || wsId
+  const ref = taskDocRef(id)
+  await safeAction(updateDoc(ref, {
+    ...updates,
+    updatedAt: serverTimestamp(),
+  }))
   if (justCompleted) {
     try {
       console.log('[HabitTracker] frontend completion hook', { taskId: id })
@@ -401,17 +401,8 @@ export async function deleteTaskFromFirebase(taskId) {
     handleAuthError({ code: 'unauthenticated', message: 'User not logged in' })
     throw new Error('User not logged in')
   }
-  let lastError = null
-  for (const ref of taskDocRefs(user.uid, taskId)) {
-    try {
-      await safeAction(deleteDoc(ref))
-      lastError = null
-      break
-    } catch (err) {
-      lastError = err
-    }
-  }
-  if (lastError) throw lastError
+  const ref = taskDocRef(taskId)
+  await safeAction(deleteDoc(ref))
 }
 
 /**
