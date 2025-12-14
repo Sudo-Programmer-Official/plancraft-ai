@@ -250,6 +250,7 @@ async function syncTaskNotification(userId, taskId, payload) {
         id: taskId,
         title: payload.title,
         details: payload.details,
+        workspaceId: payload.workspaceId || currentWorkspaceId() || null,
         date: payload.date,
         reminderTime: payload.reminderTime ?? null,
         scheduledTime: payload.scheduledTime ?? null,

@@ -12,6 +12,7 @@ import { getCalendarAdapter } from "./calendarAdapters/index.js";
 import { createTask, scheduleTaskReminder } from "./taskService.js";
 import { sendCalendarDigestNotification } from "./notificationService.js";
 import { queueReminder } from "./reminderService.js";
+import { listUserWorkspaces } from "./workspaceService.js";
 import { db } from "./firebaseAdmin.js";
 
 dayjs.extend(utc);
@@ -236,8 +237,24 @@ function buildTaskMetadata(event, timing, provider) {
   };
 }
 
+async function resolveWorkspaceIdForUser(userId, hint) {
+  if (hint) return hint;
+  try {
+    const workspaces = await listUserWorkspaces(userId);
+    return workspaces?.[0]?.id || null;
+  } catch (err) {
+    log("workspace resolve failed", err?.message || err);
+    return null;
+  }
+}
+
 async function createTaskFromEvent(userId, event, provider, meetingSettings = {}) {
   const timing = computeTimingFromEvent(event, meetingSettings);
+  const workspaceId =
+    meetingSettings.workspaceId ||
+    meetingSettings.workspace_id ||
+    meetingSettings.defaultWorkspaceId ||
+    null;
   const payload = {
     title: buildTaskTitle(event),
     details: buildDetailsFromEvent(event, timing),
@@ -245,8 +262,12 @@ async function createTaskFromEvent(userId, event, provider, meetingSettings = {}
     date: timing.date,
     reminderTime: timing.time,
     link: event.joinUrl || event.eventUrl || event.raw?.htmlLink || "",
-    metadata: buildTaskMetadata(event, timing, provider),
+    metadata: {
+      ...buildTaskMetadata(event, timing, provider),
+      workspaceId,
+    },
     source: provider,
+    workspaceId,
   };
 
   const task = await createTask(userId, payload, {
@@ -254,6 +275,8 @@ async function createTaskFromEvent(userId, event, provider, meetingSettings = {}
     silent: true,
     skipReminder: true,
     timezone: timing.timezone,
+    workspaceId,
+    resolveWorkspaceId: async () => resolveWorkspaceIdForUser(userId, workspaceId),
   });
   const reminderContext = {
     meetingLink: event.joinUrl || null,
@@ -267,6 +290,15 @@ async function createTaskFromEvent(userId, event, provider, meetingSettings = {}
 
 async function updateTaskFromEvent(userId, task, event, provider, meetingSettings = {}) {
   const timing = computeTimingFromEvent(event, meetingSettings);
+  let workspaceId =
+    task.workspaceId ||
+    meetingSettings.workspaceId ||
+    meetingSettings.workspace_id ||
+    meetingSettings.defaultWorkspaceId ||
+    null;
+  if (!workspaceId) {
+    workspaceId = await resolveWorkspaceIdForUser(userId, null);
+  }
   const updates = {};
   const desiredTitle = buildTaskTitle(event);
   if ((task.title || "").trim() !== desiredTitle) updates.title = desiredTitle;
@@ -286,7 +318,11 @@ async function updateTaskFromEvent(userId, task, event, provider, meetingSetting
     if (newLink) updates.link = newLink;
     else updates.link = null;
   }
-  updates.metadata = buildTaskMetadata(event, timing, provider);
+  updates.metadata = {
+    ...buildTaskMetadata(event, timing, provider),
+    workspaceId: workspaceId || task.workspaceId || null,
+  };
+  updates.workspaceId = workspaceId || task.workspaceId || null;
   updates.updatedAt = new Date();
   await db.collection("tasks").doc(task.id).set(updates, { merge: true });
   const mergedTask = { ...task, ...updates };
@@ -311,6 +347,16 @@ async function syncEventsToTasksFromStore(
   if (!events.length) return stats;
   const createdForDigest = [];
   const autoCreateTasks = meetingSettings.autoCreate !== false;
+  const defaultWorkspaceId =
+    meetingSettings.workspaceId ||
+    meetingSettings.workspace_id ||
+    meetingSettings.defaultWorkspaceId ||
+    (await resolveWorkspaceIdForUser(userId, null));
+  const meetingSettingsWithWorkspace = {
+    ...meetingSettings,
+    defaultWorkspaceId,
+    workspaceId: meetingSettings.workspaceId || meetingSettings.workspace_id || defaultWorkspaceId || null,
+  };
 
   for (const event of events) {
     try {
@@ -345,7 +391,7 @@ async function syncEventsToTasksFromStore(
           userId,
           event,
           provider,
-          meetingSettings,
+          meetingSettingsWithWorkspace,
         );
         await linkEventToTask(
           userId,
@@ -373,7 +419,13 @@ async function syncEventsToTasksFromStore(
         continue;
       }
 
-      const updatedTask = await updateTaskFromEvent(userId, task, event, provider, meetingSettings);
+      const updatedTask = await updateTaskFromEvent(
+        userId,
+        task,
+        event,
+        provider,
+        meetingSettingsWithWorkspace,
+      );
       await linkEventToTask(
         userId,
         provider,

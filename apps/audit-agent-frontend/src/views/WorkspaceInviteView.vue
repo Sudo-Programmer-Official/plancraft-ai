@@ -71,7 +71,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getInviteDetails, acceptInvite } from '@/services/workspaceService'
@@ -102,6 +102,19 @@ onMounted(() => {
   loadInvite()
 })
 
+watch(
+  () => ({
+    authed: isAuthenticated.value,
+    inviteLoaded: !loading.value && !!invite.value,
+    inactive: inviteInactive.value,
+  }),
+  (state) => {
+    if (state.authed && state.inviteLoaded && !state.inactive && !accepted.value && !acceptLoading.value) {
+      handleAccept({ auto: true })
+    }
+  },
+)
+
 async function loadInvite() {
   if (!token.value) {
     error.value = 'Missing invite token'
@@ -126,7 +139,8 @@ async function loadInvite() {
   }
 }
 
-async function handleAccept() {
+async function handleAccept(options = {}) {
+  const auto = options?.auto === true
   if (!isAuthenticated.value) {
     goToLogin()
     return
@@ -142,9 +156,13 @@ async function handleAccept() {
       await workspaceStore.setActive(result.workspace.id)
     }
     ElMessage.success(`You're now part of ${result?.workspace?.name || 'this workspace'}`)
-    setTimeout(() => router.push('/dashboard'), 500)
+    await router.push('/workspaces')
   } catch (err) {
-    error.value = err?.response?.data?.error || err?.message || 'Failed to accept invite'
+    if (auto && (err?.response?.status === 410 || err?.response?.status === 404)) {
+      error.value = err?.response?.data?.error || err?.message || 'Invite not available'
+    } else {
+      error.value = err?.response?.data?.error || err?.message || 'Failed to accept invite'
+    }
   } finally {
     acceptLoading.value = false
   }

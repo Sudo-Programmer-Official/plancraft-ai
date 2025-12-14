@@ -64,6 +64,27 @@ function sanitizeInvite(invite) {
   return rest;
 }
 
+async function logInviteEmailAttempt(payload = {}) {
+  try {
+    const now = new Date();
+    await db.collection("email_logs").add({
+      source: "workspace_invite",
+      created_at: now,
+      updated_at: now,
+      workspaceId: payload.workspaceId || null,
+      inviteId: payload.inviteId || null,
+      invitedBy: payload.invitedBy || null,
+      recipient: payload.recipient || null,
+      status: payload.status || null,
+      providerStatus: payload.providerStatus || null,
+      error: payload.error || null,
+      tokenSnippet: payload.tokenSnippet || null,
+    });
+  } catch (err) {
+    console.warn("[WorkspaceInvite] failed to log email event", err?.message || err);
+  }
+}
+
 router.post("/workspaces", requireAuth, async (req, res) => {
   try {
     const { name, icon, theme, timezone, workspaceType = "team", description = "" } = req.body || {};
@@ -115,7 +136,7 @@ router.get("/workspaces/:workspaceId/members", requireAuth, requireWorkspaceRole
   }
 });
 
-router.post("/workspaces/:workspaceId/invite", requireAuth, requireWorkspaceRole(["admin"]), async (req, res) => {
+async function createInviteHandler(req, res) {
   try {
     const { email, role = "editor", expiresInDays = 7 } = req.body || {};
     if (!email) return res.status(400).json({ error: "Email is required" });
@@ -142,6 +163,7 @@ router.post("/workspaces/:workspaceId/invite", requireAuth, requireWorkspaceRole
     let emailStatus = "skipped";
     let emailError = null;
     let emailProviderStatus = null;
+    const tokenSnippet = invite?.token ? `${String(invite.token).slice(0, 6)}…` : null;
 
     if (inviteLink && (invite.emailLower || invite.email)) {
       try {
@@ -193,6 +215,17 @@ router.post("/workspaces/:workspaceId/invite", requireAuth, requireWorkspaceRole
       console.warn("[WorkspaceInvite] failed to persist email status", err?.message || err);
     }
 
+    await logInviteEmailAttempt({
+      workspaceId: req.workspaceId,
+      inviteId: invite.id,
+      invitedBy: req.user.uid,
+      recipient: invite.emailLower || invite.email,
+      status: emailStatus,
+      providerStatus: emailProviderStatus,
+      error: emailError,
+      tokenSnippet,
+    });
+
     const safeInvite = sanitizeInvite({ ...invite, emailStatus, emailError, emailProviderStatus });
     return res.status(emailStatus === "failed" ? 202 : 201).json({
       invite: safeInvite,
@@ -205,7 +238,10 @@ router.post("/workspaces/:workspaceId/invite", requireAuth, requireWorkspaceRole
     console.error("[WorkspaceRoutes] invite failed", err?.message || err);
     return res.status(500).json({ error: "Failed to send invite" });
   }
-});
+}
+
+router.post("/workspaces/:workspaceId/invite", requireAuth, requireWorkspaceRole(["admin"]), createInviteHandler);
+router.post("/workspaces/:workspaceId/invites", requireAuth, requireWorkspaceRole(["admin"]), createInviteHandler);
 
 async function inviteLookupHandler(req, res) {
   try {

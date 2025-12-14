@@ -1,4 +1,5 @@
 import api from '@/services/api'
+import { useWorkspaceStore } from '@/stores/workspaceStore'
 
 function normalizeHistory(history = []) {
   if (!Array.isArray(history)) return []
@@ -18,6 +19,19 @@ function normalizeHistory(history = []) {
 
 export async function queryPlannerAssistant(query, options = {}) {
   const text = typeof query === 'string' ? query : String(query || '')
+  let workspaceId = options.workspaceId
+  if (!workspaceId) {
+    try {
+      const store = useWorkspaceStore()
+      workspaceId = store?.activeWorkspaceId || localStorage.getItem('activeWorkspaceId') || null
+    } catch {
+      try {
+        workspaceId = localStorage.getItem('activeWorkspaceId')
+      } catch {
+        workspaceId = null
+      }
+    }
+  }
   const payload = {
     message: text,
     query: text,
@@ -25,6 +39,7 @@ export async function queryPlannerAssistant(query, options = {}) {
     history: normalizeHistory(options.history),
     clientTimezone: options.clientTimezone,
     clientNow: options.clientNow,
+    workspaceId,
   }
 
   try {

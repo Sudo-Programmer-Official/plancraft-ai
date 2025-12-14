@@ -1,5 +1,6 @@
 import express from "express";
 import { requireAuth, ensureUserMatches } from "../middleware/auth.js";
+import { requireWorkspaceRole } from "../middleware/workspace.js";
 import { chatWithFallback } from "../services/openaiService.js";
 import {
   buildUserContext,
@@ -13,7 +14,18 @@ const router = express.Router();
 
 router.use(requireAuth, ensureUserMatches);
 
-router.post("/chat", async (req, res) => {
+const selectWorkspaceId = (req) =>
+  req.body?.workspaceId ||
+  req.body?.workspace_id ||
+  req.headers?.["x-workspace-id"] ||
+  req.query?.workspaceId ||
+  req.query?.workspace_id ||
+  null;
+
+router.post(
+  "/chat",
+  requireWorkspaceRole(["viewer", "editor", "admin"], { workspaceIdSelector: selectWorkspaceId }),
+  async (req, res) => {
   try {
     const {
       message,
@@ -24,8 +36,12 @@ router.post("/chat", async (req, res) => {
       inputMode,
       voicePreview,
     } = req.body || {};
+    const workspaceId = selectWorkspaceId(req);
     if (!userId || !message) {
       return res.status(400).json({ error: "Missing message or userId" });
+    }
+    if (!workspaceId) {
+      return res.status(400).json({ error: "workspaceId is required" });
     }
 
     const clientNowIso =
@@ -55,6 +71,7 @@ router.post("/chat", async (req, res) => {
       profile: {
         ...initialContext.profile,
         timezone: timezoneOverride,
+        activeWorkspaceId: workspaceId,
       },
       runtime: {
         clientTimezone: timezoneOverride,
@@ -62,7 +79,9 @@ router.post("/chat", async (req, res) => {
         lastMessage: message,
         inputMode: inputMode || null,
         voiceSnippet: voicePreview || null,
+        workspaceId,
       },
+      workspaceId,
     };
 
     const systemPrompt = `
@@ -157,8 +176,10 @@ Only include the JSON block when an action is required. Use IDs from the context
           profile: {
             ...refreshed.profile,
             timezone: context.runtime?.clientTimezone || refreshed.profile?.timezone || refreshed.profile?.tz || timezoneOverride,
+            activeWorkspaceId: workspaceId,
           },
-          runtime: { ...context.runtime },
+          runtime: { ...context.runtime, workspaceId },
+          workspaceId,
         };
         console.log("[PlannerTask] uiUpdated=✅", {
           userId,

@@ -1174,10 +1174,23 @@ async function createTaskFromAction(uid, payload = {}, context = {}) {
         continue;
       }
 
+      const workspaceId =
+        candidate.workspaceId ||
+        payload.workspaceId ||
+        context?.workspaceId ||
+        context?.profile?.activeWorkspaceId ||
+        context?.runtime?.workspaceId ||
+        null;
+      if (workspaceId) {
+        candidate.workspaceId = workspaceId;
+      }
+
       const task = await createTask(uid, candidate, {
         origin: "planner-assistant",
         silent: candidate.silent === true,
         notificationOptions: { reason: "planner-assistant" },
+        workspaceId,
+        resolveWorkspaceId: async () => workspaceId,
       });
       console.log("[PlannerTask] taskCreated=✅", {
         userId: uid,

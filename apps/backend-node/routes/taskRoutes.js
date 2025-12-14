@@ -1,5 +1,6 @@
 import express from "express";
 import { requireAuth, ensureUserMatches } from "../middleware/auth.js";
+import { requireWorkspaceRole } from "../middleware/workspace.js";
 import { createTask, scheduleTaskReminder } from "../services/taskService.js";
 import { notifyTaskCreated } from "../services/notificationService.js";
 import { db } from "../services/firebaseAdmin.js";
@@ -8,10 +9,23 @@ const router = express.Router();
 
 router.use(requireAuth, ensureUserMatches);
 
+const selectWorkspaceId = (req) =>
+  req.body?.workspaceId ||
+  req.body?.workspace_id ||
+  req.headers?.["x-workspace-id"] ||
+  req.query?.workspaceId ||
+  req.query?.workspace_id ||
+  null;
+
+const requireWorkspaceEditor = requireWorkspaceRole(["editor", "admin"], {
+  workspaceIdSelector: selectWorkspaceId,
+});
+
 function toTaskPayload(task = {}) {
   if (!task || typeof task !== "object") return {};
   return {
     id: task.id || null,
+    workspaceId: task.workspaceId || task.workspace_id || null,
     title: task.title || task.text || "Untitled Task",
     details: task.details || task.description || "",
     date: task.date || task.dueDate || null,
@@ -27,12 +41,14 @@ function toTaskPayload(task = {}) {
   };
 }
 
-router.post("/create", async (req, res) => {
+router.post("/create", requireWorkspaceEditor, async (req, res) => {
   try {
     const { userId, options = {}, ...payload } = req.body || {};
     if (!userId) return res.status(400).json({ error: "Missing userId" });
+    const workspaceId = selectWorkspaceId(req);
+    if (!workspaceId) return res.status(400).json({ error: "workspaceId is required" });
 
-    const task = await createTask(userId, payload, options);
+    const task = await createTask(userId, { ...payload, workspaceId }, { ...options, workspaceId });
     return res.json({ success: true, task });
   } catch (err) {
     console.error("[TaskRoutes] create failed", err?.message || err);
@@ -40,12 +56,15 @@ router.post("/create", async (req, res) => {
   }
 });
 
-router.post("/announce", async (req, res) => {
+router.post("/announce", requireWorkspaceEditor, async (req, res) => {
   try {
     const { userId, task, schedule = true, notificationOptions = {}, clientNow } = req.body || {};
     if (!userId || !task) return res.status(400).json({ error: "Missing userId or task" });
+    const workspaceId = selectWorkspaceId(req);
+    if (!workspaceId) return res.status(400).json({ error: "workspaceId is required" });
 
     const base = toTaskPayload(task);
+    base.workspaceId = base.workspaceId || workspaceId;
     if (!base.title && base.id) {
       try {
         const snap = await db.collection("tasks").doc(String(base.id)).get();

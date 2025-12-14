@@ -241,6 +241,18 @@ export async function createTask(userId, payload = {}, options = {}) {
   const uid = sanitizeString(String(userId || ""), "").trim();
   if (!uid) throw new Error("Missing userId for task creation");
 
+  let workspaceId = payload.workspaceId || payload.workspace_id || options.workspaceId || null;
+  if (!workspaceId && typeof options.resolveWorkspaceId === "function") {
+    try {
+      workspaceId = await options.resolveWorkspaceId(uid, payload, options);
+    } catch (err) {
+      console.warn("[TaskService] workspace resolver failed", err?.message || err);
+    }
+  }
+  if (!workspaceId) {
+    throw new Error("workspaceId is required for task creation");
+  }
+
   const now = new Date();
   const title =
     sanitizeString(payload.title, "") ||
@@ -275,6 +287,7 @@ export async function createTask(userId, payload = {}, options = {}) {
     timezone: payload.timezone || options.timezone || null,
     source: sanitizeString(payload.source || options.origin || "planner-assistant", "planner-assistant"),
     userId: uid,
+    workspaceId,
     createdAt: now,
     updatedAt: now,
   };
