@@ -5,6 +5,7 @@
     :width="dialogWidth"
     :close-on-click-modal="false"
     class="link-editor-dialog"
+    modal-class="link-editor-dialog-overlay"
     @closed="handleClose"
   >
     <div class="space-y-4">
@@ -20,7 +21,6 @@
               :value="cat.name"
             />
           </el-select>
-          <el-input v-model="form.icon" placeholder="🔗" class="sm:col-span-1" />
           <el-switch
             v-model="form.starred"
             active-text="Starred"
@@ -143,32 +143,37 @@ function handleClose() {
 </script>
 
 <style lang="scss">
-.link-editor-dialog .el-dialog {
-  background: radial-gradient(circle at 10% 20%, rgba(79, 70, 229, 0.12), transparent 25%),
-    radial-gradient(circle at 90% 10%, rgba(56, 189, 248, 0.12), transparent 25%),
+:global(.link-editor-dialog-overlay) {
+  backdrop-filter: blur(10px);
+  background: rgba(7, 10, 21, 0.6);
+}
+
+:global(.link-editor-dialog .el-dialog) {
+  background: radial-gradient(circle at 10% 20%, rgba(79, 70, 229, 0.14), transparent 28%),
+    radial-gradient(circle at 90% 10%, rgba(56, 189, 248, 0.14), transparent 28%),
     linear-gradient(135deg, #0f172a, #0b1224);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.4);
   color: #e5e7eb;
 }
 
-.link-editor-dialog .el-dialog__title {
+:global(.link-editor-dialog .el-dialog__title) {
   color: #f8fafc;
   font-weight: 700;
   letter-spacing: 0.02em;
 }
 
-.link-editor-dialog .el-input__wrapper,
-.link-editor-dialog .el-textarea__inner,
-.link-editor-dialog .el-select__wrapper {
+:global(.link-editor-dialog .el-input__wrapper),
+:global(.link-editor-dialog .el-textarea__inner),
+:global(.link-editor-dialog .el-select__wrapper) {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: none;
   color: #e5e7eb;
 }
 
-.link-editor-dialog .el-input__inner::placeholder,
-.link-editor-dialog .el-textarea__inner::placeholder {
+:global(.link-editor-dialog .el-input__inner::placeholder),
+:global(.link-editor-dialog .el-textarea__inner::placeholder) {
   color: rgba(226, 232, 240, 0.6);
 }
 </style>
