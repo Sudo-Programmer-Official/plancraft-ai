@@ -58,7 +58,8 @@ app.get('/debug/workspace', verifyAuth, (req, res) => {
 })
 
 // Support multiple base paths to tolerate different gateway rewrites (/api/ai, /ai, /api)
-['/api/ai', '/ai', '/api/ai/', '/api', '/'].forEach((base) => {
+const BASE_PATHS = ['/api/ai', '/ai', '/api/ai/', '/api', '/']
+BASE_PATHS.forEach((base) => {
   app.use(base, verifyAuth, aiRoutes)
 })
 // Explicit aliases to survive any path rewriting that forwards the full path
