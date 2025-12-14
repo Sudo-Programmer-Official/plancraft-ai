@@ -3,7 +3,7 @@
   <FeedbackPrompt />
   <FeedbackDrawer />
   <div
-    class="flex min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 text-white"
+    class="flex min-h-screen w-full max-w-full overflow-x-hidden bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 text-white"
   >
     <!-- Global upgrade banner -->
     <!-- Global Upgrade Banner -->
@@ -370,7 +370,7 @@
     </transition>
 
     <!-- Main Content -->
-    <div class="flex-1 flex flex-col w-full h-screen">
+    <div class="flex-1 flex flex-col w-full max-w-full h-screen overflow-x-hidden">
       <!-- Header -->
       <header
         class="sticky top-0 z-10 bg-gray-950/60 backdrop-blur-xl border-b border-gray-800 p-4 flex justify-between items-center w-full"
@@ -394,7 +394,7 @@
         </div>
 
         <!-- Right Section -->
-        <div class="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+        <div class="flex flex-wrap items-center gap-2 sm:gap-4 min-w-0">
           <!-- Talk to Planner shortcut -->
           <button
             @click="goToTalkPlanner"
@@ -482,7 +482,7 @@
       </header>
 
       <!-- Dynamic content -->
-      <main class="p-6 flex-1 overflow-y-auto scrollbar-plan">
+      <main class="p-6 flex-1 overflow-y-auto overflow-x-hidden scrollbar-plan">
         <RouterView />
       </main>
       <!-- Compact sticky footer -->

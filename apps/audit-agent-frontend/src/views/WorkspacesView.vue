@@ -1,30 +1,30 @@
 <template>
-  <div class="min-h-screen w-full max-w-full overflow-x-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-50">
-    <div class="w-full max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8">
-      <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div class="space-y-2">
+  <div class="min-h-screen w-full max-w-full min-w-0 overflow-x-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-50 box-border">
+    <div class="w-full max-w-6xl min-w-0 mx-auto px-4 sm:px-6 py-8 space-y-8">
+      <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 w-full max-w-full min-w-0">
+        <div class="space-y-2 min-w-0">
           <p class="text-xs uppercase tracking-[0.3em] text-indigo-300/80">Workspaces</p>
           <h1 class="text-3xl font-bold">Your universes inside PlanCraft</h1>
           <p class="text-slate-300 max-w-3xl text-sm sm:text-base">
             Switch contexts without losing focus. Every workspace keeps its own tasks, drafts, events, and AI memory.
           </p>
         </div>
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2 min-w-0 w-full sm:w-auto">
           <button
-            class="px-4 py-2 rounded-lg border border-slate-700 bg-slate-900/70 hover:bg-slate-800 text-sm font-semibold"
+            class="px-4 py-2 rounded-lg border border-slate-700 bg-slate-900/70 hover:bg-slate-800 text-sm font-semibold w-full sm:w-auto"
             @click="refresh"
           >
             Refresh
           </button>
           <button
             v-if="canManageMembers && activeWorkspaceId"
-            class="px-4 py-2 rounded-lg border border-indigo-400/60 bg-indigo-500/10 hover:bg-indigo-500/20 text-sm font-semibold text-indigo-100"
+            class="px-4 py-2 rounded-lg border border-indigo-400/60 bg-indigo-500/10 hover:bg-indigo-500/20 text-sm font-semibold text-indigo-100 w-full sm:w-auto"
             @click="openInviteModal()"
           >
             Share workspace
           </button>
           <button
-            class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold shadow-lg shadow-indigo-900/40"
+            class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold shadow-lg shadow-indigo-900/40 w-full sm:w-auto"
             @click="openCreate"
           >
             + Create workspace
@@ -32,8 +32,8 @@
         </div>
       </header>
 
-      <section class="grid gap-4 lg:grid-cols-3 w-full max-w-full">
-        <div class="lg:col-span-2 space-y-4 w-full max-w-full">
+      <section class="grid gap-4 lg:grid-cols-3 w-full max-w-full min-w-0">
+        <div class="lg:col-span-2 space-y-4 w-full max-w-full min-w-0">
           <div
             v-if="!workspaces.length && workspaceStore.loading"
             class="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 text-slate-400"
@@ -57,11 +57,11 @@
             </button>
           </div>
 
-          <div class="grid sm:grid-cols-2 gap-3 w-full max-w-full">
+          <div class="grid sm:grid-cols-2 gap-3 w-full max-w-full min-w-0">
             <article
               v-for="ws in workspaces"
               :key="ws.id"
-              class="w-full max-w-full rounded-2xl border bg-slate-900/70 p-4 space-y-3 transition hover:-translate-y-0.5 overflow-hidden box-border"
+              class="w-full max-w-full min-w-0 rounded-2xl border bg-slate-900/70 p-4 space-y-3 transition hover:-translate-y-0.5 overflow-hidden box-border"
               :class="workspaceCardClass(ws)"
             >
               <div class="flex items-start justify-between gap-2 min-w-0">
@@ -93,9 +93,9 @@
                 <span>Theme: {{ ws.color }}</span>
               </div>
 
-              <div class="flex min-w-0 flex-wrap items-center gap-2">
+              <div class="flex min-w-0 flex-wrap items-center gap-2 w-full">
                 <button
-                  class="flex-1 px-3 py-2 rounded-lg bg-indigo-600 text-sm font-semibold hover:bg-indigo-500"
+                  class="flex-1 min-w-[160px] sm:min-w-0 px-3 py-2 rounded-lg bg-indigo-600 text-sm font-semibold hover:bg-indigo-500 w-full sm:w-auto"
                   :disabled="activeWorkspaceId === ws.id"
                   @click="switchWorkspace(ws.id)"
                 >
@@ -103,13 +103,13 @@
                 </button>
                 <button
                   v-if="ws.role === 'admin'"
-                  class="px-3 py-2 rounded-lg border border-indigo-300/60 text-sm text-indigo-100 hover:bg-indigo-600/10"
+                  class="px-3 py-2 rounded-lg border border-indigo-300/60 text-sm text-indigo-100 hover:bg-indigo-600/10 w-full sm:w-auto"
                   @click="openInviteModal(ws)"
                 >
                   Members
                 </button>
                 <button
-                  class="px-3 py-2 rounded-lg border border-slate-700 text-sm hover:border-indigo-400"
+                  class="px-3 py-2 rounded-lg border border-slate-700 text-sm hover:border-indigo-400 w-full sm:w-auto"
                   @click="editWorkspace(ws)"
                 >
                   Edit
@@ -119,12 +119,12 @@
           </div>
         </div>
 
-        <aside class="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 space-y-4 h-fit">
-          <div class="flex items-center gap-3">
+        <aside class="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 space-y-4 h-fit w-full max-w-full min-w-0">
+          <div class="flex items-center gap-3 min-w-0">
             <div class="w-12 h-12 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-2xl">
               {{ activeWorkspace?.icon || '📦' }}
             </div>
-            <div>
+            <div class="min-w-0">
               <p class="text-xs uppercase tracking-[0.2em] text-indigo-300/80">Active</p>
               <p class="text-lg font-semibold">{{ activeWorkspace?.name || 'Personal' }}</p>
               <p class="text-xs text-slate-400">Data is scoped to this workspace.</p>
@@ -133,7 +133,7 @@
           <ul class="space-y-2 text-sm text-slate-300">
             <li class="flex items-start gap-2">
               <span>✅</span>
-              <span>Planner tasks save to <code class="text-indigo-200">/workspaces/{{ activeWorkspaceId || '...' }}/tasks</code></span>
+              <span class="break-words">Planner tasks save to <code class="text-indigo-200 break-all">/workspaces/{{ activeWorkspaceId || '...' }}/tasks</code></span>
             </li>
             <li class="flex items-start gap-2">
               <span>📝</span>
@@ -153,9 +153,9 @@
         </aside>
       </section>
 
-      <section id="workspace-members" class="pb-8">
-        <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 space-y-4">
-          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <section id="workspace-members" class="pb-8 w-full max-w-full min-w-0">
+        <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 space-y-4 w-full max-w-full min-w-0">
+          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 min-w-0">
             <div>
               <p class="text-xs uppercase tracking-[0.3em] text-indigo-300/80">Members</p>
               <h2 class="text-xl font-semibold text-slate-100">
@@ -198,19 +198,19 @@
               <div
                 v-for="member in members"
                 :key="member.userId"
-                class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-slate-800 rounded-xl p-3 bg-slate-900/60"
+                class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-slate-800 rounded-xl p-3 bg-slate-900/60 min-w-0"
               >
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-3 min-w-0">
                   <div class="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-sm font-semibold uppercase text-indigo-100">
                     {{ (member.name || member.email || 'M').slice(0, 2) }}
                   </div>
-                  <div>
+                  <div class="min-w-0">
                     <p class="font-semibold text-slate-100">
                       {{ member.name || member.email || 'Member' }}
                       <span v-if="member.userId === currentUserId" class="text-xs text-emerald-300 ml-1">(You)</span>
                     </p>
                     <p class="text-xs text-slate-400">
-                      {{ member.email || 'No email on file' }}
+                      <span class="break-words">{{ member.email || 'No email on file' }}</span>
                     </p>
                   </div>
                 </div>
@@ -253,10 +253,10 @@
                 <div
                   v-for="invite in invites"
                   :key="invite.id"
-                  class="border border-slate-800 rounded-lg px-3 py-2 bg-slate-900/60 flex items-center justify-between"
+                  class="border border-slate-800 rounded-lg px-3 py-2 bg-slate-900/60 flex items-center justify-between min-w-0"
                 >
-                  <div>
-                    <p class="text-sm text-slate-100">{{ invite.email }}</p>
+                  <div class="min-w-0">
+                    <p class="text-sm text-slate-100 break-words">{{ invite.email }}</p>
                     <p class="text-xs text-slate-400">
                       Role: {{ roleLabel(invite.role) }} · Expires
                       {{ formatDate(invite.expires_at || invite.expiresAt) }}
