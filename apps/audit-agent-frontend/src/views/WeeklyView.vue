@@ -3,11 +3,18 @@
     class="min-h-screen bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900 text-white overflow-x-hidden overflow-y-auto scrollbar-plan"
   >
     <div class="max-w-4xl mx-auto px-4 sm:px-6 py-10 w-full">
-      <header class="text-center mb-8">
+      <header class="text-center mb-8 space-y-2">
         <h1 class="text-3xl font-bold">Weekly Tasks</h1>
-        <p class="text-gray-300">
-          {{ completedCount }} tasks completed, {{ remainingCount }} remaining
-        </p>
+        <div class="flex items-center justify-center gap-2 text-sm text-gray-200">
+          <div class="h-2.5 w-32 bg-slate-800 rounded-full overflow-hidden">
+            <div
+              class="h-full bg-gradient-to-r from-emerald-400 via-indigo-400 to-fuchsia-500 transition-all duration-300"
+              :style="{ width: `${progressPercent}%` }"
+            ></div>
+          </div>
+          <span class="font-semibold">{{ completedCount }}/{{ totalCount }} done</span>
+        </div>
+        <p class="text-gray-300 text-sm">{{ remainingCount }} remaining this week</p>
       </header>
 
       <nav class="flex justify-between mb-6">
@@ -57,64 +64,88 @@
           </button>
         </div>
 
-        <TransitionGroup
-          v-if="filteredTasks.length"
-          name="fade-move"
-          tag="ul"
-          class="space-y-3 max-h-[420px] overflow-y-auto pr-1 scrollbar-plan"
-        >
-          <li
-            v-for="task in filteredTasks"
-            :key="task.id"
-            class="flex justify-between items-center bg-black/20 px-4 py-3 rounded-xl border border-slate-700/60"
+        <div class="space-y-4 max-h-[420px] overflow-y-auto pr-1 scrollbar-plan">
+          <TransitionGroup
+            v-if="activeFiltered.length"
+            name="fade-move"
+            tag="ul"
+            class="space-y-3"
           >
-            <div class="flex-1">
-              <p
-                :class="[
-                  'font-medium',
-                  task.completed ? 'line-through text-gray-400' : 'text-white',
-                ]"
-              >
-                {{ task.title }}
-                <span
-                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-900/70 text-[11px] font-medium shadow-sm ml-2"
-                  :class="categoryColor(task.category)"
+            <li
+              v-for="task in activeFiltered"
+              :key="task.id"
+              class="flex justify-between items-center bg-black/20 px-4 py-3 rounded-xl border border-slate-700/60"
+            >
+              <div class="flex-1">
+                <p class="font-medium text-white">
+                  {{ task.title }}
+                  <span
+                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-900/70 text-[11px] font-medium shadow-sm ml-2"
+                    :class="categoryColor(task.category)"
+                  >
+                    <span class="leading-none">{{ categoryIcon(task.category) }}</span>
+                    <span>{{ categoryLabel(task.category) }}</span>
+                  </span>
+                  <span
+                    v-if="hasLate(task)"
+                    class="ml-2 text-[10px] px-2 py-0.5 rounded bg-red-600/30 border border-red-500/40 text-red-200 align-middle"
+                  >
+                    Late<span v-if="lateDelay(task) !== null"> ({{ lateDelay(task) }}d)</span>
+                  </span>
+                </p>
+                <p
+                  v-if="formattedDetails(task)"
+                  class="text-sm text-gray-400 whitespace-pre-line"
                 >
-                  <span class="leading-none">{{ categoryIcon(task.category) }}</span>
-                  <span>{{ categoryLabel(task.category) }}</span>
-                </span>
-                <span
-                  v-if="hasLate(task)"
-                  class="ml-2 text-[10px] px-2 py-0.5 rounded bg-red-600/30 border border-red-500/40 text-red-200 align-middle"
-                >
-                  Late<span v-if="lateDelay(task) !== null"> ({{ lateDelay(task) }}d)</span>
-                </span>
-              </p>
-              <p
-                v-if="formattedDetails(task)"
-                class="text-sm text-gray-400 whitespace-pre-line"
-              >
-                {{ formattedDetails(task) }}
-              </p>
-            </div>
+                  {{ formattedDetails(task) }}
+                </p>
+              </div>
 
-            <div class="flex items-center gap-3">
-              <button @click="onView(task)" class="text-gray-400 hover:text-white">🍔</button>
-              <span class="text-sm text-gray-400">
-                {{ formatDate(task.date) }}
-              </span>
-              <input
-                type="checkbox"
-                :checked="task.completed"
-                @change="toggleComplete(task)"
-                class="w-5 h-5 accent-indigo-500"
-              />
-            </div>
-          </li>
-        </TransitionGroup>
-        <p v-else class="text-sm text-slate-300">
-          {{ activeCategory === 'All' ? 'No tasks for this day yet.' : 'No tasks for this category on this day.' }}
-        </p>
+              <div class="flex items-center gap-3">
+                <button @click="onView(task)" class="text-gray-400 hover:text-white">🍔</button>
+                <span class="text-sm text-gray-400">
+                  {{ formatDate(task.date) }}
+                </span>
+                <input
+                  type="checkbox"
+                  :checked="task.completed"
+                  @change="toggleComplete(task)"
+                  class="w-5 h-5 accent-indigo-500"
+                />
+              </div>
+            </li>
+          </TransitionGroup>
+          <p v-else class="text-sm text-slate-300">
+            {{ activeCategory === 'All' ? 'No tasks for this day yet.' : 'No tasks for this category on this day.' }}
+          </p>
+
+          <div class="pt-2">
+            <button
+              class="flex items-center gap-2 text-xs text-slate-300 hover:text-indigo-200"
+              @click="showCompleted = !showCompleted"
+            >
+              <span>{{ showCompleted ? '▾' : '▸' }}</span>
+              <span>Completed ({{ completedFiltered.length }})</span>
+            </button>
+            <transition name="fade">
+              <div v-if="showCompleted && completedFiltered.length" class="mt-2 space-y-2">
+                <div
+                  v-for="task in completedFiltered"
+                  :key="task.id"
+                  class="bg-slate-800/60 border border-slate-700/60 rounded-lg px-3 py-2 flex items-start gap-2 text-slate-300"
+                >
+                  <span class="text-emerald-300">✅</span>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-slate-100">{{ task.title }}</p>
+                    <p class="text-[11px] text-slate-400">
+                      Completed • {{ completionLabel(task) }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </transition>
+          </div>
+        </div>
       </section>
     </div>
   </div>
@@ -161,6 +192,10 @@ import { TASK_CATEGORY_FILTERS, getCategoryIcon, getCategoryColor, resolveCatego
 import { describeTaskDetails } from '@/utils/taskDisplay'
 const { tasks, toggleComplete, loadTasksForRange } = useTasks()
 const formattedDetails = (task) => describeTaskDetails(task)
+const completionLabel = (task) =>
+  task?.completedAt
+    ? new Date(task.completedAt?.toDate?.() || task.completedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    : 'Just now'
 const days = [
   { label: 'Mon', value: 0 },
   { label: 'Tue', value: 1 },
@@ -278,9 +313,6 @@ function categoryLabel(value) {
   return resolveCategory(value)
 }
 
-const completedCount = computed(() => tasks.value.filter((t) => t.completed).length)
-const remainingCount = computed(() => tasks.value.filter((t) => !t.completed).length)
-
 const dayLabel = computed(() =>
   selectedDate.value.toLocaleDateString('en-US', {
     weekday: 'long',
@@ -288,6 +320,16 @@ const dayLabel = computed(() =>
     day: 'numeric',
   }),
 )
+
+const totalCount = computed(() => filteredTasks.value.length)
+const completedCount = computed(() => filteredTasks.value.filter((t) => t.completed).length)
+const remainingCount = computed(() => filteredTasks.value.filter((t) => !t.completed).length)
+const activeFiltered = computed(() => filteredTasks.value.filter((t) => !t.completed))
+const completedFiltered = computed(() => filteredTasks.value.filter((t) => t.completed))
+const progressPercent = computed(() =>
+  totalCount.value ? Math.round((completedFiltered.value.length / totalCount.value) * 100) : 0,
+)
+const showCompleted = ref(true)
 
 function startOfWeek(d) {
   const date = new Date(d)

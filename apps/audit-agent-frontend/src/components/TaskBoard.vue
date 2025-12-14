@@ -1,24 +1,18 @@
 <template>
-  <!-- Task Board -->
   <section class="bg-white/10 backdrop-blur-md p-6 rounded-2xl shadow-md border border-white/10">
-    <!-- Header with button -->
-    <!-- <div class="flex justify-between items-center mb-4">
-      <h2 class="text-lg sm:text-xl font-semibold">📋 Today's Tasks</h2>
-      <button
-        @click="openPlanner"
-        class="flex items-center gap-2 
-               bg-gradient-to-r from-indigo-500 via-purple-600 to-pink-500
-               hover:from-indigo-600 hover:via-purple-700 hover:to-pink-600
-               text-white px-3 sm:px-4 py-1.5 sm:py-2 
-               rounded-lg shadow-md text-sm sm:text-base font-medium 
-               transition-all duration-200"
-      >
-        <span class="text-base sm:text-lg">➕</span>
-        <span>Add Task</span>
-      </button>
-    </div> -->
-    <div class="flex justify-between items-center mb-4 gap-2">
-      <h2 class="text-lg sm:text-xl font-semibold whitespace-nowrap">📋 Today's Tasks</h2>
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
+      <div class="flex items-center gap-3">
+        <h2 class="text-lg sm:text-xl font-semibold whitespace-nowrap">📋 Today's Tasks</h2>
+        <div class="flex items-center gap-2 text-xs text-slate-200">
+          <div class="h-2.5 w-28 rounded-full bg-slate-800 overflow-hidden">
+            <div
+              class="h-full bg-gradient-to-r from-emerald-400 via-indigo-400 to-fuchsia-500 transition-all duration-300"
+              :style="{ width: `${progressPercent}%` }"
+            ></div>
+          </div>
+          <span class="font-semibold">{{ completedCount }}/{{ totalCount }}</span>
+        </div>
+      </div>
       <button
         @click="openPlanner"
         class="flex-shrink-0 flex items-center gap-2 bg-gradient-to-r from-indigo-500 via-purple-600 to-pink-500 hover:from-indigo-600 hover:via-purple-700 hover:to-pink-600 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg shadow-md text-sm sm:text-base font-medium"
@@ -46,10 +40,9 @@
       </button>
     </div>
 
-    <!-- Draggable tasks -->
-    <div class="max-h-96 overflow-y-auto pr-2 scrollbar-plan">
+    <div class="max-h-96 overflow-y-auto pr-2 scrollbar-plan space-y-4">
       <draggable
-        v-model="tasks"
+        v-model="activeTasks"
         item-key="id"
         class="space-y-3"
         handle=".drag-handle"
@@ -59,27 +52,20 @@
         <template #item="{ element: task }">
           <div
             v-if="shouldRenderTask(task)"
-            class="bg-slate-900/40 p-4 rounded-xl shadow border border-slate-700/50 transition-all"
+            class="bg-slate-900/60 p-4 rounded-xl shadow border border-slate-700/50 transition-all duration-200 hover:border-indigo-400/60"
           >
             <div class="flex items-start gap-3">
-              <!-- Checkbox -->
               <input
                 type="checkbox"
                 :checked="task.completed"
                 @change="() => toggleComplete(task)"
-                class="mt-1 w-5 h-5 cursor-pointer accent-green-500"
+                class="mt-1 w-5 h-5 cursor-pointer accent-emerald-500 transition-transform duration-150 hover:scale-105"
               />
 
-              <!-- Main body -->
               <div class="flex-1">
                 <div class="flex justify-between items-start gap-3 flex-wrap">
                   <div class="flex items-center gap-3">
-                    <span
-                      class="text-base sm:text-lg font-medium"
-                      :class="{ 'line-through text-slate-500': task.completed }"
-                    >
-                      {{ task.title }}
-                    </span>
+                    <span class="text-base sm:text-lg font-semibold text-white">{{ task.title }}</span>
                     <div
                       class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/70 text-xs font-medium shadow-sm"
                       :class="categoryColor(task.category)"
@@ -94,7 +80,7 @@
                       Google
                     </span>
                   </div>
-                    <div class="flex items-center gap-2">
+                  <div class="flex items-center gap-2">
                     <a
                       v-if="meetingLink(task)"
                       :href="meetingLink(task).url"
@@ -121,31 +107,20 @@
                     >
                       🔔
                     </button>
-                    <!-- Expand toggle -->
-                    <!-- <button
-                    @click="toggleExpand(task.id)"
-                    class="text-slate-400 hover:text-slate-200"
-                  >
-                    {{ expanded.has(task.id) ? "▾" : "▸" }}
-                  </button> -->
                   </div>
                 </div>
 
-                <!-- Expanded details -->
-                <!-- Expanded details -->
                 <transition name="fade">
                   <div v-if="expanded.has(task.id)" class="mt-3 space-y-3">
                     <p v-if="formattedDetails(task)" class="text-sm text-slate-300 whitespace-pre-line">
                       {{ formattedDetails(task) }}
                     </p>
 
-                    <!-- Meeting extras -->
                     <div v-if="task?.source === 'google_calendar'" class="text-xs text-slate-300 flex items-center gap-2">
                       <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 border border-slate-700/60">Calendar</span>
                       <a v-if="task?.htmlLink" :href="task.htmlLink" target="_blank" rel="noopener" class="text-indigo-300 underline hover:text-indigo-200">Open in Google Calendar</a>
                     </div>
 
-                    <!-- Optional Link -->
                     <p v-if="task.link" class="text-sm">
                       <a
                         :href="task.link"
@@ -179,7 +154,6 @@
                 </transition>
               </div>
 
-              <!-- Drag handle with expand toggle -->
               <button
                 @click.stop="toggleExpand(task.id)"
                 class="drag-handle cursor-grab text-slate-500 ml-2 hover:text-slate-300"
@@ -191,16 +165,40 @@
           </div>
         </template>
       </draggable>
-      <p
-        v-if="visibleTasks.length === 0"
-        class="text-sm text-slate-400 mt-4"
-      >
+
+      <p v-if="activeTasks.length === 0" class="text-sm text-slate-400">
         No tasks in this category yet.
       </p>
+
+      <div class="pt-2">
+        <button
+          class="flex items-center gap-2 text-xs text-slate-300 hover:text-indigo-200"
+          @click="showCompleted = !showCompleted"
+        >
+          <span>{{ showCompleted ? '▾' : '▸' }}</span>
+          <span>Completed today ({{ completedTasks.length }})</span>
+        </button>
+        <transition name="fade">
+          <div v-if="showCompleted && completedTasks.length" class="mt-2 space-y-2">
+            <div
+              v-for="task in completedTasks"
+              :key="task.id"
+              class="bg-slate-800/60 border border-slate-700/60 rounded-lg px-3 py-2 flex items-start gap-2 text-slate-300"
+            >
+              <span class="text-emerald-300">✅</span>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-slate-100">{{ task.title }}</p>
+                <p class="text-[11px] text-slate-400">
+                  Completed • {{ completionLabel(task) }}
+                </p>
+              </div>
+            </div>
+          </div>
+        </transition>
+      </div>
     </div>
   </section>
 
-  <!-- Task dialog -->
   <TaskPlannerDialog
     v-if="showPlanner"
     :open="showPlanner"
@@ -228,184 +226,194 @@ import { resolveReminderIso } from '@/utils/timeHelper.js'
 import { resolveTaskMeetingLink } from '@/utils/taskLinks'
 import { describeTaskDetails } from '@/utils/taskDisplay'
 
-const { tasks, loadTasks, toggleComplete, deleteTask, persistOrder } = useTasks()
+const { tasks, loadTasks, toggleComplete, deleteTask: deleteTaskFn, persistOrder } = useTasks()
 
 const selectedTask = ref(null)
 const showPlanner = ref(false)
 const today = toLocalDateKey(new Date())
+const showCompleted = ref(true)
 
 // Track expanded task IDs
 const expanded = ref(new Set())
 
-// Reminder badges map: { [taskId]: true }
 const reminderActiveByTask = ref({})
-const userPrefs = ref({ notifications: {}, integrations: {} })
-const authStore = useAuthStore()
-const categories = TASK_CATEGORY_FILTERS
-const activeCategory = ref('All')
-const formattedDetails = (task) => describeTaskDetails(task)
-const meetingLink = (task) => resolveTaskMeetingLink(task)
 
-const visibleTasks = computed(() => {
-  if (activeCategory.value === 'All') return tasks.value
-  const selected = activeCategory.value
-  return tasks.value.filter((task) => resolveCategory(task?.category) === selected)
+const categories = ['All', 'Work', 'Health', 'Learning', 'Personal', 'Finance', 'Routine']
+const activeCategory = ref('All')
+
+const visibleTasks = computed(() =>
+  tasks.value.filter((task) => activeCategory.value === 'All' || categoryLabel(task.category) === activeCategory.value),
+)
+
+const activeTasks = computed(() => visibleTasks.value.filter((t) => !t.completed))
+const completedTasks = computed(() => visibleTasks.value.filter((t) => t.completed))
+const totalCount = computed(() => visibleTasks.value.length)
+const completedCount = computed(() => completedTasks.value.length)
+const progressPercent = computed(() => (totalCount.value ? Math.round((completedCount.value / totalCount.value) * 100) : 0))
+
+const authStore = useAuthStore()
+
+const reminderTimeChange = ref(null)
+
+const userPrefs = ref({ notifications: {}, integrations: {} })
+
+const autoLoad = ref(false)
+
+const showReminderDialog = ref(false)
+const reminderTask = ref(null)
+const reminderTime = ref(null)
+const reminderLoading = ref(false)
+const reminderHint = ref('')
+
+watch(
+  () => authStore.user?.uid,
+  async (uid) => {
+    if (!uid) return
+    await loadTasks()
+    await refreshReminderBadges(tasks.value)
+  },
+  { immediate: true },
+)
+
+watch(
+  () => tasks.value.map((t) => t.id).join(','),
+  () => {
+    refreshReminderBadges(tasks.value)
+  },
+)
+
+onMounted(async () => {
+  await loadTasks()
 })
 
-function categoryIcon(value) {
-  return getCategoryIcon(value)
+function categoryLabel(category) {
+  if (!category) return 'Routine'
+  if (TASK_CATEGORY_FILTERS.includes(category)) return category
+  return resolveCategory(category)
 }
 
-function categoryColor(value) {
-  return getCategoryColor(value)
+function categoryIcon(category) {
+  return getCategoryIcon(categoryLabel(category))
 }
 
-function categoryLabel(value) {
-  return resolveCategory(value)
+function categoryColor(category) {
+  return getCategoryColor(categoryLabel(category))
 }
 
 function shouldRenderTask(task) {
-  if (!task) return false
-  if (activeCategory.value === 'All') return true
-  return resolveCategory(task?.category) === activeCategory.value
+  return activeCategory.value === 'All' || categoryLabel(task.category) === activeCategory.value
 }
 
-function toggleExpand(id) {
-  if (expanded.value.has(id)) expanded.value.delete(id)
-  else expanded.value.add(id)
+function formattedDetails(task) {
+  return task.details?.trim?.()
+}
+
+function completionLabel(task) {
+  return task.completedAt
+    ? new Date(task.completedAt?.toDate?.() || task.completedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    : 'Just now'
 }
 
 function openPlanner() {
+  selectedTask.value = null
   showPlanner.value = true
 }
+
 function closePlanner() {
   showPlanner.value = false
   selectedTask.value = null
 }
 
-async function handleSave(payload) {
-  if (Array.isArray(payload)) {
-    await loadTasks()
-    return closePlanner()
-  }
-  let savedId = payload.id
-  if (payload.id) {
-    await updateTaskInFirebase(payload)
-  } else {
-    const saved = await addTaskToFirebase(payload)
-    savedId = saved?.id || savedId
-    if (saved?.__notifyMeta) payload.__notifyMeta = saved.__notifyMeta
-  }
-
-  // Sync reminder after task is saved and we have an id
-  try {
-    const uid = authStore?.user?.uid
-    if (uid && savedId) {
-      const notifyMeta = payload.__notifyMeta || null
-      if (payload.__notifyMeta) delete payload.__notifyMeta
-      const scheduledByBackend = !!notifyMeta?.scheduled
-      if (payload?.reminderTime) {
-        if (scheduledByBackend) return
-        const iso = resolveReminderIso(payload)
-        if (!iso) return
-        const prefs = userPrefs.value?.notifications || {}
-        await scheduleReminder(uid, savedId, payload.title, iso, prefs)
-      } else {
-        await api.post('/reminders/cancel', { userId: uid, taskId: savedId })
-      }
-    }
-  } catch (e) {
-    console.warn('Reminder sync (board) failed:', e?.response?.data || e?.message)
-  }
-
-  await loadTasks()
-  closePlanner()
-}
-
-function openDialog(task = null) {
+function openDialog(task) {
   selectedTask.value = task
   showPlanner.value = true
 }
 
-onMounted(loadTasks)
+function toggleExpand(taskId) {
+  if (expanded.value.has(taskId)) expanded.value.delete(taskId)
+  else expanded.value.add(taskId)
+}
 
-// Load user preferences for dynamic reminder channels
-onMounted(async () => {
-  try {
-    const uid = authStore?.user?.uid
-    if (uid) {
-      const res = await getUserPreferences(uid)
-      userPrefs.value = res || { notifications: {}, integrations: {} }
-    }
-  } catch (e) {
-    console.warn('Failed to load user prefs in TaskBoard:', e)
+async function handleSave(payload) {
+  if (Array.isArray(payload)) {
+    await loadTasks()
+    return
   }
-})
+  if (payload.id) {
+    await updateTaskInFirebase(payload)
+  } else {
+    const saved = await addTaskToFirebase(payload)
+    payload.id = saved.id
+  }
+  await loadTasks()
+  closePlanner()
+}
 
-// Refresh reminder badges whenever tasks list changes (ids/dates) or user changes
-async function refreshReminderBadges() {
+function meetingLink(task) {
+  return resolveTaskMeetingLink(task)
+}
+
+function formattedReminderTime(task) {
+  if (!task?.reminderTime) return null
   try {
-    const uid = authStore?.user?.uid
-    if (!uid) { reminderActiveByTask.value = {}; return }
-    const arr = Array.isArray(tasks.value) ? tasks.value : []
+    const iso = resolveReminderIso(task.date, task.reminderTime, task.timezone || 'UTC')
+    return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  } catch (err) {
+    console.warn('reminder-time-change', err)
+    return task.reminderTime
+  }
+}
+
+async function refreshReminderBadges(currentTasks = []) {
+  if (!authStore?.user?.uid) return
+  const uid = authStore.user.uid
+  try {
     const results = await Promise.all(
-      arr.map(async (t) => {
+      currentTasks.map(async (t) => {
         try {
           const r = await getReminderStatus(uid, t.id)
           return [t.id, !!r?.hasActive]
         } catch {
           return [t.id, false]
         }
-      })
+      }),
     )
     const map = {}
     for (const [id, flag] of results) map[id] = flag
     reminderActiveByTask.value = map
-  } catch (e) {
-    console.warn('refreshReminderBadges failed', e)
+  } catch (error) {
+    console.warn('refreshReminderBadges failed', error)
   }
 }
-
-watch(
-  () => ({ ids: (tasks.value || []).map(t => t.id).join(','), dates: (tasks.value || []).map(t => t.date).join(',') }),
-  () => { refreshReminderBadges() },
-  { immediate: true }
-)
 
 async function onReminderClick(task) {
+  reminderTask.value = task
+  reminderTime.value = task.reminderTime || null
+  reminderHint.value = formattedReminderTime(task)
+  showReminderDialog.value = true
+}
+
+async function handleReminderSave() {
+  if (!reminderTask.value || !authStore?.user?.uid) return
+  reminderLoading.value = true
   try {
-    const uid = authStore?.user?.uid
-    if (!uid || !task?.id) return
-    const choice = window.prompt('Reminder active. Type "cancel" to cancel, or leave empty to dismiss:')
-    if (choice && choice.toLowerCase() === 'cancel') {
-      await api.post('/reminders/cancel', { userId: uid, taskId: task.id })
-      await refreshReminderBadges()
-    }
-  } catch (e) {
-    console.warn('Reminder manage failed', e?.response?.data || e?.message)
+    const iso = resolveReminderIso(reminderTask.value.date, reminderTime.value, reminderTask.value.timezone || 'UTC')
+    await scheduleReminder({
+      userId: authStore.user.uid,
+      taskId: reminderTask.value.id,
+      reminderTime: iso,
+      timezone: reminderTask.value.timezone || 'UTC',
+      channels: userPrefs.value?.notifications?.channels || [],
+    })
+    reminderActiveByTask.value = { ...reminderActiveByTask.value, [reminderTask.value.id]: true }
+    showReminderDialog.value = false
+  } catch (error) {
+    console.warn('schedule reminder failed', error?.message || error)
+  } finally {
+    reminderLoading.value = false
   }
 }
-
+const deleteTask = async (task) => {
+  await deleteTaskFn(task)
+}
 </script>
-
-<style scoped>
-.v-move,
-.v-enter-active,
-.v-leave-active {
-  transition: all 180ms ease;
-}
-.v-enter-from,
-.v-leave-to {
-  opacity: 0;
-  transform: translateY(4px);
-}
-
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-</style>
