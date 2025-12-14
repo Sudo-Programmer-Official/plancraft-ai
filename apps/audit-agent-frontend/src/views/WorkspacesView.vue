@@ -1,6 +1,6 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-50">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+  <div class="min-h-screen w-full max-w-full overflow-x-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-50">
+    <div class="w-full max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8">
       <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div class="space-y-2">
           <p class="text-xs uppercase tracking-[0.3em] text-indigo-300/80">Workspaces</p>
@@ -32,8 +32,8 @@
         </div>
       </header>
 
-      <section class="grid gap-4 lg:grid-cols-3">
-        <div class="lg:col-span-2 space-y-4">
+      <section class="grid gap-4 lg:grid-cols-3 w-full max-w-full">
+        <div class="lg:col-span-2 space-y-4 w-full max-w-full">
           <div
             v-if="!workspaces.length && workspaceStore.loading"
             class="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 text-slate-400"
@@ -57,17 +57,17 @@
             </button>
           </div>
 
-          <div class="grid sm:grid-cols-2 gap-3">
+          <div class="grid sm:grid-cols-2 gap-3 w-full max-w-full">
             <article
               v-for="ws in workspaces"
               :key="ws.id"
-              class="rounded-2xl border bg-slate-900/70 p-4 space-y-3 transition hover:-translate-y-0.5"
+              class="w-full max-w-full rounded-2xl border bg-slate-900/70 p-4 space-y-3 transition hover:-translate-y-0.5 overflow-hidden box-border"
               :class="workspaceCardClass(ws)"
             >
-              <div class="flex items-start justify-between gap-2">
-                <div class="flex items-center gap-3">
+              <div class="flex items-start justify-between gap-2 min-w-0">
+                <div class="flex items-center gap-3 min-w-0">
                   <span class="text-2xl">{{ ws.icon || '📦' }}</span>
-                  <div>
+                  <div class="min-w-0">
                     <h3 class="text-lg font-semibold">{{ ws.name }}</h3>
                     <div class="flex items-center gap-2 text-[11px] text-indigo-200/90">
                       <span class="px-2 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/40">
@@ -87,13 +87,13 @@
                 </span>
               </div>
 
-              <div class="flex items-center gap-3 text-[12px] text-slate-400">
+              <div class="flex min-w-0 flex-wrap items-center gap-3 text-[12px] text-slate-400">
                 <span>Last opened: {{ formatDate(ws.lastOpenedAt || ws.updatedAt || ws.createdAt) }}</span>
                 <span>•</span>
                 <span>Theme: {{ ws.color }}</span>
               </div>
 
-              <div class="flex items-center gap-2">
+              <div class="flex min-w-0 flex-wrap items-center gap-2">
                 <button
                   class="flex-1 px-3 py-2 rounded-lg bg-indigo-600 text-sm font-semibold hover:bg-indigo-500"
                   :disabled="activeWorkspaceId === ws.id"
