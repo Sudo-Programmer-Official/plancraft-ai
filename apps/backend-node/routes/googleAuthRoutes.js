@@ -55,13 +55,14 @@ export async function handleOAuthCallback(req, res) {
     const userId = parsed.userId
     try { console.info('[GoogleOAuth] state ok → user', userId) } catch {}
     const tokens = await exchangeCodeForTokens(code)
-    await saveUserGoogleTokens(userId, tokens)
+    const integration = await saveUserGoogleTokens(userId, tokens)
     try { console.info('[GoogleOAuth] tokens saved', { uid: userId, hasRefresh: !!tokens?.refresh_token }) } catch {}
 
     // Prime calendars snapshot on connect (non-fatal if it fails)
     try {
-      const { tokens: freshTokens } = await ensureFreshAccessToken(userId)
-      await listCalendars(userId, freshTokens)
+      const primaryAccountId = integration?.primaryAccountId || integration?.accounts?.[0]?.accountId || 'primary'
+      const { tokens: freshTokens, account } = await ensureFreshAccessToken(userId, primaryAccountId)
+      await listCalendars(userId, freshTokens, account?.accountId || primaryAccountId, { email: account?.accountEmail })
     } catch (e) {
       console.warn('listCalendars after connect failed:', e?.message || e)
     }
@@ -94,7 +95,8 @@ router.get('/google/status', requireAuth, ensureUserMatches, async (req, res) =>
     const userId = req.query.userId || req?.user?.uid
     if (!userId) return res.status(400).json({ error: 'Missing userId' })
     const integ = await getUserGoogleIntegration(String(userId))
-    return res.json({ integration: integ || {} })
+    const enabled = ENABLED === '1' || ENABLED === 'true'
+    return res.json({ integration: { ...(integ || {}), enabled } })
   } catch (e) {
     console.error('GET /google/status failed', e)
     return res.status(500).json({ error: 'Internal error' })

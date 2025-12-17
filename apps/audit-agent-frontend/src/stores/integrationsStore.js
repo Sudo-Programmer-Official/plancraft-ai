@@ -8,18 +8,18 @@ export async function getGoogleStatus(userId) {
   return data?.integration || {}
 }
 
-export async function getGoogleCalendars(userId) {
-  const { data } = await api.get('/google/calendars', { params: { userId } })
-  return data?.calendars || []
+export async function getGoogleCalendars(userId, accountId = null) {
+  const { data } = await api.get('/google/calendars', { params: { userId, accountId } })
+  return data?.calendars || data || []
 }
 
-export async function saveGoogleCalendarSelection(userId, selected, windowDays) {
-  const { data } = await api.post('/google/calendars/select', { userId, selected, windowDays })
+export async function saveGoogleCalendarSelection(userId, selected, windowDays, accountId = null) {
+  const { data } = await api.post('/google/calendars/select', { userId, selected, windowDays, accountId })
   return data?.ok === true
 }
 
-export async function triggerGoogleSyncNow(userId) {
-  const { data } = await api.post('/google/sync/now', { userId })
+export async function triggerGoogleSyncNow(userId, accountId = null) {
+  const { data } = await api.post('/google/sync/now', { userId, accountId })
   return data || {}
 }
 
@@ -44,7 +44,7 @@ export async function requestGoogleConnectUrl(userId) {
   return res?.data?.url
 }
 
-export async function disconnectGoogleIntegration(userId) {
-  const { data } = await api.delete('/google/calendars/disconnect', { data: { userId } })
+export async function disconnectGoogleIntegration(userId, accountId = null) {
+  const { data } = await api.delete('/google/calendars/disconnect', { data: { userId, accountId } })
   return data?.ok === true
 }

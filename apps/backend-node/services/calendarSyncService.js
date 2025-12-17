@@ -457,7 +457,7 @@ export async function syncGoogleAccount(userId, options = {}) {
   const adapter = getCalendarAdapter("google_calendar");
   if (!adapter) throw new Error("No calendar adapter configured for Google Calendar");
 
-  const { tokens, integration } = await ensureFreshAccessToken(userId);
+  const baseIntegration = await getUserGoogleIntegration(userId);
   const userSnap = await db.collection("users").doc(String(userId)).get();
   const userData = userSnap.exists ? userSnap.data() || {} : {};
   const meetingPref = userData?.preferences?.meetings || {};
@@ -478,80 +478,112 @@ export async function syncGoogleAccount(userId, options = {}) {
       "UTC",
   };
 
-  await upsertIntegrationAccount({
-    userId,
-    provider: "google_calendar",
-    accountId: "primary",
-    accessToken: tokens?.access_token || null,
-    refreshToken: tokens?.refresh_token || null,
-    tokenExpiry: tokens?.expiry_date || null,
-    metadata: {
-      calendars: integration?.calendars || [],
-      sync: integration?.sync || {},
-    },
-  });
-
-  const calendars = Array.isArray(integration?.calendars)
-    ? integration.calendars.filter((c) => !!c.selected)
+  const availableAccounts = Array.isArray(baseIntegration?.accounts)
+    ? baseIntegration.accounts.filter((a) => a.connected !== false && (a.token?.access_token || a.token?.refresh_token))
     : [];
-  if (!calendars.length) {
-    log(`user=${userId} has no selected calendars`);
-    return stats;
+  const targetAccountId = options.accountId || null;
+  const accountsToSync = targetAccountId
+    ? availableAccounts.filter((a) => String(a.accountId) === String(targetAccountId))
+    : availableAccounts;
+
+  if (!accountsToSync.length) {
+    throw new Error("No connected Google account found");
   }
 
-  const perCalSync = { ...(integration?.sync?.perCal || {}) };
+  for (const account of accountsToSync) {
+    const accountId = account.accountId || "primary";
+    const { tokens, account: freshAccount } = await ensureFreshAccessToken(userId, accountId);
+    const activeAccount = freshAccount || account;
+    const accountWindowDays = Number.isFinite(activeAccount?.sync?.windowDays)
+      ? Number(activeAccount.sync.windowDays)
+      : windowDays;
 
-  for (const calendar of calendars) {
-    try {
-      const syncToken = options.forceFull ? null : perCalSync?.[calendar.id]?.syncToken || null;
-      const result = await adapter.fetchEvents(tokens.access_token, calendar, {
-        windowDays,
-        syncToken,
-      });
-      stats.calendars += 1;
-      stats.eventsFetched += result.events.length;
-      if (result.reset) {
-        stats.resetCount += 1;
-        perCalSync[calendar.id] = { syncToken: null, lastFullSync: null };
-        continue;
-      }
-      for (const ev of result.events) {
-        const normalized = adapter.normalizeEvent(ev, calendar);
-        await upsertExternalEvent(userId, "google_calendar", normalized);
-        stats.eventsUpserted += 1;
-      }
-      perCalSync[calendar.id] = {
-        ...(perCalSync[calendar.id] || {}),
-        syncToken: result.nextSyncToken || null,
-        lastFullSync: perCalSync[calendar.id]?.lastFullSync || (syncToken ? perCalSync[calendar.id]?.lastFullSync : new Date().toISOString()),
-      };
-      await markIntegrationAccountSync(userId, "google_calendar", calendar.id, {
-        syncToken: result.nextSyncToken || null,
-        status: "ok",
-        lastSyncAt: new Date().toISOString(),
-      });
-    } catch (err) {
-      log(`user=${userId} calendar=${calendar.id} failed:`, err?.message || err);
-      perCalSync[calendar.id] = {
-        ...(perCalSync[calendar.id] || {}),
-        error: err?.message || "sync_failed",
-      };
-      await markIntegrationAccountSync(userId, "google_calendar", calendar.id, {
-        syncToken: perCalSync[calendar.id]?.syncToken || null,
-        status: "error",
-      });
+    await upsertIntegrationAccount({
+      userId,
+      provider: "google_calendar",
+      accountId,
+      accountEmail: activeAccount?.accountEmail || null,
+      accessToken: tokens?.access_token || null,
+      refreshToken: tokens?.refresh_token || null,
+      tokenExpiry: tokens?.expiry_date || null,
+      metadata: {
+        calendars: activeAccount?.calendars || [],
+        sync: activeAccount?.sync || {},
+      },
+    });
+
+    const calendars = Array.isArray(activeAccount?.calendars)
+      ? activeAccount.calendars.filter((c) => !!c.selected)
+      : [];
+    if (!calendars.length) {
+      log(`user=${userId} account=${accountId} has no selected calendars`);
+      continue;
     }
-  }
 
-  await saveUserGoogleIntegration(userId, {
-    ...(integration || {}),
-    sync: {
-      ...(integration?.sync || {}),
-      perCal: perCalSync,
-      lastRun: dayjs().toISOString(),
-      status: "ok",
-    },
-  });
+    const perCalSync = { ...(activeAccount?.sync?.perCal || {}) };
+
+    for (const calendar of calendars) {
+      try {
+        const syncToken = options.forceFull ? null : perCalSync?.[calendar.id]?.syncToken || null;
+        const result = await adapter.fetchEvents(tokens.access_token, { ...calendar, accountId }, {
+          windowDays: accountWindowDays,
+          syncToken,
+        });
+        stats.calendars += 1;
+        stats.eventsFetched += result.events.length;
+        if (result.reset) {
+          stats.resetCount += 1;
+          perCalSync[calendar.id] = { syncToken: null, lastFullSync: null };
+          continue;
+        }
+        for (const ev of result.events) {
+          const normalized = adapter.normalizeEvent(ev, { ...calendar, accountId });
+          await upsertExternalEvent(userId, "google_calendar", normalized);
+          stats.eventsUpserted += 1;
+        }
+        perCalSync[calendar.id] = {
+          ...(perCalSync[calendar.id] || {}),
+          syncToken: result.nextSyncToken || null,
+          lastFullSync: perCalSync[calendar.id]?.lastFullSync || (syncToken ? perCalSync[calendar.id]?.lastFullSync : new Date().toISOString()),
+        };
+        await markIntegrationAccountSync(userId, "google_calendar", accountId, {
+          syncToken: result.nextSyncToken || null,
+          status: "ok",
+          lastSyncAt: new Date().toISOString(),
+        });
+      } catch (err) {
+        log(`user=${userId} account=${accountId} calendar=${calendar.id} failed:`, err?.message || err);
+        perCalSync[calendar.id] = {
+          ...(perCalSync[calendar.id] || {}),
+          error: err?.message || "sync_failed",
+        };
+        await markIntegrationAccountSync(userId, "google_calendar", accountId, {
+          syncToken: perCalSync[calendar.id]?.syncToken || null,
+          status: "error",
+        });
+      }
+    }
+
+    const updatedAccount = {
+      ...activeAccount,
+      accountId,
+      sync: {
+        ...(activeAccount?.sync || {}),
+        perCal: perCalSync,
+        lastRun: dayjs().toISOString(),
+        status: "ok",
+      },
+    };
+
+    const updatedIntegration = {
+      ...(await getUserGoogleIntegration(userId)),
+    };
+    updatedIntegration.accounts = Array.isArray(updatedIntegration.accounts)
+      ? updatedIntegration.accounts.map((a) => (String(a.accountId) === String(accountId) ? updatedAccount : a))
+      : [updatedAccount];
+    updatedIntegration.connected = updatedIntegration.accounts.some((a) => a.connected);
+    await saveUserGoogleIntegration(userId, updatedIntegration);
+  }
 
   const taskStats = await syncEventsToTasksFromStore(userId, {
     provider: "google_calendar",

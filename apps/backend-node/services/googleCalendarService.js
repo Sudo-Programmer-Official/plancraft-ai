@@ -24,27 +24,49 @@ function toYMD(d, tz) {
   } catch { return dayjs(d).format('YYYY-MM-DD') }
 }
 
-export async function listCalendars(uid, tokens) {
+export async function listCalendars(uid, tokens, accountId = 'primary', profile = null) {
   const resp = await fetchFn(CAL_LIST_URL, { headers: headers(tokens) })
   if (resp.status === 401) throw new Error('Unauthorized with Google; reconnect')
   if (!resp.ok) throw new Error(`Failed to list calendars: ${resp.status}`)
   const json = await resp.json()
   const items = Array.isArray(json?.items) ? json.items : []
-  // Save snapshot for selection UI
   const integration = (await getUserGoogleIntegration(uid)) || {}
-  const prev = Array.isArray(integration.calendars) ? integration.calendars : []
+  const targetAccountId = accountId || integration.primaryAccountId || 'primary'
+  const prevAccount = (integration.accounts || []).find((a) => String(a.accountId) === String(targetAccountId)) || {}
+  const prev = Array.isArray(prevAccount.calendars) ? prevAccount.calendars : []
   const prevSel = new Map(prev.map((c) => [String(c.id), !!c.selected]))
   const calendars = items.map((it) => ({
     id: it.id,
     selected: prevSel.get(String(it.id)) ?? (it.primary === true),
     summary: it.summary || it.id,
-    timeZone: it.timeZone || integration?.timeZone || undefined,
+    timeZone: it.timeZone || prevAccount?.timeZone || undefined,
     primary: !!it.primary,
   }))
+  const primaryCalendar = items.find((it) => it.primary)
+  const accountEmail = profile?.email || prevAccount?.accountEmail || primaryCalendar?.id || null
+  const updatedAccount = {
+    ...prevAccount,
+    accountId: targetAccountId,
+    accountEmail,
+    calendars,
+    connected: true,
+    sync: {
+      windowDays: Number.isFinite(prevAccount?.sync?.windowDays) ? Number(prevAccount.sync.windowDays) : 30,
+      perCal: prevAccount?.sync?.perCal || {},
+      lastRun: prevAccount?.sync?.lastRun || null,
+      status: prevAccount?.sync?.status || 'ok',
+    },
+    updatedAt: new Date(),
+  }
+  const accounts = Array.isArray(integration.accounts) ? integration.accounts.slice() : []
+  const idx = accounts.findIndex((a) => String(a.accountId) === String(targetAccountId))
+  if (idx >= 0) accounts.splice(idx, 1, updatedAccount)
+  else accounts.push(updatedAccount)
   await saveUserGoogleIntegration(uid, {
     ...integration,
-    connected: true,
-    calendars,
+    accounts,
+    primaryAccountId: integration.primaryAccountId || targetAccountId,
+    connected: accounts.some((a) => a.connected),
     updatedAt: new Date(),
   })
   return calendars
@@ -148,14 +170,15 @@ async function incrementalSync(uid, calendar, tokens, syncToken) {
   return { reset: false, nextSyncToken: json.nextSyncToken || null, count }
 }
 
-export async function syncCalendar(uid, calendarId, tokens) {
-  const { integration } = await ensureFreshAccessToken(uid)
+export async function syncCalendar(uid, calendarId, tokens, accountId = 'primary') {
+  const { integration } = await ensureFreshAccessToken(uid, accountId)
   const integ = integration || (await getUserGoogleIntegration(uid)) || {}
-  const windowDays = integ?.sync?.windowDays || 30
-  const calendars = Array.isArray(integ?.calendars) ? integ.calendars : []
+  const account = (integ.accounts || []).find((a) => String(a.accountId) === String(accountId)) || {}
+  const windowDays = account?.sync?.windowDays || integ?.sync?.windowDays || 30
+  const calendars = Array.isArray(account?.calendars) ? account.calendars : []
   const calendar = calendars.find((c) => String(c.id) === String(calendarId))
   if (!calendar) throw new Error('Calendar not found or not authorized')
-  const perCal = (integ?.sync?.perCal || {})
+  const perCal = (account?.sync?.perCal || {})
   const st = perCal[calendarId]?.syncToken || null
   try {
     let nextToken = st
@@ -171,41 +194,44 @@ export async function syncCalendar(uid, calendarId, tokens) {
         count = r.count
       }
     }
-    const merged = {
-      ...integ,
+    const mergedAccount = {
+      ...account,
       sync: {
-        ...(integ.sync || {}),
+        ...(account.sync || {}),
         lastRun: new Date().toISOString(),
         status: 'ok',
         perCal: {
-          ...(integ?.sync?.perCal || {}),
-          [calendarId]: { ...(integ?.sync?.perCal?.[calendarId] || {}), syncToken: nextToken, lastFullSync: !st ? new Date().toISOString() : (integ?.sync?.perCal?.[calendarId]?.lastFullSync || null) },
+          ...(account?.sync?.perCal || {}),
+          [calendarId]: { ...(account?.sync?.perCal?.[calendarId] || {}), syncToken: nextToken, lastFullSync: !st ? new Date().toISOString() : (account?.sync?.perCal?.[calendarId]?.lastFullSync || null) },
         },
       },
     }
-    await saveUserGoogleIntegration(uid, merged)
+    const accounts = Array.isArray(integ.accounts) ? integ.accounts.map((a) => (String(a.accountId) === String(accountId) ? mergedAccount : a)) : [mergedAccount]
+    await saveUserGoogleIntegration(uid, { ...integ, accounts, connected: accounts.some((a) => a.connected) })
     return { ok: true, updated: count }
   } catch (e) {
-    const merged = {
-      ...integ,
+    const mergedAccount = {
+      ...account,
       sync: {
-        ...(integ.sync || {}),
+        ...(account.sync || {}),
         lastRun: new Date().toISOString(),
         status: /401|Unauthorized/i.test(e?.message || '') ? 'auth_error' : 'error',
       },
     }
-    await saveUserGoogleIntegration(uid, merged)
+    const accounts = Array.isArray(integ.accounts) ? integ.accounts.map((a) => (String(a.accountId) === String(accountId) ? mergedAccount : a)) : [mergedAccount]
+    await saveUserGoogleIntegration(uid, { ...integ, accounts, connected: accounts.some((a) => a.connected) })
     throw e
   }
 }
 
-export async function syncSelectedCalendars(uid, tokens) {
+export async function syncSelectedCalendars(uid, tokens, accountId = 'primary') {
   const integ = (await getUserGoogleIntegration(uid)) || {}
-  const calendars = Array.isArray(integ?.calendars) ? integ.calendars.filter((c) => !!c.selected) : []
+  const account = (integ.accounts || []).find((a) => String(a.accountId) === String(accountId)) || {}
+  const calendars = Array.isArray(account?.calendars) ? account.calendars.filter((c) => !!c.selected) : []
   let total = 0
   for (const c of calendars) {
     try {
-      const r = await syncCalendar(uid, c.id, tokens)
+      const r = await syncCalendar(uid, c.id, tokens, accountId)
       total += r?.updated || 0
     } catch (e) {
       console.warn(`Sync failed for cal=${c.id}:`, e?.message || e)

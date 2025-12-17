@@ -1,7 +1,7 @@
 import { db } from './firebaseAdmin.js'
 import crypto from 'crypto'
 import nodeFetch from 'node-fetch'
-import { removeIntegrationAccount } from './integrationAccountService.js'
+import { removeIntegrationAccount, listUserIntegrationAccounts } from './integrationAccountService.js'
 import { deleteExternalEventsForAccount } from './externalEventsService.js'
 import { upsertIntegrationAccount, updateIntegrationAccountTokens } from './integrationAccountService.js'
 
@@ -48,6 +48,72 @@ function sign(data, secret) {
 
 function getStateSecret() {
   return getEnv('OAUTH_STATE_SECRET') || getEnv('APP_JWT_SECRET') || 'dev-state-secret'
+}
+
+function cleanAccountId(raw, fallback = 'primary') {
+  const value = String(raw || fallback || '').trim() || 'primary'
+  return value.replace(/[^a-zA-Z0-9@._-]/g, '_').slice(0, 120)
+}
+
+function normalizeAccount(raw = {}, fallbackId = 'primary') {
+  const sync = raw.sync || {}
+  const accountId = cleanAccountId(raw.accountId || raw.id || fallbackId)
+  return {
+    accountId,
+    accountEmail: raw.accountEmail || raw.email || raw.token?.email || null,
+    connected: raw.connected !== false && !!(raw.token?.access_token || raw.token?.refresh_token),
+    token: raw.token || null,
+    calendars: Array.isArray(raw.calendars) ? raw.calendars : [],
+    primary: !!raw.primary,
+    sync: {
+      windowDays: Number.isFinite(sync.windowDays) ? Number(sync.windowDays) : 30,
+      perCal: sync.perCal || {},
+      lastRun: sync.lastRun || raw.lastRun || null,
+      status: sync.status || raw.status || 'ok',
+    },
+    scopes: Array.isArray(raw.scopes) ? raw.scopes : [],
+  }
+}
+
+export function normalizeGoogleIntegration(data = {}) {
+  const accs = Array.isArray(data.accounts) ? data.accounts.map((a) => normalizeAccount(a, data.primaryAccountId || 'primary')) : []
+  if (!accs.length && (data.token || data.calendars || data.connected)) {
+    accs.push(
+      normalizeAccount(
+        {
+          ...data,
+          primary: true,
+        },
+        data.primaryAccountId || 'primary',
+      ),
+    )
+  }
+  const primaryAccountId = cleanAccountId(data.primaryAccountId || accs[0]?.accountId || 'primary')
+  const primaryAccount = accs.find((a) => a.accountId === primaryAccountId) || accs[0] || null
+  const scopes = Array.from(new Set([...(data.scopes || []), ...accs.flatMap((a) => a.scopes || [])]))
+  const connected = accs.some((a) => a.connected)
+  return {
+    connected,
+    primaryAccountId,
+    accounts: accs,
+    scopes,
+    token: primaryAccount?.token || null,
+    accountEmail: primaryAccount?.accountEmail || null,
+    updatedAt: data.updatedAt || new Date(),
+  }
+}
+
+async function fetchGoogleProfile(tokens) {
+  if (!tokens?.access_token) return null
+  try {
+    const resp = await fetchFn('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+    })
+    if (!resp.ok) return null
+    return await resp.json()
+  } catch {
+    return null
+  }
 }
 
 async function mintState(userId, ttlSeconds = 600) {
@@ -179,47 +245,76 @@ export async function refreshAccessToken(refresh_token) {
 export async function getUserGoogleIntegration(userId) {
   const doc = await db.collection('users').doc(String(userId)).get()
   const data = doc.exists ? doc.data() : {}
-  return (data?.integrations?.google) || null
+  return normalizeGoogleIntegration((data?.integrations?.google) || {})
 }
 
 export async function saveUserGoogleIntegration(userId, integration) {
-  const payload = { integrations: { google: integration }, updatedAt: new Date() }
+  const normalized = normalizeGoogleIntegration(integration || {})
+  const payload = { integrations: { google: normalized }, updatedAt: new Date() }
   await db.collection('users').doc(String(userId)).set(payload, { merge: true })
+  return normalized
 }
 
-export async function saveUserGoogleTokens(userId, tokens) {
-  const integ = (await getUserGoogleIntegration(userId)) || {}
-  const merged = {
-    connected: true,
-    scopes: Array.from(new Set([...(integ?.scopes || []), ...GOOGLE_SCOPES])),
-    token: tokens,
-    calendars: Array.isArray(integ?.calendars) ? integ.calendars : [],
-    sync: integ?.sync || { windowDays: 30, perCal: {}, lastRun: null, status: 'ok' },
+export async function saveUserGoogleTokens(userId, tokens, accountMeta = {}) {
+  const integ = (await getUserGoogleIntegration(userId)) || normalizeGoogleIntegration({})
+  const profile = accountMeta.profile || (await fetchGoogleProfile(tokens))
+  const accountEmail = accountMeta.accountEmail || profile?.email || null
+  const accountId = cleanAccountId(accountMeta.accountId || accountEmail || profile?.sub || integ.primaryAccountId || 'primary')
+  const existingIdx = Array.isArray(integ.accounts) ? integ.accounts.findIndex((a) => a.accountId === accountId) : -1
+  const existing = existingIdx >= 0 ? integ.accounts[existingIdx] : null
+  const refreshToken = tokens?.refresh_token || existing?.token?.refresh_token || integ?.token?.refresh_token || null
+  const mergedAccount = normalizeAccount(
+    {
+      ...(existing || {}),
+      accountId,
+      accountEmail: accountEmail || existing?.accountEmail || null,
+      token: { ...tokens, refresh_token: refreshToken },
+      connected: true,
+      primary: accountMeta.primary === true || existing?.primary || (!integ.primaryAccountId && existingIdx <= 0),
+      scopes: Array.from(new Set([...(existing?.scopes || []), ...GOOGLE_SCOPES])),
+    },
+    accountId,
+  )
+
+  const accounts = Array.isArray(integ.accounts) ? integ.accounts.slice() : []
+  if (existingIdx >= 0) accounts.splice(existingIdx, 1, mergedAccount)
+  else accounts.push(mergedAccount)
+
+  const mergedIntegration = {
+    ...integ,
+    accounts,
+    primaryAccountId: integ.primaryAccountId || accountId,
+    connected: accounts.some((a) => a.connected),
+    scopes: Array.from(new Set([...(integ.scopes || []), ...GOOGLE_SCOPES])),
     updatedAt: new Date(),
   }
-  await saveUserGoogleIntegration(userId, merged)
+
+  const normalized = await saveUserGoogleIntegration(userId, mergedIntegration)
   try {
     await upsertIntegrationAccount({
       userId: String(userId),
       provider: 'google_calendar',
-      accountId: 'primary',
+      accountId,
+      accountEmail: accountEmail || null,
       accessToken: tokens?.access_token || null,
-      refreshToken: tokens?.refresh_token || integ?.token?.refresh_token || null,
+      refreshToken,
       tokenExpiry: tokens?.expiry_date || null,
       metadata: {
-        calendars: merged.calendars || [],
-        sync: merged.sync || {},
+        calendars: mergedAccount.calendars || [],
+        sync: mergedAccount.sync || {},
       },
     })
   } catch (err) {
     console.warn('[GoogleOAuth] Failed to upsert integration account', err?.message || err)
   }
-  return merged
+  return normalized
 }
 
-export async function ensureFreshAccessToken(userId) {
-  const integ = (await getUserGoogleIntegration(userId)) || {}
-  const token = integ?.token || {}
+export async function ensureFreshAccessToken(userId, accountId = null) {
+  const integ = (await getUserGoogleIntegration(userId)) || normalizeGoogleIntegration({})
+  const targetId = cleanAccountId(accountId || integ.primaryAccountId || integ.accounts?.[0]?.accountId || 'primary')
+  const account = (integ.accounts || []).find((a) => a.accountId === targetId) || integ.accounts?.[0] || null
+  const token = account?.token || {}
   const now = Date.now()
   let current = token
   if (!current?.access_token) throw new Error('No access token; reconnect Google')
@@ -227,42 +322,66 @@ export async function ensureFreshAccessToken(userId) {
     // refresh if expiring in < 60s
     const refreshed = await refreshAccessToken(current.refresh_token)
     current = { ...current, ...refreshed }
-    await saveUserGoogleTokens(userId, current)
+    await saveUserGoogleTokens(userId, current, { accountId: targetId, accountEmail: account?.accountEmail || null })
     try {
       await updateIntegrationAccountTokens(userId, 'google_calendar', {
-        accountId: 'primary',
+        accountId: targetId,
         accessToken: current.access_token,
         refreshToken: current.refresh_token,
         tokenExpiry: current.expiry_date,
       })
     } catch {}
   }
-  return { tokens: current, integration: integ }
+  return { tokens: current, integration: integ, account: account || null }
 }
 
-export async function disconnectGoogleIntegration(userId) {
+export async function disconnectGoogleIntegration(userId, accountId = null) {
   if (!userId) return
-  const payload = {
-    integrations: {
-      google: {
-        connected: false,
-        token: null,
-        calendars: [],
-        sync: { status: 'disconnected', perCal: {}, lastRun: null },
-        updatedAt: new Date(),
-      },
-    },
+  const integ = (await getUserGoogleIntegration(userId)) || normalizeGoogleIntegration({})
+  const targetId = accountId ? cleanAccountId(accountId) : null
+  let accounts = Array.isArray(integ.accounts) ? integ.accounts.slice() : []
+  let removed = []
+
+  if (targetId) {
+    removed = accounts.filter((a) => a.accountId === targetId)
+    accounts = accounts.filter((a) => a.accountId !== targetId)
+  } else {
+    removed = accounts
+    accounts = []
+  }
+
+  const updated = {
+    ...integ,
+    accounts,
+    connected: accounts.some((a) => a.connected),
+    primaryAccountId: accounts[0]?.accountId || null,
+    token: null,
+    calendars: [],
+    sync: { status: 'disconnected', perCal: {}, lastRun: null },
     updatedAt: new Date(),
   }
-  await db.collection('users').doc(String(userId)).set(payload, { merge: true })
-  try {
-    await removeIntegrationAccount(userId, 'google_calendar', 'primary')
-  } catch (err) {
-    console.warn('[GoogleOAuth] removeIntegrationAccount failed', err?.message || err)
+
+  await saveUserGoogleIntegration(userId, updated)
+  for (const acc of removed) {
+    const aid = acc.accountId || 'primary'
+    try {
+      await removeIntegrationAccount(userId, 'google_calendar', aid)
+    } catch (err) {
+      console.warn('[GoogleOAuth] removeIntegrationAccount failed', err?.message || err)
+    }
+    try {
+      await deleteExternalEventsForAccount(userId, 'google_calendar', aid)
+    } catch (err) {
+      console.warn('[GoogleOAuth] deleteExternalEventsForAccount failed', err?.message || err)
+    }
   }
-  try {
-    await deleteExternalEventsForAccount(userId, 'google_calendar', 'primary')
-  } catch (err) {
-    console.warn('[GoogleOAuth] deleteExternalEventsForAccount failed', err?.message || err)
+  // If no accountId passed, remove any lingering integrationAccount docs
+  if (!targetId) {
+    try {
+      const accountsToClean = await listUserIntegrationAccounts(String(userId), 'google_calendar')
+      for (const acc of accountsToClean) {
+        try { await removeIntegrationAccount(userId, 'google_calendar', acc.accountId || 'primary') } catch {}
+      }
+    } catch {}
   }
 }

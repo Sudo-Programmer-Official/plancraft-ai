@@ -96,8 +96,8 @@ export function normalizeGoogleEvent(event, calendar) {
     : [];
   const occurrenceKey =
     event.recurringEventId && (event.originalStartTime?.dateTime || event.originalStartTime?.date)
-      ? `${event.recurringEventId}__${event.originalStartTime.dateTime || event.originalStartTime.date}`
-      : null;
+    ? `${event.recurringEventId}__${event.originalStartTime.dateTime || event.originalStartTime.date}`
+    : null;
   const contentHash = computeHashPayload(event, times, joinUrl);
 
   return {
@@ -105,7 +105,7 @@ export function normalizeGoogleEvent(event, calendar) {
     providerEventId: event.id,
     occurrenceKey,
     calendarId: calendar.id,
-    accountId: "primary",
+    accountId: calendar.accountId || "primary",
     title: event.summary || "Meeting",
     description: event.description || "",
     location: event.location || "",

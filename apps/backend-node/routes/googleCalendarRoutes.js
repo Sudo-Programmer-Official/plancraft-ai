@@ -14,10 +14,16 @@ router.get('/google/calendars', async (req, res) => {
   try {
     if (ENABLED !== '1' && ENABLED !== 'true') return res.json({ calendars: [], enabled: false })
     const userId = String(req.query.userId || req?.user?.uid || '')
+    const accountId = req.query.accountId ? String(req.query.accountId) : null
     if (!userId) return res.status(400).json({ error: 'Missing userId' })
-    const { tokens } = await ensureFreshAccessToken(userId)
-    const calendars = await listCalendars(userId, tokens)
-    return res.json({ enabled: true, calendars: calendars || [] })
+    const { tokens, account, integration } = await ensureFreshAccessToken(userId, accountId || undefined)
+    const calendars = await listCalendars(userId, tokens, account?.accountId || accountId || integration?.primaryAccountId || 'primary', { email: account?.accountEmail })
+    return res.json({
+      enabled: true,
+      calendars: calendars || [],
+      accountId: account?.accountId || accountId || integration?.primaryAccountId || 'primary',
+      accounts: integration?.accounts || [],
+    })
   } catch (e) {
     console.error('GET /google/calendars failed', e)
     return res.status(500).json({ error: e?.message || 'Failed to list calendars' })
@@ -29,34 +35,44 @@ router.get('/google/calendars', async (req, res) => {
 router.post('/google/calendars/select', async (req, res) => {
   try {
     if (ENABLED !== '1' && ENABLED !== 'true') return res.status(503).json({ error: 'Google Calendar integration disabled' })
-    const { userId, selected, windowDays } = req.body || {}
+    const { userId, selected, windowDays, accountId } = req.body || {}
     if (!userId || !Array.isArray(selected)) return res.status(400).json({ error: 'Missing userId or selected[]' })
     const integ = (await getUserGoogleIntegration(String(userId))) || {}
-    const calendars = Array.isArray(integ?.calendars) ? integ.calendars.slice() : []
+    const targetAccountId = accountId || integ.primaryAccountId || 'primary'
+    const accounts = Array.isArray(integ.accounts) ? integ.accounts.slice() : []
+    const idx = accounts.findIndex((a) => String(a.accountId) === String(targetAccountId))
+    const account = idx >= 0 ? accounts[idx] : { accountId: targetAccountId, calendars: [], sync: { perCal: {}, windowDays: 30 } }
+    const calendars = Array.isArray(account?.calendars) ? account.calendars.slice() : []
     const selSet = new Set(selected.map(String))
     const updated = calendars.map((c) => ({ ...c, selected: selSet.has(String(c.id)) }))
 
     const sync = Object.assign(
-      { windowDays: Number.isFinite(windowDays) ? Number(windowDays) : (integ?.sync?.windowDays || 30), perCal: integ?.sync?.perCal || {} },
+      { windowDays: Number.isFinite(windowDays) ? Number(windowDays) : (account?.sync?.windowDays || 30), perCal: account?.sync?.perCal || {} },
       {}
     )
-    // If selection changed, clear syncToken for deselected calendars
     const perCal = sync.perCal || {}
     for (const c of updated) {
       const k = String(c.id)
       perCal[k] = perCal[k] || {}
-      if (!c.selected) {
-        // not selected → do nothing special
-        continue
-      }
-      // when selecting afresh, leave syncToken as-is if exists; initial backfill will handle if missing
+      if (!c.selected) continue
     }
+
+    const mergedAccount = {
+      ...account,
+      accountId: targetAccountId,
+      calendars: updated,
+      sync: { ...(account?.sync || {}), ...sync, perCal },
+      connected: true,
+      updatedAt: new Date(),
+    }
+    if (idx >= 0) accounts.splice(idx, 1, mergedAccount)
+    else accounts.push(mergedAccount)
 
     await saveUserGoogleIntegration(String(userId), {
       ...integ,
-      connected: true,
-      calendars: updated,
-      sync: { ...(integ.sync || {}), ...sync, perCal },
+      accounts,
+      connected: accounts.some((a) => a.connected),
+      primaryAccountId: integ.primaryAccountId || targetAccountId,
       updatedAt: new Date(),
     })
 
@@ -72,9 +88,9 @@ router.post('/google/calendars/select', async (req, res) => {
 router.post('/google/sync/now', async (req, res) => {
   try {
     if (ENABLED !== '1' && ENABLED !== 'true') return res.status(503).json({ error: 'Google Calendar integration disabled' })
-    const { userId } = req.body || {}
+    const { userId, accountId } = req.body || {}
     if (!userId) return res.status(400).json({ error: 'Missing userId' })
-    const stats = await syncGoogleAccount(String(userId))
+    const stats = await syncGoogleAccount(String(userId), { accountId: accountId || undefined })
     return res.json({ ok: true, stats })
   } catch (e) {
     console.error('POST /google/sync/now failed', e)
@@ -86,8 +102,9 @@ router.delete('/google/calendars/disconnect', async (req, res) => {
   try {
     if (ENABLED !== '1' && ENABLED !== 'true') return res.status(503).json({ error: 'Google Calendar integration disabled' })
     const userId = String(req.body?.userId || req.query?.userId || req?.user?.uid || '')
+    const accountId = req.body?.accountId || req.query?.accountId || null
     if (!userId) return res.status(400).json({ error: 'Missing userId' })
-    await disconnectGoogleIntegration(userId)
+    await disconnectGoogleIntegration(userId, accountId)
     return res.json({ ok: true })
   } catch (e) {
     console.error('DELETE /google/calendars/disconnect failed', e)

@@ -1,36 +1,38 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-900 text-white px-4 sm:px-8 py-10">
+  <div class="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-900 text-white px-3 sm:px-6 lg:px-10 py-10">
     <!-- Header -->
     <header class="mb-10 text-center">
       <h1 class="text-3xl sm:text-4xl font-bold mb-2">⚙️ Settings</h1>
       <p class="text-indigo-300">Manage your notifications, integrations, and account preferences.</p>
     </header>
 
-    <main class="max-w-6xl mx-auto space-y-8 px-1">
+    <main class="settings-shell space-y-8 sm:space-y-10 px-1">
       <!-- Settings navigation -->
-      <div class="bg-white/5 border border-white/10 rounded-2xl p-4 shadow-lg">
-        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <div v-for="group in tabGroups" :key="group.id" class="space-y-2">
-            <p class="text-xs uppercase tracking-[0.2em] text-slate-300">{{ group.label }}</p>
-            <div class="flex flex-wrap gap-2">
-              <button
-                v-for="tab in group.tabs"
-                :key="tab.id"
-                type="button"
-                :class="[
-                  'px-3 py-1.5 rounded-lg text-sm border transition',
-                  activeTab === tab.id
-                    ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg'
-                    : 'bg-slate-900/40 border-slate-700 text-slate-200 hover:border-slate-500'
-                ]"
-                @click="setActiveTab(tab.id)"
-              >
-                {{ tab.label }}
-              </button>
+      <nav class="settings-panel nav-panel">
+        <div class="nav-scroll">
+          <div class="nav-grid">
+            <div v-for="group in tabGroups" :key="group.id" class="space-y-2 min-w-[220px]">
+              <p class="text-xs uppercase tracking-[0.2em] text-slate-300">{{ group.label }}</p>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-for="tab in group.tabs"
+                  :key="tab.id"
+                  type="button"
+                  :class="[
+                    'px-3 py-1.5 rounded-lg text-sm border transition min-w-[140px] text-left',
+                    activeTab === tab.id
+                      ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg'
+                      : 'bg-slate-900/40 border-slate-700 text-slate-200 hover:border-slate-500'
+                  ]"
+                  @click="setActiveTab(tab.id)"
+                >
+                  {{ tab.label }}
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </nav>
 
       <div v-show="activeTab === 'workspace-knowledge'">
         <KnowledgePanel />
@@ -42,7 +44,7 @@
 
       <section
         v-show="activeTab === 'workspace-policies'"
-        class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10"
+        class="settings-panel"
       >
         <h2 class="text-lg sm:text-xl font-semibold mb-2">🛡️ Policies</h2>
         <p class="text-sm text-indigo-200">
@@ -56,7 +58,7 @@
       <!-- Plan status and usage -->
       <section
         v-show="activeTab === 'billing-subscription'"
-        class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10 max-w-md mx-auto sm:max-w-none"
+        class="settings-panel"
       >
         <h2 class="text-lg sm:text-xl font-semibold mb-2">🌟 Subscription</h2>
         <p class="text-sm text-indigo-200">Current plan: <strong>{{ currentPlanLabel.toUpperCase() }}</strong></p>
@@ -74,7 +76,7 @@
 
       <section
         v-show="activeTab === 'help-onboarding'"
-        class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10 max-w-md mx-auto sm:max-w-none"
+        class="settings-panel"
       >
         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
@@ -98,7 +100,7 @@
 
       <section
         v-show="activeTab === 'account-profile'"
-        class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10"
+        class="settings-panel"
       >
         <h2 class="text-lg sm:text-xl font-semibold mb-2">🙋 Profile</h2>
         <p class="text-sm text-indigo-200">Profile editing lives in your account menu. A dedicated editor will arrive here soon.</p>
@@ -107,7 +109,7 @@
 
       <section
         v-show="activeTab === 'account-preferences'"
-        class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10"
+        class="settings-panel"
       >
         <h2 class="text-lg sm:text-xl font-semibold mb-2">⚙️ Preferences</h2>
         <p class="text-sm text-indigo-200">Workspace-specific preferences (theme, locale, AI persona) will be managed here soon.</p>
@@ -117,8 +119,8 @@
       <section
         v-show="activeTab === 'account-notifications'"
         ref="notificationsSection"
-        :class="['bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10 max-w-md mx-auto sm:max-w-none',
-                 highlightNotifications ? 'ring-2 ring-indigo-400' : '']"
+        :class="['settings-panel',
+                 highlightNotifications ? 'ring-2 ring-indigo-400 ring-offset-2 ring-offset-transparent' : '']"
       >
         <h2 class="text-lg sm:text-xl font-semibold mb-4">🔔 Notification Preferences</h2>
         <p class="text-sm text-indigo-200 mb-4">Choose how you’d like to be reminded about tasks, reflections, and insights.</p>
@@ -182,7 +184,7 @@
 
       <section
         v-show="activeTab === 'account-social'"
-        class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10"
+        class="settings-panel"
       >
         <h2 class="text-lg sm:text-xl font-semibold mb-2">🌐 Social Accounts</h2>
         <p class="text-sm text-indigo-200">Connect LinkedIn, GitHub, and other accounts to sync ownership context. Social linking UI will land here.</p>
@@ -191,11 +193,11 @@
       <!-- Integrations -->
       <section
         v-show="activeTab === 'workspace-integrations'"
-        class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10 max-w-md mx-auto sm:max-w-none"
+        class="settings-panel"
       >
         <h2 class="text-lg sm:text-xl font-semibold mb-4">🔗 Integrations</h2>
         <p class="text-sm text-indigo-200 mb-4">Connect your favorite platforms to sync tasks and reminders.</p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
           <button
             v-for="i in integrationOptions"
             :key="i.key"
@@ -207,118 +209,119 @@
           </button>
         </div>
 
-        <!-- GPT integration card -->
-        <div
-          ref="gptCardRef"
-          :class="[
-            'mt-6 rounded-lg border border-white/10 bg-slate-900/40 p-4 space-y-4 transition',
-            highlightGpt ? 'ring-2 ring-indigo-400 shadow-lg shadow-indigo-500/20' : ''
-          ]"
-        >
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div class="font-semibold flex items-center gap-2">
-                🤖 PlanCraft GPT
-                <span class="text-[10px] px-2 py-0.5 rounded bg-indigo-500/30 text-indigo-100 uppercase tracking-wide">Beta</span>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
+          <!-- GPT integration card -->
+          <div
+            ref="gptCardRef"
+            :class="[
+              'integration-card rounded-lg border border-white/10 bg-slate-900/40 p-4 space-y-4 transition',
+              highlightGpt ? 'ring-2 ring-indigo-400 shadow-lg shadow-indigo-500/20' : ''
+            ]"
+          >
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div class="min-w-0">
+                <div class="font-semibold flex items-center gap-2">
+                  🤖 PlanCraft GPT
+                  <span class="text-[10px] px-2 py-0.5 rounded bg-indigo-500/30 text-indigo-100 uppercase tracking-wide">Beta</span>
+                </div>
+                <p class="text-xs text-slate-300 mt-1">
+                  Generate a short-lived link code and paste it inside ChatGPT to connect the PlanCraft GPT Actions.
+                </p>
+                <p v-if="gptLink.expiresAt" class="text-[11px] text-slate-400">
+                  {{ gptLinkExpired ? 'Expired' : 'Expires' }} {{ gptLinkExpiryLabel }}
+                </p>
               </div>
-              <p class="text-xs text-slate-300 mt-1">
-                Generate a short-lived link code and paste it inside ChatGPT to connect the PlanCraft GPT Actions.
-              </p>
-              <p v-if="gptLink.expiresAt" class="text-[11px] text-slate-400">
-                {{ gptLinkExpired ? 'Expired' : 'Expires' }} {{ gptLinkExpiryLabel }}
-              </p>
+              <div class="flex items-center gap-2 flex-wrap">
+                <button
+                  class="px-3 py-1.5 rounded bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm disabled:opacity-60"
+                  :disabled="gptLink.loading || !authStore.user"
+                  @click="generateGptCode"
+                >
+                  {{ gptLink.loading ? 'Generating…' : gptLink.code ? 'Refresh Code' : 'Generate Code' }}
+                </button>
+                <button
+                  v-if="gptLink.code"
+                  class="px-3 py-1.5 rounded border border-indigo-500/50 text-indigo-100 hover:bg-indigo-500/10 text-sm disabled:opacity-40"
+                  :disabled="gptLink.copied"
+                  @click="copyGptCode"
+                >
+                  {{ gptLink.copied ? 'Copied!' : 'Copy Code' }}
+                </button>
+                <button
+                  v-if="gptLink.code && gptLaunchUrl"
+                  class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-sm text-white flex items-center gap-1"
+                  @click="openChatGpt"
+                >
+                  Open ChatGPT ↗
+                </button>
+              </div>
             </div>
-            <div class="flex items-center gap-2 flex-wrap">
-              <button
-                class="px-3 py-1.5 rounded bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm disabled:opacity-60"
-                :disabled="gptLink.loading || !authStore.user"
-                @click="generateGptCode"
-              >
-                {{ gptLink.loading ? 'Generating…' : gptLink.code ? 'Refresh Code' : 'Generate Code' }}
-              </button>
-              <button
-                v-if="gptLink.code"
-                class="px-3 py-1.5 rounded border border-indigo-500/50 text-indigo-100 hover:bg-indigo-500/10 text-sm disabled:opacity-40"
-                :disabled="gptLink.copied"
-                @click="copyGptCode"
-              >
-                {{ gptLink.copied ? 'Copied!' : 'Copy Code' }}
-              </button>
-              <button
-                v-if="gptLink.code && gptLaunchUrl"
-                class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-sm text-white flex items-center gap-1"
-                @click="openChatGpt"
-              >
-                Open ChatGPT ↗
-              </button>
+            <div v-if="gptLink.code" class="rounded-lg border border-indigo-500/30 bg-slate-950/50 p-4 space-y-3">
+              <div>
+                <p class="text-xs text-slate-400 uppercase tracking-[0.2em]">Link Code</p>
+                <p class="text-3xl font-mono tracking-[0.25em] text-white break-all">{{ gptLink.code }}</p>
+              </div>
+              <ul class="list-decimal list-inside text-xs text-slate-300 space-y-1">
+                <li>Open ChatGPT and launch the PlanCraft AI GPT.</li>
+                <li>Say “Link my account” and paste this code when prompted.</li>
+                <li>Approve the connection to sync tasks, reminders, and journal entries.</li>
+              </ul>
+              <a :href="gptHelpUrl" target="_blank" rel="noreferrer" class="text-indigo-300 text-xs inline-flex items-center gap-1 hover:text-indigo-200">
+                Need help? <span aria-hidden="true">↗</span>
+              </a>
             </div>
+            <p v-else class="text-xs text-slate-400">
+              Codes expire after a few minutes. Generate a fresh one whenever you want to connect ChatGPT.
+            </p>
+            <p v-if="gptLink.error" class="text-xs text-red-300">⚠️ {{ gptLink.error }}</p>
           </div>
-          <div v-if="gptLink.code" class="rounded-lg border border-indigo-500/30 bg-slate-950/50 p-4 space-y-3">
-            <div>
-              <p class="text-xs text-slate-400 uppercase tracking-[0.2em]">Link Code</p>
-              <p class="text-3xl font-mono tracking-[0.25em] text-white break-all">{{ gptLink.code }}</p>
-            </div>
-            <ul class="list-decimal list-inside text-xs text-slate-300 space-y-1">
-              <li>Open ChatGPT and launch the PlanCraft AI GPT.</li>
-              <li>Say “Link my account” and paste this code when prompted.</li>
-              <li>Approve the connection to sync tasks, reminders, and journal entries.</li>
-            </ul>
-            <a :href="gptHelpUrl" target="_blank" rel="noreferrer" class="text-indigo-300 text-xs inline-flex items-center gap-1 hover:text-indigo-200">
-              Need help? <span aria-hidden="true">↗</span>
-            </a>
-          </div>
-          <p v-else class="text-xs text-slate-400">
-            Codes expire after a few minutes. Generate a fresh one whenever you want to connect ChatGPT.
-          </p>
-          <p v-if="gptLink.error" class="text-xs text-red-300">⚠️ {{ gptLink.error }}</p>
-        </div>
 
-        <!-- Google Calendar Card -->
-        <div class="mt-6 rounded-lg border border-white/10 bg-slate-900/40 p-4 space-y-3">
-          <div v-if="googleLoading" class="space-y-4 animate-pulse">
-            <div class="h-5 w-40 bg-slate-800/60 rounded"></div>
-            <div class="h-4 w-3/4 bg-slate-800/40 rounded"></div>
-            <div class="h-10 bg-slate-800/50 rounded"></div>
-          </div>
-          <template v-else>
+          <!-- Google Calendar Card -->
+          <div class="integration-card rounded-lg border border-white/10 bg-slate-900/40 p-4 space-y-3">
+            <div v-if="googleLoading" class="space-y-4 animate-pulse">
+              <div class="h-5 w-40 bg-slate-800/60 rounded"></div>
+              <div class="h-4 w-3/4 bg-slate-800/40 rounded"></div>
+              <div class="h-10 bg-slate-800/50 rounded"></div>
+            </div>
+            <template v-else>
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div class="font-semibold flex items-center gap-2">📆 Google Calendar
                   <span v-if="google.enabled" :class="['text-xs px-2 py-0.5 rounded', google.connected ? 'bg-emerald-700/50 text-emerald-200' : 'bg-yellow-700/40 text-yellow-200']">
-                    {{ google.connected ? 'Connected' : 'Not Connected' }}
+                    {{ google.connected ? `${google.accounts.length} account${google.accounts.length > 1 ? 's' : ''} connected` : 'Not Connected' }}
                   </span>
                   <span v-else class="text-xs px-2 py-0.5 rounded bg-slate-700/50 text-slate-300">Disabled by server</span>
                 </div>
                 <p class="text-xs text-slate-300 mt-1">
                   Import meetings and show Join links in your tasks.
-                  <span v-if="googleLastSync">Last sync: {{ googleLastSync }}</span>
+                  <span v-if="activeGoogleAccount?.lastRun">Last sync: {{ formatGoogleLastSync(activeGoogleAccount.lastRun) }}</span>
                 </p>
               </div>
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-2 flex-wrap">
                 <button
-                  v-if="google.enabled && !google.connected && authStore.user"
+                  v-if="google.enabled && authStore.user"
                   @click="connectGoogle"
                   :disabled="googleLoading"
                   class="px-3 py-1.5 rounded bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm disabled:opacity-50"
                 >
-                  Connect
+                  {{ google.connected ? 'Add account' : 'Connect' }}
                 </button>
                 <button
-                  v-if="google.connected"
+                  v-if="google.connected && activeGoogleAccount"
                   @click="syncNow"
-                  :disabled="googleSyncing"
+                  :disabled="activeGoogleAccount.syncing"
                   class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-sm flex items-center gap-2 disabled:opacity-60"
                 >
                   <span
-                    v-if="googleSyncing"
+                    v-if="activeGoogleAccount.syncing"
                     class="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin"
                     aria-hidden="true"
                   ></span>
-                  <span>{{ googleSyncing ? 'Syncing…' : 'Sync Now' }}</span>
+                  <span>{{ activeGoogleAccount.syncing ? 'Syncing…' : 'Sync Now' }}</span>
                 </button>
                 <button
-                  v-if="google.connected"
-                  @click="disconnectGoogle"
+                  v-if="google.connected && activeGoogleAccount"
+                  @click="disconnectGoogle(activeGoogleAccount.accountId)"
                   class="px-3 py-1.5 rounded bg-red-700/80 hover:bg-red-700 text-sm"
                 >
                   Disconnect
@@ -326,10 +329,25 @@
               </div>
             </div>
 
+            <div v-if="google.connected && google.accounts.length" class="mt-3 flex items-center gap-3 flex-wrap">
+              <label class="text-sm text-slate-300">Active account:</label>
+              <select
+                :value="activeGoogleAccountId"
+                @change="(e) => setActiveGoogleAccount(e.target.value)"
+                class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm"
+              >
+                <option v-for="acc in google.accounts" :key="acc.accountId" :value="acc.accountId">
+                  {{ acc.accountEmail || acc.accountId }} {{ acc.primary ? '(primary)' : '' }}
+                </option>
+              </select>
+              <span v-if="activeGoogleAccount?.status" class="text-xs text-slate-400">Status: {{ activeGoogleAccount.status }}</span>
+              <span v-if="activeGoogleAccount?.lastRun" class="text-xs text-slate-400">Last sync: {{ formatGoogleLastSync(activeGoogleAccount.lastRun) }}</span>
+            </div>
+
             <!-- Calendars selection -->
-            <div v-if="google.connected" class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <label v-for="cal in google.calendars" :key="cal.id" class="flex items-center gap-2 bg-slate-800/40 border border-slate-700/40 rounded p-2">
-                <input type="checkbox" v-model="cal.selected" @change="onSelectionChange" class="accent-indigo-500">
+            <div v-if="google.connected && activeGoogleAccount" class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label v-for="cal in activeCalendars" :key="cal.id" class="flex items-center gap-2 bg-slate-800/40 border border-slate-700/40 rounded p-2">
+                <input type="checkbox" v-model="cal.selected" class="accent-indigo-500">
                 <div class="flex-1">
                   <div class="text-sm">{{ cal.summary || cal.id }}</div>
                   <div class="text-xs text-slate-400">{{ cal.timeZone || '—' }}</div>
@@ -339,40 +357,41 @@
             </div>
 
             <!-- Window + save -->
-            <div v-if="google.connected" class="mt-3 flex items-center gap-3 flex-wrap">
+            <div v-if="google.connected && activeGoogleAccount" class="mt-3 flex items-center gap-3 flex-wrap">
               <label class="text-sm text-slate-300">Look-ahead window:</label>
-              <select v-model.number="google.windowDays" @change="markDirty" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm">
+              <select v-model.number="activeGoogleAccount.windowDays" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm">
                 <option :value="7">7 days</option>
                 <option :value="14">14 days</option>
                 <option :value="30">30 days</option>
                 <option :value="60">60 days</option>
               </select>
               <button @click="saveSelection" class="px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-sm">Save Selection</button>
-              <span v-if="google.status" class="text-xs text-slate-400">Status: {{ google.status }}</span>
+              <span v-if="activeGoogleAccount.status" class="text-xs text-slate-400">Status: {{ activeGoogleAccount.status }}</span>
             </div>
 
-            <div v-if="google.enabled" class="pt-3 border-t border-white/5 space-y-3">
-              <label class="flex items-center gap-3 text-sm text-slate-200">
-                <input type="checkbox" v-model="meetingPrefs.autoCreate" @change="markDirty" class="accent-indigo-500" />
-                Auto-create tasks from calendar events
-              </label>
-              <div class="flex items-center gap-2 text-sm text-slate-200 flex-wrap">
-                <span>Default meeting reminder:</span>
-                <select
-                  v-model.number="meetingPrefs.defaultReminderMinutes"
-                  @change="markDirty"
-                  class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm"
-                >
-                  <option :value="5">5 minutes</option>
-                  <option :value="10">10 minutes</option>
-                  <option :value="15">15 minutes</option>
-                  <option :value="30">30 minutes</option>
-                  <option :value="60">1 hour</option>
-                </select>
-                <span class="text-xs text-slate-400">Adjust reminder lead time for meetings.</span>
+              <div v-if="google.enabled" class="pt-3 border-t border-white/5 space-y-3">
+                <label class="flex items-center gap-3 text-sm text-slate-200">
+                  <input type="checkbox" v-model="meetingPrefs.autoCreate" @change="markDirty" class="accent-indigo-500" />
+                  Auto-create tasks from calendar events
+                </label>
+                <div class="flex items-center gap-2 text-sm text-slate-200 flex-wrap">
+                  <span>Default meeting reminder:</span>
+                  <select
+                    v-model.number="meetingPrefs.defaultReminderMinutes"
+                    @change="markDirty"
+                    class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm"
+                  >
+                    <option :value="5">5 minutes</option>
+                    <option :value="10">10 minutes</option>
+                    <option :value="15">15 minutes</option>
+                    <option :value="30">30 minutes</option>
+                    <option :value="60">1 hour</option>
+                  </select>
+                  <span class="text-xs text-slate-400">Adjust reminder lead time for meetings.</span>
+                </div>
               </div>
-            </div>
-          </template>
+            </template>
+          </div>
         </div>
       </section>
 
@@ -382,7 +401,7 @@
       </div>
 
       <!-- Account -->
-      <section class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10 max-w-md mx-auto sm:max-w-none">
+      <section class="settings-panel">
         <h2 class="text-lg sm:text-xl font-semibold mb-4">👤 Account</h2>
         <div class="flex items-center gap-4 mb-4">
           <AvatarUploader :url="authStore.user?.photoURL || authStore.user?.avatarUrl" @updated="onAvatarUpdated" />
@@ -894,14 +913,35 @@ const effectiveTwilioPhone = computed(() => {
 })
 
 // Google Calendar integration state and handlers
-const google = reactive({ enabled: true, connected: false, calendars: [], windowDays: 30, status: '', lastRun: null, accountEmail: '' })
+const google = reactive({ enabled: true, connected: false, status: '', accounts: [] })
 const googleLoading = ref(true)
-const googleSyncing = ref(false)
 const meetingPrefs = reactive({ autoCreate: true, defaultReminderMinutes: DEFAULT_MEETING_REMINDER })
-const googleLastSync = computed(() => {
-  if (!google.lastRun) return null
-  try { return dayjs(google.lastRun).format('MMM D • hh:mm A') } catch { return google.lastRun }
+const activeGoogleAccountId = ref('')
+const activeGoogleAccount = computed(() => {
+  return google.accounts.find((a) => a.accountId === activeGoogleAccountId.value) || google.accounts[0] || null
 })
+const activeCalendars = computed(() => activeGoogleAccount.value?.calendars || [])
+function buildGoogleAccountModel(acc = {}, primaryId = '') {
+  const calendars = Array.isArray(acc?.calendars) ? acc.calendars.map((c) => ({ ...c })) : []
+  const primaryCal = calendars.find((c) => c.primary)
+  return {
+    accountId: acc.accountId || acc.id || 'primary',
+    accountEmail: acc.accountEmail || acc.token?.email || primaryCal?.summary || primaryCal?.id || 'Google account',
+    connected: acc.connected !== false,
+    calendars,
+    windowDays: Number(acc?.sync?.windowDays || 30),
+    status: acc?.sync?.status || acc?.status || '',
+    lastRun: acc?.sync?.lastRun || acc?.lastRun || null,
+    primary: !!(acc.primary || (acc.accountId && acc.accountId === primaryId)),
+    loading: false,
+    syncing: false,
+    saving: false,
+  }
+}
+function formatGoogleLastSync(ts) {
+  if (!ts) return null
+  try { return dayjs(ts).format('MMM D • hh:mm A') } catch { return ts }
+}
 async function connectGoogle() {
   try {
     if (!authStore.user?.uid) return
@@ -910,6 +950,53 @@ async function connectGoogle() {
     else ElMessage.error('Failed to get Google consent URL')
   } catch (e) {
     ElMessage.error(e?.response?.data?.error || 'Failed to start Google connect')
+  }
+}
+
+function upsertGoogleAccount(acc) {
+  if (!acc?.accountId) return
+  const idx = google.accounts.findIndex((a) => a.accountId === acc.accountId)
+  if (idx >= 0) google.accounts.splice(idx, 1, { ...google.accounts[idx], ...acc })
+  else google.accounts.push(acc)
+  google.connected = google.accounts.some((a) => a.connected)
+}
+
+function setActiveGoogleAccount(id) {
+  activeGoogleAccountId.value = id
+  loadGoogleCalendars(id, { suppressLoader: false })
+}
+
+async function loadGoogleCalendars(accountId, options = {}) {
+  const targetId = accountId || activeGoogleAccountId.value || google.accounts[0]?.accountId
+  if (!targetId || !authStore.user?.uid) return
+  const suppressLoader = options?.suppressLoader === true
+  const acc = google.accounts.find((a) => a.accountId === targetId)
+  if (acc && !suppressLoader) acc.loading = true
+  try {
+    const resp = await getGoogleCalendars(authStore.user.uid, targetId)
+    const calendars = Array.isArray(resp) ? resp : resp?.calendars || []
+    const mergedAccount = buildGoogleAccountModel(
+      {
+        ...(acc || {}),
+        calendars,
+        accountId: resp?.accountId || targetId,
+        accountEmail: resp?.accountEmail || acc?.accountEmail,
+        sync: {
+          ...(acc?.sync || {}),
+          windowDays: Number(resp?.windowDays || acc?.windowDays || acc?.sync?.windowDays || 30),
+          status: acc?.status,
+          lastRun: acc?.lastRun,
+        },
+      },
+      resp?.primaryAccountId || targetId,
+    )
+    upsertGoogleAccount(mergedAccount)
+  } catch (e) {
+    console.warn('loadGoogleCalendars failed', e?.message || e)
+    if (acc) acc.status = 'error'
+  } finally {
+    if (acc) acc.loading = false
+    if (!suppressLoader) googleLoading.value = false
   }
 }
 
@@ -924,21 +1011,27 @@ async function loadGoogle(options = {}) {
     } catch (e) {
       google.enabled = false
       google.connected = false
-      google.calendars = []
+      google.accounts = []
       return
     }
-    google.enabled = true
-    google.connected = !!status?.connected
-    google.windowDays = Number(status?.sync?.windowDays || 30)
-    google.status = status?.sync?.status || ''
-    google.lastRun = status?.sync?.lastRun || null
-    google.accountEmail = status?.accountEmail || status?.token?.email || ''
-    if (!google.connected) {
-      google.calendars = []
-      return
+    const enabledFromServer = status?.integration?.enabled ?? status?.enabled
+    const integration = status?.integration || status || {}
+    google.enabled = enabledFromServer !== false
+    const rawAccounts = Array.isArray(integration.accounts) && integration.accounts.length
+      ? integration.accounts
+      : [{ ...integration, accountId: integration.primaryAccountId || 'primary' }]
+    google.accounts = rawAccounts.map((acc) => buildGoogleAccountModel(acc, integration.primaryAccountId))
+    google.connected = google.accounts.some((a) => a.connected)
+    const desiredId =
+      options?.keepActive ||
+      activeGoogleAccountId.value ||
+      integration.primaryAccountId ||
+      google.accounts[0]?.accountId ||
+      ''
+    if (desiredId) activeGoogleAccountId.value = desiredId
+    if (google.accounts.length) {
+      await loadGoogleCalendars(activeGoogleAccountId.value, { suppressLoader: true })
     }
-    const cals = await getGoogleCalendars(authStore.user.uid)
-    google.calendars = Array.isArray(cals) ? cals : []
   } catch (e) {
     console.warn('loadGoogle failed', e?.message || e)
   } finally {
@@ -948,10 +1041,11 @@ async function loadGoogle(options = {}) {
 
 async function saveSelection() {
   try {
-    if (!authStore.user?.uid) return
-    const selected = (google.calendars || []).filter(c => c.selected).map(c => c.id)
-    await saveGoogleCalendarSelection(authStore.user.uid, selected, google.windowDays)
+    if (!authStore.user?.uid || !activeGoogleAccount.value) return
+    const selected = (activeCalendars.value || []).filter(c => c.selected).map(c => c.id)
+    await saveGoogleCalendarSelection(authStore.user.uid, selected, activeGoogleAccount.value.windowDays, activeGoogleAccount.value.accountId)
     ElMessage.success('Google calendar selection saved')
+    await loadGoogleCalendars(activeGoogleAccount.value.accountId, { suppressLoader: true })
   } catch (e) {
     ElMessage.error(e?.response?.data?.error || 'Failed to save selection')
   }
@@ -959,9 +1053,10 @@ async function saveSelection() {
 
 async function syncNow() {
   try {
-    if (!authStore.user?.uid || googleSyncing.value) return
-    googleSyncing.value = true
-    const result = await triggerGoogleSyncNow(authStore.user.uid)
+    if (!authStore.user?.uid || !activeGoogleAccount.value) return
+    const acc = activeGoogleAccount.value
+    acc.syncing = true
+    const result = await triggerGoogleSyncNow(authStore.user.uid, acc.accountId)
     if (result?.ok) {
       const stats = result.stats || {}
       const cleared = (stats.cancelled || 0) + (stats.deleted || 0)
@@ -972,30 +1067,29 @@ async function syncNow() {
       if (stats.skipped) summaryParts.push(`${stats.skipped} unchanged`)
       const label = summaryParts.length ? `Synced ${summaryParts.join(', ')}` : 'Calendar sync completed'
       ElMessage.success(label)
-      await loadGoogle({ suppressLoader: true })
+      await loadGoogle({ suppressLoader: true, keepActive: acc.accountId })
     } else {
       ElMessage.warning('Sync request not accepted')
     }
   } catch (e) {
     ElMessage.error(e?.response?.data?.error || 'Sync failed')
   } finally {
-    googleSyncing.value = false
+    if (activeGoogleAccount.value) activeGoogleAccount.value.syncing = false
   }
 }
 
-function onSelectionChange() {
-  markDirty()
-}
-
-async function disconnectGoogle() {
+async function disconnectGoogle(accountId = null) {
   try {
     if (!authStore.user?.uid) return
-    await disconnectGoogleIntegration(authStore.user.uid)
+    const targetId = accountId || activeGoogleAccount.value?.accountId || null
+    await disconnectGoogleIntegration(authStore.user.uid, targetId)
     ElMessage.success('Google Calendar disconnected')
-    google.connected = false
-    google.calendars = []
-    google.status = 'disconnected'
-    google.lastRun = null
+    google.accounts = google.accounts.filter((a) => a.accountId !== targetId)
+    google.connected = google.accounts.some((a) => a.connected)
+    activeGoogleAccountId.value = google.accounts[0]?.accountId || ''
+    if (activeGoogleAccountId.value) {
+      await loadGoogleCalendars(activeGoogleAccountId.value, { suppressLoader: true })
+    }
   } catch (e) {
     ElMessage.error(e?.response?.data?.error || 'Failed to disconnect Google Calendar')
   }
@@ -1335,6 +1429,57 @@ const premiumEndsOn = computed(() => {
 </script>
 
 <style scoped>
+.settings-shell {
+  width: min(1200px, 100%);
+  margin: 0 auto;
+}
+
+.settings-panel {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: radial-gradient(120% 120% at 10% 10%, rgba(99, 102, 241, 0.08), rgba(15, 23, 42, 0.8)), rgba(15, 23, 42, 0.6);
+  border-radius: 18px;
+  padding: 1.25rem;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(10px);
+}
+
+.nav-panel {
+  position: relative;
+}
+
+.nav-scroll {
+  overflow-x: auto;
+  margin: 0 -0.5rem;
+  padding: 0 0.5rem 0.5rem;
+}
+
+.nav-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.nav-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 9999px;
+}
+
+.nav-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+  min-width: 100%;
+}
+
+.integration-card {
+  height: 100%;
+}
+
+@media (max-width: 640px) {
+  .settings-panel {
+    padding: 1rem;
+  }
+}
+
 section h2 {
   color: #f8fafc;
 }

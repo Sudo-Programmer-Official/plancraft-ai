@@ -1,6 +1,6 @@
 <template>
-  <section class="bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-6 shadow-lg border border-white/10 max-w-4xl mx-auto">
-    <div class="flex items-center justify-between gap-3 flex-wrap">
+  <section class="social-panel">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
       <div>
         <h2 class="text-lg sm:text-xl font-semibold">🔗 Social Accounts</h2>
         <p class="text-sm text-indigo-100 mt-1">Connect channels for publishing from PlanCraft.</p>
@@ -11,8 +11,8 @@
       </div>
     </div>
 
-    <div class="grid sm:grid-cols-2 gap-4 mt-4">
-      <div v-for="card in cards" :key="card.key" class="rounded-lg border border-white/10 bg-slate-900/40 p-4 space-y-3">
+    <div class="social-grid mt-4">
+      <div v-for="card in cards" :key="card.key" class="social-card rounded-lg border border-white/10 bg-slate-900/40 p-4 space-y-3">
         <div class="flex items-start justify-between gap-2">
           <div>
             <div class="font-semibold flex items-center gap-2">
@@ -288,5 +288,32 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.social-panel {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: radial-gradient(120% 120% at 10% 10%, rgba(99, 102, 241, 0.07), rgba(15, 23, 42, 0.75)), rgba(15, 23, 42, 0.6);
+  border-radius: 18px;
+  padding: 1.25rem;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(10px);
+  margin: 0 auto;
+}
+
+.social-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.social-card {
+  height: 100%;
+}
+
+@media (min-width: 640px) {
+  .social-panel {
+    padding: 1.5rem;
+  }
+}
+
 button { transition: all 0.15s ease; }
 </style>
