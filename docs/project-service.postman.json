@@ -1,0 +1,41 @@
+{
+  "info": {
+    "name": "Project Service",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Postman collection for project-service (scaffold)."
+  },
+  "item": [
+    {
+      "name": "Health",
+      "request": { "method": "GET", "url": "{{baseUrl}}/health" }
+    },
+    {
+      "name": "Get Plugin Settings",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/v1/workspaces/{{workspaceId}}/plugins/project-management",
+        "header": [ { "key": "x-user-id", "value": "demo" }, { "key": "x-workspace-id", "value": "{{workspaceId}}" } ]
+      }
+    },
+    {
+      "name": "Enable PM",
+      "request": {
+        "method": "PUT",
+        "url": "{{baseUrl}}/v1/workspaces/{{workspaceId}}/plugins/project-management",
+        "header": [
+          { "key": "x-user-id", "value": "admin" },
+          { "key": "x-workspace-id", "value": "{{workspaceId}}" },
+          { "key": "x-roles", "value": "workspace_admin" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"projectManagementEnabled\": true,\n  \"sprintEnabled\": true,\n  \"sprintLabel\": \"Sprint\"\n}"
+        }
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4005" },
+    { "key": "workspaceId", "value": "ws_demo" }
+  ]
+}
