@@ -618,7 +618,9 @@ export async function createMessage(req, res, next) {
       body: data.body || '',
       bodyPreview: (data.body || '').slice(0, 180),
       scheduledAt: scheduled ? admin.firestore.Timestamp.fromDate(scheduled) : null,
-      status: ['sms', 'whatsapp', 'email', 'call'].includes(channel) ? 'scheduled' : data.status || 'draft',
+      status: ['sms', 'whatsapp', 'email', 'call', 'voice_call', 'voice'].includes(channel)
+        ? 'scheduled'
+        : data.status || 'draft',
       createdAt: serverTs(),
       updatedAt: serverTs(),
       meta: data.meta || {},
@@ -626,7 +628,7 @@ export async function createMessage(req, res, next) {
     await docRef.set(payload)
 
     let job = null
-    if (['sms', 'whatsapp', 'email'].includes(channel)) {
+    if (['sms', 'whatsapp', 'email', 'voice_call', 'voice'].includes(channel)) {
       const jobBody = {
         jobType: 'leader_outreach',
         channel,
@@ -637,6 +639,7 @@ export async function createMessage(req, res, next) {
           body: payload.body,
           fromProfileId: payload.fromProfileId || 'default',
           contactIds,
+          audioUrl: data?.meta?.audioUrl || data?.audioUrl || null,
         },
         meta: {
           leaderId: uid,
@@ -707,44 +710,49 @@ export async function sendMessageNow(req, res, next) {
     }
     const channel = data.channel || 'sms'
     const scheduled = new Date()
-    const jobBody = {
-      jobType: 'leader_outreach',
-      channel,
-      fromProfileId: data.fromProfileId || 'default',
-      scheduledAt: scheduled.toISOString(),
-      payload: {
-        to: data.to,
-        body: data.body,
+    if (['sms', 'whatsapp', 'email', 'voice_call', 'voice'].includes(channel)) {
+      const jobBody = {
+        jobType: 'leader_outreach',
+        channel,
         fromProfileId: data.fromProfileId || 'default',
-        contactIds: data.contactIds || [],
-      },
-      meta: {
-        leaderId: uid,
-        occasionId: data.occasionId || null,
-        eventId: data.eventId || null,
-        workspaceId: wsId || data.workspaceId || null,
-        messageId: `leaders/${uid}/messages/${id}`,
-      },
+        scheduledAt: scheduled.toISOString(),
+        payload: {
+          to: data.to,
+          body: data.body,
+          fromProfileId: data.fromProfileId || 'default',
+          contactIds: data.contactIds || [],
+          audioUrl: data?.meta?.audioUrl || data?.audioUrl || null,
+        },
+        meta: {
+          leaderId: uid,
+          occasionId: data.occasionId || null,
+          eventId: data.eventId || null,
+          workspaceId: wsId || data.workspaceId || null,
+          messageId: `leaders/${uid}/messages/${id}`,
+        },
+      }
+      let job = null
+      try {
+        job = await enqueuePostingJob(jobBody)
+        await userCollection(uid, 'messages')
+          .doc(id)
+          .set(
+            {
+              status: 'scheduled',
+              scheduledAt: admin.firestore.Timestamp.fromDate(scheduled),
+              jobId: job?.jobId || job?.id || null,
+              updatedAt: serverTs(),
+            },
+            { merge: true },
+          )
+      } catch (err) {
+        return res.status(500).json({ success: false, error: err?.message || 'Failed to send' })
+      }
+      const updated = await userCollection(uid, 'messages').doc(id).get()
+      return res.json({ success: true, message: { id, ...updated.data() }, job })
     }
-    let job = null
-    try {
-      job = await enqueuePostingJob(jobBody)
-      await userCollection(uid, 'messages')
-        .doc(id)
-        .set(
-          {
-            status: 'scheduled',
-            scheduledAt: admin.firestore.Timestamp.fromDate(scheduled),
-            jobId: job?.jobId || job?.id || null,
-            updatedAt: serverTs(),
-          },
-          { merge: true },
-        )
-    } catch (err) {
-      return res.status(500).json({ success: false, error: err?.message || 'Failed to send' })
-    }
-    const updated = await userCollection(uid, 'messages').doc(id).get()
-    res.json({ success: true, message: { id, ...updated.data() }, job })
+
+    res.status(400).json({ success: false, error: `Unsupported channel ${channel}` })
   } catch (err) {
     next(err)
   }

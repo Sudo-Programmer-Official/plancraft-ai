@@ -7,6 +7,7 @@ import { sendEmail } from './integrations/emailProvider.js'
 import { makeCallForUser, sendSMSForUser } from './twilioService.js'
 import { getUserPrefs } from './userPrefService.js'
 import { buildReminderBrandCopy } from './notificationTemplates.js'
+import { enqueueNotificationJob, postingServiceAvailable } from './postingServiceClient.js'
 
 export async function sendNotification(userId, message, channel = 'all', options = {}) {
   const snap = await db.collection('users').doc(String(userId)).get()
@@ -144,6 +145,38 @@ function ensureArray(items) {
   return [items].filter(Boolean)
 }
 
+async function loadUserContacts(userId) {
+  try {
+    const snap = await db.collection('users').doc(String(userId)).get()
+    const data = snap.exists ? snap.data() : {}
+    const notifications = data?.preferences?.notifications || {}
+    const integrations = data?.integrations || {}
+    const whatsapp = integrations?.whatsapp?.phone || notifications?.whatsapp_phone || data?.phone || null
+    const sms = notifications?.phone_sms || integrations?.sms?.phone || integrations?.whatsapp?.phone || data?.phone || null
+    const voice =
+      notifications?.phone_voice || integrations?.sms?.phone || integrations?.whatsapp?.phone || data?.phone || null
+    const email =
+      integrations?.email ||
+      data?.email ||
+      data?.profile?.email ||
+      data?.preferences?.email ||
+      notifications?.email ||
+      null
+    return { whatsapp, sms, voice, email }
+  } catch (err) {
+    console.warn('[Notification] loadUserContacts failed', err?.message || err)
+    return {}
+  }
+}
+
+function pickRecipientForChannel(channel, contacts = {}) {
+  if (channel === 'whatsapp') return contacts.whatsapp || contacts.sms || contacts.voice || null
+  if (channel === 'sms') return contacts.sms || contacts.whatsapp || contacts.voice || null
+  if (channel === 'voice') return contacts.voice || contacts.sms || contacts.whatsapp || null
+  if (channel === 'email') return contacts.email || null
+  return null
+}
+
 function describeItem(item) {
   const title = item?.title || item?.text || item?.message || 'Untitled task'
   const parts = []
@@ -191,7 +224,32 @@ async function sendWhatsAppWithFallback(userId, primary, fallback) {
   }
 }
 
-async function sendViaChannel(channel, userId, payload) {
+async function sendViaChannel(channel, userId, payload, contacts = {}, meta = {}) {
+  // Prefer routing through posting-service if available and we have a recipient.
+  const normalizedChannel = channel === 'voice' ? 'voice_call' : channel
+  const postingEnabled = postingServiceAvailable()
+  const to = pickRecipientForChannel(channel, contacts)
+  if (postingEnabled && to) {
+    try {
+      const res = await enqueueNotificationJob(normalizedChannel, {
+        to,
+        body:
+          channel === 'whatsapp'
+            ? payload.whatsappPrimary || payload.whatsappFallback || payload.message
+            : channel === 'email'
+              ? payload.emailMessage || payload.message
+              : channel === 'sms'
+                ? payload.smsMessage || payload.message
+                : payload.voiceMessage || payload.message,
+        subject: payload.subject || 'PlanCraftAI Update',
+        audioUrl: payload.voiceOptions?.audioUrl || null,
+      }, { userId, ...meta })
+      if (res) return res
+    } catch (err) {
+      console.warn('[Notification] posting-service send failed; falling back', err?.message || err)
+    }
+  }
+
   if (channel === 'whatsapp') {
     return sendWhatsAppWithFallback(userId, payload.whatsappPrimary, payload.whatsappFallback || payload.message)
   }
@@ -224,6 +282,7 @@ export async function notifyTaskCreated(userId, tasksInput = [], options = {}) {
   const title = options.title || '🆕 New Tasks Created'
   const message = options.message || buildGroupedMessage(title, tasks, { fallback: 'A new task is ready for you.' })
   const subject = options.subject || 'PlanCraftAI Update'
+  const contacts = await loadUserContacts(userId)
 
   const channelResolution = await resolveUserChannels(userId, options.channels, {
     includeVoice: false,
@@ -266,7 +325,7 @@ export async function notifyTaskCreated(userId, tasksInput = [], options = {}) {
   } catch {}
   for (const channel of channels) {
     try {
-      deliveries.push(await sendViaChannel(channel, userId, payload))
+      deliveries.push(await sendViaChannel(channel, userId, payload, contacts, { workspaceId: tasks[0]?.workspaceId || null, type: 'task_created' }))
       console.log(`[Notify] Task creation alert sent to ${userId} via ${channel}`)
     } catch (err) {
       console.warn(`[Notification] ${channel} failed for task creation`, err?.message || err)
@@ -300,6 +359,7 @@ export async function sendCalendarDigestNotification(userId, createdTasks = []) 
     returnContext: true,
   })
   const channels = channelResolution.channels
+  const contacts = await loadUserContacts(userId)
 
   const payload = {
     message,
@@ -320,7 +380,7 @@ export async function sendCalendarDigestNotification(userId, createdTasks = []) 
   const deliveries = []
   for (const channel of channels) {
     try {
-      deliveries.push(await sendViaChannel(channel, userId, payload))
+      deliveries.push(await sendViaChannel(channel, userId, payload, contacts, { type: 'calendar_digest' }))
       console.log(`[Notify] Calendar digest sent via ${channel}`)
     } catch (err) {
       console.warn('[Notification] calendar digest failed', err?.message || err)
@@ -378,6 +438,7 @@ export async function notifyReminderDue(userId, itemsInput = [], options = {}) {
     returnContext: true,
   })
   const channels = channelResolution.channels
+  const contacts = await loadUserContacts(userId)
 
   const payload = {
     message,
@@ -411,7 +472,7 @@ export async function notifyReminderDue(userId, itemsInput = [], options = {}) {
   } catch {}
   for (const channel of channels) {
     try {
-      deliveries.push(await sendViaChannel(channel, userId, payload))
+      deliveries.push(await sendViaChannel(channel, userId, payload, contacts, { type: 'reminder_due' }))
       console.log(`[Notify] Reminder alert sent to ${userId} via ${channel}`)
     } catch (err) {
       console.warn(`[Notification] ${channel} failed for reminder`, err?.message || err)
