@@ -9,7 +9,7 @@ const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || ''
 const TWILIO_FROM = process.env.TWILIO_PHONE_NUMBER || process.env.TWILIO_SMS_FROM || ''
 const TWILIO_BASE = 'https://api.twilio.com/2010-04-01'
 
-const SES_REGION = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1'
+const SES_REGION = process.env.AWS_SES_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1'
 const SES_FROM = process.env.SES_FROM_EMAIL || process.env.SES_FROM || process.env.EMAIL_FROM || ''
 let sesClient = null
 
