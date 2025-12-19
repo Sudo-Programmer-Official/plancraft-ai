@@ -439,6 +439,11 @@ export async function notifyReminderDue(userId, itemsInput = [], options = {}) {
   })
   const channels = channelResolution.channels
   const contacts = await loadUserContacts(userId)
+  const workspaceId =
+    options.workspaceId ||
+    reminders.find((r) => r?.workspaceId)?.workspaceId ||
+    reminders.find((r) => r?.context?.workspaceId)?.context?.workspaceId ||
+    null
 
   const payload = {
     message,
@@ -472,7 +477,9 @@ export async function notifyReminderDue(userId, itemsInput = [], options = {}) {
   } catch {}
   for (const channel of channels) {
     try {
-      deliveries.push(await sendViaChannel(channel, userId, payload, contacts, { type: 'reminder_due' }))
+      deliveries.push(
+        await sendViaChannel(channel, userId, payload, contacts, { type: 'reminder_due', workspaceId }),
+      )
       console.log(`[Notify] Reminder alert sent to ${userId} via ${channel}`)
     } catch (err) {
       console.warn(`[Notification] ${channel} failed for reminder`, err?.message || err)

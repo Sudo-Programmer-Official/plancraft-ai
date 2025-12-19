@@ -1,16 +1,25 @@
 import axios from 'axios'
 
 const POSTING_BASE =
-  (process.env.POSTING_SERVICE_URL ||
-    process.env.POSTING_API_BASE ||
-    process.env.POSTING_URL ||
-    '').replace(/\/+$/, '')
+  [
+    process.env.POSTING_SERVICE_URL,
+    process.env.POSTING_API_BASE,
+    process.env.POSTING_URL,
+    'http://posting-service',
+    'http://localhost:8080',
+  ]
+    .map((val) => (val || '').trim())
+    .find((val) => !!val)
+    ?.replace(/\/+$/, '') || ''
 
 const APP_TOKEN = (process.env.SERVICE_APP_TOKEN || process.env.APP_TOKEN || '').trim()
 
 function buildHeaders(workspaceId) {
   const headers = { 'Content-Type': 'application/json' }
-  if (APP_TOKEN) headers['x-app-token'] = APP_TOKEN
+  if (APP_TOKEN) {
+    headers['x-app-token'] = APP_TOKEN
+    headers['Authorization'] = `Bearer ${APP_TOKEN}`
+  }
   if (workspaceId) headers['x-workspace-id'] = workspaceId
   return headers
 }
