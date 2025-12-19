@@ -25,7 +25,7 @@ function buildHeaders(workspaceId) {
 }
 
 export function postingServiceAvailable() {
-  return !!POSTING_BASE
+  return !!POSTING_BASE && !!APP_TOKEN
 }
 
 export async function enqueueNotificationJob(channel, payload = {}, meta = {}) {
