@@ -224,6 +224,13 @@ async function sendWhatsAppWithFallback(userId, primary, fallback) {
   }
 }
 
+function maskRecipient(value) {
+  if (!value) return null
+  const s = String(value)
+  if (s.length <= 4) return '***'
+  return `${s.slice(0, 2)}…${s.slice(-2)}`
+}
+
 async function sendViaChannel(channel, userId, payload, contacts = {}, meta = {}) {
   // Prefer routing through posting-service if available and we have a recipient.
   const normalizedChannel = channel === 'voice' ? 'voice_call' : channel
@@ -231,6 +238,13 @@ async function sendViaChannel(channel, userId, payload, contacts = {}, meta = {}
   const to = pickRecipientForChannel(channel, contacts)
   if (postingEnabled && to) {
     try {
+      console.log('[Notification] enqueue posting-service', {
+        channel: normalizedChannel,
+        to: maskRecipient(to),
+        workspaceId: meta.workspaceId || payload.workspaceId || null,
+        userId,
+        type: meta.type || null,
+      })
       const res = await enqueueNotificationJob(normalizedChannel, {
         to,
         body:
@@ -244,6 +258,12 @@ async function sendViaChannel(channel, userId, payload, contacts = {}, meta = {}
         subject: payload.subject || 'PlanCraftAI Update',
         audioUrl: payload.voiceOptions?.audioUrl || null,
       }, { userId, ...meta })
+      console.log('[Notification] posting-service enqueued', {
+        channel: normalizedChannel,
+        to: maskRecipient(to),
+        jobId: res?.job?.id || res?.job?.jobId || null,
+        workspaceId: meta.workspaceId || payload.workspaceId || null,
+      })
       if (res) return res
     } catch (err) {
       console.warn('[Notification] posting-service send failed; falling back', err?.message || err)

@@ -1,6 +1,13 @@
 import { saveJob, fetchDueJobs, markJobStatus } from '../firestore/jobsRepository.js'
 import { handleJob } from './deliveryService.js'
 
+function mask(value) {
+  if (!value) return null
+  const s = String(value)
+  if (s.length <= 4) return '***'
+  return `${s.slice(0, 2)}…${s.slice(-2)}`
+}
+
 function normalizeChannel(channel) {
   const lower = (channel || '').toLowerCase()
   if (lower === 'call' || lower === 'voice') return 'voice_call'
@@ -32,6 +39,13 @@ export async function processJob(job) {
   // Lightweight send: use deliveryService for supported channels, log for others.
   if (['sms', 'whatsapp', 'voice_call', 'email'].includes(channel)) {
     const recipient = buildRecipient(job)
+    console.log('[posting-service] job:process', {
+      id: job.id || job.jobId,
+      jobType: job.jobType,
+      channel,
+      to: mask(recipient?.phoneNumber || recipient?.email || recipient?.contactId),
+      workspaceId: job.workspaceId || job.meta?.workspaceId || null,
+    })
     return handleJob({
       channel,
       recipients: [recipient],
