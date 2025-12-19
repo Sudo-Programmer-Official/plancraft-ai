@@ -231,11 +231,38 @@ function maskRecipient(value) {
   return `${s.slice(0, 2)}…${s.slice(-2)}`
 }
 
+function hasPayloadForChannel(channel, payload = {}) {
+  if (channel === 'sms') return !!payload.smsMessage
+  if (channel === 'voice') return !!payload.voiceMessage
+  if (channel === 'email') return !!payload.emailMessage || !!payload.message
+  if (channel === 'whatsapp') return !!(payload.whatsappPrimary || payload.whatsappFallback || payload.message)
+  if (channel === 'pwa') return !!payload.pwa || !!payload.message
+  return false
+}
+
 async function sendViaChannel(channel, userId, payload, contacts = {}, meta = {}) {
+  // PWA never needs posting-service; send directly so users always see at least one channel.
+  if (channel === 'pwa') {
+    return sendPWA(
+      userId,
+      payload.pwa || {
+        title: 'PlanCraftAI',
+        body: payload.message,
+        data: payload.pwaData || {},
+      },
+    )
+  }
+
   // Prefer routing through posting-service if available and we have a recipient.
   const normalizedChannel = channel === 'voice' ? 'voice_call' : channel
   const postingEnabled = postingServiceAvailable()
   const to = pickRecipientForChannel(channel, contacts)
+
+  if (!hasPayloadForChannel(channel, payload)) {
+    console.log('[Notification] skipping channel due to empty payload', { channel })
+    return null
+  }
+
   if (postingEnabled && to) {
     try {
       console.log('[Notification] enqueue posting-service', {
@@ -275,16 +302,6 @@ async function sendViaChannel(channel, userId, payload, contacts = {}, meta = {}
   }
   if (channel === 'email') {
     return sendEmail(userId, payload.emailMessage || payload.message, payload.subject)
-  }
-  if (channel === 'pwa') {
-    return sendPWA(
-      userId,
-      payload.pwa || {
-        title: 'PlanCraftAI',
-        body: payload.message,
-        data: payload.pwaData || {},
-      },
-    )
   }
   if (channel === 'voice') {
     if (!payload.voiceMessage) return null
