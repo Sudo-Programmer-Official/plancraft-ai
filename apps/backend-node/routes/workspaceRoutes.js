@@ -18,6 +18,7 @@ import {
   updateInviteEmailStatus,
   updateWorkspace,
 } from "../services/workspaceService.js";
+import { recomputeSeatsUsed } from "../services/workspaceService.js";
 import { sendEmail } from "../services/emailService.js";
 import { db } from "../services/firebaseAdmin.js";
 
@@ -25,6 +26,7 @@ const router = express.Router();
 
 function roleLabel(role) {
   const normalized = String(role || "").toLowerCase();
+  if (normalized === "owner") return "Owner";
   if (normalized === "admin") return "Admin";
   if (normalized === "editor") return "Editor";
   return "Viewer";
@@ -87,7 +89,7 @@ async function logInviteEmailAttempt(payload = {}) {
 
 router.post("/workspaces", requireAuth, async (req, res) => {
   try {
-    const { name, icon, theme, timezone, workspaceType = "team", description = "" } = req.body || {};
+    const { name, icon, theme, timezone, workspaceType = "team", description = "", plan, planIntent, seatLimit } = req.body || {};
     const workspace = await createWorkspace({
       name,
       icon,
@@ -96,8 +98,10 @@ router.post("/workspaces", requireAuth, async (req, res) => {
       workspaceType,
       description,
       ownerId: req.user.uid,
+      plan: plan || planIntent || req.query?.plan || "free",
+      seatLimit: seatLimit ?? null,
     });
-    return res.status(201).json({ workspace, role: "admin" });
+    return res.status(201).json({ workspace, role: "owner" });
   } catch (err) {
     console.error("[WorkspaceRoutes] create failed", err?.message || err);
     return res.status(500).json({ error: "Failed to create workspace" });
@@ -114,8 +118,11 @@ router.get("/workspaces", requireAuth, async (req, res) => {
   }
 });
 
-router.patch("/workspaces/:workspaceId", requireAuth, requireWorkspaceRole(["admin"]), async (req, res) => {
+router.patch("/workspaces/:workspaceId", requireAuth, requireWorkspaceRole(["admin", "owner"]), async (req, res) => {
   try {
+    if (req.body?.plan && req.workspace?.ownerId && req.workspace.ownerId !== req.user.uid) {
+      return res.status(403).json({ error: "Only workspace owners can change plan" });
+    }
     const workspace = await updateWorkspace(req.workspaceId, req.body || {});
     return res.json({ workspace });
   } catch (err) {
@@ -124,7 +131,7 @@ router.patch("/workspaces/:workspaceId", requireAuth, requireWorkspaceRole(["adm
   }
 });
 
-router.get("/workspaces/:workspaceId/members", requireAuth, requireWorkspaceRole(["admin"]), async (req, res) => {
+router.get("/workspaces/:workspaceId/members", requireAuth, requireWorkspaceRole(["admin", "owner"]), async (req, res) => {
   try {
     const members = await listWorkspaceMembers(req.workspaceId);
     const invitesRaw = await listWorkspaceInvites(req.workspaceId, ["pending"]);
@@ -151,6 +158,14 @@ async function createInviteHandler(req, res) {
       invitedBy: req.user.uid,
       expiresInDays: Number(expiresInDays) || 7,
     });
+    if (invite.duplicate) {
+      return res.status(200).json({
+        invite: sanitizeInvite(invite),
+        duplicate: true,
+        emailStatus: "skipped",
+        emailError: "Invite already pending for this email",
+      });
+    }
     const workspace = req.workspace || (await getWorkspace(req.workspaceId));
     const baseUrl =
       process.env.APP_BASE_URL ||
@@ -240,8 +255,8 @@ async function createInviteHandler(req, res) {
   }
 }
 
-router.post("/workspaces/:workspaceId/invite", requireAuth, requireWorkspaceRole(["admin"]), createInviteHandler);
-router.post("/workspaces/:workspaceId/invites", requireAuth, requireWorkspaceRole(["admin"]), createInviteHandler);
+router.post("/workspaces/:workspaceId/invite", requireAuth, requireWorkspaceRole(["admin", "owner"]), createInviteHandler);
+router.post("/workspaces/:workspaceId/invites", requireAuth, requireWorkspaceRole(["admin", "owner"]), createInviteHandler);
 
 async function inviteLookupHandler(req, res) {
   try {
@@ -298,7 +313,7 @@ async function inviteRevokeHandler(req, res) {
     if (!invite) return res.status(404).json({ error: "Invite not found" });
     if (invite.status === "accepted") return res.status(400).json({ error: "Invite already accepted" });
     const membership = await getWorkspaceMembership(invite.workspaceId, req.user.uid);
-    if (!membership || membership.status !== "active" || membership.role !== "admin") {
+    if (!membership || membership.status !== "active" || !["admin", "owner"].includes(membership.role)) {
       return res.status(403).json({ error: "Only workspace admins can revoke invites" });
     }
     const revoked = await revokeInviteToken(token, req.user.uid);
@@ -322,7 +337,7 @@ router.post("/invites/:token/revoke", requireAuth, inviteRevokeHandler);
 router.delete(
   "/workspaces/:workspaceId/members/:userId",
   requireAuth,
-  requireWorkspaceRole(["admin"]),
+  requireWorkspaceRole(["admin", "owner"]),
   async (req, res) => {
     try {
       const targetId = req.params?.userId;
@@ -342,18 +357,19 @@ router.delete(
 router.patch(
   "/workspaces/:workspaceId/members/:userId",
   requireAuth,
-  requireWorkspaceRole(["admin"]),
+  requireWorkspaceRole(["admin", "owner"]),
   async (req, res) => {
     try {
       const targetId = req.params?.userId;
       const { role } = req.body || {};
       if (!isValidWorkspaceRole(role)) {
-        return res.status(400).json({ error: "Role must be viewer, editor, or admin" });
+        return res.status(400).json({ error: "Role must be viewer, editor, admin, or owner" });
       }
       if (req.workspace?.ownerId && req.workspace.ownerId === targetId) {
         return res.status(400).json({ error: "Cannot downgrade workspace owner" });
       }
       const member = await setWorkspaceMemberRole(req.workspaceId, targetId, String(role).toLowerCase());
+      await recomputeSeatsUsed(req.workspaceId, { excludeViewers: true });
       return res.json({ member });
     } catch (err) {
       console.error("[WorkspaceRoutes] role update failed", err?.message || err);

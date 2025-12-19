@@ -146,6 +146,10 @@ import { trackLinkedInConversion } from '@/utils/ads'
 import { useAuthStore } from '@/stores/authStore'
 import EmptyState from '@/components/EmptyState.vue'
 import { resolveReminderLink } from '@/utils/taskLinks'
+import { resolveTaskMeetingLink } from '@/utils/taskLinks'
+import { toUtcIso } from '@/utils/time'
+import { useTasks } from '@/composables/useTasks'
+import { useWorkspaceStore } from '@/stores/workspaceStore'
 
 // Time setup
 dayjs.extend(utc)
@@ -163,6 +167,9 @@ const usage = ref({ used: 0, limit: 0, plan: '' })
 const { isPremium, isGuest, isFreeUser } = useAuthFlags()
 const customDate = ref(dayjs().format('YYYY-MM-DD'))
 const authStore = useAuthStore()
+const workspaceStore = useWorkspaceStore()
+const activeWorkspaceId = computed(() => workspaceStore.activeWorkspaceId)
+const { allTasks, refreshAllTasks, ensureDailyRollover, getTaskPlannedDate } = useTasks()
 
 function logTimeBrainReminder(event, payload) {
   try {
@@ -291,6 +298,59 @@ const groupedReminders = computed(() => {
   })
 })
 
+function deriveReminderIsoFromTask(task, tz) {
+  const direct = task?.scheduledTime || task?.scheduled_time
+  const directDate = toJsDate(direct)
+  if (directDate && !Number.isNaN(directDate.getTime())) return directDate.toISOString()
+
+  const hhmm = task?.reminderTime || task?.time
+  const date = getTaskPlannedDate(task) || task?.date || task?.dueDate
+  if (hhmm && date) {
+    try {
+      return toUtcIso(String(date), String(hhmm), tz)
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
+const fallbackTaskReminders = computed(() => {
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const tasks = Array.isArray(allTasks.value) ? allTasks.value : []
+  return tasks
+    .map((t) => {
+      const iso = deriveReminderIsoFromTask(t, zone)
+      if (!iso) return null
+      const meeting = resolveTaskMeetingLink(t)
+      return {
+        id: `task-${t.id || t.title}-${iso}`,
+        task: t.title || 'Task',
+        text: t.title || 'Task',
+        scheduledTime: iso,
+        taskId: t.id || null,
+        channels: normalizeChannels(t.reminderChannels || t.channels),
+        status: 'scheduled',
+        meetingLink: meeting?.url || null,
+        meetingLabel: meeting?.label || '',
+      }
+    })
+    .filter(Boolean)
+})
+
+function mergeReminders(primary = [], fallback = []) {
+  const map = new Map()
+  const add = (r, source) => {
+    if (!r) return
+    const key = `${r.taskId || ''}:${r.scheduledTime || r.id || ''}`
+    if (map.has(key)) return
+    map.set(key, { ...r, __source: source })
+  }
+  primary.forEach((r) => add(r, 'api'))
+  fallback.forEach((r) => add(r, 'tasks'))
+  return Array.from(map.values())
+}
+
 async function loadReminders() {
   const uid = authStore?.user?.uid || auth?.currentUser?.uid || localStorage.getItem('uid')
   if (!uid) {
@@ -301,7 +361,9 @@ async function loadReminders() {
   }
   loading.value = true
   try {
-    const { data } = await api.get('/reminders', { params: { userId: uid } })
+    const { data } = await api.get('/reminders', {
+      params: { userId: uid, workspaceId: activeWorkspaceId.value || undefined },
+    })
     const rows = Array.isArray(data?.items) ? data.items : []
     const normalizedRows = rows.map(normalizeReminder).filter(Boolean)
     logTimeBrainReminder('load-reminders:api', { rows: rows.length, normalized: normalizedRows.length })
@@ -317,8 +379,9 @@ async function loadReminders() {
         const dt = toJsDate(r?.scheduledTime)
         return dt ? dt.getTime() >= now - 60 * 60 * 1000 : false
       })
-    reminders.value = upcoming
-    logTimeBrainReminder('load-reminders:upcoming', { count: upcoming.length })
+    const merged = mergeReminders(upcoming, fallbackTaskReminders.value)
+    reminders.value = merged
+    logTimeBrainReminder('load-reminders:upcoming', { count: merged.length, api: upcoming.length, fallback: fallbackTaskReminders.value.length })
     selectedGroup.value ||= Object.keys(groupedReminders.value)[0] || null
   } catch (err) {
     console.warn('[RemindersOverview] Failed to load reminders', err?.message || err)
@@ -361,9 +424,15 @@ async function onSnooze(r) {
 }
 
 onMounted(() => {
-  loadReminders()
-  fetchUsage()
-  refreshTimer = setInterval(loadReminders, 60 * 1000)
+  (async () => {
+    try {
+      await ensureDailyRollover().catch(() => {})
+      await refreshAllTasks(true).catch(() => {})
+    } catch {}
+    await loadReminders()
+    fetchUsage()
+    refreshTimer = setInterval(loadReminders, 60 * 1000)
+  })()
 })
 onUnmounted(() => {
   if (refreshTimer) {

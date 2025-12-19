@@ -29,8 +29,8 @@ export async function enqueueJob(job = {}) {
 
 export async function processJob(job) {
   const channel = normalizeChannel(job.channel)
-  // Lightweight send: use existing deliveryService for text/call, log for others.
-  if (['sms', 'whatsapp', 'voice_call'].includes(channel)) {
+  // Lightweight send: use deliveryService for supported channels, log for others.
+  if (['sms', 'whatsapp', 'voice_call', 'email'].includes(channel)) {
     const recipient = buildRecipient(job)
     return handleJob({
       channel,

@@ -20,7 +20,7 @@ export function requireWorkspaceId(req, res, next) {
   return next();
 }
 
-export function requireWorkspaceRole(allowedRoles = ["viewer", "editor", "admin"], options = {}) {
+export function requireWorkspaceRole(allowedRoles = ["viewer", "editor", "admin", "owner"], options = {}) {
   const allowed = Array.isArray(allowedRoles)
     ? allowedRoles.map((r) => String(r || "").toLowerCase())
     : [];

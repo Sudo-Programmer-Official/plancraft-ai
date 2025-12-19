@@ -230,7 +230,7 @@ import ChangeImpactPreview from '@/components/ChangeImpactPreview.vue'
 const workspaceStore = useWorkspaceStore()
 const activeWorkspaceId = computed(() => workspaceStore.activeWorkspaceId)
 const activeRole = computed(() => workspaceStore.activeWorkspaceRole || 'viewer')
-const canWrite = computed(() => ['admin', 'editor'].includes(activeRole.value))
+const canWrite = computed(() => ['admin', 'editor', 'owner'].includes(activeRole.value))
 
 const title = ref('')
 const text = ref('')

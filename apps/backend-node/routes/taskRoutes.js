@@ -1,6 +1,8 @@
 import express from "express";
 import { requireAuth, ensureUserMatches } from "../middleware/auth.js";
 import { requireWorkspaceRole } from "../middleware/workspace.js";
+import { requireFeature } from "../middleware/feature.js";
+import { FEATURE_KEYS } from "../services/entitlements.js";
 import { createTask, scheduleTaskReminder } from "../services/taskService.js";
 import { notifyTaskCreated } from "../services/notificationService.js";
 import { db } from "../services/firebaseAdmin.js";
@@ -20,6 +22,7 @@ const selectWorkspaceId = (req) =>
 const requireWorkspaceEditor = requireWorkspaceRole(["editor", "admin"], {
   workspaceIdSelector: selectWorkspaceId,
 });
+const requireVoiceFeature = requireFeature(FEATURE_KEYS.voiceReminders);
 
 function toTaskPayload(task = {}) {
   if (!task || typeof task !== "object") return {};
@@ -56,7 +59,7 @@ router.post("/create", requireWorkspaceEditor, async (req, res) => {
   }
 });
 
-router.post("/announce", requireWorkspaceEditor, async (req, res) => {
+router.post("/announce", requireWorkspaceEditor, requireVoiceFeature, async (req, res) => {
   try {
     const { userId, task, schedule = true, notificationOptions = {}, clientNow } = req.body || {};
     if (!userId || !task) return res.status(400).json({ error: "Missing userId or task" });

@@ -10,7 +10,7 @@
     <div class="space-y-4 text-slate-100">
       <p class="text-sm sm:text-base">
         <strong class="text-indigo-100">Current plan:</strong>
-        <span class="ml-1 text-slate-50">{{ planKey }}</span>
+        <span class="ml-1 text-slate-50">{{ planLabel }}</span>
       </p>
 
       <div>
@@ -45,7 +45,7 @@
 import { ref, computed, watch } from 'vue'
 import { trackLinkedInConversion } from '@/utils/ads'
 import { useAuthStore } from '@/stores/authStore'
-import { PLANS } from '@/services/planService'
+import { PLANS, resolvePlanKey } from '@/services/planService'
 
 const props = defineProps({ open: { type: Boolean, default: false } })
 const emit = defineEmits(['close'])
@@ -65,9 +65,17 @@ watch(() => props.open, v => internalOpen.value = v)
 const authStore = useAuthStore()
 const usage = computed(() => authStore.user?.usage || { today: { aiGenerations: 0, reminders: 0 } })
 
-const planKey = computed(() =>
-  String(authStore.user?.plan || '').toLowerCase() === 'premium' ? 'PREMIUM' : 'FREE'
-)
+const planKey = computed(() => resolvePlanKey(authStore.user))
+const planLabel = computed(() => {
+  const raw = authStore.user?.plan || planKey.value
+  const cleaned = String(raw || '').replace(/[_-]+/g, ' ').trim()
+  if (!cleaned) return planKey.value
+  return cleaned
+    .split(' ')
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+})
 const dialogWidth = ref(window.innerWidth < 640 ? '90%' : '420px')
 
 

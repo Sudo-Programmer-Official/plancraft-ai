@@ -32,6 +32,7 @@ const router = createRouter({
     { path: '/', name: 'landing', component: LandingPage },
     { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue') },
     { path: '/signup', name: 'signup', component: () => import('@/views/GuestOnboarding.vue') },
+    { path: '/billing/upgrade', name: 'billing-upgrade', component: () => import('@/views/BillingUpgradeView.vue') },
     { path: '/privacy', component: PrivacyPolicy },
     { path: '/terms', component: Terms },
     { path: '/contact', component: Contact },
@@ -64,6 +65,7 @@ const router = createRouter({
       name: 'google-calendar-integration',
       component: () => import('@/views/CalendarIntegrationView.vue'),
     },
+    { path: '/feedback', name: 'feedback-public', component: () => import('@/views/FeedbackView.vue') },
 
     // ✅ Blog (public)
     {
@@ -113,6 +115,7 @@ const router = createRouter({
         { path: 'talk-to-planner', name: 'talk-to-planner', component: () => import('@/views/TalkToPlanner.vue') },
         { path: 'today', name: 'today', component: () => import('@/views/TodayView.vue') },
         { path: 'planner', name: 'planner', component: () => import('@/views/PlannerView.vue') },
+        { path: 'tasks', name: 'tasks', component: () => import('@/views/AllTasksView.vue') },
         { path: 'quick-add', name: 'quick-add', component: () => import('@/views/NapkinView.vue') },
         { path: 'napkin', name: 'napkin', component: () => import('@/views/NapkinView.vue') },
         { path: 'timeline', name: 'timeline', component: () => import('@/views/TimelineView.vue') },
@@ -122,6 +125,8 @@ const router = createRouter({
         { path: 'pricing', name: 'pricing', component: () => import('@/views/PricingView.vue') },
         { path: 'subscription', name: 'subscription', component: () => import('@/views/PricingView.vue') },
         { path: 'workspaces', name: 'workspaces', component: () => import('@/views/WorkspacesView.vue') },
+        { path: 'workspaces/new', name: 'workspace-new', component: () => import('@/views/WorkspaceOnboarding.vue') },
+        { path: 'app', name: 'workspace-app', component: () => import('@/views/WorkspaceAppView.vue') },
         { path: 'help', name: 'help', component: () => import('@/views/HelpView.vue') },
       ],
     },
@@ -177,11 +182,30 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
 
+  const wantsTeamSignup = to.path === '/signup' && to.query?.mode === 'team'
+  if (wantsTeamSignup) {
+    const nextTarget =
+      (typeof to.query?.next === 'string' && to.query.next.length && to.query.next) ||
+      '/workspaces/new'
+    try {
+      localStorage.setItem('postLoginRedirect', nextTarget)
+    } catch {}
+    const isGuest =
+      authStore?.isGuest === true || authStore?.guest === true || authStore?.user?.mode === 'guest'
+    if (authStore?.user && !isGuest) {
+      return next(nextTarget)
+    }
+    return next({ path: '/login', query: { mode: 'team', next: nextTarget } })
+  }
+
   // If navigating to login or signup: only redirect away when fully signed-in (not guest)
   if (to.path === '/login' || to.path === '/signup') {
     try {
       const isGuest = authStore?.isGuest === true || authStore?.guest === true || authStore?.user?.mode === 'guest'
-      if (authStore?.user && !isGuest) return next('/dashboard')
+      const nextTarget =
+        (typeof to.query?.next === 'string' && to.query.next.length && to.query.next) ||
+        '/dashboard'
+      if (authStore?.user && !isGuest) return next(nextTarget)
     } catch {}
     return next()
   }
@@ -199,7 +223,19 @@ router.beforeEach(async (to, from, next) => {
         return next()
       }
     } catch {}
+    if (to.path === '/workspaces/new') {
+      return next({ path: '/signup', query: { mode: 'team', next: '/workspaces/new' } })
+    }
     return next({ path: '/login', query: { redirect: to.fullPath } })
+  }
+
+  const isGuest =
+    authStore?.isGuest === true || authStore?.guest === true || authStore?.user?.mode === 'guest'
+  if (isGuest && (to.path === '/workspaces/new' || to.path === '/app')) {
+    try {
+      localStorage.setItem('postLoginRedirect', to.fullPath || '/workspaces/new')
+    } catch {}
+    return next({ path: '/login', query: { mode: 'team', next: to.fullPath || '/workspaces/new' } })
   }
 
   // Admin guard

@@ -10,6 +10,13 @@ function normalizeWorkspace(payload = {}) {
     theme: color,
     description: payload.description || '',
     workspaceType: payload.workspaceType || 'team',
+    plan: payload.plan || 'free',
+    seatLimit: payload.seatLimit ?? null,
+    seats: payload.seats ?? payload.seatCount ?? null,
+    billingStatus: payload.billingStatus || 'none',
+    stripeSubscriptionId: payload.stripeSubscriptionId || payload.stripeSubId || null,
+    seatsUsed: payload.seatsUsed ?? null,
+    features: payload.features || {},
     timezone: payload.timezone || 'UTC',
     ownerId: payload.ownerId || null,
     role: payload.role || payload.membershipRole || 'viewer',
@@ -34,6 +41,9 @@ export async function createWorkspaceDoc(_userId, payload) {
     timezone: payload?.timezone,
     workspaceType: payload?.workspaceType,
     description: payload?.description,
+    plan: payload?.plan,
+    seatLimit: payload?.seatLimit,
+    planIntent: payload?.planIntent,
   }
   const { data } = await api.post('/workspaces', body)
   return normalizeWorkspace({ ...(data?.workspace || {}), role: data?.role || 'admin' })

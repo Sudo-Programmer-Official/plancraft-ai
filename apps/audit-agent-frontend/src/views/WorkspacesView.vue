@@ -19,6 +19,7 @@
           <button
             v-if="canManageMembers && activeWorkspaceId"
             class="px-4 py-2 rounded-lg border border-indigo-400/60 bg-indigo-500/10 hover:bg-indigo-500/20 text-sm font-semibold text-indigo-100 w-full sm:w-auto"
+            :disabled="!canInvite"
             @click="openInviteModal()"
           >
             Share workspace
@@ -102,7 +103,7 @@
                   {{ activeWorkspaceId === ws.id ? 'Current workspace' : 'Switch here' }}
                 </button>
                 <button
-                  v-if="ws.role === 'admin'"
+                  v-if="['admin', 'owner'].includes(ws.role)"
                   class="px-3 py-2 rounded-lg border border-indigo-300/60 text-sm text-indigo-100 hover:bg-indigo-600/10 w-full sm:w-auto"
                   @click="openInviteModal(ws)"
                 >
@@ -176,7 +177,7 @@
               <button
                 v-if="canManageMembers"
                 class="px-3 py-2 rounded-lg bg-indigo-600 text-sm font-semibold hover:bg-indigo-500 disabled:opacity-60"
-                :disabled="!activeWorkspaceId"
+                :disabled="!activeWorkspaceId || !canInvite"
                 @click="openInviteModal()"
               >
                 Invite
@@ -468,6 +469,7 @@ import {
   sendWorkspaceInvite,
   updateMemberRole,
 } from '@/services/workspaceService'
+import { canUseFeature } from '@/utils/entitlements'
 
 const workspaceStore = useWorkspaceStore()
 const authStore = useAuthStore()
@@ -522,12 +524,30 @@ const activeWorkspaceId = computed(() => workspaceStore.activeWorkspaceId)
 const activeWorkspace = computed(() => workspaceStore.activeWorkspace || {})
 const canSave = computed(() => !!form.name && form.name.trim().length > 1)
 const activeRole = computed(() => workspaceStore.activeWorkspaceRole || 'viewer')
-const canManageMembers = computed(() => activeRole.value === 'admin')
+const canManageMembers = computed(() => ['admin', 'owner'].includes(activeRole.value))
+const canInvite = computed(() => canUseFeature(activeWorkspace.value, activeRole.value, 'invites'))
 const currentUserId = computed(() => authStore?.user?.uid || null)
 
 function typeLabel(value) {
   const found = workspaceTypes.find((t) => t.value === value)
   return found ? found.label : 'Personal'
+}
+
+function normalizeInvites(list = []) {
+  const map = new Map()
+  for (const inv of Array.isArray(list) ? list : []) {
+    if (!inv || inv.status !== 'pending') continue
+    const key = (inv.emailLower || inv.email || inv.id || '').trim().toLowerCase()
+    const existing = map.get(key)
+    if (!existing) {
+      map.set(key || inv.id, inv)
+      continue
+    }
+    const existingTs = new Date(existing.expires_at || existing.expiresAt || 0).getTime()
+    const nextTs = new Date(inv.expires_at || inv.expiresAt || 0).getTime()
+    if (nextTs > existingTs) map.set(key, inv)
+  }
+  return Array.from(map.values())
 }
 
 onMounted(() => {
@@ -551,12 +571,12 @@ watch(
   () => activeRole.value,
   (role) => {
     if (!workspaces.value.length) return
-    if (role === 'admin' && activeWorkspaceId.value) {
+    if (['admin', 'owner'].includes(role) && activeWorkspaceId.value) {
       loadMembers(activeWorkspaceId.value)
-    } else if (role !== 'admin') {
+    } else if (!['admin', 'owner'].includes(role)) {
       members.value = []
       invites.value = []
-      membersError.value = role ? 'Only admins can view members for this workspace.' : ''
+      membersError.value = role ? 'Only admins/owners can view members for this workspace.' : ''
     }
   },
 )
@@ -607,10 +627,10 @@ async function loadMembers(id = null) {
   const workspaceId = id || activeWorkspaceId.value
   if (!workspaceId) return
   if (!workspaces.value.length) return
-  if (activeRole.value !== 'admin') {
+  if (!['admin', 'owner'].includes(activeRole.value)) {
     members.value = []
     invites.value = []
-    membersError.value = 'Only admins can view members for this workspace.'
+    membersError.value = 'Only admins/owners can view members for this workspace.'
     return
   }
   membersLoading.value = true
@@ -618,13 +638,13 @@ async function loadMembers(id = null) {
   try {
     const { members: list, invites: pending } = await fetchWorkspaceMembers(workspaceId)
     members.value = list || []
-    invites.value = pending || []
+    invites.value = normalizeInvites(pending || [])
   } catch (err) {
     members.value = []
     invites.value = []
     const status = err?.response?.status
     if (status === 403) {
-      membersError.value = 'You need to be an admin to view members for this workspace.'
+      membersError.value = 'You need to be an admin/owner to view members for this workspace.'
     } else if (status === 400) {
       membersError.value = err?.response?.data?.error || 'workspaceId is required'
     } else {
@@ -636,7 +656,7 @@ async function loadMembers(id = null) {
 }
 
 function openInviteModal(ws = null) {
-  if (activeRole.value !== 'admin') {
+  if (!['admin', 'owner'].includes(activeRole.value)) {
     ElMessage.error('Only admins can invite members')
     return
   }
@@ -660,19 +680,27 @@ async function sendInvite() {
     ElMessage.error('Enter an email to invite')
     return
   }
+  inviteForm.email = String(inviteForm.email).trim().toLowerCase()
   inviteEmailStatus.value = null
   inviteEmailError.value = ''
   inviteLink.value = null
   inviteSending.value = true
   try {
-    const { invite, link, emailStatus, emailError } = await sendWorkspaceInvite(
+    const { invite, link, emailStatus, emailError, duplicate } = await sendWorkspaceInvite(
       activeWorkspaceId.value,
       inviteForm,
     )
+    if (duplicate) {
+      inviteEmailStatus.value = 'duplicate'
+      inviteEmailError.value = emailError || 'Invite already pending for this email'
+      ElMessage.warning(inviteEmailError.value)
+      inviteSending.value = false
+      return
+    }
     inviteLink.value = link || null
     inviteEmailStatus.value = emailStatus || invite?.emailStatus || null
     inviteEmailError.value = emailError || invite?.emailError || ''
-    if (invite) invites.value = [...invites.value.filter((i) => i.id !== invite.id), invite]
+    if (invite) invites.value = normalizeInvites([...invites.value.filter((i) => i.id !== invite.id), invite])
     if (inviteEmailStatus.value === 'failed') {
       ElMessage.warning('Email failed — copy the invite link below.')
     } else if (link) {
@@ -790,6 +818,7 @@ function workspaceCardClass(ws) {
 function roleLabel(role) {
   const normalized = String(role || '').toLowerCase()
   if (normalized === 'editor') return 'Editor'
+  if (normalized === 'owner') return 'Owner'
   if (normalized === 'admin') return 'Admin'
   return 'Viewer'
 }

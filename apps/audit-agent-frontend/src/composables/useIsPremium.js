@@ -2,6 +2,7 @@
 import { computed, onMounted, watch } from 'vue'
 import { useAuthStore } from '@/stores/authStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
+import { resolvePlanKey } from '@/services/planService'
 
 export function useIsPremium() {
   const authStore = useAuthStore()
@@ -23,9 +24,10 @@ export function useIsPremium() {
   })
 
   const isPremium = computed(() => {
-    const storePremium = String(planFromStore.value || '').toLowerCase() === 'premium'
-    const userPremium = String(authStore?.user?.plan || '').toLowerCase() === 'premium'
-    return storePremium || userPremium || isAdmin.value
+    if (isAdmin.value) return true
+    const storePremium = resolvePlanKey(planFromStore.value) === 'PREMIUM'
+    const userPremium = resolvePlanKey(authStore?.user) === 'PREMIUM'
+    return storePremium || userPremium
   })
 
   async function refresh() {

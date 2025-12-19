@@ -1,5 +1,6 @@
 import { db, uploadBufferToStorage } from './firebaseAdmin.js'
 import dayjs from 'dayjs'
+import { getWorkspace, getWorkspaceMembership, listWorkspaceMembers } from './workspaceService.js'
 
 function ymd(d = new Date()) {
   const y = d.getFullYear()
@@ -30,19 +31,107 @@ function toDate(val) {
   return null
 }
 
-export async function buildUserReport(uid, period) {
+async function fetchTasksForScope({ workspaceId, userId, startYMD, endYMD }) {
+  const clauses = [
+    workspaceId ? ['workspaceId', '==', workspaceId] : ['userId', '==', userId],
+    ['date', '>=', startYMD],
+    ['date', '<=', endYMD],
+  ]
+
+  async function run(orderByDate = true) {
+    let query = db.collection('tasks')
+    for (const [field, op, value] of clauses) {
+      query = query.where(field, op, value)
+    }
+    if (orderByDate) query = query.orderBy('date', 'asc')
+    const snap = await query.get()
+    const list = []
+    snap.forEach((d) => list.push({ id: d.id, ...d.data() }))
+    return list
+  }
+
+  let tasks = []
+  try {
+    tasks = await run(true)
+  } catch (err) {
+    console.warn('[ReportService] primary task query failed, falling back', err?.message || err)
+    try {
+      tasks = await run(false)
+    } catch (err2) {
+      console.error('[ReportService] task query failed', err2?.message || err2)
+    }
+  }
+
+  // Legacy fallback: personal tasks without workspaceId
+  if ((!tasks || !tasks.length) && workspaceId && userId) {
+    try {
+      const legacy = await db
+        .collection('tasks')
+        .where('workspaceId', '==', null)
+        .where('userId', '==', userId)
+        .where('date', '>=', startYMD)
+        .where('date', '<=', endYMD)
+        .get()
+      const list = []
+      legacy.forEach((d) => list.push({ id: d.id, ...d.data(), legacyWorkspace: true }))
+      tasks = list
+    } catch (err) {
+      console.warn('[ReportService] legacy task query failed', err?.message || err)
+    }
+  }
+
+  return tasks || []
+}
+
+function summarizeContributors(tasks = [], memberMap = new Map()) {
+  const agg = new Map()
+  for (const task of tasks) {
+    const userId = String(task.userId || task.createdBy || '').trim()
+    if (!userId) continue
+    const existing = agg.get(userId) || { userId, total: 0, completed: 0 }
+    existing.total += 1
+    if (task.completed) existing.completed += 1
+    agg.set(userId, existing)
+  }
+
+  const contributors = Array.from(agg.values()).map((entry) => {
+    const member = memberMap.get(entry.userId) || {}
+    return {
+      ...entry,
+      name: member.name || null,
+      email: member.email || null,
+      role: member.role || null,
+    }
+  })
+
+  return contributors
+    .sort((a, b) => {
+      if (b.completed !== a.completed) return b.completed - a.completed
+      return b.total - a.total
+    })
+    .slice(0, 8)
+}
+
+export async function buildUserReport(uid, period, options = {}) {
   const { startYMD, endYMD } = rangeFor(period)
+  const workspaceId = options?.workspaceId || null
 
-  // Tasks in range by date field (YYYY-MM-DD)
-  const tasksSnap = await db
-    .collection('tasks')
-    .where('userId', '==', uid)
-    .where('date', '>=', startYMD)
-    .where('date', '<=', endYMD)
-    .get()
+  let workspace = options?.workspace || null
+  let membership = options?.membership || null
+  if (workspaceId) {
+    try {
+      workspace = workspace || (await getWorkspace(workspaceId))
+    } catch (err) {
+      console.warn('[ReportService] workspace lookup failed', err?.message || err)
+    }
+    try {
+      membership = membership || (await getWorkspaceMembership(workspaceId, uid))
+    } catch {
+      /* noop */
+    }
+  }
 
-  const tasks = []
-  tasksSnap.forEach((d) => tasks.push({ id: d.id, ...d.data() }))
+  const tasks = await fetchTasksForScope({ workspaceId, userId: uid, startYMD, endYMD })
 
   const completed = tasks.filter((t) => !!t.completed)
   const totalCompleted = completed.length
@@ -109,8 +198,31 @@ export async function buildUserReport(uid, period) {
     voiceLogs = vsnap.size || 0
   } catch {}
 
+  // Workspace members for team stats
+  let members = []
+  if (workspaceId) {
+    try {
+      members = await listWorkspaceMembers(workspaceId)
+    } catch (err) {
+      console.warn('[ReportService] workspace members lookup failed', err?.message || err)
+    }
+  }
+  const memberMap = new Map()
+  members.forEach((m) => {
+    if (m?.userId) memberMap.set(String(m.userId), m)
+  })
+
+  const contributors = summarizeContributors(tasks, memberMap)
+  const memberCount = members.filter((m) => (m?.status || 'active') === 'active').length || null
+  const completionRate = tasks.length ? Math.round((totalCompleted / tasks.length) * 100) / 100 : 0
+
   const summary = {
     userId: uid,
+    generatedBy: options?.generatedBy || uid,
+    generatedByEmail: options?.generatedByEmail || null,
+    workspaceId: workspaceId || null,
+    workspaceName: workspace?.name || null,
+    workspaceRole: options?.workspaceRole || membership?.role || null,
     period,
     start: startYMD,
     end: endYMD,
@@ -121,6 +233,9 @@ export async function buildUserReport(uid, period) {
       topTags,
       moods,
       voiceLogs,
+      contributors,
+      teamMembers: memberCount,
+      completionRate,
     },
     generatedAt: new Date().toISOString(),
   }
@@ -142,6 +257,9 @@ export function renderReportHtml(summary) {
   const moodHtml = (m.moods || [])
     .map((x) => `<li>${x.mood} — ${x.count}</li>`)
     .join('')
+  const contributorsHtml = (m.contributors || [])
+    .map((c) => `<li>${c.name || c.email || c.userId || 'Teammate'} — ${c.completed}/${c.total} completed</li>`)
+    .join('')
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8" /><title>PlanCraftAI ${summary.period} Report</title>
 <style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#0b1020;color:#eef;line-height:1.5;padding:24px} .card{background:#121833;border:1px solid #2a3160;border-radius:12px;padding:16px;margin:12px 0} h1,h2{margin:0 0 8px} small{opacity:.8}</style>
@@ -152,10 +270,13 @@ export function renderReportHtml(summary) {
 <div class="card">
 <h2>Highlights</h2>
 <ul>
+  ${summary.workspaceName ? `<li>Workspace: <strong>${summary.workspaceName}</strong></li>` : ''}
   <li>Total tasks: <strong>${m.totalTasks || 0}</strong></li>
   <li>Completed: <strong>${m.totalCompleted || 0}</strong></li>
   <li>Avg completion time: <strong>${msToHuman(m.avgCompletionMs)}</strong></li>
+  ${typeof m.completionRate === 'number' ? `<li>Completion rate: <strong>${Math.round((m.completionRate || 0) * 100)}%</strong></li>` : ''}
   <li>Voice logs: <strong>${m.voiceLogs || 0}</strong></li>
+  ${typeof m.teamMembers === 'number' ? `<li>Active members: <strong>${m.teamMembers}</strong></li>` : ''}
   <li>Generated: <strong>${summary.generatedAt}</strong></li>
   <li>App: <strong>PlanCraftAI</strong></li>
   <li>Period: <strong>${summary.period}</strong></li>
@@ -174,13 +295,19 @@ export function renderReportHtml(summary) {
 <ul>${moodHtml || '<li>—</li>'}</ul>
 </div>
 
+<div class="card">
+<h2>Top Contributors</h2>
+<ul>${contributorsHtml || '<li>—</li>'}</ul>
+</div>
+
 <p style="opacity:.8">Generated at ${summary.generatedAt}</p>
 </body></html>`
 }
 
 export async function persistReport(uid, period, summary) {
   const ts = Date.now()
-  const base = `reports/${uid}/${period}-${summary.start}-${summary.end}-${ts}`
+  const workspaceSegment = summary?.workspaceId || uid
+  const base = `reports/${workspaceSegment}/${period}-${summary.start}-${summary.end}-${ts}`
   const jsonBuf = Buffer.from(JSON.stringify(summary, null, 2))
   const htmlBuf = Buffer.from(renderReportHtml(summary))
   const [jsonUrl, htmlUrl] = await Promise.all([
@@ -189,6 +316,11 @@ export async function persistReport(uid, period, summary) {
   ])
   const doc = {
     userId: uid,
+    generatedBy: summary?.generatedBy || uid,
+    generatedByEmail: summary?.generatedByEmail || null,
+    workspaceId: summary?.workspaceId || null,
+    workspaceName: summary?.workspaceName || null,
+    workspaceRole: summary?.workspaceRole || null,
     period,
     start: summary.start,
     end: summary.end,

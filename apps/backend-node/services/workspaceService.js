@@ -5,8 +5,28 @@ import { db } from "./firebaseAdmin.js";
 export const WORKSPACE_COLLECTION = "workspaces";
 export const WORKSPACE_MEMBERS_COLLECTION = "workspace_members";
 export const WORKSPACE_INVITES_COLLECTION = "workspace_invites";
+export const WORKSPACE_BILLING_INTENTS_COLLECTION = "workspace_billing_intents";
 
-export const WORKSPACE_ROLES = ["viewer", "editor", "admin"];
+export const WORKSPACE_ROLES = ["viewer", "editor", "admin", "owner"];
+export const WORKSPACE_PLANS = ["free", "starter", "pro"];
+
+function planFeatures(plan = "free", overrides = {}) {
+  const base = {
+    voiceReminders: false,
+    advancedPermissions: false,
+    prioritySupport: false,
+  };
+  const normalized = String(plan || "free").toLowerCase();
+  if (normalized === "starter") {
+    base.voiceReminders = true;
+  }
+  if (normalized === "pro") {
+    base.voiceReminders = true;
+    base.advancedPermissions = true;
+    base.prioritySupport = true;
+  }
+  return { ...base, ...(overrides || {}) };
+}
 
 function normalizeDate(value) {
   if (!value) return null;
@@ -28,6 +48,14 @@ function normalizeWorkspaceDoc(doc) {
     timezone: data.timezone || "UTC",
     workspaceType: data.workspaceType || "team",
     description: data.description || "",
+    plan: data.plan || "free",
+    seatLimit: data.seatLimit ?? null,
+    seats: data.seats ?? data.seatCount ?? null,
+    seatsUsed: data.seatsUsed ?? data.seats_used ?? null,
+    billingStatus: data.billingStatus || "none",
+    stripeSubscriptionId: data.stripeSubscriptionId || data.stripeSubId || null,
+    stripeCustomerId: data.stripeCustomerId || null,
+    features: planFeatures(data.plan || "free", data.features || {}),
     lastOpenedAt: normalizeDate(data.lastOpenedAt || data.last_opened_at),
     created_at: normalizeDate(data.created_at || data.createdAt),
     updated_at: normalizeDate(data.updated_at || data.updatedAt),
@@ -85,6 +113,60 @@ function hashToken(token) {
   return crypto.createHash("sha256").update(String(token)).digest("hex");
 }
 
+export async function countBillableMembers(workspaceId, { excludeViewers = true } = {}) {
+  if (!workspaceId) return 0;
+  try {
+    const snap = await db
+      .collection(WORKSPACE_MEMBERS_COLLECTION)
+      .where("workspaceId", "==", workspaceId)
+      .where("status", "==", "active")
+      .get();
+    if (snap.empty) return 0;
+    let count = 0;
+    snap.forEach((doc) => {
+      const role = String(doc.data()?.role || "").toLowerCase();
+      if (excludeViewers && role === "viewer") return;
+      count += 1;
+    });
+    return count;
+  } catch (err) {
+    console.warn("[Workspace] countBillableMembers failed", err?.message || err);
+    return 0;
+  }
+}
+
+export async function recomputeSeatsUsed(workspaceId, { excludeViewers = true } = {}) {
+  if (!workspaceId) return null;
+  const count = await countBillableMembers(workspaceId, { excludeViewers });
+  try {
+    await db
+      .collection(WORKSPACE_COLLECTION)
+      .doc(String(workspaceId))
+      .set({ seatsUsed: count, updated_at: new Date() }, { merge: true });
+  } catch (err) {
+    console.warn("[Workspace] recomputeSeatsUsed failed", err?.message || err);
+  }
+  return count;
+}
+
+function incrementSeats(workspaceId, delta = 0) {
+  if (!workspaceId || !delta) return Promise.resolve();
+  try {
+    return db
+      .collection(WORKSPACE_COLLECTION)
+      .doc(String(workspaceId))
+      .set(
+        {
+          seatsUsed: admin.firestore.FieldValue.increment(delta),
+          updated_at: new Date(),
+        },
+        { merge: true },
+      );
+  } catch {
+    return Promise.resolve();
+  }
+}
+
 function memberRef(workspaceId, userId) {
   const key = `${workspaceId}_${userId}`;
   return db.collection(WORKSPACE_MEMBERS_COLLECTION).doc(key);
@@ -136,8 +218,17 @@ export async function createWorkspace({
   timezone = "UTC",
   workspaceType = "team",
   description = "",
+  plan = "free",
+  planIntent = null,
+  seatLimit = null,
+  features = null,
+  seats = 1,
+  billingStatus = "none",
 }) {
   if (!ownerId) throw new Error("ownerId is required to create a workspace");
+  const planNormalized = WORKSPACE_PLANS.includes(String(planIntent || plan || "free").toLowerCase())
+    ? String(planIntent || plan || "free").toLowerCase()
+    : "free";
   const now = new Date();
   const ref = await db.collection(WORKSPACE_COLLECTION).add({
     name: (name || "New workspace").trim(),
@@ -147,6 +238,14 @@ export async function createWorkspace({
     timezone: timezone || "UTC",
     workspaceType: workspaceType || "team",
     description: description || "",
+    plan: planNormalized,
+    seatLimit: seatLimit ?? null,
+    seats: Number.isFinite(seats) ? Math.max(1, Number(seats)) : 1,
+    seatsUsed: 1,
+    billingStatus: billingStatus || "none",
+    stripeSubscriptionId: null,
+    stripeCustomerId: null,
+    features: planFeatures(planNormalized, features || {}),
     lastOpenedAt: now,
     created_at: now,
     updated_at: now,
@@ -161,6 +260,14 @@ export async function createWorkspace({
     timezone: timezone || "UTC",
     workspaceType: workspaceType || "team",
     description: description || "",
+    plan: planNormalized,
+    seatLimit: seatLimit ?? null,
+    seats: Number.isFinite(seats) ? Math.max(1, Number(seats)) : 1,
+    seatsUsed: 1,
+    billingStatus: billingStatus || "none",
+    stripeSubscriptionId: null,
+    stripeCustomerId: null,
+    features: planFeatures(planNormalized, features || {}),
     lastOpenedAt: now,
     created_at: now,
     updated_at: now,
@@ -170,7 +277,7 @@ export async function createWorkspace({
     {
       workspaceId: ref.id,
       userId: ownerId,
-      role: "admin",
+      role: "owner",
       invitedBy: ownerId,
       status: "active",
       joined_at: now,
@@ -179,7 +286,7 @@ export async function createWorkspace({
     { merge: true },
   );
   await mirrorUserMembership(ref.id, ownerId, {
-    role: "admin",
+    role: "owner",
     invitedBy: ownerId,
     status: "active",
     joined_at: now,
@@ -197,6 +304,14 @@ export async function updateWorkspace(workspaceId, patch = {}) {
     "timezone",
     "workspaceType",
     "description",
+    "plan",
+    "seatLimit",
+    "seats",
+    "seatsUsed",
+    "billingStatus",
+    "stripeSubscriptionId",
+    "stripeCustomerId",
+    "features",
     "lastOpenedAt",
     "last_opened_at",
   ];
@@ -211,6 +326,15 @@ export async function updateWorkspace(workspaceId, patch = {}) {
   if (typeof updates.last_opened_at === "string") {
     const parsed = new Date(updates.last_opened_at);
     if (!Number.isNaN(parsed.getTime())) updates.last_opened_at = parsed;
+  }
+  if (updates.plan && !WORKSPACE_PLANS.includes(String(updates.plan).toLowerCase())) {
+    delete updates.plan;
+  }
+  if (updates.features || updates.plan) {
+    updates.features = planFeatures(
+      updates.plan || undefined,
+      updates.features && typeof updates.features === "object" ? updates.features : {},
+    );
   }
   updates.updated_at = new Date();
   await db.collection(WORKSPACE_COLLECTION).doc(String(workspaceId)).set(updates, { merge: true });
@@ -401,6 +525,7 @@ export async function removeWorkspaceMember(workspaceId, userId) {
     role: "viewer",
     joined_at: now,
   });
+  await recomputeSeatsUsed(workspaceId, { excludeViewers: true });
   return true;
 }
 
@@ -415,11 +540,25 @@ export async function createWorkspaceInvite({
   if (!email) throw new Error("email is required");
   const normalizedRole = String(role || "").toLowerCase();
   if (!isValidWorkspaceRole(normalizedRole)) throw new Error("Invalid role");
+  const emailLower = String(email).trim().toLowerCase();
+
+  // De-dupe pending invites
+  const existingSnap = await db
+    .collection(WORKSPACE_INVITES_COLLECTION)
+    .where("workspaceId", "==", workspaceId)
+    .where("emailLower", "==", emailLower)
+    .where("status", "==", "pending")
+    .limit(1)
+    .get();
+  if (!existingSnap.empty) {
+    const invite = normalizeInviteDoc(existingSnap.docs[0]);
+    return { ...invite, duplicate: true };
+  }
+
   const token = generateInviteToken();
   const hashedToken = hashToken(token);
   const now = new Date();
   const expires_at = new Date(now.getTime() + expiresInDays * 24 * 60 * 60 * 1000);
-  const emailLower = String(email).trim().toLowerCase();
   const ref = db.collection(WORKSPACE_INVITES_COLLECTION).doc();
   await ref.set({
     workspaceId,
@@ -522,9 +661,25 @@ export async function acceptInviteToken(token, user) {
     throw new Error("Invite is addressed to a different email");
   }
 
-  const now = new Date();
   const existing = await getWorkspaceMembership(invite.workspaceId, user.uid);
   const roleToApply = existing?.status === "active" && existing.role ? existing.role : invite.role || "editor";
+  const billableRole = roleToApply !== "viewer";
+  if (billableRole) {
+    const seatsCap =
+      typeof workspace.seats === "number" && workspace.seats > 0
+        ? workspace.seats
+        : workspace.plan !== "free"
+          ? Math.max(3, Number(workspace.seats) || 3)
+          : null;
+    if (seatsCap) {
+      const currentSeats = await countBillableMembers(invite.workspaceId, { excludeViewers: true });
+      if (currentSeats >= seatsCap) {
+        throw new Error("No seats available in this workspace");
+      }
+    }
+  }
+
+  const now = new Date();
 
   await setWorkspaceMemberRole(invite.workspaceId, user.uid, roleToApply, {
     invitedBy: invite.invitedByUid || invite.invitedBy || user.uid,
@@ -532,6 +687,8 @@ export async function acceptInviteToken(token, user) {
     joined_at: existing?.joined_at || now,
     status: "active",
   });
+
+  await recomputeSeatsUsed(invite.workspaceId, { excludeViewers: true });
 
   await db.collection(WORKSPACE_INVITES_COLLECTION).doc(invite.id).set(
     {
@@ -583,6 +740,7 @@ export async function updateInviteEmailStatus(inviteId, status, error = null, pr
       emailError: error || null,
       emailProviderStatus: providerStatus || null,
       updated_at: new Date(),
+      lastAttemptAt: new Date(),
     },
     { merge: true },
   );
