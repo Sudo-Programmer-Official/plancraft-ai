@@ -7,6 +7,7 @@ const DEBUG = process.env.WHATSAPP_DEBUG === '1' || process.env.WHATSAPP_LOG ===
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || ''
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || ''
 const TWILIO_FROM = process.env.TWILIO_PHONE_NUMBER || process.env.TWILIO_SMS_FROM || ''
+const TWILIO_VOICE = process.env.TWILIO_VOICE || process.env.TWILIO_TTS_VOICE || 'Polly.Joanna'
 const TWILIO_BASE = 'https://api.twilio.com/2010-04-01'
 
 const SES_REGION = process.env.AWS_SES_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1'
@@ -167,9 +168,10 @@ export async function sendVoiceCall(job) {
 
   const audioUrl = job?.audioUrl || job?.payload?.audioUrl || null
   const message = String(job?.message || job?.payload?.body || 'Hello from PlanCraftAI')
+  const voiceName = job?.payload?.voice || job?.payload?.voiceName || TWILIO_VOICE || 'alice'
   const twiml = audioUrl
     ? `<Response><Play>${audioUrl}</Play></Response>`
-    : `<Response><Say voice="alice">${message}</Say></Response>`
+    : `<Response><Say voice="${voiceName}">${message}</Say></Response>`
 
   const url = `${TWILIO_BASE}/Accounts/${TWILIO_ACCOUNT_SID}/Calls.json`
   const payload = new URLSearchParams({
