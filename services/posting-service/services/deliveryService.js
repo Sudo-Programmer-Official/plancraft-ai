@@ -73,6 +73,18 @@ function ensureSesConfig() {
   }
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function isRetryableWhatsAppError(err) {
+  const status = err?.response?.status
+  const code = err?.response?.data?.error?.code
+  if (code === 131000) return true // Meta internal error; retry is recommended
+  if (status && status >= 500) return true
+  return false
+}
+
 async function sendWhatsAppText(to, message) {
   const { token, phoneId } = resolveWhatsAppConfig()
   const payload = {
@@ -110,8 +122,17 @@ async function sendWhatsAppText(to, message) {
   } catch (err) {
     const status = err?.response?.status
     const body = err?.response?.data
+    const headers = err?.response?.headers || {}
     if (status === 401 && body?.error?.code === 190) {
       console.warn('[posting-service][WhatsApp] Access token invalid/expired; refresh META_WHATSAPP_TOKEN', body?.error)
+    }
+    if (isRetryableWhatsAppError(err)) {
+      const detail = status ? `${status} ${JSON.stringify(body || {})}` : err?.message || 'unknown error'
+      const fbTraceId = headers['x-fb-trace-id'] || headers['x-fb-trace-id'.toLowerCase()] || null
+      const retryError = new Error(`WhatsApp send retryable: ${detail}`)
+      retryError.retryable = true
+      retryError.fbTraceId = fbTraceId
+      throw retryError
     }
     const detail = status ? `${status} ${JSON.stringify(body || {})}` : err?.message || 'unknown error'
     throw new Error(`WhatsApp send failed: ${detail}`)
@@ -122,8 +143,33 @@ export async function sendTextWhatsApp(job) {
   const to = resolveRecipient(job)
   if (!to) throw new Error('WhatsApp recipient missing')
   const message = job?.message || job?.payload?.body || ''
-  const resp = await sendWhatsAppText(to, message)
-  return { status: 'sent', channel: 'whatsapp', recipient: to, response: resp }
+  const maxAttempts = 3
+  const backoffs = [0, 1500, 5000]
+  let attempt = 0
+  let lastErr = null
+
+  while (attempt < maxAttempts) {
+    try {
+      if (backoffs[attempt]) await sleep(backoffs[attempt])
+      const resp = await sendWhatsAppText(to, message)
+      return { status: 'sent', channel: 'whatsapp', recipient: to, response: resp }
+    } catch (err) {
+      lastErr = err
+      if (err?.retryable && attempt < maxAttempts - 1) {
+        console.warn('[posting-service][WhatsApp] transient failure, will retry', {
+          attempt: attempt + 1,
+          to: mask(to),
+          detail: err?.message,
+          fbTraceId: err?.fbTraceId || null,
+        })
+        attempt += 1
+        continue
+      }
+      throw err
+    }
+  }
+
+  throw lastErr || new Error('WhatsApp send failed after retries')
 }
 
 export async function sendTextSMS(job) {
