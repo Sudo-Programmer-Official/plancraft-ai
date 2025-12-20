@@ -16,8 +16,11 @@ import { runLlmWithImage } from '../services/visionClient.js'
  */
 export async function ingestImage(req, res, next) {
   try {
+    const imageUrl = req.body?.imageUrl || req.body?.image_url || ''
     const image = req.body?.image || ''
-    if (!image) return res.status(400).json({ success: false, error: 'image is required' })
+    if (!imageUrl && !image) {
+      return res.status(400).json({ success: false, error: 'image or imageUrl is required' })
+    }
     const mode = (req.query?.mode || req.body?.mode || 'auto').toString().toLowerCase()
 
     const prompt = [
@@ -68,7 +71,7 @@ export async function ingestImage(req, res, next) {
       prompt.push('Auto-detect whether content is tasks, an event, or an occasion; fill what is relevant.')
     }
 
-    const { text } = await runLlmWithImage(prompt.join('\n'), image)
+    const { text } = await runLlmWithImage(prompt.join('\n'), { imageDataUrl: image, imageUrl })
     let parsed = {}
     try {
       const start = text.indexOf('{')

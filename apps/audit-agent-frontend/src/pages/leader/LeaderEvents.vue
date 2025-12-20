@@ -235,6 +235,7 @@ import {
   suggestEventCopy,
 } from '@/services/leader/events'
 import { nlpClient } from '@/services/leader/http'
+import { uploadImageForVision } from '@/services/visionUploadService'
 
 const router = useRouter()
 const route = useRoute()
@@ -441,14 +442,9 @@ async function onScanFile(event) {
   capturePreview.value = ''
   captureConfidence.value = null
   try {
-    const reader = new FileReader()
-    const dataUrl = await new Promise((resolve, reject) => {
-      reader.onload = () => resolve(reader.result)
-      reader.onerror = reject
-      reader.readAsDataURL(file)
-    })
-    capturePreview.value = typeof dataUrl === 'string' ? dataUrl : ''
-    const { data } = await nlpClient.post('/workspace/ingest-image?mode=event', { image: dataUrl })
+    capturePreview.value = URL.createObjectURL(file)
+    const { imageUrl } = await uploadImageForVision(file)
+    const { data } = await nlpClient.post('/workspace/ingest-image?mode=event', { imageUrl })
     if (data?.event) {
       form.title = data.event.title || form.title
       form.date = data.event.date || form.date

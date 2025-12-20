@@ -198,6 +198,7 @@ import {
 } from '@/services/leader/occasions'
 import { listContacts, listGroups } from '@/services/leader/contacts'
 import { nlpClient } from '@/services/leader/http'
+import { uploadImageForVision } from '@/services/visionUploadService'
 
 const occasions = ref([])
 const loading = ref(false)
@@ -337,13 +338,8 @@ async function onScanFile(event) {
   captureLoading.value = true
   captureConfidence.value = null
   try {
-    const reader = new FileReader()
-    const dataUrl = await new Promise((resolve, reject) => {
-      reader.onload = () => resolve(reader.result)
-      reader.onerror = reject
-      reader.readAsDataURL(file)
-    })
-    const { data } = await nlpClient.post('/workspace/ingest-image?mode=occasion', { image: dataUrl })
+    const { imageUrl } = await uploadImageForVision(file)
+    const { data } = await nlpClient.post('/workspace/ingest-image?mode=occasion', { imageUrl })
     if (data?.occasion) {
       form.name = data.occasion.name || form.name
       form.type = data.occasion.type || form.type
