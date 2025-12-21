@@ -1141,9 +1141,10 @@ async function save() {
     reminderToSave = reminderTime.value || null
   }
 
-  const scheduledIso = reminderToSave
+  const baseIso = reminderToSave
     ? (reminderAbsoluteIso.value || buildLocalIso(dateToSave, reminderToSave))
     : null
+  const scheduledIso = baseIso ? enforceFutureReminder(baseIso, { allowDateChange: !props.lockDate }) : null
 
   const channelsToSave = setReminder.value ? computeReminderChannels() : []
 
@@ -1161,6 +1162,38 @@ async function save() {
   })
   ElNotification({ title: 'Success', message: 'Task saved', type: 'success' })
   closeDialog()
+}
+
+function enforceFutureReminder(iso, { allowDateChange = true } = {}) {
+  if (!iso) return null
+  try {
+    const tzCandidate = getUserTimezone()
+    const tz = typeof tzCandidate === 'string' && tzCandidate.includes('/')
+      ? tzCandidate
+      : Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+
+    const local = dayjs(iso).tz(tz)
+    if (!local.isValid()) return iso
+
+    const minFuture = dayjs().tz(tz).add(2, 'minute')
+    if (local.isBefore(minFuture)) {
+      const adjusted = minFuture
+      reminderAutofillGuard = true
+      try {
+        reminderTime.value = adjusted.format('HH:mm')
+        reminderAbsoluteIso.value = adjusted.utc().toISOString()
+        if (allowDateChange) {
+          selectedDate.value = normalizeDateInput(adjusted.format('YYYY-MM-DD'))
+        }
+      } finally {
+        reminderAutofillGuard = false
+      }
+      return reminderAbsoluteIso.value
+    }
+    return local.utc().toISOString()
+  } catch {
+    return iso
+  }
 }
 
 /* ---------------- Close ---------------- */
