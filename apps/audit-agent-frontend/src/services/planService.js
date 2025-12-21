@@ -33,7 +33,7 @@ export const PLANS = {
   },
 }
 
-function resolvePlanKey(userOrPlan) {
+export function resolvePlanKey(userOrPlan) {
   // Treat admins as premium for feature gating
   try {
     if (typeof userOrPlan === 'object' && userOrPlan) {
@@ -41,8 +41,12 @@ function resolvePlanKey(userOrPlan) {
       if (role === 'admin' || role === 'superadmin') return 'PREMIUM'
     }
   } catch {}
-  const planStr = typeof userOrPlan === 'string' ? userOrPlan : (userOrPlan?.plan || userOrPlan?.subscription?.plan)
-  return String(planStr || '').toLowerCase() === 'premium' ? 'PREMIUM' : 'FREE'
+  const planStr = typeof userOrPlan === 'string'
+    ? userOrPlan
+    : (userOrPlan?.plan || userOrPlan?.subscription?.plan)
+  const plan = String(planStr || '').toLowerCase()
+  const premiumTokens = ['premium', 'pro', 'team', 'starter']
+  return premiumTokens.some((token) => plan.includes(token)) ? 'PREMIUM' : 'FREE'
 }
 
 export function getPlanFeatures(userOrPlan) {

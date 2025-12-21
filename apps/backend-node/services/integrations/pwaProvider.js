@@ -37,12 +37,40 @@ export async function sendPWA(userId, message) {
     })
 
     let ok = 0
+    const expired = new Set()
     for (const sub of subs) {
       try {
         await webpush.sendNotification(sub, payload)
         ok++
       } catch (err) {
-        console.error('[PWA] Failed for sub:', err?.statusCode || '', err?.message || err)
+        const code = err?.statusCode || err?.status || null
+        const endpoint = sub?.endpoint || null
+        if (code === 404 || code === 410) {
+          console.log('[PWA] Subscription expired; removing', { userId, endpoint })
+          if (endpoint) expired.add(endpoint)
+        } else {
+          console.error('[PWA] Failed for sub:', code || '', err?.message || err)
+        }
+      }
+    }
+    if (expired.size) {
+      try {
+        const filtered = subs.filter((s) => s?.endpoint && !expired.has(s.endpoint))
+        await db.collection('users').doc(String(userId)).set(
+          {
+            integrations: {
+              ...(data?.integrations || {}),
+              pwa: {
+                ...(data?.integrations?.pwa || {}),
+                subscriptions: filtered,
+              },
+            },
+          },
+          { merge: true },
+        )
+        console.log('[PWA] Pruned expired subscriptions', { userId, removed: expired.size })
+      } catch (err) {
+        console.warn('[PWA] Failed to prune expired subscriptions', err?.message || err)
       }
     }
     console.log('[PWA] Sent push', { userId, delivered: ok, total: subs.length })

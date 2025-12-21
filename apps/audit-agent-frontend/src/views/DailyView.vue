@@ -60,14 +60,15 @@ import TaskBoard from '@/components/TaskBoard.vue'
 import VoiceRecorder from '@/components/VoiceRecorder.vue'
 import GuestBanner from '@/components/GuestBanner.vue'
 import { generateTasksFromText, enhanceJournal } from '@/services/aiService'
-import { addTaskToFirebase, saveEntryToFirebase, fetchTasks } from '@/services/firebaseService'
+import { saveEntryToFirebase } from '@/services/firebaseService'
 import { toLocalDateKey } from '@/utils/dateHelper'
+import { useTasks } from '@/composables/useTasks'
 
 const authStore = useAuthStore()
 const planningInput = ref('')
 const reflectionText = ref('')
 const enhancedText = ref('')
-const tasks = ref([])
+const { addTask, loadTasks } = useTasks()
 
 const route = useRoute()
 const SITE_URL = import.meta.env.VITE_SITE_URL || 'https://plancraftai.com'
@@ -85,7 +86,7 @@ useHead({
 })
 
 onMounted(async () => {
-  tasks.value = await fetchTasks()
+  await loadTasks().catch(() => {})
 })
 
 function redirectToLogin() {
@@ -109,11 +110,9 @@ async function generateTasks() {
       details: '',
       completed: false,
       date: toLocalDateKey(new Date()),
-      order: tasks.value.length + i,
       logs: [],
     }
-    const saved = await addTaskToFirebase(newTask)
-    tasks.value = [saved, ...tasks.value.filter(t => t.id !== saved.id)]
+    await addTask(newTask)
   }
   planningInput.value = ''
 }

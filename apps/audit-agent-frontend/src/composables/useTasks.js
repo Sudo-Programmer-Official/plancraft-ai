@@ -1,100 +1,278 @@
 // src/composables/useTasks.js
 import { ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import { trackEvent } from '@/services/analytics'
 import { useAuthStore } from '@/stores/authStore'
 import { toLocalDateKey } from '@/utils/dateHelper'
 import {
-  fetchTasksForToday,
-  fetchTasksByDate,
-  fetchTasksBetween,
   addTaskToFirebase,
-  updateTaskInFirebase,
   deleteTaskFromFirebase,
+  fetchAllTasksForWorkspace,
+  fetchTasksForToday,
+  fetchUnfinishedTasksBefore,
+  moveTasksToDate,
+  updateTaskInFirebase,
 } from '@/services/firebaseService'
 import { resolveCategory } from '@/constants/taskCategories'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 
 // 🔗 Shared singleton state
 const tasks = ref([])
+const allTasks = ref([])
+const activeFilter = ref(makeDefaultFilter())
 let initialized = false
 let refreshListenerAttached = false
 let workspaceWatchAttached = false
+let refreshPromise = null
+let lastRolloverKey = null
+
+function makeTodayKey() {
+  return toLocalDateKey(new Date())
+}
+
+function makeDefaultFilter() {
+  const today = makeTodayKey()
+  return {
+    dateFilter: 'today',
+    startDate: today,
+    endDate: today,
+    status: 'all',
+    category: 'All',
+    search: '',
+    sortBy: 'default',
+    sortDir: 'desc',
+  }
+}
 
 export function useTasks() {
   const authStore = useAuthStore()
   const workspaceStore = useWorkspaceStore()
+
   /**
-   * 🔄 Load tasks from Firestore for today (and current user)
+   * 🔄 Helpers
    */
   function uniqueById(list) {
-    return Array.from(new Map((Array.isArray(list) ? list : []).map(t => [t.id, t])).values())
+    return Array.from(new Map((Array.isArray(list) ? list : []).map((t) => [t.id, t])).values())
+  }
+
+  // Read-only resolver for a task's planned date; never mutates or persists.
+  function getTaskPlannedDate(task) {
+    if (!task) return null
+    const candidates = [
+      task.plannedDate,
+      task.date,
+      task.scheduledDate,
+      task.scheduled_time,
+      task.scheduledTime,
+      task.dueDate,
+      task?.metadata?.plannedDate,
+    ]
+    for (const value of candidates) {
+      if (!value && value !== 0) continue
+      if (typeof value === 'string') {
+        const trimmed = value.trim()
+        if (/\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed
+        const isoDate = new Date(trimmed)
+        if (!Number.isNaN(isoDate.getTime())) return toLocalDateKey(isoDate)
+      } else if (value?.toDate) {
+        try {
+          return toLocalDateKey(value.toDate())
+        } catch {}
+      } else if (value instanceof Date || typeof value === 'number') {
+        const d = new Date(value)
+        if (!Number.isNaN(d.getTime())) return toLocalDateKey(d)
+      }
+    }
+    if (task.createdAt) {
+      try {
+        const created = task.createdAt?.toDate ? task.createdAt.toDate() : new Date(task.createdAt)
+        if (!Number.isNaN(created?.getTime?.())) return toLocalDateKey(created)
+      } catch {}
+    }
+    return null
+  }
+
+  function coerceTs(value) {
+    if (!value) return 0
+    if (typeof value === 'number') return value
+    if (value?.seconds) return value.seconds * 1000 + Math.floor((value.nanoseconds || 0) / 1e6)
+    if (typeof value?.toMillis === 'function') return value.toMillis()
+    if (value instanceof Date) return value.getTime()
+    const num = Number(value)
+    return Number.isFinite(num) ? num : 0
+  }
+
+  function normalizeTask(task) {
+    if (!task) return null
+    const normalizedDate = getTaskPlannedDate(task) || makeTodayKey()
+    return {
+      ...task,
+      date: normalizedDate,
+      category: resolveCategory(task?.category),
+      status: task?.status || (task?.completed ? 'completed' : 'pending'),
+      createdAt: coerceTs(task?.createdAt) || Date.now(),
+    }
   }
 
   function normalizeList(raw) {
     const base = Array.isArray(raw) ? raw : []
-    return base.map((task) => ({
-      ...task,
-      category: resolveCategory(task?.category),
-    }))
+    return base.map((task) => normalizeTask(task)).filter(Boolean)
   }
 
-  async function loadTasks() {
-    const raw = await fetchTasksForToday()
+  function sortTasks(list, sortBy = 'default', sortDir = 'desc') {
+    const arr = Array.isArray(list) ? [...list] : []
+    const dir = sortDir === 'asc' ? 1 : -1
+    const toTs = (ymd) => {
+      if (!ymd) return 0
+      const [y, m, d] = String(ymd).split('-').map((v) => parseInt(v, 10))
+      if (!y || !m || !d) return 0
+      return new Date(y, m - 1, d).getTime()
+    }
 
-    // Ensure newest first + incomplete before complete
-    tasks.value = normalizeList(uniqueById(raw)).sort((a, b) => {
-      if (a.completed !== b.completed) {
-        return a.completed - b.completed // incomplete first
+    return arr.sort((a, b) => {
+      if (sortBy === 'dueDate') {
+        const diff = (toTs(getTaskPlannedDate(a)) - toTs(getTaskPlannedDate(b))) * dir
+        if (diff !== 0) return diff
+      } else if (sortBy === 'createdAt') {
+        const diff = (coerceTs(a.createdAt) - coerceTs(b.createdAt)) * dir
+        if (diff !== 0) return diff
+      } else if (sortBy === 'priority') {
+        const pa = Number.isFinite(a.priority) ? a.priority : -Infinity
+        const pb = Number.isFinite(b.priority) ? b.priority : -Infinity
+        if (pa !== pb) return (pa - pb) * dir
       }
-      return (b.createdAt || 0) - (a.createdAt || 0) // newest first
-    })
-    try { if (import.meta.env.DEV) console.log('[useTasks] loadTasks ids:', tasks.value.map(t => t.id)) } catch {}
 
-    initialized = true
+      // Default/fallback: incomplete first, then newest first
+      if (a.completed !== b.completed) return a.completed ? 1 : -1
+      return coerceTs(b.createdAt) - coerceTs(a.createdAt)
+    })
+  }
+
+  function applyFilters(base, filter = null) {
+    const opts = { ...makeDefaultFilter(), ...(filter || {}) }
+    let filtered = Array.isArray(base) ? [...base] : []
+
+    if (opts.status === 'pending') {
+      filtered = filtered.filter((t) => !t.completed && t.status !== 'completed')
+    } else if (opts.status === 'completed') {
+      filtered = filtered.filter((t) => t.completed || t.status === 'completed')
+    }
+
+    const today = makeTodayKey()
+    if (opts.dateFilter === 'today') {
+      filtered = filtered.filter((t) => (getTaskPlannedDate(t) || today) === today)
+    } else if (opts.dateFilter === 'tomorrow') {
+      const d = new Date()
+      d.setDate(d.getDate() + 1)
+      const target = toLocalDateKey(d)
+      filtered = filtered.filter((t) => (getTaskPlannedDate(t) || target) === target)
+    } else if (opts.dateFilter === 'overdue') {
+      filtered = filtered.filter((t) => {
+        const planned = getTaskPlannedDate(t) || today
+        return planned < today && !t.completed
+      })
+    } else if (opts.dateFilter === 'range' || opts.dateFilter === 'custom') {
+      const start = opts.startDate || today
+      const end = opts.endDate || start
+      filtered = filtered.filter((t) => {
+        const planned = getTaskPlannedDate(t) || today
+        return planned >= start && planned <= end
+      })
+    }
+
+    if (opts.category && opts.category !== 'All') {
+      const target = resolveCategory(opts.category)
+      filtered = filtered.filter((t) => resolveCategory(t.category) === target)
+    }
+
+    if (opts.search) {
+      const needle = opts.search.toLowerCase()
+      filtered = filtered.filter((t) => {
+        const title = String(t.title || '').toLowerCase()
+        const details = String(t.details || '').toLowerCase()
+        return title.includes(needle) || details.includes(needle)
+      })
+    }
+
+    return sortTasks(filtered, opts.sortBy, opts.sortDir)
+  }
+
+  function syncFiltered(nextFilter = null) {
+    if (nextFilter) {
+      activeFilter.value = { ...activeFilter.value, ...nextFilter }
+    }
+    tasks.value = applyFilters(allTasks.value, activeFilter.value)
+  }
+
+  async function refreshAllTasks(force = false) {
+    if (refreshPromise && !force) return refreshPromise
+    refreshPromise = (async () => {
+      // Prefer a single fetch of all tasks for the workspace; fall back to today if needed
+      let raw = []
+      try {
+        raw = await fetchAllTasksForWorkspace()
+      } catch {
+        raw = await fetchTasksForToday()
+      }
+      allTasks.value = sortTasks(normalizeList(uniqueById(raw)))
+      syncFiltered()
+      initialized = true
+    })()
+    try {
+      await refreshPromise
+    } finally {
+      refreshPromise = null
+    }
+  }
+
+  /**
+   * Load tasks for a view; filters are applied locally over the single source of truth.
+   */
+  async function loadTasks(filterOverrides = {}) {
+    const today = makeTodayKey()
+    const baseFilter = {
+      ...makeDefaultFilter(),
+      ...filterOverrides,
+      dateFilter: filterOverrides?.dateFilter || 'today',
+      startDate: filterOverrides?.startDate || today,
+      endDate: filterOverrides?.endDate || filterOverrides?.startDate || today,
+    }
+    await ensureDailyRollover()
+    await refreshAllTasks(true)
+    syncFiltered(baseFilter)
   }
 
   /**
    * Load tasks for a specific date (YYYY-MM-DD)
    */
   async function loadTasksForDate(dateStr) {
-    const raw = await fetchTasksByDate(dateStr)
-
-    tasks.value = normalizeList(uniqueById(raw)).sort((a, b) => {
-      if (a.completed !== b.completed) {
-        return a.completed - b.completed
-      }
-      return (b.createdAt || 0) - (a.createdAt || 0)
+    const target = typeof dateStr === 'string' ? dateStr : makeTodayKey()
+    return loadTasks({
+      dateFilter: 'range',
+      startDate: target,
+      endDate: target,
     })
-    try { if (import.meta.env.DEV) console.log('[useTasks] loadTasksForDate ids:', tasks.value.map(t => t.id)) } catch {}
-
-    initialized = true
   }
 
   /**
    * Load tasks for a date range inclusive (YYYY-MM-DD)
    */
   async function loadTasksForRange(startYMD, endYMD) {
-    tasks.value = normalizeList(uniqueById(await fetchTasksBetween(startYMD, endYMD)))
-
-    // add sorting if needed
-    tasks.value.sort((a, b) => {
-      if (a.completed !== b.completed) {
-        return a.completed - b.completed // incomplete first
-      }
-      return (b.createdAt || 0) - (a.createdAt || 0) // newest first
+    const start = typeof startYMD === 'string' ? startYMD : makeTodayKey()
+    const end = typeof endYMD === 'string' ? endYMD : start
+    return loadTasks({
+      dateFilter: 'range',
+      startDate: start,
+      endDate: end,
     })
-    try { if (import.meta.env.DEV) console.log('[useTasks] loadTasksForRange ids:', tasks.value.map(t => t.id)) } catch {}
-
-    initialized = true
   }
 
   /**
    * ➕ Add new task
    */
   async function addTask(newTask = null) {
-      if (!newTask) throw new Error("Task data is required")
+    if (!newTask) throw new Error('Task data is required')
     const baseTask = {
-      // id: Date.now().toString(),
       title: 'New Task',
       details: '',
       completed: false,
@@ -104,19 +282,40 @@ export function useTasks() {
     }
 
     const task = { ...baseTask, ...(newTask || {}) }
+    const normalizedTask = normalizeTask(task)
+    const optimisticId = `temp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+    const optimisticTask = {
+      ...normalizedTask,
+      id: optimisticId,
+      optimistic: true,
+    }
 
-    const saved = await addTaskToFirebase(task)
-    // Replace by id if exists; then put newest first
-    const normalized = { ...saved, category: resolveCategory(saved?.category) }
-    tasks.value = [normalized, ...tasks.value.filter(t => t.id !== normalized.id)]
-    try { if (import.meta.env.DEV) console.log('[useTasks] addTask ids:', tasks.value.map(t => t.id)) } catch {}
+    tasks.value = [optimisticTask, ...tasks.value]
+    allTasks.value = sortTasks(uniqueById([optimisticTask, ...allTasks.value]))
+
     try {
-      trackEvent('Task Created', {
-        source: newTask?.source || 'journal',
-        guest: !!authStore?.isGuest,
-      })
-    } catch (e) {
-      console.warn('analytics: Task Created track failed', e)
+      const saved = await addTaskToFirebase(task)
+      const normalized = { ...saved, category: resolveCategory(saved?.category) }
+      allTasks.value = sortTasks(
+        uniqueById([normalized, ...allTasks.value.filter((t) => t.id !== optimisticId && t.id !== normalized.id)]),
+      )
+      syncFiltered()
+      try {
+        trackEvent('Task Created', {
+          source: newTask?.source || 'journal',
+          guest: !!authStore?.isGuest,
+        })
+      } catch (e) {
+        console.warn('analytics: Task Created track failed', e)
+      }
+      return normalized
+    } catch (err) {
+      tasks.value = tasks.value.filter((t) => t.id !== optimisticId)
+      allTasks.value = allTasks.value.filter((t) => t.id !== optimisticId)
+      try {
+        ElMessage.error('Could not create task. Please try again.')
+      } catch {}
+      throw err
     }
   }
 
@@ -127,6 +326,10 @@ export function useTasks() {
     try {
       task.completed = !task.completed
       await updateTaskInFirebase(task)
+      allTasks.value = sortTasks(
+        uniqueById(allTasks.value.map((t) => (t.id === task.id ? normalizeTask(task) : t))),
+      )
+      syncFiltered()
       if (task.completed) {
         try {
           trackEvent('Task Completed', { taskId: task.id })
@@ -149,6 +352,10 @@ export function useTasks() {
     task.logs.push(task.newLog.trim())
     task.newLog = ''
     await updateTaskInFirebase(task)
+    allTasks.value = sortTasks(
+      uniqueById(allTasks.value.map((t) => (t.id === task.id ? normalizeTask(task) : t))),
+    )
+    syncFiltered()
   }
 
   /**
@@ -159,6 +366,8 @@ export function useTasks() {
       task.order = index
       await updateTaskInFirebase(task)
     }
+    allTasks.value = sortTasks(uniqueById(allTasks.value.map((t) => normalizeTask(t))))
+    syncFiltered()
   }
 
   /**
@@ -167,6 +376,101 @@ export function useTasks() {
   async function deleteTask(task) {
     await deleteTaskFromFirebase(task.id)
     tasks.value = tasks.value.filter((t) => t.id !== task.id)
+    allTasks.value = allTasks.value.filter((t) => t.id !== task.id)
+    syncFiltered()
+  }
+
+  /**
+   * ↪️ Move tasks to a target date (used by auto-rollover + banner actions)
+   */
+  async function moveTasks(taskEntries = [], targetDate = makeTodayKey(), options = {}) {
+    const entries = Array.isArray(taskEntries) ? taskEntries : []
+    const normalized = entries
+      .map((entry) => (typeof entry === 'string' ? { id: entry } : entry))
+      .filter((entry) => entry?.id)
+    if (!normalized.length) return []
+
+    const normalizedDate = typeof targetDate === 'string' ? targetDate : toLocalDateKey(new Date(targetDate))
+    const prevById = new Map(allTasks.value.map((t) => [t.id, t.date]))
+    const payload = normalized.map((entry) => ({
+      id: entry.id,
+      previousDate: entry.previousDate || prevById.get(entry.id) || entry.date || null,
+      completed: options.completed ?? false,
+    }))
+    const ids = payload.map((p) => p.id)
+
+    // Optimistic update
+    allTasks.value = sortTasks(
+      uniqueById(
+        allTasks.value.map((t) =>
+          ids.includes(t.id)
+            ? normalizeTask({
+                ...t,
+                date: normalizedDate,
+                status: options.status || 'pending',
+                completed: options.completed ?? false,
+                rolledOver: options.rolledOver ?? t.rolledOver,
+                previousDate: payload.find((p) => p.id === t.id)?.previousDate || t.previousDate || null,
+              })
+            : t,
+        ),
+      ),
+    )
+    syncFiltered()
+
+    try {
+      await moveTasksToDate(payload, normalizedDate, {
+        status: options.status || 'pending',
+        rolledOver: options.rolledOver ?? false,
+        rolledOverAt: options.rolledOver ? new Date() : undefined,
+        completed: options.completed ?? false,
+        previousDate: options.previousDate,
+      })
+      await refreshAllTasks(true)
+    } catch (err) {
+      console.warn('[useTasks] moveTasks failed', err?.message || err)
+      await refreshAllTasks(true)
+      throw err
+    }
+  }
+
+  /**
+   * ♻️ Auto-roll unfinished tasks forward once per day per user/workspace
+   */
+  async function ensureDailyRollover() {
+    const userId = authStore?.user?.uid || null
+    const wsId = workspaceStore?.activeWorkspaceId || null
+    if (!userId || !wsId) return
+    const today = makeTodayKey()
+    const storageKey = `tasks:last-rollover:${userId}:${wsId}`
+    const checkKey = `${storageKey}:${today}`
+    if (lastRolloverKey === checkKey) return
+    const lastSeen = (() => {
+      try {
+        return localStorage.getItem(storageKey)
+      } catch {
+        return null
+      }
+    })()
+    if (lastSeen === today) {
+      lastRolloverKey = checkKey
+      return
+    }
+
+    try {
+      const stale = await fetchUnfinishedTasksBefore(today)
+      if (stale.length) {
+        await moveTasks(stale, today, { rolledOver: true, status: 'pending', completed: false })
+      }
+      try {
+        localStorage.setItem(storageKey, today)
+      } catch {
+        /* ignore */
+      }
+      lastRolloverKey = checkKey
+    } catch (err) {
+      console.warn('[useTasks] ensureDailyRollover failed', err?.message || err)
+    }
   }
 
   // 🔹 Only load once when app starts
@@ -174,7 +478,9 @@ export function useTasks() {
   if (!refreshListenerAttached) {
     try {
       window.addEventListener('tasks:refresh-request', () => {
-        loadTasks().catch((err) => console.warn('[useTasks] refresh failed', err?.message || err))
+        refreshAllTasks(true)
+          .then(() => syncFiltered())
+          .catch((err) => console.warn('[useTasks] refresh failed', err?.message || err))
       })
       refreshListenerAttached = true
     } catch (err) {
@@ -185,8 +491,14 @@ export function useTasks() {
     try {
       watch(
         () => workspaceStore.activeWorkspaceId,
-        () => {
-          loadTasks().catch((err) => console.warn('[useTasks] workspace switch load failed', err?.message || err))
+        async () => {
+          allTasks.value = []
+          tasks.value = []
+          activeFilter.value = makeDefaultFilter()
+          initialized = false
+          await loadTasks().catch((err) =>
+            console.warn('[useTasks] workspace switch load failed', err?.message || err),
+          )
         },
       )
       workspaceWatchAttached = true
@@ -197,13 +509,19 @@ export function useTasks() {
 
   return {
     tasks,
+    allTasks,
+    activeFilter,
     loadTasks,
     loadTasksForDate,
     loadTasksForRange,
+    refreshAllTasks,
     addTask,
     toggleComplete,
     addLog,
     persistOrder,
     deleteTask,
+    moveTasks,
+    ensureDailyRollover,
+    getTaskPlannedDate,
   }
 }

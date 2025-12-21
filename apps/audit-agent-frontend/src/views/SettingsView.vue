@@ -58,19 +58,140 @@
       <!-- Plan status and usage -->
       <section
         v-show="activeTab === 'billing-subscription'"
-        class="settings-panel"
+        class="settings-panel space-y-4"
       >
-        <h2 class="text-lg sm:text-xl font-semibold mb-2">🌟 Subscription</h2>
-        <p class="text-sm text-indigo-200">Current plan: <strong>{{ currentPlanLabel.toUpperCase() }}</strong></p>
-        <p class="text-sm text-gray-300 mt-2">
-          Daily AI limit: <span :class="isPremium ? 'text-green-300' : 'text-yellow-300'">{{ aiRemaining }}</span> left today
-        </p>
-        <p v-if="isPremium && subStore.subscription?.remainingDays > 0" class="text-sm text-indigo-300 mt-1">
-          ⏳ Ends on: {{ premiumEndsOn }}
-        </p>
-        <div class="mt-3">
-          <button v-if="!isPremium" @click="upgradePlan" class="bg-gradient-to-r from-purple-500 to-pink-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-white shadow-lg hover:from-purple-600 hover:to-pink-700 transition text-sm sm:text-base">🚀 Upgrade</button>
-          <el-button size="small" plain @click="planOpen=true" class="ml-2">View Plan Details</el-button>
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Billing</p>
+            <h2 class="text-lg sm:text-xl font-semibold mb-1">🌟 Subscription & Usage</h2>
+            <p class="text-sm text-indigo-200">
+              Personal plan status plus the new teams pricing for shared workspaces.
+            </p>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/20 border border-indigo-300/40 text-indigo-50 text-sm">
+              <span class="text-[11px] uppercase tracking-[0.18em] text-indigo-100/80">Plan</span>
+              <strong class="text-white">{{ normalizedPlanLabel }}</strong>
+            </span>
+            <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/70 border border-white/10 text-slate-200 text-sm">
+              <span class="text-[11px] uppercase tracking-[0.18em] text-slate-300">AI today</span>
+              <span>{{ aiUsed }} / {{ aiLimitLabel }}</span>
+            </span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-[1.05fr,1fr] gap-4">
+          <div class="rounded-2xl border border-white/10 bg-slate-900/60 p-4 sm:p-5 space-y-4 shadow-lg">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p class="text-sm text-indigo-200 font-semibold">Personal plan</p>
+                <p class="text-xs text-slate-300">
+                  Daily AI limit {{ aiLimitLabel }}, reminders {{ remindersLimitLabel }} / day.
+                </p>
+              </div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <button
+                  v-if="!isPremium"
+                  @click="upgradePlan"
+                  class="bg-gradient-to-r from-purple-500 to-pink-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-white shadow-lg hover:from-purple-600 hover:to-pink-700 transition text-sm sm:text-base"
+                >
+                  🚀 Upgrade
+                </button>
+                <el-button size="small" plain @click="openSubscriptionPage">Manage in billing</el-button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div class="rounded-lg bg-slate-800/70 border border-white/10 p-3">
+                <p class="text-[11px] uppercase tracking-[0.2em] text-indigo-200 mb-1">AI generations</p>
+                <p class="text-2xl font-semibold text-white">
+                  {{ aiUsed }}
+                  <span class="text-sm text-slate-300">/ {{ aiLimitLabel }}</span>
+                </p>
+              </div>
+              <div class="rounded-lg bg-slate-800/70 border border-white/10 p-3">
+                <p class="text-[11px] uppercase tracking-[0.2em] text-indigo-200 mb-1">Reminders</p>
+                <p class="text-2xl font-semibold text-white">
+                  {{ remindersUsed }}
+                  <span class="text-sm text-slate-300">/ {{ remindersLimitLabel }}</span>
+                </p>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 flex-wrap">
+              <el-button size="small" @click="planOpen = true">Usage breakdown</el-button>
+              <p v-if="isPremium && subStore.subscription?.remainingDays > 0" class="text-xs text-indigo-300">
+                ⏳ Ends on {{ premiumEndsOn }}
+              </p>
+            </div>
+          </div>
+
+          <div class="rounded-2xl border border-indigo-400/30 bg-indigo-900/60 p-4 sm:p-5 space-y-3 shadow-lg">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <p class="text-xs uppercase tracking-[0.25em] text-indigo-200">Teams pricing</p>
+                <h3 class="text-xl font-semibold text-white">Seat-based workspaces</h3>
+                <p class="text-sm text-indigo-100/90">
+                  Starter from $6/seat · Pro from $10/seat. Roles, invites, and Voice AI reminders.
+                </p>
+              </div>
+              <button
+                class="px-3 py-1.5 rounded-lg bg-white text-indigo-800 font-semibold text-sm hover:bg-slate-100 transition"
+                @click="goToTeamsPricing"
+              >
+                View plans
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div class="rounded-xl border border-white/10 bg-slate-950/50 p-3 space-y-2">
+                <div class="flex items-center justify-between">
+                  <h4 class="text-lg font-semibold text-white">Team Starter</h4>
+                  <span class="text-[11px] px-2 py-1 rounded-full bg-white/10 text-indigo-100">Launch teams</span>
+                </div>
+                <div class="flex items-baseline gap-2">
+                  <span class="text-2xl font-bold text-white">$6</span>
+                  <span class="text-xs text-indigo-200">/ seat / month</span>
+                </div>
+                <ul class="text-xs text-indigo-100/90 space-y-1">
+                  <li>✅ Shared workspace & invites</li>
+                  <li>✅ Role-based access</li>
+                  <li>✅ Voice AI reminders</li>
+                </ul>
+                <button
+                  class="w-full mt-2 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition"
+                  @click="handleTeamCta('starter')"
+                >
+                  {{ starterCtaLabel }}
+                </button>
+              </div>
+              <div class="rounded-xl border border-indigo-300/40 bg-gradient-to-br from-indigo-900/80 via-slate-900 to-indigo-950 p-3 space-y-2 shadow ring-1 ring-indigo-400/30">
+                <div class="flex items-center justify-between">
+                  <h4 class="text-lg font-semibold text-white">Team Pro</h4>
+                  <span class="text-[11px] px-2 py-1 rounded-full bg-indigo-500/20 border border-indigo-300/50 text-indigo-100">
+                    Admin controls
+                  </span>
+                </div>
+                <div class="flex items-baseline gap-2">
+                  <span class="text-2xl font-bold text-white">$10</span>
+                  <span class="text-xs text-indigo-200">/ seat / month</span>
+                </div>
+                <ul class="text-xs text-indigo-100/90 space-y-1">
+                  <li>✅ Everything in Starter</li>
+                  <li>✅ Advanced admin controls (Coming soon)</li>
+                  <li>✅ Priority support</li>
+                </ul>
+                <button
+                  class="w-full mt-2 px-3 py-2 rounded-lg bg-white text-indigo-800 font-semibold text-sm hover:bg-slate-100 transition"
+                  @click="handleTeamCta('pro')"
+                >
+                  {{ proCtaLabel }}
+                </button>
+              </div>
+            </div>
+
+            <p class="text-xs text-indigo-100/80">Seats = teammates you invite. Billing adjusts automatically when seats change.</p>
+          </div>
         </div>
       </section>
 
@@ -505,7 +626,7 @@ import { createGptLinkCode } from '@/services/gptService'
 import SocialIntegrationPanel from '@/components/settings/SocialIntegrationPanel.vue'
 import { subscribeUserToPush } from "@/services/pwaService"
 import { useSubscriptionStore } from "@/stores/subscriptionStore"
-import { isFeatureAllowed, getRemainingAI } from "@/services/planService"
+import { PLANS, resolvePlanKey } from "@/services/planService"
 import PlanSummaryModal from "@/components/PlanSummaryModal.vue"
 import KnowledgePanel from "@/components/KnowledgePanel.vue"
 import ProposalInbox from "@/components/ProposalInbox.vue"
@@ -515,6 +636,7 @@ import { getAuth, updateProfile, updateEmail, GoogleAuthProvider, reauthenticate
 import { db } from '@/firebase/init'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import AvatarUploader from '@/components/AvatarUploader.vue'
+import { useWorkspaceStore } from '@/stores/workspaceStore'
 import dayjs from 'dayjs'
 
 const authStore = useAuthStore()
@@ -522,6 +644,15 @@ const router = useRouter()
 const route = useRoute()
 const subStore = useSubscriptionStore()
 const { refresh: refreshPremium } = useIsPremium()
+const workspaceStore = useWorkspaceStore()
+const teamWorkspaces = computed(() =>
+  (workspaceStore.workspaces || []).filter((w) => (w.workspaceType || w.type) === 'team'),
+)
+const activeTeamWorkspace = computed(() => {
+  const active = workspaceStore.activeWorkspace
+  if (active && ((active.workspaceType || active.type) === 'team')) return active
+  return teamWorkspaces.value[0] || null
+})
 
 const tabGroups = [
   {
@@ -688,12 +819,15 @@ const prefs = reactive({
 
 const isPremium = computed(() => {
   try {
-    const planFromStore = subStore?.plan ?? subStore?.value?.plan
-    const planFromUser = authStore?.user?.plan
-    const roleFromUser = authStore?.user?.role
-    return [planFromStore, planFromUser, roleFromUser]
-      .map(v => String(v || '').toLowerCase())
-      .includes('premium')
+    const planCandidates = [
+      subStore?.subscription?.value?.plan ?? subStore?.subscription?.plan,
+      authStore?.user?.plan,
+      authStore?.user,
+    ]
+    const role = String(authStore?.user?.role || '').toLowerCase()
+    const isAdminRole = role === 'admin' || role === 'superadmin'
+    const hasPremiumPlan = planCandidates.some((plan) => resolvePlanKey(plan) === 'PREMIUM')
+    return hasPremiumPlan || isAdminRole
   } catch { return false }
 })
 
@@ -701,6 +835,9 @@ onMounted(async () => {
   try {
     // Ensure latest subscription state on entry
     try { await refreshPremium() } catch {}
+    if (authStore?.user?.uid) {
+      try { workspaceStore.init?.() } catch {}
+    }
     // Deep link: /settings?tab=notifications → scroll and highlight
     try {
       const tab = String(route?.query?.tab || '').toLowerCase()
@@ -1100,9 +1237,46 @@ function handleLogout() {
   router.push("/login")
 }
 
+function openSubscriptionPage(hash = '') {
+  const targetHash = hash ? `#${hash}` : ''
+  router.push({ path: '/subscription', hash: targetHash })
+}
+
+function goToTeamsPricing() {
+  openSubscriptionPage('teams')
+}
+
+function handleTeamCta(plan = 'starter') {
+  const isGuest = authStore.isGuest === true || authStore.guest === true || authStore.user?.mode === 'guest'
+  const target = plan === 'pro' ? '/workspaces/new?plan=pro' : '/workspaces/new'
+  const workspace = activeTeamWorkspace.value
+
+  if (!authStore.user?.uid || isGuest) {
+    try { localStorage.setItem('postLoginRedirect', target) } catch {}
+    router.push({ path: '/signup', query: { mode: 'team', next: target } })
+    return
+  }
+
+  if (!workspace) {
+    router.push({ path: '/workspaces/new', query: { plan } })
+    return
+  }
+
+  const currentPlan = String(workspace.plan || 'free').toLowerCase()
+  const needsUpgrade =
+    (plan === 'starter' && currentPlan === 'free') || (plan === 'pro' && !currentPlan.includes('pro'))
+
+  if (needsUpgrade) {
+    router.push({ path: '/billing/upgrade', query: { plan, workspaceId: workspace.id } })
+    return
+  }
+
+  router.push('/workspaces')
+}
+
 function upgradePlan() {
   try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_UPGRADE_CLICK) } catch {}
-  router.push("/subscription") // redirect to subscription/pricing
+  openSubscriptionPage() // redirect to subscription/pricing
 }
 
 // Updated saveSettings function with user feedback
@@ -1412,12 +1586,39 @@ async function enablePush() {
 
 // Plan gates
 // Use unified premium flag to control gates for a consistent UX
-const canWhatsapp = computed(() => !!isPremium.value)
-const canPwa = computed(() => !!isPremium.value)
-const aiRemaining = computed(() => getRemainingAI(authStore.user || {}))
+const usageToday = computed(() => authStore.user?.usage?.today || { aiGenerations: 0, reminders: 0 })
+const aiUsed = computed(() => Number(usageToday.value.aiGenerations || 0))
+const remindersUsed = computed(() => Number(usageToday.value.reminders || 0))
+const aiLimitLabel = computed(() => (isPremium.value ? '∞' : PLANS.FREE.limits.aiGenerations))
+const remindersLimitLabel = computed(() => (isPremium.value ? '∞' : PLANS.FREE.limits.remindersPerDay))
 const planOpen = ref(false)
 
-const currentPlanLabel = computed(() => (isPremium.value ? 'premium' : 'free'))
+const normalizedPlanLabel = computed(() => {
+  const raw =
+    authStore.user?.plan ||
+    subStore.subscription?.value?.plan ||
+    subStore.subscription?.plan ||
+    (isPremium.value ? 'Premium' : 'Free')
+  const cleaned = String(raw || '').trim()
+  if (!cleaned) return isPremium.value ? 'Premium' : 'Free'
+  return cleaned
+    .replace(/[_-]+/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
+})
+const starterCtaLabel = computed(() => {
+  if (!activeTeamWorkspace.value) return 'Create workspace'
+  const plan = String(activeTeamWorkspace.value.plan || 'free').toLowerCase()
+  if (plan === 'free') return 'Upgrade workspace'
+  return 'Manage workspace'
+})
+const proCtaLabel = computed(() => {
+  if (!activeTeamWorkspace.value) return 'Create workspace'
+  const plan = String(activeTeamWorkspace.value.plan || 'free').toLowerCase()
+  return plan.includes('pro') ? 'Manage workspace' : 'Upgrade to Pro'
+})
 
 // Approximate end date using remainingDays provided by subscription store
 const premiumEndsOn = computed(() => {

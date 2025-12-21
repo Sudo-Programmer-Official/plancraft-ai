@@ -38,11 +38,10 @@
 import { ref } from 'vue'
 import VoiceRecorder from '@/components/VoiceRecorder.vue'
 import { generateTasksFromText } from '@/services/aiService'
-import { addTaskToFirebase } from '@/services/firebaseService'
 import { useTasks } from '@/composables/useTasks'
 import { toLocalDateKey } from '@/utils/dateHelper'
 
-const { tasks, loadTasks } = useTasks()
+const { tasks, loadTasks, addTask } = useTasks()
 
 const planningInput = ref('')
 // No enhanced text shown in Morning Planning by design
@@ -70,9 +69,7 @@ async function generateTasks() {
         order: tasks.value.length + i,
         logs: [],
       }
-      const saved = await addTaskToFirebase(newTask)
-      // Avoid duplicates by id; newest to front
-      tasks.value = [saved, ...tasks.value.filter(t => t.id !== saved.id)]
+      await addTask(newTask)
     }
   } catch (err) {
     console.error('Task generation failed:', err)

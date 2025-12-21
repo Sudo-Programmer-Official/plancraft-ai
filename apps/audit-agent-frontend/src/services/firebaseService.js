@@ -13,6 +13,7 @@ import {
   getDoc,
   onSnapshot,
   limit,
+  writeBatch,
 } from "firebase/firestore";
 import { signOut } from 'firebase/auth'
 import { ElMessageBox } from 'element-plus'
@@ -43,16 +44,35 @@ function resolveTasksRef() {
   return tasksRef
 }
 
+function normalizeTaskDate(value) {
+  try {
+    if (typeof value === 'string') {
+      const trimmed = value.trim()
+      if (/\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed
+    }
+    if (value?.toDate) return toLocalDateKey(value.toDate())
+    if (value instanceof Date || typeof value === 'number') {
+      const d = new Date(value)
+      if (!Number.isNaN(d.getTime())) return toLocalDateKey(d)
+    }
+  } catch {
+    /* fall back below */
+  }
+  return toLocalDateKey(new Date())
+}
+
 function taskDocRef(taskId) {
   return doc(db, 'tasks', taskId)
 }
 
 function mapTaskDoc(docSnap) {
   const data = docSnap.data()
+  const storedWorkspaceId = data.workspaceId || null
   return {
     id: docSnap.id,
     ...data,
-    workspaceId: data.workspaceId || currentWorkspaceId(),
+    workspaceId: storedWorkspaceId,
+    orphanedWorkspace: !storedWorkspaceId,
     date: typeof data.date === 'string' ? data.date : toLocalDateKey(data.date),
   }
 }
@@ -240,6 +260,75 @@ export async function fetchTasksBetween(startYMD, endYMD) {
 }
 
 /**
+ * 📚 Fetch every task for the active workspace (single source of truth)
+ */
+export async function fetchAllTasksForWorkspace() {
+  const user = auth.currentUser
+  if (!user) return []
+  const wsId = currentWorkspaceId()
+  if (!wsId) return []
+  const scopedTasks = resolveTasksRef()
+  const primaryQuery = query(scopedTasks, where('workspaceId', '==', wsId))
+  const orphanQuery = query(scopedTasks, where('workspaceId', '==', null), where('userId', '==', user.uid))
+
+  const [primarySnap, orphanSnap] = await Promise.all([
+    safeAction(getDocs(primaryQuery)),
+    safeAction(getDocs(orphanQuery)),
+  ])
+  const combined = [...(primarySnap?.docs || []), ...(orphanSnap?.docs || [])]
+
+  // De-duplicate by id in case of overlap
+  const byId = new Map()
+  combined.forEach((doc) => byId.set(doc.id, doc))
+  return Array.from(byId.values()).map(mapTaskDoc)
+}
+
+/**
+ * ⏩ Find unfinished tasks scheduled before a given date (YYYY-MM-DD)
+ */
+export async function fetchUnfinishedTasksBefore(ymd) {
+  const user = auth.currentUser
+  if (!user) return []
+  const wsId = currentWorkspaceId()
+  if (!wsId) return []
+  const scopedTasks = resolveTasksRef()
+  const target = typeof ymd === 'string' && /\d{4}-\d{2}-\d{2}/.test(ymd)
+    ? ymd
+    : toLocalDateKey(new Date(ymd || Date.now()))
+
+  async function runQuery(includeCompletedFilter = true, useLegacy = false) {
+    const clauses = [where('workspaceId', '==', useLegacy ? null : wsId)]
+    if (useLegacy) clauses.push(where('userId', '==', user.uid))
+    clauses.push(where('date', '<', target))
+    if (includeCompletedFilter) clauses.push(where('completed', '==', false))
+    const qy = query(scopedTasks, ...clauses, orderBy('date', 'asc'))
+    return safeAction(getDocs(qy))
+  }
+
+  let snap = null
+  try {
+    snap = await runQuery(true, false)
+  } catch {
+    try {
+      snap = await runQuery(false, false)
+    } catch (err) {
+      console.warn('[fetchUnfinishedTasksBefore] primary query failed, falling back', err?.message || err)
+    }
+  }
+
+  if (!snap || !snap.size) {
+    try {
+      snap = await runQuery(true, true)
+    } catch {
+      snap = await runQuery(false, true)
+    }
+  }
+
+  const tasks = snap?.docs?.map(mapTaskDoc) || []
+  return tasks.filter((t) => t.completed === false)
+}
+
+/**
  * ➕ Add a new task
  */
 /**
@@ -292,9 +381,7 @@ export async function addTaskToFirebase(task) {
       : 'Uncategorized',
     logs: Array.isArray(task?.logs) ? task.logs : [],
     attachments: Array.isArray(task?.attachments) ? task.attachments : [],
-    date: typeof task?.date === 'string' && /\d{4}-\d{2}-\d{2}/.test(task.date)
-      ? task.date
-      : toLocalDateKey(new Date()), // YYYY-MM-DD
+    date: normalizeTaskDate(task?.date || task?.dueDate), // YYYY-MM-DD
     order: task?.order ?? 0,
     userId: user.uid,
     createdBy: user.uid,
@@ -359,18 +446,21 @@ export async function addTaskToFirebase(task) {
 //   });
 // }
 export async function updateTaskInFirebase(task) {
-  console.log("updateTaskInFirebase called with task:", task);
   if (!task.id) throw new Error("Task missing Firestore ID")
   const user = auth.currentUser
   if (!user) {
     handleAuthError({ code: 'unauthenticated', message: 'User not logged in' })
     throw new Error('User not logged in')
   }
-  const wsId = currentWorkspaceId()
-  if (!wsId) throw new Error('No active workspace selected')
-  const { id, createdAt, ...updates } = task
+  const { id, createdAt, workspaceId, ...updates } = task
   const justCompleted = updates.completed === true
-  updates.workspaceId = updates.workspaceId || wsId
+
+  // Avoid mutating workspace ownership; imported meeting tasks may not have workspaceId set.
+  const normalizedWsId = typeof workspaceId === 'string' && workspaceId.trim() ? workspaceId.trim() : null
+  if (normalizedWsId) updates.workspaceId = normalizedWsId
+  else delete updates.workspaceId
+  if ('date' in updates) updates.date = normalizeTaskDate(updates.date)
+
   const ref = taskDocRef(id)
   await safeAction(updateDoc(ref, {
     ...updates,
@@ -404,6 +494,51 @@ export async function deleteTaskFromFirebase(taskId) {
   }
   const ref = taskDocRef(taskId)
   await safeAction(deleteDoc(ref))
+}
+
+/**
+ * ↪️ Move a set of tasks to a new date (batch)
+ */
+export async function moveTasksToDate(taskPayloads = [], targetDate, extra = {}) {
+  const user = auth.currentUser
+  if (!user) {
+    handleAuthError({ code: 'unauthenticated', message: 'User not logged in' })
+    throw new Error('User not logged in')
+  }
+  const wsId = currentWorkspaceId()
+  if (!wsId) throw new Error('No active workspace selected')
+  const normalizedDate =
+    typeof targetDate === 'string' && /\d{4}-\d{2}-\d{2}/.test(targetDate)
+      ? targetDate
+      : toLocalDateKey(new Date(targetDate || Date.now()))
+
+  const list = (Array.isArray(taskPayloads) ? taskPayloads : [])
+    .map((item) => (typeof item === 'string' ? { id: item } : item))
+    .filter((t) => t?.id)
+  if (!list.length) return []
+
+  const batch = writeBatch(db)
+  list.forEach((task) => {
+    const ref = taskDocRef(task.id)
+    const updates = {
+      date: normalizedDate,
+      updatedAt: serverTimestamp(),
+      workspaceId: wsId,
+    }
+    if (extra.status) updates.status = extra.status
+    if ('completed' in extra) updates.completed = !!extra.completed
+    else if (task.completed !== undefined) updates.completed = !!task.completed
+    if (updates.status === 'pending') updates.completed = false
+    if ('rolledOver' in extra) updates.rolledOver = !!extra.rolledOver
+    if ('rolledOverAt' in extra) updates.rolledOverAt = extra.rolledOverAt
+    if ('previousDate' in extra || 'previousDate' in task) {
+      updates.previousDate = task.previousDate || extra.previousDate || null
+    }
+    batch.update(ref, updates)
+  })
+
+  await safeAction(batch.commit())
+  return list.map((t) => ({ ...t, date: normalizedDate }))
 }
 
 /**

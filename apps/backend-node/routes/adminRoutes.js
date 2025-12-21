@@ -3,6 +3,7 @@ import requireAdmin from '../middleware/requireAdmin.js'
 import { dataStore } from './dataStore.js'
 import { db } from '../services/firebaseAdmin.js'
 import dayjs from 'dayjs'
+import { WORKSPACE_COLLECTION } from '../services/workspaceService.js'
 
 const router = express.Router()
 
@@ -161,6 +162,115 @@ router.post('/users/updatePlan', requireAdmin, async (req, res) => {
     return res.json({ id: userId, name: data.name || '', email: data.email || '', role: data.role || 'user', plan: data.plan || p })
   } catch (e) {
     return res.status(500).json({ error: 'Failed to update plan' })
+  }
+})
+
+// Admin: Workspace billing snapshot
+router.get('/billing/workspaces', requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.max(1, Math.min(100, parseInt(String(req.query.limit || '50'), 10)))
+    let ref = db.collection(WORKSPACE_COLLECTION).orderBy('updated_at', 'desc')
+    const snap = await ref.limit(limit).get()
+    const rows = []
+    for (const doc of snap.docs) {
+      const data = doc.data() || {}
+      const wsId = doc.id
+      // Fetch latest stripe event for this workspace if present
+      let lastEvent = null
+      try {
+        const evSnap = await db
+          .collection('stripe_events')
+          .where('workspaceId', '==', wsId)
+          .orderBy('processedAt', 'desc')
+          .limit(1)
+          .get()
+        if (!evSnap.empty) {
+          const ev = evSnap.docs[0].data() || {}
+          lastEvent = {
+            id: ev.id,
+            type: ev.type,
+            processedAt: ev.processedAt || ev.created || null,
+            billingStatus: ev.billingStatus || null,
+          }
+        }
+      } catch (e) {
+        /* ignore */
+      }
+      rows.push({
+        id: wsId,
+        name: data.name || 'Workspace',
+        ownerId: data.ownerId || null,
+        plan: data.plan || 'free',
+        billingStatus: data.billingStatus || 'none',
+        seats: data.seats || null,
+        seatsUsed: data.seatsUsed || null,
+        stripeSubscriptionId: data.stripeSubscriptionId || null,
+        stripeCustomerId: data.stripeCustomerId || null,
+        updatedAt: data.updated_at || data.updatedAt || null,
+        lastEvent,
+      })
+    }
+    return res.json({ workspaces: rows, limit })
+  } catch (err) {
+    console.error('[Admin] billing workspaces failed', err?.message || err)
+    return res.status(500).json({ error: 'Failed to load workspace billing' })
+  }
+})
+
+// Admin: recent Stripe events
+router.get('/billing/events', requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.max(1, Math.min(100, parseInt(String(req.query.limit || '50'), 10)))
+    let ref = db.collection('stripe_events').orderBy('processedAt', 'desc')
+    const snap = await ref.limit(limit).get()
+    const events = snap.docs.map((doc) => {
+      const data = doc.data() || {}
+      return {
+        id: doc.id,
+        type: data.type || null,
+        workspaceId: data.workspaceId || null,
+        plan: data.plan || null,
+        seats: data.seats || null,
+        billingStatus: data.billingStatus || null,
+        reason: data.reason || null,
+        processedAt: data.processedAt || data.created || null,
+      }
+    })
+    return res.json({ events, limit })
+  } catch (err) {
+    console.error('[Admin] billing events failed', err?.message || err)
+    return res.status(500).json({ error: 'Failed to load events' })
+  }
+})
+
+// Admin: billing timeline for a workspace
+router.get('/billing/workspaces/:workspaceId/timeline', requireAdmin, async (req, res) => {
+  try {
+    const workspaceId = String(req.params.workspaceId || '')
+    if (!workspaceId) return res.status(400).json({ error: 'workspaceId is required' })
+    const limit = Math.max(1, Math.min(100, parseInt(String(req.query.limit || '50'), 10)))
+    const snap = await db
+      .collection('stripe_events')
+      .where('workspaceId', '==', workspaceId)
+      .orderBy('processedAt', 'desc')
+      .limit(limit)
+      .get()
+    const events = snap.docs.map((doc) => {
+      const data = doc.data() || {}
+      return {
+        id: doc.id,
+        type: data.type || null,
+        plan: data.plan || null,
+        seats: data.seats || null,
+        billingStatus: data.billingStatus || null,
+        reason: data.reason || null,
+        processedAt: data.processedAt || data.created || null,
+      }
+    })
+    return res.json({ events, limit })
+  } catch (err) {
+    console.error('[Admin] billing timeline failed', err?.message || err)
+    return res.status(500).json({ error: 'Failed to load timeline' })
   }
 })
 

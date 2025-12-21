@@ -677,6 +677,7 @@ const navGroups = [
     children: [
       { label: 'Dashboard', icon: '📊', to: '/dashboard' },
       { label: 'Daily', icon: '🗓', to: '/daily' },
+      { label: 'All Tasks', icon: '🗂', to: '/tasks' },
       { label: 'Weekly', icon: '📅', to: '/weekly' },
       { label: 'Monthly', icon: '📆', to: '/monthly' },
       { label: 'Journal', icon: '📔', to: '/journal' },

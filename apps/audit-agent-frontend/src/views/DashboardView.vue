@@ -65,20 +65,20 @@
       </div>
 
       <div
-        v-if="carryoverCount > 0 || (usage.plan === 'free' && !isPremium.value) || reactivateEligible"
+        v-if="showCarryoverBanner || (usage.plan === 'free' && !isPremium.value) || reactivateEligible"
         class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4"
       >
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
           <div
-            v-if="carryoverCount > 0"
+            v-if="showCarryoverBanner"
             class="move-card flex flex-col justify-between p-4 rounded-2xl bg-gradient-to-b from-[#431f64] to-[#291642] shadow-lg text-white space-y-3"
           >
             <div class="text-content">
               <p class="text-xl font-semibold">
-                {{ carryoverCount }} unfinished task{{ carryoverCount === 1 ? '' : 's' }} from today.
+                {{ carryoverCount }} unfinished task{{ carryoverCount === 1 ? '' : 's' }} from yesterday.
               </p>
               <p class="text-sm text-gray-300 mt-1">
-                Move a few forward so tomorrow starts lighter.
+                Move a few forward so today starts lighter.
               </p>
             </div>
 
@@ -851,7 +851,7 @@ function goToUpgrade() {
 }
 
 /* -------------- Tasks + Journal state -------------- */
-const { loadTasks } = useTasks()
+const { loadTasks, allTasks, moveTasks, refreshAllTasks, ensureDailyRollover } = useTasks()
 const aiSummary = ref(null)
 const dailyTasks = ref([])
 const weeklyTasks = ref([])
@@ -860,7 +860,7 @@ const showPlanner = ref(false)
 const selectedTask = ref(null)
 const dailyList = ref(null)
 const journalLogs = ref([])
-const carryoverCount = ref(0)
+const carryoverDismissedToday = ref(false)
 const latestReport = ref(null)
 const generatingWeekly = ref(false)
 const generatingMonthly = ref(false)
@@ -938,6 +938,24 @@ const onboardingSteps = computed(() => [
     aiTip: 'Turn on nudges for critical tasks; I’ll avoid meeting conflicts automatically.',
   },
 ])
+
+const todayKeyRef = computed(() => toLocalDateKey(new Date()))
+const carryoverCandidates = computed(() => {
+  const todayKey = todayKeyRef.value
+  return (allTasks.value || [])
+    .filter((t) => {
+      if (!t || t.completed) return false
+      const fromPreviousDay = t.date < todayKey
+      const flagged = t.is_carryover === true && t.date < todayKey
+      return fromPreviousDay || flagged
+    })
+    .sort((a, b) => {
+      if (a.date !== b.date) return a.date < b.date ? -1 : 1
+      return (a.createdAt || 0) - (b.createdAt || 0)
+    })
+})
+const carryoverCount = computed(() => carryoverCandidates.value.length)
+const showCarryoverBanner = computed(() => carryoverCount.value > 0 && !carryoverDismissedToday.value)
 
 // Animated insights
 const defaultInsights = [
@@ -1284,6 +1302,14 @@ function goToProgress() {
 }
 
 onMounted(async () => {
+  await ensureDailyRollover()
+  await refreshAllTasks().catch(() => {})
+  try {
+    carryoverDismissedToday.value =
+      localStorage.getItem(`carryover:dismiss:${todayKeyRef.value}`) === '1'
+  } catch {
+    carryoverDismissedToday.value = false
+  }
   try {
     const seen = localStorage.getItem('pcai_setup_done') === '1'
     const tz = localStorage.getItem('user_timezone')
@@ -1573,11 +1599,6 @@ function handleTaskSnapshot(snapshot) {
     }
   })
   dailyTasks.value = userTasks.filter((t) => t.date === toYMD(today))
-  try {
-    carryoverCount.value = dailyTasks.value.filter((t) => t.is_carryover === true && t.completed === false).length
-  } catch {
-    carryoverCount.value = 0
-  }
   const weekDays = ymdRange(startOfWeek, endOfWeek)
   weeklyTasks.value = userTasks.filter((t) => weekDays.includes(t.date))
   const monthDays = ymdRange(startOfMonth, endOfMonth)
@@ -1652,27 +1673,46 @@ async function onReactivate() {
 
 async function applyCarryover(limit = 3) {
   try {
-    const uid = authStore?.user?.uid
-    if (!uid) return
+    const candidates = carryoverCandidates.value
+    if (!candidates.length) {
+      ElMessage({ message: 'All unfinished tasks are already in Today.', type: 'info', duration: 1600 })
+      return
+    }
     const normalizedLimit =
-      limit === 'all'
-        ? Math.max(1, carryoverCount.value || 0)
-        : Math.max(1, Number(limit) || 1)
-    await api.post('/carryover/apply', { userId: uid, limit: normalizedLimit })
-    await loadTasks()
-    ElMessage({ message: 'Moved to tomorrow ✅', type: 'success', duration: 1600 })
+      limit === 'all' ? candidates.length : Math.max(1, Number(limit) || 1)
+    const selection = candidates.slice(0, normalizedLimit)
+    const todayKey = toLocalDateKey(new Date())
+    await moveTasks(
+      selection.map((t) => ({ id: t.id, previousDate: t.previousDate || t.date })),
+      todayKey,
+      { rolledOver: true, status: 'pending', completed: false },
+    )
+    await refreshAllTasks(true)
+    const movedAll = selection.length === candidates.length
+    if (movedAll) carryoverDismissedToday.value = true
+    ElMessage({
+      message: movedAll
+        ? 'All unfinished tasks moved to today ✅'
+        : `${selection.length} task${selection.length === 1 ? '' : 's'} moved to today ✅`,
+      type: 'success',
+      duration: 1600,
+    })
   } catch (error) {
     console.warn('applyCarryover failed', error?.response?.data || error?.message)
+    ElMessage({ type: 'error', message: 'Could not move tasks right now.', duration: 1800 })
   }
 }
 
 async function ignoreCarryover() {
   try {
-    const uid = authStore?.user?.uid
-    if (!uid) return
-    await api.post('/carryover/ignore', { userId: uid })
-    await loadTasks()
-    ElMessage({ message: 'Marked as overdue', type: 'info', duration: 1600 })
+    const todayKey = toLocalDateKey(new Date())
+    carryoverDismissedToday.value = true
+    try {
+      localStorage.setItem(`carryover:dismiss:${todayKey}`, '1')
+    } catch {
+      /* noop */
+    }
+    ElMessage({ message: 'Banner dismissed for today', type: 'info', duration: 1600 })
   } catch (error) {
     console.warn('ignoreCarryover failed', error?.response?.data || error?.message)
   }

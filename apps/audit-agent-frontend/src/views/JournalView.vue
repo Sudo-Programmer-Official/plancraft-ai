@@ -293,6 +293,7 @@ import VoiceRecorder from '@/components/VoiceRecorder.vue'
 import { ElNotification } from 'element-plus'
 import { nlpClient } from '@/services/leader/http'
 import { addTaskToFirebase } from '@/services/firebaseService'
+import { uploadImageForVision } from '@/services/visionUploadService'
 
 const authStore = useAuthStore()
 const userName = computed(() => authStore?.user?.displayName || 'friend')
@@ -457,23 +458,17 @@ function onFileChange(e) {
   const file = e.target.files?.[0]
   if (!file) return
   captureImageName.value = file.name
-  const reader = new FileReader()
-  reader.onload = async (evt) => {
-    const dataUrl = evt.target?.result
-    if (typeof dataUrl === 'string') {
-      await processCapture(dataUrl)
-    }
-  }
-  reader.readAsDataURL(file)
+  processCapture(file)
 }
 
-async function processCapture(dataUrl) {
+async function processCapture(file) {
   captureLoading.value = true
   captureError.value = ''
   captureItems.value = []
   try {
-    const { data } = await nlpClient.post('/workspace/ingest-image', { image: dataUrl })
-    capturePreview.value = data?.ocrText || ''
+    const { imageUrl } = await uploadImageForVision(file)
+    const { data } = await nlpClient.post('/workspace/ingest-image', { imageUrl })
+    capturePreview.value = data?.rawText || data?.ocrText || ''
     captureItems.value = (data?.items || []).map((it) => ({
       title: it.title || 'Task',
       description: it.description || '',

@@ -5,6 +5,23 @@ const SITE_URL = (import.meta?.env?.VITE_SITE_URL && String(import.meta.env.VITE
 const BASE_URL = SITE_URL.endsWith('/') ? SITE_URL.slice(0, -1) : SITE_URL
 const DEFAULT_IMAGE = `${BASE_URL}/plancraftai-post-one.png`
 
+function buildCanonicalUrl({ canonical, canonicalPath, routePath }) {
+  // Always strip query/hash noise from canonical so UTM links don't fragment indexing
+  const rawPath = canonicalPath || routePath || '/'
+  const isAbsolute = typeof rawPath === 'string' && /^https?:\/\//i.test(rawPath)
+  const normalizedPath = isAbsolute
+    ? rawPath
+    : `${BASE_URL}${rawPath.startsWith('/') ? rawPath : `/${rawPath}`}`
+
+  if (canonical) {
+    return /^https?:\/\//i.test(canonical)
+      ? canonical
+      : `${BASE_URL}${canonical.startsWith('/') ? canonical : `/${canonical}`}`
+  }
+
+  return normalizedPath.replace(/\/{2,}/g, '/').replace('https:/', 'https://')
+}
+
 export function useSeoMeta(options = {}) {
   const route = useRoute()
   const {
@@ -20,7 +37,11 @@ export function useSeoMeta(options = {}) {
     pageLabel,
   } = options
 
-  const canonicalUrl = canonical || `${BASE_URL}${canonicalPath || route?.fullPath || ''}`
+  const canonicalUrl = buildCanonicalUrl({
+    canonical,
+    canonicalPath,
+    routePath: route?.path || '/',
+  })
   const keywordList = Array.isArray(keywords) ? keywords : typeof keywords === 'string' ? [keywords] : []
   const metaEntries = [
     { name: 'description', content: description },

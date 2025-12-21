@@ -327,6 +327,7 @@ async function verifyOtp() {
 }
 
 function redirectAfterLogin() {
+  const nextParam = typeof route?.query?.next === 'string' && route.query.next.length ? route.query.next : null
   try {
     // Priority 1: stored intent
     const stored = localStorage.getItem('postLoginRedirect')
@@ -335,11 +336,12 @@ function redirectAfterLogin() {
       return router.push(stored)
     }
   } catch {}
+  if (nextParam) return router.push(nextParam)
   // Priority 2: redirect query from guard
   const q = route?.query?.redirect
   if (typeof q === 'string' && q.length) return router.push(q)
-  // Default: dashboard
-  router.push('/dashboard')
+  // Default: team onboarding
+  router.push('/workspaces/new')
 }
 
 // --- Star animation ---

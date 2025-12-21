@@ -195,7 +195,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { getCategoryIcon, getCategoryColor, resolveCategory } from '@/constants/taskCategories'
 import { describeTaskDetails } from '@/utils/taskDisplay'
 
-const { tasks, toggleComplete, loadTasksForRange } = useTasks()
+const { tasks, toggleComplete, loadTasksForRange, getTaskPlannedDate } = useTasks()
 const formattedDetails = (task) => describeTaskDetails(task)
 
 const { authStore, userPrefs } = useAuthStore()
@@ -325,7 +325,7 @@ function toYMD(date) {
 const tasksForSelectedDay = computed(() => {
   const target = toYMD(selectedDate.value)
   return tasks.value.filter((task) => {
-    const taskDate = typeof task.date === 'string' ? task.date : toYMD(task.date)
+    const taskDate = getTaskPlannedDate(task) || (typeof task.date === 'string' ? task.date : toYMD(task.date))
     return taskDate === target
   })
 })

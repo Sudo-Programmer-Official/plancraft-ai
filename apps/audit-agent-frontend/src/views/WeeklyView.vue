@@ -190,7 +190,7 @@ import { hasNotificationSetup } from '@/utils/notificationCheck'
 import NotificationPrompt from '@/components/NotificationPrompt.vue'
 import { TASK_CATEGORY_FILTERS, getCategoryIcon, getCategoryColor, resolveCategory } from '@/constants/taskCategories'
 import { describeTaskDetails } from '@/utils/taskDisplay'
-const { tasks, toggleComplete, loadTasksForRange } = useTasks()
+const { tasks, toggleComplete, loadTasksForRange, getTaskPlannedDate } = useTasks()
 const formattedDetails = (task) => describeTaskDetails(task)
 const completionLabel = (task) =>
   task?.completedAt
@@ -294,7 +294,7 @@ async function handleSaveAndSchedule(payload) {
 const filteredTasks = computed(() => {
   const target = toYMD(selectedDate.value)
   const byDate = tasks.value.filter((task) => {
-    const taskDate = typeof task.date === 'string' ? task.date : toYMD(task.date)
+    const taskDate = getTaskPlannedDate(task) || (typeof task.date === 'string' ? task.date : toYMD(task.date))
     return taskDate === target
   })
   if (activeCategory.value === 'All') return byDate
