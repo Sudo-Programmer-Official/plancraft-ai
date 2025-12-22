@@ -1,8 +1,7 @@
 import express from "express";
 import { requireAuth, ensureUserMatches } from "../middleware/auth.js";
 import { requireWorkspaceRole } from "../middleware/workspace.js";
-import { requireFeature } from "../middleware/feature.js";
-import { FEATURE_KEYS } from "../services/entitlements.js";
+import { canUseFeature, FEATURE_KEYS } from "../services/entitlements.js";
 import { createTask, scheduleTaskReminder } from "../services/taskService.js";
 import { notifyTaskCreated } from "../services/notificationService.js";
 import { db } from "../services/firebaseAdmin.js";
@@ -22,7 +21,33 @@ const selectWorkspaceId = (req) =>
 const requireWorkspaceEditor = requireWorkspaceRole(["editor", "admin"], {
   workspaceIdSelector: selectWorkspaceId,
 });
-const requireVoiceFeature = requireFeature(FEATURE_KEYS.voiceReminders);
+
+function stripVoiceChannels(channels, voiceAllowed) {
+  if (voiceAllowed) return channels;
+  if (!Array.isArray(channels)) return null;
+  const filtered = channels
+    .map((c) => String(c || "").trim())
+    .filter(Boolean)
+    .filter((c) => {
+      const normalized = c.toLowerCase();
+      return (
+        normalized !== "voice" &&
+        normalized !== "voice_call" &&
+        normalized !== "voice-call" &&
+        normalized !== "call" &&
+        normalized !== "phone"
+      );
+    });
+  return filtered.length ? filtered : null;
+}
+
+function sanitizeVoiceChannels(task, voiceAllowed) {
+  if (voiceAllowed || !task || typeof task !== "object") return task;
+  const next = { ...task };
+  if ("channels" in next) next.channels = stripVoiceChannels(next.channels, voiceAllowed);
+  if ("reminderChannels" in next) next.reminderChannels = stripVoiceChannels(next.reminderChannels, voiceAllowed);
+  return next;
+}
 
 function toTaskPayload(task = {}) {
   if (!task || typeof task !== "object") return {};
@@ -59,14 +84,18 @@ router.post("/create", requireWorkspaceEditor, async (req, res) => {
   }
 });
 
-router.post("/announce", requireWorkspaceEditor, requireVoiceFeature, async (req, res) => {
+router.post("/announce", requireWorkspaceEditor, async (req, res) => {
   try {
     const { userId, task, schedule = true, notificationOptions = {}, clientNow } = req.body || {};
     if (!userId || !task) return res.status(400).json({ error: "Missing userId or task" });
     const workspaceId = selectWorkspaceId(req);
     if (!workspaceId) return res.status(400).json({ error: "workspaceId is required" });
 
-    const base = toTaskPayload(task);
+    // Allow non-voice notifications even if the workspace is not entitled to voice reminders.
+    const role = req.workspaceRole || req.workspaceMembership?.role || null;
+    const voiceAllowed = canUseFeature({ workspace: req.workspace, userRole: role }, FEATURE_KEYS.voiceReminders);
+
+    let base = toTaskPayload(task);
     base.workspaceId = base.workspaceId || workspaceId;
     if (!base.title && base.id) {
       try {
@@ -83,6 +112,15 @@ router.post("/announce", requireWorkspaceEditor, requireVoiceFeature, async (req
         console.warn("[TaskRoutes] announce lookup failed", err?.message || err);
       }
     }
+    base = sanitizeVoiceChannels(base, voiceAllowed);
+    if (!voiceAllowed) {
+      console.info("[TaskRoutes] voice stripped", {
+        workspaceId,
+        userId,
+        taskId: base?.id || task?.id || null,
+      });
+    }
+    const reminderPayload = base;
 
     try {
       await notifyTaskCreated(userId, [base], notificationOptions);
@@ -92,7 +130,7 @@ router.post("/announce", requireWorkspaceEditor, requireVoiceFeature, async (req
 
     let scheduled = null;
     if (schedule !== false) {
-      scheduled = await scheduleTaskReminder(userId, base, task, {
+      scheduled = await scheduleTaskReminder(userId, base, reminderPayload, {
         source: "task_sync",
         timezone: task?.timezone || task?.tz,
         clientNow,
