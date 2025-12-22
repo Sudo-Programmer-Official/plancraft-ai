@@ -1,11 +1,13 @@
 import express from "express";
 import { store } from "../store/firestoreStore.js";
-import { requireAuth, requireWorkspace } from "../middleware/auth.js";
+import { requireAuth, requireWorkspace, requireWorkspaceMember } from "../middleware/auth.js";
 import { requireProjectManagementEnabled, requireSprintEnabled } from "../middleware/pluginGate.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { emitEvent } from "../events/eventEmitter.js";
+import { PROJECT_EVENTS } from "../events/projectEvents.js";
 
 const router = express.Router({ mergeParams: true });
-router.use(requireAuth, requireWorkspace, requireProjectManagementEnabled);
+router.use(requireAuth, requireWorkspace, requireWorkspaceMember, requireProjectManagementEnabled);
 
 async function ensureProject(projectId, workspaceId) {
   const project = await store.getProject(projectId);
@@ -16,6 +18,11 @@ async function defaultStatusId(projectId) {
   const statuses = await store.listStatuses(projectId);
   const todo = statuses.find((s) => s.name.toLowerCase() === "todo");
   return (todo && todo.id) || (statuses[0] && statuses[0].id) || null;
+}
+
+function actorMeta(req) {
+  const displayName = req.user?.name || req.user?.email || null;
+  return { actorUserId: req.user?.id || null, actorDisplayName: displayName };
 }
 
 router.post(
@@ -38,6 +45,14 @@ router.post(
       statusId: effectiveStatusId,
       sprintId,
       addedBy: req.user?.id || null,
+    });
+    emitEvent(PROJECT_EVENTS.TASK_CREATED, {
+      workspaceId: req.workspaceId,
+      projectId,
+      ...actorMeta(req),
+      entityType: "task",
+      entityId: taskId,
+      data: { taskId, statusId: mapping.statusId, sprintId: mapping.sprintId },
     });
     res.status(201).json(mapping);
   }),
@@ -64,6 +79,7 @@ router.patch(
     if (!(await ensureProject(projectId, req.workspaceId))) return res.status(404).json({ error: "Not found" });
     const mapping = await store.getProjectTask(projectId, taskId);
     if (!mapping) return res.status(404).json({ error: "Not found" });
+    const prevStatusId = mapping.statusId;
     const patch = {};
     if (req.body.statusId) patch.statusId = req.body.statusId;
     if (req.body.hasOwnProperty("sprintId")) {
@@ -77,6 +93,25 @@ router.patch(
       patch.sprintId = sprintId || null;
     }
     const updated = await store.updateProjectTask(projectId, taskId, patch);
+    if (patch.statusId && patch.statusId !== prevStatusId) {
+      emitEvent(PROJECT_EVENTS.TASK_STATUS_CHANGED, {
+        workspaceId: req.workspaceId,
+        projectId,
+        ...actorMeta(req),
+        entityType: "task",
+        entityId: taskId,
+        data: { taskId, from: prevStatusId, to: patch.statusId },
+      });
+    } else {
+      emitEvent(PROJECT_EVENTS.TASK_UPDATED, {
+        workspaceId: req.workspaceId,
+        projectId,
+        ...actorMeta(req),
+        entityType: "task",
+        entityId: taskId,
+        data: { taskId, patch },
+      });
+    }
     res.json(updated);
   }),
 );

@@ -7,6 +7,7 @@ const COLLECTIONS = {
   sprints: "project_sprints",
   mappings: "project_tasks",
   pluginSettings: "project_plugin_settings",
+  feedback: "project_feedback",
 };
 
 function now() {
@@ -268,6 +269,26 @@ export class FirestoreStore {
     if (filters.statusId) query = query.where("statusId", "==", filters.statusId);
     const snap = await query.get();
     return snap.docs.map((d) => d.data());
+  }
+
+  async createFeedback(data) {
+    const id = data.id || uuid();
+    const ref = this.db.collection(COLLECTIONS.feedback).doc(id);
+    const nowTs = now();
+    const payload = {
+      id,
+      projectId: data.projectId,
+      workspaceId: data.workspaceId,
+      source: data.source || "client",
+      text: data.text || "",
+      url: data.url || null,
+      author: data.author || null,
+      createdBy: data.createdBy || null,
+      createdAt: nowTs,
+      updatedAt: nowTs,
+    };
+    await ref.set(payload);
+    return payload;
   }
 }
 

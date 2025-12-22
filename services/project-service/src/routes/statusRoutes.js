@@ -1,11 +1,11 @@
 import express from "express";
 import { store } from "../store/firestoreStore.js";
-import { requireAuth, requireWorkspace, withRole } from "../middleware/auth.js";
+import { requireAuth, requireWorkspace, requireWorkspaceMember, withRole } from "../middleware/auth.js";
 import { requireProjectManagementEnabled } from "../middleware/pluginGate.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
 const router = express.Router({ mergeParams: true });
-router.use(requireAuth, requireWorkspace, requireProjectManagementEnabled);
+router.use(requireAuth, requireWorkspace, requireWorkspaceMember, requireProjectManagementEnabled);
 
 function hasWorkspaceAdmin(req) {
   const roles = (req.headers["x-roles"] || "").split(",").map((r) => r.trim()).filter(Boolean);

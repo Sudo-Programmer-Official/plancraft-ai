@@ -689,6 +689,14 @@ const navGroups = [
     ],
   },
   {
+    key: 'projects',
+    title: 'Projects',
+    icon: '🗂️',
+    collapsible: true,
+    defaultOpen: false,
+    children: [{ label: 'Projects', icon: '🗂️', to: '/projects' }],
+  },
+  {
     key: 'creator',
     title: 'Creator Mode',
     icon: '🎨',

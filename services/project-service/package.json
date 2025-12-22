@@ -7,7 +7,8 @@
     "dev": "node --watch server.js",
     "start": "node server.js",
     "lint": "echo 'lint not configured yet'",
-    "migrate": "node migrate.js"
+    "migrate": "node migrate.js",
+    "smoke:auth": "node scripts/auth-smoke.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

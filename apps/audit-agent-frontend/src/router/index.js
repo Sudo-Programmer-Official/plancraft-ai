@@ -128,6 +128,18 @@ const router = createRouter({
         { path: 'workspaces/new', name: 'workspace-new', component: () => import('@/views/WorkspaceOnboarding.vue') },
         { path: 'app', name: 'workspace-app', component: () => import('@/views/WorkspaceAppView.vue') },
         { path: 'help', name: 'help', component: () => import('@/views/HelpView.vue') },
+        {
+          path: 'projects',
+          component: () => import('@/views/projects/ProjectsLayout.vue'),
+          children: [
+            { path: '', name: 'projects', component: () => import('@/views/projects/ProjectsHome.vue') },
+            {
+              path: ':projectId',
+              name: 'project-detail',
+              component: () => import('@/views/projects/ProjectDetailView.vue'),
+            },
+          ],
+        },
       ],
     },
 

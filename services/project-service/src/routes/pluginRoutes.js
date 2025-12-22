@@ -1,10 +1,10 @@
 import express from "express";
 import { store } from "../store/firestoreStore.js";
-import { requireAuth, requireWorkspace, withRole } from "../middleware/auth.js";
+import { requireAuth, requireWorkspace, requireWorkspaceMember, withRole } from "../middleware/auth.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
 const router = express.Router({ mergeParams: true });
-router.use(requireAuth, requireWorkspace);
+router.use(requireAuth, requireWorkspace, requireWorkspaceMember);
 
 router.get(
   "/:workspaceId/plugins/project-management",

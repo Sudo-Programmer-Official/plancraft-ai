@@ -1,0 +1,28 @@
+{
+  "ServiceName": "plancraft-project-service",
+  "SourceConfiguration": {
+    "AuthenticationConfiguration": {
+      "ConnectionArn": "arn:aws:apprunner:us-west-2:495849799931:connection/github"
+    },
+    "CodeRepository": {
+      "RepositoryUrl": "https://github.com/AbhishekAI2025/audit-agent",
+      "SourceCodeVersion": {
+        "Type": "BRANCH",
+        "Value": "main"
+      },
+      "CodeConfiguration": {
+        "ConfigurationSource": "API",
+        "CodeConfigurationValues": {
+          "Runtime": "NODEJS_18",
+          "BuildCommand": "npm install",
+          "StartCommand": "npm run start:project",
+          "Port": "8080"
+        }
+      }
+    }
+  },
+  "InstanceConfiguration": {
+    "Cpu": "0.25 vCPU",
+    "Memory": "0.5 GB"
+  }
+}

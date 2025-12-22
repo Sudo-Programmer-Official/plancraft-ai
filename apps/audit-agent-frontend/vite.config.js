@@ -77,6 +77,7 @@ export default defineConfig({
       '/api': 'http://localhost:4000',
       '/creator-api': 'http://localhost:5005',
       '/posting-api': 'http://localhost:5006',
+      '/project-api': 'http://localhost:4005',
     },
   },
   build: {

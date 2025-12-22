@@ -11,6 +11,7 @@ export class MemoryStore {
     this.statuses = new Map(); // statusId -> status
     this.projectTasks = new Map(); // `${projectId}:${taskId}` -> mapping
     this.sprints = new Map(); // sprintId -> sprint
+    this.feedback = new Map(); // feedbackId -> feedback
   }
 
   upsertPluginSettings(workspaceId, payload, updatedBy) {
@@ -218,6 +219,25 @@ export class MemoryStore {
       if (statusId && m.statusId !== statusId) return false;
       return true;
     });
+  }
+
+  createFeedback(data) {
+    const id = data.id || uuid();
+    const nowTs = now();
+    const entry = {
+      id,
+      projectId: data.projectId,
+      workspaceId: data.workspaceId,
+      source: data.source || "client",
+      text: data.text || "",
+      url: data.url || null,
+      author: data.author || null,
+      createdBy: data.createdBy || null,
+      createdAt: nowTs,
+      updatedAt: nowTs,
+    };
+    this.feedback.set(id, entry);
+    return entry;
   }
 }
 

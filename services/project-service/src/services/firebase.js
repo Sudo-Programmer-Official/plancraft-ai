@@ -20,3 +20,9 @@ export function firestore() {
   init();
   return admin.firestore();
 }
+
+// Expose the initialized admin instance for auth token verification.
+export function getFirebaseAdmin() {
+  init();
+  return admin;
+}

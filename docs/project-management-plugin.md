@@ -141,8 +141,9 @@ Add an optional Project Management layer (Projects / Status workflows / optional
 ## Current Implementation Status (scaffold)
 - Added `services/project-service` Express scaffold with Firestore-backed store (replaces in-memory), plugin gating, project/status/sprint/project-task endpoints, and AI stubs.  
 - Added `/docs/openapi/project-service.yaml` and `/docs/project-service.postman.json` for initial contracts.  
-- Service uses temporary headers (`x-user-id`, `x-workspace-id`, `x-roles`) and Firestore persistence—replace with shared auth/membership and task validation next.  
+- Service accepts Firebase/app tokens and resolves roles from `workspace_members` (keeps `x-roles` as a dev fallback, gated by `ALLOW_HEADER_ROLE_OVERRIDE`, and header-auth dev-only via `ALLOW_DEV_HEADER_AUTH`); task validation still to-do.  
 - Default statuses are auto-created on project creation; sprint endpoints gated by `sprintEnabled`.  
 - Added minimal migration runner (`npm run migrate`) that records applied migrations in Firestore (`project_migrations`).  
+- Event sink added (`EVENT_SINK=log|memory|none`, `EVENT_MEMORY_LIMIT`, `EVENT_ACTIVITY_ENABLED`) with activity pagination (`limit`, `cursor`) and feedback ingestion endpoint emitting `FEEDBACK_INGESTED`.  
 - Impact & Proposals integration still to implement in backend/frontend (scope selector, additive APIs, project validation).  
 - Tests and frontend surfaces remain to be built; next steps: wire real datastore, membership checks, and UI gating per roadmap.

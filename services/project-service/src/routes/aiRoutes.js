@@ -1,9 +1,9 @@
 import express from "express";
-import { requireAuth, requireWorkspace } from "../middleware/auth.js";
+import { requireAuth, requireWorkspace, requireWorkspaceMember } from "../middleware/auth.js";
 import { requireProjectManagementEnabled } from "../middleware/pluginGate.js";
 
 const router = express.Router({ mergeParams: true });
-router.use(requireAuth, requireWorkspace, requireProjectManagementEnabled);
+router.use(requireAuth, requireWorkspace, requireWorkspaceMember, requireProjectManagementEnabled);
 
 function okStub(message) {
   return { status: "stub", message };
