@@ -17,9 +17,14 @@ import {
   browserLocalPersistence,
   GoogleAuthProvider,
   signInWithPopup,
+  linkWithPopup,
+  linkWithCredential,
   signInWithRedirect,
   getRedirectResult,
   signInWithPhoneNumber,
+  signInWithEmailAndPassword,
+  EmailAuthProvider,
+  PhoneAuthProvider,
 } from 'firebase/auth'
 import firebaseApp from '@/firebase/init'
 import { identifyUser, trackEvent } from '@/services/analytics'
@@ -280,6 +285,54 @@ export const useAuthStore = defineStore('authStore', {
         const provider = new GoogleAuthProvider()
         provider.setCustomParameters({ prompt: 'select_account' })
 
+        // If already signed in (phone/email/guest), link Google to the current UID to avoid duplicates.
+        const current = auth.currentUser
+        const alreadyLinked = (current?.providerData || []).some((p) => p?.providerId === 'google.com')
+        if (current && !alreadyLinked) {
+          try {
+            const linkResult = await linkWithPopup(current, provider)
+            const user = linkResult?.user || current
+            await setDoc(
+              doc(db, 'users', user.uid),
+              {
+                email: user.email,
+                name: user.displayName || '',
+                mode: 'google',
+                lastLoginAt: Date.now(),
+                profileComplete: !!(user.displayName),
+              },
+              { merge: true },
+            )
+            this.user = {
+              uid: user.uid,
+              displayName: user.displayName,
+              email: user.email,
+              photoURL: user.photoURL,
+              role: this.user?.role || 'user',
+            }
+        this.guest = false
+        this.token = await user.getIdToken()
+        localStorage.setItem('user', JSON.stringify(this.user))
+        localStorage.setItem('token', this.token)
+        ElNotification({
+          title: 'Google connected',
+          message: 'Your Google account is now linked.',
+          type: 'success',
+          duration: 2200,
+          offset: 80,
+        })
+        return user
+      } catch (err) {
+        const code = String(err?.code || '')
+        if (code.includes('provider-already-linked')) {
+          return current
+        }
+        // Do not fall through to sign-in while a session exists; avoids duplicate users.
+        console.warn('[Auth] Google link failed; aborting sign-in to avoid duplicates', err?.message || err)
+        throw err
+      }
+    }
+
         // Safari/iOS and standalone PWAs are unreliable with popups → prefer redirect
         try {
           const ua = navigator.userAgent || ''
@@ -468,8 +521,19 @@ export const useAuthStore = defineStore('authStore', {
       if (!otp) throw new Error('Missing OTP code')
       this.loading = true
       try {
-        const result = await confirmationResult.confirm(otp)
-        const user = result?.user
+        const current = auth.currentUser
+        const alreadyLinked = (current?.providerData || []).some((p) => p?.providerId === 'phone')
+
+        let user = null
+        if (current && !alreadyLinked) {
+          // Link phone credential to existing session to avoid duplicate UIDs.
+          const cred = PhoneAuthProvider.credential(confirmationResult.verificationId, otp)
+          const linkRes = await linkWithCredential(current, cred)
+          user = linkRes?.user || current
+        } else {
+          const result = await confirmationResult.confirm(otp)
+          user = result?.user
+        }
         if (!user?.uid) throw new Error('Phone sign-in failed')
 
         // Ensure Firestore profile exists/updated
@@ -521,39 +585,93 @@ export const useAuthStore = defineStore('authStore', {
       }
     },
 
-    async loginWithEmail(email, password) {
-      this.loading = true
-      try {
-        const user = await signInWithEmail(email, password)
+  async loginWithEmail(email, password) {
+    this.loading = true
+    try {
+      const current = auth.currentUser
+      const alreadyLinked = (current?.providerData || []).some((p) => p?.providerId === 'password')
+
+      if (current && !alreadyLinked) {
+        // Link email/password to current session; abort on failure to avoid duplicate UIDs.
+        const credential = EmailAuthProvider.credential(email, password)
+        const linkRes = await linkWithCredential(current, credential)
+        const user = linkRes?.user || current
+        await setDoc(
+          doc(db, 'users', user.uid),
+          {
+            email: user.email,
+            name: user.displayName || '',
+            mode: 'email',
+            lastLoginAt: Date.now(),
+            profileComplete: !!(user.displayName),
+          },
+          { merge: true },
+        )
         const profile = await fetchUserProfile(user.uid)
         this.user = {
           uid: user.uid,
           displayName: user.displayName,
           email: user.email,
           photoURL: user.photoURL,
-          role: profile?.role || 'user',
+          role: profile?.role || this.user?.role || 'user',
         }
         this.guest = false
         this.token = await user.getIdToken()
         localStorage.setItem('user', JSON.stringify(this.user))
         localStorage.setItem('token', this.token)
-        try {
-          if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
-            const mod = await import('@/services/appTokenService.js')
-            mod.refreshAppToken().catch(() => {})
-          }
-        } catch {}
         ElNotification({
-          title: 'Signed in ✨',
-          message: `Welcome ${this.user.displayName || this.user.email || ''}`,
+          title: 'Email linked',
+          message: 'Email/password added to your account.',
           type: 'success',
-          duration: 2400,
+          duration: 2200,
           offset: 80,
         })
-      } finally {
-        this.loading = false
+        return user
       }
-    },
+
+      // No active session or already linked: standard sign-in.
+      const cred = await signInWithEmailAndPassword(auth, email, password)
+      const user = cred.user
+      await setDoc(
+        doc(db, 'users', user.uid),
+        {
+          email: user.email,
+          name: user.displayName || '',
+          mode: 'email',
+          lastLoginAt: Date.now(),
+          ...(user.displayName ? { profileComplete: true } : {}),
+        },
+        { merge: true },
+      )
+      const profile = await fetchUserProfile(user.uid)
+      this.user = {
+        uid: user.uid,
+        displayName: user.displayName,
+        email: user.email,
+        photoURL: user.photoURL,
+        role: profile?.role || 'user',
+      }
+      this.guest = false
+      this.token = await user.getIdToken()
+      localStorage.setItem('user', JSON.stringify(this.user))
+      localStorage.setItem('token', this.token)
+      try {
+        if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
+          const mod = await import('@/services/appTokenService.js')
+          mod.refreshAppToken().catch(() => {})
+        }
+      } catch {}
+      ElNotification({
+        title: 'Signed in ✨',
+        message: `Welcome ${this.user.displayName || this.user.email || ''}`,
+        type: 'success',
+        duration: 2400,
+        offset: 80,
+      })
+    } finally {
+      this.loading = false
+    }
+  },
 
     async registerEmail(email, password) {
       this.loading = true

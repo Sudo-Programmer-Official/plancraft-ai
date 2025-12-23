@@ -33,6 +33,7 @@ import { db } from '@/firebase/init'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { ElMessage } from 'element-plus'
 import { normalizePhone, guessCountryFromLocale } from '@/utils/phoneUtils'
+import { useAuthStore } from '@/stores/authStore'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -45,6 +46,7 @@ const name = ref('')
 const email = ref('')
 const phone = ref('')
 const saving = ref(false)
+const authStore = useAuthStore()
 
 watch(() => props.open, (v) => { openLocal.value = v })
 
@@ -101,6 +103,17 @@ async function saveProfile() {
       if (email.value && email.value !== user.email) {
         await updateEmail(user, email.value)
       }
+    } catch {}
+    try {
+      authStore.user = {
+        ...(authStore.user || {}),
+        uid: user.uid,
+        displayName: name.value.trim(),
+        name: name.value.trim(),
+        email: email.value.trim() || undefined,
+        phone: phoneE164 || undefined,
+      }
+      localStorage.setItem('user', JSON.stringify(authStore.user))
     } catch {}
     ElMessage.success('Profile updated!')
     emit('saved')

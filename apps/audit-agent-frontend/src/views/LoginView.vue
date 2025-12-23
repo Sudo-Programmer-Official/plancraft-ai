@@ -21,25 +21,35 @@
           <!-- Off-screen reCAPTCHA anchor (must be mounted in DOM) -->
           <div id="recaptcha-container" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;"></div>
 
-          <div class="mt-10 space-y-4">
-            <button
-              @click="loginGoogle"
-              :disabled="authStore.loading"
-              class="w-full flex items-center justify-center gap-3 bg-white text-gray-900 px-6 py-4 rounded-2xl font-semibold shadow-lg hover:-translate-y-0.5 hover:shadow-2xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 disabled:opacity-70"
-            >
-              <img src="https://www.svgrepo.com/show/355037/google.svg" alt="Google" class="w-5 h-5" />
-              Continue with Google
-            </button>
-
-            <div class="flex flex-col sm:flex-row items-center justify-center gap-1 text-xs sm:text-sm text-indigo-200/90">
-              <button class="auth-link" type="button" @click="showEmail = !showEmail">
-                {{ showEmail ? 'Hide email sign in' : 'Prefer email? Sign in with email' }}
+<div class="mt-10 space-y-4">
+            <div class="space-y-3">
+              <button
+                @click="loginGoogle"
+                :disabled="authStore.loading"
+                class="w-full flex items-center justify-center gap-3 bg-white text-gray-900 px-6 py-4 rounded-xl font-semibold shadow-lg hover:-translate-y-0.5 hover:shadow-2xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 disabled:opacity-70"
+              >
+                <img src="https://www.svgrepo.com/show/355037/google.svg" alt="Google" class="w-5 h-5" />
+                Continue with Google
               </button>
-              <span class="hidden sm:inline text-indigo-300/60">•</span>
-              <button class="auth-link" type="button" @click="togglePhone()">
-                {{ showPhone ? 'Hide phone sign in' : 'Prefer phone? Sign in with OTP' }}
+              <button
+                type="button"
+                :disabled="authStore.loading"
+                class="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-xl font-semibold border border-white/10 text-white hover:border-indigo-300/70 hover:bg-white/5 transition disabled:opacity-70"
+                @click="toggleEmail"
+              >
+                ✉️ Continue with Email
+              </button>
+              <button
+                type="button"
+                :disabled="authStore.loading"
+                class="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-xl font-semibold border border-white/10 text-white hover:border-indigo-300/70 hover:bg-white/5 transition disabled:opacity-70"
+                @click="togglePhone(true)"
+              >
+                📱 Continue with Phone (OTP)
               </button>
             </div>
+
+            <p class="text-center text-sm text-indigo-200/80">Choose how you want to sign in. No spam. No passwords.</p>
 
             <div v-if="showEmail" class="auth-panel">
               <h2 class="text-lg font-semibold text-white mb-3">Email access</h2>
@@ -73,15 +83,17 @@
               <h2 class="text-lg font-semibold text-white mb-3">Phone OTP</h2>
               <div class="space-y-3">
                 <input
-                  v-model="phone"
+                  v-model="phoneInput"
                   type="tel"
-                  placeholder="+1 234 567 8901"
+                  placeholder="Enter phone (digits only)"
                   class="auth-input"
+                  inputmode="numeric"
+                  @input="sanitizePhone"
                 />
                 <div v-if="!otpSent">
                   <button
                     @click="sendOtp"
-                    :disabled="sendingOtp || !phone"
+                    :disabled="sendingOtp || !phoneInput"
                     class="auth-action primary w-full disabled:opacity-60"
                   >
                     {{ sendingOtp ? 'Sending…' : 'Send OTP' }}
@@ -234,12 +246,22 @@ async function onSendMagic() {
 
 // Phone OTP auth
 const showPhone = ref(false)
-const phone = ref('')
+const phoneInput = ref('')
 const otp = ref('')
 const otpSent = ref(false)
 const sendingOtp = ref(false)
 const verifyingOtp = ref(false)
 let confirmationResult = null
+const IS_LOCAL = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname)
+
+function resetRecaptcha() {
+  try {
+    if (window.recaptchaVerifier?.clear) {
+      window.recaptchaVerifier.clear()
+      window.recaptchaVerifier = null
+    }
+  } catch {}
+}
 
 async function ensureRecaptcha(force = false) {
   try {
@@ -249,7 +271,7 @@ async function ensureRecaptcha(force = false) {
     let v = window.recaptchaVerifier
     const needsNew = force || !v
     if (needsNew) {
-      try { v?.clear?.() } catch {}
+      resetRecaptcha()
       v = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible', callback: () => {} })
       window.recaptchaVerifier = v
       try { await v.render() } catch {}
@@ -274,22 +296,32 @@ function togglePhone() {
   showPhone.value = !showPhone.value
   if (showPhone.value) {
     setTimeout(() => ensureRecaptcha(), 0)
+  } else {
+    resetRecaptcha()
   }
 }
 
+function toggleEmail() {
+  showEmail.value = !showEmail.value
+}
+
+function sanitizePhone() {
+  phoneInput.value = phoneInput.value.replace(/[^\d]/g, '')
+}
+
 async function sendOtp() {
-  if (!phone.value) return ElMessage.error('Please enter a phone number.')
+  if (!phoneInput.value) return ElMessage.error('Please enter a phone number.')
   try {
     sendingOtp.value = true
     let verifier = await ensureRecaptcha()
     if (!verifier) throw new Error('reCAPTCHA not ready. Please try again.')
     // Normalize to E.164 before sending
     const cc = guessCountryFromLocale()
-    const formatted = normalizePhone(phone.value, cc)
+    const formatted = normalizePhone(phoneInput.value, cc)
     if (!/^\+[1-9]\d{6,14}$/.test(formatted)) {
       throw new Error('Invalid phone format. Use full number incl. country code.')
     }
-    phone.value = formatted
+    phoneInput.value = formatted.replace('+', '') // keep digits visible without extra +
     // Execute reCAPTCHA once to ensure a fresh token
     try { await verifier.verify() } catch (e) {
       // If element was removed, rebuild and retry once
@@ -306,7 +338,11 @@ async function sendOtp() {
     ElMessage.success('OTP sent successfully!')
   } catch (error) {
     console.error('[OTP] send failed', error)
-    ElMessage.error('Failed to send OTP. Please check your number and try again.')
+    resetRecaptcha()
+    const msg = IS_LOCAL
+      ? 'OTP send failed on localhost. Use a Firebase test number or try email/Google.'
+      : 'Failed to send OTP. Please check your number and try again.'
+    ElMessage.error(msg)
   } finally {
     sendingOtp.value = false
   }
