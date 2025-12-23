@@ -82,14 +82,24 @@
             <div v-if="showPhone" class="auth-panel">
               <h2 class="text-lg font-semibold text-white mb-3">Phone OTP</h2>
               <div class="space-y-3">
-                <input
-                  v-model="phoneInput"
-                  type="tel"
-                  placeholder="Enter phone (digits only)"
-                  class="auth-input"
-                  inputmode="numeric"
-                  @input="sanitizePhone"
-                />
+                <div class="auth-phone-row">
+                  <el-select v-model="countryCode" size="large" class="auth-select" popper-class="auth-select-dropdown">
+                    <el-option
+                      v-for="opt in countryOptions"
+                      :key="opt.code"
+                      :label="`${opt.flag} ${opt.label} (${opt.code})`"
+                      :value="opt.code"
+                    />
+                  </el-select>
+                  <input
+                    v-model="phoneInput"
+                    type="tel"
+                    placeholder="Enter phone (digits only)"
+                    class="auth-input auth-phone-input"
+                    inputmode="numeric"
+                    @input="sanitizePhone"
+                  />
+                </div>
                 <div v-if="!otpSent">
                   <button
                     @click="sendOtp"
@@ -145,7 +155,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue"
+import { ref, onMounted, computed } from "vue"
 import { useRouter, useRoute } from "vue-router"
 import { useAuthStore } from "@/stores/authStore"
 import LoginFeatureSlider from '@/components/LoginFeatureSlider.vue'
@@ -247,6 +257,7 @@ async function onSendMagic() {
 // Phone OTP auth
 const showPhone = ref(false)
 const phoneInput = ref('')
+const countryCode = ref('+1')
 const otp = ref('')
 const otpSent = ref(false)
 const sendingOtp = ref(false)
@@ -309,18 +320,45 @@ function sanitizePhone() {
   phoneInput.value = phoneInput.value.replace(/[^\d]/g, '')
 }
 
+const countryOptions = [
+  { label: 'United States/Canada', code: '+1', flag: '🇺🇸' },
+  { label: 'United Kingdom', code: '+44', flag: '🇬🇧' },
+  { label: 'India', code: '+91', flag: '🇮🇳' },
+  { label: 'Hungary', code: '+36', flag: '🇭🇺' },
+  { label: 'Australia', code: '+61', flag: '🇦🇺' },
+  { label: 'Singapore', code: '+65', flag: '🇸🇬' },
+  { label: 'Germany', code: '+49', flag: '🇩🇪' },
+  { label: 'France', code: '+33', flag: '🇫🇷' },
+  { label: 'Brazil', code: '+55', flag: '🇧🇷' },
+  { label: 'Mexico', code: '+52', flag: '🇲🇽' },
+  { label: 'South Africa', code: '+27', flag: '🇿🇦' },
+  { label: 'New Zealand', code: '+64', flag: '🇳🇿' },
+  { label: 'United Arab Emirates', code: '+971', flag: '🇦🇪' },
+  { label: 'Philippines', code: '+63', flag: '🇵🇭' },
+  { label: 'Pakistan', code: '+92', flag: '🇵🇰' },
+  { label: 'Nigeria', code: '+234', flag: '🇳🇬' },
+  { label: 'Indonesia', code: '+62', flag: '🇮🇩' },
+  { label: 'Spain', code: '+34', flag: '🇪🇸' },
+  { label: 'Italy', code: '+39', flag: '🇮🇹' },
+]
+
+const normalizedPhone = computed(() => {
+  try {
+    const formatted = normalizePhone(phoneInput.value, countryCode.value.replace('+', '') || 'US')
+    if (!formatted || !/^\+[1-9]\d{6,14}$/.test(formatted)) return ''
+    return formatted
+  } catch {
+    return ''
+  }
+})
+
 async function sendOtp() {
-  if (!phoneInput.value) return ElMessage.error('Please enter a phone number.')
+  if (!normalizedPhone.value) return ElMessage.error('Enter a valid phone number.')
   try {
     sendingOtp.value = true
     let verifier = await ensureRecaptcha()
     if (!verifier) throw new Error('reCAPTCHA not ready. Please try again.')
-    // Normalize to E.164 before sending
-    const cc = guessCountryFromLocale()
-    const formatted = normalizePhone(phoneInput.value, cc)
-    if (!/^\+[1-9]\d{6,14}$/.test(formatted)) {
-      throw new Error('Invalid phone format. Use full number incl. country code.')
-    }
+    const formatted = normalizedPhone.value
     phoneInput.value = formatted.replace('+', '') // keep digits visible without extra +
     // Execute reCAPTCHA once to ensure a fresh token
     try { await verifier.verify() } catch (e) {
@@ -340,7 +378,7 @@ async function sendOtp() {
     console.error('[OTP] send failed', error)
     resetRecaptcha()
     const msg = IS_LOCAL
-      ? 'OTP send failed on localhost. Use a Firebase test number or try email/Google.'
+      ? 'OTP send failed on localhost. Use a Firebase test number (e.g., +13614429376 code 123456) or try email/Google.'
       : 'Failed to send OTP. Please check your number and try again.'
     ElMessage.error(msg)
   } finally {
@@ -539,6 +577,44 @@ onMounted(async () => {
 .feature-pill {
   background: rgba(255, 255, 255, 0.04);
   border-radius: 1.25rem;
+}
+
+.auth-phone-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.auth-select :deep(.el-input__wrapper) {
+  height: 52px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #e5e7eb;
+  box-shadow: none;
+}
+
+.auth-select :deep(.el-input__inner) {
+  color: #e5e7eb;
+}
+
+.auth-select-dropdown {
+  background: #0b1224 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.auth-select-dropdown .el-select-dropdown__item {
+  color: #e5e7eb;
+}
+
+.auth-select-dropdown .el-select-dropdown__item.selected {
+  color: #a5b4fc;
+  font-weight: 700;
+}
+
+.auth-phone-input {
+  height: 52px;
+  border-radius: 12px;
 }
 
 @media (max-width: 640px) {
