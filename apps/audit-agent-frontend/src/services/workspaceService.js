@@ -2,6 +2,7 @@ import api from '@/services/api'
 
 function normalizeWorkspace(payload = {}) {
   const color = payload.theme || payload.color || 'indigo'
+  const settings = payload.settings || {}
   return {
     id: payload.id,
     name: payload.name || 'Workspace',
@@ -24,6 +25,10 @@ function normalizeWorkspace(payload = {}) {
     createdAt: payload.created_at || payload.createdAt || null,
     updatedAt: payload.updated_at || payload.updatedAt || null,
     lastOpenedAt: payload.lastOpenedAt || payload.last_opened_at || null,
+    settings: {
+      creatorModeEnabled: !!settings.creatorModeEnabled,
+      leaderModeEnabled: !!settings.leaderModeEnabled,
+    },
   }
 }
 
@@ -129,4 +134,10 @@ export async function updateMemberRole(workspaceId, userId, role) {
   if (!workspaceId || !userId) throw new Error('workspaceId and userId are required')
   const { data } = await api.patch(`/workspaces/${workspaceId}/members/${userId}`, { role })
   return data?.member || null
+}
+
+export async function updateWorkspaceSettings(workspaceId, settings = {}) {
+  if (!workspaceId) throw new Error('workspaceId is required')
+  const { data } = await api.patch(`/workspaces/${workspaceId}/settings`, { settings })
+  return normalizeWorkspace(data?.workspace || {})
 }

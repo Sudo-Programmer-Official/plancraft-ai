@@ -120,7 +120,7 @@
       <!-- Nav links -->
       <nav class="flex-1 mt-4 space-y-3 overflow-y-auto scrollbar-plan px-2">
         <div
-          v-for="group in navGroups"
+          v-for="group in filteredNavGroups"
           :key="group.key"
           class="rounded-lg"
         >
@@ -269,7 +269,7 @@
 
           <!-- Navigation -->
           <nav class="space-y-3 flex-1 overflow-y-auto scrollbar-plan">
-            <div v-for="group in navGroups" :key="group.key" class="rounded-lg">
+            <div v-for="group in filteredNavGroups" :key="group.key" class="rounded-lg">
               <div
                 class="flex items-center justify-between px-3 py-2 text-sm font-semibold text-slate-200"
                 @click="toggleGroup(group.key)"
@@ -588,6 +588,7 @@ const { isPremium, isGuest } = useAuthFlags()
 const authReady = computed(() => !authStore.loading)
 const activeWorkspace = computed(() => workspaceStore.activeWorkspace || {})
 const activeWorkspaceId = computed(() => workspaceStore.activeWorkspaceId)
+const activeWorkspaceSettings = computed(() => activeWorkspace.value?.settings || {})
 
 const isOnTalkPlanner = computed(() => route.path === '/talk-to-planner')
 let upgradeHandler = null
@@ -727,11 +728,20 @@ const navGroups = [
     defaultOpen: false,
     children: [
       { label: 'Talk to Planner', icon: '🎤', to: '/talk-to-planner' },
-      { label: 'Quick Add', icon: '⚡', to: '/quick-add' },
       { label: 'Napkin', icon: '🧾', to: '/napkin' },
     ],
   },
 ]
+
+const filteredNavGroups = computed(() => {
+  const creatorOn = !!activeWorkspaceSettings.value.creatorModeEnabled
+  const leaderOn = !!activeWorkspaceSettings.value.leaderModeEnabled
+  return navGroups.filter((group) => {
+    if (group.key === 'creator') return creatorOn
+    if (group.key === 'leader') return leaderOn
+    return true
+  })
+})
 
 const systemLinks = [
   { label: 'Workspaces', icon: '📦', to: '/workspaces' },

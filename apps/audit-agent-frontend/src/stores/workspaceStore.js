@@ -7,6 +7,7 @@ import {
   fetchWorkspaces,
   touchWorkspaceOpened,
   updateWorkspaceMeta,
+  updateWorkspaceSettings,
 } from '@/services/workspaceService'
 
 export const useWorkspaceStore = defineStore('workspaceStore', () => {
@@ -114,6 +115,16 @@ export const useWorkspaceStore = defineStore('workspaceStore', () => {
     }
   }
 
+  async function applyWorkspaceSettings(id, settings) {
+    const uid = auth?.currentUser?.uid
+    if (!uid || !id) return null
+    const updated = await updateWorkspaceSettings(id, settings)
+    if (updated) {
+      workspaces.value = workspaces.value.map((ws) => (ws.id === id ? { ...ws, ...updated } : ws))
+    }
+    return updated
+  }
+
   function reset() {
     workspaces.value = []
     setLocalActive(null)
@@ -140,6 +151,7 @@ export const useWorkspaceStore = defineStore('workspaceStore', () => {
     setActive,
     createWorkspace,
     updateWorkspace,
+    applyWorkspaceSettings,
     reset,
   }
 })
