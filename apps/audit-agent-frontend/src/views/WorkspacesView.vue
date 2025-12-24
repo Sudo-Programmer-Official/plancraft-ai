@@ -145,6 +145,44 @@
               <span>Leader/Creator boards respect the active workspace context.</span>
             </li>
           </ul>
+          <div class="border border-slate-800 rounded-xl p-3 bg-slate-900/70 space-y-3">
+            <div class="flex items-center justify-between gap-2">
+              <div>
+                <p class="text-xs uppercase tracking-[0.2em] text-indigo-300/80">Creator mode</p>
+                <p class="text-[12px] text-slate-400">Content & repurposing tools for this workspace.</p>
+              </div>
+              <el-switch
+                v-model="modeForm.creator"
+                :disabled="!canEditModes || modesSaving"
+                @change="modesDirty = true"
+              />
+            </div>
+            <div class="flex items-center justify-between gap-2">
+              <div>
+                <p class="text-xs uppercase tracking-[0.2em] text-indigo-300/80">Leader mode</p>
+                <p class="text-[12px] text-slate-400">Team dashboards, delegation, and summaries.</p>
+              </div>
+              <el-switch
+                v-model="modeForm.leader"
+                :disabled="!canEditModes || modesSaving"
+                @change="modesDirty = true"
+              />
+            </div>
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-xs text-slate-400">
+                Admins control modes. Integrations can request enablement, but admins override.
+              </p>
+              <el-button
+                size="small"
+                type="primary"
+                :disabled="!modesDirty || modesSaving || !canEditModes"
+                :loading="modesSaving"
+                @click="saveModes"
+              >
+                Save modes
+              </el-button>
+            </div>
+          </div>
           <button
             class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm hover:border-indigo-400"
             @click="openCreate"
@@ -527,6 +565,10 @@ const activeRole = computed(() => workspaceStore.activeWorkspaceRole || 'viewer'
 const canManageMembers = computed(() => ['admin', 'owner'].includes(activeRole.value))
 const canInvite = computed(() => canUseFeature(activeWorkspace.value, activeRole.value, 'invites'))
 const currentUserId = computed(() => authStore?.user?.uid || null)
+const canEditModes = computed(() => ['admin', 'owner'].includes(activeRole.value))
+const modeForm = reactive({ creator: false, leader: false })
+const modesDirty = ref(false)
+const modesSaving = ref(false)
 
 function typeLabel(value) {
   const found = workspaceTypes.find((t) => t.value === value)
@@ -560,9 +602,16 @@ watch(
     if (!id) {
       members.value = []
       invites.value = []
+      modeForm.creator = false
+      modeForm.leader = false
+      modesDirty.value = false
       return
     }
     loadMembers(id)
+    const settings = activeWorkspace.value?.settings || {}
+    modeForm.creator = !!settings.creatorModeEnabled
+    modeForm.leader = !!settings.leaderModeEnabled
+    modesDirty.value = false
   },
   { immediate: true },
 )
@@ -620,6 +669,23 @@ async function saveWorkspace() {
     ElMessage.error(err?.message || 'Failed to save workspace')
   } finally {
     saving.value = false
+  }
+}
+
+async function saveModes() {
+  if (!activeWorkspaceId.value || !canEditModes.value || modesSaving.value) return
+  modesSaving.value = true
+  try {
+    await workspaceStore.applyWorkspaceSettings(activeWorkspaceId.value, {
+      creatorModeEnabled: modeForm.creator,
+      leaderModeEnabled: modeForm.leader,
+    })
+    modesDirty.value = false
+    ElMessage.success('Workspace modes updated')
+  } catch (err) {
+    ElMessage.error(err?.message || 'Failed to update modes')
+  } finally {
+    modesSaving.value = false
   }
 }
 

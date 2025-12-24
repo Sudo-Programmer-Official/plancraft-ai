@@ -131,6 +131,35 @@ router.patch("/workspaces/:workspaceId", requireAuth, requireWorkspaceRole(["adm
   }
 });
 
+router.patch("/workspaces/:workspaceId/settings", requireAuth, requireWorkspaceRole(["admin", "owner"]), async (req, res) => {
+  try {
+    const inboundSettings =
+      req.body && typeof req.body.settings === "object" ? { ...req.body.settings } : {};
+    if (req.body?.creatorModeEnabled !== undefined) {
+      inboundSettings.creatorModeEnabled = req.body.creatorModeEnabled;
+    }
+    if (req.body?.leaderModeEnabled !== undefined) {
+      inboundSettings.leaderModeEnabled = req.body.leaderModeEnabled;
+    }
+    const hasKeys =
+      inboundSettings.creatorModeEnabled !== undefined || inboundSettings.leaderModeEnabled !== undefined;
+    if (!hasKeys) {
+      return res.status(400).json({ error: "No settings provided" });
+    }
+    const workspace = await updateWorkspace(req.workspaceId, { settings: inboundSettings });
+    console.info("[WorkspaceRoutes] settings updated", {
+      workspaceId: req.workspaceId,
+      actor: req.user?.uid || null,
+      creatorModeEnabled: inboundSettings.creatorModeEnabled,
+      leaderModeEnabled: inboundSettings.leaderModeEnabled,
+    });
+    return res.json({ workspace });
+  } catch (err) {
+    console.error("[WorkspaceRoutes] settings update failed", err?.message || err);
+    return res.status(400).json({ error: "Failed to update workspace settings" });
+  }
+});
+
 router.get("/workspaces/:workspaceId/members", requireAuth, requireWorkspaceRole(["admin", "owner"]), async (req, res) => {
   try {
     const members = await listWorkspaceMembers(req.workspaceId);

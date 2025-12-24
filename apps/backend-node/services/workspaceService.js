@@ -36,6 +36,28 @@ function normalizeDate(value) {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+function coerceBoolean(value, fallback = null) {
+  if (value === undefined || value === null) return fallback;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) return fallback;
+    if (["true", "1", "yes", "on"].includes(normalized)) return true;
+    if (["false", "0", "no", "off"].includes(normalized)) return false;
+  }
+  return fallback;
+}
+
+function normalizeWorkspaceSettings(settings = {}) {
+  const creator = coerceBoolean(settings.creatorModeEnabled, false);
+  const leader = coerceBoolean(settings.leaderModeEnabled, false);
+  return {
+    creatorModeEnabled: !!creator,
+    leaderModeEnabled: !!leader,
+  };
+}
+
 function normalizeWorkspaceDoc(doc) {
   if (!doc?.exists) return null;
   const data = doc.data() || {};
@@ -56,6 +78,7 @@ function normalizeWorkspaceDoc(doc) {
     stripeSubscriptionId: data.stripeSubscriptionId || data.stripeSubId || null,
     stripeCustomerId: data.stripeCustomerId || null,
     features: planFeatures(data.plan || "free", data.features || {}),
+    settings: normalizeWorkspaceSettings(data.settings || {}),
     lastOpenedAt: normalizeDate(data.lastOpenedAt || data.last_opened_at),
     created_at: normalizeDate(data.created_at || data.createdAt),
     updated_at: normalizeDate(data.updated_at || data.updatedAt),
@@ -222,6 +245,7 @@ export async function createWorkspace({
   planIntent = null,
   seatLimit = null,
   features = null,
+  settings = null,
   seats = 1,
   billingStatus = "none",
 }) {
@@ -246,6 +270,7 @@ export async function createWorkspace({
     stripeSubscriptionId: null,
     stripeCustomerId: null,
     features: planFeatures(planNormalized, features || {}),
+    settings: normalizeWorkspaceSettings(settings || {}),
     lastOpenedAt: now,
     created_at: now,
     updated_at: now,
@@ -268,6 +293,7 @@ export async function createWorkspace({
     stripeSubscriptionId: null,
     stripeCustomerId: null,
     features: planFeatures(planNormalized, features || {}),
+    settings: normalizeWorkspaceSettings(settings || {}),
     lastOpenedAt: now,
     created_at: now,
     updated_at: now,
@@ -314,6 +340,7 @@ export async function updateWorkspace(workspaceId, patch = {}) {
     "features",
     "lastOpenedAt",
     "last_opened_at",
+    "settings",
   ];
   const updates = {};
   for (const key of allowedFields) {
@@ -335,6 +362,18 @@ export async function updateWorkspace(workspaceId, patch = {}) {
       updates.plan || undefined,
       updates.features && typeof updates.features === "object" ? updates.features : {},
     );
+  }
+  const requestedSettings = patch?.settings && typeof patch.settings === "object" ? patch.settings : {};
+  const directSettings = {};
+  if (patch.creatorModeEnabled !== undefined) directSettings.creatorModeEnabled = patch.creatorModeEnabled;
+  if (patch.leaderModeEnabled !== undefined) directSettings.leaderModeEnabled = patch.leaderModeEnabled;
+  const mergedSettings = { ...requestedSettings, ...directSettings };
+  const hasSettingKeys =
+    mergedSettings.creatorModeEnabled !== undefined || mergedSettings.leaderModeEnabled !== undefined;
+  if (hasSettingKeys) {
+    updates.settings = normalizeWorkspaceSettings({
+      ...mergedSettings,
+    });
   }
   updates.updated_at = new Date();
   await db.collection(WORKSPACE_COLLECTION).doc(String(workspaceId)).set(updates, { merge: true });

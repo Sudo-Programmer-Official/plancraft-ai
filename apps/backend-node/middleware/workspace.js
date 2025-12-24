@@ -68,3 +68,56 @@ export function requireWorkspaceRole(allowedRoles = ["viewer", "editor", "admin"
     }
   };
 }
+
+function modeEnabled(workspace, modeKey) {
+  const settings = workspace?.settings || {};
+  if (modeKey === "creator") return !!settings.creatorModeEnabled;
+  if (modeKey === "leader") return !!settings.leaderModeEnabled;
+  return false;
+}
+
+function requireWorkspaceMode(modeKey) {
+  return async function modeMiddleware(req, res, next) {
+    try {
+      if (!req.user) {
+        await attachAuth(req, res, () => {});
+      }
+      if (!req.user?.uid) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const workspaceId = extractWorkspaceId(req);
+      if (!workspaceId) {
+        return res.status(400).json({ error: "workspaceId is required" });
+      }
+      req.workspaceId = workspaceId;
+
+      const workspace = req.workspace || (await getWorkspace(workspaceId));
+      if (!workspace) return res.status(404).json({ error: "Workspace not found" });
+      req.workspace = workspace;
+
+      const membership = req.workspaceMembership || (await getWorkspaceMembership(workspaceId, req.user.uid));
+      if (!membership || membership.status !== "active") {
+        return res.status(403).json({ error: "Not a member of this workspace" });
+      }
+      req.workspaceMembership = membership;
+      req.workspaceRole = membership.role;
+
+      if (!modeEnabled(workspace, modeKey)) {
+        return res.status(403).json({ error: `${modeKey} mode is disabled for this workspace` });
+      }
+      return next();
+    } catch (err) {
+      console.error("[WorkspaceMiddleware] mode enforcement failed", err?.message || err);
+      return res.status(500).json({ error: "Workspace mode enforcement failed" });
+    }
+  };
+}
+
+export function requireCreatorMode(req, res, next) {
+  return requireWorkspaceMode("creator")(req, res, next);
+}
+
+export function requireLeaderMode(req, res, next) {
+  return requireWorkspaceMode("leader")(req, res, next);
+}
