@@ -195,10 +195,39 @@ import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useIsPremium } from '@/composables/useIsPremium'
 import { trackLinkedInConversion } from '@/utils/ads'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
+import { useSeoMeta } from '@/composables/useSeoMeta'
 
 const authStore = useAuthStore()
 const workspaceStore = useWorkspaceStore()
 const router = useRouter()
+useSeoMeta({
+  title: 'Pricing | PlanCraft AI – Solo & Team Plans with Voice AI',
+  description:
+    'Compare solo and team plans for PlanCraft AI. Get AI planning, calendar sync, and Voice AI reminders with pricing built for individuals and shared workspaces.',
+  keywords: [
+    'PlanCraft AI pricing',
+    'AI planner subscription',
+    'voice AI reminders pricing',
+    'team workspace pricing',
+  ],
+  canonicalPath: '/pricing',
+  structuredData: [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: 'PlanCraft AI',
+      description:
+        'AI planning workspace with voice reminders, calendar sync, journaling, and shared workspaces for teams.',
+      url: 'https://plancraftai.com/pricing',
+      offers: [
+        { '@type': 'Offer', name: 'Solo Free', price: '0.00', priceCurrency: 'USD' },
+        { '@type': 'Offer', name: 'Solo Premium', price: '2.00', priceCurrency: 'USD' },
+        { '@type': 'Offer', name: 'Team Starter', price: '6.00', priceCurrency: 'USD' },
+      ],
+      category: 'Productivity',
+    },
+  ],
+})
 const loading = ref(false)
 const monthlyPriceId = import.meta.env.VITE_STRIPE_MONTHLY_PRICE_ID || 'price_monthly_default'
 const errorVisible = ref(false)

@@ -55,7 +55,15 @@
 </template>
 
 <script setup>
-// Optional SEO/meta
-// import { useHead } from '@vueuse/head'
-// useHead({ title: 'Data Deletion – PlanCraftAI' })
+import { useSeoMeta } from '@/composables/useSeoMeta'
+
+useSeoMeta({
+  title: 'Data Deletion | PlanCraft AI',
+  description:
+    'Request deletion of your PlanCraft AI account and data. Learn how to remove your information via email or API.',
+  keywords: ['PlanCraft data deletion', 'delete PlanCraft account', 'PlanCraft privacy'],
+  canonicalPath: '/data-deletion',
+  type: 'article',
+  noindex: false,
+})
 </script>

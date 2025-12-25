@@ -159,10 +159,18 @@ import { useAuthStore } from '@/stores/authStore'
 import { ElMessage } from 'element-plus'
 import { trackGuestCompletedOnboarding, trackGuestReachedSignup } from '@/services/analytics'
 import { seedGuestStarterTasks } from '@/utils/guestTasks'
+import { useSeoMeta } from '@/composables/useSeoMeta'
 
 const authStore = useAuthStore()
 const router = useRouter()
 const route = useRoute()
+useSeoMeta({
+  title: 'Sign up | PlanCraft AI Guest Onboarding',
+  description:
+    'Try PlanCraft AI in guest mode before creating an account. Start planning with AI, calendar sync, and voice reminders.',
+  canonicalPath: '/signup',
+  noindex: true,
+})
 
 const steps = [
   {

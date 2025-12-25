@@ -88,6 +88,9 @@ export const marketingPages = [
 ]
 
 export const restrictedPaths = [
+  '/login',
+  '/signup',
+  '/billing/upgrade',
   '/dashboard',
   '/daily',
   '/weekly',
@@ -105,6 +108,10 @@ export const restrictedPaths = [
   '/admin',
   '/app',
   '/profile',
+  '/creator',
+  '/leader',
+  '/workspaces',
+  '/workspaces/new',
 ]
 
 export function getMarketingRoutes() {

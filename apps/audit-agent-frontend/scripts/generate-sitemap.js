@@ -12,36 +12,49 @@ import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import https from "https";
 import process from "process";
-import dotenv from "dotenv"
-dotenv.config({ path: ".env.production" }) // choose your env file
-
+import dotenv from "dotenv";
 import admin from "firebase-admin";
 import { getMarketingRoutes, getRestrictedPaths } from "../../../shared/seo/routes.js";
 import { buildSitemapXml, buildRobotsTxt } from "../../../shared/seo/generator.js";
 
-const serviceAccountPath = join(process.cwd(), "firebase-service-account.json");
-const serviceAccount = JSON.parse(readFileSync(serviceAccountPath, "utf8"));
+// Load env for production by default; allow override via SITEMAP_ENV_FILE
+const envPath = process.env.SITEMAP_ENV_FILE || ".env.production";
+dotenv.config({ path: envPath });
 
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  });
+const rawSiteUrl = (process.env.VITE_SITE_URL && String(process.env.VITE_SITE_URL)) || "https://plancraftai.com";
+const SITE_URL = rawSiteUrl.endsWith("/") ? rawSiteUrl.slice(0, -1) : rawSiteUrl;
+const apiUrl = process.env.VITE_API_BASE_URL;
+
+if (!apiUrl) {
+  console.warn("ℹ️ VITE_API_BASE_URL is not set. Proceeding without API validation.");
+} else if (apiUrl.includes("localhost")) {
+  console.warn("ℹ️ Local API base detected; continuing but skipping API safety exit.");
+} else {
+  console.log("🌐 Using API Base URL:", apiUrl);
 }
 
-console.log("🚨 Using API Base URL:", process.env.VITE_API_BASE_URL)
-const apiUrl = process.env.VITE_API_BASE_URL
-if (apiUrl === "undefined") {
-  console.error("❌ Missing VITE_API_BASE_URL! Check .env or .env.production.")
-  process.exit(1)
-}
-if (process.env.VITE_API_BASE_URL.includes("localhost")) {
-  console.error("❌ ABORT: Localhost URL detected! Switch to production env.")
-  process.exit(1)
-}
+// Initialize Firebase admin if credentials are present
+let db = null;
+try {
+  const serviceAccountPath = join(process.cwd(), "firebase-service-account.json");
+  const serviceAccountJson = readFileSync(serviceAccountPath, "utf8");
+  const serviceAccount = JSON.parse(serviceAccountJson);
 
-const db = admin.firestore();
+  if (!admin.apps.length) {
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+    });
+  }
+  db = admin.firestore();
+} catch (err) {
+  console.warn("⚠️ Firebase admin not initialized; skipping blog slug fetch.", err.message);
+}
 
 async function getBlogSlugs() {
+  if (!db) {
+    console.warn("ℹ️ Firestore unavailable — sitemap will include marketing pages only.");
+    return [];
+  }
   try {
     const snap = await db.collection("blogs").get();
     const slugs = snap.docs
@@ -69,34 +82,6 @@ async function getBlogSlugs() {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const ROOT = join(__dirname, "..");
-const SITE_URL = "https://plancraftai.com";
-
-// --------------------------------------------------
-// 🔹 Firebase initialization
-// --------------------------------------------------
-
-
-// const app = initializeApp(firebaseConfig);
-// const db = getFirestore(app);
-
-// --------------------------------------------------
-// 🔹 Fetch all blog slugs
-// --------------------------------------------------
-// async function getBlogSlugs() {
-//   try {
-//     const snap = await getDocs(collection(db, "blogs"));
-//     const slugs = snap.docs
-//       .map((d) => d.data()?.slug)
-//       .filter(Boolean)
-//       .map((slug) => `/blog/${slug}`);
-
-//     console.log(`📝 Found ${slugs.length} blog posts`);
-//     return slugs;
-//   } catch (err) {
-//     console.warn("⚠️ Failed to fetch blog slugs:", err.message);
-//     return [];
-//   }
-// }
 
 // --------------------------------------------------
 // 🔹 Generate sitemap.xml
@@ -142,6 +127,10 @@ async function generateSitemap() {
 // 🔹 Optional: Notify Google & Bing
 // --------------------------------------------------
 async function pingSearchEngines() {
+  if (process.env.SKIP_SITEMAP_PING === "1") {
+    console.log("ℹ️ SKIP_SITEMAP_PING=1 — skipping search engine pings.");
+    return;
+  }
   const sitemapUrl = `${SITE_URL}/sitemap.xml`;
   const pingUrls = [
     `https://www.google.com/ping?sitemap=${sitemapUrl}`,

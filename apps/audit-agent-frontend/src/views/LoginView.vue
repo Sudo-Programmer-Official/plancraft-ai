@@ -159,11 +159,18 @@ import { ref, onMounted, computed } from "vue"
 import { useRouter, useRoute } from "vue-router"
 import { useAuthStore } from "@/stores/authStore"
 import LoginFeatureSlider from '@/components/LoginFeatureSlider.vue'
+import { useSeoMeta } from '@/composables/useSeoMeta'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const starsCanvas = ref(null)
+useSeoMeta({
+  title: 'Login | PlanCraft AI',
+  description: 'Sign in to PlanCraft AI to access AI planning, calendar sync, and voice reminders.',
+  canonicalPath: '/login',
+  noindex: true,
+})
 const featureHighlights = [
   { icon: '🧠', label: 'Smart AI Task Planning', desc: 'Guided next steps' },
   { icon: '🔔', label: 'Auto Reminders', desc: 'Call · Text · WhatsApp · Email' },

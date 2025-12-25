@@ -171,5 +171,14 @@
 </template>
 
 <script setup>
-// Static page, no script needed
+import { useSeoMeta } from '@/composables/useSeoMeta'
+
+useSeoMeta({
+  title: 'Terms of Service | PlanCraft AI',
+  description:
+    'Review the terms for using PlanCraft AI, including account responsibilities, billing, and data handling for calendar integrations.',
+  keywords: ['PlanCraft terms', 'PlanCraft AI terms of service', 'PlanCraft user agreement'],
+  canonicalPath: '/terms',
+  type: 'article',
+})
 </script>

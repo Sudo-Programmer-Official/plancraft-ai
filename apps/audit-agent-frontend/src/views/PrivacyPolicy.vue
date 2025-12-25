@@ -116,3 +116,16 @@
     </footer>
   </div>
 </template>
+
+<script setup>
+import { useSeoMeta } from '@/composables/useSeoMeta'
+
+useSeoMeta({
+  title: 'Privacy Policy | PlanCraft AI',
+  description:
+    'Understand how PlanCraft AI handles data, calendar permissions, and account security with encryption and limited-use integrations.',
+  keywords: ['PlanCraft privacy policy', 'PlanCraft data handling', 'PlanCraft security'],
+  canonicalPath: '/privacy',
+  type: 'article',
+})
+</script>

@@ -209,6 +209,7 @@ watchEffect(() => {
 // 🧠 SEO & OG metadata
 watchEffect(() => {
   if (post.value) {
+    const canonicalUrl = `https://plancraftai.com/blog/${post.value.slug}`
     useHead({
       title: `${post.value.title} | PlanCraftAI Blog`,
       meta: [
@@ -228,10 +229,15 @@ watchEffect(() => {
         },
         {
           property: 'og:url',
-          content: `https://plancraftai.com/blog/${post.value.slug}`,
+          content: canonicalUrl,
         },
         { name: 'twitter:card', content: 'summary_large_image' },
-        { rel: 'canonical', href: `https://plancraftai.com/blog/${post.value.slug}` },
+      ],
+      link: [
+        {
+          rel: 'canonical',
+          href: canonicalUrl,
+        },
       ],
     })
   }

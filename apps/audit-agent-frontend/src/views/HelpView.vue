@@ -38,9 +38,18 @@
 <script setup>
 import { useRoute } from 'vue-router'
 import { useFeedbackStore } from '@/stores/feedbackStore'
+import { useSeoMeta } from '@/composables/useSeoMeta'
 
 const feedbackStore = useFeedbackStore()
 const route = useRoute()
+
+useSeoMeta({
+  title: 'Help Center | PlanCraft AI Support',
+  description:
+    'Get help with PlanCraft AI: email support, share feedback, or join the community. Find answers and reach the team fast.',
+  keywords: ['PlanCraft help', 'PlanCraft support', 'PlanCraft AI assistance'],
+  canonicalPath: '/help',
+})
 
 function openFeedback() {
   feedbackStore.openDrawer({ route: route.name || route.path, source: 'help-view' })

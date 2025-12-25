@@ -160,6 +160,38 @@
       </div>
     </section>
 
+    <section class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4">
+      <div class="dashboard-card flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div class="space-y-1">
+          <p class="text-[11px] uppercase tracking-[0.3em] text-indigo-200/80">Layout</p>
+          <h3 class="text-base sm:text-lg font-semibold text-slate-100">Pick the cards you want to see</h3>
+          <p class="text-xs text-indigo-200/80">Defaults to all cards; choices are saved on this device.</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <label
+            v-for="card in dashboardCardOptions"
+            :key="card.key"
+            class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/15 bg-white/5 text-xs text-indigo-50 cursor-pointer transition hover:border-indigo-400/60"
+          >
+            <input
+              type="checkbox"
+              class="accent-indigo-500 rounded"
+              :checked="isCardEnabled(card.key)"
+              @change="onCardToggle(card.key, $event.target.checked)"
+            />
+            <span class="font-semibold">{{ card.label }}</span>
+          </label>
+          <button
+            type="button"
+            class="px-3 py-1.5 rounded-lg border border-white/20 bg-transparent text-xs text-indigo-100 hover:border-indigo-300/70 transition"
+            @click="resetCardVisibility"
+          >
+            Show all
+          </button>
+        </div>
+      </div>
+    </section>
+
     <!-- Tier 2 · Workspaces -->
     <section class="grid grid-cols-1 gap-4 lg:gap-6 md:grid-cols-2 xl:grid-cols-5">
       <div
@@ -608,6 +640,93 @@
         </div>
       </div>
 
+      <div
+        v-if="showNapkin"
+        class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 lg:col-span-2"
+      >
+        <div
+          class="dashboard-card napkin-card space-y-4 bg-gradient-to-br from-slate-900/70 via-indigo-900/60 to-purple-900/60 border border-indigo-700/40"
+        >
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <p class="text-[11px] uppercase tracking-[0.35em] text-indigo-200/80">Napkin logs</p>
+              <h3 class="text-lg sm:text-xl font-semibold text-white">Recent captures</h3>
+              <p class="text-xs sm:text-sm text-indigo-100/80">
+                Voice drops, quick adds, and ideas routed from this workspace.
+              </p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <RouterLink
+                to="/napkin"
+                class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-sm transition"
+              >
+                Open Napkin →
+              </RouterLink>
+              <RouterLink
+                to="/quick-add"
+                class="px-3 py-1.5 rounded-lg border border-white/20 text-indigo-50 hover:border-indigo-300/70 hover:bg-white/5 text-xs font-semibold transition"
+              >
+                Drop a note
+              </RouterLink>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+            <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80">
+              <p class="text-slate-400 text-xs">Captured</p>
+              <p class="text-lg font-semibold text-slate-50">{{ napkinCapturedCount }}</p>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80">
+              <p class="text-slate-400 text-xs">Converted</p>
+              <p class="text-lg font-semibold text-emerald-200">{{ napkinConvertedCount }}</p>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80">
+              <p class="text-slate-400 text-xs">Voice notes</p>
+              <p class="text-lg font-semibold text-indigo-200">{{ napkinVoiceCount }}</p>
+            </div>
+          </div>
+
+          <div v-if="napkinError" class="text-rose-200 text-sm bg-rose-900/40 border border-rose-600/40 rounded-xl px-3 py-2">
+            {{ napkinError }}
+          </div>
+          <div v-else-if="napkinLoading" class="space-y-2">
+            <div v-for="n in 3" :key="n" class="h-16 bg-slate-900/40 border border-slate-800 rounded-xl animate-pulse" />
+          </div>
+          <div v-else-if="napkinPreview.length" class="space-y-3">
+            <article
+              v-for="item in napkinPreview"
+              :key="item.id"
+              class="p-3 rounded-xl bg-slate-900/70 border border-slate-800/80 hover:border-indigo-500/60 transition space-y-2"
+            >
+              <div class="flex flex-wrap items-center gap-2 text-[11px]">
+                <span class="px-2 py-1 rounded-full bg-indigo-900/60 border border-indigo-700/60 text-indigo-100 uppercase tracking-wide">
+                  {{ item.type }}
+                </span>
+                <span class="px-2 py-1 rounded-full bg-slate-900/70 border border-slate-700 text-slate-100">
+                  {{ item.category }}
+                </span>
+                <span
+                  v-if="item.status !== 'unsorted'"
+                  class="px-2 py-1 rounded-full bg-emerald-900/60 border border-emerald-700/60 text-emerald-100 uppercase tracking-wide"
+                >
+                  {{ item.status }}
+                </span>
+                <span class="text-slate-400">{{ formatNapkinDate(item.createdAt) }}</span>
+              </div>
+              <p class="text-sm text-slate-50 whitespace-pre-line leading-relaxed">
+                {{ item.text }}
+              </p>
+              <p v-if="item.tags?.length" class="text-[11px] text-slate-400">
+                #{{ item.tags.slice(0, 4).join(' #') }}
+              </p>
+            </article>
+          </div>
+          <div v-else class="text-sm text-slate-300 bg-slate-900/60 border border-slate-800 rounded-xl px-3 py-2">
+            No napkin captures yet. Drop a quick note or voice memo to see it here.
+          </div>
+        </div>
+      </div>
+
       <div class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 lg:col-span-2">
         <div class="dashboard-card report-card space-y-4">
           <div class="flex flex-wrap items-center justify-between gap-3">
@@ -785,6 +904,7 @@ import { ensureDailyStreakState, getUserStreak } from '@/services/streakService'
 import { resolveReminderIso } from '@/utils/timeHelper.js'
 import { resolveTaskMeetingLink } from '@/utils/taskLinks'
 import { seedGuestStarterTasks } from '@/utils/guestTasks'
+import { subscribeToNapkinItems } from '@/services/napkinService'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -816,12 +936,66 @@ const cancelAtFmt = computed(() =>
 )
 
 // UI toggles
-const showDaily = ref(true)
-const showQuickLinks = ref(true)
-const showWeekly = ref(true)
-const showMonthly = ref(true)
-const showJournal = ref(true)
-const showAIInsights = ref(true)
+const dashboardCardOptions = [
+  { key: 'daily', label: 'Daily focus' },
+  { key: 'weekly', label: 'Weekly horizon' },
+  { key: 'monthly', label: 'Monthly momentum' },
+  { key: 'quickLinks', label: 'Quick links' },
+  { key: 'journal', label: 'Journal snapshot' },
+  { key: 'ai', label: 'AI insights' },
+  { key: 'napkin', label: 'Napkin logs' },
+]
+const DASHBOARD_CARD_STORAGE_KEY = 'dashboard:cards:v1'
+const allCardKeys = dashboardCardOptions.map((c) => c.key)
+
+function loadCardVisibility() {
+  if (typeof window === 'undefined') return [...allCardKeys]
+  try {
+    const raw = JSON.parse(localStorage.getItem(DASHBOARD_CARD_STORAGE_KEY) || '[]')
+    if (Array.isArray(raw) && raw.length) {
+      const valid = raw.filter((key) => allCardKeys.includes(key))
+      const missing = allCardKeys.filter((key) => !valid.includes(key))
+      return [...valid, ...missing]
+    }
+  } catch {
+    /* noop */
+  }
+  return [...allCardKeys]
+}
+
+const cardVisibility = ref(new Set(loadCardVisibility()))
+function persistCardVisibility(nextSet) {
+  try {
+    localStorage.setItem(DASHBOARD_CARD_STORAGE_KEY, JSON.stringify(Array.from(nextSet)))
+  } catch {
+    /* noop */
+  }
+}
+
+function setCardVisibility(key, enabled) {
+  const next = new Set(cardVisibility.value)
+  if (enabled) next.add(key)
+  else next.delete(key)
+  cardVisibility.value = next
+  persistCardVisibility(next)
+}
+function resetCardVisibility() {
+  const next = new Set(allCardKeys)
+  cardVisibility.value = next
+  persistCardVisibility(next)
+}
+const isCardEnabled = (key) => cardVisibility.value.has(key)
+function onCardToggle(key, checked) {
+  setCardVisibility(key, checked)
+}
+
+const showDaily = computed(() => cardVisibility.value.has('daily'))
+const showQuickLinks = computed(() => cardVisibility.value.has('quickLinks'))
+const showWeekly = computed(() => cardVisibility.value.has('weekly'))
+const showMonthly = computed(() => cardVisibility.value.has('monthly'))
+const showJournal = computed(() => cardVisibility.value.has('journal'))
+const showAIInsights = computed(() => cardVisibility.value.has('ai'))
+const showNapkin = computed(() => cardVisibility.value.has('napkin'))
 
 // Usage meter (free plan)
 const usage = ref({ used: 0, limit: 0, plan: '' })
@@ -849,6 +1023,71 @@ function goToUpgrade() {
     /* noop */
   }
 }
+
+/* -------------- Napkin preview -------------- */
+const napkinItems = ref([])
+const napkinLoading = ref(false)
+const napkinError = ref('')
+
+const napkinPreview = computed(() =>
+  napkinItems.value
+    .filter((item) => item.status !== 'archived')
+    .slice(0, 4)
+)
+const napkinCapturedCount = computed(() => napkinItems.value.length)
+const napkinConvertedCount = computed(
+  () => napkinItems.value.filter((i) => i.status === 'converted').length
+)
+const napkinVoiceCount = computed(() => napkinItems.value.filter((i) => i.audioUrl || i.source === 'voice').length)
+
+let napkinUnsub = null
+function detachNapkinListener() {
+  if (!napkinUnsub) return
+  try {
+    napkinUnsub()
+  } catch {
+    /* noop */
+  }
+  napkinUnsub = null
+}
+
+function attachNapkinListener() {
+  detachNapkinListener()
+  if (!authStore?.user?.uid) {
+    napkinItems.value = []
+    napkinLoading.value = false
+    return
+  }
+  napkinLoading.value = true
+  napkinError.value = ''
+  try {
+    napkinUnsub = subscribeToNapkinItems((list) => {
+      napkinItems.value = list
+      napkinLoading.value = false
+    })
+  } catch (error) {
+    napkinError.value = error?.message || 'Unable to load napkin stream.'
+    napkinLoading.value = false
+  }
+}
+
+watch(
+  () => ({
+    uid: authStore.user?.uid,
+    workspace: activeWorkspaceId.value,
+    visible: showNapkin.value,
+  }),
+  ({ uid, visible }) => {
+    if (!uid || !visible) {
+      napkinItems.value = []
+      napkinLoading.value = false
+      detachNapkinListener()
+      return
+    }
+    attachNapkinListener()
+  },
+  { immediate: true }
+)
 
 /* -------------- Tasks + Journal state -------------- */
 const { loadTasks, allTasks, moveTasks, refreshAllTasks, ensureDailyRollover } = useTasks()
@@ -1208,6 +1447,13 @@ function categoryColor(value) {
 }
 function categoryLabel(value) {
   return resolveCategory(value)
+}
+function formatNapkinDate(ms) {
+  try {
+    return dayjs(ms).format('MMM D, h:mm A')
+  } catch {
+    return new Date(ms).toLocaleString()
+  }
 }
 
 async function toggleComplete(task) {
@@ -1646,6 +1892,7 @@ watch(activeWorkspaceId, () => {
 
 onUnmounted(() => {
   if (unsubscribe.value) unsubscribe.value()
+  detachNapkinListener()
   if (insightIntervalId.value) clearInterval(insightIntervalId.value)
   if (typeof window !== 'undefined') {
     window.removeEventListener('pcai:onboarding:request', handleOnboardingReplayEvent)

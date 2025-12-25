@@ -108,8 +108,17 @@
 import { ref } from 'vue'
 import { getFirestore, collection, addDoc, serverTimestamp } from 'firebase/firestore'
 import firebaseApp from '@/firebase/init'
+import { useSeoMeta } from '@/composables/useSeoMeta'
 
 const db = getFirestore(firebaseApp)
+
+useSeoMeta({
+  title: 'Contact PlanCraft AI | Support & Demo Requests',
+  description:
+    'Reach the PlanCraft AI team for product support, demos, or partnership questions. Send a message and we will respond quickly.',
+  keywords: ['contact PlanCraft AI', 'PlanCraft support', 'PlanCraft demo request'],
+  canonicalPath: '/contact',
+})
 
 const form = ref({ name: '', email: '', message: '' })
 const loading = ref(false)
