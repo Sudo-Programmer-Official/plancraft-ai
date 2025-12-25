@@ -9,6 +9,7 @@ import { extractReminderTime as extractReminderTimeAI } from "./openaiService.js
 import { formatLocalTime } from "../utils/timezone.js";
 import { listEventsForWindow, getNextMeeting } from "./externalEventsService.js";
 import { createGoalViaService } from "./goalsClient.js";
+import { createGoogleCalendarEvent } from "./googleCalendarService.js";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -103,6 +104,34 @@ const GOAL_CATEGORY_HINTS = [
   { value: "Learning", regex: /(learn|study|course|class|book|reading|school)/i },
   { value: "Relationships", regex: /(family|relationship|partner|friends|community|social)/i },
 ];
+
+function resolveTimezoneId(context = {}) {
+  return (
+    context?.runtime?.clientTimezone ||
+    context?.profile?.timezone ||
+    context?.profile?.tz ||
+    context?.summary?.timezone ||
+    DEFAULT_TIMEZONE
+  );
+}
+
+function toUtcIsoFlexible(value, timezoneId = DEFAULT_TIMEZONE) {
+  if (!value && value !== 0) return null;
+  try {
+    const s = String(value).trim();
+    if (!s) return null;
+    const hasZone = /[zZ]|[+-]\d\d:?\d\d$/.test(s);
+    if (hasZone) {
+      const d = dayjs(s);
+      return d.isValid() ? d.utc().toISOString() : null;
+    }
+    const parsedTz = dayjs.tz(s, timezoneId, true);
+    if (parsedTz.isValid()) return parsedTz.utc().toISOString();
+    const parsed = dayjs(s);
+    if (parsed.isValid()) return parsed.utc().toISOString();
+  } catch {}
+  return null;
+}
 
 function inferGoalCategoryFromText(text = "") {
   for (const hint of GOAL_CATEGORY_HINTS) {
@@ -491,10 +520,79 @@ async function fetchRecentNotes(uid, limit = 6) {
   }
 }
 
+async function fetchQuickLinks(uid, { workspaceId = null, query = null } = {}) {
+  try {
+    let ref = db.collection("quick_links").where("userId", "==", String(uid));
+    if (workspaceId) {
+      try {
+        ref = ref.where("workspaceId", "==", workspaceId);
+      } catch {
+        /* if composite index missing, fallback below */
+      }
+    }
+    const snap = await ref.limit(50).get();
+    const links = [];
+    snap.forEach((doc) => {
+      const data = doc.data() || {};
+      links.push({
+        id: doc.id,
+        title: data.title || data.name || "Link",
+        url: data.url || data.href || "",
+        description: data.description || "",
+        tags: Array.isArray(data.tags) ? data.tags : [],
+        workspaceId: data.workspaceId || null,
+      });
+    });
+    if (!query) return links.slice(0, 5);
+    const q = String(query).toLowerCase();
+    const scoreLink = (link) => {
+      const haystack = [
+        link.title,
+        link.description,
+        ...(Array.isArray(link.tags) ? link.tags : []),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      if (!haystack) return 0;
+      if (haystack.includes(q)) return 2;
+      if (q.split(/\s+/).some((part) => haystack.includes(part))) return 1;
+      return 0;
+    };
+    const scored = links
+      .map((link) => ({ link, score: scoreLink(link) }))
+      .filter((entry) => entry.score > 0)
+      .sort((a, b) => b.score - a.score);
+    return scored.slice(0, 5).map((entry) => entry.link);
+  } catch (err) {
+    console.warn("[PlannerAssistant] fetchQuickLinks failed", err?.message || err);
+    return [];
+  }
+}
+
 function normalizeIdToken(value) {
   if (value === undefined || value === null) return null;
   const token = String(value).trim();
   return token.length ? token : null;
+}
+
+async function fetchQuickLinksForUser(uid, payload = {}, context = {}) {
+  const workspaceId =
+    payload.workspaceId ||
+    payload.workspace_id ||
+    context?.runtime?.workspaceId ||
+    context?.profile?.activeWorkspaceId ||
+    null;
+  const query = payload.query || payload.search || payload.title || payload.text || null;
+  const links = await fetchQuickLinks(uid, { workspaceId, query });
+  return {
+    status: "completed",
+    type: "fetch_quick_link",
+    items: links,
+    message: links.length
+      ? `🔗 Found ${links.length} quick link${links.length > 1 ? "s" : ""}.${links[0]?.url ? ` ${links[0].title || "Link"} → ${links[0].url}` : ""}`
+      : "No matching quick links found.",
+  };
 }
 
 function normalizeTitleToken(value) {
@@ -1008,6 +1106,56 @@ async function joinNextMeetingForUser(uid) {
   };
 }
 
+async function createCalendarEventForUser(uid, payload = {}, context = {}) {
+  const timezoneId = payload.timezone || payload.timeZone || resolveTimezoneId(context);
+  const durationMinutes = Number.isFinite(payload.durationMinutes) ? Number(payload.durationMinutes) : 30;
+  let startIso =
+    toUtcIsoFlexible(payload.startTime || payload.start, timezoneId) ||
+    dayjs().tz(timezoneId).add(1, "hour").utc().toISOString();
+  let endIso =
+    toUtcIsoFlexible(payload.endTime || payload.end, timezoneId) ||
+    (startIso ? dayjs(startIso).add(durationMinutes, "minute").toISOString() : null);
+
+  if (!startIso || !endIso) {
+    throw new Error("Missing or invalid start/end time for meeting");
+  }
+
+  const attendees = Array.isArray(payload.attendees)
+    ? payload.attendees
+        .map((a) => (typeof a === "string" ? { email: a } : { email: a?.email, optional: !!a?.optional }))
+        .filter((a) => a.email)
+    : [];
+
+  const eventPayload = {
+    title: payload.title || payload.summary || "Meeting",
+    description: payload.description || payload.details || "",
+    location: payload.location || "",
+    startTime: startIso,
+    endTime: endIso,
+    timeZone: timezoneId,
+    attendees,
+    reminders: Array.isArray(payload.reminders) ? payload.reminders : null,
+    createConference: payload.createConference !== false,
+    sendUpdates: payload.sendUpdates || "all",
+  };
+
+  const created = await createGoogleCalendarEvent(
+    uid,
+    eventPayload,
+    payload.accountId || payload.calendarAccountId || null,
+    payload.calendarId || "primary",
+  );
+
+  const localStart = dayjs(startIso).tz(timezoneId).format("MMM D • h:mm A");
+  return {
+    status: "completed",
+    type: "create_google_calendar_event",
+    payload: eventPayload,
+    message: `📅 Created "${eventPayload.title}" on Google Calendar for ${localStart}.`,
+    result: created,
+  };
+}
+
 async function getRemindersForUser(uid, payload = {}, context = {}) {
   const limitRaw = Number(payload.limit) || 5;
   const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 15) : 5;
@@ -1426,6 +1574,10 @@ export async function executePlannerActions(uid, actions = [], context = {}) {
         results.push(await getMeetingsForUser(uid, raw?.payload || raw, context));
       } else if (type === "join_meeting") {
         results.push(await joinNextMeetingForUser(uid));
+      } else if (type === "create_google_calendar_event" || type === "create_meeting") {
+        results.push(await createCalendarEventForUser(uid, raw?.payload || raw, context));
+      } else if (type === "fetch_quick_link") {
+        results.push(await fetchQuickLinksForUser(uid, raw?.payload || raw, context));
       } else {
         results.push({
           status: "ignored",
@@ -1449,6 +1601,8 @@ export async function executePlannerActions(uid, actions = [], context = {}) {
 export function detectIntentFromMessage(message = "") {
   if (!message) return null;
   const text = String(message).toLowerCase();
+  if (/(schedule|create|set|book).*(meeting|call|calendar|event)/.test(text)) return "create_meeting";
+  if (/(link|url).*(find|show|get|pull|open)/.test(text) || /quick\s+link/.test(text)) return "fetch_quick_link";
   if (/create|add|new/.test(text) && /task/.test(text)) return "create_task";
   if (/remind|reminder|nudge|follow\s*up/.test(text)) return "schedule_reminder";
   if (/(set|create|plan|start|build).*(goal|objective|mission)/.test(text) || /goal\s+to/.test(text)) {
@@ -1501,6 +1655,10 @@ export async function buildFallbackActionsFromIntent(intent, message = "", conte
 
   if (intent === "join_meeting") {
     return [{ type: "join_meeting", payload: {} }];
+  }
+
+  if (intent === "fetch_quick_link") {
+    return [{ type: "fetch_quick_link", payload: { query: message } }];
   }
 
   if (intent === "schedule_reminder") {

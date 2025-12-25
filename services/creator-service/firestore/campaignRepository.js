@@ -51,3 +51,15 @@ export async function fetchCampaign(id, { userId, workspaceId } = {}) {
   if (workspaceId && data.workspaceId && data.workspaceId !== workspaceId) return null
   return { id: snap.id, ...data }
 }
+
+export async function findActiveCampaign({ userId, workspaceId } = {}) {
+  ensureApp()
+  const db = admin.firestore()
+  let query = db.collection('content_campaigns').where('status', '==', 'active').orderBy('updatedAt', 'desc').limit(1)
+  if (userId) query = query.where('userId', '==', userId)
+  if (workspaceId) query = query.where('workspaceId', '==', workspaceId)
+  const snap = await query.get()
+  if (snap.empty) return null
+  const doc = snap.docs[0]
+  return { id: doc.id, ...doc.data() }
+}

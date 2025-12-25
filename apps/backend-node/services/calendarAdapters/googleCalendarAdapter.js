@@ -127,3 +127,56 @@ export function normalizeGoogleEvent(event, calendar) {
     contentHash,
   };
 }
+
+export async function createGoogleEvent(accessToken, calendarId = 'primary', payload = {}) {
+  const headers = {
+    Authorization: `Bearer ${accessToken}`,
+    'Content-Type': 'application/json',
+  };
+
+  const body = {
+    summary: payload.title || payload.summary || 'Meeting',
+    description: payload.description || '',
+    location: payload.location || '',
+    start: {
+      dateTime: payload.startTime,
+      timeZone: payload.timeZone || payload.timezone || payload.tz || 'UTC',
+    },
+    end: {
+      dateTime: payload.endTime,
+      timeZone: payload.timeZone || payload.timezone || payload.tz || 'UTC',
+    },
+    attendees: Array.isArray(payload.attendees)
+      ? payload.attendees
+          .map((a) => (typeof a === "string" ? { email: a } : { email: a?.email, optional: !!a?.optional }))
+          .filter((a) => !!a.email)
+      : [],
+    reminders: payload.reminders
+      ? {
+          useDefault: false,
+          overrides: (payload.reminders || [])
+            .map((m) => Number(m))
+            .filter((n) => Number.isFinite(n))
+            .map((minutes) => ({ method: 'popup', minutes })),
+        }
+      : undefined,
+    conferenceData: payload.createConference
+      ? {
+          createRequest: {
+            requestId: crypto.randomUUID(),
+            conferenceSolutionKey: { type: 'hangoutsMeet' },
+          },
+        }
+      : undefined,
+  };
+
+  const qs = payload.sendUpdates ? `?sendUpdates=${encodeURIComponent(payload.sendUpdates)}` : '';
+  const url = `${GOOGLE_EVENTS_URL(calendarId)}${qs}${payload.createConference ? '&conferenceDataVersion=1' : ''}`;
+  const resp = await fetchFn(url, { method: "POST", headers, body: JSON.stringify(body) });
+  if (resp.status === 401) throw new Error("Unauthorized with Google; reconnect");
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(`Google event create failed: ${resp.status} ${text}`);
+  }
+  return resp.json();
+}

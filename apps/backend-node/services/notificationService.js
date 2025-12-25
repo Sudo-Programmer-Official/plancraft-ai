@@ -5,6 +5,7 @@ import { send as sendWhatsApp } from './integrations/whatsappProvider.js'
 import { sendPWA } from './integrations/pwaProvider.js'
 import { sendEmail } from './integrations/emailProvider.js'
 import { makeCallForUser, sendSMSForUser } from './twilioService.js'
+import { sendDiscordMessage } from './discordNotificationService.js'
 import { getUserPrefs } from './userPrefService.js'
 import { buildReminderBrandCopy } from './notificationTemplates.js'
 import { enqueueNotificationJob, postingServiceAvailable } from './postingServiceClient.js'
@@ -14,10 +15,14 @@ export async function sendNotification(userId, message, channel = 'all', options
   const data = snap.exists ? snap.data() : {}
   const prefs = data?.preferences?.notifications || {}
 
-  const supported = ['whatsapp', 'slack']
+  const supported = ['whatsapp', 'slack', 'discord']
   let channels = []
   if (channel === 'all') {
-    channels = supported.filter((c) => !!prefs[c] || (c === 'slack' && !!process.env.SLACK_WEBHOOK_URL))
+    channels = supported.filter((c) => {
+      if (c === 'slack') return !!prefs[c] || !!process.env.SLACK_WEBHOOK_URL
+      if (c === 'discord') return !!prefs[c] && (process.env.ENABLE_DISCORD || '').toString().match(/1|true/i)
+      return !!prefs[c]
+    })
   } else if (Array.isArray(channel)) {
     channels = channel.filter((c) => supported.includes(c))
   } else if (typeof channel === 'string') {
@@ -44,9 +49,10 @@ const CHANNEL_ENV_FLAGS = {
   pwa: resolveChannelFlag('ENABLE_PWA'),
   voice: resolveChannelFlag('ENABLE_VOICE'),
   sms: resolveChannelFlag('ENABLE_SMS'),
+  discord: resolveChannelFlag('ENABLE_DISCORD', false),
 }
 
-const ALL_CHANNELS = ['whatsapp', 'email', 'pwa', 'voice', 'sms']
+const ALL_CHANNELS = ['whatsapp', 'email', 'pwa', 'voice', 'sms', 'discord']
 
 function isChannelEnabled(flagValue) {
   if (flagValue === undefined || flagValue === null) return false
@@ -73,6 +79,7 @@ function normalizeChannelName(channel) {
   if (normalized === 'text' || normalized === 'sms_text') {
     return 'sms'
   }
+  if (normalized === 'discord') return 'discord'
   return normalized
 }
 
@@ -98,6 +105,7 @@ function channelPermitted(channel, ctx) {
   if (channel === 'pwa') return ctx.prefs.enable_pwa
   if (channel === 'voice') return ctx.prefs.enable_voice
   if (channel === 'sms') return ctx.prefs.enable_sms
+  if (channel === 'discord') return ctx.prefs.enable_discord
 
   return false
 }
@@ -310,6 +318,16 @@ async function sendViaChannel(channel, userId, payload, contacts = {}, meta = {}
   if (channel === 'sms') {
     if (!payload.smsMessage) return null
     return sendSMSForUser(userId, payload.smsMessage)
+  }
+  if (channel === 'discord') {
+    const msg = payload.message || payload.emailMessage || payload.smsMessage
+    if (!msg) return null
+    return sendDiscordMessage({
+      userId,
+      message: msg,
+      channelId: meta.channelId || payload.discordChannelId || null,
+      isDM: meta.isDM !== false,
+    })
   }
   return null
 }

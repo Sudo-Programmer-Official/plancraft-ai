@@ -1,5 +1,6 @@
 import { proxyAi } from '../services/aiClient.js'
 import { logAiOutput } from '../firestore/aiOutputsRepository.js'
+import { fetchProfile } from '../firestore/profileRepository.js'
 
 function workspaceId(req) {
   return req.headers['x-workspace-id'] || req.query?.workspaceId || req.body?.workspaceId || null
@@ -8,14 +9,16 @@ function workspaceId(req) {
 async function handle(type, req, res, next) {
   try {
     const wsId = workspaceId(req)
-    const payload = { ...(req.body || {}), workspaceId: wsId }
+    const userId = req.user?.uid || null
+    const profile = userId ? await fetchProfile(userId, wsId || 'default') : null
+    const payload = { ...(req.body || {}), workspaceId: wsId, creatorProfile: profile }
     const data = await proxyAi(type, payload)
     try {
       await logAiOutput({
         input: payload,
         output: data,
         type,
-        userId: req.user?.uid,
+        userId,
         workspaceId: wsId,
       })
     } catch {}

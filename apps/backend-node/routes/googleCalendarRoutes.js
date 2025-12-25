@@ -1,7 +1,7 @@
 import express from 'express'
 import { requireAuth, ensureUserMatches } from '../middleware/auth.js'
 import { ensureFreshAccessToken, getUserGoogleIntegration, saveUserGoogleIntegration, disconnectGoogleIntegration } from '../services/googleOAuth.js'
-import { listCalendars } from '../services/googleCalendarService.js'
+import { listCalendars, createGoogleCalendarEvent } from '../services/googleCalendarService.js'
 import { syncGoogleAccount } from '../services/calendarSyncService.js'
 
 const router = express.Router()
@@ -109,6 +109,23 @@ router.delete('/google/calendars/disconnect', async (req, res) => {
   } catch (e) {
     console.error('DELETE /google/calendars/disconnect failed', e)
     return res.status(500).json({ error: e?.message || 'Failed to disconnect Google Calendar' })
+  }
+})
+
+// POST /api/integrations/google-calendar/events/create
+router.post('/integrations/google-calendar/events/create', async (req, res) => {
+  try {
+    if (ENABLED !== '1' && ENABLED !== 'true') return res.status(503).json({ error: 'Google Calendar integration disabled' })
+    const { userId, accountId, calendarId, event } = req.body || {}
+    if (!userId) return res.status(400).json({ error: 'Missing userId' })
+    if (!event?.startTime && !event?.start) return res.status(400).json({ error: 'Missing event.startTime' })
+    if (!event?.endTime && !event?.end) return res.status(400).json({ error: 'Missing event.endTime' })
+
+    const created = await createGoogleCalendarEvent(String(userId), event, { accountId, calendarId })
+    return res.json({ ok: true, event: created })
+  } catch (e) {
+    console.error('POST /integrations/google-calendar/events/create failed', e?.message || e)
+    return res.status(500).json({ error: e?.message || 'Failed to create calendar event' })
   }
 })
 

@@ -95,8 +95,12 @@ Supported action types and payload hints:
 - update_task: { "taskId": string, "title"?: string, "date"?: "YYYY-MM-DD", "reminderTime"?: "HH:mm", "completed"?: boolean }
 - complete_task: { "taskId": string }
 - schedule_reminder: { "text": string, "scheduledTime": ISO-8601 UTC, "timezone"?: string, "channels"?: [] }
+- create_google_calendar_event: { "title": string, "startTime": ISO-8601, "endTime"?: ISO-8601, "attendees"?: ["email"], "createConference"?: true, "sendUpdates"?: "all", "timezone"?: string }
 - get_tasks: { "status"?: "open" | "completed" | "all", "date"?: "YYYY-MM-DD", "limit"?: number }
 - get_reminders: { "status"?: "scheduled" | "sent", "limit"?: number }
+- get_meetings: { "windowHours"?: number, "limit"?: number }
+- join_meeting: { }
+- fetch_quick_link: { "query": string, "workspaceId"?: string }
 Example JSON:
 \`\`\`json
 {"actions":[{"type":"create_task","payload":{"title":"Call client","date":"2025-02-15"}}]}

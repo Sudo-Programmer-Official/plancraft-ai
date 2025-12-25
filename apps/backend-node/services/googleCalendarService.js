@@ -5,6 +5,7 @@ import nodeFetch from 'node-fetch'
 import { db } from './firebaseAdmin.js'
 import { extractJoinLink } from '../utils/joinLink.js'
 import { ensureFreshAccessToken, getUserGoogleIntegration, saveUserGoogleIntegration } from './googleOAuth.js'
+import { getCalendarAdapter } from './calendarAdapters/index.js'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -238,4 +239,33 @@ export async function syncSelectedCalendars(uid, tokens, accountId = 'primary') 
     }
   }
   return total
+}
+
+// Create an event in Google Calendar with the existing OAuth token
+export async function createGoogleCalendarEvent(userId, eventPayload = {}, options = {}) {
+  if (!userId) throw new Error('Missing userId')
+  const accountId = options.accountId || eventPayload.accountId || null
+  const calendarId = options.calendarId || eventPayload.calendarId || 'primary'
+  const adapter = getCalendarAdapter('google_calendar')
+  if (!adapter?.createEvent) throw new Error('Google calendar adapter missing createEvent')
+
+  const { tokens } = await ensureFreshAccessToken(String(userId), accountId || undefined)
+  const startTime = eventPayload.startTime || eventPayload.start || null
+  const endTime = eventPayload.endTime || eventPayload.end || null
+  if (!startTime || !endTime) throw new Error('startTime and endTime are required')
+
+  const payload = {
+    title: eventPayload.title || eventPayload.summary || 'Meeting',
+    description: eventPayload.description || '',
+    location: eventPayload.location || '',
+    startTime,
+    endTime,
+    timeZone: eventPayload.timeZone || eventPayload.timezone || eventPayload.tz || eventPayload.timeZoneId || 'UTC',
+    attendees: Array.isArray(eventPayload.attendees) ? eventPayload.attendees : [],
+    reminders: Array.isArray(eventPayload.reminders) ? eventPayload.reminders : null,
+    createConference: eventPayload.createConference === true || eventPayload.meet === true,
+    sendUpdates: eventPayload.sendUpdates || undefined,
+  }
+
+  return adapter.createEvent(tokens.access_token, calendarId, payload)
 }

@@ -15,6 +15,13 @@
         <button class="px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm" @click="goRepurpose">
           Repurpose
         </button>
+        <button
+          class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-sm font-semibold disabled:opacity-60"
+          :disabled="autopilotRunning"
+          @click="runAutopilot"
+        >
+          {{ autopilotRunning ? 'Running…' : 'Run Autopilot' }}
+        </button>
       </div>
     </div>
 
@@ -82,13 +89,14 @@
 import { onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { fetchCreatorBoard, fetchCreatorSlots, fetchCreatorInspiration } from '@/services/creatorApi'
+import { fetchCreatorBoard, fetchCreatorSlots, fetchCreatorInspiration, runCreatorAutopilot } from '@/services/creatorApi'
 
 const router = useRouter()
 const loading = ref(false)
 const drafts = ref([])
 const inspiration = ref([])
 const scheduled = ref([])
+const autopilotRunning = ref(false)
 
 function fallbackInspiration() {
   return [
@@ -160,4 +168,18 @@ onMounted(async () => {
   await loadBoard()
   if (!inspiration.value.length) await loadInspiration()
 })
+
+async function runAutopilot() {
+  autopilotRunning.value = true
+  try {
+    const result = await runCreatorAutopilot()
+    const count = result?.draftsCreated ?? result?.variants?.length ?? 0
+    ElMessage.success(`Autopilot created ${count} draft${count === 1 ? '' : 's'}.`)
+    await loadBoard()
+  } catch (err) {
+    ElMessage.error(err?.response?.data?.error || 'Autopilot run failed')
+  } finally {
+    autopilotRunning.value = false
+  }
+}
 </script>

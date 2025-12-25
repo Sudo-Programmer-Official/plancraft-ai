@@ -1,6 +1,7 @@
 import { proxyAi } from '../services/aiClient.js'
 import { createDraft } from '../firestore/draftsRepository.js'
 import { createVariantsFromMap } from '../firestore/variantsRepository.js'
+import { fetchProfile } from '../firestore/profileRepository.js'
 
 function uid(req) {
   const id = req.user?.uid
@@ -17,10 +18,12 @@ export async function runRepurpose(req, res, next) {
     const userId = uid(req)
     const wsId = workspaceId(req)
     const payload = req.body || {}
+    const profile = await fetchProfile(userId, wsId || 'default')
     const aiPayload = {
       sourceContent: payload.source || payload.sourceContent || '',
       targetFormats: payload.formats || payload.targetFormats || ['linkedin_post', 'twitter_thread'],
       workspaceId: wsId,
+      creatorProfile: profile,
     }
     const data = await proxyAi('repurpose', aiPayload, { headers: req.headers })
     const variants = data?.variants || data || {}

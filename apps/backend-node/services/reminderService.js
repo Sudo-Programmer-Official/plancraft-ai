@@ -18,7 +18,7 @@ dayjs.extend(timezone);
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const REMINDER_CHANNEL_ALLOW_LIST = ['pwa', 'whatsapp', 'email', 'sms', 'voice_call'];
+const REMINDER_CHANNEL_ALLOW_LIST = ['pwa', 'whatsapp', 'email', 'sms', 'voice_call', 'discord'];
 const VOICE_CALL_MIN_LEAD_MS = 60 * 1000;
 const ENV_DEFAULT_CHANNELS = Array.isArray(process.env.DEFAULT_REMINDER_CHANNELS?.split?.(','))
   ? process.env.DEFAULT_REMINDER_CHANNELS.split(',').map((c) => String(c || '').trim().toLowerCase()).filter((c) => REMINDER_CHANNEL_ALLOW_LIST.includes(c))
@@ -139,6 +139,7 @@ function normalizeReminderChannel(channel) {
   if (normalized === 'voice_call' || normalized === 'voice-call') return 'voice';
   if (normalized === 'push' || normalized === 'webpush' || normalized === 'web-push') return 'pwa';
   if (normalized === 'text' || normalized === 'sms_text') return 'sms';
+  if (normalized === 'discord') return 'discord';
   return normalized;
 }
 

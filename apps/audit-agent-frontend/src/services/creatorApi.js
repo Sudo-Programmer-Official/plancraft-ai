@@ -68,6 +68,16 @@ export async function fetchCreatorPlan(id) {
   return data?.plan || data || {}
 }
 
+export async function fetchCreatorProfile() {
+  const { data } = await creatorClient.get('/creator/profile')
+  return data?.profile || data || null
+}
+
+export async function saveCreatorProfile(payload) {
+  const { data } = await creatorClient.post('/creator/profile', payload)
+  return data?.profile || data || null
+}
+
 export async function saveCreatorPlan(id, payload) {
   if (id === 'new') {
     const { data } = await creatorClient.post('/creator/plan/create', payload)
@@ -191,5 +201,10 @@ export async function generateAiImages(payload) {
     workspaceId: payload.workspaceId,
   }
   const { data } = await nlpClient.post('/images/generate', body)
+  return data
+}
+
+export async function runCreatorAutopilot() {
+  const { data } = await creatorClient.post('/creator/autopilot/run')
   return data
 }

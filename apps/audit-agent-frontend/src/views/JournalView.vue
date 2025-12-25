@@ -109,9 +109,17 @@
             <span class="px-2 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/40 text-xs text-cyan-100">Live</span>
           </div>
           <VoiceRecorder @transcribed="handleTranscript" />
-          <div v-if="voiceTranscript" class="rounded-xl bg-slate-900/60 border border-white/10 p-3 text-sm">
-            <p class="text-xs text-indigo-200 mb-1">Transcript</p>
-            <p class="text-slate-100">{{ voiceTranscript }}</p>
+          <div
+            v-if="voiceTranscript || pendingAudio"
+            class="rounded-xl bg-slate-900/60 border border-white/10 p-3 text-sm space-y-2"
+          >
+            <div class="flex items-center justify-between">
+              <p class="text-xs text-indigo-200">Transcript</p>
+              <span v-if="pendingAudio" class="text-[11px] px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-400/30 text-emerald-100">
+                Voice clip attached
+              </span>
+            </div>
+            <p class="text-slate-100 whitespace-pre-line">{{ voiceTranscript }}</p>
             <div class="mt-2 flex gap-2">
               <button
                 class="px-3 py-1 rounded-full text-xs bg-indigo-500/20 border border-indigo-400/40"
@@ -119,7 +127,7 @@
               >
                 Use as entry
               </button>
-              <button class="px-3 py-1 rounded-full text-xs bg-white/10 border border-white/10" @click="voiceTranscript = ''">
+              <button class="px-3 py-1 rounded-full text-xs bg-white/10 border border-white/10" @click="clearVoiceCapture">
                 Clear
               </button>
             </div>
@@ -195,6 +203,39 @@
             </div>
             <span class="text-xs text-indigo-200">({{ filteredLogs.length }})</span>
           </div>
+          <div class="flex flex-wrap items-center gap-2 text-xs text-indigo-100 mb-3">
+            <button
+              class="px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/40 hover:bg-indigo-500/30 transition disabled:opacity-60"
+              :disabled="!filteredLogs.length || isLoadingTrack"
+              @click="togglePlayAll"
+            >
+              {{ isPlaying ? 'Pause' : 'Play all' }}
+            </button>
+            <button
+              class="px-3 py-1 rounded-full bg-white/10 border border-white/10 hover:bg-white/20 transition disabled:opacity-50"
+              :disabled="!canSkipPrev || isLoadingTrack"
+              @click="playPrevious"
+            >
+              ⏮ Prev
+            </button>
+            <button
+              class="px-3 py-1 rounded-full bg-white/10 border border-white/10 hover:bg-white/20 transition disabled:opacity-50"
+              :disabled="!canSkipNext || isLoadingTrack"
+              @click="playNext"
+            >
+              Next ⏭
+            </button>
+            <button
+              class="px-3 py-1 rounded-full bg-white/10 border border-white/10 hover:bg-white/20 transition"
+              @click="toggleOrder"
+            >
+              {{ playbackOrderLabel }}
+            </button>
+            <span v-if="nowPlayingEntry" class="text-[11px] text-indigo-200 truncate flex-1 min-w-0">
+              Now playing: {{ nowPlayingEntry.summary || nowPlayingEntry.text?.slice(0, 80) }}
+            </span>
+            <span v-if="playbackError" class="text-[11px] text-rose-300">{{ playbackError }}</span>
+          </div>
           <div class="space-y-3 max-h-[480px] overflow-y-auto pr-1 scrollbar-plan">
             <div
               v-for="log in filteredLogs"
@@ -218,6 +259,23 @@
                 <span class="px-2 py-1 rounded-full bg-white/5 border border-white/10" v-for="tag in log.tags || []" :key="tag">
                   #{{ tag }}
                 </span>
+              </div>
+              <div class="mt-2 flex items-center gap-2 text-[11px] text-indigo-200">
+                <button
+                  class="px-3 py-1 rounded-full bg-indigo-500/15 border border-indigo-400/40 hover:bg-indigo-500/25 transition text-xs"
+                  :disabled="isLoadingTrack"
+                  @click="toggleEntryPlayback(log)"
+                >
+                  <span v-if="isEntryPlaying(log)">⏸ Pause</span>
+                  <span v-else>▶ Play</span>
+                </button>
+                <span
+                  class="px-2 py-1 rounded-full border"
+                  :class="log.audioUrl ? 'border-emerald-300/50 text-emerald-200' : 'border-indigo-300/50 text-indigo-200'"
+                >
+                  {{ log.audioUrl ? 'Voice' : 'TTS on play' }}
+                </span>
+                <span v-if="isEntryPlaying(log)" class="text-emerald-300">Now playing</span>
                 <button class="ml-auto text-indigo-300 hover:text-white text-xs" @click="openEntry(log)">View full</button>
               </div>
             </div>
@@ -285,15 +343,22 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useAuthStore } from '@/stores/authStore'
-import { fetchEntries, saveEntryToFirebase } from '@/services/firebaseService'
+import {
+  addTaskToFirebase,
+  fetchEntries,
+  saveEntryToFirebase,
+  updateJournalEntry,
+  uploadJournalAudio,
+} from '@/services/firebaseService'
 import { enhanceJournal } from '@/services/aiService'
 import VoiceRecorder from '@/components/VoiceRecorder.vue'
 import { ElNotification } from 'element-plus'
 import { nlpClient } from '@/services/leader/http'
-import { addTaskToFirebase } from '@/services/firebaseService'
 import { uploadImageForVision } from '@/services/visionUploadService'
+import { useWorkspaceStore } from '@/stores/workspaceStore'
+import { requestSpeechUrl } from '@/services/ttsService'
 
 const authStore = useAuthStore()
 const userName = computed(() => authStore?.user?.displayName || 'friend')
@@ -306,11 +371,14 @@ const moodOptions = [
   { emoji: '☀', label: 'Hopeful', score: 4, class: 'bg-gradient-to-r from-yellow-200/60 to-amber-300/50 border border-amber-100/60' },
 ]
 
+const workspaceStore = useWorkspaceStore()
+
 const entryText = ref('')
 const enhancedText = ref('')
 const logs = ref([])
 const selectedMood = ref(null)
 const voiceTranscript = ref('')
+const pendingAudio = ref(null)
 const tagSuggestions = ['gratitude', 'focus', 'relationships', 'health', 'learning']
 const drawerOpen = ref(false)
 const activeEntry = ref(null)
@@ -320,13 +388,58 @@ const captureLoading = ref(false)
 const captureError = ref('')
 const captureImageName = ref('')
 const fileInput = ref(null)
+const playbackOrder = ref('desc') // desc = newest first
+const playbackQueue = ref([])
+const currentTrackIndex = ref(-1)
+const isLoadingTrack = ref(false)
+const isPlaying = ref(false)
+const playbackError = ref('')
+const audioEl = ref(null)
 
 onMounted(async () => {
-  logs.value = await fetchEntries()
+  audioEl.value = new Audio()
+  audioEl.value.addEventListener('ended', handleTrackEnded)
+  audioEl.value.addEventListener('pause', () => {
+    isPlaying.value = false
+  })
+  audioEl.value.addEventListener('play', () => {
+    isPlaying.value = true
+  })
+  audioEl.value.addEventListener('error', () => {
+    playbackError.value = 'Audio failed to load.'
+  })
+
+  try {
+    logs.value = await fetchEntries()
+  } catch (err) {
+    console.error('Failed to load entries', err)
+    logs.value = []
+  }
+})
+
+onBeforeUnmount(() => {
+  if (audioEl.value) {
+    audioEl.value.pause()
+    audioEl.value.removeEventListener('ended', handleTrackEnded)
+  }
 })
 
 const filteredLogs = computed(() =>
-  [...logs.value].sort((a, b) => (b.timestamp || b.createdAt || 0) - (a.timestamp || a.createdAt || 0)),
+  [...logs.value].sort((a, b) => entryTimestamp(b) - entryTimestamp(a)),
+)
+const orderedLogsForPlayback = computed(() =>
+  playbackOrder.value === 'asc' ? [...filteredLogs.value].reverse() : filteredLogs.value,
+)
+const nowPlayingEntry = computed(() =>
+  playbackQueue.value[currentTrackIndex.value] || null,
+)
+const playingEntryId = computed(() => nowPlayingEntry.value?.id || null)
+const playbackOrderLabel = computed(() =>
+  playbackOrder.value === 'asc' ? 'Oldest → Newest' : 'Newest → Oldest',
+)
+const canSkipPrev = computed(() => currentTrackIndex.value > 0)
+const canSkipNext = computed(
+  () => currentTrackIndex.value >= 0 && currentTrackIndex.value < playbackQueue.value.length - 1,
 )
 
 const streak = computed(() => computeStreak(filteredLogs.value))
@@ -362,12 +475,34 @@ const insights = computed(() => {
   ]
 })
 
+function entryTimestamp(entry = {}) {
+  const raw = entry?.timestamp || entry?.createdAt || entry?.date
+  if (raw?.seconds) return raw.seconds * 1000 + Math.floor((raw.nanoseconds || 0) / 1e6)
+  const num = Number(raw)
+  if (Number.isFinite(num)) return num
+  const dateObj = raw instanceof Date ? raw : new Date(raw || Date.now())
+  const ms = dateObj.getTime()
+  return Number.isFinite(ms) ? ms : Date.now()
+}
+
 function selectMood(mood) {
   selectedMood.value = mood
 }
 
-function handleTranscript(text) {
-  voiceTranscript.value = text
+function handleTranscript(text, meta = {}) {
+  voiceTranscript.value = text || ''
+  if (meta?.audioBlob) {
+    pendingAudio.value = {
+      blob: meta.audioBlob,
+      mimeType: meta.mimeType || 'audio/webm',
+      durationSeconds: meta.durationSeconds || 0,
+    }
+  }
+}
+
+function clearVoiceCapture() {
+  voiceTranscript.value = ''
+  pendingAudio.value = null
 }
 
 function appendTag(tag) {
@@ -376,29 +511,71 @@ function appendTag(tag) {
 }
 
 async function saveEntry() {
-  if (!entryText.value.trim()) return
-  const enhanced = await enhanceJournal(entryText.value)
-  enhancedText.value = enhanced
+  const baseText = entryText.value.trim() || voiceTranscript.value.trim()
+  if (!baseText) return
+
+  let enhanced = ''
+  try {
+    enhanced = await enhanceJournal(baseText)
+    enhancedText.value = enhanced
+  } catch (err) {
+    console.warn('Enhance journal failed; using raw text', err)
+  }
+
+  let uploadedAudio = null
+  if (pendingAudio.value?.blob) {
+    try {
+      uploadedAudio = await uploadJournalAudio(pendingAudio.value.blob, {
+        mimeType: pendingAudio.value.mimeType,
+      })
+    } catch (err) {
+      console.warn('Audio upload failed', err)
+      ElNotification({
+        title: 'Voice upload skipped',
+        message: 'Saved your entry, but the voice clip could not be uploaded.',
+        type: 'warning',
+      })
+    }
+  }
+
   const timestamp = Date.now()
+  const finalText = enhanced || baseText
+  const summaryText = finalText.length > 140 ? `${finalText.slice(0, 140)}…` : finalText
   const entry = {
     id: crypto.randomUUID?.() || timestamp,
-    text: enhanced || entryText.value,
+    text: finalText,
     mood: selectedMood.value,
     timestamp,
     createdAt: timestamp,
     tags: tagSuggestions.slice(0, 2),
-    summary: (enhanced || entryText.value).slice(0, 100) + '…',
+    summary: summaryText,
+    audioUrl: uploadedAudio?.url || null,
+    audioStoragePath: uploadedAudio?.path || null,
+    audioType: pendingAudio.value?.mimeType || null,
+    audioDuration: pendingAudio.value?.durationSeconds || null,
+    source: pendingAudio.value ? 'voice' : 'text',
   }
-  await saveEntryToFirebase(entry)
-  logs.value = [entry, ...logs.value]
-  entryText.value = ''
-  voiceTranscript.value = ''
-  selectedMood.value = null
-  ElNotification({ title: 'Saved', message: 'Your reflection was saved 💫', type: 'success' })
+  try {
+    const res = await saveEntryToFirebase(entry)
+    const saved = { ...entry, id: res?.id || entry.id }
+    logs.value = [saved, ...logs.value]
+    entryText.value = ''
+    voiceTranscript.value = ''
+    pendingAudio.value = null
+    selectedMood.value = null
+    ElNotification({ title: 'Saved', message: 'Your reflection was saved 💫', type: 'success' })
+  } catch (err) {
+    console.error('Save entry failed', err)
+    ElNotification({
+      title: 'Save failed',
+      message: err?.message || 'Could not save your entry. Please try again.',
+      type: 'error',
+    })
+  }
 }
 
 function formatDate(ms) {
-  const d = new Date(ms)
+  const d = new Date(entryTimestamp({ timestamp: ms }))
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', weekday: 'short' })
 }
 
@@ -423,7 +600,7 @@ function dominantMood(list = []) {
 
 function computeStreak(list = []) {
   if (!list.length) return 0
-  const dates = new Set(list.map((l) => new Date(l.timestamp).toDateString()))
+  const dates = new Set(list.map((l) => new Date(entryTimestamp(l)).toDateString()))
   let streakCount = 0
   let day = new Date()
   while (dates.has(day.toDateString())) {
@@ -435,7 +612,7 @@ function computeStreak(list = []) {
 
 function computeLongestStreak(list = []) {
   if (!list.length) return 0
-  const dates = [...new Set(list.map((l) => new Date(l.timestamp).toDateString()))].sort(
+  const dates = [...new Set(list.map((l) => new Date(entryTimestamp(l)).toDateString()))].sort(
     (a, b) => new Date(a) - new Date(b),
   )
   let longest = 1
@@ -452,6 +629,155 @@ function computeLongestStreak(list = []) {
     }
   }
   return longest
+}
+
+async function resolveEntryAudio(entry) {
+  if (!entry) throw new Error('No entry to play.')
+  if (entry.audioUrl) return { url: entry.audioUrl, kind: 'voice' }
+  if (entry.ttsUrl) return { url: entry.ttsUrl, kind: 'tts' }
+
+  const text = String(entry.text || '').trim()
+  if (!text) throw new Error('No text available to speak.')
+
+  const trimmed = text.length > 1200 ? text.slice(0, 1200) : text
+  let tts = null
+  try {
+    tts = await requestSpeechUrl(trimmed)
+  } catch (err) {
+    const reason = err?.response?.data?.error || err?.message || 'Unable to generate audio.'
+    throw new Error(reason)
+  }
+  if (tts?.url) {
+    entry.ttsUrl = tts.url
+    if (entry.id) {
+      updateJournalEntry(entry.id, { ttsUrl: tts.url }).catch((err) =>
+        console.warn('Persisting TTS url failed', err),
+      )
+    }
+    return { url: tts.url, kind: 'tts' }
+  }
+  throw new Error('Unable to generate audio for this entry.')
+}
+
+async function startEntryPlayback(entry) {
+  if (!entry || !audioEl.value) return
+  isLoadingTrack.value = true
+  playbackError.value = ''
+  try {
+    const source = await resolveEntryAudio(entry)
+    if (!source?.url) throw new Error('Audio unavailable for this entry.')
+    audioEl.value.src = source.url
+    await audioEl.value.play()
+    isPlaying.value = true
+  } catch (err) {
+    playbackError.value = err?.message || 'Playback failed.'
+    isPlaying.value = false
+    if (canSkipNext.value) {
+      await playNext()
+    }
+  } finally {
+    isLoadingTrack.value = false
+  }
+}
+
+async function playCurrentFromQueue() {
+  const entry = playbackQueue.value[currentTrackIndex.value]
+  if (entry) {
+    await startEntryPlayback(entry)
+  }
+}
+
+async function toggleEntryPlayback(entry) {
+  if (!entry) return
+  playbackError.value = ''
+  const queue = [...orderedLogsForPlayback.value]
+  playbackQueue.value = queue
+  const idx = queue.findIndex((l) => l.id === entry.id)
+  currentTrackIndex.value = idx >= 0 ? idx : 0
+  if (playingEntryId.value === entry.id && isPlaying.value) {
+    pausePlayback()
+  } else {
+    await playCurrentFromQueue()
+  }
+}
+
+async function togglePlayAll() {
+  playbackError.value = ''
+  if (isPlaying.value && playbackQueue.value.length) {
+    pausePlayback()
+    return
+  }
+
+  if (playbackQueue.value.length && currentTrackIndex.value >= 0) {
+    await resumePlayback()
+    return
+  }
+
+  playbackQueue.value = [...orderedLogsForPlayback.value]
+  currentTrackIndex.value = playbackQueue.value.length ? 0 : -1
+  await playCurrentFromQueue()
+}
+
+function pausePlayback() {
+  if (audioEl.value) {
+    audioEl.value.pause()
+  }
+  isPlaying.value = false
+}
+
+async function resumePlayback() {
+  if (!audioEl.value) return
+  if (!audioEl.value.src) {
+    await playCurrentFromQueue()
+  } else {
+    try {
+      await audioEl.value.play()
+      isPlaying.value = true
+    } catch (err) {
+      playbackError.value = err?.message || 'Playback failed.'
+    }
+  }
+}
+
+async function playNext() {
+  playbackError.value = ''
+  if (!canSkipNext.value) {
+    isPlaying.value = false
+    return
+  }
+  currentTrackIndex.value += 1
+  await playCurrentFromQueue()
+}
+
+async function playPrevious() {
+  playbackError.value = ''
+  if (!canSkipPrev.value) return
+  currentTrackIndex.value -= 1
+  await playCurrentFromQueue()
+}
+
+function handleTrackEnded() {
+  if (canSkipNext.value) {
+    playNext()
+  } else {
+    isPlaying.value = false
+  }
+}
+
+function toggleOrder() {
+  playbackOrder.value = playbackOrder.value === 'asc' ? 'desc' : 'asc'
+  if (playbackQueue.value.length) {
+    const activeId = playingEntryId.value
+    playbackQueue.value = [...orderedLogsForPlayback.value]
+    if (activeId) {
+      const idx = playbackQueue.value.findIndex((l) => l.id === activeId)
+      currentTrackIndex.value = idx >= 0 ? idx : currentTrackIndex.value
+    }
+  }
+}
+
+function isEntryPlaying(entry) {
+  return playingEntryId.value && playingEntryId.value === entry?.id && isPlaying.value
 }
 
 function onFileChange(e) {

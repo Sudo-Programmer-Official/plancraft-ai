@@ -11,6 +11,8 @@ import mediaRoutes from './routes/mediaRoutes.js'
 import publishRoutes from './routes/publishRoutes.js'
 import boardRoutes from './routes/boardRoutes.js'
 import validationRoutes from './routes/validationRoutes.js'
+import profileRoutes from './routes/profileRoutes.js'
+import autopilotRoutes from './routes/autopilotRoutes.js'
 import { errorHandler } from './utils/errorHandler.js'
 import { verifyAuth } from './utils/auth.js'
 
@@ -78,6 +80,8 @@ basePaths.forEach((base) => {
   app.use(base, verifyAuth, publishRoutes)
   app.use(base, verifyAuth, boardRoutes)
   app.use(base, verifyAuth, validationRoutes)
+  app.use(base, verifyAuth, profileRoutes)
+  app.use(base, verifyAuth, autopilotRoutes)
 })
 
 app.use(errorHandler)

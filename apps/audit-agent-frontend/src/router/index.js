@@ -143,6 +143,7 @@ const router = createRouter({
         { path: 'repurpose', name: 'creator-repurpose', component: () => import('@/views/creator/CreatorRepurpose.vue') },
         { path: 'preview/:id', name: 'creator-preview', component: () => import('@/views/creator/CreatorPreview.vue') },
         { path: 'publish/:id', name: 'creator-publish', component: () => import('@/views/creator/CreatorPublish.vue') },
+        { path: 'profile', name: 'creator-profile', component: () => import('@/views/creator/CreatorProfile.vue') },
       ],
     },
 

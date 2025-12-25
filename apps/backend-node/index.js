@@ -102,6 +102,8 @@ import { attachAuth } from "./middleware/auth.js";
 import twilioRoutes from "./routes/twilioRoutes.js";
 import googleAuthRoutes, { handleOAuthCallback } from "./routes/googleAuthRoutes.js";
 import googleCalendarRoutes from "./routes/googleCalendarRoutes.js";
+import discordRoutes, { handleDiscordOAuthCallback } from "./routes/discordRoutes.js";
+import outlookRoutes, { handleOutlookOAuthCallback } from "./routes/outlookRoutes.js";
 import notifyRouter from "./routes/notifyRouter.js";
 import plannerRoutes from "./routes/plannerRoutes.js";
 import talkToPlannerRoutes from "./routes/talkToPlannerRoutes.js";
@@ -238,6 +240,12 @@ app.get('/api/google-calendar/callback', handleOAuthCallback)
 // Also expose root-level aliases to avoid any /api middleware interference on some hosts
 app.get('/google/oauth/callback', handleOAuthCallback)
 app.get('/google-calendar/callback', handleOAuthCallback)
+// Outlook OAuth callbacks
+app.get('/api/outlook/oauth/callback', handleOutlookOAuthCallback)
+app.get('/outlook/oauth/callback', handleOutlookOAuthCallback)
+// Discord OAuth callbacks
+app.get('/api/discord/oauth/callback', handleDiscordOAuthCallback)
+app.get('/discord/oauth/callback', handleDiscordOAuthCallback)
 
 // Lightweight trace logger for Google OAuth routes (enable with GOOGLE_OAUTH_DEBUG=1)
 if (String(process.env.GOOGLE_OAUTH_DEBUG || '').toLowerCase() === '1' || String(process.env.GOOGLE_OAUTH_DEBUG || '').toLowerCase() === 'true') {
@@ -296,6 +304,8 @@ app.use("/", seoRoutes);
 // Mount Google routes (guarded internally by feature flag)
 app.use("/api", googleAuthRoutes);
 app.use("/api", googleCalendarRoutes);
+app.use("/api", outlookRoutes);
+app.use("/api", discordRoutes);
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {

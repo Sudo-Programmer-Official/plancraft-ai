@@ -6,6 +6,7 @@ const DEFAULT_PREFS = {
   enable_pwa: true,
   enable_voice: true,
   enable_sms: false,
+  enable_discord: false,
 }
 
 function coerceBoolean(value) {
@@ -50,6 +51,7 @@ function applyFromSource(prefs, source) {
   applyFlag(prefs, 'enable_pwa', source.enable_pwa ?? source.pwa ?? source.push ?? source.enable_push)
   applyFlag(prefs, 'enable_voice', source.enable_voice ?? source.voice ?? source.enable_voice_call ?? source.voice_call)
   applyFlag(prefs, 'enable_sms', source.enable_sms ?? source.sms ?? source.text)
+  applyFlag(prefs, 'enable_discord', source.enable_discord ?? source.discord)
 }
 
 export async function getUserPrefs(userId) {
@@ -99,6 +101,7 @@ export async function getUserPrefs(userId) {
     if (channelSet.has('pwa') && prefs.enable_pwa !== false) prefs.enable_pwa = true
     if (channelSet.has('voice') && prefs.enable_voice !== false) prefs.enable_voice = true
     if (channelSet.has('sms') && prefs.enable_sms !== false) prefs.enable_sms = true
+    if (channelSet.has('discord') && prefs.enable_discord !== false) prefs.enable_discord = true
   }
 
   return prefs

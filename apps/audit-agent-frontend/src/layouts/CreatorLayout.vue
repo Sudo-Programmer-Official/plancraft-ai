@@ -13,6 +13,7 @@
         <CreatorNavButton to="/creator/calendar" icon="📆" label="Calendar" />
         <CreatorNavButton to="/creator/repurpose" icon="♻️" label="Repurpose" />
         <CreatorNavButton to="/creator/editor/new" icon="✍️" label="Editor" />
+        <CreatorNavButton to="/creator/profile" icon="🧠" label="Profile" />
       </nav>
       <div class="p-3 border-t border-slate-800">
         <button

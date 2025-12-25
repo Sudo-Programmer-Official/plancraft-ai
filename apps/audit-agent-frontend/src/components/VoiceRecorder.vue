@@ -103,7 +103,7 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['transcribed', 'state-change'])
+const emit = defineEmits(['transcribed', 'state-change', 'audio-ready'])
 
 const state = ref('idle') // idle | recording | transcribing | done
 const transcript = ref('')
@@ -112,6 +112,7 @@ let mediaRecorder = null
 let stream = null
 let timerId = null
 let recordedChunks = []
+let recorderMimeType = 'audio/webm'
 
 const formattedDuration = computed(() => {
   const seconds = Math.max(0, durationSeconds.value || 0)
@@ -155,7 +156,15 @@ async function startRecording() {
 
 function initRecorder() {
   if (!stream) return
-  const options = { mimeType: 'audio/webm;codecs=opus' }
+  const preferredTypes = [
+    'audio/mp4;codecs=mp4a.40.2',
+    'audio/mp4',
+    'audio/webm;codecs=opus',
+    'audio/webm',
+  ]
+  const mimeType = preferredTypes.find((t) => MediaRecorder.isTypeSupported(t)) || ''
+  recorderMimeType = mimeType || 'audio/webm'
+  const options = mimeType ? { mimeType } : undefined
   mediaRecorder = new MediaRecorder(stream, options)
   mediaRecorder.ondataavailable = (event) => {
     if (event?.data?.size) recordedChunks.push(event.data)
@@ -174,13 +183,20 @@ function stopRecording() {
 
 async function handleRecorderStop() {
   try {
-    const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'audio/webm' })
+    const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || recorderMimeType || 'audio/webm' })
     const text = await transcribeBlob(blob)
     transcript.value = text
     state.value = 'done'
     emit('state-change', state.value)
+    const meta = {
+      text,
+      audioBlob: blob,
+      mimeType: blob.type || mediaRecorder.mimeType || recorderMimeType || 'audio/webm',
+      durationSeconds: durationSeconds.value,
+    }
+    emit('audio-ready', meta)
     if (text) {
-      emit('transcribed', { text })
+      emit('transcribed', text, meta)
     } else {
       resetRecorder()
     }

@@ -15,11 +15,12 @@ import {
   limit,
   writeBatch,
 } from "firebase/firestore";
+import { getDownloadURL, getStorage, ref as storageRef, uploadBytes } from 'firebase/storage'
 import { signOut } from 'firebase/auth'
 import { ElMessageBox } from 'element-plus'
 import { toLocalDateKey } from "@/utils/dateHelper";
 import api from '@/services/api'
-import { db, auth } from '@/firebase/init'
+import firebaseApp, { db, auth } from '@/firebase/init'
 import { updateStreakOnEntry } from '@/services/streakService'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 
@@ -42,6 +43,28 @@ function currentWorkspaceId() {
 function resolveTasksRef() {
   // Shared task collection keyed by workspaceId
   return tasksRef
+}
+
+function randomId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
+  return Math.random().toString(36).slice(2, 10)
+}
+
+function inferAudioExtension(fileName = '', mimeType = '') {
+  const lowerName = String(fileName || '').toLowerCase()
+  if (lowerName.includes('.')) {
+    const ext = lowerName.split('.').pop()
+    if (ext) return ext
+  }
+  const type = String(mimeType || '').toLowerCase()
+  if (type.includes('mp3')) return 'mp3'
+  if (type.includes('wav')) return 'wav'
+  if (type.includes('ogg')) return 'ogg'
+  if (type.includes('mp4')) return 'mp4'
+  if (type.includes('m4a')) return 'm4a'
+  if (type.includes('aac')) return 'aac'
+  if (type.includes('webm')) return 'webm'
+  return 'webm'
 }
 
 function normalizeTaskDate(value) {
@@ -551,11 +574,15 @@ export async function saveEntryToFirebase(entry) {
     throw new Error("User not logged in");
   }
 
-  await safeAction(addDoc(journalRef, {
+  const timestamp = coerceTimestamp(entry?.timestamp) || Date.now()
+  const payload = {
     ...entry,
+    timestamp,
     userId: user.uid,
     createdAt: serverTimestamp(),
-  }));
+  }
+
+  const ref = await safeAction(addDoc(journalRef, payload));
 
   // Update streak based on this entry; fire-and-forget but surface confetti via event
   try {
@@ -569,6 +596,8 @@ export async function saveEntryToFirebase(entry) {
     // Non-fatal; do not block journal save
     console.warn('Streak update failed:', e?.message || e)
   }
+
+  return { id: ref.id }
 }
 
 /**
@@ -585,7 +614,54 @@ export async function fetchEntries() {
   );
 
   const snapshot = await safeAction(getDocs(q));
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+  return snapshot.docs.map(mapJournalEntryDoc);
+}
+
+export async function updateJournalEntry(entryId, updates = {}) {
+  const user = auth.currentUser
+  if (!user) throw new Error('User not logged in')
+  if (!entryId) throw new Error('Entry ID is required')
+
+  const ref = doc(db, 'journalEntries', entryId)
+  const payload = {
+    ...updates,
+    updatedAt: serverTimestamp(),
+  }
+  await safeAction(updateDoc(ref, payload))
+}
+
+export async function uploadJournalAudio(blob, options = {}) {
+  const user = auth.currentUser
+  if (!user) throw new Error('User not logged in')
+  if (!(blob instanceof Blob)) throw new Error('Audio blob is required')
+
+  const storage = getStorage(firebaseApp)
+  const ext = inferAudioExtension(options.fileName || '', options.mimeType || blob.type)
+  const key = `journal-audio/${user.uid}/${Date.now()}-${randomId()}.${ext}`
+  const ref = storageRef(storage, key)
+
+  await uploadBytes(ref, blob, {
+    contentType: options.mimeType || blob.type || 'audio/webm',
+    cacheControl: 'public,max-age=31536000',
+  })
+  const url = await getDownloadURL(ref)
+  return { url, path: key }
+}
+
+function mapJournalEntryDoc(docSnap) {
+  const data = docSnap.data() || {}
+  const ts = coerceTimestamp(data.timestamp || data.createdAt) || Date.now()
+  return {
+    id: docSnap.id,
+    ...data,
+    timestamp: ts,
+    createdAt: coerceTimestamp(data.createdAt) || ts,
+    audioUrl: data.audioUrl || data.voiceUrl || null,
+    audioStoragePath: data.audioStoragePath || data.audioPath || null,
+    audioType: data.audioType || data.voiceType || null,
+    audioDuration: data.audioDuration || null,
+    ttsUrl: data.ttsUrl || null,
+  }
 }
 
 /** 🔗 Link Management (workspace-scoped) */

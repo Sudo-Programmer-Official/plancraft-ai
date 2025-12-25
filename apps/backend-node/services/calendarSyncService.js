@@ -2,6 +2,7 @@ import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc.js";
 import timezone from "dayjs/plugin/timezone.js";
 import { ensureFreshAccessToken, getUserGoogleIntegration, saveUserGoogleIntegration } from "./googleOAuth.js";
+import { ensureFreshOutlookAccessToken, getUserOutlookIntegration, saveUserOutlookIntegration } from "./outlookOAuth.js";
 import { upsertIntegrationAccount, markIntegrationAccountSync } from "./integrationAccountService.js";
 import {
   upsertExternalEvent,
@@ -598,6 +599,174 @@ export async function syncMultipleGoogleAccounts(userIds = []) {
   for (const userId of userIds) {
     try {
       const stats = await syncGoogleAccount(userId);
+      summary.push({ userId, ...stats });
+    } catch (err) {
+      summary.push({ userId, error: err?.message || String(err) });
+    }
+  }
+  return summary;
+}
+
+export async function syncOutlookAccount(userId, options = {}) {
+  const stats = {
+    calendars: 0,
+    eventsFetched: 0,
+    eventsUpserted: 0,
+    resetCount: 0,
+  };
+  const windowDays = options.windowDays || DEFAULT_WINDOW_DAYS;
+  const adapter = getCalendarAdapter("outlook_calendar");
+  if (!adapter) throw new Error("No calendar adapter configured for Outlook Calendar");
+
+  const baseIntegration = await getUserOutlookIntegration(userId);
+  const userSnap = await db.collection("users").doc(String(userId)).get();
+  const userData = userSnap.exists ? userSnap.data() || {} : {};
+  const meetingPref = userData?.preferences?.meetings || {};
+  const meetingSettings = {
+    autoCreate: meetingPref.autoCreateCalendarTasks !== false,
+    defaultReminderMinutes:
+      clampMinutes(
+        meetingPref.defaultReminderMinutes ??
+          meetingPref.defaultMeetingReminderMinutes ??
+          DEFAULT_REMINDER_MINUTES,
+      ) ?? DEFAULT_REMINDER_MINUTES,
+    userTimezone:
+      userData?.timezone ||
+      userData?.tz ||
+      userData?.profile?.timezone ||
+      userData?.preferences?.timezone ||
+      userData?.settings?.timezone ||
+      "UTC",
+  };
+
+  const availableAccounts = Array.isArray(baseIntegration?.accounts)
+    ? baseIntegration.accounts.filter((a) => a.connected !== false && (a.token?.access_token || a.token?.refresh_token))
+    : [];
+  const targetAccountId = options.accountId || null;
+  const accountsToSync = targetAccountId
+    ? availableAccounts.filter((a) => String(a.accountId) === String(targetAccountId))
+    : availableAccounts;
+
+  if (!accountsToSync.length) {
+    throw new Error("No connected Outlook account found");
+  }
+
+  for (const account of accountsToSync) {
+    const accountId = account.accountId || "primary";
+    const { tokens, account: freshAccount } = await ensureFreshOutlookAccessToken(userId, accountId);
+    const activeAccount = freshAccount || account;
+    const accountWindowDays = Number.isFinite(activeAccount?.sync?.windowDays)
+      ? Number(activeAccount.sync.windowDays)
+      : windowDays;
+
+    await upsertIntegrationAccount({
+      userId,
+      provider: "outlook_calendar",
+      accountId,
+      accountEmail: activeAccount?.accountEmail || null,
+      accessToken: tokens?.access_token || null,
+      refreshToken: tokens?.refresh_token || null,
+      tokenExpiry: tokens?.expiry_date || null,
+      metadata: {
+        calendars: activeAccount?.calendars || [],
+        sync: activeAccount?.sync || {},
+      },
+    });
+
+    const calendars = Array.isArray(activeAccount?.calendars)
+      ? activeAccount.calendars.filter((c) => c.selected !== false)
+      : [];
+    const calendarsToSync = calendars.length
+      ? calendars
+      : [
+          {
+            id: "primary",
+            summary: "Outlook Calendar",
+            selected: true,
+            timeZone: activeAccount?.timeZone || activeAccount?.timezone || null,
+          },
+        ];
+
+    const perCalSync = { ...(activeAccount?.sync?.perCal || {}) };
+
+    for (const calendar of calendarsToSync) {
+      try {
+        const syncToken = options.forceFull ? null : perCalSync?.[calendar.id]?.syncToken || null;
+        const result = await adapter.fetchEvents(tokens.access_token, { ...calendar, accountId }, {
+          windowDays: accountWindowDays,
+          syncToken,
+        });
+        stats.calendars += 1;
+        stats.eventsFetched += result.events.length;
+        if (result.reset) {
+          stats.resetCount += 1;
+          perCalSync[calendar.id] = { syncToken: null, lastFullSync: null };
+          continue;
+        }
+        for (const ev of result.events) {
+          const normalized = adapter.normalizeEvent(ev, { ...calendar, accountId });
+          await upsertExternalEvent(userId, "outlook_calendar", normalized);
+          stats.eventsUpserted += 1;
+        }
+        perCalSync[calendar.id] = {
+          ...(perCalSync[calendar.id] || {}),
+          syncToken: result.nextSyncToken || null,
+          lastFullSync:
+            perCalSync[calendar.id]?.lastFullSync ||
+            (syncToken ? perCalSync[calendar.id]?.lastFullSync : new Date().toISOString()),
+        };
+        await markIntegrationAccountSync(userId, "outlook_calendar", accountId, {
+          syncToken: result.nextSyncToken || null,
+          status: "ok",
+          lastSyncAt: new Date().toISOString(),
+        });
+      } catch (err) {
+        log(`user=${userId} account=${accountId} calendar=${calendar.id} failed:`, err?.message || err);
+        perCalSync[calendar.id] = {
+          ...(perCalSync[calendar.id] || {}),
+          error: err?.message || "sync_failed",
+        };
+        await markIntegrationAccountSync(userId, "outlook_calendar", accountId, {
+          syncToken: perCalSync[calendar.id]?.syncToken || null,
+          status: "error",
+        });
+      }
+    }
+
+    const updatedAccount = {
+      ...activeAccount,
+      accountId,
+      sync: {
+        ...(activeAccount?.sync || {}),
+        perCal: perCalSync,
+        lastRun: dayjs().toISOString(),
+        status: "ok",
+      },
+    };
+
+    const updatedIntegration = {
+      ...(await getUserOutlookIntegration(userId)),
+    };
+    updatedIntegration.accounts = Array.isArray(updatedIntegration.accounts)
+      ? updatedIntegration.accounts.map((a) => (String(a.accountId) === String(accountId) ? updatedAccount : a))
+      : [updatedAccount];
+    updatedIntegration.connected = updatedIntegration.accounts.some((a) => a.connected);
+    await saveUserOutlookIntegration(userId, updatedIntegration);
+  }
+
+  const taskStats = await syncEventsToTasksFromStore(userId, {
+    provider: "outlook_calendar",
+    windowDays,
+    meetingSettings,
+  });
+  return { ...stats, ...taskStats };
+}
+
+export async function syncMultipleOutlookAccounts(userIds = []) {
+  const summary = [];
+  for (const userId of userIds) {
+    try {
+      const stats = await syncOutlookAccount(userId);
       summary.push({ userId, ...stats });
     } catch (err) {
       summary.push({ userId, error: err?.message || String(err) });

@@ -23,6 +23,7 @@ export async function proxyAi(type, payload, options = {}) {
   const typeMap = {
     repurpose: 'generate/repurpose',
     hook: 'generate/hook',
+    ideas: 'generate/ideas',
     reel_script: 'generate/reel-script',
     story_frames: 'generate/story-frame',
     thread: 'generate/tweet-thread',

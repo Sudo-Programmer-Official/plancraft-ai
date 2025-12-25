@@ -5,6 +5,7 @@ import { initReportScheduler } from "../jobs/reportScheduler.js"
 import { initHabitAnalyticsScheduler } from "../jobs/habitAnalyticsScheduler.js"
 import { initMorningCoach } from "../jobs/morningCoach.js"
 import { initGoogleCalendarSync } from "../jobs/googleCalendarSyncJob.js"
+import { initOutlookCalendarSync } from "../jobs/outlookCalendarSyncJob.js"
 import { initSitemapJob } from "../jobs/sitemapJob.js"
 import { initRetentionJob } from "../jobs/retentionJob.js"
 
@@ -46,6 +47,7 @@ export async function initScheduler() {
   try { initHabitAnalyticsScheduler() } catch (e) { console.warn('Habit analytics init failed', e) }
   try { initMorningCoach() } catch (e) { console.warn('Morning coach init failed', e) }
   try { initGoogleCalendarSync() } catch (e) { console.warn('Google calendar sync init failed', e) }
+  try { initOutlookCalendarSync() } catch (e) { console.warn('Outlook calendar sync init failed', e) }
   try { initSitemapJob() } catch (e) { console.warn('Sitemap job init failed', e) }
   try { initRetentionJob() } catch (e) { console.warn('Retention job init failed', e) }
 }
