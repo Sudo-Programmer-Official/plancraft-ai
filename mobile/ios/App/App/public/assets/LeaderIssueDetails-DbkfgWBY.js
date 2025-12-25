@@ -1,0 +1,1 @@
+import{aP as t,d as a,e as s,z as l}from"./index-Bk6ni3fC.js";const o={},c={class:"min-h-screen bg-slate-950 text-slate-100 p-6"};function r(n,e){return l(),a("div",c,e[0]||(e[0]=[s("h1",{class:"text-2xl font-bold"},"Issue Details",-1),s("p",{class:"text-slate-400 text-sm"},"Details for a selected issue.",-1)]))}const i=t(o,[["render",r]]);export{i as default};

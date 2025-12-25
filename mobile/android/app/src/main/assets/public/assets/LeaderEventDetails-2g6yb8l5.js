@@ -1,0 +1,1 @@
+import{aP as s,d as a,e as t,z as n}from"./index-Bk6ni3fC.js";const l={},o={class:"min-h-screen bg-slate-950 text-slate-100 p-6"};function c(r,e){return n(),a("div",o,e[0]||(e[0]=[t("h1",{class:"text-2xl font-bold"},"Event Details",-1),t("p",{class:"text-slate-400 text-sm"},"Details for a selected event.",-1)]))}const i=s(l,[["render",c]]);export{i as default};

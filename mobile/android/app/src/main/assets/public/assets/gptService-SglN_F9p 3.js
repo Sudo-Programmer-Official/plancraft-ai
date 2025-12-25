@@ -1,0 +1,1 @@
+import{B as o}from"./index-Bk6ni3fC.js";async function s(a,i={}){if(!a)throw new Error("Missing userId");const n={userId:a};i.ttlMinutes&&(n.ttlMinutes=i.ttlMinutes);const t=await o.post("/gpt/auth/link",n);return(t==null?void 0:t.data)||{}}export{s as c};
