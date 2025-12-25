@@ -16,10 +16,12 @@ import {
   setPersistence,
   browserLocalPersistence,
   GoogleAuthProvider,
+  OAuthProvider,
   signInWithPopup,
   linkWithPopup,
   linkWithCredential,
   signInWithRedirect,
+  linkWithRedirect,
   getRedirectResult,
   signInWithPhoneNumber,
   signInWithEmailAndPassword,
@@ -34,6 +36,7 @@ import { doc, updateDoc, setDoc, onSnapshot } from 'firebase/firestore'
 import { db } from '@/firebase/init'
 import { ElNotification } from 'element-plus'
 import { clearAppToken } from '@/services/appTokenService'
+import { Capacitor } from '@capacitor/core'
 
 const auth = getAuth(firebaseApp)
 setPersistence(auth, browserLocalPersistence)
@@ -42,6 +45,14 @@ setPersistence(auth, browserLocalPersistence)
 function isInAppBrowser() {
   const ua = navigator.userAgent || navigator.vendor || window.opera
   return /FBAN|FBAV|Instagram|LinkedInApp|Twitter/i.test(ua)
+}
+
+function isIosCapacitorApp() {
+  try {
+    return Capacitor?.getPlatform?.() === 'ios'
+  } catch {
+    return false
+  }
 }
 
 export const useAuthStore = defineStore('authStore', {
@@ -446,12 +457,136 @@ export const useAuthStore = defineStore('authStore', {
       }
     },
 
+    // 🍎 Sign in with Apple (iOS-only button will call this)
+    async loginWithApple() {
+      this.loading = true
+      try {
+        const provider = new OAuthProvider('apple.com')
+        provider.addScope('email')
+        provider.addScope('name')
+
+        const shouldRedirect = (() => {
+          if (isIosCapacitorApp()) return true
+          const ua = navigator.userAgent || ''
+          const isIOS = /iP(hone|ad|od)/i.test(ua)
+          const isSafari = /safari/i.test(ua) && !/crios|fxios|edgios|chrome/i.test(ua)
+          const isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone
+          return isIOS || isSafari || isStandalone
+        })()
+
+        const current = auth.currentUser
+        const alreadyLinked = (current?.providerData || []).some((p) => p?.providerId === 'apple.com')
+        if (alreadyLinked) {
+          ElNotification({
+            title: 'Apple already connected',
+            message: 'Your Apple account is already linked.',
+            type: 'info',
+            duration: 2000,
+            offset: 80,
+          })
+          return current
+        }
+
+        let result = null
+        if (current) {
+          try {
+            result = await linkWithPopup(current, provider)
+          } catch (err) {
+            const code = String(err?.code || '')
+            const popupIssues = code.includes('popup') || code === 'auth/operation-not-supported-in-this-environment'
+            if (shouldRedirect && popupIssues) {
+              await linkWithRedirect(current, provider)
+              return
+            }
+            console.warn('[Auth] Apple link failed; aborting to avoid duplicate accounts', err)
+            throw err
+          }
+        } else {
+          try {
+            result = await signInWithPopup(auth, provider)
+          } catch (err) {
+            const code = String(err?.code || '')
+            const popupIssues = code.includes('popup') || code === 'auth/operation-not-supported-in-this-environment'
+            if (shouldRedirect && popupIssues) {
+              await signInWithRedirect(auth, provider)
+              return
+            }
+            throw err
+          }
+        }
+
+        const user = result?.user
+        if (!user?.uid) throw new Error('Apple sign-in failed')
+
+        await setDoc(
+          doc(db, 'users', user.uid),
+          {
+            email: user.email || null,
+            name: user.displayName || '',
+            mode: 'apple',
+            lastLoginAt: Date.now(),
+            profileComplete: !!(user.displayName),
+          },
+          { merge: true },
+        )
+
+        const profile = await fetchUserProfile(user.uid)
+        this.user = {
+          uid: user.uid,
+          displayName: user.displayName || profile?.name || '',
+          email: user.email || profile?.email || null,
+          photoURL: user.photoURL || null,
+          role: profile?.role || this.user?.role || 'user',
+        }
+        this.guest = false
+        this.token = await user.getIdToken()
+        localStorage.setItem('user', JSON.stringify(this.user))
+        localStorage.setItem('token', this.token)
+        try {
+          if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
+            const mod = await import('@/services/appTokenService.js')
+            mod.refreshAppToken().catch(() => {})
+          }
+        } catch {}
+        this.refreshPlan().catch(() => {})
+        ElNotification({
+          title: current ? 'Apple linked' : 'Welcome back ✨',
+          message: current ? 'Apple has been added to your account.' : `Signed in as ${this.user.displayName || this.user.email || 'User'}`,
+          type: 'success',
+          duration: 2400,
+          offset: 80,
+        })
+        return user
+      } finally {
+        this.loading = false
+      }
+    },
+
     // ✅ Handles post-redirect Google login
     async checkRedirectResult() {
       try {
         const result = await getRedirectResult(auth)
         if (result && result.user) {
           const user = result.user
+          try {
+            const providerId = result?.providerId || (result?.user?.providerData || [])[0]?.providerId
+            const mode = providerId === 'apple.com' ? 'apple' : providerId === 'google.com' ? 'google' : null
+            if (mode) {
+              await setDoc(
+                doc(db, 'users', user.uid),
+                {
+                  email: user.email,
+                  name: user.displayName || '',
+                  mode,
+                  lastLoginAt: Date.now(),
+                  profileComplete: !!(user.displayName),
+                },
+                { merge: true },
+              )
+            }
+          } catch (profileErr) {
+            console.warn('[Auth] Failed to upsert profile after redirect', profileErr)
+          }
           const profile = await fetchUserProfile(user.uid)
           this.user = {
             uid: user.uid,

@@ -32,6 +32,15 @@
                 Continue with Google
               </button>
               <button
+                v-if="isIosApp"
+                @click="loginApple"
+                :disabled="authStore.loading"
+                class="w-full flex items-center justify-center gap-3 bg-white text-gray-900 px-6 py-4 rounded-xl font-semibold shadow-lg hover:-translate-y-0.5 hover:shadow-2xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 disabled:opacity-70"
+              >
+                <img src="https://www.svgrepo.com/show/303128/apple-logo.svg" alt="Apple" class="w-5 h-5" />
+                Continue with Apple
+              </button>
+              <button
                 type="button"
                 :disabled="authStore.loading"
                 class="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-xl font-semibold border border-white/10 text-white hover:border-indigo-300/70 hover:bg-white/5 transition disabled:opacity-70"
@@ -160,11 +169,19 @@ import { useRouter, useRoute } from "vue-router"
 import { useAuthStore } from "@/stores/authStore"
 import LoginFeatureSlider from '@/components/LoginFeatureSlider.vue'
 import { useSeoMeta } from '@/composables/useSeoMeta'
+import { Capacitor } from '@capacitor/core'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const starsCanvas = ref(null)
+const isIosApp = computed(() => {
+  try {
+    return Capacitor?.getPlatform?.() === 'ios'
+  } catch {
+    return false
+  }
+})
 useSeoMeta({
   title: 'Login | PlanCraft AI',
   description: 'Sign in to PlanCraft AI to access AI planning, calendar sync, and voice reminders.',
@@ -203,6 +220,17 @@ async function loginGoogle() {
     console.warn('Google login failed; offering OTP fallback', err)
     showPhone.value = true
     try { ElMessage.info('Google sign-in unavailable. Try phone OTP.') } catch {}
+  }
+}
+
+async function loginApple() {
+  try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_SIGNIN_CLICK) } catch {}
+  try {
+    await authStore.loginWithApple()
+    if (authStore.user) redirectAfterLogin()
+  } catch (err) {
+    console.warn('Apple login failed', err)
+    try { ElMessage.info('Apple sign-in unavailable. Try another method.') } catch {}
   }
 }
 
