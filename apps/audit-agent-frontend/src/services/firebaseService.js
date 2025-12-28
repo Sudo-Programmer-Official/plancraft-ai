@@ -77,6 +77,56 @@ function mapTaskDoc(docSnap) {
   }
 }
 
+const INTERNAL_ASSERTION_PATTERN = /INTERNAL ASSERTION FAILED/i
+let attemptedFirestoreRecovery = false
+
+function looksLikeFirestoreInternalError(error) {
+  if (!error) return false
+  const code = error?.code
+  const message = String(error?.message || '')
+  return code === 'internal' || INTERNAL_ASSERTION_PATTERN.test(message)
+}
+
+function deleteIndexedDb(name) {
+  return new Promise((resolve) => {
+    try {
+      const req = indexedDB.deleteDatabase(name)
+      req.onsuccess = req.onerror = req.onblocked = () => resolve(null)
+    } catch {
+      resolve(null)
+    }
+  })
+}
+
+async function recoverFromFirestoreInternalError(error) {
+  if (attemptedFirestoreRecovery) return
+  if (typeof indexedDB === 'undefined') return
+  attemptedFirestoreRecovery = true
+
+  const candidates = new Set(['firebase-firestore-database', 'firestore/[DEFAULT]'])
+  const projectId = db?.app?.options?.projectId || null
+  if (projectId) {
+    candidates.add(`firebase-firestore-database-${projectId}`)
+    candidates.add(`firestore/${projectId}`)
+  }
+
+  if (indexedDB.databases) {
+    try {
+      const dbs = await indexedDB.databases()
+      dbs.forEach((info) => {
+        if (info?.name && info.name.toLowerCase().includes('firestore')) candidates.add(info.name)
+      })
+    } catch {
+      /* noop */
+    }
+  }
+
+  await Promise.all(Array.from(candidates).map((name) => deleteIndexedDb(name)))
+  console.warn('[firestore] Cleared local cache after internal error; reload if issues persist.', {
+    code: error?.code,
+  })
+}
+
 // Prevent spamming multiple auth-expired dialogs at once
 let authDialogOpen = false
 
@@ -87,6 +137,10 @@ let authDialogOpen = false
 export function handleAuthError(error) {
   const code = error?.code
   const message = String(error?.message || '')
+  const looksInternal = looksLikeFirestoreInternalError(error)
+  if (looksInternal) {
+    recoverFromFirestoreInternalError(error).catch(() => {})
+  }
   const hasUser = !!auth?.currentUser
   const tokenExpired =
     code === 'auth/id-token-expired' ||
