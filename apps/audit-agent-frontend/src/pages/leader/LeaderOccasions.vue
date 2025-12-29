@@ -198,7 +198,13 @@ import {
 } from '@/services/leader/occasions'
 import { listContacts, listGroups } from '@/services/leader/contacts'
 import { nlpClient } from '@/services/leader/http'
-import { uploadImageForVision } from '@/services/visionUploadService'
+
+function parseEnvFlag(value) {
+  return String(value || '')
+    .split('#')[0]
+    .trim()
+    .toLowerCase() === 'true'
+}
 
 const occasions = ref([])
 const loading = ref(false)
@@ -222,6 +228,21 @@ const form = reactive({
   contactId: '',
   groupId: '',
 })
+
+const imageTasksEnabled = parseEnvFlag(import.meta.env.VITE_ENABLE_IMAGE_TASKS)
+let visionUploadLoader = null
+async function getVisionUploader() {
+  if (!imageTasksEnabled) throw new Error('Image capture is disabled')
+  if (!visionUploadLoader) {
+    visionUploadLoader = import('@/services/visionUploadService')
+      .then((mod) => mod.uploadImageForVision)
+      .catch((err) => {
+        visionUploadLoader = null
+        throw err
+      })
+  }
+  return visionUploadLoader
+}
 
 function resetForm() {
   form.name = ''
@@ -328,16 +349,26 @@ async function aiPreviewFromModal() {
 
 function triggerScan() {
   captureError.value = ''
+  if (!imageTasksEnabled) {
+    ElMessage.warning('Image scanning is disabled in this environment.')
+    return
+  }
   fileInput.value?.click()
 }
 
 async function onScanFile(event) {
   const file = event.target.files?.[0]
   if (!file) return
+  if (!imageTasksEnabled) {
+    captureError.value = 'Image scanning is disabled.'
+    if (event?.target?.value) event.target.value = ''
+    return
+  }
   captureError.value = ''
   captureLoading.value = true
   captureConfidence.value = null
   try {
+    const uploadImageForVision = await getVisionUploader()
     const { imageUrl } = await uploadImageForVision(file)
     const { data } = await nlpClient.post('/workspace/ingest-image?mode=occasion', { imageUrl })
     if (data?.occasion) {

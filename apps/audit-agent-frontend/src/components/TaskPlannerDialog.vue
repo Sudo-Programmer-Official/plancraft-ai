@@ -67,29 +67,114 @@
           :rows="3"
           placeholder="Speak or type your task..."
           resize="none"
-          class="mb-4"
+          class="task-textarea"
         />
-        <div v-if="!props.task" class="planner-voice-row">
-          <div class="planner-voice">
-            <label class="field-label">Dictate instead</label>
-            <VoiceRecorder
-              :autoCommit="true"
-              :disabled="loading"
-              :reset-trigger="plannerVoiceReset"
-              @transcribed="handleTranscript"
-            />
+        <div class="assistive-bar">
+          <div class="assistive-actions">
+            <el-button
+              v-if="imageTasksEnabled"
+              size="small"
+              class="icon-btn attach-btn"
+              :disabled="loading || attachmentUploading"
+            :loading="attachmentUploading"
+            @click="openAttachmentPicker"
+            title="Attach image or PDF"
+          >
+            📎
+          </el-button>
+            <div
+              class="icon-btn mic-btn"
+              :class="{ 'mic-btn--active': loading }"
+              title="Dictate"
+              aria-label="Start voice input"
+            >
+              <VoiceRecorder
+                :autoCommit="true"
+                :disabled="loading"
+                :reset-trigger="plannerVoiceReset"
+                @transcribed="handleTranscript"
+              />
+              <span class="mic-visual" aria-hidden="true">🎤</span>
+            </div>
           </div>
           <el-button
             @click="generateTasks"
-            :loading="loading"
-            :disabled="!input.trim() || !isFeatureAllowed({ plan: subStore.subscription.plan, role: authStore?.user?.role }, 'aiSplit')"
+            :loading="loading || generationMode === 'imageAnalyzing' || attachmentUploading"
+            :disabled="generateDisabled"
             class="generate-btn"
           >
-            {{ loading ? '⏳ Generating...' : '+ Generate Tasks' }}
+            <span class="generate-inner">
+              <span class="generate-icon" aria-hidden="true">
+                <span v-if="generateState === 'idle'">+</span>
+                <span v-else-if="generateState === 'loading'" class="spinner"></span>
+                <span v-else>✔</span>
+              </span>
+              <span class="generate-text">{{ generateButtonLabel }}</span>
+            </span>
+          </el-button>
+        </div>
+        <div v-if="imageTasksEnabled" class="attachment-block">
+          <input
+            ref="attachmentInput"
+            type="file"
+            class="hidden"
+            accept="image/png,image/jpeg,image/jpg,application/pdf"
+            capture="environment"
+            @change="onAttachmentChange"
+          />
+          <div v-if="attachmentUploading || visionStatus" class="attachment-status">
+            {{ visionStatus || 'Analyzing image…' }}
+          </div>
+          <div v-if="attachments.length" class="attachment-previews">
+            <div
+              v-for="(file, idx) in attachments"
+              :key="file.url || idx"
+              class="attachment-card compact"
+            >
+              <div class="attachment-thumb-wrap">
+                <img
+                  v-if="!isPdf(file)"
+                  :src="file.url"
+                  alt="Attachment preview"
+                  class="attachment-thumb"
+                />
+                <div v-else class="attachment-thumb attachment-thumb--pdf">📄</div>
+              </div>
+              <div class="attachment-meta">
+                <p class="attachment-name">{{ file.name || 'Attachment' }}</p>
+                <p class="attachment-source">From image</p>
+              </div>
+              <button type="button" class="attachment-remove" @click="removeAttachment(idx)">
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section v-if="pendingGeneratedTasks.length" class="planner-card">
+        <div class="card-heading">
+          <div>
+            <p class="card-eyebrow">Review</p>
+            <h3 class="card-title">Confirm generated tasks</h3>
+          </div>
+        </div>
+        <div class="generated-preview">
+          <div v-for="task in pendingGeneratedTasks" :key="task.title" class="generated-preview__item">
+            <div class="generated-preview__title">{{ task.title }}</div>
+            <div v-if="task.details" class="generated-preview__details">{{ task.details }}</div>
+            <div v-if="task.attachments?.length" class="generated-preview__badge">📎 From image</div>
+          </div>
+        </div>
+        <div class="preview-actions">
+          <el-button size="small" @click="clearGeneratedPreview">Discard</el-button>
+          <el-button type="primary" size="small" :loading="loading" @click="confirmGeneratedTasks">
+            Save tasks
           </el-button>
         </div>
       </section>
 
+      <div class="section-divider" />
       <section class="planner-card reminder-card" :class="{ 'reminder-card--collapsed': !reminderOptionsVisible }">
         <div class="card-heading">
           <div>
@@ -225,12 +310,12 @@
 /* ---------------- Core Imports ---------------- */
 import { ref, computed, watch, onBeforeUnmount, onMounted } from 'vue'
 import { ElNotification, ElMessage } from 'element-plus'
-import api from '@/services/api'
 import VoiceRecorder from '@/components/VoiceRecorder.vue'
 import NotificationPrompt from '@/components/NotificationPrompt.vue'
 import { useAuthStore } from '@/stores/authStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useTasks } from '@/composables/useTasks'
+import { useWorkspaceStore } from '@/stores/workspaceStore'
 
 /* ---------------- Services ---------------- */
 import { generateTasksFromText, extractReminderTime } from '@/services/aiService'
@@ -251,6 +336,13 @@ dayjs.extend(utc)
 dayjs.extend(timezone)
 
 /* ---------------- Constants ---------------- */
+function parseEnvFlag(value) {
+  return String(value || '')
+    .split('#')[0]
+    .trim()
+    .toLowerCase() === 'true'
+}
+
 const DURATION_HINTS = {
   class: 75, lecture: 60, exam: 120, study: 45, homework: 40,
   assignment: 40, gym: 60, workout: 60, run: 45, dinner: 45,
@@ -418,6 +510,31 @@ const tasks = computed(() => {
   const value = taskStore?.value
   return Array.isArray(value) ? value : []
 })
+const workspaceStore = useWorkspaceStore()
+const activeWorkspaceId = computed(() => workspaceStore.activeWorkspaceId)
+
+const imageTasksEnabled = parseEnvFlag(import.meta.env.VITE_ENABLE_IMAGE_TASKS)
+const attachments = ref([])
+const attachmentUploading = ref(false)
+const attachmentInput = ref(null)
+const visionStatus = ref('')
+const pendingGeneratedTasks = ref([])
+const allowedAttachmentTypes = ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf']
+const generationMode = ref('idle') // idle | textGenerating | imageUploading | imageAnalyzing | preview
+let visionUploadLoader = null
+
+async function getVisionUploader() {
+  if (!imageTasksEnabled) throw new Error('Image tasks are disabled')
+  if (!visionUploadLoader) {
+    visionUploadLoader = import('@/services/visionUploadService')
+      .then((mod) => mod.uploadImageForVision)
+      .catch((err) => {
+        visionUploadLoader = null
+        throw err
+      })
+  }
+  return visionUploadLoader
+}
 
 const authStore = useAuthStore()
 const subStore = useSubscriptionStore()
@@ -443,6 +560,32 @@ const notificationChecked = ref(false)
 function getInputText() {
   return coerceText(input.value)
 }
+
+const hasAttachmentsComputed = computed(() => imageTasksEnabled && attachments.value.length > 0)
+const featureAllowed = computed(() =>
+  isFeatureAllowed({ plan: subStore.subscription.plan, role: authStore?.user?.role }, 'aiSplit'),
+)
+const generateDisabled = computed(() => {
+  // Keep image-only flow valid: allow submit when attachments exist even if text is empty
+  if (!featureAllowed.value) return true
+  if (loading.value || attachmentUploading.value) return true
+  if (generationMode.value === 'imageAnalyzing' || generationMode.value === 'imageUploading') return true
+  const hasText = !!getInputText().trim()
+  if (hasAttachmentsComputed.value) return false
+  return !hasText
+})
+const generateButtonLabel = computed(() => {
+  if (attachmentUploading.value) return 'Uploading…'
+  if (generationMode.value === 'imageAnalyzing') return 'Analyzing image…'
+  if (loading.value) return 'Generating…'
+  if (pendingGeneratedTasks.value.length) return 'Review Tasks'
+  return 'Generate Tasks'
+})
+const generateState = computed(() => {
+  if (pendingGeneratedTasks.value.length) return 'review'
+  if (loading.value || generationMode.value === 'imageAnalyzing' || attachmentUploading.value) return 'loading'
+  return 'idle'
+})
 
 function onReminderTimeChange() {
   if (!reminderAutofillGuard) {
@@ -471,12 +614,70 @@ const displayLink = computed(() => {
   }
 })
 
+function openAttachmentPicker() {
+  if (!imageTasksEnabled) return
+  try {
+    attachmentInput.value?.click?.()
+  } catch {
+    /* noop */
+  }
+}
+
+function isPdf(file) {
+  return String(file?.mime || '').toLowerCase().includes('pdf')
+}
+
+function removeAttachment(index) {
+  attachments.value = attachments.value.filter((_, idx) => idx !== index)
+}
+
+async function onAttachmentChange(event) {
+  if (!imageTasksEnabled) return
+  const file = event?.target?.files?.[0]
+  if (!file) return
+  generationMode.value = 'imageUploading'
+  const mime = file.type || ''
+  if (allowedAttachmentTypes.length && !allowedAttachmentTypes.includes(mime)) {
+    ElMessage.error('Unsupported file type. Use PNG, JPG, or PDF.')
+    if (event?.target) event.target.value = ''
+    return
+  }
+  attachmentUploading.value = true
+  visionStatus.value = 'Analyzing image…'
+  try {
+    const uploadImageForVision = await getVisionUploader()
+    const { imageUrl, path } = await uploadImageForVision(file)
+    attachments.value = [
+      {
+        type: 'image',
+        url: imageUrl,
+        mime,
+        path,
+        name: file.name || 'attachment',
+      },
+    ]
+    generationMode.value = 'imageAnalyzing'
+    // Auto-trigger generation from image so the user sees a preview without extra clicks
+    await generateTasks({ origin: 'auto-vision' })
+  } catch (err) {
+    console.error('Attachment upload failed', err)
+    ElMessage.error('Upload failed. You can still plan with text.')
+    generationMode.value = 'idle'
+  } finally {
+    attachmentUploading.value = false
+    visionStatus.value = ''
+    if (event?.target) event.target.value = ''
+  }
+}
+
 /* ---------------- Screen Size Reactive ---------------- */
-const screenWidth = ref(window.innerWidth)
+const screenWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1024)
 let resizeHandler = null
 onMounted(() => {
-  resizeHandler = () => (screenWidth.value = window.innerWidth)
-  window.addEventListener('resize', resizeHandler)
+  if (typeof window !== 'undefined') {
+    resizeHandler = () => (screenWidth.value = window.innerWidth)
+    window.addEventListener('resize', resizeHandler)
+  }
 })
 onBeforeUnmount(() => {
   if (resizeHandler) {
@@ -619,6 +820,10 @@ function resetNewTaskState() {
   if (!allowedReminderChannels.value.length && reminderPrefs.value.channels.length) {
     allowedReminderChannels.value = reminderPrefs.value.channels.filter(ch => channelOptionIds.includes(ch))
   }
+  attachments.value = []
+  pendingGeneratedTasks.value = []
+  visionStatus.value = ''
+  generationMode.value = 'idle'
 }
 
 function hydrateFromTask(current) {
@@ -638,6 +843,7 @@ function hydrateFromTask(current) {
       timezoneOverride: current.timezone,
     })
   }
+  attachments.value = Array.isArray(current.attachments) ? current.attachments : []
   if (!reminderHydrated) {
     reminderTime.value = current.reminderTime || ''
     if (current.scheduledTime) {
@@ -942,8 +1148,22 @@ function parseLocalMoment(value, tz) {
 /* ---------------- Main Generator ---------------- */
 async function generateTasks() {
   const currentInput = getInputText()
-  if (!currentInput.trim()) return
+  const hasAttachments = hasAttachmentsComputed.value
+  if (!currentInput.trim() && !hasAttachments) return
   loading.value = true
+  generationMode.value = hasAttachments ? 'imageAnalyzing' : 'textGenerating'
+  const attachmentPayload = hasAttachments
+    ? attachments.value.map((file) => ({
+        type: 'image',
+        url: file?.url,
+        mime: file?.mime,
+        name: file?.name,
+        path: file?.path,
+      })).filter((file) => file.url)
+    : []
+  if (hasAttachments) {
+    visionStatus.value = 'Analyzing image…'
+  }
 
   const tzCandidate = getUserTimezone()
   const tz = typeof tzCandidate === 'string' && tzCandidate.includes('/')
@@ -968,6 +1188,9 @@ async function generateTasks() {
       userPreferences: reminderPrefs.value,
       existingTasks: contextTasks,
       debugLabel: 'TaskPlannerDialog',
+      attachments: attachmentPayload,
+      workspaceId: activeWorkspaceId.value || null,
+      reminderTime: reminderTime.value || null,
     })
 
     const contextBundle = result?.context
@@ -1043,7 +1266,7 @@ async function generateTasks() {
       logTimeBrainDialog('generate:empty', { reason: 'no-tasks-returned' })
       ElNotification({
         title: 'No Tasks Generated',
-        message: 'Try adding more detail or different phrasing.',
+        message: hasAttachments ? 'No clear actions — add manually?' : 'Try adding more detail or different phrasing.',
         type: 'warning',
         duration: 2500,
       })
@@ -1053,59 +1276,128 @@ async function generateTasks() {
   if (!props.lockDate && autoPlanDate) {
     selectedDate.value = normalizeDateInput(autoPlanDate)
   }
-  if (!reminderTime.value && autoReminderTime) {
-    reminderTime.value = autoReminderTime
-    reminderManuallyEdited.value = false
-  }
+    if (!reminderTime.value && autoReminderTime) {
+      reminderTime.value = autoReminderTime
+      reminderManuallyEdited.value = false
+    }
 
-    const prepared = refined.map((task, idx) => ({
-      title: task.finalTitle || task.title || `Task ${idx + 1}`,
-      displayTitle: task.displayTitle || task.finalTitle || task.title,
-      rawPhrase: task.rawPhrase || task.title,
-      details: task.details || '',
-      category: task.category || 'Uncategorized',
-      scheduledTime: task.scheduledTime,
-      timezone: tz,
-      reminderTime: task.reminderTime,
-      timeHint: task.timeHint,
-      relation: task.relation,
-      gapMinutes: task.gapMinutes,
-      confidence: task.confidence,
-      meta: {
-        ...task.meta,
-        finalTitle: task.finalTitle,
-        rawPhrase: task.rawPhrase,
-        displayTitle: task.displayTitle,
-      },
-    }))
+    const prepared = refined.map((task, idx) => {
+      const perTaskAttachments =
+        Array.isArray(task.attachments) && task.attachments.length
+          ? task.attachments
+          : attachmentPayload
+      const metadata =
+        perTaskAttachments.length && (task.metadata || task.metaData)
+          ? { ...(task.metadata || task.metaData), attachmentUrl: perTaskAttachments[0]?.url }
+          : perTaskAttachments.length
+          ? { attachmentUrl: perTaskAttachments[0]?.url }
+          : task.metadata || null
 
-    const saved = await Promise.all(
-      prepared.map(async (task, idx) => {
-        const payload = {
-          ...task,
-          date: selectedDate.value,
-          order: tasks.value.length + idx,
-          completed: false,
-        }
-        return await addTaskToFirebase(payload)
-      })
-    )
+      const preparedTask = {
+        title: task.finalTitle || task.title || `Task ${idx + 1}`,
+        displayTitle: task.displayTitle || task.finalTitle || task.title,
+        rawPhrase: task.rawPhrase || task.title,
+        details: task.details || '',
+        category: task.category || 'Uncategorized',
+        scheduledTime: task.scheduledTime,
+        timezone: tz,
+        reminderTime: task.reminderTime,
+        timeHint: task.timeHint,
+        relation: task.relation,
+        gapMinutes: task.gapMinutes,
+        confidence: task.confidence,
+        source: task.source || (hasAttachments ? 'image' : 'text'),
+        meta: {
+          ...task.meta,
+          finalTitle: task.finalTitle,
+          rawPhrase: task.rawPhrase,
+          displayTitle: task.displayTitle,
+        },
+      }
 
-    ElNotification({
-      title: 'Success',
-      message: `${saved.length} task${saved.length > 1 ? 's' : ''} created`,
-      type: 'success',
-      duration: 2500,
+      if (perTaskAttachments.length) {
+        preparedTask.attachments = perTaskAttachments
+      }
+      if (metadata && Object.keys(metadata || {}).length) {
+        preparedTask.metadata = metadata
+      }
+      return preparedTask
     })
-    emit('saved', saved)
-    logTimeBrainDialog('generate:completed', { saved: saved.length })
-    if (!notifPromptOpen.value) closeDialog()
+
+    if (hasAttachments) {
+      pendingGeneratedTasks.value = prepared
+      ElNotification({
+        title: 'Review tasks',
+        message: 'Review the generated tasks below, then save.',
+        type: 'info',
+        duration: 2200,
+      })
+      return
+    }
+
+    await persistPreparedTasks(prepared)
   } catch (err) {
     console.error('Generate failed', err)
     ElNotification({ title: 'Error', message: 'Task generation failed', type: 'error' })
   } finally {
     loading.value = false
+    visionStatus.value = ''
+    if (pendingGeneratedTasks.value.length) {
+      generationMode.value = 'preview'
+    } else {
+      generationMode.value = 'idle'
+    }
   }
+}
+
+async function persistPreparedTasks(prepared = []) {
+  if (!prepared.length) return []
+  const baseOrder = tasks.value.length
+  const saved = await Promise.all(
+    prepared.map(async (task, idx) => {
+      const payload = {
+        ...task,
+        date: selectedDate.value,
+        order: baseOrder + idx,
+        completed: false,
+      }
+      if (!payload.attachments || !payload.attachments.length) delete payload.attachments
+      if (payload.metadata && !Object.keys(payload.metadata || {}).length) delete payload.metadata
+      return await addTaskToFirebase(payload)
+    }),
+  )
+
+  ElNotification({
+    title: 'Success',
+    message: `${saved.length} task${saved.length > 1 ? 's' : ''} created`,
+    type: 'success',
+    duration: 2500,
+  })
+  emit('saved', saved)
+  logTimeBrainDialog('generate:completed', { saved: saved.length })
+  pendingGeneratedTasks.value = []
+  attachments.value = []
+  if (!notifPromptOpen.value) closeDialog()
+  generationMode.value = 'idle'
+  return saved
+}
+
+async function confirmGeneratedTasks() {
+  if (!pendingGeneratedTasks.value.length) return
+  loading.value = true
+  try {
+    await persistPreparedTasks(pendingGeneratedTasks.value)
+  } catch (err) {
+    console.error('Failed to save generated tasks', err)
+    ElNotification({ title: 'Error', message: 'Could not save generated tasks', type: 'error' })
+  } finally {
+    loading.value = false
+  }
+}
+
+function clearGeneratedPreview() {
+  pendingGeneratedTasks.value = []
+  generationMode.value = 'idle'
 }
 
 /* ---------------- Save Handler ---------------- */
@@ -1159,6 +1451,7 @@ async function save() {
     scheduledTime: scheduledIso,
     reminderChannels: channelsToSave,
     channels: channelsToSave,
+    attachments: attachments.value.length ? attachments.value : props.task?.attachments,
   })
   ElNotification({ title: 'Success', message: 'Task saved', type: 'success' })
   closeDialog()
@@ -1199,6 +1492,8 @@ function enforceFutureReminder(iso, { allowDateChange = true } = {}) {
 /* ---------------- Close ---------------- */
 function closeDialog() {
   logTimeBrainDialog('close-dialog', { inputLength: getInputText().length })
+  pendingGeneratedTasks.value = []
+  visionStatus.value = ''
   emit('close')
 }
 
@@ -1277,11 +1572,11 @@ function appendDetails(result = {}) {
 .planner-stack {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.1rem;
 }
 
 .planner-card {
-  padding: 1.1rem;
+  padding: 1.15rem;
   background: rgba(5, 8, 22, 0.45);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 1rem;
@@ -1300,7 +1595,7 @@ function appendDetails(result = {}) {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   font-size: 0.75rem;
-  color: rgba(148, 163, 184, 0.8);
+  color: rgba(148, 163, 184, 0.65);
   margin: 0 0 0.2rem;
 }
 
@@ -1356,25 +1651,124 @@ function appendDetails(result = {}) {
   display: block;
   font-size: 0.9rem;
   margin-bottom: 0.35rem;
-  color: rgba(226, 232, 240, 0.9);
+  color: rgba(226, 232, 240, 0.8);
 }
 
-.planner-voice-row {
+/* assistive bar */
+.assistive-bar {
   display: flex;
-  gap: 1rem;
-  align-items: stretch;
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
 }
 
-.planner-voice {
-  flex: 1 1 260px;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
+.assistive-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.icon-btn {
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.mic-btn {
+  border: none;
+  padding: 0;
+  background: transparent;
+  position: relative;
+  overflow: visible;
+}
+
+.mic-btn--active {
+  box-shadow: 0 0 0 6px rgba(79, 70, 229, 0.12), 0 10px 25px rgba(14, 165, 233, 0.2);
+}
+
+.task-textarea :deep(textarea.el-textarea__inner) {
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.mic-btn :deep(.voice-controller) {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+}
+
+.mic-visual {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 1.1rem;
+  border-radius: 999px;
+  background: radial-gradient(circle at 30% 30%, rgba(79, 70, 229, 0.4), rgba(14, 165, 233, 0.18));
+  box-shadow: 0 6px 18px rgba(14, 165, 233, 0.2);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.mic-btn :deep(.voice-controller.recording) ~ .mic-visual {
+  animation: mic-pulse 1.1s ease-in-out infinite;
+  box-shadow: 0 0 0 8px rgba(79, 70, 229, 0.12), 0 12px 28px rgba(14, 165, 233, 0.28);
+}
+
+@keyframes mic-pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.25);
+  }
+  50% {
+    transform: scale(1.03);
+    box-shadow: 0 0 0 8px rgba(79, 70, 229, 0.08);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.02);
+  }
 }
 
 .planner-voice :deep(.voice-controller) {
   width: 100%;
+}
+
+.voice-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 32px;
+}
+
+.voice-icon {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 30% 30%, rgba(79, 70, 229, 0.45), rgba(14, 165, 233, 0.25));
+  box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.02);
+}
+
+.voice-title {
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.voice-hint {
+  margin-left: auto;
+  font-size: 0.78rem;
+  color: rgba(148, 163, 184, 0.8);
 }
 
 .generate-btn {
@@ -1385,16 +1779,54 @@ function appendDetails(result = {}) {
   background: linear-gradient(120deg, #7c3aed, #0ea5e9);
   border: none;
   color: #fdf4ff;
+  height: 44px;
+  padding: 0 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .generate-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.55;
   box-shadow: none;
+  cursor: not-allowed;
 }
 
 .generate-btn:not(:disabled):hover {
   transform: translateY(-1px);
   box-shadow: 0 18px 38px rgba(79, 70, 229, 0.45);
+}
+
+.generate-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.generate-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+}
+
+.generate-text {
+  white-space: nowrap;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .reminder-card {
@@ -1481,6 +1913,141 @@ function appendDetails(result = {}) {
 .link-preview {
   margin-top: 0.4rem;
   font-size: 0.85rem;
+}
+
+/* Attachment & voice polish */
+.attachment-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.attachment-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.attachment-labels {
+  display: flex;
+  flex-direction: column;
+}
+
+.attachment-subtext {
+  margin: 0;
+  font-size: 0.82rem;
+  color: rgba(148, 163, 184, 0.75);
+}
+
+.attachment-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.attach-btn {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.attach-icon {
+  margin-right: 6px;
+}
+
+.attachment-status {
+  font-size: 0.9rem;
+  color: rgba(148, 163, 184, 0.9);
+}
+
+.attachment-previews {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.attachment-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.attachment-card.compact {
+  grid-template-columns: 44px 1fr auto;
+}
+
+.attachment-thumb-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 0.65rem;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.2);
+  display: grid;
+  place-items: center;
+}
+
+.attachment-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.attachment-thumb--pdf {
+  font-size: 1.2rem;
+}
+
+.attachment-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.attachment-name {
+  margin: 0;
+  font-weight: 600;
+  color: #e2e8f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.attachment-source {
+  margin: 0;
+  font-size: 0.82rem;
+  color: rgba(148, 163, 184, 0.8);
+}
+
+.attachment-remove {
+  border: none;
+  background: transparent;
+  color: #93c5fd;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.attachment-remove:hover {
+  color: #bfdbfe;
+}
+
+/* Mobile-only tweaks for generate button */
+@media (max-width: 480px) {
+  .generate-btn {
+    min-width: 160px;
+    height: 40px;
+    padding: 0 14px;
+    font-size: 0.92rem;
+    background: linear-gradient(120deg, #6d28d9, #0284c7);
+    box-shadow: 0 8px 16px rgba(79, 70, 229, 0.22);
+  }
 }
 </style>
 
@@ -1697,5 +2264,86 @@ function appendDetails(result = {}) {
 .task-planner-dialog .el-input__wrapper:hover {
   background-color: rgba(255, 255, 255, 0.15) !important; /* slightly brighter */
   border-color: #6366f1 !important; /* indigo highlight */
+}
+
+.attachment-block {
+  margin-top: 0.5rem;
+}
+.attachment-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.attachment-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.attachment-status {
+  font-size: 12px;
+  color: #c7d2fe;
+}
+.attachment-previews {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.35rem;
+}
+.attachment-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+}
+.attachment-thumb {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.attachment-chip__pdf {
+  font-size: 12px;
+  color: #e2e8f0;
+}
+.attachment-remove {
+  background: transparent;
+  border: none;
+  color: #cbd5e1;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0.2rem 0.4rem;
+}
+.generated-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.generated-preview__item {
+  padding: 0.5rem 0.65rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.generated-preview__title {
+  font-weight: 600;
+  color: #ffffff;
+}
+.generated-preview__details {
+  font-size: 12px;
+  color: #cbd5e1;
+}
+.generated-preview__badge {
+  font-size: 12px;
+  color: #c7d2fe;
+}
+.preview-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
 }
 </style>

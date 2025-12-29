@@ -107,6 +107,8 @@ export function normalizeTemporalTasks(rawItems = [], context = {}) {
     const relation = normalizeRelation(item.relation ?? item.timeRelation ?? item.time_relation)
     const timeHint = normalizeTimeHint(item.timeHint ?? item.time_hint ?? item.hint)
     const confidence = normalizeConfidence(item.confidence ?? item.score ?? item.certainty)
+    const attachments = Array.isArray(item.attachments) ? item.attachments : []
+    const source = typeof item.source === 'string' ? item.source : null
     const displayTitle = typeof item.displayTitle === 'string' && item.displayTitle.trim()
       ? item.displayTitle.trim()
       : null
@@ -127,6 +129,8 @@ export function normalizeTemporalTasks(rawItems = [], context = {}) {
       relation,
       gapMinutes,
       confidence,
+      attachments,
+      source,
       parsedTimeLocal: parsedLocal,
       sourceIndex: index,
       category,

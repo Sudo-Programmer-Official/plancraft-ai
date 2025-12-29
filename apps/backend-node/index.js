@@ -116,6 +116,7 @@ import gptRoutes from "./routes/gptRoutes.js";
 import journalRoutes from "./routes/journalRoutes.js";
 import locationRoutes from "./routes/locationRoutes.js";
 import workspaceRoutes from "./routes/workspaceRoutes.js";
+import visionRoutes from "./routes/visionRoutes.js";
 
 dotenv.config();
 
@@ -292,6 +293,7 @@ app.use("/api", billingRoutes);
 app.use("/api", journalRoutes);
 app.use("/api", locationRoutes);
 app.use("/api", workspaceRoutes);
+app.use("/api", visionRoutes);
 app.use("/", seoRoutes);
 // Mount Google routes (guarded internally by feature flag)
 app.use("/api", googleAuthRoutes);

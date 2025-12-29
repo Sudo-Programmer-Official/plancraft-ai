@@ -235,7 +235,13 @@ import {
   suggestEventCopy,
 } from '@/services/leader/events'
 import { nlpClient } from '@/services/leader/http'
-import { uploadImageForVision } from '@/services/visionUploadService'
+
+function parseEnvFlag(value) {
+  return String(value || '')
+    .split('#')[0]
+    .trim()
+    .toLowerCase() === 'true'
+}
 
 const router = useRouter()
 const route = useRoute()
@@ -259,6 +265,21 @@ const form = reactive({
   location: '',
   tags: '',
 })
+
+const imageTasksEnabled = parseEnvFlag(import.meta.env.VITE_ENABLE_IMAGE_TASKS)
+let visionUploadLoader = null
+async function getVisionUploader() {
+  if (!imageTasksEnabled) throw new Error('Image capture is disabled')
+  if (!visionUploadLoader) {
+    visionUploadLoader = import('@/services/visionUploadService')
+      .then((mod) => mod.uploadImageForVision)
+      .catch((err) => {
+        visionUploadLoader = null
+        throw err
+      })
+  }
+  return visionUploadLoader
+}
 
 const currentMonthLabel = computed(() => currentMonth.value.format('MMMM YYYY'))
 
@@ -431,18 +452,28 @@ async function suggestAi() {
 
 function triggerScan() {
   captureError.value = ''
+  if (!imageTasksEnabled) {
+    ElMessage.warning('Image scanning is disabled in this environment.')
+    return
+  }
   fileInput.value?.click()
 }
 
 async function onScanFile(event) {
   const file = event.target.files?.[0]
   if (!file) return
+  if (!imageTasksEnabled) {
+    captureError.value = 'Image scanning is disabled.'
+    if (event?.target?.value) event.target.value = ''
+    return
+  }
   captureError.value = ''
   captureLoading.value = true
   capturePreview.value = ''
   captureConfidence.value = null
   try {
     capturePreview.value = URL.createObjectURL(file)
+    const uploadImageForVision = await getVisionUploader()
     const { imageUrl } = await uploadImageForVision(file)
     const { data } = await nlpClient.post('/workspace/ingest-image?mode=event', { imageUrl })
     if (data?.event) {
