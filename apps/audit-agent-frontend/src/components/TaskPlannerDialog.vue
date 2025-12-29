@@ -82,7 +82,8 @@
           >
             📎
           </el-button>
-            <div
+            <button
+              type="button"
               class="icon-btn mic-btn"
               :class="{ 'mic-btn--active': loading }"
               title="Dictate"
@@ -94,8 +95,8 @@
                 :reset-trigger="plannerVoiceReset"
                 @transcribed="handleTranscript"
               />
-              <span class="mic-visual" aria-hidden="true">🎤</span>
-            </div>
+              <span class="mic-visual" aria-hidden="true"></span>
+            </button>
           </div>
           <el-button
             @click="generateTasks"
@@ -1686,10 +1687,16 @@ function appendDetails(result = {}) {
   background: transparent;
   position: relative;
   overflow: visible;
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .mic-btn--active {
   box-shadow: 0 0 0 6px rgba(79, 70, 229, 0.12), 0 10px 25px rgba(14, 165, 233, 0.2);
+}
+
+.mic-btn:focus-visible {
+  outline: 2px solid rgba(125, 211, 252, 0.8);
+  outline-offset: 2px;
 }
 
 .task-textarea :deep(textarea.el-textarea__inner) {
@@ -1704,6 +1711,7 @@ function appendDetails(result = {}) {
   width: 100%;
   height: 100%;
   opacity: 0;
+  pointer-events: auto;
 }
 
 .mic-visual {
@@ -1711,16 +1719,27 @@ function appendDetails(result = {}) {
   inset: 0;
   display: grid;
   place-items: center;
-  font-size: 1.1rem;
   border-radius: 999px;
-  background: radial-gradient(circle at 30% 30%, rgba(79, 70, 229, 0.4), rgba(14, 165, 233, 0.18));
+  background: radial-gradient(circle at 30% 30%, rgba(79, 70, 229, 0.35), rgba(14, 165, 233, 0.15));
   box-shadow: 0 6px 18px rgba(14, 165, 233, 0.2);
   transition: box-shadow 0.2s ease, transform 0.2s ease;
+  pointer-events: none;
 }
 
-.mic-btn :deep(.voice-controller.recording) ~ .mic-visual {
+.mic-visual::before {
+  content: '🎤';
+  font-size: 1.1rem;
+}
+
+.mic-btn :deep(.voice-controller--recording) ~ .mic-visual {
   animation: mic-pulse 1.1s ease-in-out infinite;
-  box-shadow: 0 0 0 8px rgba(79, 70, 229, 0.12), 0 12px 28px rgba(14, 165, 233, 0.28);
+  box-shadow: 0 0 0 8px rgba(79, 70, 229, 0.18), 0 12px 28px rgba(14, 165, 233, 0.3);
+  transform: scale(1.05);
+  border: 1px solid rgba(125, 211, 252, 0.9);
+}
+
+.mic-btn :deep(.voice-controller--recording) ~ .mic-visual::before {
+  content: '⏹';
 }
 
 @keyframes mic-pulse {

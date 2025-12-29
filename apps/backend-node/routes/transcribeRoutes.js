@@ -236,6 +236,16 @@ router.post("/transcribe", upload.single("file"), async (req, res) => {
         .json({ error: 'No audio file provided. Use field name "file".' });
     }
 
+    if (!req.file.buffer || req.file.buffer.length < MINIMUM_AUDIO_BYTES) {
+      console.warn("🎤 Skipping transcription: audio too short or empty");
+      return res.status(200).json({
+        ok: true,
+        skipped: true,
+        reason: "audio_too_short",
+        transcript: "",
+      });
+    }
+
     const mime = req.file.mimetype || "";
     const { buffer: normalizedBuffer, filename } = await normalizeAudioUpload(
       req.file.buffer,
