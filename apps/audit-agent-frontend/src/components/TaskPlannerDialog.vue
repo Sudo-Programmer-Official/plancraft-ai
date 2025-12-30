@@ -1677,8 +1677,9 @@ function appendDetails(result = {}) {
   border-radius: 999px;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  color: #f8fafc;
 }
 
 .mic-btn {
@@ -1969,7 +1970,7 @@ function appendDetails(result = {}) {
 .attach-btn {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.05);
-  color: #e2e8f0;
+  color: #f8fafc;
   border: 1px solid rgba(255, 255, 255, 0.14);
 }
 
@@ -2059,13 +2060,33 @@ function appendDetails(result = {}) {
 
 /* Mobile-only tweaks for generate button */
 @media (max-width: 480px) {
+  .planner-card {
+    padding: 0.85rem;
+  }
   .generate-btn {
-    min-width: 160px;
+    min-width: 0;
     height: 40px;
-    padding: 0 14px;
-    font-size: 0.92rem;
+    padding: 0 12px;
+    font-size: 0.9rem;
     background: linear-gradient(120deg, #6d28d9, #0284c7);
     box-shadow: 0 8px 16px rgba(79, 70, 229, 0.22);
+  }
+  .assistive-bar {
+    flex-wrap: wrap;
+    justify-content: space-between;
+    width: 100%;
+    gap: 0.5rem;
+  }
+  .assistive-actions {
+    gap: 0.35rem;
+    flex-shrink: 0;
+  }
+  .icon-btn {
+    width: 40px;
+    height: 40px;
+  }
+  .generate-btn {
+    flex: 1;
   }
 }
 </style>
@@ -2101,6 +2122,8 @@ function appendDetails(result = {}) {
   border-radius: 1rem;
   padding: 1rem;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+  max-height: calc(100vh - 64px);
+  overflow: hidden;
 }
 /* Title */
 .task-planner-dialog .el-dialog__header {
@@ -2146,6 +2169,10 @@ function appendDetails(result = {}) {
 .task-planner-dialog .el-dialog__footer {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   padding-top: 1rem;
+}
+.task-planner-dialog .el-dialog__body {
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
 }
 /* TaskPlannerDialog.vue or global theme file */
 
