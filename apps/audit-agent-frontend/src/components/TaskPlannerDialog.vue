@@ -128,7 +128,6 @@
             type="file"
             class="hidden"
             accept="image/png,image/jpeg,image/jpg,application/pdf"
-            capture="environment"
             @change="onAttachmentChange"
           />
           <div v-if="attachmentUploading || visionStatus" class="attachment-status">
