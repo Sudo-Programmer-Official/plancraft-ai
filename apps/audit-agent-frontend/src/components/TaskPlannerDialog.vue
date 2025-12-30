@@ -71,6 +71,7 @@
         />
         <div class="assistive-bar">
           <div class="assistive-actions">
+            <div>
             <el-button
               v-if="imageTasksEnabled"
               size="small"
@@ -90,6 +91,8 @@
                 </svg>
               </span>
             </el-button>
+            </div>
+            <div>
             <button
               type="button"
               class="icon-btn mic-btn"
@@ -105,6 +108,7 @@
               />
               <span class="mic-visual" aria-hidden="true"></span>
             </button>
+            </div>
           </div>
           <el-button
             @click="generateTasks"
@@ -693,7 +697,7 @@ onBeforeUnmount(() => {
     resizeHandler = null
   }
 })
-const dialogWidth = computed(() => (screenWidth.value < 640 ? '90vw' : '480px'))
+const dialogWidth = computed(() => (screenWidth.value < 640 ? '90vw' : '520px'))
 
 /* ---------------- Watchers ---------------- */
 watch(
@@ -1652,7 +1656,9 @@ function appendDetails(result = {}) {
 .field-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 1rem;
+  column-gap: 1rem;
+  row-gap: 1.1rem;
+  margin-bottom: 0.5rem;
 }
 
 .field-label {
@@ -1672,9 +1678,10 @@ function appendDetails(result = {}) {
 }
 
 .assistive-actions {
-  display: inline-flex;
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.65rem;
 }
 
 .icon-btn {
@@ -1814,7 +1821,9 @@ function appendDetails(result = {}) {
 }
 
 .generate-btn:disabled {
-  opacity: 0.55;
+  opacity: 0.75;
+  background: linear-gradient(120deg, #4b5563, #475569);
+  color: #e2e8f0;
   box-shadow: none;
   cursor: not-allowed;
 }
@@ -2083,10 +2092,10 @@ function appendDetails(result = {}) {
     gap: 0.65rem;
   }
   .assistive-actions {
-    gap: 0.4rem;
+    gap: 0.6rem;
     flex-shrink: 0;
     width: 100%;
-    justify-content: flex-start;
+    justify-content: space-between;
     flex-wrap: wrap;
   }
   .icon-btn {
