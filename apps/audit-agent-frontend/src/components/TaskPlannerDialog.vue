@@ -74,14 +74,22 @@
             <el-button
               v-if="imageTasksEnabled"
               size="small"
-              class="icon-btn attach-btn"
-              :disabled="loading || attachmentUploading"
+            class="icon-btn attach-btn"
+            :disabled="loading || attachmentUploading"
             :loading="attachmentUploading"
             @click="openAttachmentPicker"
             title="Attach image or PDF"
           >
-            📎
-          </el-button>
+              <span class="attach-svg" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path
+                    d="M8.5 12.5l5.8-5.8a3 3 0 1 1 4.3 4.2l-7.1 7.1a4.5 4.5 0 0 1-6.4 0 4.5 4.5 0 0 1 0-6.4l7.6-7.6"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </span>
+            </el-button>
             <button
               type="button"
               class="icon-btn mic-btn"
@@ -1974,6 +1982,13 @@ function appendDetails(result = {}) {
   border: 1px solid rgba(255, 255, 255, 0.14);
 }
 
+.attach-svg {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  color: #fff;
+}
+
 .attach-icon {
   margin-right: 6px;
 }
@@ -2059,9 +2074,25 @@ function appendDetails(result = {}) {
 }
 
 /* Mobile-only tweaks for generate button */
-@media (max-width: 480px) {
+@media (max-width: 640px) {
   .planner-card {
     padding: 0.85rem;
+  }
+  .assistive-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.65rem;
+  }
+  .assistive-actions {
+    gap: 0.4rem;
+    flex-shrink: 0;
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+  .icon-btn {
+    width: 40px;
+    height: 40px;
   }
   .generate-btn {
     min-width: 0;
@@ -2070,23 +2101,7 @@ function appendDetails(result = {}) {
     font-size: 0.9rem;
     background: linear-gradient(120deg, #6d28d9, #0284c7);
     box-shadow: 0 8px 16px rgba(79, 70, 229, 0.22);
-  }
-  .assistive-bar {
-    flex-wrap: wrap;
-    justify-content: space-between;
     width: 100%;
-    gap: 0.5rem;
-  }
-  .assistive-actions {
-    gap: 0.35rem;
-    flex-shrink: 0;
-  }
-  .icon-btn {
-    width: 40px;
-    height: 40px;
-  }
-  .generate-btn {
-    flex: 1;
   }
 }
 </style>
