@@ -471,15 +471,44 @@
                 Smart scheduling with Google Calendar
               </h3>
               <p class="text-sm text-indigo-100/80">
-                Connect once to auto-pull meetings, prep agendas, and hold buffer space.
+                {{ googleConnected ? 'Pull meetings and prep without re-connecting.' : 'Connect once to auto-pull meetings, prep agendas, and hold buffer space.' }}
               </p>
+              <div v-if="googleConnected" class="flex flex-wrap items-center gap-2 text-xs text-indigo-100/90">
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-700/50 text-emerald-100">
+                  <span class="w-2 h-2 rounded-full bg-emerald-300"></span>
+                  Connected
+                </span>
+                <span v-if="googleLastSync" class="text-slate-200/90">Last sync: {{ googleLastSync }}</span>
+              </div>
             </div>
-            <RouterLink
-              to="/google-calendar-integration"
-              class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm font-semibold text-indigo-50 border border-white/10 transition"
-            >
-              Connect calendar →
-            </RouterLink>
+            <div class="flex flex-wrap items-center gap-2">
+              <button
+                v-if="!googleConnected"
+                type="button"
+                class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm font-semibold text-indigo-50 border border-white/10 transition"
+                @click="goToIntegrations"
+              >
+                Connect calendar →
+              </button>
+              <template v-else>
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm font-semibold text-indigo-50 border border-white/10 transition"
+                  @click="goToMeetings"
+                >
+                  View meetings
+                </button>
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-indigo-500/80 hover:bg-indigo-500 text-sm font-semibold text-white border border-indigo-400/60 transition disabled:opacity-60"
+                  :disabled="googleSyncing"
+                  @click="syncGoogleNow"
+                >
+                  <span v-if="googleSyncing" class="h-4 w-4 mr-2 border-2 border-white/40 border-t-white rounded-full animate-spin" aria-hidden="true"></span>
+                  {{ googleSyncing ? 'Syncing…' : 'Sync now' }}
+                </button>
+              </template>
+            </div>
           </div>
           <ul class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-indigo-100/90">
             <li class="px-3 py-2 rounded-2xl bg-slate-900/40 border border-white/5">🗓️ Auto-sync meetings</li>
@@ -906,6 +935,7 @@ import { resolveTaskMeetingLink } from '@/utils/taskLinks'
 import { seedGuestStarterTasks } from '@/utils/guestTasks'
 import { subscribeToNapkinItems } from '@/services/napkinService'
 import { fetchDashboardPreferences, saveDashboardPreferences } from '@/services/dashboardPreferencesService'
+import { getGoogleStatus, triggerGoogleSyncNow } from '@/stores/integrationsStore'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -1102,6 +1132,17 @@ const showNapkin = computed(() => cardVisibility.value.has('napkin'))
 
 // Usage meter (free plan)
 const usage = ref({ used: 0, limit: 0, plan: '' })
+const googleStatus = ref({ connected: false, accounts: [] })
+const googleLoading = ref(false)
+const googleSyncing = ref(false)
+const primaryGoogleAccount = computed(() => googleStatus.value?.accounts?.[0] || null)
+const googleConnected = computed(() => !!googleStatus.value?.connected && (googleStatus.value?.accounts?.length || googleStatus.value?.accountId))
+const googleLastSync = computed(() => {
+  const lastRun = primaryGoogleAccount.value?.lastRun || googleStatus.value?.lastRun
+  if (!lastRun) return ''
+  const ts = dayjs(lastRun)
+  return ts.isValid() ? ts.format('MMM D · h:mm A') : ''
+})
 async function fetchUsage() {
   try {
     const uid = auth?.currentUser?.uid || localStorage.getItem('uid')
@@ -1110,6 +1151,49 @@ async function fetchUsage() {
     if (data?.success) usage.value = { used: data.used || 0, limit: data.limit || 0, plan: data.plan || '' }
   } catch {
     /* noop */
+  }
+}
+
+async function loadGoogleStatus() {
+  if (!authStore?.user?.uid) return
+  googleLoading.value = true
+  try {
+    const status = await getGoogleStatus(authStore.user.uid)
+    googleStatus.value = status || { connected: false, accounts: [] }
+  } catch (e) {
+    console.warn('google status load failed', e?.message || e)
+  } finally {
+    googleLoading.value = false
+  }
+}
+
+async function syncGoogleNow() {
+  if (!authStore?.user?.uid || !googleConnected.value) return
+  googleSyncing.value = true
+  try {
+    await triggerGoogleSyncNow(authStore.user.uid, primaryGoogleAccount.value?.accountId || null)
+    await loadGoogleStatus()
+    ElMessage.success('Sync started')
+  } catch (e) {
+    console.warn('google sync failed', e?.message || e)
+    ElMessage.error('Unable to sync right now')
+  } finally {
+    googleSyncing.value = false
+  }
+}
+
+function goToIntegrations() {
+  try {
+    routerNav.push('/settings?tab=integrations')
+  } catch (e) {
+    console.warn(e)
+  }
+}
+function goToMeetings() {
+  try {
+    routerNav.push('/meetings')
+  } catch (e) {
+    console.warn(e)
   }
 }
 
@@ -2336,6 +2420,7 @@ watch(
       }
       await ensureDailyStreakState(uid)
       userStreak.value = await getUserStreak(uid)
+      await loadGoogleStatus()
     } catch {
       /* noop */
     }
@@ -2344,6 +2429,7 @@ watch(
 )
 
 onMounted(fetchUsage)
+onMounted(loadGoogleStatus)
 
 onMounted(() => {
   try {

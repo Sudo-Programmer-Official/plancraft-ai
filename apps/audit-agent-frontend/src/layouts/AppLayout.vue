@@ -670,23 +670,51 @@ function isActive(path) {
 
 const navGroups = [
   {
+    key: 'core',
+    title: 'Core',
+    icon: '⭐',
+    collapsible: false,
+    defaultOpen: true,
+    children: [
+      { label: 'Dashboard', icon: '📊', to: '/dashboard' },
+      { label: 'Planner', icon: '🧭', to: '/planner' },
+      { label: 'Meetings', icon: '📅', to: '/meetings' },
+      { label: 'Napkin', icon: '🧾', to: '/napkin' },
+    ],
+  },
+  {
     key: 'planning',
-    title: 'Planner',
-    icon: '📘',
+    title: 'Planning',
+    icon: '🗓',
+    collapsible: true,
+    defaultOpen: true,
+    children: [
+      { label: 'Daily', icon: '📆', to: '/daily' },
+      { label: 'Weekly', icon: '🗒', to: '/weekly' },
+      { label: 'Monthly', icon: '🗂', to: '/monthly' },
+    ],
+  },
+  {
+    key: 'review',
+    title: 'Review',
+    icon: '📊',
     collapsible: true,
     defaultOpen: false,
     children: [
-      { label: 'Dashboard', icon: '📊', to: '/dashboard' },
-      { label: 'Daily', icon: '🗓', to: '/daily' },
-      { label: 'All Tasks', icon: '🗂', to: '/tasks' },
-      { label: 'Weekly', icon: '📅', to: '/weekly' },
-      { label: 'Monthly', icon: '📆', to: '/monthly' },
       { label: 'Journal', icon: '📔', to: '/journal' },
-      { label: 'Reminders', icon: '🔔', to: '/reminders' },
-      { label: 'Quick Links', icon: '🔗', to: '/links' },
-      { label: 'Goals', icon: '🎯', to: '/goals' },
       { label: 'Reports', icon: '📈', to: '/reports' },
       { label: 'Habits', icon: '🏆', to: '/habits' },
+    ],
+  },
+  {
+    key: 'settings',
+    title: 'Settings',
+    icon: '⚙️',
+    collapsible: true,
+    defaultOpen: false,
+    children: [
+      { label: 'Integrations', icon: '🔗', to: '/settings?tab=integrations' },
+      { label: 'Reminders', icon: '🔔', to: '/reminders' },
     ],
   },
   {
