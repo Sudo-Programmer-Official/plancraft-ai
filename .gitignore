@@ -187,3 +187,40 @@ gsutil.*
 # --- Local shell & setup scripts ---
 fix_cors.sh
 setup_env.sh
+
+# --- Requested ignores (Consolidated) ---
+# Node
+node_modules/
+.pnpm-store/
+
+# Env files (VERY IMPORTANT)
+.env
+.env.*
+!.env.example
+
+# Vite / build output
+dist/
+apps/**/dist/
+
+# Capacitor / Android
+mobile/android/.gradle/
+mobile/android/build/
+mobile/android/**/build/
+mobile/android/local.properties
+
+# Android Studio
+*.iml
+.idea/
+.DS_Store
+
+# iOS (future-proof)
+mobile/ios/Pods/
+mobile/ios/build/
+
+# Firebase local tools
+.firebase/
+firebase-debug.log
+
+# Logs
+npm-debug.log*
+pnpm-debug.log*

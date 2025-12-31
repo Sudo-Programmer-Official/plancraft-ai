@@ -9,7 +9,7 @@ const config: CapacitorConfig = {
 
   server: {
     cleartext: false,
-    hostname: 'plancraftai.com',
+    hostname: 'plancraftai.com', // ✅ IMPORTANT: must match the domain used in Firebase Auth
     iosScheme: 'https', // ✅ REQUIRED for Firebase redirect
     androidScheme: 'https', // ✅ REQUIRED for Firebase redirect
   },
