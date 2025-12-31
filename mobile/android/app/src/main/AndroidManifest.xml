@@ -22,19 +22,39 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Deep link to capture Firebase/Google redirect back into the app -->
-            <intent-filter android:autoVerify="true">
+            <!-- Custom scheme used by Capacitor (androidScheme: 'plancraftai') -->
+            <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
-
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="plancraftai"
+                    android:host="localhost"
+                    android:pathPrefix="/" />
+            </intent-filter>
 
+            <!-- Firebase default domain for mobile auth handler return -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="audit-agent-66451.firebaseapp.com"
+                    android:pathPrefix="/__/auth/handler" />
+            </intent-filter>
+
+            <!-- Optional: keep custom domain handler if used on mobile -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
                 <data
                     android:scheme="https"
                     android:host="plancraftai.com"
-                    android:pathPrefix="/login" />
+                    android:pathPrefix="/__/auth/handler" />
             </intent-filter>
-
+          
         </activity>
 
         <provider

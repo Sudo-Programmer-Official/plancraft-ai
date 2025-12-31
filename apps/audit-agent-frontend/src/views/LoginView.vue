@@ -91,28 +91,22 @@
             <div v-if="showPhone" class="auth-panel">
               <h2 class="text-lg font-semibold text-white mb-3">Phone OTP</h2>
               <div class="space-y-3">
-                <div class="auth-phone-row">
-                  <el-select v-model="countryCode" size="large" class="auth-select" popper-class="auth-select-dropdown">
-                    <el-option
-                      v-for="opt in countryOptions"
-                      :key="opt.code"
-                      :label="`${opt.flag} ${opt.label} (${opt.code})`"
-                      :value="opt.code"
-                    />
-                  </el-select>
+                <div class="flex items-center gap-3 bg-[#1e1b2e] border border-white/10 rounded-xl px-3 py-2">
+                  <span class="text-2xl select-none" aria-label="Detected country flag">{{ detectedFlag }}</span>
                   <input
                     v-model="phoneInput"
                     type="tel"
-                    placeholder="Enter phone (digits only)"
-                    class="auth-input auth-phone-input"
-                    inputmode="numeric"
-                    @input="sanitizePhone"
+                    placeholder="Enter phone e.g. +1 650 555 1234"
+                    class="flex-1 bg-transparent text-white placeholder:text-indigo-200/60 focus:outline-none text-base py-2"
+                    inputmode="tel"
+                    @input="onPhoneInput"
                   />
                 </div>
+                <p class="text-xs text-indigo-200/70">{{ phoneHint }}</p>
                 <div v-if="!otpSent">
                   <button
                     @click="sendOtp"
-                    :disabled="sendingOtp || !phoneInput"
+                    :disabled="sendingOtp || !normalizedPhone"
                     class="auth-action primary w-full disabled:opacity-60"
                   >
                     {{ sendingOtp ? 'Sending…' : 'Send OTP' }}
@@ -208,7 +202,7 @@ import { trackLinkedInConversion } from '@/utils/ads'
 import { RecaptchaVerifier } from 'firebase/auth'
 import { auth } from '@/firebase/init'
 import { ElMessage } from 'element-plus'
-import { normalizePhone, guessCountryFromLocale } from '@/utils/phoneUtils'
+import { parsePhoneNumberFromString } from 'libphonenumber-js'
 import { sendMagicLink, completeMagicLinkSignIn } from '@/services/authService'
 import GoogleAuthDiagnostic from '@/components/GoogleAuthDiagnostic.vue'
 async function loginGoogle() {
@@ -292,7 +286,6 @@ async function onSendMagic() {
 // Phone OTP auth
 const showPhone = ref(false)
 const phoneInput = ref('')
-const countryCode = ref('+1')
 const otp = ref('')
 const otpSent = ref(false)
 const sendingOtp = ref(false)
@@ -355,7 +348,7 @@ function sanitizePhone() {
   phoneInput.value = phoneInput.value.replace(/[^\d]/g, '')
 }
 
-const countryOptions = [
+const countryCodeHints = [
   { label: 'United States/Canada', code: '+1', flag: '🇺🇸' },
   { label: 'United Kingdom', code: '+44', flag: '🇬🇧' },
   { label: 'India', code: '+91', flag: '🇮🇳' },
@@ -379,13 +372,50 @@ const countryOptions = [
 
 const normalizedPhone = computed(() => {
   try {
-    const formatted = normalizePhone(phoneInput.value, countryCode.value.replace('+', '') || 'US')
-    if (!formatted || !/^\+[1-9]\d{6,14}$/.test(formatted)) return ''
-    return formatted
+    const raw = String(phoneInput.value || '').trim()
+    if (!raw) return ''
+    const parsed = parsePhoneNumberFromString(raw)
+    if (parsed && parsed.isPossible()) return parsed.number
+    return ''
   } catch {
     return ''
   }
 })
+
+const detectedFlag = computed(() => {
+  const raw = String(phoneInput.value || '').trim()
+  const parsed = parsePhoneNumberFromString(raw)
+  if (parsed?.country) return flagFromIso(parsed.country)
+  const hint = countryCodeHints.find((opt) => raw.startsWith(opt.code))
+  return hint?.flag || '🌐'
+})
+
+const phoneHint = computed(() => {
+  if (normalizedPhone.value) return `Will use ${normalizedPhone.value} (E.164)`
+  return 'Use +<country code> then your number (e.g., +44..., +91..., +1...)'
+})
+
+function flagFromIso(iso) {
+  try {
+    return iso
+      .toUpperCase()
+      .split('')
+      .map((c) => String.fromCodePoint(c.charCodeAt(0) + 127397))
+      .join('')
+  } catch {
+    return '🌐'
+  }
+}
+
+function onPhoneInput() {
+  let val = String(phoneInput.value || '')
+  // Keep only digits and plus
+  val = val.replace(/[^\d+]/g, '')
+  const hasPlus = val.startsWith('+')
+  val = val.replace(/\+/g, '')
+  if (hasPlus) val = `+${val}`
+  phoneInput.value = val
+}
 
 async function sendOtp() {
   if (!normalizedPhone.value) return ElMessage.error('Enter a valid phone number.')
@@ -394,7 +424,6 @@ async function sendOtp() {
     let verifier = await ensureRecaptcha()
     if (!verifier) throw new Error('reCAPTCHA not ready. Please try again.')
     const formatted = normalizedPhone.value
-    phoneInput.value = formatted.replace('+', '') // keep digits visible without extra +
     // Execute reCAPTCHA once to ensure a fresh token
     try { await verifier.verify() } catch (e) {
       // If element was removed, rebuild and retry once

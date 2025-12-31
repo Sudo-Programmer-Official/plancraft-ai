@@ -4,13 +4,15 @@ import { getFirestore } from "firebase/firestore";
 import { getAnalytics, isSupported as analyticsIsSupported } from "firebase/analytics";
 import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check'
 import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
+import { Capacitor } from '@capacitor/core';
 
 // Build Firebase config from environment with safe fallbacks
 // This lets us swap projects (e.g., PlanCraftAI) without code changes.
-// Use the provided authDomain as-is so teams can use a custom domain
-// (e.g., plancraftai.com) that serves the Firebase auth handler at
-// /__/auth/handler via Firebase Hosting. Falling back only if not provided.
-const safeAuthDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "audit-agent-66451.firebaseapp.com"
+// For native (Capacitor) builds, prefer a dedicated mobile auth domain if provided.
+const isNative = !!Capacitor?.isNativePlatform?.()
+const safeAuthDomain = isNative
+  ? (import.meta.env.VITE_FIREBASE_AUTH_DOMAIN_MOBILE || import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "audit-agent-66451.firebaseapp.com")
+  : (import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "audit-agent-66451.firebaseapp.com")
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDI0qFImSxQFYkT5CRu2K1yEZuPX1W2xEY",

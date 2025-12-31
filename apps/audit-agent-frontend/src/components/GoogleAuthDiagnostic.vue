@@ -22,6 +22,7 @@
 
 <script setup>
 import { ref } from 'vue'
+import { Capacitor } from '@capacitor/core'
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect } from 'firebase/auth'
 import { auth } from '@/firebase/init'
 
@@ -51,6 +52,8 @@ function popupPossible() {
 
 async function runChecks() {
   const ua = getUAInfo()
+  const isNative = Capacitor.isNativePlatform?.() || false
+  const platform = Capacitor.getPlatform?.() || 'web'
   const origin = window.location.origin
   const referrer = document.referrer
   const env = {
@@ -61,10 +64,20 @@ async function runChecks() {
   const effective = {
     authDomain: (auth && auth.app && auth.app.options && auth.app.options.authDomain) || null,
   }
-  const shouldRedirect = ua.isStandalone || (ua.isIOS && ua.isSafari) || ua.isInApp
+  const shouldRedirect = isNative || ua.isStandalone || (ua.isIOS && ua.isSafari) || ua.isInApp
   const canPopup = popupPossible()
-  const suggestion = shouldRedirect ? 'Prefer redirect flow on this device' : (canPopup ? 'Popup should work; check Authorized domains' : 'Popup blocked; try redirect')
-  results.value = { ua, origin, referrer, env, effective, canPopup, shouldRedirect, suggestion }
+  const suggestion = shouldRedirect ? 'Native/redirect flow required on this device' : (canPopup ? 'Popup should work; check Authorized domains' : 'Popup blocked; try redirect')
+  results.value = {
+    ua,
+    native: { isNative, platform },
+    origin,
+    referrer,
+    env,
+    effective,
+    canPopup,
+    shouldRedirect,
+    suggestion,
+  }
 }
 
 async function testPopup() {
@@ -82,6 +95,8 @@ async function testRedirect() {
   const provider = new GoogleAuthProvider()
   provider.setCustomParameters({ prompt: 'select_account' })
   try {
+    console.log('[AuthDiag] redirect authDomain:', auth?.app?.options?.authDomain)
+    console.log('[AuthDiag] redirect URL:', `https://${auth?.app?.options?.authDomain || ''}/__/auth/handler`)
     results.value = { ...results.value, redirect: { starting: true } }
     await signInWithRedirect(auth, provider)
   } catch (e) {
