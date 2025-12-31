@@ -37,6 +37,37 @@ cd android
 ./gradlew bundleRelease
 ```
 
+## Build & sync flow (what runs where)
+
+1) Web + Capacitor layer (run here):
+```
+audit-agent-frontend/
+├─ dist/
+├─ capacitor.config.*      # appId/appName/webDir
+├─ .env.production         # prod API/auth keys
+└─ package.json
+```
+Commands:
+- `npm run build`
+- `npx cap sync android`
+- `npx cap open android`
+
+2) Native Android layer (run here):
+```
+audit-agent-frontend/android/
+├─ app/
+└─ gradlew
+```
+Commands:
+- `./gradlew clean`
+- `./gradlew bundleRelease`
+
+Artifact: `android/app/build/outputs/bundle/release/app-release.aab`
+
+Notes:
+- Ensure `.env.production` points to the real API (no localhost) before `npm run build`.
+- Google/Bing “ping” 404/410 warnings during build are harmless; they don’t affect Android output.
+
 ### Phase 2 — Prep the iOS build (commands)
 
 1) Sync iOS project

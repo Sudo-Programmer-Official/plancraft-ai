@@ -16,6 +16,7 @@
     "tw:init": "tailwindcss init -p"
   },
   "dependencies": {
+    "@capacitor/android": "^8.0.0",
     "@dataconnect/generated": "file:src/dataconnect-generated",
     "@element-plus/icons-vue": "^2.3.1",
     "@fontsource/poppins": "^5.2.6",

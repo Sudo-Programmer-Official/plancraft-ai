@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "488930745261",
+    "project_id": "audit-agent-66451",
+    "storage_bucket": "audit-agent-66451.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:488930745261:android:e120601930b7e037091f24",
+        "android_client_info": {
+          "package_name": "com.sudoprogrammer.plancraftai"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "488930745261-gupaui07bnd41vr67ca180c8sbqh80c9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDv7WQptRBZajFtxUKtR546H3FLQXgIcow"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "488930745261-2cdejk5k1b88aaajifhgpqc0vkman0re.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

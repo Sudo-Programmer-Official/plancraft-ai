@@ -679,6 +679,7 @@ const navGroups = [
       { label: 'Dashboard', icon: '📊', to: '/dashboard' },
       { label: 'Planner', icon: '🧭', to: '/planner' },
       { label: 'Meetings', icon: '📅', to: '/meetings' },
+      { label: 'Quick Links', icon: '🔗', to: '/links' },
       { label: 'Napkin', icon: '🧾', to: '/napkin' },
     ],
   },

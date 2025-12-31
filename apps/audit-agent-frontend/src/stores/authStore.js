@@ -296,9 +296,22 @@ export const useAuthStore = defineStore('authStore', {
         const provider = new GoogleAuthProvider()
         provider.setCustomParameters({ prompt: 'select_account' })
 
-        // If already signed in (phone/email/guest), link Google to the current UID to avoid duplicates.
         const current = auth.currentUser
         const alreadyLinked = (current?.providerData || []).some((p) => p?.providerId === 'google.com')
+        const isNative = !!Capacitor?.isNativePlatform?.()
+        if (isNative) {
+          console.info('[Auth] Native platform detected; using redirect Google sign-in', { linking: !!current && !alreadyLinked })
+          if (current && !alreadyLinked) {
+            await linkWithRedirect(current, provider)
+          } else {
+            await signInWithRedirect(auth, provider)
+          }
+          return
+        }
+
+        console.info('[Auth] Web platform detected; using popup Google sign-in', { linking: !!current && !alreadyLinked })
+
+        // If already signed in (phone/email/guest), link Google to the current UID to avoid duplicates.
         if (current && !alreadyLinked) {
           try {
             const linkResult = await linkWithPopup(current, provider)
@@ -321,40 +334,42 @@ export const useAuthStore = defineStore('authStore', {
               photoURL: user.photoURL,
               role: this.user?.role || 'user',
             }
-        this.guest = false
-        this.token = await user.getIdToken()
-        localStorage.setItem('user', JSON.stringify(this.user))
-        localStorage.setItem('token', this.token)
-        ElNotification({
-          title: 'Google connected',
-          message: 'Your Google account is now linked.',
-          type: 'success',
-          duration: 2200,
-          offset: 80,
-        })
-        return user
-      } catch (err) {
-        const code = String(err?.code || '')
-        if (code.includes('provider-already-linked')) {
-          return current
-        }
-        // Do not fall through to sign-in while a session exists; avoids duplicate users.
-        console.warn('[Auth] Google link failed; aborting sign-in to avoid duplicates', err?.message || err)
-        throw err
-      }
-    }
-
-        // Safari/iOS and standalone PWAs are unreliable with popups → prefer redirect
-        try {
-          const ua = navigator.userAgent || ''
-          const isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone
-          const isIOS = /iP(hone|ad|od)/i.test(ua)
-          const isSafari = /safari/i.test(ua) && !/crios|fxios|fxios|edgios|chrome/i.test(ua)
-          if (isStandalone || (isIOS && isSafari)) {
-            await signInWithRedirect(auth, provider)
-            return
+            this.guest = false
+            this.token = await user.getIdToken()
+            localStorage.setItem('user', JSON.stringify(this.user))
+            localStorage.setItem('token', this.token)
+            ElNotification({
+              title: 'Google connected',
+              message: 'Your Google account is now linked.',
+              type: 'success',
+              duration: 2200,
+              offset: 80,
+            })
+            return user
+          } catch (err) {
+            const code = String(err?.code || '')
+            if (code.includes('provider-already-linked')) {
+              return current
+            }
+            // Do not fall through to sign-in while a session exists; avoids duplicate users.
+            console.warn('[Auth] Google link failed; aborting sign-in to avoid duplicates', err?.message || err)
+            throw err
           }
-        } catch {}
+        }
+
+        // Redirect is reserved for native builds; browsers stay on popup flow.
+        if (isNative) {
+          try {
+            const ua = navigator.userAgent || ''
+            const isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone
+            const isIOS = /iP(hone|ad|od)/i.test(ua)
+            const isSafari = /safari/i.test(ua) && !/crios|fxios|fxios|edgios|chrome/i.test(ua)
+            if (isStandalone || (isIOS && isSafari)) {
+              await signInWithRedirect(auth, provider)
+              return
+            }
+          } catch {}
+        }
 
         // if (isInAppBrowser()) {
         //   console.warn('In-app browser detected — showing warning modal')
@@ -380,7 +395,7 @@ export const useAuthStore = defineStore('authStore', {
 
         //   return // Wait until modal resolves
         // }
-        if (isInAppBrowser()) {
+        if (isNative && isInAppBrowser()) {
           console.warn('In-app browser detected — showing helper modal')
           const container = document.createElement('div')
           document.body.appendChild(container)
@@ -418,7 +433,7 @@ export const useAuthStore = defineStore('authStore', {
           const isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone
           const shouldTryRedirect = popupBlocked || isStandalone || (isIOS && isSafari)
 
-          if (shouldTryRedirect) {
+          if (shouldTryRedirect && isNative) {
             console.warn('[Auth] Popup sign-in blocked/unavailable; trying redirect instead', { code, msg })
             try {
               await signInWithRedirect(auth, provider)
