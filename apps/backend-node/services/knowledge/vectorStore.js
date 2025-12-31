@@ -1,13 +1,23 @@
-import { Pinecone } from "@pinecone-database/pinecone";
-
 const PINECONE_API_KEY = process.env.PINECONE_API_KEY || "";
 const PINECONE_INDEX_NAME = process.env.PINECONE_INDEX_NAME || "plancraft-memory";
 
 let client = null;
 let index = null;
+let pineconeModulePromise = null;
 
 function vectorStoreEnabled() {
   return Boolean(PINECONE_API_KEY && PINECONE_INDEX_NAME);
+}
+
+async function loadPinecone() {
+  if (!pineconeModulePromise) {
+    // Lazy-load Pinecone so startup doesn't crash when the dependency is unavailable or optional
+    pineconeModulePromise = import("@pinecone-database/pinecone").catch((err) => {
+      pineconeModulePromise = null;
+      throw err;
+    });
+  }
+  return pineconeModulePromise;
 }
 
 async function getIndex() {
@@ -15,6 +25,7 @@ async function getIndex() {
     throw new Error("Vector store disabled (missing PINECONE_API_KEY or PINECONE_INDEX_NAME)");
   }
   if (!client) {
+    const { Pinecone } = await loadPinecone();
     client = new Pinecone({ apiKey: PINECONE_API_KEY });
     index = client.index(PINECONE_INDEX_NAME);
   }

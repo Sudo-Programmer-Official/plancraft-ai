@@ -293,7 +293,13 @@ import VoiceRecorder from '@/components/VoiceRecorder.vue'
 import { ElNotification } from 'element-plus'
 import { nlpClient } from '@/services/leader/http'
 import { addTaskToFirebase } from '@/services/firebaseService'
-import { uploadImageForVision } from '@/services/visionUploadService'
+
+function parseEnvFlag(value) {
+  return String(value || '')
+    .split('#')[0]
+    .trim()
+    .toLowerCase() === 'true'
+}
 
 const authStore = useAuthStore()
 const userName = computed(() => authStore?.user?.displayName || 'friend')
@@ -320,6 +326,20 @@ const captureLoading = ref(false)
 const captureError = ref('')
 const captureImageName = ref('')
 const fileInput = ref(null)
+const imageTasksEnabled = parseEnvFlag(import.meta.env.VITE_ENABLE_IMAGE_TASKS)
+let visionUploadLoader = null
+async function getVisionUploader() {
+  if (!imageTasksEnabled) throw new Error('Image capture is disabled')
+  if (!visionUploadLoader) {
+    visionUploadLoader = import('@/services/visionUploadService')
+      .then((mod) => mod.uploadImageForVision)
+      .catch((err) => {
+        visionUploadLoader = null
+        throw err
+      })
+  }
+  return visionUploadLoader
+}
 
 onMounted(async () => {
   logs.value = await fetchEntries()
@@ -466,6 +486,10 @@ async function processCapture(file) {
   captureError.value = ''
   captureItems.value = []
   try {
+    if (!imageTasksEnabled) {
+      throw new Error('Image scanning is disabled.')
+    }
+    const uploadImageForVision = await getVisionUploader()
     const { imageUrl } = await uploadImageForVision(file)
     const { data } = await nlpClient.post('/workspace/ingest-image', { imageUrl })
     capturePreview.value = data?.rawText || data?.ocrText || ''

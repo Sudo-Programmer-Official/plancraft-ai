@@ -1,23 +1,28 @@
-import { getDownloadURL, getStorage, ref as storageRef, uploadBytes } from 'firebase/storage'
-import firebaseApp, { auth } from '@/firebase/init'
+import api from '@/services/api'
 
-const storage = getStorage(firebaseApp)
-
-function randomId() {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
-  return Math.random().toString(36).slice(2, 10)
+type UploadResponse = {
+  imageUrl: string
+  path: string
+  contentType?: string
 }
 
-export async function uploadImageForVision(file: File | Blob) {
-  const uid = auth?.currentUser?.uid || 'anon'
-  const ext = typeof (file as File).name === 'string' && (file as File).name.includes('.')
-    ? (file as File).name.split('.').pop()
-    : (file as File).type?.split('/')?.pop() || 'png'
-  const key = `vision-uploads/${uid}/${Date.now()}-${randomId()}.${ext}`
-  const ref = storageRef(storage, key)
-  await uploadBytes(ref, file, {
-    contentType: (file as File).type || 'image/png',
+export async function uploadImageForVision(file: File | Blob): Promise<UploadResponse> {
+  if (!file) throw new Error('File is required')
+  const form = new FormData()
+  form.append('file', file)
+
+  const res = await api.post('/vision/upload', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 30000,
   })
-  const imageUrl = await getDownloadURL(ref)
-  return { imageUrl, path: key }
+
+  if (!res?.data?.imageUrl || !res?.data?.path) {
+    throw new Error('Upload failed')
+  }
+
+  return {
+    imageUrl: res.data.imageUrl,
+    path: res.data.path,
+    contentType: res.data.contentType,
+  }
 }

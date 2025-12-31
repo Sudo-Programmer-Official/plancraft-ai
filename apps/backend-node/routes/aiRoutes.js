@@ -1,16 +1,20 @@
 // routes/ai.js
 import express from "express";
 import { requireAuth } from "../middleware/auth.js";
-import { enhanceJournalEntry, summarizeTasks, splitTasks, extractReminderTime } from "../services/openaiService.js";
+import { enhanceJournalEntry, summarizeTasks, splitTasks, extractReminderTime, extractTasksFromImage } from "../services/openaiService.js";
 import { inferCategory } from "../services/categoryService.js";
 import { checkUserPlanUsage } from "../services/planService.js";
-import OpenAI from "openai";
 import dotenv from "dotenv";
 
 dotenv.config();
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const router = express.Router();
+// Enable image tasks if either env flag is true; default to true to avoid blocking uploads in dev
+const ENABLE_IMAGE_TASKS = (() => {
+  const flagString = process.env.VITE_ENABLE_IMAGE_TASKS ?? process.env.ENABLE_IMAGE_TASKS
+  if (flagString === undefined) return true // default on to avoid breaking image-only flows
+  return String(flagString).toLowerCase() === 'true'
+})()
 
 const allowedOrigins = [
   "https://plancraftai.com",
@@ -291,11 +295,33 @@ router.post("/tasks/summarize", async (req, res) => {
 // });
 router.post('/split-tasks', async (req, res) => {
   try {
-    const { text, maxItems = 6, context = '', timeContext = null, now: clientNow } = req.body || {}
+    const {
+      text,
+      maxItems = 6,
+      context = '',
+      timeContext = null,
+      now: clientNow,
+      attachments = [],
+      planDate = null,
+      reminderTime: requestedReminderTime = null,
+      workspaceId = null,
+    } = req.body || {}
     const tz = (req.body && req.body.timezone) || req.headers['x-user-tz'] || 'UTC'
     const nowIso = typeof clientNow === 'string' && clientNow ? clientNow : new Date().toISOString()
-    if (!text || typeof text !== 'string') {
-      return res.status(400).json({ error: "'text' is required" })
+    const normalizedAttachments = Array.isArray(attachments)
+      ? attachments
+          .map((att) => ({
+            type: 'image',
+            url: att?.url,
+            mime: att?.mime,
+            name: att?.name,
+          }))
+          .filter((att) => att.url)
+      : []
+    const hasAttachment = normalizedAttachments.length > 0
+    const visionAllowed = ENABLE_IMAGE_TASKS && hasAttachment
+    if (!text && !hasAttachment) {
+      return res.status(400).json({ error: "Either 'text' or 'attachments' is required" })
     }
     // Plan enforcement and usage increment
     try {
@@ -307,11 +333,50 @@ router.post('/split-tasks', async (req, res) => {
         }
       }
     } catch {}
-    const result = await splitTasks(text, { maxItems, context, timeContext })
-    if (!result || !Array.isArray(result.tasks)) {
-      return res.status(502).json({ error: 'Upstream returned unexpected format.' })
+
+    const combinedTasks = []
+    let reminderTime = requestedReminderTime || null
+    const firstAttachment = hasAttachment ? normalizedAttachments[0] : null
+
+    if (visionAllowed && firstAttachment) {
+      try {
+        const vision = await extractTasksFromImage(firstAttachment.url, {
+          planDate,
+          reminderTime: requestedReminderTime,
+          workspaceId,
+        })
+        if (Array.isArray(vision?.tasks)) {
+          combinedTasks.push(
+            ...vision.tasks.map((task) => ({
+              ...task,
+              source: task?.source || 'image',
+              metadata: { ...(task?.metadata || {}), attachmentUrl: firstAttachment.url },
+              attachments: [firstAttachment],
+            })),
+          )
+        }
+      } catch (err) {
+        console.warn('[TimeBrain] vision extraction failed', err?.message || err)
+      }
     }
-    const normalizedTasks = result.tasks
+
+    let reminderFromText = null
+    if (text && typeof text === 'string') {
+      const result = await splitTasks(text, { maxItems, context, timeContext })
+      if (!result || !Array.isArray(result.tasks)) {
+        return res.status(502).json({ error: 'Upstream returned unexpected format.' })
+      }
+      reminderFromText = result?.reminderTime ?? null
+      combinedTasks.push(
+        ...result.tasks.map((t) => ({
+          ...t,
+          source: t?.source || 'text',
+        })),
+      )
+    }
+
+    const rawTasks = combinedTasks.length ? combinedTasks.slice(0, maxItems) : []
+    const normalizedTasks = rawTasks
       .filter((t) => t && typeof t.title === 'string' && t.title.trim().length > 0)
       .map((t, i) => ({
         title: t.title.trim(),
@@ -328,6 +393,9 @@ router.post('/split-tasks', async (req, res) => {
           ? String(t.relation).toLowerCase()
           : 'independent',
         gapMinutes: Number.isFinite(t.gapMinutes) ? Math.max(0, Math.min(Number(t.gapMinutes), 120)) : 15,
+        source: t.source || (firstAttachment ? 'image' : 'text'),
+        metadata: t.metadata || (firstAttachment ? { attachmentUrl: firstAttachment.url } : {}),
+        attachments: Array.isArray(t.attachments) ? t.attachments : firstAttachment ? [firstAttachment] : [],
       }))
     const tasks = await Promise.all(
       normalizedTasks.map(async (task) => {
@@ -352,8 +420,10 @@ router.post('/split-tasks', async (req, res) => {
       })
     } catch {}
     // Attempt time extraction from the same input (non-fatal)
-    let reminderTime = null
-    try { reminderTime = await extractReminderTime(text, { nowISO: nowIso, timezone: tz, timeContext }) } catch {}
+    if (!reminderTime && reminderFromText) reminderTime = reminderFromText
+    if (!reminderTime && text) {
+      try { reminderTime = await extractReminderTime(text, { nowISO: nowIso, timezone: tz, timeContext }) } catch {}
+    }
     res.json({ tasks, reminderTime })
   } catch (error) {
     console.error('❌ Split Tasks API Error:', error)

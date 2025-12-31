@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Open in Browser | PlanCraftAI</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f9fafb;
+      color: #111827;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      text-align: center;
+      padding: 1.5rem;
+    }
+    .card {
+      background: #fff;
+      padding: 2rem;
+      border-radius: 1rem;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+      max-width: 400px;
+    }
+    button {
+      margin-top: 1rem;
+      padding: 0.8rem 1.2rem;
+      border: none;
+      border-radius: 0.5rem;
+      background: #4f46e5;
+      color: #fff;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    .small {
+      font-size: 0.75rem;
+      color: #6b7280;
+      margin-top: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>🌿 Open in Your Browser</h2>
+    <p>
+      It looks like you’re inside the Instagram app.<br>
+      To continue securely with Google Sign-In, please open this page in
+      <strong>Safari</strong> or <strong>Chrome</strong>.
+    </p>
+
+    <button id="copyBtn">📋 Copy Link</button>
+    <div class="small" id="status"></div>
+    <div class="small">Tip: Tap the ••• menu → <em>Open in Browser</em></div>
+  </div>
+
+  <script>
+    const copyBtn = document.getElementById('copyBtn')
+    const status = document.getElementById('status')
+    const homepage = 'https://plancraftai.com'
+
+    // ✅ 1. Copy link support
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(homepage)
+        status.textContent = '✅ Link copied! Open it in Safari or Chrome.'
+      } catch {
+        status.textContent = '⚠️ Long-press and copy manually.'
+      }
+    })
+
+    // ✅ 2. Detect if user is still in an in-app browser
+    const ua = navigator.userAgent.toLowerCase()
+    const isInApp = /(instagram|fbav|facebook|line|wechat|micromessenger|pinterest|snapchat|tiktok)/i.test(ua)
+
+    // ✅ 3. If not in in-app browser → auto redirect to homepage
+    if (!isInApp) {
+      window.location.replace(homepage)
+    }
+  </script>
+</body>
+</html>

@@ -165,7 +165,7 @@
         <div class="space-y-1">
           <p class="text-[11px] uppercase tracking-[0.3em] text-indigo-200/80">Layout</p>
           <h3 class="text-base sm:text-lg font-semibold text-slate-100">Pick the cards you want to see</h3>
-          <p class="text-xs text-indigo-200/80">Defaults to all cards; choices are saved on this device.</p>
+          <p class="text-xs text-indigo-200/80">Defaults to all cards; choices are saved for this workspace.</p>
         </div>
         <div class="flex flex-wrap gap-2">
           <label
@@ -471,15 +471,44 @@
                 Smart scheduling with Google Calendar
               </h3>
               <p class="text-sm text-indigo-100/80">
-                Connect once to auto-pull meetings, prep agendas, and hold buffer space.
+                {{ googleConnected ? 'Pull meetings and prep without re-connecting.' : 'Connect once to auto-pull meetings, prep agendas, and hold buffer space.' }}
               </p>
+              <div v-if="googleConnected" class="flex flex-wrap items-center gap-2 text-xs text-indigo-100/90">
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-700/50 text-emerald-100">
+                  <span class="w-2 h-2 rounded-full bg-emerald-300"></span>
+                  Connected
+                </span>
+                <span v-if="googleLastSync" class="text-slate-200/90">Last sync: {{ googleLastSync }}</span>
+              </div>
             </div>
-            <RouterLink
-              to="/google-calendar-integration"
-              class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm font-semibold text-indigo-50 border border-white/10 transition"
-            >
-              Connect calendar →
-            </RouterLink>
+            <div class="flex flex-wrap items-center gap-2">
+              <button
+                v-if="!googleConnected"
+                type="button"
+                class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm font-semibold text-indigo-50 border border-white/10 transition"
+                @click="goToIntegrations"
+              >
+                Connect calendar →
+              </button>
+              <template v-else>
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm font-semibold text-indigo-50 border border-white/10 transition"
+                  @click="goToMeetings"
+                >
+                  View meetings
+                </button>
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-indigo-500/80 hover:bg-indigo-500 text-sm font-semibold text-white border border-indigo-400/60 transition disabled:opacity-60"
+                  :disabled="googleSyncing"
+                  @click="syncGoogleNow"
+                >
+                  <span v-if="googleSyncing" class="h-4 w-4 mr-2 border-2 border-white/40 border-t-white rounded-full animate-spin" aria-hidden="true"></span>
+                  {{ googleSyncing ? 'Syncing…' : 'Sync now' }}
+                </button>
+              </template>
+            </div>
           </div>
           <ul class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-indigo-100/90">
             <li class="px-3 py-2 rounded-2xl bg-slate-900/40 border border-white/5">🗓️ Auto-sync meetings</li>
@@ -905,6 +934,8 @@ import { resolveReminderIso } from '@/utils/timeHelper.js'
 import { resolveTaskMeetingLink } from '@/utils/taskLinks'
 import { seedGuestStarterTasks } from '@/utils/guestTasks'
 import { subscribeToNapkinItems } from '@/services/napkinService'
+import { fetchDashboardPreferences, saveDashboardPreferences } from '@/services/dashboardPreferencesService'
+import { getGoogleStatus, triggerGoogleSyncNow } from '@/stores/integrationsStore'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -945,31 +976,122 @@ const dashboardCardOptions = [
   { key: 'ai', label: 'AI insights' },
   { key: 'napkin', label: 'Napkin logs' },
 ]
-const DASHBOARD_CARD_STORAGE_KEY = 'dashboard:cards:v1'
+const DASHBOARD_CARD_STORAGE_KEY = 'dashboard:cards:v2'
 const allCardKeys = dashboardCardOptions.map((c) => c.key)
 
-function loadCardVisibility() {
-  if (typeof window === 'undefined') return [...allCardKeys]
-  try {
-    const raw = JSON.parse(localStorage.getItem(DASHBOARD_CARD_STORAGE_KEY) || '[]')
-    if (Array.isArray(raw) && raw.length) {
-      const valid = raw.filter((key) => allCardKeys.includes(key))
-      const missing = allCardKeys.filter((key) => !valid.includes(key))
-      return [...valid, ...missing]
-    }
-  } catch {
-    /* noop */
-  }
-  return [...allCardKeys]
+const cardVisibility = ref(new Set(allCardKeys))
+let savePrefsTimer = null
+let lastPrefsRequestId = 0
+
+function storageKey() {
+  const wsId = activeWorkspaceId.value || 'default'
+  const uid = authStore?.user?.uid || 'anon'
+  return `${DASHBOARD_CARD_STORAGE_KEY}:${uid}:${wsId}`
 }
 
-const cardVisibility = ref(new Set(loadCardVisibility()))
-function persistCardVisibility(nextSet) {
+function sanitizeCardList(list) {
+  const seen = new Set()
+  ;(Array.isArray(list) ? list : []).forEach((key) => {
+    if (typeof key === 'string' && allCardKeys.includes(key)) seen.add(key)
+  })
+  return Array.from(seen)
+}
+
+function cacheVisibility(nextSet) {
+  if (typeof window === 'undefined') return
   try {
-    localStorage.setItem(DASHBOARD_CARD_STORAGE_KEY, JSON.stringify(Array.from(nextSet)))
+    const payload = {
+      visibleCards: Array.from(nextSet),
+      knownCards: [...allCardKeys],
+      updatedAt: Date.now(),
+    }
+    localStorage.setItem(storageKey(), JSON.stringify(payload))
   } catch {
     /* noop */
   }
+}
+
+function readCachedVisibility() {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = localStorage.getItem(storageKey())
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    const visibleCards = sanitizeCardList(parsed.visibleCards)
+    const knownCards = sanitizeCardList(parsed.knownCards || parsed.allCards)
+    if (!visibleCards.length && !knownCards.length) return null
+    return { visibleCards, knownCards }
+  } catch {
+    return null
+  }
+}
+
+function applyVisibility(payload = {}, options = {}) {
+  const visible = sanitizeCardList(payload.visibleCards)
+  const known = sanitizeCardList(payload.knownCards && payload.knownCards.length ? payload.knownCards : allCardKeys)
+  const newKeys = allCardKeys.filter((key) => !known.includes(key))
+  let next = visible.length ? [...visible, ...newKeys] : []
+  if (!next.length && options.fallbackToAll !== false) next = [...allCardKeys]
+  cardVisibility.value = new Set(next)
+  if (options.persistLocal !== false) cacheVisibility(cardVisibility.value)
+}
+
+async function hydrateCardVisibility() {
+  const wsId = activeWorkspaceId.value
+  const uid = authStore?.user?.uid
+  if (!wsId) {
+    applyVisibility({ visibleCards: allCardKeys, knownCards: allCardKeys })
+    return
+  }
+
+  const cached = readCachedVisibility()
+  if (cached) applyVisibility(cached, { persistLocal: false, fallbackToAll: false })
+
+  if (!uid || isGuest.value) {
+    if (!cached) applyVisibility({ visibleCards: allCardKeys, knownCards: allCardKeys })
+    return
+  }
+
+  const requestId = ++lastPrefsRequestId
+  try {
+    const prefs = await fetchDashboardPreferences(uid, wsId)
+    if (requestId !== lastPrefsRequestId) return
+    if (prefs?.visibleCards?.length) {
+      applyVisibility(
+        {
+          visibleCards: prefs.visibleCards,
+          knownCards: prefs.knownCards?.length ? prefs.knownCards : allCardKeys,
+        },
+        { fallbackToAll: true },
+      )
+    } else {
+      applyVisibility({ visibleCards: allCardKeys, knownCards: allCardKeys }, { fallbackToAll: true })
+    }
+  } catch (error) {
+    console.warn('Dashboard layout prefs load failed', error?.message || error)
+    if (!cached && requestId === lastPrefsRequestId) {
+      applyVisibility({ visibleCards: allCardKeys, knownCards: allCardKeys }, { fallbackToAll: true })
+    }
+  }
+}
+
+function schedulePersistVisibility(nextSet) {
+  cacheVisibility(nextSet)
+  const uid = authStore?.user?.uid
+  const wsId = activeWorkspaceId.value
+  if (!uid || !wsId || isGuest.value) return
+  if (savePrefsTimer) clearTimeout(savePrefsTimer)
+  savePrefsTimer = setTimeout(async () => {
+    savePrefsTimer = null
+    try {
+      await saveDashboardPreferences(uid, wsId, {
+        visibleCards: Array.from(nextSet),
+        knownCards: [...allCardKeys],
+      })
+    } catch (error) {
+      console.warn('Dashboard layout prefs save failed', error?.message || error)
+    }
+  }, 400)
 }
 
 function setCardVisibility(key, enabled) {
@@ -977,17 +1099,28 @@ function setCardVisibility(key, enabled) {
   if (enabled) next.add(key)
   else next.delete(key)
   cardVisibility.value = next
-  persistCardVisibility(next)
+  schedulePersistVisibility(next)
 }
 function resetCardVisibility() {
   const next = new Set(allCardKeys)
   cardVisibility.value = next
-  persistCardVisibility(next)
+  schedulePersistVisibility(next)
 }
 const isCardEnabled = (key) => cardVisibility.value.has(key)
 function onCardToggle(key, checked) {
   setCardVisibility(key, checked)
 }
+
+watch(
+  () => ({
+    uid: authStore.user?.uid,
+    workspace: activeWorkspaceId.value,
+  }),
+  () => {
+    hydrateCardVisibility()
+  },
+  { immediate: true }
+)
 
 const showDaily = computed(() => cardVisibility.value.has('daily'))
 const showQuickLinks = computed(() => cardVisibility.value.has('quickLinks'))
@@ -999,6 +1132,17 @@ const showNapkin = computed(() => cardVisibility.value.has('napkin'))
 
 // Usage meter (free plan)
 const usage = ref({ used: 0, limit: 0, plan: '' })
+const googleStatus = ref({ connected: false, accounts: [] })
+const googleLoading = ref(false)
+const googleSyncing = ref(false)
+const primaryGoogleAccount = computed(() => googleStatus.value?.accounts?.[0] || null)
+const googleConnected = computed(() => !!googleStatus.value?.connected && (googleStatus.value?.accounts?.length || googleStatus.value?.accountId))
+const googleLastSync = computed(() => {
+  const lastRun = primaryGoogleAccount.value?.lastRun || googleStatus.value?.lastRun
+  if (!lastRun) return ''
+  const ts = dayjs(lastRun)
+  return ts.isValid() ? ts.format('MMM D · h:mm A') : ''
+})
 async function fetchUsage() {
   try {
     const uid = auth?.currentUser?.uid || localStorage.getItem('uid')
@@ -1007,6 +1151,49 @@ async function fetchUsage() {
     if (data?.success) usage.value = { used: data.used || 0, limit: data.limit || 0, plan: data.plan || '' }
   } catch {
     /* noop */
+  }
+}
+
+async function loadGoogleStatus() {
+  if (!authStore?.user?.uid) return
+  googleLoading.value = true
+  try {
+    const status = await getGoogleStatus(authStore.user.uid)
+    googleStatus.value = status || { connected: false, accounts: [] }
+  } catch (e) {
+    console.warn('google status load failed', e?.message || e)
+  } finally {
+    googleLoading.value = false
+  }
+}
+
+async function syncGoogleNow() {
+  if (!authStore?.user?.uid || !googleConnected.value) return
+  googleSyncing.value = true
+  try {
+    await triggerGoogleSyncNow(authStore.user.uid, primaryGoogleAccount.value?.accountId || null)
+    await loadGoogleStatus()
+    ElMessage.success('Sync started')
+  } catch (e) {
+    console.warn('google sync failed', e?.message || e)
+    ElMessage.error('Unable to sync right now')
+  } finally {
+    googleSyncing.value = false
+  }
+}
+
+function goToIntegrations() {
+  try {
+    routerNav.push('/settings?tab=integrations')
+  } catch (e) {
+    console.warn(e)
+  }
+}
+function goToMeetings() {
+  try {
+    routerNav.push('/meetings')
+  } catch (e) {
+    console.warn(e)
   }
 }
 
@@ -1061,12 +1248,24 @@ function attachNapkinListener() {
   napkinLoading.value = true
   napkinError.value = ''
   try {
-    napkinUnsub = subscribeToNapkinItems((list) => {
-      napkinItems.value = list
-      napkinLoading.value = false
-    })
+    napkinUnsub = subscribeToNapkinItems(
+      (list) => {
+        napkinItems.value = list
+        napkinLoading.value = false
+        napkinError.value = ''
+      },
+      {
+        onError: (error) => {
+          // If we already have data, keep showing it instead of a scary banner.
+          if (!napkinItems.value.length) {
+            napkinError.value = 'Napkin feed is unavailable right now. Please refresh to try again.'
+          }
+          napkinLoading.value = false
+        },
+      },
+    )
   } catch (error) {
-    napkinError.value = error?.message || 'Unable to load napkin stream.'
+    napkinError.value = 'Unable to load napkin stream.'
     napkinLoading.value = false
   }
 }
@@ -1901,6 +2100,10 @@ onUnmounted(() => {
     clearTimeout(onboardingTimer)
     onboardingTimer = null
   }
+  if (savePrefsTimer) {
+    clearTimeout(savePrefsTimer)
+    savePrefsTimer = null
+  }
 })
 
 async function redirectToLogin() {
@@ -2217,6 +2420,7 @@ watch(
       }
       await ensureDailyStreakState(uid)
       userStreak.value = await getUserStreak(uid)
+      await loadGoogleStatus()
     } catch {
       /* noop */
     }
@@ -2225,6 +2429,7 @@ watch(
 )
 
 onMounted(fetchUsage)
+onMounted(loadGoogleStatus)
 
 onMounted(() => {
   try {

@@ -106,10 +106,6 @@ export async function summarizeTasks(tasks) {
  */
 export async function generateTasksFromText(text, options = {}) {
   const trimmed = String(text ?? '').trim()
-  if (!trimmed) {
-    return { tasks: [], items: [], reminderTime: null, revalidation: [], context: null, contextSerialized: null }
-  }
-
   const {
     planDate,
     timezone,
@@ -120,7 +116,24 @@ export async function generateTasksFromText(text, options = {}) {
     existingTasks,
     maxItems,
     debugLabel,
+    attachments,
+    workspaceId,
+    reminderTime,
   } = options
+
+  const sanitizedAttachments = Array.isArray(attachments)
+    ? attachments
+        .map((att) => ({
+          type: att?.type || 'image',
+          url: att?.url,
+          mime: att?.mime,
+        }))
+        .filter((att) => att.url)
+    : []
+
+  if (!trimmed && !sanitizedAttachments.length) {
+    return { tasks: [], items: [], reminderTime: null, revalidation: [], context: null, contextSerialized: null }
+  }
 
   const contextBundle = buildTimeContext({
     planDate,
@@ -140,6 +153,10 @@ export async function generateTasksFromText(text, options = {}) {
     timeContext: contextBundle.context,
     now: contextBundle.context.now,
   }
+  if (planDate) payload.planDate = planDate
+  if (workspaceId) payload.workspaceId = workspaceId
+  if (reminderTime) payload.reminderTime = reminderTime
+  if (sanitizedAttachments.length) payload.attachments = sanitizedAttachments
 
   logTimeBrain('generateTasksFromText:request', {
     label: debugLabel,

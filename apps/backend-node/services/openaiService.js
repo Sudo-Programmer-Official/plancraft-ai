@@ -21,6 +21,30 @@ const FALLBACK_MODELS = (
     "gpt-4.1",
   ]
 ).map((s) => s.trim()).filter(Boolean);
+const VISION_MODEL_CANDIDATES = (
+  process.env.OPENAI_VISION_MODELS?.split(",") || [
+    "gpt-4.1",
+    "gpt-4.1-mini",
+    "gpt-4o",
+    "gpt-4o-mini",
+  ]
+).map((s) => s.trim()).filter(Boolean)
+
+function stripJsonFences(text = "") {
+  return text.replace(/```json/gi, "").replace(/```/g, "").trim()
+}
+
+function tryParseTasks(jsonText = "") {
+  const cleaned = stripJsonFences(jsonText)
+  try {
+    const parsed = JSON.parse(cleaned)
+    if (Array.isArray(parsed)) return parsed
+    if (Array.isArray(parsed?.tasks)) return parsed.tasks
+    return []
+  } catch {
+    return []
+  }
+}
 
 export async function chatWithFallback({ messages, temperature = 0.7, modelList, timeoutMs = 60000 }) {
   const models = modelList && modelList.length ? modelList : [DEFAULT_MODEL, ...FALLBACK_MODELS];
@@ -66,6 +90,41 @@ export async function chatWithFallback({ messages, temperature = 0.7, modelList,
   );
   friendly.cause = lastErr;
   throw friendly;
+}
+
+export async function extractTasksFromImage(imageUrl, { planDate = null, reminderTime = null, workspaceId = null } = {}) {
+  if (!imageUrl) return { tasks: [] }
+  const details = [
+    'You are an assistant turning screenshots and photos into actionable tasks.',
+    'Look for todos, deadlines, meetings, and errands.',
+    'Return ONLY valid JSON:',
+    '{"tasks":[{"title":"","description":"","dueDate":"","priority":"","timeHint":""}]}',
+    'Keep titles under 9 words. If nothing actionable, return {"tasks":[]}.',
+  ]
+  if (planDate) details.push(`Planning date: ${planDate}.`)
+  if (reminderTime) details.push(`Reminder time preference: ${reminderTime}.`)
+  if (workspaceId) details.push(`Workspace: ${workspaceId}.`)
+
+  const messages = [
+    { role: "system", content: "You translate visual notes into short, clear tasks for a planner." },
+    {
+      role: "user",
+      content: [
+        { type: "text", text: details.join("\n") },
+        { type: "image_url", image_url: { url: imageUrl, detail: "low" } },
+      ],
+    },
+  ]
+
+  const content = await chatWithFallback({
+    messages,
+    temperature: 0.3,
+    modelList: VISION_MODEL_CANDIDATES,
+    timeoutMs: 90000,
+  })
+
+  const tasks = tryParseTasks(content)
+  return { tasks }
 }
 
 // ✨ Journal Enhancer

@@ -223,6 +223,13 @@
           </div>
         </div>
 
+        <div
+          v-if="napkinError"
+          class="text-sm text-rose-200 bg-rose-900/40 border border-rose-700/40 rounded-xl px-3 py-2"
+        >
+          {{ napkinError }}
+        </div>
+
         <div v-if="loading" class="space-y-2">
           <div v-for="n in 4" :key="n" class="h-20 bg-slate-900/60 border border-slate-800 rounded-xl animate-pulse" />
         </div>
@@ -334,6 +341,7 @@ const recordedBlob = ref<Blob | null>(null)
 const classification = ref<NapkinClassification | null>(null)
 const saving = ref(false)
 const loading = ref(true)
+const napkinError = ref('')
 const items = ref<NapkinItem[]>([])
 const filter = ref('all')
 const plannerOpen = ref(false)
@@ -684,13 +692,27 @@ async function deleteItem(item: NapkinItem) {
 
 function subscribe() {
   loading.value = true
+  napkinError.value = ''
   try {
-    unsubscribe = subscribeToNapkinItems((list) => {
-      items.value = list
-      loading.value = false
-    })
+    unsubscribe = subscribeToNapkinItems(
+      (list) => {
+        items.value = list
+        loading.value = false
+        napkinError.value = ''
+      },
+      {
+        onError: (error) => {
+          if (!items.value.length) {
+            napkinError.value =
+              'Napkin feed is unavailable right now. Showing the last saved items if possible.'
+          }
+          loading.value = false
+        },
+      },
+    )
   } catch (err: any) {
     console.warn('[napkin] subscribe failed', err?.message || err)
+    napkinError.value = 'Unable to load napkin stream.'
     loading.value = false
   }
 }

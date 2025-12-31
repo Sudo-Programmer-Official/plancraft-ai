@@ -53,6 +53,11 @@ service cloud.firestore {
       allow read, write: if isUser(uid) || isAdmin();
     }
 
+    // Workspace-scoped preferences (per user)
+    match /users/{uid}/workspaces/{workspaceId}/preferences/{prefId} {
+      allow read, write: if isUser(uid) && isActiveMember(workspaceId);
+    }
+
     // tasks — shared per workspace (workspaceId required), legacy fallback to user-owned
     match /tasks/{taskId} {
       // CREATE: must target a workspace and be editor/admin; createdBy must be caller
@@ -83,6 +88,26 @@ service cloud.firestore {
         isAdmin()
         || (resource.data.workspaceId is string && hasWorkspaceRole(resource.data.workspaceId, ['owner', 'admin']))
         || isLegacyPersonalTask(resource.data);
+    }
+
+    // Napkin captures (workspace-scoped under user/workspace)
+    match /users/{uid}/workspaces/{workspaceId}/napkin/{itemId} {
+      allow read: if isUser(uid) && isActiveMember(workspaceId);
+      allow create: if isUser(uid)
+        && hasWorkspaceRole(workspaceId, ['owner', 'admin', 'editor'])
+        && request.resource.data.workspaceId == workspaceId;
+      allow update: if isUser(uid)
+        && hasWorkspaceRole(workspaceId, ['owner', 'admin', 'editor'])
+        && resource.data.workspaceId == workspaceId
+        && request.resource.data.workspaceId == workspaceId;
+      allow delete: if isUser(uid)
+        && hasWorkspaceRole(workspaceId, ['owner', 'admin', 'editor'])
+        && resource.data.workspaceId == workspaceId;
+    }
+
+    // Napkin captures (legacy path)
+    match /napkin/{uid}/items/{itemId} {
+      allow read, write: if isUser(uid);
     }
 
     // journalEntries — owned by user via `userId` field

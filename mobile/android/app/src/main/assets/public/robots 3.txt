@@ -1,0 +1,42 @@
+User-agent: *
+
+Allow: /
+Allow: /features
+Allow: /voice-planning
+Allow: /ai-reminders
+Allow: /google-calendar-integration
+Allow: /blog
+Allow: /pricing
+Allow: /contact
+Allow: /privacy
+Allow: /privacy-policy
+Allow: /terms
+Allow: /data-deletion
+Allow: /help
+
+Disallow: /login
+Disallow: /signup
+Disallow: /billing/upgrade
+Disallow: /dashboard
+Disallow: /daily
+Disallow: /weekly
+Disallow: /monthly
+Disallow: /today
+Disallow: /planner
+Disallow: /timeline
+Disallow: /journal
+Disallow: /habits
+Disallow: /reports
+Disallow: /settings
+Disallow: /subscription
+Disallow: /talk-to-planner
+Disallow: /reminders
+Disallow: /admin
+Disallow: /app
+Disallow: /profile
+Disallow: /creator
+Disallow: /leader
+Disallow: /workspaces
+Disallow: /workspaces/new
+
+Sitemap: https://plancraftai.com/sitemap.xml
