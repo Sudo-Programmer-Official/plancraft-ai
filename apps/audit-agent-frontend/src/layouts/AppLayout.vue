@@ -2,18 +2,13 @@
   <NotificationBanner :user-id="currentUserId" />
   <FeedbackPrompt />
   <FeedbackDrawer />
-  <div
-    class="flex min-h-screen w-full max-w-full overflow-x-hidden bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 text-white"
-  >
-    <!-- Global upgrade banner -->
-    <!-- Global Upgrade Banner -->
+  <div class="flex min-h-screen w-full max-w-full overflow-x-hidden bg-bg text-text transition-colors">
     <div v-if="showUpgrade" class="fixed top-0 left-0 right-0 z-50 px-3 sm:px-6">
       <div
-        class="bg-gradient-to-r from-fuchsia-600/40 via-purple-600/40 to-indigo-600/40 backdrop-blur-xl border border-fuchsia-400/30 text-white rounded-b-xl shadow-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 py-2 sm:py-3 px-3 sm:px-5 animate-fade-in"
+        class="bg-surface border border-border text-text rounded-b-xl shadow-md flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 py-2 sm:py-3 px-3 sm:px-5"
       >
         <span class="text-sm sm:text-base font-medium text-center sm:text-left">
-          🚀 You're on the <span class="text-fuchsia-300 font-semibold">Free Plan</span>. Upgrade to
-          unlock unlimited AI and reminders.
+          🚀 You're on the <span class="font-semibold text-primary">Free Plan</span>. Upgrade to unlock unlimited AI and reminders.
         </span>
 
         <div class="flex flex-wrap items-center justify-center gap-2">
@@ -21,69 +16,68 @@
             v-if="!isGuest"
             to="/subscription"
             @click="trackUpgradeClick"
-            class="bg-gradient-to-r from-fuchsia-500 via-purple-500 to-indigo-500 text-white font-semibold text-sm px-3 py-1.5 rounded-lg hover:scale-105 transition-transform shadow-md"
+            class="bg-primary text-white font-semibold text-sm px-3 py-1.5 rounded-lg hover:bg-primary/90 transition-colors"
           >
             Upgrade
           </RouterLink>
           <RouterLink
             v-else
             to="/login"
-            class="bg-gradient-to-r from-indigo-500 via-sky-500 to-blue-600 text-white font-semibold text-sm px-3 py-1.5 rounded-lg hover:scale-105 transition-transform shadow-md"
+            class="bg-primary text-white font-semibold text-sm px-3 py-1.5 rounded-lg hover:bg-primary/90 transition-colors"
           >
             Sign in
           </RouterLink>
 
           <button
             @click="planOpen = true"
-            class="border border-fuchsia-300/60 text-fuchsia-200 text-sm px-3 py-1.5 rounded-lg hover:bg-fuchsia-500/10 hover:text-white transition-colors"
+            class="border border-border text-text text-sm px-3 py-1.5 rounded-lg hover:bg-surface/70 transition-colors"
           >
             View Plan
           </button>
 
           <button
             @click="showUpgrade = false"
-            class="text-sm text-gray-300 px-2 py-1 hover:text-white hover:bg-fuchsia-400/20 rounded-lg transition-colors"
+            class="text-sm text-muted px-2 py-1 hover:text-text hover:bg-surface/70 rounded-lg transition-colors"
           >
             Dismiss
           </button>
         </div>
       </div>
     </div>
-    <!-- Sidebar (desktop only) -->
+
     <aside
-      class="hidden md:flex flex-col h-screen transition-all duration-300 bg-gray-950/70 backdrop-blur-xl"
+      class="hidden md:flex flex-col h-screen transition-all duration-300 bg-surface border-r border-border"
       :class="sidebarOpen ? 'w-72' : 'w-20'"
     >
-      <div class="flex-shrink-0 flex items-center justify-between p-4 border-b border-gray-700">
-        <h1 v-if="sidebarOpen" class="text-lg font-bold">🌙 PlanCraftAI</h1>
+      <div class="flex-shrink-0 flex items-center justify-between p-4 border-b border-border">
+        <h1 v-if="sidebarOpen" class="text-lg font-semibold truncate">PlanCraft</h1>
         <button
           @click="sidebarOpen = !sidebarOpen"
-          class="p-2 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 transition-colors"
+          class="p-2 rounded-lg border border-border hover:bg-surface/80 transition-colors"
           aria-label="Toggle sidebar"
         >
-          <svg v-if="sidebarOpen" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg v-if="sidebarOpen" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
           </svg>
-          <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
           </svg>
         </button>
       </div>
 
-      <!-- Workspace switcher -->
-      <div class="px-3 pb-3 border-b border-gray-800/70">
+      <div class="px-3 pb-3 border-b border-border">
         <div class="flex items-center justify-between gap-2">
           <div class="flex items-center gap-2 min-w-0">
-            <div class="w-9 h-9 rounded-lg bg-indigo-500/20 border border-indigo-400/40 flex items-center justify-center text-lg">
+            <div class="w-9 h-9 rounded-lg bg-surface border border-border flex items-center justify-center text-lg">
               {{ activeWorkspace?.icon || '📦' }}
             </div>
             <div v-if="sidebarOpen" class="min-w-0">
-              <p class="text-[11px] uppercase tracking-[0.25em] text-slate-500">Workspace</p>
+              <p class="text-[11px] uppercase tracking-[0.25em] text-muted">Workspace</p>
               <p class="text-sm font-semibold truncate">{{ activeWorkspace?.name || 'Personal' }}</p>
             </div>
           </div>
           <button
-            class="p-2 rounded-lg bg-slate-900/70 border border-slate-800 hover:border-indigo-400 transition"
+            class="p-2 rounded-lg border border-border hover:bg-surface/70 transition"
             @click="workspaceMenuOpen = !workspaceMenuOpen"
             aria-label="Change workspace"
           >
@@ -91,23 +85,20 @@
             <span v-else>▼</span>
           </button>
         </div>
-        <div
-          v-if="workspaceMenuOpen"
-          class="mt-2 space-y-1"
-        >
+        <div v-if="workspaceMenuOpen" class="mt-2 space-y-1">
           <button
             v-for="ws in workspaceStore.workspaces"
             :key="ws.id"
-            class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm border border-slate-800 hover:border-indigo-400 transition"
-            :class="{ 'bg-indigo-600/20 border-indigo-400/60': ws.id === activeWorkspaceId }"
+            class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm border border-border hover:border-primary/40 transition"
+            :class="{ 'bg-primary/10 border-primary/30 text-primary': ws.id === activeWorkspaceId }"
             @click="selectWorkspace(ws.id)"
           >
-            <span>{{ ws.icon || '📦' }}</span>
+            <span>{{ ws.icon || '•' }}</span>
             <span v-if="sidebarOpen" class="truncate">{{ ws.name }}</span>
           </button>
           <RouterLink
             to="/workspaces"
-            class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-indigo-200 hover:text-white bg-slate-900/70 border border-slate-800 hover:border-indigo-400 transition"
+            class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-text hover:text-primary border border-border hover:border-primary/40 transition"
             @click="workspaceMenuOpen = false"
           >
             <span>➕</span>
@@ -117,7 +108,6 @@
         </div>
       </div>
 
-      <!-- Nav links -->
       <nav class="flex-1 mt-4 space-y-3 overflow-y-auto scrollbar-plan px-2">
         <div
           v-for="group in filteredNavGroups"
@@ -126,26 +116,20 @@
         >
           <button
             v-if="group.collapsible"
-            class="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold text-slate-200 rounded hover:bg-gray-800"
+            class="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold rounded hover:bg-surface/80 text-text"
             @click="toggleGroup(group.key)"
           >
             <span class="flex items-center gap-2">
-              <span>{{ group.icon }}</span>
-              <span v-if="sidebarOpen" class="flex items-center gap-2">
-                <span>{{ group.title }}</span>
-                <span v-if="group.beta" class="beta-pill">Beta</span>
-              </span>
+              <span v-if="sidebarOpen">{{ group.title }}</span>
+              <span v-else class="font-semibold">{{ group.title?.charAt(0) }}</span>
             </span>
-            <span v-if="sidebarOpen" class="text-xs text-slate-400">
+            <span v-if="sidebarOpen" class="text-xs text-muted">
               {{ openGroups[group.key] ? '▾' : '▸' }}
             </span>
           </button>
-          <div v-else class="px-3 py-2 text-sm font-semibold text-slate-200 flex items-center gap-2">
-            <span>{{ group.icon }}</span>
-            <span v-if="sidebarOpen" class="flex items-center gap-2">
-              <span>{{ group.title }}</span>
-              <span v-if="group.beta" class="beta-pill">Beta</span>
-            </span>
+          <div v-else class="px-3 py-2 text-sm font-semibold text-text flex items-center gap-2">
+            <span v-if="sidebarOpen">{{ group.title }}</span>
+            <span v-else class="font-semibold">{{ group.title?.charAt(0) }}</span>
           </div>
 
           <div v-show="!group.collapsible || openGroups[group.key]" class="mt-1 space-y-1">
@@ -153,132 +137,101 @@
               v-for="item in group.children"
               :key="item.to"
               :to="item.to"
-              class="flex items-center gap-3 w-full px-4 py-2 rounded transition hover:bg-gray-800 text-sm text-slate-200"
-              :class="{ 'bg-indigo-600': isActive(item.to) }"
+              class="flex items-center w-full px-4 py-2 rounded-lg transition text-sm text-text hover:bg-surface/70 border border-transparent"
+              :class="{ 'bg-primary/10 text-primary border-primary/30': isActive(item.to) }"
             >
-              <span>{{ item.icon }}</span>
               <span v-if="sidebarOpen">{{ item.label }}</span>
+              <span v-else class="text-xs font-semibold">{{ item.label.charAt(0) }}</span>
             </RouterLink>
           </div>
         </div>
-
-        <div class="pt-2 border-t border-gray-800/60 mt-4">
-          <RouterLink
-            v-for="item in systemLinks"
-            :key="item.to"
-            :to="item.to"
-            class="flex items-center gap-3 w-full px-3 py-2 rounded transition hover:bg-gray-800 text-sm text-slate-200"
-            :class="{ 'bg-indigo-600': isActive(item.to) }"
-          >
-            <span>{{ item.icon }}</span>
-            <span v-if="sidebarOpen">{{ item.label }}</span>
-          </RouterLink>
-        </div>
       </nav>
 
-      <!-- Sidebar Footer: segmented actions -->
       <div class="flex-shrink-0 mt-auto pb-4 px-3">
-        <div
-          class="grid gap-1 bg-gray-900/60 border border-gray-800 rounded-lg p-1"
-          :class="[authStore.user?.role === 'admin' ? 'grid-cols-7' : 'grid-cols-6']"
-        >
+        <div class="grid grid-cols-6 gap-1 bg-surface border border-border rounded-lg p-1">
           <button
             @click="startTour"
-            class="text-xs py-2 rounded-md hover:bg-gray-800 transition"
+            class="text-xs py-2 rounded-md hover:bg-surface/70 transition"
             title="Show Tour"
           >
             ❔
           </button>
           <RouterLink
             to="/settings"
-            class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
+            class="text-xs py-2 rounded-md hover:bg-surface/70 text-center transition"
             title="Settings"
             >⚙️</RouterLink
           >
           <RouterLink
             to="/subscription"
-            class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
+            class="text-xs py-2 rounded-md hover:bg-surface/70 text-center transition"
             title="Billing"
             >💳</RouterLink
           >
           <RouterLink
-            v-if="authStore.user?.role === 'admin'"
-            to="/admin"
-            class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
-            title="Admin Panel"
-            >🛠</RouterLink
-          >
-          <RouterLink
             to="/help"
-            class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
+            class="text-xs py-2 rounded-md hover:bg-surface/70 text-center transition"
             title="Help"
             >💬</RouterLink
+          >
+          <RouterLink
+            to="/workspaces"
+            class="text-xs py-2 rounded-md hover:bg-surface/70 text-center transition"
+            title="Workspaces"
+            >🏠</RouterLink
           >
           <button
             v-if="!isGuest"
             @click="handleLogout"
-            class="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-1.5 rounded-lg 
-                   bg-gradient-to-r from-red-600 to-pink-600 text-white shadow-md 
-                   hover:shadow-lg hover:from-red-500 hover:to-pink-500 
-                   transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98]"
+            class="text-xs py-2 rounded-md hover:bg-surface/70 transition text-danger font-semibold"
             title="Logout"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 -ml-[1px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-7.5A2.25 2.25 0 003.75 5.25v13.5A2.25 2.25 0 006 21h7.5a2.25 2.25 0 002.25-2.25V15" />
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h12m0 0l-3-3m3 3l-3 3" />
-            </svg>
+            ⎋
           </button>
-          
         </div>
       </div>
     </aside>
 
-    <!-- Mobile drawer -->
     <transition name="slide">
       <aside
         v-if="mobileMenu"
-        class="fixed inset-0 bg-black/50 z-40 md:hidden"
+        class="fixed inset-0 bg-black/40 z-40 md:hidden"
         @click.self="mobileMenu = false"
       >
-        <div class="absolute left-0 top-0 bottom-0 w-64 bg-gray-900 p-4 flex flex-col">
-          <!-- Header -->
+        <div class="absolute left-0 top-0 bottom-0 w-64 bg-surface p-4 flex flex-col border-r border-border">
           <div class="flex justify-between items-center mb-6">
-            <h1 class="text-lg font-bold">🌙 PlanCraftAI</h1>
-            <button @click="mobileMenu = false" class="p-2 rounded hover:bg-gray-800">✖️</button>
+            <h1 class="text-lg font-semibold">PlanCraft</h1>
+            <button @click="mobileMenu = false" class="p-2 rounded hover:bg-surface/70">✖️</button>
           </div>
 
           <div class="mb-4">
-            <p class="text-xs text-slate-400 mb-1">Workspace</p>
+            <p class="text-xs text-muted mb-1">Workspace</p>
             <select
               v-model="selectedWorkspaceId"
-              class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100"
+              class="w-full bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text"
               @change="selectWorkspace(selectedWorkspaceId)"
             >
               <option v-for="ws in workspaceStore.workspaces" :key="ws.id" :value="ws.id">
-                {{ ws.icon || '📦' }} {{ ws.name }}
+                {{ ws.name }}
               </option>
             </select>
             <RouterLink
               to="/workspaces"
-              class="mt-2 inline-flex items-center gap-2 text-xs text-indigo-200"
+              class="mt-2 inline-flex items-center gap-2 text-xs text-primary"
               @click="mobileMenu = false"
             >
-              ➕ Manage workspaces
+              Manage workspaces
             </RouterLink>
           </div>
 
-          <!-- Navigation -->
           <nav class="space-y-3 flex-1 overflow-y-auto scrollbar-plan">
             <div v-for="group in filteredNavGroups" :key="group.key" class="rounded-lg">
               <div
-                class="flex items-center justify-between px-3 py-2 text-sm font-semibold text-slate-200"
+                class="flex items-center justify-between px-3 py-2 text-sm font-semibold text-text"
                 @click="toggleGroup(group.key)"
               >
-                <span class="flex items-center gap-2">
-                  <span>{{ group.icon }}</span>
-                  <span>{{ group.title }}</span>
-                </span>
-                <span class="text-xs text-slate-400">
+                <span>{{ group.title }}</span>
+                <span class="text-xs text-muted">
                   {{ openGroups[group.key] ? '▾' : '▸' }}
                 </span>
               </div>
@@ -287,63 +240,34 @@
                   v-for="item in group.children"
                   :key="item.to"
                   :to="item.to"
-                  class="block px-4 py-2 rounded hover:bg-indigo-600"
+                  class="block px-4 py-2 rounded hover:bg-surface/70"
                   @click="mobileMenu = false"
                 >
-                  {{ item.icon }} {{ item.label }}
+                  {{ item.label }}
                 </RouterLink>
               </div>
             </div>
-            <div class="pt-2 border-t border-gray-800/60 mt-4">
-              <RouterLink
-                v-for="item in systemLinks"
-                :key="item.to"
-                :to="item.to"
-                class="block px-3 py-2 rounded hover:bg-indigo-600"
-                @click="mobileMenu = false"
-              >
-                {{ item.icon }} {{ item.label }}
-              </RouterLink>
-            </div>
           </nav>
 
-          <!-- Logout -->
-          <!-- <button
-            v-if="authStore.isLoggedIn"
-            @click="handleLogout"
-            class="mt-6 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg w-full"
-          >
-            Logout
-          </button> -->
-          <div class="p-4 border-t border-gray-800">
-            <!-- Grouped card: Settings | Tour | Profile | Billing | Help | Logout -->
-            <div
-              class="grid grid-cols-6 gap-1 bg-gray-900/60 border border-gray-800 rounded-lg p-1"
-            >
+          <div class="p-4 border-t border-border">
+            <div class="grid grid-cols-5 gap-1 bg-surface border border-border rounded-lg p-1">
               <RouterLink
                 to="/settings"
                 @click="mobileMenu = false"
-                class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
+                class="text-xs py-2 rounded-md hover:bg-surface/70 text-center transition"
                 title="Settings"
                 >⚙️</RouterLink
               >
               <RouterLink
-                to="/profile"
-                @click="mobileMenu = false"
-                class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
-                title="Profile"
-                >👤</RouterLink
-              >
-              <RouterLink
                 to="/subscription"
                 @click="mobileMenu = false"
-                class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
+                class="text-xs py-2 rounded-md hover:bg-surface/70 text-center transition"
                 title="Billing"
                 >💳</RouterLink
               >
               <button
                 @click="startTour"
-                class="text-xs py-2 rounded-md hover:bg-gray-800 transition"
+                class="text-xs py-2 rounded-md hover:bg-surface/70 transition"
                 title="Show Tour"
               >
                 ❔
@@ -351,17 +275,17 @@
               <RouterLink
                 to="/help"
                 @click="mobileMenu = false"
-                class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
+                class="text-xs py-2 rounded-md hover:bg-surface/70 text-center transition"
                 title="Help"
                 >💬</RouterLink
               >
               <button
                 v-if="authStore.isLoggedIn"
                 @click="handleLogout"
-                class="text-xs py-2 rounded-md hover:bg-gray-800 transition"
+                class="text-xs py-2 rounded-md hover:bg-surface/70 transition text-danger font-semibold"
                 title="Logout"
               >
-                🚪
+                ⎋
               </button>
             </div>
           </div>
@@ -369,15 +293,12 @@
       </aside>
     </transition>
 
-    <!-- Main Content -->
-    <div class="flex-1 flex flex-col w-full max-w-full h-screen overflow-x-hidden">
-      <!-- Header -->
+    <div class="flex-1 flex flex-col w-full max-w-full h-screen overflow-x-hidden bg-bg">
       <header
-        class="sticky top-0 z-10 bg-gray-950/60 backdrop-blur-xl border-b border-gray-800 p-4 flex justify-between items-center w-full"
+        class="sticky top-0 z-10 bg-surface/95 backdrop-blur border-b border-border p-4 flex justify-between items-center w-full"
       >
         <div class="flex items-center gap-3 min-w-0 flex-1">
-          <!-- Hamburger (mobile only) -->
-          <button class="md:hidden p-2 hover:bg-gray-800 rounded" @click="mobileMenu = !mobileMenu">
+          <button class="md:hidden p-2 rounded border border-border hover:bg-surface/70" @click="mobileMenu = !mobileMenu">
             <svg
               class="w-6 h-6"
               fill="none"
@@ -388,21 +309,27 @@
               <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <h2 class="text-lg sm:text-2xl font-semibold capitalize truncate max-w-[50vw]">
+          <h2 class="text-lg sm:text-2xl font-semibold truncate max-w-[50vw]">
             {{ $route.name }}
           </h2>
         </div>
 
-        <!-- Right Section -->
-        <div class="flex flex-wrap items-center gap-2 sm:gap-4 min-w-0">
-          <!-- Talk to Planner shortcut -->
+        <div class="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
+          <button
+            @click="switchTheme"
+            class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border hover:bg-surface/70 text-sm"
+            aria-label="Toggle theme"
+          >
+            <span>{{ themeMode === 'dark' ? 'Dark' : 'Light' }}</span>
+          </button>
+
           <button
             @click="goToTalkPlanner"
             :class="[
-              'flex items-center justify-center rounded-full border p-2 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-400',
+              'flex items-center justify-center rounded-full border p-2 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary/50',
               isOnTalkPlanner
-                ? 'bg-indigo-500/40 border-indigo-300 text-white'
-                : 'bg-indigo-500/15 border-indigo-400/50 text-indigo-200 hover:bg-indigo-500/25'
+                ? 'bg-primary/20 border-primary/50 text-primary'
+                : 'bg-surface border-border text-text hover:bg-surface/70'
             ]"
             title="Talk to Planner"
             aria-label="Talk to Planner"
@@ -423,71 +350,56 @@
             </svg>
           </button>
 
-          <!-- Feedback shortcut -->
-          <!-- <button
-            @click="openFeedback"
-            class="hidden sm:flex items-center justify-center rounded-full border border-fuchsia-400/40 bg-fuchsia-500/15 p-2 text-fuchsia-100 transition hover:bg-fuchsia-500/30 focus:outline-none focus:ring-2 focus:ring-fuchsia-400"
-            title="Share feedback"
-          >
-            💬
-          </button> -->
-
-          <!-- Upgrade Button / Pro Badge -->
           <div v-if="authReady" class="flex items-center gap-2 whitespace-nowrap">
             <template v-if="isPremium">
               <el-tooltip content="You're on the Premium Plan!" placement="bottom">
                 <RouterLink
                   to="/subscription"
-                  class="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-sm hover:from-purple-600 hover:to-pink-700 transition"
+                  class="bg-primary text-white px-3 py-1 rounded-full text-sm font-semibold shadow-sm hover:bg-primary/90 transition"
                 >
-                  🧠 Pro
+                  Pro
                 </RouterLink>
-                <!-- <span class="bg-gradient-to-r from-purple-700 to-pink-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-sm">🧠 Pro</span> -->
               </el-tooltip>
             </template>
             <template v-else>
               <RouterLink
                 v-if="!isGuest"
                 to="/subscription"
-                class="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-sm hover:from-purple-600 hover:to-pink-700 transition"
+                class="border border-border text-sm px-3 py-1 rounded-full font-semibold hover:bg-surface/70 transition"
               >
-                🚀 Upgrade
+                Upgrade
               </RouterLink>
               <button
                 v-else
                 @click="goToLogin"
-                class="bg-gradient-to-r from-indigo-600 to-blue-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-sm hover:from-indigo-500 hover:to-blue-500 transition animate-pulse-slow"
+                class="border border-border text-sm px-3 py-1 rounded-full font-semibold hover:bg-surface/70 transition"
               >
-                🔑 Sign in
+                Sign in
               </button>
             </template>
           </div>
           <div
             v-else
-            class="w-[88px] h-8 rounded-full bg-white/10 animate-pulse"
+            class="w-[88px] h-8 rounded-full bg-surface animate-pulse"
             aria-hidden="true"
           ></div>
 
-          <!-- User Avatar -->
           <img
             v-if="authStore.isLoggedIn"
             :src="authStore.user?.photoURL || 'https://i.pravatar.cc/40'"
-            class="rounded-full w-10 h-10 cursor-pointer"
+            class="rounded-full w-10 h-10 cursor-pointer border border-border"
             alt="avatar"
             @click="router.push('/settings')"
           />
-
-          <!-- Logout removed from header per guidelines -->
         </div>
       </header>
 
-      <!-- Dynamic content -->
-      <main class="p-6 flex-1 overflow-y-auto overflow-x-hidden scrollbar-plan">
+      <main class="p-6 flex-1 overflow-y-auto overflow-x-hidden scrollbar-plan bg-bg">
         <RouterView />
       </main>
-      <!-- Compact sticky footer -->
+
       <footer
-        class="py-3 text-center text-xs sm:text-sm text-indigo-300 bg-slate-950/95 border-t border-gray-800"
+        class="py-3 text-center text-xs sm:text-sm text-muted bg-surface border-t border-border"
       >
         <div
           class="max-w-7xl mx-auto px-4 flex items-center justify-center sm:justify-between gap-3"
@@ -530,6 +442,7 @@ import { db } from '@/firebase/init'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { trackLinkedInConversion } from '@/utils/ads'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
+import { initTheme, toggleTheme } from '@/composables/useTheme'
 const currentUserId = ref(null)
 
 function deriveUidFromStorage() {
@@ -573,6 +486,7 @@ const mobileMenu = ref(false) // mobile drawer toggle
 const showUpgrade = ref(false)
 const planOpen = ref(false)
 const profileSetupOpen = ref(false)
+const themeMode = ref(initTheme())
 
 const router = useRouter()
 const route = useRoute()
@@ -588,7 +502,6 @@ const { isPremium, isGuest } = useAuthFlags()
 const authReady = computed(() => !authStore.loading)
 const activeWorkspace = computed(() => workspaceStore.activeWorkspace || {})
 const activeWorkspaceId = computed(() => workspaceStore.activeWorkspaceId)
-const activeWorkspaceSettings = computed(() => activeWorkspace.value?.settings || {})
 
 const isOnTalkPlanner = computed(() => route.path === '/talk-to-planner')
 let upgradeHandler = null
@@ -670,111 +583,46 @@ function isActive(path) {
 
 const navGroups = [
   {
-    key: 'core',
-    title: 'Core',
-    icon: '⭐',
+    key: 'dashboard',
+    title: 'Dashboard',
     collapsible: false,
     defaultOpen: true,
-    children: [
-      { label: 'Dashboard', icon: '📊', to: '/dashboard' },
-      { label: 'Planner', icon: '🧭', to: '/planner' },
-      { label: 'Meetings', icon: '📅', to: '/meetings' },
-      { label: 'Quick Links', icon: '🔗', to: '/links' },
-      { label: 'Napkin', icon: '🧾', to: '/napkin' },
-    ],
+    children: [{ label: 'Home', to: '/dashboard' }],
   },
   {
-    key: 'planning',
-    title: 'Planning',
-    icon: '🗓',
+    key: 'planner',
+    title: 'Planner',
     collapsible: true,
     defaultOpen: true,
     children: [
-      { label: 'Daily', icon: '📆', to: '/daily' },
-      { label: 'Weekly', icon: '🗒', to: '/weekly' },
-      { label: 'Monthly', icon: '🗂', to: '/monthly' },
+      { label: 'Daily', to: '/daily' },
+      { label: 'Weekly', to: '/weekly' },
+      { label: 'Monthly', to: '/monthly' },
     ],
   },
   {
     key: 'review',
     title: 'Review',
-    icon: '📊',
     collapsible: true,
-    defaultOpen: false,
+    defaultOpen: true,
     children: [
-      { label: 'Journal', icon: '📔', to: '/journal' },
-      { label: 'Reports', icon: '📈', to: '/reports' },
-      { label: 'Habits', icon: '🏆', to: '/habits' },
+      { label: 'Reports', to: '/reports' },
+      { label: 'Journal', to: '/journal' },
     ],
   },
   {
     key: 'settings',
     title: 'Settings',
-    icon: '⚙️',
     collapsible: true,
-    defaultOpen: false,
+    defaultOpen: true,
     children: [
-      { label: 'Integrations', icon: '🔗', to: '/settings?tab=integrations' },
-      { label: 'Reminders', icon: '🔔', to: '/reminders' },
-    ],
-  },
-  {
-    key: 'creator',
-    title: 'Creator Mode',
-    icon: '🎨',
-    beta: true,
-    collapsible: true,
-    defaultOpen: false,
-    children: [
-      { label: 'Content Board', icon: '🏠', to: '/creator' },
-      { label: 'Calendar', icon: '📅', to: '/creator/calendar' },
-      { label: 'Repurpose', icon: '🔁', to: '/creator/repurpose' },
-      { label: 'Editor', icon: '✏️', to: '/creator/editor' },
-      { label: 'Publish', icon: '📤', to: '/creator/publish' },
-    ],
-  },
-  {
-    key: 'leader',
-    title: 'Leader Mode',
-    icon: '🧑‍💼',
-    beta: true,
-    collapsible: true,
-    defaultOpen: false,
-    children: [
-      { label: 'Events', icon: '🎉', to: '/leader/events' },
-      { label: 'Occasions', icon: '🎂', to: '/leader/occasions' },
-      { label: 'Messages', icon: '✉️', to: '/leader/messages' },
-      { label: 'Issues', icon: '🚨', to: '/leader/issues' },
-      { label: 'Contacts', icon: '👥', to: '/leader/contacts' },
-      { label: 'Maps', icon: '🗺', to: '/leader/maps' },
-    ],
-  },
-  {
-    key: 'ai',
-    title: 'AI Quick Actions',
-    icon: '🤖',
-    collapsible: true,
-    defaultOpen: false,
-    children: [
-      { label: 'Talk to Planner', icon: '🎤', to: '/talk-to-planner' },
-      { label: 'Napkin', icon: '🧾', to: '/napkin' },
+      { label: 'Settings', to: '/settings' },
+      { label: 'Workspaces', to: '/workspaces' },
     ],
   },
 ]
 
-const filteredNavGroups = computed(() => {
-  const creatorOn = !!activeWorkspaceSettings.value.creatorModeEnabled
-  const leaderOn = !!activeWorkspaceSettings.value.leaderModeEnabled
-  return navGroups.filter((group) => {
-    if (group.key === 'creator') return creatorOn
-    if (group.key === 'leader') return leaderOn
-    return true
-  })
-})
-
-const systemLinks = [
-  { label: 'Workspaces', icon: '📦', to: '/workspaces' },
-]
+const filteredNavGroups = computed(() => navGroups)
 
 const openGroups = reactive({})
 
@@ -803,12 +651,8 @@ function goToTalkPlanner() {
   }
 }
 
-function openFeedback() {
-  try {
-    feedbackStore.openDrawer({ route: route.name || route.path, source: 'header' })
-  } catch (err) {
-    console.warn('Failed to open feedback drawer', err?.message || err)
-  }
+function switchTheme() {
+  themeMode.value = toggleTheme()
 }
 
 onMounted(() => {
@@ -853,24 +697,5 @@ function startTour() {
 .slide-enter-from,
 .slide-leave-to {
   transform: translateX(-100%);
-}
-/* Subtle pulse for guest sign-in CTA */
-@keyframes pulseSlow {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.9; transform: scale(1.02); }
-}
-.animate-pulse-slow {
-  animation: pulseSlow 2s ease-in-out infinite;
-}
-
-.beta-pill {
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: #c7d2fe;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
 }
 </style>

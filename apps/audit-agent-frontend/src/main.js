@@ -4,6 +4,9 @@ import './assets/theme.scss'
 import './assets/styles/scrollbar.css'
 import 'element-plus/dist/index.css'
 
+import { initTheme } from '@/composables/useTheme'
+initTheme()
+
 import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'

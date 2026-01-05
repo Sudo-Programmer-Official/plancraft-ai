@@ -32,7 +32,7 @@ const examplePrompt = buildPrompt('Build an AI app for food delivery')
 </style> -->
 
 <template>
-  <div v-if="authStore.loading" class="flex items-center justify-center h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 text-white">
+  <div v-if="authStore.loading" class="flex items-center justify-center h-screen bg-bg text-text">
     <div class="text-center animate-pulse">
       <div class="text-2xl">🌙 PlanCraftAI</div>
       <p class="text-sm opacity-80 mt-2">Restoring your session...</p>

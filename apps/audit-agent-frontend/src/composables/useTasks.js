@@ -237,7 +237,6 @@ export function useTasks() {
       startDate: filterOverrides?.startDate || today,
       endDate: filterOverrides?.endDate || filterOverrides?.startDate || today,
     }
-    await ensureDailyRollover()
     await refreshAllTasks(true)
     syncFiltered(baseFilter)
   }
@@ -427,6 +426,7 @@ export function useTasks() {
         previousDate: options.previousDate,
       })
       await refreshAllTasks(true)
+      return payload
     } catch (err) {
       console.warn('[useTasks] moveTasks failed', err?.message || err)
       await refreshAllTasks(true)
@@ -506,6 +506,19 @@ export function useTasks() {
       console.warn('[useTasks] failed to attach workspace watcher', err?.message || err)
     }
   }
+
+  // Keep filtered tasks in sync when the shared list changes externally.
+  watch(
+    allTasks,
+    () => {
+      try {
+        syncFiltered()
+      } catch (err) {
+        console.warn('[useTasks] sync after allTasks change failed', err?.message || err)
+      }
+    },
+    { deep: true },
+  )
 
   return {
     tasks,

@@ -1,41 +1,39 @@
-/* === PlanCraftAI Toast Theme === */
+/* === Toast Theme === */
 .el-notification {
   border-radius: 0.75rem !important;
-  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 35%, #4c1d95 100%) !important;
-  color: #e2e8f0 !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  box-shadow: 0 0 20px rgba(147, 51, 234, 0.3);
-  backdrop-filter: blur(12px);
+  background: rgb(var(--surface)) !important;
+  color: rgb(var(--text)) !important;
+  border: 1px solid rgb(var(--border)) !important;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.18);
   font-family: 'Inter', 'Poppins', sans-serif;
-  animation: toastSlideIn 0.5s ease forwards;
+  animation: toastSlideIn 0.35s ease forwards;
 }
 
 .el-notification__title {
-  color: #c4b5fd !important; /* light purple */
+  color: rgb(var(--text)) !important;
   font-weight: 600;
 }
 
 .el-notification__content {
-  color: #e2e8f0 !important; /* slate-100 */
-  font-size: 0.9rem;
+  color: rgb(var(--muted)) !important;
+  font-size: 0.95rem;
 }
 
-/* Icon glow variants */
-.el-notification--success::before { content: '✨'; margin-right: 0.5rem; }
-.el-notification--info::before    { content: '💡'; margin-right: 0.5rem; }
-.el-notification--error::before   { content: '⚠️'; margin-right: 0.5rem; }
-.el-notification--warning::before { content: '🚧'; margin-right: 0.5rem; }
-
-/* Gradient glow for toast border */
 .el-notification__group {
-  border-left: 3px solid transparent;
-  border-image: linear-gradient(180deg, #ec4899, #a855f7) 1;
-  border-image-slice: 1;
+  border-left: 3px solid rgb(var(--primary));
 }
 
-/* Subtle slide-in animation */
+.el-notification--success .el-notification__group {
+  border-left-color: rgb(var(--accent));
+}
+.el-notification--error .el-notification__group {
+  border-left-color: rgb(var(--danger));
+}
+.el-notification--warning .el-notification__group {
+  border-left-color: rgb(var(--primary));
+}
+
 @keyframes toastSlideIn {
-  0% { opacity: 0; transform: translateY(-10px) scale(0.98); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
+  0% { opacity: 0; transform: translateY(-8px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
-
