@@ -194,7 +194,7 @@ const filterMode = ref('Today') // Today | Next7 | Custom
 const authStore = useAuthStore()
 const workspaceStore = useWorkspaceStore()
 const activeWorkspaceId = computed(() => workspaceStore.activeWorkspaceId)
-const { allTasks, refreshAllTasks, ensureDailyRollover, getTaskPlannedDate } = useTasks()
+const { allTasks, refreshAllTasks, getTaskPlannedDate } = useTasks()
 const showPast = ref(false)
 const visibleCount = computed(() => visibleReminders.value.length)
 const chipDates = computed(() =>
@@ -502,7 +502,6 @@ async function onSnooze(r) {
 onMounted(() => {
   (async () => {
     try {
-      await ensureDailyRollover().catch(() => {})
       await refreshAllTasks(true).catch(() => {})
     } catch {}
     await loadReminders()

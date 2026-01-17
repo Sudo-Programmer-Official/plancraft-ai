@@ -207,7 +207,7 @@ import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { useTasks } from '@/composables/useTasks'
 
 const workspaceStore = useWorkspaceStore()
-const { allTasks, refreshAllTasks, ensureDailyRollover, getTaskPlannedDate } = useTasks()
+const { allTasks, refreshAllTasks, getTaskPlannedDate } = useTasks()
 
 const loading = ref(true)
 const searchTerm = ref('')
@@ -325,7 +325,6 @@ function resetFilters() {
 async function reload() {
   loading.value = true
   try {
-    await ensureDailyRollover()
     await refreshAllTasks(true)
   } finally {
     loading.value = false
@@ -364,7 +363,6 @@ watch(
 
 onMounted(async () => {
   try {
-    await ensureDailyRollover()
     await refreshAllTasks(true)
   } finally {
     loading.value = false

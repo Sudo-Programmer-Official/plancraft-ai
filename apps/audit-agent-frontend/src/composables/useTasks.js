@@ -237,7 +237,6 @@ export function useTasks() {
       startDate: filterOverrides?.startDate || today,
       endDate: filterOverrides?.endDate || filterOverrides?.startDate || today,
     }
-    await ensureDailyRollover()
     await refreshAllTasks(true)
     syncFiltered(baseFilter)
   }

@@ -255,7 +255,12 @@
                 <li
                   v-for="task in filteredDaily"
                   :key="task.id"
-                  class="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-900/70 border border-slate-800/80 hover:border-indigo-500/40 transition"
+                  :class="[
+                    'flex items-center justify-between gap-3 p-3 rounded-xl transition border',
+                    activeTaskId === task.id
+                      ? 'bg-indigo-900/60 border-indigo-400/70 shadow-[0_0_12px_rgba(99,102,241,0.35)]'
+                      : 'bg-slate-900/70 border-slate-800/80 hover:border-indigo-500/40',
+                  ]"
                 >
                   <div class="flex flex-1 items-start gap-3">
                     <input
@@ -296,6 +301,14 @@
                     </div>
                   </div>
                   <div class="flex items-center gap-2">
+                    <button
+                      v-if="!task.completed"
+                      @click.stop="markTaskActive(task)"
+                      class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold border transition"
+                      :class="activeTaskId === task.id ? 'border-indigo-400 bg-indigo-900/60 text-indigo-100' : 'border-slate-600 bg-slate-800/70 text-slate-200 hover:border-indigo-400 hover:text-white'"
+                    >
+                      <span class="text-xs">{{ activeTaskId === task.id ? '▶ Active' : 'Start' }}</span>
+                    </button>
                     <button
                       v-if="reminderActiveByTask[task.id]"
                       @click.stop="onReminderClick(task)"
@@ -453,7 +466,12 @@
               <li
                 v-for="task in filteredAllTasks"
                 :key="task.id"
-                class="p-3 rounded-xl bg-slate-900/70 border border-slate-800/80 hover:border-indigo-500/40 transition flex justify-between gap-3"
+                :class="[
+                  'p-3 rounded-xl border transition flex justify-between gap-3',
+                  activeTaskId === task.id
+                    ? 'bg-indigo-900/60 border-indigo-500/60 shadow-[0_0_12px_rgba(99,102,241,0.35)]'
+                    : 'bg-slate-900/70 border-slate-800/80 hover:border-indigo-500/40',
+                ]"
               >
                 <div class="space-y-1">
                   <div class="flex flex-wrap items-center gap-2">
@@ -493,6 +511,13 @@
                       class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-800/70 border border-slate-700 text-slate-200"
                     >
                       ◻️ Open
+                    </span>
+                    <span
+                      v-if="activeTaskId === task.id"
+                      class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-indigo-900/60 border border-indigo-600/70 text-indigo-100"
+                    >
+                      <span class="w-2 h-2 rounded-full bg-indigo-300 animate-pulse"></span>
+                      Active
                     </span>
                   </div>
                 </div>
@@ -1462,11 +1487,12 @@ watch(
 )
 
 /* -------------- Tasks + Journal state -------------- */
-const { loadTasks, allTasks, moveTasks, refreshAllTasks, ensureDailyRollover } = useTasks()
+const { loadTasks, allTasks, moveTasks, refreshAllTasks } = useTasks()
 const aiSummary = ref(null)
 const dailyTasks = ref([])
 const weeklyTasks = ref([])
 const monthlyTasks = ref([])
+const activeTaskId = ref(null)
 const showPlanner = ref(false)
 const selectedTask = ref(null)
 const dailyList = ref(null)
@@ -1794,6 +1820,13 @@ const filteredDaily = computed(() => {
   return sortedDaily.value.filter((task) => resolveCategory(task?.category) === dashboardCategory.value)
 })
 
+const activeTaskExists = computed(() => {
+  const id = activeTaskId.value
+  if (!id) return false
+  const pool = [...dailyTasks.value, ...weeklyTasks.value, ...monthlyTasks.value]
+  return pool.some((t) => t?.id === id)
+})
+
 const filteredWeeklyPreview = computed(() => {
   const base =
     dashboardCategory.value === 'All'
@@ -1830,6 +1863,7 @@ function formatNapkinDate(ms) {
 
 async function toggleComplete(task) {
   task.completed = !task.completed
+  if (task.completed && activeTaskId.value === task.id) activeTaskId.value = null
   const patch = { completed: task.completed }
   if (task.completed) patch.completedAt = serverTimestamp()
   else patch.completedAt = null
@@ -1919,8 +1953,20 @@ function goToProgress() {
   routerNav.push('/reports')
 }
 
+function markTaskActive(task) {
+  if (!task || task.completed) return
+  activeTaskId.value = task.id === activeTaskId.value ? null : task.id
+}
+
+watch(
+  () => [dailyTasks.value, weeklyTasks.value, monthlyTasks.value].map((list) => list.map((t) => t.id).join(',')).join(';'),
+  () => {
+    if (!activeTaskId.value) return
+    if (!activeTaskExists.value) activeTaskId.value = null
+  },
+)
+
 onMounted(async () => {
-  await ensureDailyRollover()
   await refreshAllTasks().catch(() => {})
   try {
     carryoverDismissedToday.value =
