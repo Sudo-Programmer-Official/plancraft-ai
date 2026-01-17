@@ -561,6 +561,13 @@ export async function moveTasksToDate(taskPayloads = [], targetDate, extra = {})
   }
   const wsId = currentWorkspaceId()
   if (!wsId) throw new Error('No active workspace selected')
+  let currentRole = null
+  try {
+    const store = useWorkspaceStore?.()
+    currentRole = store?.activeWorkspaceRole || store?.workspaces?.find?.((w) => w.id === wsId)?.role || null
+  } catch {
+    currentRole = null
+  }
   const normalizedDate =
     typeof targetDate === 'string' && /\d{4}-\d{2}-\d{2}/.test(targetDate)
       ? targetDate
@@ -570,6 +577,21 @@ export async function moveTasksToDate(taskPayloads = [], targetDate, extra = {})
     .map((item) => (typeof item === 'string' ? { id: item } : item))
     .filter((t) => t?.id)
   if (!list.length) return []
+
+  try {
+    console.log('[moveTasksToDate] write payload', {
+      count: list.length,
+      ids: list.map((t) => t.id),
+      targetDate: normalizedDate,
+      workspaceId: wsId,
+      createdBy: list[0]?.createdBy,
+      uid: user.uid,
+      role: currentRole,
+      extra,
+    })
+  } catch {
+    /* noop */
+  }
 
   const batch = writeBatch(db)
   list.forEach((task) => {

@@ -2462,6 +2462,13 @@ async function onReactivate() {
 }
 
 async function applyCarryover(limit = 3) {
+  if (!authStore?.user?.uid) {
+    return redirectToLogin()
+  }
+  if (isGuest.value) {
+    ElMessage({ type: 'warning', message: 'Sign in to move tasks forward.', duration: 2000 })
+    return
+  }
   try {
     const candidates = carryoverCandidates.value
     if (!candidates.length) {
@@ -2488,8 +2495,14 @@ async function applyCarryover(limit = 3) {
       duration: 1600,
     })
   } catch (error) {
-    console.warn('applyCarryover failed', error?.response?.data || error?.message)
-    ElMessage({ type: 'error', message: 'Could not move tasks right now.', duration: 1800 })
+    const msg = error?.response?.data || error?.message || ''
+    const perm = typeof error?.code === 'string' && error.code.includes('permission')
+    console.warn('applyCarryover failed', msg)
+    ElMessage({
+      type: perm ? 'warning' : 'error',
+      message: perm ? 'You do not have permission to move tasks in this workspace.' : 'Could not move tasks right now.',
+      duration: 2400,
+    })
   }
 }
 
