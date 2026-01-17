@@ -573,10 +573,16 @@ export async function moveTasksToDate(taskPayloads = [], targetDate, extra = {})
       ? targetDate
       : toLocalDateKey(new Date(targetDate || Date.now()))
 
-  const list = (Array.isArray(taskPayloads) ? taskPayloads : [])
+  const incoming = (Array.isArray(taskPayloads) ? taskPayloads : [])
     .map((item) => (typeof item === 'string' ? { id: item } : item))
     .filter((t) => t?.id)
-  if (!list.length) return []
+  if (!incoming.length) return []
+
+  const list = incoming.filter((t) => !t.workspaceId || t.workspaceId === wsId)
+  const skipped = incoming.filter((t) => t.workspaceId && t.workspaceId !== wsId).map((t) => t.id)
+  if (!list.length) {
+    throw new Error('No tasks in the active workspace to move')
+  }
 
   try {
     console.log('[moveTasksToDate] write payload', {
@@ -588,6 +594,7 @@ export async function moveTasksToDate(taskPayloads = [], targetDate, extra = {})
       uid: user.uid,
       role: currentRole,
       extra,
+      skippedCrossWorkspace: skipped,
     })
   } catch {
     /* noop */
@@ -599,8 +606,8 @@ export async function moveTasksToDate(taskPayloads = [], targetDate, extra = {})
     const updates = {
       date: normalizedDate,
       updatedAt: serverTimestamp(),
-      workspaceId: wsId,
     }
+    if (!task.workspaceId) updates.workspaceId = wsId
     if (extra.status) updates.status = extra.status
     if ('completed' in extra) updates.completed = !!extra.completed
     else if (task.completed !== undefined) updates.completed = !!task.completed
