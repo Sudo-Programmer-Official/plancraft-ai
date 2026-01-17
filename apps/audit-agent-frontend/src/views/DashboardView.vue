@@ -6,7 +6,7 @@
   <SetupPrompt v-else-if="showSetup" @done="showSetup = false" @close="showSetup = false" />
   <main
     v-else
-    class="min-h-screen px-2 py-6 sm:px-4 md:px-6 space-y-6 lg:space-y-8 pb-12 transition-colors"
+    class="min-h-screen px-2 py-6 sm:px-4 md:px-6 space-y-6 lg:space-y-8 pb-12 transition-colors max-w-7xl mx-auto"
   >
     <GuestBanner :isGuest="authStore.guest" @login="redirectToLogin" />
 
@@ -193,11 +193,8 @@
     </section>
 
     <!-- Tier 2 · Workspaces -->
-    <section class="grid grid-cols-1 gap-4 lg:gap-6 md:grid-cols-2 xl:grid-cols-5">
-      <div
-        v-if="showDaily"
-        class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 xl:col-span-3"
-      >
+    <section class="space-y-4 lg:space-y-5">
+      <div v-if="showDaily" class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4">
         <div class="dashboard-card daily-card space-y-5">
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
@@ -320,7 +317,7 @@
             </div>
 
             <p v-else class="text-slate-400 text-sm">
-              {{ dashboardCategory === 'All' ? 'No tasks today.' : 'No tasks in this category yet.' }}
+              {{ dashboardCategory === 'All' ? 'Nothing planned for today.' : 'No tasks in this category yet.' }}
             </p>
           </div>
 
@@ -336,10 +333,183 @@
         </div>
       </div>
 
-      <div
-        v-if="showWeekly"
-        class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 xl:col-span-2"
-      >
+      <div v-if="showAllTasks" class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4">
+        <div class="dashboard-card all-tasks-card space-y-5">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h3 class="text-lg sm:text-xl font-semibold text-slate-100">
+                🗂 All Tasks
+              </h3>
+              <p class="text-xs sm:text-sm text-indigo-200/80">
+                Sweep across weeks or set a custom window to review every task in one calm view.
+              </p>
+            </div>
+            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900/70 border border-indigo-700/50 text-xs text-indigo-100">
+              <span class="uppercase tracking-[0.25em] text-[10px] text-indigo-300/80">Range</span>
+              <span class="font-semibold">{{ allTasksRangeLabel }}</span>
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="preset in allTasksPresets"
+                :key="preset.key"
+                type="button"
+                @click="applyAllTasksPreset(preset.key)"
+                :class="[
+                  'flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition',
+                  allTasksPreset === preset.key
+                    ? 'bg-indigo-600 text-white shadow-[0_10px_30px_rgba(79,70,229,0.35)] border border-indigo-400/70'
+                    : 'bg-slate-900/70 border border-slate-700/60 text-slate-200 hover:border-indigo-400/40',
+                ]"
+              >
+                <span>{{ preset.label }}</span>
+                <span v-if="preset.hint" class="text-[11px] text-indigo-100/80">{{ preset.hint }}</span>
+              </button>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3 p-3 rounded-2xl bg-slate-900/70 border border-slate-800/70">
+              <label class="flex items-center gap-2 text-xs text-slate-300">
+                <span class="text-slate-400">From</span>
+                <input
+                  v-model="allTasksStartDate"
+                  type="date"
+                  class="rounded-lg bg-slate-800/80 border border-slate-700 text-slate-100 text-xs px-3 py-2 focus:border-indigo-400 focus:outline-none"
+                />
+              </label>
+              <span class="text-slate-600 text-sm">→</span>
+              <label class="flex items-center gap-2 text-xs text-slate-300">
+                <span class="text-slate-400">To</span>
+                <input
+                  v-model="allTasksEndDate"
+                  type="date"
+                  class="rounded-lg bg-slate-800/80 border border-slate-700 text-slate-100 text-xs px-3 py-2 focus:border-indigo-400 focus:outline-none"
+                />
+              </label>
+
+              <div class="flex items-center gap-2 ml-auto flex-wrap sm:flex-nowrap">
+                <div class="flex gap-1 bg-slate-800/60 border border-slate-700 rounded-full p-1">
+                  <button
+                    v-for="status in allTasksStatusOptions"
+                    :key="status.key"
+                    type="button"
+                    @click="allTasksStatus = status.key"
+                    :class="[
+                      'px-2.5 py-1 rounded-full text-[11px] font-semibold transition',
+                      allTasksStatus === status.key
+                        ? 'bg-indigo-600 text-white shadow-[0_10px_30px_rgba(79,70,229,0.35)]'
+                        : 'text-slate-200 hover:text-white',
+                    ]"
+                  >
+                    {{ status.label }}
+                  </button>
+                </div>
+                <select
+                  v-model="allTasksCategory"
+                  class="text-xs bg-slate-800/80 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:border-indigo-400 focus:outline-none"
+                >
+                  <option v-for="cat in categoryFilters" :key="cat" :value="cat">
+                    {{ categoryIcon(cat) }} {{ cat }}
+                  </option>
+                </select>
+                <div class="relative">
+                  <span class="absolute left-2 top-2.5 text-slate-500">🔍</span>
+                  <input
+                    v-model="allTasksSearch"
+                    type="text"
+                    placeholder="Search title or notes"
+                    class="pl-7 pr-3 py-2 rounded-lg bg-slate-800/80 border border-slate-700 text-xs text-slate-100 focus:border-indigo-400 focus:outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 text-sm">
+            <div class="p-3 rounded-xl bg-slate-900/70 border border-slate-800/80">
+              <p class="text-[11px] uppercase tracking-[0.25em] text-indigo-200/70">Total</p>
+              <p class="text-lg font-semibold text-slate-50">{{ allTasksRangeStats.total }}</p>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/70 border border-slate-800/80">
+              <p class="text-[11px] uppercase tracking-[0.25em] text-emerald-200/70">Done</p>
+              <p class="text-lg font-semibold text-emerald-200">{{ allTasksRangeStats.completed }}</p>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/70 border border-slate-800/80">
+              <p class="text-[11px] uppercase tracking-[0.25em] text-amber-200/70">Open</p>
+              <p class="text-lg font-semibold text-amber-200">{{ allTasksRangeStats.pending }}</p>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/70 border border-slate-800/80">
+              <p class="text-[11px] uppercase tracking-[0.25em] text-rose-200/70">Overdue</p>
+              <p class="text-lg font-semibold text-rose-200">{{ allTasksRangeStats.overdue }}</p>
+            </div>
+          </div>
+
+          <div
+            v-if="filteredAllTasks.length"
+            class="overflow-y-auto max-h-[60vh] md:max-h-72 scrollbar-plan rounded-2xl pr-1"
+          >
+            <ul class="space-y-2 text-sm">
+              <li
+                v-for="task in filteredAllTasks"
+                :key="task.id"
+                class="p-3 rounded-xl bg-slate-900/70 border border-slate-800/80 hover:border-indigo-500/40 transition flex justify-between gap-3"
+              >
+                <div class="space-y-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span
+                      class="font-medium"
+                      :class="{ 'line-through text-slate-500': task.completed, 'text-slate-100': !task.completed }"
+                    >
+                      {{ task.title }}
+                    </span>
+                    <div
+                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/80 text-[11px] font-medium shadow-sm"
+                      :class="categoryColor(task.category)"
+                    >
+                      <span class="leading-none">{{ categoryIcon(task.category) }}</span>
+                      <span>{{ categoryLabel(task.category) }}</span>
+                    </div>
+                  </div>
+                  <div class="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-800/70 border border-slate-700">
+                      <span class="text-indigo-300">📅</span>
+                      <span>{{ task.date }}</span>
+                    </span>
+                    <span
+                      v-if="task.completed"
+                      class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-800/60 border border-emerald-600/60 text-emerald-100"
+                    >
+                      ✅ Done
+                    </span>
+                    <span
+                      v-else-if="task.date < todayKeyRef"
+                      class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-rose-900/50 border border-rose-700/70 text-rose-100"
+                    >
+                      ⚠️ Overdue
+                    </span>
+                    <span
+                      v-else
+                      class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-800/70 border border-slate-700 text-slate-200"
+                    >
+                      ◻️ Open
+                    </span>
+                  </div>
+                </div>
+              </li>
+            </ul>
+          </div>
+          <p v-else class="text-slate-400 text-sm">
+            No tasks match this range yet. Try widening the dates or clearing filters.
+          </p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 gap-4 lg:gap-6 md:grid-cols-2 xl:grid-cols-5">
+        <div
+          v-if="showWeekly"
+          class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 xl:col-span-2"
+        >
         <div class="dashboard-card weekly-card space-y-4">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -550,6 +720,7 @@
           </div>
         </div>
       </div>
+    </div>
     </section>
 
     <!-- Tier 3 · Analytics & Insights -->
@@ -969,6 +1140,7 @@ const cancelAtFmt = computed(() =>
 // UI toggles
 const dashboardCardOptions = [
   { key: 'daily', label: 'Daily focus' },
+  { key: 'allTasks', label: 'All tasks timeline' },
   { key: 'weekly', label: 'Weekly horizon' },
   { key: 'monthly', label: 'Monthly momentum' },
   { key: 'quickLinks', label: 'Quick links' },
@@ -1126,6 +1298,7 @@ const showDaily = computed(() => cardVisibility.value.has('daily'))
 const showQuickLinks = computed(() => cardVisibility.value.has('quickLinks'))
 const showWeekly = computed(() => cardVisibility.value.has('weekly'))
 const showMonthly = computed(() => cardVisibility.value.has('monthly'))
+const showAllTasks = computed(() => cardVisibility.value.has('allTasks'))
 const showJournal = computed(() => cardVisibility.value.has('journal'))
 const showAIInsights = computed(() => cardVisibility.value.has('ai'))
 const showNapkin = computed(() => cardVisibility.value.has('napkin'))
@@ -2025,6 +2198,127 @@ const endOfWeek = new Date(startOfWeek)
 endOfWeek.setDate(startOfWeek.getDate() + 6)
 const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
 const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0)
+
+const allTasksPreset = ref('thisWeek')
+const allTasksStartDate = ref(toLocalDateKey(startOfWeek))
+const allTasksEndDate = ref(toLocalDateKey(endOfWeek))
+const allTasksStatus = ref('all')
+const allTasksCategory = ref('All')
+const allTasksSearch = ref('')
+const allTasksStatusOptions = [
+  { key: 'all', label: 'All' },
+  { key: 'pending', label: 'Pending' },
+  { key: 'completed', label: 'Done' },
+]
+let applyingAllTasksPreset = false
+
+const allTasksPresets = computed(() => [
+  { key: 'thisWeek', label: 'This week', hint: 'Week view' },
+  { key: 'last7', label: 'Last 7 days', hint: 'Retro' },
+  { key: 'next7', label: 'Next 7 days', hint: 'Upcoming' },
+  { key: 'thisMonth', label: 'This month', hint: dayjs(today).format('MMM') },
+  { key: 'custom', label: 'Custom range', hint: 'Pick dates' },
+])
+
+const normalizedAllTaskRange = computed(() => {
+  const start = allTasksStartDate.value || todayKeyRef.value
+  const end = allTasksEndDate.value || start
+  if (start > end) return { start: end, end: start }
+  return { start, end }
+})
+
+const allTasksRangeLabel = computed(() => {
+  const { start, end } = normalizedAllTaskRange.value
+  const startFmt = start ? dayjs(start).format('MMM D') : '—'
+  const endFmt = end ? dayjs(end).format('MMM D') : startFmt
+  const days = start && end ? Math.max(1, dayjs(end).diff(dayjs(start), 'day') + 1) : 0
+  return days ? `${startFmt} → ${endFmt} · ${days} day${days === 1 ? '' : 's'}` : `${startFmt} → ${endFmt}`
+})
+
+function resolveAllTasksPresetRange(key) {
+  const now = dayjs()
+  if (key === 'thisWeek') return { start: toLocalDateKey(startOfWeek), end: toLocalDateKey(endOfWeek) }
+  if (key === 'last7')
+    return { start: toLocalDateKey(now.subtract(6, 'day').toDate()), end: toLocalDateKey(now.toDate()) }
+  if (key === 'next7')
+    return { start: toLocalDateKey(now.toDate()), end: toLocalDateKey(now.add(6, 'day').toDate()) }
+  if (key === 'thisMonth') return { start: toLocalDateKey(startOfMonth), end: toLocalDateKey(endOfMonth) }
+  return {
+    start: allTasksStartDate.value || todayKeyRef.value,
+    end: allTasksEndDate.value || allTasksStartDate.value || todayKeyRef.value,
+  }
+}
+
+function applyAllTasksPreset(key) {
+  const { start, end } = resolveAllTasksPresetRange(key)
+  applyingAllTasksPreset = true
+  allTasksStartDate.value = start
+  allTasksEndDate.value = end
+  allTasksPreset.value = key
+  setTimeout(() => {
+    applyingAllTasksPreset = false
+  }, 0)
+}
+
+const allTasksRangePool = computed(() => {
+  const { start, end } = normalizedAllTaskRange.value
+  const safeStart = start || todayKeyRef.value
+  const safeEnd = end || safeStart
+  const fallback = [...dailyTasks.value, ...weeklyTasks.value, ...monthlyTasks.value]
+  const source = (allTasks.value && allTasks.value.length ? allTasks.value : fallback) || []
+  const uniqueSource = Array.from(new Map(source.map((t) => [t.id, t])).values())
+  return uniqueSource.filter((task) => {
+    const plannedRaw =
+      typeof task.date === 'string' ? task.date : task.date ? toYMD(task.date?.toDate?.() || task.date) : null
+    const planned = plannedRaw || safeStart
+    return planned >= safeStart && planned <= safeEnd
+  })
+})
+
+const filteredAllTasks = computed(() => {
+  const search = allTasksSearch.value.trim().toLowerCase()
+  const status = allTasksStatus.value
+  const targetCategory = allTasksCategory.value === 'All' ? null : resolveCategory(allTasksCategory.value)
+
+  const list = allTasksRangePool.value.filter((task) => {
+    const cat = resolveCategory(task?.category)
+    if (targetCategory && cat !== targetCategory) return false
+    if (status === 'pending' && task.completed) return false
+    if (status === 'completed' && !task.completed) return false
+    if (search) {
+      const title = String(task.title || '').toLowerCase()
+      const details = String(task.details || '').toLowerCase()
+      if (!title.includes(search) && !details.includes(search)) return false
+    }
+    return true
+  })
+
+  return list.sort((a, b) => {
+    if (a.completed !== b.completed) return a.completed ? 1 : -1
+    if (a.date !== b.date) return a.date > b.date ? 1 : -1
+    return (b.createdAt || 0) - (a.createdAt || 0)
+  })
+})
+
+const allTasksRangeStats = computed(() => {
+  const base = allTasksRangePool.value
+  const total = base.length
+  const completed = base.filter((t) => t.completed).length
+  const pending = Math.max(0, total - completed)
+  const overdue = base.filter((t) => !t.completed && (t.date || '') < todayKeyRef.value).length
+  return { total, completed, pending, overdue }
+})
+
+watch(
+  [allTasksStartDate, allTasksEndDate],
+  ([start, end]) => {
+    if (applyingAllTasksPreset) return
+    if (start && end && start > end) {
+      allTasksEndDate.value = start
+    }
+    allTasksPreset.value = 'custom'
+  },
+)
 
 const unsubscribe = ref(null)
 
