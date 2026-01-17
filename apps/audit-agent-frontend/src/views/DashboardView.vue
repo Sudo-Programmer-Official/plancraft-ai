@@ -473,52 +473,60 @@
                     : 'bg-slate-900/70 border-slate-800/80 hover:border-indigo-500/40',
                 ]"
               >
-                <div class="space-y-1">
-                  <div class="flex flex-wrap items-center gap-2">
-                    <span
-                      class="font-medium"
-                      :class="{ 'line-through text-slate-500': task.completed, 'text-slate-100': !task.completed }"
-                    >
-                      {{ task.title }}
-                    </span>
-                    <div
-                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/80 text-[11px] font-medium shadow-sm"
-                      :class="categoryColor(task.category)"
-                    >
-                      <span class="leading-none">{{ categoryIcon(task.category) }}</span>
-                      <span>{{ categoryLabel(task.category) }}</span>
+                <div class="flex items-start gap-3 flex-1">
+                  <input
+                    type="checkbox"
+                    :checked="task.completed"
+                    @change="() => toggleComplete(task)"
+                    class="mt-1 w-4 h-4 cursor-pointer accent-indigo-500"
+                  />
+                  <div class="space-y-1">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span
+                        class="font-medium"
+                        :class="{ 'line-through text-slate-500': task.completed, 'text-slate-100': !task.completed }"
+                      >
+                        {{ task.title }}
+                      </span>
+                      <div
+                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/80 text-[11px] font-medium shadow-sm"
+                        :class="categoryColor(task.category)"
+                      >
+                        <span class="leading-none">{{ categoryIcon(task.category) }}</span>
+                        <span>{{ categoryLabel(task.category) }}</span>
+                      </div>
                     </div>
-                  </div>
-                  <div class="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
-                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-800/70 border border-slate-700">
-                      <span class="text-indigo-300">📅</span>
-                      <span>{{ task.date }}</span>
-                    </span>
-                    <span
-                      v-if="task.completed"
-                      class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-800/60 border border-emerald-600/60 text-emerald-100"
-                    >
-                      ✅ Done
-                    </span>
-                    <span
-                      v-else-if="task.date < todayKeyRef"
-                      class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-rose-900/50 border border-rose-700/70 text-rose-100"
-                    >
-                      ⚠️ Overdue
-                    </span>
-                    <span
-                      v-else
-                      class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-800/70 border border-slate-700 text-slate-200"
-                    >
-                      ◻️ Open
-                    </span>
-                    <span
-                      v-if="activeTaskId === task.id"
-                      class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-indigo-900/60 border border-indigo-600/70 text-indigo-100"
-                    >
-                      <span class="w-2 h-2 rounded-full bg-indigo-300 animate-pulse"></span>
-                      Active
-                    </span>
+                    <div class="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+                      <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-800/70 border border-slate-700">
+                        <span class="text-indigo-300">📅</span>
+                        <span>{{ task.date }}</span>
+                      </span>
+                      <span
+                        v-if="task.completed"
+                        class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-800/60 border border-emerald-600/60 text-emerald-100"
+                      >
+                        ✅ Done
+                      </span>
+                      <span
+                        v-else-if="task.date < todayKeyRef"
+                        class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-rose-900/50 border border-rose-700/70 text-rose-100"
+                      >
+                        ⚠️ Overdue
+                      </span>
+                      <span
+                        v-else
+                        class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-800/70 border border-slate-700 text-slate-200"
+                      >
+                        ◻️ Open
+                      </span>
+                      <span
+                        v-if="activeTaskId === task.id"
+                        class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-indigo-900/60 border border-indigo-600/70 text-indigo-100"
+                      >
+                        <span class="w-2 h-2 rounded-full bg-indigo-300 animate-pulse"></span>
+                        Active
+                      </span>
+                    </div>
                   </div>
                 </div>
               </li>
