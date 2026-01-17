@@ -538,10 +538,10 @@
         </div>
       </div>
 
-      <div class="grid grid-cols-1 gap-4 lg:gap-6 md:grid-cols-2 xl:grid-cols-5">
+      <div class="space-y-4 lg:space-y-5">
         <div
           v-if="showWeekly"
-          class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 xl:col-span-2"
+          class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4"
         >
         <div class="dashboard-card weekly-card space-y-4">
           <div class="flex flex-wrap items-center justify-between gap-3">
@@ -623,7 +623,7 @@
 
       <div
         v-if="showQuickLinks"
-        class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 xl:col-span-2"
+        class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4"
       >
         <div class="dashboard-card quick-links-card">
           <QuickLinksCard />
@@ -632,7 +632,7 @@
 
       <div
         v-if="showMonthly"
-        class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 xl:col-span-3"
+        class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4"
       >
         <div class="dashboard-card monthly-card space-y-4">
           <div class="flex flex-wrap items-center justify-between gap-3">
@@ -663,7 +663,7 @@
         </div>
       </div>
 
-      <div class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 xl:col-span-2">
+      <div class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4">
         <div
           class="dashboard-card calendar-sync-card space-y-4 bg-gradient-to-br from-indigo-900/70 via-purple-900/60 to-slate-900/70 border border-indigo-600/40 shadow-lg"
         >
@@ -756,12 +756,12 @@
     </div>
     </section>
 
-    <!-- Tier 3 · Analytics & Insights -->
-    <section class="grid grid-cols-1 gap-4 lg:gap-6 lg:grid-cols-2">
-      <div
-        v-if="showJournal"
-        class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4"
-      >
+<!-- Tier 3 · Analytics & Insights -->
+<section class="space-y-4 lg:space-y-5">
+  <div
+    v-if="showJournal"
+    class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4"
+  >
         <div class="dashboard-card journal-card space-y-4">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <h3 class="text-lg sm:text-xl font-semibold text-slate-100">📖 Journal Snapshot</h3>
@@ -873,10 +873,10 @@
         </div>
       </div>
 
-      <div
-        v-if="showNapkin"
-        class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 lg:col-span-2"
-      >
+  <div
+    v-if="showNapkin"
+    class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4"
+  >
         <div
           class="dashboard-card napkin-card space-y-4 bg-gradient-to-br from-slate-900/70 via-indigo-900/60 to-purple-900/60 border border-indigo-700/40"
         >
@@ -960,7 +960,7 @@
         </div>
       </div>
 
-      <div class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 lg:col-span-2">
+  <div class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4">
         <div class="dashboard-card report-card space-y-4">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="flex items-center gap-2">
