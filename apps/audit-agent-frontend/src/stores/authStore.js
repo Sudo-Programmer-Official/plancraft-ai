@@ -20,6 +20,7 @@ import {
   signInWithPopup,
   linkWithPopup,
   linkWithCredential,
+  signInWithCredential,
   signInWithRedirect,
   linkWithRedirect,
   getRedirectResult,
@@ -677,9 +678,24 @@ export const useAuthStore = defineStore('authStore', {
         let user = null
         if (current && !alreadyLinked) {
           // Link phone credential to existing session to avoid duplicate UIDs.
-          const cred = PhoneAuthProvider.credential(confirmationResult.verificationId, otp)
-          const linkRes = await linkWithCredential(current, cred)
-          user = linkRes?.user || current
+          const verificationId = confirmationResult?.verificationId
+          if (!verificationId) throw new Error('Missing verification id')
+          const cred = PhoneAuthProvider.credential(verificationId, otp)
+          try {
+            const linkRes = await linkWithCredential(current, cred)
+            user = linkRes?.user || current
+          } catch (err) {
+            const code = String(err?.code || '')
+            if (
+              code === 'auth/credential-already-in-use' ||
+              code === 'auth/account-exists-with-different-credential'
+            ) {
+              const signInRes = await signInWithCredential(auth, cred)
+              user = signInRes?.user
+            } else {
+              throw err
+            }
+          }
         } else {
           const result = await confirmationResult.confirm(otp)
           user = result?.user

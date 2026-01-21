@@ -55,7 +55,10 @@
       :class="sidebarOpen ? 'w-72' : 'w-20'"
     >
       <div class="flex-shrink-0 flex items-center justify-between p-4 border-b border-gray-700">
-        <h1 v-if="sidebarOpen" class="text-lg font-bold">🌙 PlanCraftAI</h1>
+        <div class="flex items-center gap-2 min-w-0">
+          <img src="/logo-bg-remove.png" alt="PlanCraftAI" class="w-8 h-8" />
+          <span v-if="sidebarOpen" class="text-lg font-semibold truncate">PlanCraftAI</span>
+        </div>
         <button
           @click="sidebarOpen = !sidebarOpen"
           class="p-2 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 transition-colors"
@@ -243,7 +246,10 @@
         <div class="absolute left-0 top-0 bottom-0 w-64 bg-gray-900 p-4 flex flex-col">
           <!-- Header -->
           <div class="flex justify-between items-center mb-6">
-            <h1 class="text-lg font-bold">🌙 PlanCraftAI</h1>
+            <div class="flex items-center gap-2 min-w-0">
+              <img src="/logo-bg-remove.png" alt="PlanCraftAI" class="w-8 h-8" />
+              <span class="text-lg font-semibold truncate">PlanCraftAI</span>
+            </div>
             <button @click="mobileMenu = false" class="p-2 rounded hover:bg-gray-800">✖️</button>
           </div>
 

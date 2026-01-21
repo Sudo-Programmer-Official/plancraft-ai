@@ -440,7 +440,7 @@
                   to="/subscription"
                   class="inline-block w-full px-6 py-3 rounded-xl bg-white text-indigo-700 font-semibold hover:bg-slate-100 transition shadow-md"
                 >
-                  Go Premium ✨
+                  💎 Explore Premium
                 </RouterLink>
               </div>
             </div>

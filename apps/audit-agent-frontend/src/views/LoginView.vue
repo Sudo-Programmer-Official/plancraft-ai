@@ -120,6 +120,7 @@
                     autocomplete="one-time-code"
                     placeholder="Enter OTP"
                     class="auth-input"
+                    @input="sanitizeOtpInput"
                   />
                   <button
                     @click="verifyOtp"
@@ -417,6 +418,10 @@ function onPhoneInput() {
   phoneInput.value = val
 }
 
+function sanitizeOtpInput() {
+  otp.value = String(otp.value || '').replace(/\D/g, '')
+}
+
 async function sendOtp() {
   if (!normalizedPhone.value) return ElMessage.error('Enter a valid phone number.')
   try {
@@ -451,14 +456,24 @@ async function sendOtp() {
 }
 
 async function verifyOtp() {
-  if (!otp.value) return alert('Enter the OTP you received.')
+  const code = String(otp.value || '').replace(/\D/g, '')
+  if (!code) return alert('Enter the OTP you received.')
+  if (!confirmationResult) {
+    ElMessage.error('OTP session expired. Please request a new code.')
+    return
+  }
   try {
     verifyingOtp.value = true
-    await authStore.confirmPhoneOtp(confirmationResult, otp.value)
+    await authStore.confirmPhoneOtp(confirmationResult, code)
     redirectAfterLogin()
   } catch (error) {
     console.error('[OTP] verify failed', error)
-    ElMessage.error('Invalid OTP. Please try again.')
+    const code = String(error?.code || '')
+    if (code.includes('auth/code-expired')) {
+      ElMessage.error('OTP expired. Please request a new code.')
+    } else {
+      ElMessage.error('Invalid OTP. Please try again.')
+    }
   } finally {
     verifyingOtp.value = false
   }
