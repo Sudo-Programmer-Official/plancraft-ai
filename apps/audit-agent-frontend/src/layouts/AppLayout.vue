@@ -678,7 +678,7 @@ const navGroups = [
   {
     key: 'core',
     title: 'Core',
-    icon: '⭐',
+    icon: '💎',
     collapsible: false,
     defaultOpen: true,
     children: [

@@ -426,10 +426,10 @@
                   Unlock the full mindful productivity experience.
                 </p>
                 <ul class="space-y-3 text-left text-sm mb-6 text-white/95">
-                  <li>⭐ Unlimited reminders & AI summaries</li>
-                  <li>⭐ Voice journaling & insights</li>
-                  <li>⭐ Calendar & WhatsApp integration</li>
-                  <li>⭐ Priority support & early access</li>
+                  <li>💎 Unlimited reminders & AI summaries</li>
+                  <li>💎 Voice journaling & insights</li>
+                  <li>💎 Calendar & WhatsApp integration</li>
+                  <li>💎 Priority support & early access</li>
                 </ul>
               </div>
               <div class="mt-auto">
