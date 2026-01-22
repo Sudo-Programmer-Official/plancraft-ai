@@ -8,6 +8,7 @@ import { makeCallForUser, sendSMSForUser } from './twilioService.js'
 import { getUserPrefs } from './userPrefService.js'
 import { buildReminderBrandCopy } from './notificationTemplates.js'
 import { enqueueNotificationJob, postingServiceAvailable } from './postingServiceClient.js'
+import { offlineMessagesEnabled } from '../config/flags.js'
 
 export async function sendNotification(userId, message, channel = 'all', options = {}) {
   const snap = await db.collection('users').doc(String(userId)).get()
@@ -251,6 +252,15 @@ async function sendViaChannel(channel, userId, payload, contacts = {}, meta = {}
         data: payload.pwaData || {},
       },
     )
+  }
+
+  // Cost guard: disable SMS sends when offline messaging is turned off.
+  if (channel === 'sms' && !offlineMessagesEnabled()) {
+    console.warn('[CostGuard] Offline messaging disabled — skipping SMS delivery', {
+      userId,
+      type: meta.type || null,
+    })
+    return { skipped: true, reason: 'offline_messages_disabled' }
   }
 
   // Prefer routing through posting-service if available and we have a recipient.

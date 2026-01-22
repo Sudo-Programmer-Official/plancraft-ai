@@ -1,6 +1,7 @@
 import dotenv from 'dotenv'
 import twilio from 'twilio'
 import { db } from './firebaseAdmin.js'
+import { offlineMessagesEnabled } from '../config/flags.js'
 
 dotenv.config()
 
@@ -83,7 +84,15 @@ async function sentRecently(userId, channel, windowMinutes = 10) {
   }
 }
 
+function offlineGuard(channel) {
+  if (channel !== 'sms') return false
+  if (offlineMessagesEnabled()) return false
+  console.warn('[CostGuard] Offline messaging disabled — Twilio SMS send skipped')
+  return true
+}
+
 export async function sendSMS(to, message) {
+  if (offlineGuard('sms')) return null
   const c = getClient()
   if (!envOk() || !c) {
     console.warn('[Twilio] Missing credentials — skipping SMS')
@@ -94,6 +103,10 @@ export async function sendSMS(to, message) {
 }
 
 export async function sendSMSForUser(userId, message) {
+  if (offlineGuard('sms')) {
+    await logDelivery({ userId, channel: 'sms', sid: null, status: 'skipped', message: 'offline_messages_disabled' })
+    return null
+  }
   const to = await getUserPhone(userId, 'sms')
   if (!to) throw new Error('User phone not configured')
   try {
