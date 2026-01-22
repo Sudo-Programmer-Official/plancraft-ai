@@ -65,7 +65,7 @@
       </div>
 
       <div
-        v-if="showCarryoverBanner || (usage.plan === 'free' && !isPremium.value) || reactivateEligible"
+        v-if="showCarryoverBanner || (usage.plan === 'free' && !isPremium.value) || reactivateEligible || reminderNudge"
         class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4"
       >
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
@@ -103,6 +103,33 @@
                 @click="ignoreCarryover()"
               >
                 Ignore
+              </button>
+            </div>
+          </div>
+
+          <div
+            v-if="reminderNudge"
+            class="dashboard-banner bg-slate-900/70 border-indigo-500/40 text-indigo-100 flex flex-col gap-3"
+          >
+            <div class="flex items-start gap-3">
+              <span class="text-xl">{{ reminderNudge.icon }}</span>
+              <div class="space-y-1">
+                <p class="font-medium text-sm sm:text-base">{{ reminderNudge.title }}</p>
+                <p class="text-xs sm:text-sm text-indigo-200/80">{{ reminderNudge.body }}</p>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button
+                @click="goToNotifications"
+                class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold"
+              >
+                {{ reminderNudge.cta }}
+              </button>
+              <button
+                @click="dismissReminderNudge(reminderNudge.type)"
+                class="px-3 py-1.5 rounded-lg border border-slate-600/70 text-slate-200 text-xs font-semibold hover:bg-slate-800/60 transition"
+              >
+                {{ reminderNudge.dismissLabel }}
               </button>
             </div>
           </div>
@@ -1129,7 +1156,7 @@ import { trackGuestDashboardLoaded } from '@/services/analytics'
 import { getReminderStatus, scheduleReminder } from '@/services/reminderService'
 import { listReports, generateReport } from '@/services/reportsService'
 import api from '@/services/api'
-import { getPreferences as getUserPreferences, updateOnboardingStatus } from '@/services/settingsService'
+import { getPreferences as getUserPreferences, getIntegrations, updateOnboardingStatus } from '@/services/settingsService'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { ElMessage, ElNotification } from 'element-plus'
 import { TASK_CATEGORY_FILTERS, getCategoryIcon, getCategoryColor, resolveCategory } from '@/constants/taskCategories'
@@ -1403,6 +1430,15 @@ function goToMeetings() {
   }
 }
 
+function goToNotifications() {
+  clearTaskCreatedNudge()
+  try {
+    routerNav.push('/settings?tab=notifications')
+  } catch (e) {
+    console.warn(e)
+  }
+}
+
 function goToUpgrade() {
   try {
     trackLinkedInConversion(import.meta.env.VITE_LI_CONV_UPGRADE_CLICK)
@@ -1518,6 +1554,7 @@ const reminderActiveByTask = ref({})
 const taskMeetingLink = (task) => resolveTaskMeetingLink(task)
 const checkingAuth = ref(true)
 const userPrefs = ref({ notifications: {}, integrations: {} })
+const integrationEndpoints = ref({ whatsapp: { phone: '' }, email: '' })
 const onboardingTourVisible = ref(false)
 const onboardingStatus = ref({
   completed: false,
@@ -1526,6 +1563,98 @@ const onboardingStatus = ref({
   completedAt: null,
 })
 const onboardingSessionPlayed = ref(false)
+const NUDGE_DISMISS_PREFIX = 'dismiss-until:'
+const TASK_CREATED_TTL_MS = 7 * 24 * 60 * 60 * 1000
+const NUDGE_COOLDOWN_MS = 20 * 1000
+const taskCreatedAt = ref(0)
+const nudgeCooldownUntil = ref(0)
+
+function readNudgeTimestamp(key) {
+  if (typeof window === 'undefined') return 0
+  try {
+    const value = Number(localStorage.getItem(key) || 0)
+    return Number.isFinite(value) ? value : 0
+  } catch {
+    return 0
+  }
+}
+
+function writeNudgeTimestamp(key, value) {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem(key, String(value))
+  } catch {}
+}
+
+function nudgeScopeKey(suffix) {
+  const uid = authStore?.user?.uid || 'anon'
+  const wsId = activeWorkspaceId.value || 'default'
+  return `pcai:nudge:${uid}:${wsId}:${suffix}`
+}
+
+function taskCreatedKey() {
+  return nudgeScopeKey('task-created-at')
+}
+
+function nudgeCooldownKey() {
+  return nudgeScopeKey('cooldown-until')
+}
+
+function clearTaskCreatedNudge() {
+  taskCreatedAt.value = 0
+  nudgeCooldownUntil.value = 0
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.removeItem(taskCreatedKey())
+    localStorage.removeItem(nudgeCooldownKey())
+  } catch {}
+}
+
+function markTaskCreatedNudge(ts = Date.now()) {
+  taskCreatedAt.value = ts
+  writeNudgeTimestamp(taskCreatedKey(), ts)
+}
+
+function dismissKey(type) {
+  return nudgeScopeKey(`${NUDGE_DISMISS_PREFIX}${type}`)
+}
+
+function isNudgeDismissed(type) {
+  const until = readNudgeTimestamp(dismissKey(type))
+  return until > Date.now()
+}
+
+function dismissReminderNudge(type, hours) {
+  const defaultHours = {
+    overdue: 24,
+    dueSoon: 24,
+    taskCreated: 24 * 7,
+  }
+  const duration = typeof hours === 'number' ? hours : (defaultHours[type] || 24)
+  const workspaceId = activeWorkspaceId.value || null
+  const until = Date.now() + duration * 60 * 60 * 1000
+  writeNudgeTimestamp(dismissKey(type), until)
+  try {
+    const meta = { type, dismissedAt: new Date().toISOString(), workspaceId }
+    localStorage.setItem(nudgeScopeKey('last-dismiss'), JSON.stringify(meta))
+  } catch {}
+  if (type === 'taskCreated') clearTaskCreatedNudge()
+}
+
+function handleTaskCreatedEvent(evt) {
+  const now = Date.now()
+  const detail = evt?.detail || {}
+  const uid = authStore?.user?.uid
+  if (!uid) return
+  if (detail.createdBy && detail.createdBy !== uid) return
+  const wsId = detail.workspaceId
+  if (wsId && activeWorkspaceId.value && wsId !== activeWorkspaceId.value) return
+  if (reminderNudge.value && reminderNudge.value.type !== 'taskCreated') return
+  if (now < nudgeCooldownUntil.value) return
+  markTaskCreatedNudge(detail.createdAt || now)
+  nudgeCooldownUntil.value = now + NUDGE_COOLDOWN_MS
+  writeNudgeTimestamp(nudgeCooldownKey(), nudgeCooldownUntil.value)
+}
 
 const onboardingSteps = computed(() => [
   {
@@ -1584,7 +1713,95 @@ const onboardingSteps = computed(() => [
   },
 ])
 
+const notificationPrefs = computed(() => {
+  const prefs = userPrefs.value?.notifications
+  if (!prefs || typeof prefs !== 'object') return null
+  return Object.keys(prefs).length ? prefs : null
+})
+function resolveNotificationChannels(prefs) {
+  if (!prefs || typeof prefs !== 'object') return []
+  if (Array.isArray(prefs.channels)) {
+    return prefs.channels.map((c) => String(c).toLowerCase())
+  }
+  const channels = []
+  if (prefs.email) channels.push('email')
+  if (prefs.whatsapp) channels.push('whatsapp')
+  if (prefs.sms) channels.push('sms')
+  if (prefs.voice_call) channels.push('voice_call')
+  if (prefs.pwa || prefs.push) channels.push('pwa')
+  return channels
+}
+function isValidE164(value) {
+  const raw = String(value || '').trim()
+  return /^\+[1-9]\d{6,14}$/.test(raw)
+}
+
+function isValidEmailAddress(value) {
+  const raw = String(value || '').trim()
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw)
+}
+
+const notificationChannels = computed(() => resolveNotificationChannels(notificationPrefs.value))
+const whatsappNumber = computed(() => String(integrationEndpoints.value?.whatsapp?.phone || '').trim())
+const emailAddress = computed(() => {
+  const integrationsEmail = integrationEndpoints.value?.email
+  const fallback = authStore?.user?.email
+  return String(integrationsEmail || fallback || '').trim()
+})
+const pushPermission = computed(() => {
+  try {
+    return typeof Notification !== 'undefined' ? Notification.permission : 'default'
+  } catch {
+    return 'default'
+  }
+})
+const reminderChannelState = computed(() => {
+  const channels = notificationChannels.value
+  const wantsWhatsApp = channels.includes('whatsapp')
+  const wantsPush = channels.includes('pwa')
+  const wantsEmail = channels.includes('email')
+  const whatsappReady = wantsWhatsApp && isValidE164(whatsappNumber.value)
+  const pushReady = wantsPush && pushPermission.value === 'granted'
+  const emailReady = wantsEmail && isValidEmailAddress(emailAddress.value)
+  const enabled = whatsappReady || pushReady || emailReady
+  const pushBlocked = wantsPush && pushPermission.value === 'denied'
+  return {
+    channels,
+    wantsWhatsApp,
+    whatsappReady,
+    wantsPush,
+    pushPermission: pushPermission.value,
+    pushBlocked,
+    wantsEmail,
+    emailReady,
+    enabled,
+  }
+})
+const notificationsEnabled = computed(() => reminderChannelState.value.enabled)
+const reminderNudgeReason = computed(() => {
+  const state = reminderChannelState.value
+  if (state.enabled) return 'enabled'
+  if (state.wantsWhatsApp && !state.whatsappReady) return 'whatsappMissing'
+  if (state.pushBlocked) return 'pushBlocked'
+  return 'allOff'
+})
+
+function resolveReminderCta(reason) {
+  if (reason === 'pushBlocked') return 'Enable WhatsApp reminders instead'
+  if (reason === 'whatsappMissing') return 'Add WhatsApp number to get reminders'
+  return 'Enable reminders'
+}
+
+function resolveReminderDismissLabel(type) {
+  return type === 'taskCreated' ? 'Hide' : 'Snooze 24h'
+}
+
 const todayKeyRef = computed(() => toLocalDateKey(new Date()))
+const tomorrowKeyRef = computed(() => {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  return toLocalDateKey(d)
+})
 const carryoverCandidates = computed(() => {
   const todayKey = todayKeyRef.value
   return (allTasks.value || [])
@@ -1601,6 +1818,65 @@ const carryoverCandidates = computed(() => {
 })
 const carryoverCount = computed(() => carryoverCandidates.value.length)
 const showCarryoverBanner = computed(() => carryoverCount.value > 0 && !carryoverDismissedToday.value)
+const overdueCount = computed(() =>
+  (allTasks.value || []).filter((t) => {
+    if (!t || t.completed) return false
+    const date = t.date
+    if (!date) return false
+    return date < todayKeyRef.value
+  }).length
+)
+const dueSoonCount = computed(() =>
+  (allTasks.value || []).filter((t) => {
+    if (t?.completed) return false
+    const date = t?.date || ''
+    return date === todayKeyRef.value || date === tomorrowKeyRef.value
+  }).length
+)
+const taskCreatedFresh = computed(() => {
+  if (!taskCreatedAt.value) return false
+  return Date.now() - taskCreatedAt.value < TASK_CREATED_TTL_MS
+})
+const reminderNudge = computed(() => {
+  if (notificationsEnabled.value) return null
+  const reason = reminderNudgeReason.value
+  const cta = resolveReminderCta(reason)
+  if (overdueCount.value > 0 && !isNudgeDismissed('overdue')) {
+    return {
+      type: 'overdue',
+      icon: '⚠️',
+      title: 'You have overdue tasks',
+      body: 'Reminders could help you stay on track this week.',
+      cta,
+      dismissLabel: resolveReminderDismissLabel('overdue'),
+    }
+  }
+  if (dueSoonCount.value > 0 && !isNudgeDismissed('dueSoon')) {
+    return {
+      type: 'dueSoon',
+      icon: '⏰',
+      title: 'Tasks are due soon',
+      body: 'Turn on reminders so you do not miss them.',
+      cta,
+      dismissLabel: resolveReminderDismissLabel('dueSoon'),
+    }
+  }
+  if (taskCreatedFresh.value && !isNudgeDismissed('taskCreated')) {
+    return {
+      type: 'taskCreated',
+      icon: '🔔',
+      title: 'Want reminders for this task?',
+      body: 'Set up reminders in a few seconds so nothing slips.',
+      cta,
+      dismissLabel: resolveReminderDismissLabel('taskCreated'),
+    }
+  }
+  return null
+})
+
+watch(notificationsEnabled, (enabled) => {
+  if (enabled) clearTaskCreatedNudge()
+})
 
 // Animated insights
 const defaultInsights = [
@@ -1784,6 +2060,15 @@ function handleOnboardingReplayEvent() {
   return
 }
 
+function normalizeIntegrationEndpoints(integrations = {}) {
+  const whatsappPhone = String(integrations?.whatsapp?.phone || '').trim()
+  const email = String(integrations?.email || authStore?.user?.email || '').trim()
+  return {
+    whatsapp: { phone: whatsappPhone },
+    email,
+  }
+}
+
 async function bootstrapPreferences(uid) {
   try {
     const prefs = await getUserPreferences(uid)
@@ -1792,6 +2077,13 @@ async function bootstrapPreferences(uid) {
     maybeLaunchOnboarding()
   } catch (error) {
     console.warn('Failed to load user prefs:', error)
+  }
+  try {
+    const integrations = await getIntegrations(uid)
+    integrationEndpoints.value = normalizeIntegrationEndpoints(integrations || {})
+  } catch (error) {
+    integrationEndpoints.value = normalizeIntegrationEndpoints({})
+    console.warn('Failed to load integrations:', error)
   }
 }
 
@@ -2674,6 +2966,7 @@ watch(
   (uid) => {
     if (!uid) {
       userPrefs.value = { notifications: {}, integrations: {} }
+      integrationEndpoints.value = { whatsapp: { phone: '' }, email: '' }
       onboardingStatus.value = {
         completed: false,
         lastStep: 0,
@@ -2792,6 +3085,23 @@ watch(
 onMounted(fetchUsage)
 onMounted(loadGoogleStatus)
 
+watch(
+  () => [activeWorkspaceId.value, authStore?.user?.uid],
+  () => {
+    taskCreatedAt.value = readNudgeTimestamp(taskCreatedKey())
+    nudgeCooldownUntil.value = readNudgeTimestamp(nudgeCooldownKey())
+  },
+  { immediate: true }
+)
+
+onMounted(() => {
+  try {
+    window.addEventListener('pcai:task-created', handleTaskCreatedEvent)
+  } catch {
+    /* noop */
+  }
+})
+
 onMounted(() => {
   try {
     window.addEventListener('usage-refresh', fetchUsage)
@@ -2803,6 +3113,11 @@ onMounted(() => {
 onUnmounted(() => {
   try {
     window.removeEventListener('usage-refresh', fetchUsage)
+  } catch {
+    /* noop */
+  }
+  try {
+    window.removeEventListener('pcai:task-created', handleTaskCreatedEvent)
   } catch {
     /* noop */
   }

@@ -479,6 +479,24 @@ export async function addTaskToFirebase(task) {
 
   const notifyMeta = await syncTaskNotification(user.uid, docRef.id, payload)
 
+  try {
+    if (typeof window !== 'undefined') {
+      const ts = Date.now()
+      localStorage.setItem('pcai:nudge:task-created-at', String(ts))
+      window.dispatchEvent(
+        new CustomEvent('pcai:task-created', {
+          detail: {
+            id: docRef.id,
+            date: payload.date,
+            createdAt: ts,
+            workspaceId: payload.workspaceId || null,
+            createdBy: payload.createdBy || null,
+          },
+        })
+      )
+    }
+  } catch {}
+
   // Return task with Firestore's doc ID
   return { id: docRef.id, ...payload, __notifyMeta: notifyMeta };
 }

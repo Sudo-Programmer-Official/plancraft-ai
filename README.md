@@ -22,6 +22,21 @@ Hosting	Web (Vercel/Fly.io), Mobile-friendly
 Login/Auth	Supabase Auth (or Firebase)
 Dashboard	Cross-device (phone + browser)
 
+## Build & Deploy (Frontend)
+
+From the repo root:
+
+```bash
+cd apps/audit-agent-frontend
+npm install
+npm run build
+firebase deploy
+```
+
+Notes:
+- `npm run build` runs `vite build --mode production` and then generates the sitemap.
+- `firebase deploy` publishes the built assets (requires Firebase CLI login + project selection).
+
 
 ⸻
 
