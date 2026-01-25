@@ -13,8 +13,6 @@ import {
   getAuth,
   onAuthStateChanged,
   onIdTokenChanged,
-  setPersistence,
-  browserLocalPersistence,
   GoogleAuthProvider,
   OAuthProvider,
   signInWithPopup,
@@ -38,9 +36,35 @@ import { db } from '@/firebase/init'
 import { ElNotification } from 'element-plus'
 import { clearAppToken } from '@/services/appTokenService'
 import { Capacitor } from '@capacitor/core'
+import { Preferences } from '@capacitor/preferences'
 
 const auth = getAuth(firebaseApp)
-setPersistence(auth, browserLocalPersistence)
+const isNative = !!Capacitor?.isNativePlatform?.()
+
+// Token storage that avoids WebView localStorage pitfalls on native
+const TokenStore = {
+  async set(token) {
+    if (isNative) {
+      await Preferences.set({ key: 'token', value: token || '' })
+    } else {
+      localStorage.setItem('token', token)
+    }
+  },
+  async get() {
+    if (isNative) {
+      const { value } = await Preferences.get({ key: 'token' })
+      return value || null
+    }
+    return localStorage.getItem('token')
+  },
+  async clear() {
+    if (isNative) {
+      await Preferences.remove({ key: 'token' })
+    } else {
+      localStorage.removeItem('token')
+    }
+  },
+}
 
 // 🧠 Helper: detect in-app / insecure browsers (LinkedIn, Instagram, etc.)
 function isInAppBrowser() {
@@ -87,10 +111,10 @@ export const useAuthStore = defineStore('authStore', {
       } catch {}
       try {
         localStorage.removeItem('user')
-        localStorage.removeItem('token')
         localStorage.removeItem('authStore')
         localStorage.removeItem('sessionBackup')
       } catch {}
+      try { TokenStore.clear() } catch {}
       try { clearAppToken() } catch {}
       try {
         import('@/stores/subscriptionStore').then((mod) => {
@@ -139,19 +163,29 @@ export const useAuthStore = defineStore('authStore', {
     },
 
     async init() {
-      // 🧩 Attempt fast bootstrap from local backup (helps iOS PWA)
-      try {
-        const cachedUser = localStorage.getItem('user')
-        const cachedToken = localStorage.getItem('token')
-        if (!auth.currentUser && cachedUser && cachedToken) {
-          this.user = JSON.parse(cachedUser)
-          this.token = cachedToken
-          this.guest = false
+      // Failsafe: never let UI stay stuck on "restoring session" beyond 3s
+      const timeout = setTimeout(() => {
+        if (this.loading) {
           this.loading = false
-          console.log('[Auth] Restored session from local backup')
+          if (!this.user) this.resetAuth()
         }
-      } catch (e) {
-        console.warn('[Auth] Failed to restore local session', e)
+      }, 3000)
+
+      // 🧩 Attempt fast bootstrap from local backup (helps iOS PWA)
+      if (!isNative) {
+        try {
+          const cachedUser = localStorage.getItem('user')
+          const cachedToken = await TokenStore.get()
+          if (!auth.currentUser && cachedUser && cachedToken) {
+            this.user = JSON.parse(cachedUser)
+            this.token = cachedToken
+            this.guest = false
+            this.loading = false
+            console.log('[Auth] Restored session from local backup')
+          }
+        } catch (e) {
+          console.warn('[Auth] Failed to restore local session', e)
+        }
       }
 
       onAuthStateChanged(auth, async (user) => {
@@ -174,7 +208,7 @@ export const useAuthStore = defineStore('authStore', {
             this.token = token
             identifyUser(this.user)
             localStorage.setItem('user', JSON.stringify(this.user))
-            localStorage.setItem('token', this.token)
+            await TokenStore.set(this.token)
             try {
               import('@/stores/workspaceStore').then((mod) => {
                 try { mod.useWorkspaceStore().init() } catch {}
@@ -207,6 +241,7 @@ export const useAuthStore = defineStore('authStore', {
           } else {
             this.resetAuth()
           }
+          clearTimeout(timeout)
         } catch {
           this.resetAuth()
         }
@@ -226,7 +261,7 @@ export const useAuthStore = defineStore('authStore', {
             try {
               const token = await user.getIdToken(true)
               this.token = token
-              localStorage.setItem('token', token)
+              await TokenStore.set(token)
               // Optionally refresh long-lived app token if enabled and nearing expiry
               try {
                 if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
@@ -243,14 +278,18 @@ export const useAuthStore = defineStore('authStore', {
             }
           } else {
             // Try to nudge a restore from backup when Firebase layer is null
-            try {
-              const cachedUser = localStorage.getItem('user')
-              const cachedToken = localStorage.getItem('token')
-              if (!this.user && cachedUser && cachedToken) {
-                this.user = JSON.parse(cachedUser)
-                this.token = cachedToken
-              }
-            } catch {}
+            if (!isNative) {
+              try {
+                const cachedUser = localStorage.getItem('user')
+                const cachedToken = await TokenStore.get()
+                if (!this.user && cachedUser && cachedToken) {
+                  this.user = JSON.parse(cachedUser)
+                  this.token = cachedToken
+                }
+              } catch {}
+            } else {
+              try { await TokenStore.clear() } catch {}
+            }
           }
         }, 45 * 60 * 1000) // every 45 minutes
       } catch {}
@@ -271,7 +310,7 @@ export const useAuthStore = defineStore('authStore', {
         this.guest = true
         this.token = await user.getIdToken()
         localStorage.setItem('user', JSON.stringify(this.user))
-        localStorage.setItem('token', this.token)
+        await TokenStore.set(this.token)
         try {
           if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
             const mod = await import('@/services/appTokenService.js')
@@ -338,7 +377,7 @@ export const useAuthStore = defineStore('authStore', {
             this.guest = false
             this.token = await user.getIdToken()
             localStorage.setItem('user', JSON.stringify(this.user))
-            localStorage.setItem('token', this.token)
+            await TokenStore.set(this.token)
             ElNotification({
               title: 'Google connected',
               message: 'Your Google account is now linked.',
@@ -460,7 +499,7 @@ export const useAuthStore = defineStore('authStore', {
         this.guest = false
         this.token = await user.getIdToken()
         localStorage.setItem('user', JSON.stringify(this.user))
-        localStorage.setItem('token', this.token)
+        await TokenStore.set(this.token)
         ElNotification({
           title: 'Welcome back ✨',
           message: `Signed in as ${this.user.displayName || this.user.email || 'User'}`,
@@ -557,7 +596,7 @@ export const useAuthStore = defineStore('authStore', {
         this.guest = false
         this.token = await user.getIdToken()
         localStorage.setItem('user', JSON.stringify(this.user))
-        localStorage.setItem('token', this.token)
+        await TokenStore.set(this.token)
         try {
           if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
             const mod = await import('@/services/appTokenService.js')
@@ -614,7 +653,7 @@ export const useAuthStore = defineStore('authStore', {
           this.guest = false
           this.token = await user.getIdToken()
           localStorage.setItem('user', JSON.stringify(this.user))
-          localStorage.setItem('token', this.token)
+          await TokenStore.set(this.token)
           try {
             if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
               const mod = await import('@/services/appTokenService.js')
@@ -730,7 +769,7 @@ export const useAuthStore = defineStore('authStore', {
         this.guest = false
         this.token = await user.getIdToken()
         localStorage.setItem('user', JSON.stringify(this.user))
-        localStorage.setItem('token', this.token)
+        await TokenStore.set(this.token)
         try {
           if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
             const mod = await import('@/services/appTokenService.js')
@@ -784,7 +823,7 @@ export const useAuthStore = defineStore('authStore', {
         this.guest = false
         this.token = await user.getIdToken()
         localStorage.setItem('user', JSON.stringify(this.user))
-        localStorage.setItem('token', this.token)
+        await TokenStore.set(this.token)
         ElNotification({
           title: 'Email linked',
           message: 'Email/password added to your account.',
@@ -820,7 +859,7 @@ export const useAuthStore = defineStore('authStore', {
       this.guest = false
       this.token = await user.getIdToken()
       localStorage.setItem('user', JSON.stringify(this.user))
-      localStorage.setItem('token', this.token)
+      await TokenStore.set(this.token)
       try {
         if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
           const mod = await import('@/services/appTokenService.js')
@@ -854,7 +893,7 @@ export const useAuthStore = defineStore('authStore', {
         this.guest = false
         this.token = await user.getIdToken()
         localStorage.setItem('user', JSON.stringify(this.user))
-        localStorage.setItem('token', this.token)
+        await TokenStore.set(this.token)
         try {
           if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
             const mod = await import('@/services/appTokenService.js')

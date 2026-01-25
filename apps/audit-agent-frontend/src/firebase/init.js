@@ -3,7 +3,7 @@ import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAnalytics, isSupported as analyticsIsSupported } from "firebase/analytics";
 import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check'
-import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
+import { getAuth, setPersistence, browserLocalPersistence, inMemoryPersistence } from "firebase/auth";
 import { Capacitor } from '@capacitor/core';
 
 // Build Firebase config from environment with safe fallbacks
@@ -29,7 +29,17 @@ const firebaseConfig = {
 const firebaseApp = initializeApp(firebaseConfig);
 export const db = getFirestore(firebaseApp);
 export const auth = getAuth(firebaseApp);
-setPersistence(auth, browserLocalPersistence);
+
+// Persistence: use in-memory on native (Capacitor) to avoid broken WebView restores
+try {
+  const persistence = isNative ? inMemoryPersistence : browserLocalPersistence
+  // run async without blocking module init
+  setPersistence(auth, persistence).catch((err) => {
+    console.warn('[Firebase] setPersistence failed; continuing with default', err)
+  })
+} catch (err) {
+  console.warn('[Firebase] setPersistence guard threw', err)
+}
 
 // Analytics is only available in browser environments.
 let analytics = null;
