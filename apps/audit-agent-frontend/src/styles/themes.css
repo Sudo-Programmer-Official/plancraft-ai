@@ -1,0 +1,161 @@
+:root {
+  --pc-brand-500: #6c63ff;
+  --pc-brand-400: #8b84ff;
+  --pc-brand-300: #a7a2ff;
+  --pc-brand-rgb: 108 99 255;
+  --pc-brand-soft-rgb: 139 132 255;
+  --pc-brand-tint-rgb: 167 162 255;
+
+  --pc-bg: #f8f9ff;
+  --pc-bg-rgb: 248 249 255;
+  --pc-surface: #ffffff;
+  --pc-surface-rgb: 255 255 255;
+  --pc-surface-muted: #f1f3ff;
+  --pc-surface-muted-rgb: 241 243 255;
+  --pc-card: #ffffff;
+  --pc-card-rgb: 255 255 255;
+
+  --pc-ink: #1f2937;
+  --pc-ink-rgb: 31 41 55;
+  --pc-muted: #6b7280;
+  --pc-muted-rgb: 107 114 128;
+
+  --pc-border: #e5e7eb;
+  --pc-border-rgb: 229 231 235;
+  --pc-border-strong-rgb: 216 220 239;
+
+  --pc-card-border: rgba(0, 0, 0, 0.05);
+  --pc-card-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  --pc-soft-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+
+  --pc-radius-md: 14px;
+  --pc-radius-lg: 18px;
+  --pc-radius-xl: 24px;
+
+  --pc-app-bg: radial-gradient(circle at 18% 20%, rgba(108, 99, 255, 0.14), transparent 32%),
+    radial-gradient(circle at 82% 0%, rgba(139, 132, 255, 0.12), transparent 30%),
+    linear-gradient(180deg, #f8f9ff 0%, #f2f4ff 50%, #f8f9ff 100%);
+  --pc-sidebar-bg: rgba(255, 255, 255, 0.9);
+  --pc-header-bg: rgba(255, 255, 255, 0.94);
+  --pc-footer-bg: rgba(248, 249, 255, 0.94);
+  --pc-glass-blur: 18px;
+
+  --el-color-primary: var(--pc-brand-500);
+  --el-color-primary-light-3: color-mix(in srgb, var(--pc-brand-500) 70%, #fff);
+  --el-color-primary-light-5: color-mix(in srgb, var(--pc-brand-500) 50%, #fff);
+  --el-color-primary-light-7: color-mix(in srgb, var(--pc-brand-500) 30%, #fff);
+  --el-color-primary-light-9: color-mix(in srgb, var(--pc-brand-500) 12%, #fff);
+  --el-color-primary-dark-2: color-mix(in srgb, var(--pc-brand-500) 80%, #000);
+  --el-text-color-primary: var(--pc-ink);
+  --el-text-color-regular: var(--pc-muted);
+  --el-border-color: var(--pc-border);
+  --el-bg-color: var(--pc-surface);
+
+  color: var(--pc-ink);
+  background-color: var(--pc-bg);
+  font-family: 'Inter', 'Poppins', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  text-rendering: optimizeLegibility;
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  --pc-brand-500: #8b84ff;
+  --pc-brand-400: #a7a2ff;
+  --pc-brand-300: #c7c3ff;
+  --pc-brand-rgb: 139 132 255;
+  --pc-brand-soft-rgb: 151 146 255;
+  --pc-brand-tint-rgb: 199 195 255;
+
+  --pc-bg: #0f1221;
+  --pc-bg-rgb: 15 18 33;
+  --pc-surface: #151935;
+  --pc-surface-rgb: 21 25 53;
+  --pc-surface-muted: #1d2245;
+  --pc-surface-muted-rgb: 29 34 69;
+  --pc-card: #1b2042;
+  --pc-card-rgb: 27 32 66;
+
+  --pc-ink: #f5f7ff;
+  --pc-ink-rgb: 245 247 255;
+  --pc-muted: #b8c0ff;
+  --pc-muted-rgb: 184 192 255;
+
+  --pc-border: rgba(255, 255, 255, 0.12);
+  --pc-border-rgb: 83 92 138;
+  --pc-border-strong-rgb: 96 105 152;
+
+  --pc-card-border: rgba(255, 255, 255, 0.12);
+  --pc-card-shadow: 0 14px 42px rgba(0, 0, 0, 0.45);
+  --pc-soft-shadow: 0 10px 28px rgba(0, 0, 0, 0.32);
+
+  --pc-app-bg: radial-gradient(circle at 18% 18%, rgba(139, 132, 255, 0.18), transparent 32%),
+    radial-gradient(circle at 86% 8%, rgba(104, 117, 245, 0.18), transparent 30%),
+    linear-gradient(180deg, #0f1221 0%, #0d1124 40%, #0f1221 100%);
+  --pc-sidebar-bg: rgba(21, 25, 53, 0.92);
+  --pc-header-bg: rgba(21, 25, 53, 0.94);
+  --pc-footer-bg: rgba(15, 18, 33, 0.96);
+  --pc-glass-blur: 18px;
+
+  color-scheme: dark;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--pc-app-bg);
+  color: var(--pc-ink);
+  transition: background-color 200ms ease, color 200ms ease;
+}
+
+.app-shell {
+  background: var(--pc-app-bg);
+  color: var(--pc-ink);
+}
+
+.surface-card {
+  background: var(--pc-card);
+  color: var(--pc-ink);
+  border: 1px solid var(--pc-card-border);
+  box-shadow: var(--pc-card-shadow);
+  border-radius: var(--pc-radius-lg);
+}
+
+.sidebar-panel {
+  background: var(--pc-sidebar-bg);
+  backdrop-filter: blur(var(--pc-glass-blur));
+  border-right: 1px solid rgb(var(--pc-border-strong-rgb, 216 220 239) / 0.8);
+  color: var(--pc-ink);
+}
+
+.header-bar {
+  background: var(--pc-header-bg);
+  backdrop-filter: blur(var(--pc-glass-blur));
+  border-bottom: 1px solid rgb(var(--pc-border-strong-rgb, 216 220 239) / 0.8);
+  box-shadow: var(--pc-soft-shadow);
+}
+
+.footer-bar {
+  background: var(--pc-footer-bg);
+  border-top: 1px solid rgb(var(--pc-border-strong-rgb, 216 220 239) / 0.8);
+  color: var(--pc-muted);
+}
+
+.nav-item-active {
+  background: color-mix(in srgb, var(--pc-brand-500) 14%, transparent);
+  color: var(--pc-brand-500);
+}
+
+.badge-muted {
+  background: color-mix(in srgb, var(--pc-ink) 6%, transparent);
+  color: var(--pc-muted);
+  border: 1px solid rgb(var(--pc-border-strong-rgb, 216 220 239) / 0.7);
+}
+
+.gradient-chip {
+  background: linear-gradient(
+    120deg,
+    color-mix(in srgb, var(--pc-brand-500) 28%, #fff),
+    color-mix(in srgb, var(--pc-brand-400) 20%, #fff)
+  );
+  color: var(--pc-ink);
+  border: 1px solid rgb(var(--pc-border-strong-rgb, 216 220 239) / 0.7);
+}

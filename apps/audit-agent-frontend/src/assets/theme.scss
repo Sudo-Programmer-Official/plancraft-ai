@@ -1,22 +1,27 @@
 /* === PlanCraftAI Toast Theme === */
 .el-notification {
-  border-radius: 0.75rem !important;
-  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 35%, #4c1d95 100%) !important;
-  color: #e2e8f0 !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  box-shadow: 0 0 20px rgba(147, 51, 234, 0.3);
-  backdrop-filter: blur(12px);
+  border-radius: var(--pc-radius-lg, 18px) !important;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--pc-brand-500) 18%, #0f172a) 0%,
+    color-mix(in srgb, var(--pc-brand-400) 24%, #111827) 38%,
+    color-mix(in srgb, var(--pc-brand-300) 30%, #0f172a) 100%
+  ) !important;
+  color: #e7eaf7 !important;
+  border: 1px solid rgb(var(--pc-border-strong-rgb, 216 220 239) / 0.7) !important;
+  box-shadow: var(--pc-card-shadow);
+  backdrop-filter: blur(14px);
   font-family: 'Inter', 'Poppins', sans-serif;
   animation: toastSlideIn 0.5s ease forwards;
 }
 
 .el-notification__title {
-  color: #c4b5fd !important; /* light purple */
+  color: color-mix(in srgb, var(--pc-brand-300) 70%, #fff) !important;
   font-weight: 600;
 }
 
 .el-notification__content {
-  color: #e2e8f0 !important; /* slate-100 */
+  color: #e3e8ff !important;
   font-size: 0.9rem;
 }
 
@@ -38,4 +43,3 @@
   0% { opacity: 0; transform: translateY(-10px) scale(0.98); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
-

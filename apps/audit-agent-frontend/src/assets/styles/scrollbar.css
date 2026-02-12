@@ -2,7 +2,7 @@
 
 .scrollbar-plan {
   scrollbar-width: thin;
-  scrollbar-color: rgba(99, 102, 241, 0.4) transparent; /* For Firefox */
+  scrollbar-color: color-mix(in srgb, var(--pc-brand-500, #6c63ff) 40%, transparent) transparent;
 }
 
 /* Chrome, Edge, Safari */
@@ -18,8 +18,8 @@
 .scrollbar-plan::-webkit-scrollbar-thumb {
   background: linear-gradient(
     180deg,
-    rgba(99, 102, 241, 0.25),
-    rgba(147, 51, 234, 0.25)
+    color-mix(in srgb, var(--pc-brand-500, #6c63ff) 28%, transparent),
+    color-mix(in srgb, var(--pc-brand-400, #8b84ff) 28%, transparent)
   );
   border-radius: 12px;
   transition: background 0.3s ease, opacity 0.3s ease;
@@ -28,8 +28,8 @@
 .scrollbar-plan::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(
     180deg,
-    rgba(99, 102, 241, 0.6),
-    rgba(147, 51, 234, 0.6)
+    color-mix(in srgb, var(--pc-brand-500, #6c63ff) 60%, transparent),
+    color-mix(in srgb, var(--pc-brand-400, #8b84ff) 60%, transparent)
   );
 }
 

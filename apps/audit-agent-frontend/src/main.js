@@ -1,4 +1,5 @@
 // Global styles
+import './styles/themes.css'
 import './assets/tailwind.scss'
 import './assets/theme.scss'
 import './assets/styles/scrollbar.css'
@@ -17,6 +18,7 @@ import { initAnalytics, bindRouter } from '@/services/analytics'
 import 'driver.js/dist/driver.css'
 import { handleAuthError } from '@/services/firebaseService'
 import { setupLinkedInTag } from './analytics/linkedin.js'
+import { loadInitialTheme } from '@/composables/useTheme'
 
 // Day.js timezone defaults
 import dayjs from 'dayjs'
@@ -57,6 +59,9 @@ registerSW({
 
 // Firebase auth export for quick token refreshes
 import { auth } from '@/firebase/init'
+
+// 🌓 Apply saved theme before the app mounts to avoid flash
+try { loadInitialTheme() } catch {}
 
 const app = createApp(App)
 

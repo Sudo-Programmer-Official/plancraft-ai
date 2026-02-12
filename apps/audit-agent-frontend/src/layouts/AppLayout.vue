@@ -2,17 +2,15 @@
   <NotificationBanner :user-id="currentUserId" />
   <FeedbackPrompt />
   <FeedbackDrawer />
-  <div
-    class="flex min-h-screen w-full max-w-full overflow-x-hidden bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 text-white"
-  >
+  <div class="flex min-h-screen w-full max-w-full overflow-x-hidden app-shell text-ink">
     <!-- Global upgrade banner -->
     <!-- Global Upgrade Banner -->
     <div v-if="showUpgrade" class="fixed top-0 left-0 right-0 z-50 px-3 sm:px-6">
       <div
-        class="bg-gradient-to-r from-fuchsia-600/40 via-purple-600/40 to-indigo-600/40 backdrop-blur-xl border border-fuchsia-400/30 text-white rounded-b-xl shadow-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 py-2 sm:py-3 px-3 sm:px-5 animate-fade-in"
+        class="surface-card backdrop-blur-xl border border-border/70 rounded-b-xl shadow-card flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 py-2 sm:py-3 px-3 sm:px-5 animate-fade-in"
       >
-        <span class="text-sm sm:text-base font-medium text-center sm:text-left">
-          🚀 You're on the <span class="text-fuchsia-300 font-semibold">Free Plan</span>. Upgrade to
+        <span class="text-sm sm:text-base font-medium text-center sm:text-left text-ink">
+          🚀 You're on the <span class="text-brand font-semibold">Free Plan</span>. Upgrade to
           unlock unlimited AI and reminders.
         </span>
 
@@ -21,28 +19,28 @@
             v-if="!isGuest"
             to="/subscription"
             @click="trackUpgradeClick"
-            class="bg-gradient-to-r from-fuchsia-500 via-purple-500 to-indigo-500 text-white font-semibold text-sm px-3 py-1.5 rounded-lg hover:scale-105 transition-transform shadow-md"
+            class="bg-brand text-white font-semibold text-sm px-3 py-1.5 rounded-lg hover:scale-105 transition-transform shadow-soft"
           >
             Upgrade
           </RouterLink>
           <RouterLink
             v-else
             to="/login"
-            class="bg-gradient-to-r from-indigo-500 via-sky-500 to-blue-600 text-white font-semibold text-sm px-3 py-1.5 rounded-lg hover:scale-105 transition-transform shadow-md"
+            class="bg-brand/90 text-white font-semibold text-sm px-3 py-1.5 rounded-lg hover:scale-105 transition-transform shadow-soft"
           >
             Sign in
           </RouterLink>
 
           <button
             @click="planOpen = true"
-            class="border border-fuchsia-300/60 text-fuchsia-200 text-sm px-3 py-1.5 rounded-lg hover:bg-fuchsia-500/10 hover:text-white transition-colors"
+            class="border border-border text-muted text-sm px-3 py-1.5 rounded-lg hover:bg-surface-muted hover:text-ink transition-colors"
           >
             View Plan
           </button>
 
           <button
             @click="showUpgrade = false"
-            class="text-sm text-gray-300 px-2 py-1 hover:text-white hover:bg-fuchsia-400/20 rounded-lg transition-colors"
+            class="text-sm text-muted px-2 py-1 hover:text-ink hover:bg-surface-muted rounded-lg transition-colors"
           >
             Dismiss
           </button>
@@ -51,42 +49,42 @@
     </div>
     <!-- Sidebar (desktop only) -->
     <aside
-      class="hidden md:flex flex-col h-screen transition-all duration-300 bg-gray-950/70 backdrop-blur-xl"
+      class="hidden md:flex flex-col h-screen transition-all duration-300 sidebar-panel"
       :class="sidebarOpen ? 'w-72' : 'w-20'"
     >
-      <div class="flex-shrink-0 flex items-center justify-between p-4 border-b border-gray-700">
+      <div class="flex-shrink-0 flex items-center justify-between p-4 border-b border-border/60">
         <div class="flex items-center gap-2 min-w-0">
           <img src="/logo-bg-remove.png" alt="PlanCraftAI" class="w-8 h-8" />
           <span v-if="sidebarOpen" class="text-lg font-semibold truncate">PlanCraftAI</span>
         </div>
         <button
           @click="sidebarOpen = !sidebarOpen"
-          class="p-2 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 transition-colors"
+          class="p-2 rounded-lg bg-brand/20 hover:bg-brand/30 text-brand transition-colors"
           aria-label="Toggle sidebar"
         >
-          <svg v-if="sidebarOpen" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg v-if="sidebarOpen" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
           </svg>
-          <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
           </svg>
         </button>
       </div>
 
       <!-- Workspace switcher -->
-      <div class="px-3 pb-3 border-b border-gray-800/70">
+      <div class="px-3 pb-3 border-b border-border/70">
         <div class="flex items-center justify-between gap-2">
           <div class="flex items-center gap-2 min-w-0">
-            <div class="w-9 h-9 rounded-lg bg-indigo-500/20 border border-indigo-400/40 flex items-center justify-center text-lg">
+            <div class="w-9 h-9 rounded-lg bg-brand/10 border border-brand/30 flex items-center justify-center text-lg text-brand">
               {{ activeWorkspace?.icon || '📦' }}
             </div>
             <div v-if="sidebarOpen" class="min-w-0">
-              <p class="text-[11px] uppercase tracking-[0.25em] text-slate-500">Workspace</p>
+              <p class="text-[11px] uppercase tracking-[0.25em] text-muted">Workspace</p>
               <p class="text-sm font-semibold truncate">{{ activeWorkspace?.name || 'Personal' }}</p>
             </div>
           </div>
           <button
-            class="p-2 rounded-lg bg-slate-900/70 border border-slate-800 hover:border-indigo-400 transition"
+            class="p-2 rounded-lg bg-surface-muted border border-border/80 hover:border-brand/50 transition"
             @click="workspaceMenuOpen = !workspaceMenuOpen"
             aria-label="Change workspace"
           >
@@ -101,8 +99,8 @@
           <button
             v-for="ws in workspaceStore.workspaces"
             :key="ws.id"
-            class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm border border-slate-800 hover:border-indigo-400 transition"
-            :class="{ 'bg-indigo-600/20 border-indigo-400/60': ws.id === activeWorkspaceId }"
+            class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm border border-border/70 hover:border-brand/60 transition text-ink"
+            :class="{ 'bg-brand/20 border-brand/60 text-brand': ws.id === activeWorkspaceId }"
             @click="selectWorkspace(ws.id)"
           >
             <span>{{ ws.icon || '📦' }}</span>
@@ -110,7 +108,7 @@
           </button>
           <RouterLink
             to="/workspaces"
-            class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-indigo-200 hover:text-white bg-slate-900/70 border border-slate-800 hover:border-indigo-400 transition"
+            class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-ink hover:text-brand bg-surface-muted border border-border/70 hover:border-brand/60 transition"
             @click="workspaceMenuOpen = false"
           >
             <span>➕</span>
@@ -129,7 +127,7 @@
         >
           <button
             v-if="group.collapsible"
-            class="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold text-slate-200 rounded hover:bg-gray-800"
+            class="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold text-ink rounded hover:bg-surface-muted transition"
             @click="toggleGroup(group.key)"
           >
             <span class="flex items-center gap-2">
@@ -139,11 +137,11 @@
                 <span v-if="group.beta" class="beta-pill">Beta</span>
               </span>
             </span>
-            <span v-if="sidebarOpen" class="text-xs text-slate-400">
+            <span v-if="sidebarOpen" class="text-xs text-muted">
               {{ openGroups[group.key] ? '▾' : '▸' }}
             </span>
           </button>
-          <div v-else class="px-3 py-2 text-sm font-semibold text-slate-200 flex items-center gap-2">
+          <div v-else class="px-3 py-2 text-sm font-semibold text-ink flex items-center gap-2">
             <span>{{ group.icon }}</span>
             <span v-if="sidebarOpen" class="flex items-center gap-2">
               <span>{{ group.title }}</span>
@@ -156,8 +154,8 @@
               v-for="item in group.children"
               :key="item.to"
               :to="item.to"
-              class="flex items-center gap-3 w-full px-4 py-2 rounded transition hover:bg-gray-800 text-sm text-slate-200"
-              :class="{ 'bg-indigo-600': isActive(item.to) }"
+              class="flex items-center gap-3 w-full px-4 py-2 rounded transition hover:bg-surface-muted text-sm text-ink"
+              :class="{ 'bg-brand/20 text-brand font-semibold': isActive(item.to) }"
             >
               <span>{{ item.icon }}</span>
               <span v-if="sidebarOpen">{{ item.label }}</span>
@@ -165,14 +163,14 @@
           </div>
         </div>
 
-        <div class="pt-2 border-t border-gray-800/60 mt-4">
-          <RouterLink
-            v-for="item in systemLinks"
-            :key="item.to"
-            :to="item.to"
-            class="flex items-center gap-3 w-full px-3 py-2 rounded transition hover:bg-gray-800 text-sm text-slate-200"
-            :class="{ 'bg-indigo-600': isActive(item.to) }"
-          >
+        <div class="pt-2 border-t border-border/60 mt-4">
+            <RouterLink
+              v-for="item in systemLinks"
+              :key="item.to"
+              :to="item.to"
+              class="flex items-center gap-3 w-full px-3 py-2 rounded transition hover:bg-surface-muted text-sm text-ink"
+              :class="{ 'bg-brand/20 text-brand font-semibold': isActive(item.to) }"
+            >
             <span>{{ item.icon }}</span>
             <span v-if="sidebarOpen">{{ item.label }}</span>
           </RouterLink>
@@ -182,38 +180,38 @@
       <!-- Sidebar Footer: segmented actions -->
       <div class="flex-shrink-0 mt-auto pb-4 px-3">
         <div
-          class="grid gap-1 bg-gray-900/60 border border-gray-800 rounded-lg p-1"
+          class="grid gap-1 bg-surface-muted border border-border/70 rounded-lg p-1"
           :class="[authStore.user?.role === 'admin' ? 'grid-cols-7' : 'grid-cols-6']"
         >
           <button
             @click="startTour"
-            class="text-xs py-2 rounded-md hover:bg-gray-800 transition"
+            class="text-xs py-2 rounded-md hover:bg-surface transition"
             title="Show Tour"
           >
             ❔
           </button>
           <RouterLink
             to="/settings"
-            class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
+            class="text-xs py-2 rounded-md hover:bg-surface text-center transition text-ink"
             title="Settings"
             >⚙️</RouterLink
           >
           <RouterLink
             to="/subscription"
-            class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
+            class="text-xs py-2 rounded-md hover:bg-surface text-center transition text-ink"
             title="Billing"
             >💳</RouterLink
           >
           <RouterLink
             v-if="authStore.user?.role === 'admin'"
             to="/admin"
-            class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
+            class="text-xs py-2 rounded-md hover:bg-surface text-center transition text-ink"
             title="Admin Panel"
             >🛠</RouterLink
           >
           <RouterLink
             to="/help"
-            class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
+            class="text-xs py-2 rounded-md hover:bg-surface text-center transition text-ink"
             title="Help"
             >💬</RouterLink
           >
@@ -243,21 +241,21 @@
         class="fixed inset-0 bg-black/50 z-40 md:hidden"
         @click.self="mobileMenu = false"
       >
-        <div class="absolute left-0 top-0 bottom-0 w-64 bg-gray-900 p-4 flex flex-col">
+        <div class="absolute left-0 top-0 bottom-0 w-64 bg-surface shadow-card p-4 flex flex-col border-r border-border/70">
           <!-- Header -->
           <div class="flex justify-between items-center mb-6">
             <div class="flex items-center gap-2 min-w-0">
               <img src="/logo-bg-remove.png" alt="PlanCraftAI" class="w-8 h-8" />
               <span class="text-lg font-semibold truncate">PlanCraftAI</span>
             </div>
-            <button @click="mobileMenu = false" class="p-2 rounded hover:bg-gray-800">✖️</button>
+            <button @click="mobileMenu = false" class="p-2 rounded hover:bg-surface-muted">✖️</button>
           </div>
 
           <div class="mb-4">
-            <p class="text-xs text-slate-400 mb-1">Workspace</p>
+            <p class="text-xs text-muted mb-1">Workspace</p>
             <select
               v-model="selectedWorkspaceId"
-              class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100"
+              class="w-full bg-surface-muted border border-border rounded-lg px-3 py-2 text-sm text-ink"
               @change="selectWorkspace(selectedWorkspaceId)"
             >
               <option v-for="ws in workspaceStore.workspaces" :key="ws.id" :value="ws.id">
@@ -266,7 +264,7 @@
             </select>
             <RouterLink
               to="/workspaces"
-              class="mt-2 inline-flex items-center gap-2 text-xs text-indigo-200"
+              class="mt-2 inline-flex items-center gap-2 text-xs text-brand font-medium"
               @click="mobileMenu = false"
             >
               ➕ Manage workspaces
@@ -277,14 +275,14 @@
           <nav class="space-y-3 flex-1 overflow-y-auto scrollbar-plan">
             <div v-for="group in filteredNavGroups" :key="group.key" class="rounded-lg">
               <div
-                class="flex items-center justify-between px-3 py-2 text-sm font-semibold text-slate-200"
+                class="flex items-center justify-between px-3 py-2 text-sm font-semibold text-ink"
                 @click="toggleGroup(group.key)"
               >
                 <span class="flex items-center gap-2">
                   <span>{{ group.icon }}</span>
                   <span>{{ group.title }}</span>
                 </span>
-                <span class="text-xs text-slate-400">
+                <span class="text-xs text-muted">
                   {{ openGroups[group.key] ? '▾' : '▸' }}
                 </span>
               </div>
@@ -293,19 +291,19 @@
                   v-for="item in group.children"
                   :key="item.to"
                   :to="item.to"
-                  class="block px-4 py-2 rounded hover:bg-indigo-600"
+                  class="block px-4 py-2 rounded hover:bg-surface-muted text-ink"
                   @click="mobileMenu = false"
                 >
                   {{ item.icon }} {{ item.label }}
                 </RouterLink>
               </div>
             </div>
-            <div class="pt-2 border-t border-gray-800/60 mt-4">
+            <div class="pt-2 border-t border-border/60 mt-4">
               <RouterLink
                 v-for="item in systemLinks"
                 :key="item.to"
                 :to="item.to"
-                class="block px-3 py-2 rounded hover:bg-indigo-600"
+                class="block px-3 py-2 rounded hover:bg-surface-muted text-ink"
                 @click="mobileMenu = false"
               >
                 {{ item.icon }} {{ item.label }}
@@ -321,35 +319,35 @@
           >
             Logout
           </button> -->
-          <div class="p-4 border-t border-gray-800">
+          <div class="p-4 border-t border-border/70">
             <!-- Grouped card: Settings | Tour | Profile | Billing | Help | Logout -->
             <div
-              class="grid grid-cols-6 gap-1 bg-gray-900/60 border border-gray-800 rounded-lg p-1"
+              class="grid grid-cols-6 gap-1 bg-surface-muted border border-border/70 rounded-lg p-1"
             >
               <RouterLink
                 to="/settings"
                 @click="mobileMenu = false"
-                class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
+                class="text-xs py-2 rounded-md hover:bg-surface text-center transition text-ink"
                 title="Settings"
                 >⚙️</RouterLink
               >
               <RouterLink
                 to="/profile"
                 @click="mobileMenu = false"
-                class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
+                class="text-xs py-2 rounded-md hover:bg-surface text-center transition text-ink"
                 title="Profile"
                 >👤</RouterLink
               >
               <RouterLink
                 to="/subscription"
                 @click="mobileMenu = false"
-                class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
+                class="text-xs py-2 rounded-md hover:bg-surface text-center transition text-ink"
                 title="Billing"
                 >💳</RouterLink
               >
               <button
                 @click="startTour"
-                class="text-xs py-2 rounded-md hover:bg-gray-800 transition"
+                class="text-xs py-2 rounded-md hover:bg-surface transition text-ink"
                 title="Show Tour"
               >
                 ❔
@@ -357,14 +355,14 @@
               <RouterLink
                 to="/help"
                 @click="mobileMenu = false"
-                class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
+                class="text-xs py-2 rounded-md hover:bg-surface text-center transition text-ink"
                 title="Help"
                 >💬</RouterLink
               >
               <button
                 v-if="authStore.isLoggedIn"
                 @click="handleLogout"
-                class="text-xs py-2 rounded-md hover:bg-gray-800 transition"
+                class="text-xs py-2 rounded-md hover:bg-surface transition text-ink"
                 title="Logout"
               >
                 🚪
@@ -379,11 +377,11 @@
     <div class="flex-1 flex flex-col w-full max-w-full h-screen overflow-x-hidden">
       <!-- Header -->
       <header
-        class="sticky top-0 z-10 bg-gray-950/60 backdrop-blur-xl border-b border-gray-800 p-4 flex justify-between items-center w-full"
+        class="sticky top-0 z-10 header-bar p-4 flex justify-between items-center w-full"
       >
         <div class="flex items-center gap-3 min-w-0 flex-1">
           <!-- Hamburger (mobile only) -->
-          <button class="md:hidden p-2 hover:bg-gray-800 rounded" @click="mobileMenu = !mobileMenu">
+          <button class="md:hidden p-2 hover:bg-surface-muted rounded text-ink" @click="mobileMenu = !mobileMenu">
             <svg
               class="w-6 h-6"
               fill="none"
@@ -405,10 +403,10 @@
           <button
             @click="goToTalkPlanner"
             :class="[
-              'flex items-center justify-center rounded-full border p-2 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-400',
+              'flex items-center justify-center rounded-full border p-2 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-brand/40',
               isOnTalkPlanner
-                ? 'bg-indigo-500/40 border-indigo-300 text-white'
-                : 'bg-indigo-500/15 border-indigo-400/50 text-indigo-200 hover:bg-indigo-500/25'
+                ? 'bg-brand/20 border-brand/50 text-brand'
+                : 'bg-surface border-border text-ink hover:bg-brand/10'
             ]"
             title="Talk to Planner"
             aria-label="Talk to Planner"
@@ -429,6 +427,8 @@
             </svg>
           </button>
 
+          <ThemeToggle />
+
           <!-- Feedback shortcut -->
           <!-- <button
             @click="openFeedback"
@@ -444,7 +444,7 @@
               <el-tooltip content="You're on the Premium Plan!" placement="bottom">
                 <RouterLink
                   to="/subscription"
-                  class="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-sm hover:from-purple-600 hover:to-pink-700 transition"
+                  class="bg-brand text-white px-3 py-1 rounded-full text-sm font-semibold shadow-soft hover:shadow-card transition"
                 >
                   🧠 Pro
                 </RouterLink>
@@ -455,14 +455,14 @@
               <RouterLink
                 v-if="!isGuest"
                 to="/subscription"
-                class="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-sm hover:from-purple-600 hover:to-pink-700 transition"
+                class="bg-brand text-white px-3 py-1 rounded-full text-sm font-semibold shadow-soft hover:shadow-card transition"
               >
                 🚀 Upgrade
               </RouterLink>
               <button
                 v-else
                 @click="goToLogin"
-                class="bg-gradient-to-r from-indigo-600 to-blue-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-sm hover:from-indigo-500 hover:to-blue-500 transition animate-pulse-slow"
+                class="bg-brand/90 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-soft hover:shadow-card transition animate-pulse-slow border border-brand/60"
               >
                 🔑 Sign in
               </button>
@@ -470,7 +470,7 @@
           </div>
           <div
             v-else
-            class="w-[88px] h-8 rounded-full bg-white/10 animate-pulse"
+            class="w-[88px] h-8 rounded-full bg-surface-muted animate-pulse"
             aria-hidden="true"
           ></div>
 
@@ -488,12 +488,12 @@
       </header>
 
       <!-- Dynamic content -->
-      <main class="p-6 flex-1 overflow-y-auto overflow-x-hidden scrollbar-plan">
+      <main class="p-6 flex-1 overflow-y-auto overflow-x-hidden scrollbar-plan bg-surface/80">
         <RouterView />
       </main>
       <!-- Compact sticky footer -->
       <footer
-        class="py-3 text-center text-xs sm:text-sm text-indigo-300 bg-slate-950/95 border-t border-gray-800"
+        class="py-3 text-center text-xs sm:text-sm footer-bar"
       >
         <div
           class="max-w-7xl mx-auto px-4 flex items-center justify-center sm:justify-between gap-3"
@@ -525,6 +525,7 @@ import { hasSubscription, registerPushSubscription } from '@/services/pushServic
 import NotificationBanner from '@/components/NotificationBanner.vue'
 import FeedbackPrompt from '@/components/feedback/FeedbackPrompt.vue'
 import FeedbackDrawer from '@/components/feedback/FeedbackDrawer.vue'
+import ThemeToggle from '@/components/ThemeToggle.vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
@@ -873,9 +874,9 @@ function startTour() {
   font-size: 10px;
   padding: 2px 6px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: #c7d2fe;
+  background: color-mix(in srgb, var(--pc-brand-500) 12%, transparent);
+  border: 1px solid rgb(var(--pc-border-strong-rgb, 216 220 239) / 0.7);
+  color: var(--pc-brand-500);
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
