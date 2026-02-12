@@ -6,12 +6,12 @@
   <SetupPrompt v-else-if="showSetup" @done="showSetup = false" @close="showSetup = false" />
   <main
     v-else
-    class="min-h-screen px-2 py-6 sm:px-4 md:px-6 space-y-6 lg:space-y-8 pb-12 transition-colors max-w-7xl mx-auto"
+    class="min-h-screen px-2 py-6 sm:px-4 md:px-6 pb-12 transition-colors max-w-7xl mx-auto flex flex-col gap-6 lg:gap-8"
   >
-    <GuestBanner :isGuest="authStore.guest" @login="redirectToLogin" />
+    <GuestBanner :isGuest="authStore.guest" class="order-1" @login="redirectToLogin" />
 
     <!-- Tier 1 · Overview -->
-    <section class="space-y-4">
+    <section class="space-y-4 order-2">
       <div class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4">
         <div class="dashboard-card greeting-card space-y-4">
           <div>
@@ -64,103 +64,104 @@
         </div>
       </div>
 
-      <div
-        v-if="showCarryoverBanner || (usage.plan === 'free' && !isPremium.value) || reactivateEligible"
-        class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4"
-      >
-        <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-          <div
-            v-if="showCarryoverBanner"
-            class="move-card flex flex-col justify-between p-4 rounded-2xl bg-gradient-to-b from-[#431f64] to-[#291642] shadow-lg text-white space-y-3"
-          >
-            <div class="text-content">
-              <p class="text-xl font-semibold">
-                {{ carryoverCount }} unfinished task{{ carryoverCount === 1 ? '' : 's' }} from yesterday.
-              </p>
-              <p class="text-sm text-gray-300 mt-1">
-                Move a few forward so today starts lighter.
-              </p>
-            </div>
+    </section>
 
-            <div class="flex flex-col sm:flex-row gap-2">
-              <button
-                type="button"
-                class="flex-1 py-2 rounded-lg bg-gradient-to-r from-amber-400 to-yellow-500 font-semibold text-black hover:opacity-90 transition"
-                @click="applyCarryover(Math.min(3, carryoverCount))"
-              >
-                Move {{ Math.min(3, carryoverCount) }}
-              </button>
-              <button
-                type="button"
-                class="flex-1 py-2 rounded-lg bg-gradient-to-r from-purple-900 to-purple-700 font-semibold text-white hover:opacity-90 transition"
-                @click="applyCarryover('all')"
-              >
-                Move All
-              </button>
-              <button
-                type="button"
-                class="px-4 py-2 rounded-lg border border-gray-500 font-semibold text-gray-300 hover:bg-gray-800 transition"
-                @click="ignoreCarryover()"
-              >
-                Ignore
-              </button>
-            </div>
+    <div
+      v-if="showCarryoverBanner || (usage.plan === 'free' && !isPremium.value) || reactivateEligible"
+      class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-4"
+    >
+      <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+        <div
+          v-if="showCarryoverBanner"
+          class="move-card flex flex-col justify-between p-4 rounded-2xl bg-gradient-to-b from-[#431f64] to-[#291642] shadow-lg text-white space-y-3"
+        >
+          <div class="text-content">
+            <p class="text-xl font-semibold">
+              {{ carryoverCount }} unfinished task{{ carryoverCount === 1 ? '' : 's' }} from yesterday.
+            </p>
+            <p class="text-sm text-gray-300 mt-1">
+              Move a few forward so today starts lighter.
+            </p>
           </div>
 
-          <div
-            v-if="usage.plan === 'free' && !isPremium.value"
-            class="dashboard-banner bg-indigo-600/10 border-indigo-500/40 text-indigo-100 flex items-center justify-between gap-3"
-          >
-            <div class="flex items-center gap-2">
-              <span class="text-xl">🚀</span>
-              <p class="text-sm sm:text-base">
-                You’ve used {{ usage.used }}/{{ usage.limit }} reminders today.
-              </p>
-            </div>
+          <div class="flex flex-col sm:flex-row gap-2">
             <button
-              v-if="!isGuest.value"
-              @click="goToUpgrade"
-              class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold"
+              type="button"
+              class="flex-1 py-2 rounded-lg bg-gradient-to-r from-amber-400 to-yellow-500 font-semibold text-black hover:opacity-90 transition"
+              @click="applyCarryover(Math.min(3, carryoverCount))"
             >
-              Upgrade
+              Move {{ Math.min(3, carryoverCount) }}
             </button>
-            <RouterLink
-              v-else
-              to="/login"
-              class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold"
-            >
-              🔑 Sign in
-            </RouterLink>
-          </div>
-
-          <div
-            v-if="reactivateEligible"
-            class="dashboard-banner bg-yellow-500/10 border-yellow-400/30 text-yellow-50 flex items-start gap-3"
-          >
-            <span class="text-xl">🔁</span>
-            <div class="flex-1 space-y-1">
-              <p class="font-medium text-sm sm:text-base">
-                Premium until {{ cancelAtFmt }}
-                <span v-if="daysLeft > 0">
-                  ({{ daysLeft }} day{{ daysLeft === 1 ? '' : 's' }} left)
-                </span>
-              </p>
-              <p class="text-xs sm:text-sm opacity-80">
-                Reactivate instantly to keep all pro automations and reminders.
-              </p>
-            </div>
             <button
-              @click="onReactivate"
-              class="px-3 py-1.5 rounded-lg bg-black/30 hover:bg-black/45 text-yellow-50 text-xs font-semibold"
+              type="button"
+              class="flex-1 py-2 rounded-lg bg-gradient-to-r from-purple-900 to-purple-700 font-semibold text-white hover:opacity-90 transition"
+              @click="applyCarryover('all')"
             >
-              Reactivate
+              Move All
+            </button>
+            <button
+              type="button"
+              class="px-4 py-2 rounded-lg border border-gray-500 font-semibold text-gray-300 hover:bg-gray-800 transition"
+              @click="ignoreCarryover()"
+            >
+              Ignore
             </button>
           </div>
         </div>
-      </div>
-    </section>
 
-    <section class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4">
+        <div
+          v-if="usage.plan === 'free' && !isPremium.value"
+          class="dashboard-banner bg-indigo-600/10 border-indigo-500/40 text-indigo-100 flex items-center justify-between gap-3"
+        >
+          <div class="flex items-center gap-2">
+            <span class="text-xl">🚀</span>
+            <p class="text-sm sm:text-base">
+              You’ve used {{ usage.used }}/{{ usage.limit }} reminders today.
+            </p>
+          </div>
+          <button
+            v-if="!isGuest.value"
+            @click="goToUpgrade"
+            class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold"
+          >
+            Upgrade
+          </button>
+          <RouterLink
+            v-else
+            to="/login"
+            class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold"
+          >
+            🔑 Sign in
+          </RouterLink>
+        </div>
+
+        <div
+          v-if="reactivateEligible"
+          class="dashboard-banner bg-yellow-500/10 border-yellow-400/30 text-yellow-50 flex items-start gap-3"
+        >
+          <span class="text-xl">🔁</span>
+          <div class="flex-1 space-y-1">
+            <p class="font-medium text-sm sm:text-base">
+              Premium until {{ cancelAtFmt }}
+              <span v-if="daysLeft > 0">
+                ({{ daysLeft }} day{{ daysLeft === 1 ? '' : 's' }} left)
+              </span>
+            </p>
+            <p class="text-xs sm:text-sm opacity-80">
+              Reactivate instantly to keep all pro automations and reminders.
+            </p>
+          </div>
+          <button
+            @click="onReactivate"
+            class="px-3 py-1.5 rounded-lg bg-black/30 hover:bg-black/45 text-yellow-50 text-xs font-semibold"
+          >
+            Reactivate
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <section class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-6">
       <div class="dashboard-card flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div class="space-y-1">
           <p class="text-[11px] uppercase tracking-[0.3em] text-indigo-200/80">Layout</p>
@@ -193,8 +194,10 @@
     </section>
 
     <!-- Tier 2 · Workspaces -->
-    <section class="space-y-4 lg:space-y-5">
-      <div v-if="showDaily" class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4">
+    <div
+      v-if="showDaily"
+      class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-3"
+    >
         <div class="dashboard-card daily-card space-y-5">
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
@@ -346,7 +349,10 @@
         </div>
       </div>
 
-      <div v-if="showAllTasks" class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4">
+    <div
+      v-if="showAllTasks"
+      class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-5"
+    >
         <div class="dashboard-card all-tasks-card space-y-5">
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
@@ -538,7 +544,7 @@
         </div>
       </div>
 
-      <div class="space-y-4 lg:space-y-5">
+    <section class="space-y-4 lg:space-y-5 order-7">
         <div
           v-if="showWeekly"
           class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4"
@@ -753,11 +759,10 @@
           </div>
         </div>
       </div>
-    </div>
     </section>
 
 <!-- Tier 3 · Analytics & Insights -->
-<section class="space-y-4 lg:space-y-5">
+<section class="space-y-4 lg:space-y-5 order-8">
   <div
     v-if="showJournal"
     class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4"
@@ -1066,7 +1071,7 @@
     </section>
 
     <!-- Tier 4 · AI Quick Actions -->
-    <section class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4">
+    <section class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-9">
       <div class="dashboard-card flex flex-col items-center gap-4 text-center">
         <h3 class="text-base sm:text-lg font-semibold text-slate-100">✨ AI Quick Actions</h3>
         <p class="text-xs sm:text-sm text-indigo-200/80 max-w-2xl">
