@@ -2970,7 +2970,7 @@ onUnmounted(() => {
   height: 100vh;
   z-index: 50;
   background: radial-gradient(circle at 20% 20%, rgba(79, 70, 229, 0.35), transparent 35%), radial-gradient(circle at 80% 0%, rgba(236, 72, 153, 0.25), transparent 32%), #0f172a;
-  padding: 1rem 1.25rem 2rem;
+  padding: 4.5rem 1.25rem 2rem;
   overflow-y: auto;
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.65);
   transition: opacity 0.3s ease, transform 0.3s ease;
@@ -2986,9 +2986,9 @@ onUnmounted(() => {
 
 .today-exit-btn {
   position: fixed;
-  top: 14px;
-  right: 16px;
-  z-index: 60;
+  top: 12px;
+  right: 14px;
+  z-index: 90;
   min-height: 44px;
   padding: 0.65rem 1.1rem;
   border-radius: 12px;
