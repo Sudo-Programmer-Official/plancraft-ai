@@ -214,10 +214,10 @@ export async function sendVoiceCall(job) {
 
   const audioUrl = job?.audioUrl || job?.payload?.audioUrl || null
   const message = String(job?.message || job?.payload?.body || 'Hello from PlanCraftAI')
-  const voiceName = job?.payload?.voice || job?.payload?.voiceName || TWILIO_VOICE || 'alice'
+  const voiceName = job?.payload?.voice || job?.payload?.voiceName || TWILIO_VOICE || 'Polly.Joanna-Neural'
   const twiml = audioUrl
     ? `<Response><Play>${audioUrl}</Play></Response>`
-    : `<Response><Say voice="${voiceName}">${message}</Say></Response>`
+    : `<Response><Say voice="${voiceName}"><prosody rate="88%"><break time="0.6s"/>${message}</prosody></Say></Response>`
 
   const url = `${TWILIO_BASE}/Accounts/${TWILIO_ACCOUNT_SID}/Calls.json`
   const payload = new URLSearchParams({

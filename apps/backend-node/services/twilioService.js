@@ -14,6 +14,16 @@ let client = null
 function envOk() {
   return !!(ACCOUNT_SID && AUTH_TOKEN && FROM_NUMBER)
 }
+
+function xmlEscape(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
+}
+
 function getClient() {
   if (!client) {
     if (!ACCOUNT_SID || !AUTH_TOKEN) {
@@ -126,8 +136,14 @@ export async function makeCall(to, message, meta = {}) {
     console.warn('[Twilio] Missing credentials — skipping Voice call')
     return null
   }
-  // Use a clearer neural voice for reminder calls
-  const twiml = `<Response><Say voice="Polly.Joanna-Neural" language="en-US">${String(message || '')}</Say></Response>`
+  // Use a clearer neural voice and add a short pause to avoid clipping the intro
+  const safeMessage = xmlEscape(message)
+  const twiml =
+    `<Response>` +
+    `<Say voice="Polly.Joanna-Neural" language="en-US">` +
+    `<prosody rate="88%"><break time="0.6s"/>${safeMessage}</prosody>` +
+    `</Say>` +
+    `</Response>`
   const statusCallback = `${API_BASE_URL}/api/twilio/call-status` +
     `?u=${encodeURIComponent(meta.userId || '')}&m=${encodeURIComponent(message || '')}`
   const res = await c.calls.create({

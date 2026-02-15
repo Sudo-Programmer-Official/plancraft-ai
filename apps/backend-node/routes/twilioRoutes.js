@@ -89,7 +89,7 @@ function buildPlayResponse(audioUrl, fallbackText) {
     `<?xml version="1.0" encoding="UTF-8"?>` +
     `<Response>` +
     `<Play>${safeAudio}</Play>` +
-    `<Say voice="alice">${safeFallback}</Say>` +
+    `<Say voice="Polly.Joanna-Neural" language="en-US"><prosody rate="88%"><break time="0.6s"/>${safeFallback}</prosody></Say>` +
     `</Response>`
   )
 }
@@ -110,11 +110,11 @@ router.all('/voice-response', async (req, res) => {
       const twiml = buildPlayResponse(absoluteUrl, message)
       return res.status(200).send(twiml)
     }
-    const fallback = `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice">${escapeXml(message)}</Say></Response>`
+    const fallback = `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna-Neural" language="en-US"><prosody rate="88%"><break time="0.6s"/>${escapeXml(message)}</prosody></Say></Response>`
     return res.status(200).send(fallback)
   } catch (e) {
     console.error('[Twilio] voice-response TTS failed', e?.message || e)
-    const fallback = `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice">${escapeXml(message)}</Say></Response>`
+    const fallback = `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna-Neural" language="en-US"><prosody rate="88%"><break time="0.6s"/>${escapeXml(message)}</prosody></Say></Response>`
     return res.status(200).send(fallback)
   }
 })
