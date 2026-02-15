@@ -25,10 +25,12 @@
         <!-- Voice Recorder -->
         <button
           @click="toggleRecording"
+          :disabled="isTranscribing"
           :class="isRecording ? 'bg-red-500' : 'bg-indigo-600'"
-          class="px-3 py-2 rounded text-white mt-2"
+          class="px-3 py-2 rounded text-white mt-2 disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          {{ isRecording ? '🎙️ Recording… Tap to Stop' : '🎤 Add by Voice' }}
+          <span v-if="isTranscribing">⏳ Transcribing…</span>
+          <span v-else>{{ isRecording ? '🎙️ Recording… Tap to Stop' : '🎤 Add by Voice' }}</span>
         </button>
 
         <!-- Date -->
@@ -66,7 +68,7 @@
 import { ref, watch } from "vue"
 import { ElNotification } from 'element-plus'
 import { addTaskToFirebase, updateTaskInFirebase } from "@/services/firebaseService"
-import { useVoiceRecorder } from "@/composables/useVoiceRecorder"
+import { useAudioRecorder } from "@/composables/useAudioRecorder"
 import api from "@/services/api"
 import { useAuthStore } from "@/stores/authStore"
 import { getReminderStatus, scheduleReminder } from "@/services/reminderService"
@@ -129,8 +131,16 @@ watch(
 )
 
 // Voice recorder for details
-const { isRecording, startRecording, stopRecording } = useVoiceRecorder(async (rawText) => {
-  form.value.details = rawText
+const {
+  isRecording,
+  startRecording,
+  stopRecording,
+  isTranscribing,
+} = useAudioRecorder({
+  onTranscription: async (rawText) => {
+    form.value.details = rawText
+  },
+  logPrefix: '[TaskDialogVoice]',
 })
 
 function toggleRecording() {

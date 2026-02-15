@@ -56,7 +56,10 @@
         Listening…
         <span class="voice-controller__time">{{ formattedDuration }}</span>
       </p>
-      <p v-else-if="state === 'transcribing'">Transcribing audio…</p>
+      <div v-else-if="state === 'transcribing'" class="voice-controller__processing">
+        <span class="voice-controller__spinner" aria-hidden="true"></span>
+        <p>{{ processingMessage }}</p>
+      </div>
       <p v-else-if="transcript" class="voice-controller__transcript">{{ transcript }}</p>
     </div>
 
@@ -88,8 +91,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onBeforeUnmount, watch } from 'vue'
-import api from '@/services/api'
+import { computed, watch, ref, onBeforeUnmount } from 'vue'
+import { useAudioRecorder } from '@/composables/useAudioRecorder'
+import { ElMessage } from 'element-plus'
 
 const props = defineProps({
   disabled: Boolean,
@@ -103,15 +107,27 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['transcribed', 'state-change'])
+const emit = defineEmits(['transcribed', 'state-change', 'processing-start', 'processing-end', 'processing-error'])
 
-const state = ref('idle') // idle | recording | transcribing | done
-const transcript = ref('')
-const durationSeconds = ref(0)
-let mediaRecorder = null
-let stream = null
-let timerId = null
-let recordedChunks = []
+const {
+  state,
+  transcript,
+  durationSeconds,
+  isRecording,
+  isTranscribing,
+  startRecording,
+  stopRecording,
+  resetRecorder,
+} = useAudioRecorder({
+  onTranscription: (text) => {
+    if (text) emit('transcribed', { text })
+    emit('processing-end')
+  },
+  logPrefix: '[VoiceRecorder]',
+})
+
+const processingMessage = ref('Transcribing your task…')
+let processingTimer = null
 
 const formattedDuration = computed(() => {
   const seconds = Math.max(0, durationSeconds.value || 0)
@@ -129,118 +145,33 @@ const primaryLabel = computed(() => {
 
 function handlePrimaryPress() {
   if (props.disabled || state.value === 'transcribing') return
-  if (state.value === 'recording') {
-    stopRecording()
-  } else {
-    startRecording()
-  }
+  if (state.value === 'recording') stopRecording()
+  else startRecording()
 }
 
-async function startRecording() {
-  if (state.value === 'recording' || props.disabled) return
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-  } catch (err) {
-    console.warn('[VoiceRecorder] microphone denied', err)
-    return
-  }
-  recordedChunks = []
-  transcript.value = ''
-  durationSeconds.value = 0
-  state.value = 'recording'
-  emit('state-change', state.value)
-  initRecorder()
-  startTimer()
-}
-
-function initRecorder() {
-  if (!stream) return
-  const options = { mimeType: 'audio/webm;codecs=opus' }
-  mediaRecorder = new MediaRecorder(stream, options)
-  mediaRecorder.ondataavailable = (event) => {
-    if (event?.data?.size) recordedChunks.push(event.data)
-  }
-  mediaRecorder.onstop = handleRecorderStop
-  mediaRecorder.start()
-}
-
-function stopRecording() {
-  if (!mediaRecorder || state.value !== 'recording') return
-  state.value = 'transcribing'
-  emit('state-change', state.value)
-  stopTimer()
-  if (mediaRecorder.state !== 'inactive') mediaRecorder.stop()
-}
-
-async function handleRecorderStop() {
-  try {
-    const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'audio/webm' })
-    const text = await transcribeBlob(blob)
-    transcript.value = text
-    state.value = 'done'
-    emit('state-change', state.value)
-    if (text) {
-      emit('transcribed', { text })
-    } else {
-      resetRecorder()
+watch(
+  () => state.value,
+  (val) => {
+    emit('state-change', val)
+    if (processingTimer) {
+      clearTimeout(processingTimer)
+      processingTimer = null
     }
-  } catch (err) {
-    console.error('[VoiceRecorder] transcription failed', err)
-    resetRecorder()
-  } finally {
-    mediaRecorder = null
-    stopTracks()
-  }
-}
-
-async function transcribeBlob(blob) {
-  const fd = new FormData()
-  fd.append('file', blob, 'speech.webm')
-  const res = await api.post('/transcribe', fd, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  })
-  return res?.data?.text || ''
-}
-
-function resetRecorder() {
-  stopTimer()
-  stopTracks()
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-    mediaRecorder.stop()
-  }
-  mediaRecorder = null
-  recordedChunks = []
-  transcript.value = ''
-  durationSeconds.value = 0
-  state.value = 'idle'
-  emit('state-change', state.value)
-}
-
-function stopTracks() {
-  if (stream) {
-    stream.getTracks().forEach((track) => track.stop())
-    stream = null
-  }
-}
-
-function startTimer() {
-  stopTimer()
-  timerId = window.setInterval(() => {
-    durationSeconds.value += 1
-  }, 1000)
-}
-
-function stopTimer() {
-  if (timerId) {
-    clearInterval(timerId)
-    timerId = null
-  }
-}
-
-onBeforeUnmount(() => {
-  stopTimer()
-  stopTracks()
-})
+    if (val === 'transcribing') {
+      processingMessage.value = 'Transcribing your task…'
+      processingTimer = window.setTimeout(() => {
+        processingMessage.value = 'Still processing… almost there.'
+      }, 5000)
+      emit('processing-start')
+    } else if (val === 'idle' || val === 'done') {
+      emit('processing-end')
+    } else if (val === 'error') {
+      emit('processing-end')
+      emit('processing-error')
+      ElMessage.error('Transcription failed. Try again.')
+    }
+  },
+)
 
 watch(
   () => props.resetTrigger,
@@ -248,6 +179,13 @@ watch(
     resetRecorder()
   },
 )
+
+onBeforeUnmount(() => {
+  if (processingTimer) {
+    clearTimeout(processingTimer)
+    processingTimer = null
+  }
+})
 </script>
 
 <style scoped>
@@ -348,6 +286,22 @@ watch(
   text-align: left;
 }
 
+.voice-controller__processing {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+}
+
+.voice-controller__spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #a5b4fc;
+  animation: spin 1s linear infinite;
+}
+
 .voice-controller__transcript {
   white-space: normal;
   word-break: break-word;
@@ -395,6 +349,12 @@ watch(
   100% {
     transform: scale(0.9);
     opacity: 0.6;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 

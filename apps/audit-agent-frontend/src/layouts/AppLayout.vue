@@ -51,32 +51,37 @@
     </div>
     <!-- Sidebar (desktop only) -->
     <aside
-      class="hidden md:flex flex-col h-screen transition-all duration-300 bg-gray-950/70 backdrop-blur-xl"
-      :class="sidebarOpen ? 'w-72' : 'w-20'"
+      class="hidden md:flex flex-col h-screen transition-all duration-200 bg-gray-950/70 backdrop-blur-xl"
+      :class="sidebarOpen ? 'w-64' : 'w-16'"
     >
-      <div class="flex-shrink-0 flex items-center justify-between p-4 border-b border-gray-700">
-        <div class="flex items-center gap-2 min-w-0">
-          <img src="/logo-bg-remove.png" alt="PlanCraftAI" class="w-8 h-8" />
-          <span v-if="sidebarOpen" class="text-lg font-semibold truncate">PlanCraftAI</span>
+      <div
+        class="flex-shrink-0 border-b border-gray-700"
+        :class="sidebarOpen ? 'flex items-center justify-between p-4' : 'flex items-center justify-center p-2 h-14'"
+      >
+        <div v-if="sidebarOpen" class="flex items-center gap-2 min-w-0">
+          <img src=\"/logo-bg-remove.png\" alt=\"PlanCraftAI\" class=\"w-8 h-8\" />
+          <span class=\"text-lg font-semibold truncate\">PlanCraftAI</span>
         </div>
         <button
-          @click="sidebarOpen = !sidebarOpen"
-          class="p-2 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 transition-colors"
-          aria-label="Toggle sidebar"
+          @click=\"sidebarOpen = !sidebarOpen\"
+          class=\"p-2 rounded-lg hover:bg-indigo-600/40 transition-colors flex items-center justify-center\"
+          :class=\"sidebarOpen ? 'bg-indigo-600/20' : 'bg-transparent'\"
+          aria-label=\"Toggle sidebar\"
+          :title=\"sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'\"
         >
-          <svg v-if="sidebarOpen" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+          <svg v-if=\"sidebarOpen\" xmlns=\"http://www.w3.org/2000/svg\" class=\"h-5 w-5 text-indigo-300\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\">
+            <path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M15 19l-7-7 7-7\" />
           </svg>
-          <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+          <svg v-else xmlns=\"http://www.w3.org/2000/svg\" class=\"h-5 w-5 text-indigo-300\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\">
+            <path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M9 5l7 7-7 7\" />
           </svg>
         </button>
       </div>
 
       <!-- Workspace summary (dropdown removed) -->
-      <div class="px-3 pb-3 border-b border-gray-800/70">
-        <div class="flex items-center gap-3 min-w-0" :class="sidebarOpen ? 'justify-start' : 'justify-center'">
-          <div v-if="sidebarOpen" class="flex items-baseline gap-2 min-w-0">
+      <div v-if="sidebarOpen" class="px-3 pb-3 border-b border-gray-800/70">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="flex items-baseline gap-2 min-w-0">
             <span class="text-[11px] uppercase tracking-[0.25em] text-slate-500">Workspace</span>
             <span class="text-sm font-semibold truncate text-white">{{ activeWorkspace?.name || 'Personal' }}</span>
           </div>
@@ -92,9 +97,10 @@
         >
           <button
             v-if="group.collapsible"
-            class="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold text-slate-200 rounded hover:bg-gray-800"
+            class="w-full flex items-center rounded text-slate-200 hover:bg-gray-800 transition"
+            :class="sidebarOpen ? 'justify-between px-3 py-2 text-sm font-semibold' : 'justify-center px-0 py-2 text-base'"
             @click="toggleGroup(group.key)"
-          >
+            >
             <span class="flex items-center gap-2">
               <span>{{ group.icon }}</span>
               <span v-if="sidebarOpen" class="flex items-center gap-2">
@@ -119,8 +125,11 @@
               v-for="item in group.children"
               :key="item.to"
               :to="item.to"
-              class="flex items-center gap-3 w-full px-4 py-2 rounded transition hover:bg-gray-800 text-sm text-slate-200"
+              class="flex items-center gap-3 w-full rounded transition hover:bg-gray-800 text-sm text-slate-200"
+              :class="sidebarOpen ? 'justify-start px-4 py-2' : 'justify-center px-0 py-2'"
               :class="{ 'bg-indigo-600': isActive(item.to) }"
+              :title="sidebarOpen ? '' : item.label"
+              :aria-label="sidebarOpen ? item.label : item.label"
             >
               <span>{{ item.icon }}</span>
               <span v-if="sidebarOpen">{{ item.label }}</span>
@@ -133,8 +142,11 @@
             v-for="item in systemLinks"
             :key="item.to"
             :to="item.to"
-            class="flex items-center gap-3 w-full px-3 py-2 rounded transition hover:bg-gray-800 text-sm text-slate-200"
+            class="flex items-center gap-3 w-full rounded transition hover:bg-gray-800 text-sm text-slate-200"
+            :class="sidebarOpen ? 'justify-start px-3 py-2' : 'justify-center px-0 py-2'"
             :class="{ 'bg-indigo-600': isActive(item.to) }"
+            :title="sidebarOpen ? '' : item.label"
+            :aria-label="item.label"
           >
             <span>{{ item.icon }}</span>
             <span v-if="sidebarOpen">{{ item.label }}</span>
@@ -144,58 +156,73 @@
 
       <!-- Sidebar Footer: segmented actions -->
       <div class="flex-shrink-0 mt-auto pb-4 px-3">
-        <div
-          class="grid gap-1 bg-gray-900/60 border border-gray-800 rounded-lg p-1"
-          :class="[authStore.user?.role === 'admin' ? 'grid-cols-7' : 'grid-cols-6']"
-        >
-          <button
-            @click="startTour"
-            class="text-xs py-2 rounded-md hover:bg-gray-800 transition"
-            title="Show Tour"
+        <template v-if="sidebarOpen">
+          <div
+            class="grid gap-1 bg-gray-900/60 border border-gray-800 rounded-lg p-1"
+            :class="[authStore.user?.role === 'admin' ? 'grid-cols-7' : 'grid-cols-6']"
           >
-            ❔
-          </button>
-          <RouterLink
-            to="/settings"
-            class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
-            title="Settings"
-            >⚙️</RouterLink
-          >
-          <RouterLink
-            to="/subscription"
-            class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
-            title="Billing"
-            >💳</RouterLink
-          >
-          <RouterLink
-            v-if="authStore.user?.role === 'admin'"
-            to="/admin"
-            class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
-            title="Admin Panel"
-            >🛠</RouterLink
-          >
-          <RouterLink
-            to="/help"
-            class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
-            title="Help"
-            >💬</RouterLink
-          >
-          <button
-            v-if="!isGuest"
-            @click="handleLogout"
-            class="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-1.5 rounded-lg 
-                   bg-gradient-to-r from-red-600 to-pink-600 text-white shadow-md 
-                   hover:shadow-lg hover:from-red-500 hover:to-pink-500 
-                   transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98]"
-            title="Logout"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 -ml-[1px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-7.5A2.25 2.25 0 003.75 5.25v13.5A2.25 2.25 0 006 21h7.5a2.25 2.25 0 002.25-2.25V15" />
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h12m0 0l-3-3m3 3l-3 3" />
-            </svg>
-          </button>
-          
-        </div>
+            <button
+              @click="startTour"
+              class="text-xs py-2 rounded-md hover:bg-gray-800 transition"
+              title="Show Tour"
+            >
+              ❔
+            </button>
+            <RouterLink
+              to="/settings"
+              class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
+              title="Settings"
+              >⚙️</RouterLink
+            >
+            <RouterLink
+              to="/subscription"
+              class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
+              title="Billing"
+              >💳</RouterLink
+            >
+            <RouterLink
+              v-if="authStore.user?.role === 'admin'"
+              to="/admin"
+              class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
+              title="Admin Panel"
+              >🛠</RouterLink
+            >
+            <RouterLink
+              to="/help"
+              class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
+              title="Help"
+              >💬</RouterLink
+            >
+            <button
+              v-if="!isGuest"
+              @click="handleLogout"
+              class="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-1.5 rounded-lg 
+                     bg-gradient-to-r from-red-600 to-pink-600 text-white shadow-md 
+                     hover:shadow-lg hover:from-red-500 hover:to-pink-500 
+                     transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98]"
+              title="Logout"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 -ml-[1px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-7.5A2.25 2.25 0 003.75 5.25v13.5A2.25 2.25 0 006 21h7.5a2.25 2.25 0 002.25-2.25V15" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h12m0 0l-3-3m3 3l-3 3" />
+              </svg>
+            </button>
+            
+          </div>
+        </template>
+        <template v-else>
+          <div class="flex items-center justify-center">
+            <button
+              v-if="!isGuest"
+              @click="handleLogout"
+              class="p-2 rounded-md hover:bg-gray-800 transition text-xl"
+              title="Logout"
+              aria-label="Logout"
+            >
+              🚪
+            </button>
+          </div>
+        </template>
       </div>
     </aside>
 
@@ -524,7 +551,13 @@ onMounted(() => {
   try { maybePromptProfile() } catch {}
 })
 
-const sidebarOpen = ref(true) // desktop toggle
+const isSidebarCollapsed = ref(false)
+const sidebarOpen = computed({
+  get: () => !isSidebarCollapsed.value,
+  set: (val) => {
+    isSidebarCollapsed.value = !val
+  },
+}) // desktop toggle (open = !collapsed)
 const mobileMenu = ref(false) // mobile drawer toggle
 const showUpgrade = ref(false)
 const planOpen = ref(false)

@@ -73,7 +73,7 @@
       <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
         <div
           v-if="showCarryoverBanner"
-          class="move-card flex flex-col justify-between p-4 rounded-2xl bg-gradient-to-b from-[#431f64] to-[#291642] shadow-lg text-white space-y-3"
+          class="move-card move-card--full flex flex-col justify-between p-4 rounded-2xl bg-gradient-to-b from-[#431f64] to-[#291642] shadow-lg text-white space-y-3"
         >
           <div class="text-content">
             <p class="text-xl font-semibold">
@@ -87,14 +87,14 @@
           <div class="flex flex-col sm:flex-row gap-2">
             <button
               type="button"
-              class="flex-1 py-2 rounded-lg bg-gradient-to-r from-amber-400 to-yellow-500 font-semibold text-black hover:opacity-90 transition"
+              class="flex-1 py-2 rounded-lg move-primary-btn font-semibold text-white transition"
               @click="applyCarryover(Math.min(3, carryoverCount))"
             >
               Move {{ Math.min(3, carryoverCount) }}
             </button>
             <button
               type="button"
-              class="flex-1 py-2 rounded-lg bg-gradient-to-r from-purple-900 to-purple-700 font-semibold text-white hover:opacity-90 transition"
+              class="flex-1 py-2 rounded-lg move-secondary-btn font-semibold text-white transition"
               @click="applyCarryover('all')"
             >
               Move All
@@ -199,14 +199,34 @@
       class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-3"
     >
         <div class="dashboard-card daily-card space-y-5">
+          <button
+            v-if="isTodayFullscreen"
+            type="button"
+            class="today-exit-btn"
+            @click="toggleTodayFullscreen"
+          >
+            ✕ Exit Fullscreen
+          </button>
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <h3 class="text-lg sm:text-xl font-semibold text-slate-100">
-                📅 Today’s Focus
-              </h3>
-              <p class="text-xs sm:text-sm text-indigo-200/80">
-                Prioritise, drag, and complete your most important work.
-              </p>
+            <div class="flex items-center gap-3">
+              <div>
+                <h3 class="text-lg sm:text-xl font-semibold text-slate-100">
+                  📅 Today’s Focus
+                </h3>
+                <p class="text-xs sm:text-sm text-indigo-200/80">
+                  Prioritise, drag, and complete your most important work.
+                </p>
+              </div>
+              <button
+                type="button"
+                class="today-fullscreen-btn"
+                :aria-pressed="isTodayFullscreen"
+                :title="isTodayFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'"
+                @click="toggleTodayFullscreen"
+              >
+                <span v-if="!isTodayFullscreen">⤢</span>
+                <span v-else>⤡</span>
+              </button>
             </div>
             <button
               @click="openPlanner"
@@ -217,7 +237,7 @@
             </button>
           </div>
 
-          <div class="flex gap-2 sm:gap-3 overflow-x-auto pb-2 scrollbar-plan">
+          <div class="flex gap-2 sm:gap-3 overflow-x-auto pb-2 scrollbar-plan" :class="{ 'opacity-70 pointer-events-none': isTodayFullscreen }">
             <button
               v-for="category in categoryFilters"
               :key="category"
@@ -235,7 +255,7 @@
             </button>
           </div>
 
-          <div class="space-y-3">
+          <div class="space-y-3" :class="{ 'today--fullscreen': isTodayFullscreen }">
             <div class="progress-card bg-slate-900/50 border border-slate-700/40 rounded-xl px-4 py-3">
               <div class="flex items-center justify-between text-xs sm:text-sm text-slate-300 mb-2">
                 <span>Completion</span>
@@ -252,7 +272,8 @@
             <div
               v-if="filteredDaily.length"
               ref="dailyList"
-              class="overflow-y-auto max-h-[60vh] md:max-h-64 scrollbar-plan rounded-2xl pr-1"
+              class="today-list overflow-y-auto max-h-[60vh] md:max-h-64 scrollbar-plan rounded-2xl pr-1"
+              :class="{ 'today-list--fullscreen': isTodayFullscreen }"
             >
               <ul class="space-y-2 text-sm">
                 <li
@@ -1109,7 +1130,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick, watchEffect, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, nextTick, watchEffect, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { collection, onSnapshot, updateDoc, doc, query, where, serverTimestamp, getDocs } from 'firebase/firestore'
 import { db, auth } from '@/firebase/init'
@@ -1507,6 +1528,7 @@ const weeklyTasks = ref([])
 const monthlyTasks = ref([])
 const activeTaskId = ref(null)
 const showPlanner = ref(false)
+const isTodayFullscreen = ref(false)
 const selectedTask = ref(null)
 const dailyList = ref(null)
 const journalLogs = ref([])
@@ -2218,6 +2240,17 @@ function closePlanner() {
   selectedTask.value = null
 }
 
+function toggleTodayFullscreen() {
+  isTodayFullscreen.value = !isTodayFullscreen.value
+  try {
+    const root = document?.documentElement
+    if (!root) return
+    root.classList.toggle('today-fullscreen-mode', isTodayFullscreen.value)
+  } catch (err) {
+    console.warn('toggleTodayFullscreen failed', err)
+  }
+}
+
 function reloadDaily() {
   return loadTasks()
 }
@@ -2457,6 +2490,12 @@ onUnmounted(() => {
     clearTimeout(savePrefsTimer)
     savePrefsTimer = null
   }
+})
+
+onBeforeUnmount(() => {
+  try {
+    document?.documentElement?.classList?.remove('today-fullscreen-mode')
+  } catch (_) {}
 })
 
 async function redirectToLogin() {
@@ -2902,5 +2941,108 @@ onUnmounted(() => {
     min-height: 3rem;
   }
 }
+
+.today-fullscreen-btn {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(79, 70, 229, 0.15);
+  color: #e0e7ff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: all 0.2s ease;
+}
+
+.today-fullscreen-btn:hover {
+  background: rgba(99, 102, 241, 0.25);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(79, 70, 229, 0.25);
+}
+
+.today--fullscreen {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 50;
+  background: radial-gradient(circle at 20% 20%, rgba(79, 70, 229, 0.35), transparent 35%), radial-gradient(circle at 80% 0%, rgba(236, 72, 153, 0.25), transparent 32%), #0f172a;
+  padding: 1rem 1.25rem 2rem;
+  overflow-y: auto;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.65);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.today-list {
+  transition: max-height 0.25s ease;
+}
+
+.today-list--fullscreen {
+  max-height: calc(100vh - 220px);
+}
+
+.today-exit-btn {
+  position: fixed;
+  top: 14px;
+  right: 16px;
+  z-index: 60;
+  min-height: 44px;
+  padding: 0.65rem 1.1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(15, 23, 42, 0.9);
+  color: #e2e8f0;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 18px 38px rgba(15, 23, 42, 0.45);
+}
+
+.today-exit-btn:hover {
+  background: rgba(79, 70, 229, 0.2);
+}
+
+:global(.today-fullscreen-mode aside) {
+  display: none !important;
+}
+:global(.today-fullscreen-mode header.sticky) {
+  display: none !important;
+}
+:global(.today-fullscreen-mode footer) {
+  display: none !important;
+}
+:global(.today-fullscreen-mode body) {
+  overflow: hidden;
+}
+
+.move-card--full {
+  grid-column: 1 / -1;
+  width: 100%;
+  padding: 1.2rem;
+}
+
+.move-card--full button {
+  min-height: 44px;
+}
+
+.move-primary-btn {
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
+  box-shadow: 0 14px 30px rgba(99, 102, 241, 0.35);
+}
+.move-primary-btn:hover {
+  filter: brightness(1.05);
+}
+.move-secondary-btn {
+  background: linear-gradient(135deg, #312e81, #4338ca);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.move-secondary-btn:hover {
+  filter: brightness(1.05);
+}
+
 
 </style>

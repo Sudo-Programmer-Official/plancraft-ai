@@ -1,0 +1,253 @@
+import { computed, onBeforeUnmount, ref } from 'vue'
+import api from '@/services/api'
+import { recordAndSendToBackend } from '@/utils/backendRecorder'
+
+const MAX_DURATION_MS = 60_000
+const STOP_FALLBACK_MS = 1_800
+const MIME_CANDIDATES = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4', 'audio/webm']
+
+function pickMimeType() {
+  try {
+    if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') {
+      return MIME_CANDIDATES[0]
+    }
+    return MIME_CANDIDATES.find((m) => MediaRecorder.isTypeSupported(m)) || MIME_CANDIDATES[0]
+  } catch (_) {
+    return MIME_CANDIDATES[0]
+  }
+}
+
+export function useAudioRecorder(options = {}) {
+  const { onTranscription, autoStopMs = MAX_DURATION_MS, logPrefix = '[VoiceRecorder]' } = options
+
+  const state = ref('idle') // idle | recording | transcribing | done | error
+  const transcript = ref('')
+  const durationSeconds = ref(0)
+
+  const isRecording = computed(() => state.value === 'recording')
+  const isTranscribing = computed(() => state.value === 'transcribing')
+
+  let mediaRecorder = null
+  let backendRecorder = null
+  let stream = null
+  let recordedChunks = []
+  let tickId = null
+  let autoStopId = null
+  let stopTimeoutId = null
+  let stopRequested = false
+  let stopHandled = false
+
+  const clearTimers = (resetDuration = false) => {
+    if (tickId) {
+      clearInterval(tickId)
+      tickId = null
+    }
+    if (autoStopId) {
+      clearTimeout(autoStopId)
+      autoStopId = null
+    }
+    if (stopTimeoutId) {
+      clearTimeout(stopTimeoutId)
+      stopTimeoutId = null
+    }
+    if (resetDuration) durationSeconds.value = 0
+  }
+
+  const stopStreams = () => {
+    try {
+      if (stream) stream.getTracks().forEach((t) => t.stop())
+    } catch (_) {}
+    stream = null
+  }
+
+  const releaseRecorder = () => {
+    try {
+      if (mediaRecorder?.__listeners) {
+        const { onData, onStop, onError } = mediaRecorder.__listeners
+        if (onData) mediaRecorder.removeEventListener('dataavailable', onData)
+        if (onStop) mediaRecorder.removeEventListener('stop', onStop)
+        if (onError) mediaRecorder.removeEventListener('error', onError)
+      }
+    } catch (_) {}
+    mediaRecorder = null
+    backendRecorder = null
+  }
+
+  const cleanup = (resetTranscript = false) => {
+    clearTimers(false)
+    stopStreams()
+    releaseRecorder()
+    recordedChunks = []
+    stopRequested = false
+    stopHandled = false
+    if (resetTranscript) transcript.value = ''
+  }
+
+  const transcribeBlob = async (blob) => {
+    console.log(`${logPrefix} transcription request`, { size: blob?.size, type: blob?.type })
+    const fd = new FormData()
+    const ext = blob?.type?.includes('ogg') ? 'ogg' : blob?.type?.includes('mp4') ? 'm4a' : 'webm'
+    fd.append('file', blob, `speech.${ext}`)
+    const res = await api.post('/transcribe', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    console.log(`${logPrefix} transcription response`, res?.data)
+    return res?.data?.text || ''
+  }
+
+  const startFallbackRecorder = async () => {
+    backendRecorder = await recordAndSendToBackend(async (text, isFinal) => {
+      if (!text) return
+      transcript.value = text
+      if (isFinal) {
+        state.value = 'done'
+        if (typeof onTranscription === 'function') await onTranscription(text)
+      }
+    })
+    state.value = 'recording'
+    tickId = window.setInterval(() => (durationSeconds.value += 1), 1000)
+    if (autoStopMs > 0) autoStopId = window.setTimeout(() => stopRecording('auto'), autoStopMs)
+  }
+
+  const startRecording = async () => {
+    if (isRecording.value || isTranscribing.value) return
+    cleanup(false)
+    transcript.value = ''
+    durationSeconds.value = 0
+    stopRequested = false
+    stopHandled = false
+
+    try {
+      if (!navigator?.mediaDevices?.getUserMedia) throw new Error('Microphone unavailable')
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mimeType = pickMimeType()
+      recordedChunks = []
+
+      mediaRecorder = new MediaRecorder(stream, { mimeType })
+
+      const onData = (event) => {
+        if (event?.data?.size) recordedChunks.push(event.data)
+      }
+      const onStop = () => finalize('onstop')
+      const onError = (evt) => {
+        console.warn(`${logPrefix} recorder error`, evt?.error || evt)
+        finalize('error')
+      }
+
+      mediaRecorder.addEventListener('dataavailable', onData)
+      mediaRecorder.addEventListener('stop', onStop)
+      mediaRecorder.addEventListener('error', onError)
+      mediaRecorder.__listeners = { onData, onStop, onError }
+
+      mediaRecorder.start(1000)
+      state.value = 'recording'
+      console.log(`${logPrefix} recording started`, { mimeType })
+      tickId = window.setInterval(() => (durationSeconds.value += 1), 1000)
+      if (autoStopMs > 0) autoStopId = window.setTimeout(() => stopRecording('auto'), autoStopMs)
+    } catch (err) {
+      console.warn(`${logPrefix} native recorder unavailable, falling back`, err)
+      stopStreams()
+      try {
+        await startFallbackRecorder()
+        console.log(`${logPrefix} fallback recorder active`)
+      } catch (fallbackError) {
+        console.error(`${logPrefix} start failed`, fallbackError)
+        state.value = 'error'
+        throw fallbackError
+      }
+    }
+  }
+
+  const finalize = async (trigger) => {
+    if (stopHandled) return
+    stopHandled = true
+    clearTimers()
+    stopStreams()
+
+    try {
+      if (backendRecorder) {
+        // Callback will set transcript/state; ensure recorder cleared
+        backendRecorder = null
+        return
+      }
+
+      if (!recordedChunks.length) {
+        console.warn(`${logPrefix} no audio captured; resetting`)
+        state.value = 'idle'
+        return
+      }
+
+      const blob = new Blob(recordedChunks, { type: mediaRecorder?.mimeType || 'audio/webm' })
+      const text = await transcribeBlob(blob)
+      transcript.value = text
+      state.value = text ? 'done' : 'idle'
+      if (text && typeof onTranscription === 'function') await onTranscription(text)
+    } catch (err) {
+      console.error(`${logPrefix} transcription failed`, err)
+      state.value = 'error'
+      throw err
+    } finally {
+      releaseRecorder()
+      if (state.value === 'error') {
+        state.value = 'idle'
+      }
+    }
+  }
+
+  const stopRecording = async (reason = 'user') => {
+    if (stopRequested) return
+    if (!isRecording.value && state.value !== 'recording') return
+    stopRequested = true
+    state.value = 'transcribing'
+    clearTimers()
+    console.log(`${logPrefix} stop requested`, { reason })
+
+    try {
+      if (backendRecorder && typeof backendRecorder._stop === 'function') {
+        await backendRecorder._stop()
+        stopHandled = true
+        stopStreams()
+        backendRecorder = null
+        return
+      }
+
+      if (mediaRecorder) {
+        if (mediaRecorder.state !== 'inactive') {
+          try {
+            if (typeof mediaRecorder.requestData === 'function') mediaRecorder.requestData()
+          } catch (_) {}
+          mediaRecorder.stop()
+          stopTimeoutId = window.setTimeout(() => finalize('timeout'), STOP_FALLBACK_MS)
+        } else {
+          await finalize('inactive')
+        }
+      } else {
+        await finalize('missing')
+      }
+    } catch (err) {
+      console.error(`${logPrefix} stop failed`, err)
+      await finalize('stop-error')
+    }
+  }
+
+  const resetRecorder = () => {
+    cleanup(true)
+    state.value = 'idle'
+    durationSeconds.value = 0
+  }
+
+  onBeforeUnmount(() => {
+    cleanup(false)
+  })
+
+  return {
+    startRecording,
+    stopRecording,
+    resetRecorder,
+    state,
+    transcript,
+    durationSeconds,
+    isRecording,
+    isTranscribing,
+  }
+}
