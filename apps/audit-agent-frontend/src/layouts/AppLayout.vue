@@ -73,50 +73,16 @@
         </button>
       </div>
 
-      <!-- Workspace switcher -->
+      <!-- Workspace summary (dropdown removed) -->
       <div class="px-3 pb-3 border-b border-gray-800/70">
-        <div class="flex items-center justify-between gap-2">
-          <div class="flex items-center gap-2 min-w-0">
-            <div class="w-9 h-9 rounded-lg bg-indigo-500/20 border border-indigo-400/40 flex items-center justify-center text-lg">
-              {{ activeWorkspace?.icon || '📦' }}
-            </div>
-            <div v-if="sidebarOpen" class="min-w-0">
-              <p class="text-[11px] uppercase tracking-[0.25em] text-slate-500">Workspace</p>
-              <p class="text-sm font-semibold truncate">{{ activeWorkspace?.name || 'Personal' }}</p>
-            </div>
+        <div class="flex items-center gap-2 min-w-0">
+          <div class="w-9 h-9 rounded-lg bg-indigo-500/20 border border-indigo-400/40 flex items-center justify-center text-lg">
+            {{ activeWorkspace?.icon || '📦' }}
           </div>
-          <button
-            class="p-2 rounded-lg bg-slate-900/70 border border-slate-800 hover:border-indigo-400 transition"
-            @click="workspaceMenuOpen = !workspaceMenuOpen"
-            aria-label="Change workspace"
-          >
-            <span v-if="workspaceMenuOpen">▲</span>
-            <span v-else>▼</span>
-          </button>
-        </div>
-        <div
-          v-if="workspaceMenuOpen"
-          class="mt-2 space-y-1"
-        >
-          <button
-            v-for="ws in workspaceStore.workspaces"
-            :key="ws.id"
-            class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm border border-slate-800 hover:border-indigo-400 transition"
-            :class="{ 'bg-indigo-600/20 border-indigo-400/60': ws.id === activeWorkspaceId }"
-            @click="selectWorkspace(ws.id)"
-          >
-            <span>{{ ws.icon || '📦' }}</span>
-            <span v-if="sidebarOpen" class="truncate">{{ ws.name }}</span>
-          </button>
-          <RouterLink
-            to="/workspaces"
-            class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-indigo-200 hover:text-white bg-slate-900/70 border border-slate-800 hover:border-indigo-400 transition"
-            @click="workspaceMenuOpen = false"
-          >
-            <span>➕</span>
-            <span v-if="sidebarOpen" class="truncate">Manage workspaces</span>
-            <span v-else>➕</span>
-          </RouterLink>
+          <div v-if="sidebarOpen" class="min-w-0">
+            <p class="text-[11px] uppercase tracking-[0.25em] text-slate-500">Workspace</p>
+            <p class="text-sm font-semibold truncate">{{ activeWorkspace?.name || 'Personal' }}</p>
+          </div>
         </div>
       </div>
 
@@ -253,24 +219,14 @@
             <button @click="mobileMenu = false" class="p-2 rounded hover:bg-gray-800">✖️</button>
           </div>
 
-          <div class="mb-4">
-            <p class="text-xs text-slate-400 mb-1">Workspace</p>
-            <select
-              v-model="selectedWorkspaceId"
-              class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100"
-              @change="selectWorkspace(selectedWorkspaceId)"
-            >
-              <option v-for="ws in workspaceStore.workspaces" :key="ws.id" :value="ws.id">
-                {{ ws.icon || '📦' }} {{ ws.name }}
-              </option>
-            </select>
-            <RouterLink
-              to="/workspaces"
-              class="mt-2 inline-flex items-center gap-2 text-xs text-indigo-200"
-              @click="mobileMenu = false"
-            >
-              ➕ Manage workspaces
-            </RouterLink>
+          <div class="mb-4 flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg bg-indigo-500/20 border border-indigo-400/40 flex items-center justify-center text-lg">
+              {{ activeWorkspace?.icon || '📦' }}
+            </div>
+            <div class="min-w-0">
+              <p class="text-xs text-slate-400 mb-1">Workspace</p>
+              <p class="text-sm font-semibold text-white truncate">{{ activeWorkspace?.name || 'Personal' }}</p>
+            </div>
           </div>
 
           <!-- Navigation -->
@@ -584,9 +540,6 @@ const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const workspaceStore = useWorkspaceStore()
-const workspaceMenuOpen = ref(false)
-const selectedWorkspaceId = ref(null)
-
 // Subscription state via store
 const subStore = useSubscriptionStore()
 const feedbackStore = useFeedbackStore()
@@ -609,14 +562,6 @@ watch(
     } else {
       workspaceStore.reset()
     }
-  },
-  { immediate: true },
-)
-
-watch(
-  () => workspaceStore.activeWorkspaceId,
-  (val) => {
-    selectedWorkspaceId.value = val
   },
   { immediate: true },
 )
@@ -652,18 +597,6 @@ function onProfileSaved() {
     const uid = authStore?.user?.uid
     if (uid) localStorage.setItem(`profile_setup_done:${uid}`, '1')
   } catch {}
-}
-
-async function selectWorkspace(id) {
-  if (!id) return
-  selectedWorkspaceId.value = id
-  workspaceMenuOpen.value = false
-  mobileMenu.value = false
-  try {
-    await workspaceStore.setActive(id)
-  } catch (err) {
-    console.warn('Workspace switch failed', err?.message || err)
-  }
 }
 
 function toggleGroup(key) {
