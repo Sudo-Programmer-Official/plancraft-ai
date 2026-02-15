@@ -1,0 +1,72 @@
+/* Global surface overrides for non-admin app pages (AppLayout root = .app-shell) */
+
+.app-shell .bg-gradient-to-r,
+.app-shell .bg-gradient-to-l,
+.app-shell .bg-gradient-to-b,
+.app-shell .bg-gradient-to-t,
+.app-shell .bg-gradient-to-br,
+.app-shell .bg-gradient-to-bl,
+.app-shell .bg-gradient-to-tr,
+.app-shell .bg-gradient-to-tl {
+  background-image: none !important;
+}
+
+.app-shell [class*="card"],
+.app-shell [class*="panel"],
+.app-shell .surface,
+.app-shell .glass,
+.app-shell .tile,
+.app-shell .stat,
+.app-shell .widget,
+.app-shell .pill,
+.app-shell .chip,
+.app-shell .banner,
+.app-shell .section-box {
+  background: var(--pc-card) !important;
+  color: var(--pc-ink) !important;
+  border: 1px solid var(--pc-card-border, rgb(0 0 0 / 0.05)) !important;
+  box-shadow: var(--pc-card-shadow, 0 10px 24px rgba(15, 23, 42, 0.08)) !important;
+  backdrop-filter: blur(var(--pc-glass-blur, 14px));
+}
+
+.app-shell [class*="card"] :is(p, h1, h2, h3, h4, h5, h6, span, label, small, strong),
+.app-shell [class*="panel"] :is(p, h1, h2, h3, h4, h5, h6, span, label, small, strong) {
+  color: var(--pc-ink) !important;
+}
+
+.app-shell .text-slate-100,
+.app-shell .text-slate-200,
+.app-shell .text-slate-300,
+.app-shell .text-gray-200,
+.app-shell .text-gray-300,
+.app-shell .text-indigo-200,
+.app-shell .text-indigo-100 {
+  color: var(--pc-ink) !important;
+}
+
+.app-shell .border-gray-800,
+.app-shell .border-indigo-600,
+.app-shell .border-indigo-700,
+.app-shell .border-white\/15,
+.app-shell .border-white\/20,
+.app-shell .border-white\/30 {
+  border-color: var(--pc-border) !important;
+}
+
+.app-shell .bg-slate-900,
+.app-shell .bg-slate-950,
+.app-shell .bg-indigo-900,
+.app-shell .bg-purple-900,
+.app-shell .bg-gray-900,
+.app-shell .bg-gray-950 {
+  background-color: var(--pc-surface) !important;
+}
+
+/* Soft CTA pills */
+.app-shell .cta-primary,
+.app-shell .pill-primary,
+.app-shell .tag-primary {
+  background: var(--pc-brand-500);
+  color: #fff;
+  border-color: color-mix(in srgb, var(--pc-brand-500) 80%, #000);
+}

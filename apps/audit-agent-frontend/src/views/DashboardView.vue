@@ -6,7 +6,7 @@
   <SetupPrompt v-else-if="showSetup" @done="showSetup = false" @close="showSetup = false" />
   <main
     v-else
-    class="min-h-screen px-2 py-6 sm:px-4 md:px-6 pb-12 transition-colors max-w-7xl mx-auto flex flex-col gap-6 lg:gap-8"
+    class="min-h-screen px-2 py-6 sm:px-4 md:px-6 pb-12 transition-colors max-w-7xl mx-auto flex flex-col gap-6 lg:gap-8 text-ink"
   >
     <GuestBanner :isGuest="authStore.guest" class="order-1" @login="redirectToLogin" />
 
@@ -2815,19 +2815,27 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.dashboard-card {
-  background: linear-gradient(145deg, rgba(30, 27, 75, 0.88), rgba(49, 46, 129, 0.85), rgba(76, 29, 149, 0.82));
+.dashboard-card,
+.move-card,
+.calendar-sync-card,
+.reminders-card,
+.napkin-card {
+  background: var(--pc-card) !important;
+  color: var(--pc-ink) !important;
   border-radius: 1.25rem;
   padding: 1.75rem;
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  box-shadow: 0 18px 38px rgba(11, 13, 26, 0.45);
-  backdrop-filter: blur(10px);
+  border: 1px solid var(--pc-card-border);
+  box-shadow: var(--pc-card-shadow);
+  backdrop-filter: blur(var(--pc-glass-blur, 12px));
 }
 
 .dashboard-banner {
   border-radius: 1.15rem;
   padding: 1rem 1.25rem;
-  box-shadow: inset 0 1px 12px rgba(255, 255, 255, 0.06);
+  box-shadow: var(--pc-soft-shadow);
+  background: var(--pc-surface-muted);
+  color: var(--pc-ink);
+  border: 1px solid var(--pc-border);
 }
 
 .dashboard-section {
@@ -2844,7 +2852,9 @@ onUnmounted(() => {
 }
 
 .now-bar {
-  box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.08);
+  box-shadow: inset 0 1px 0 rgb(var(--pc-border-rgb, 229 231 235) / 0.7);
+  background: var(--pc-surface-muted);
+  border: 1px solid var(--pc-border);
 }
 
 .action-chip {
@@ -2856,6 +2866,20 @@ onUnmounted(() => {
   font-size: 0.85rem;
   font-weight: 600;
   transition: all 0.25s ease;
+}
+
+.action-chip,
+.dashboard-card :is(p, h1, h2, h3, h4, h5, h6, span, label, small, strong) {
+  color: var(--pc-ink) !important;
+}
+
+.muted-text {
+  color: var(--pc-muted) !important;
+}
+
+.chip-neutral {
+  background: color-mix(in srgb, var(--pc-brand-500) 8%, var(--pc-surface));
+  border: 1px solid var(--pc-border);
 }
 
 .slide-enter-active,

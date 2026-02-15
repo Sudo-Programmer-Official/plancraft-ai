@@ -1,6 +1,7 @@
 // Global styles
 import './styles/themes.css'
 import './assets/tailwind.scss'
+import './styles/soft-surfaces.css'
 import './assets/theme.scss'
 import './assets/styles/scrollbar.css'
 import 'element-plus/dist/index.css'
