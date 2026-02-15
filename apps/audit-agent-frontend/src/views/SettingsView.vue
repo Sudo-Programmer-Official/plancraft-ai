@@ -654,6 +654,38 @@ const activeTeamWorkspace = computed(() => {
   return teamWorkspaces.value[0] || null
 })
 
+function normalizeTab(tab) {
+  const t = String(tab || '').trim().toLowerCase()
+  if (!t) return ''
+  const alias = {
+    notifications: 'account-notifications',
+    notification: 'account-notifications',
+    'account-notifications': 'account-notifications',
+    integrations: 'workspace-integrations',
+    'workspace-integrations': 'workspace-integrations',
+    knowledge: 'workspace-knowledge',
+    'workspace-knowledge': 'workspace-knowledge',
+    proposals: 'workspace-proposals',
+    'workspace-proposals': 'workspace-proposals',
+    policies: 'workspace-policies',
+    'workspace-policies': 'workspace-policies',
+    profile: 'account-profile',
+    'account-profile': 'account-profile',
+    preferences: 'account-preferences',
+    'account-preferences': 'account-preferences',
+    social: 'account-social',
+    'account-social': 'account-social',
+    billing: 'billing-subscription',
+    subscription: 'billing-subscription',
+    'subscription-usage': 'billing-subscription',
+    'billing-subscription': 'billing-subscription',
+    help: 'help-onboarding',
+    onboarding: 'help-onboarding',
+    'help-onboarding': 'help-onboarding',
+  }
+  return alias[t] || t
+}
+
 const tabGroups = [
   {
     id: 'workspace',
@@ -687,10 +719,22 @@ const tabGroups = [
   },
 ]
 
-const activeTab = ref(route.query?.tab || 'workspace-knowledge')
+const activeTab = ref(normalizeTab(route.query?.tab) || 'workspace-knowledge')
+
+watch(
+  () => route.query?.tab,
+  (tab) => {
+    const target = normalizeTab(tab) || 'workspace-knowledge'
+    if (activeTab.value !== target) activeTab.value = target
+    if (target === 'account-notifications') focusNotifications()
+  },
+)
 
 function setActiveTab(id) {
-  activeTab.value = id
+  const target = normalizeTab(id) || 'workspace-knowledge'
+  if (activeTab.value !== target) activeTab.value = target
+  router.replace({ query: { ...route.query, tab: target } }).catch(() => {})
+  if (target === 'account-notifications') focusNotifications()
 }
 const dirty = ref(false) // tracks unsaved changes
 const notificationsSection = ref(null)
@@ -712,6 +756,14 @@ const onboardingLastCompleted = computed(() => {
 
 function markDirty() {
   dirty.value = true
+}
+
+function focusNotifications() {
+  nextTick(() => {
+    try { notificationsSection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }) } catch {}
+    highlightNotifications.value = true
+    setTimeout(() => { highlightNotifications.value = false }, 1600)
+  })
 }
 
 async function replayOnboardingTour() {
@@ -838,15 +890,9 @@ onMounted(async () => {
     if (authStore?.user?.uid) {
       try { workspaceStore.init?.() } catch {}
     }
-    // Deep link: /settings?tab=notifications → scroll and highlight
     try {
-      const tab = String(route?.query?.tab || '').toLowerCase()
-      if (tab === 'notifications') {
-        setTimeout(() => {
-          try { notificationsSection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }) } catch {}
-          highlightNotifications.value = true
-          setTimeout(() => { highlightNotifications.value = false }, 1600)
-        }, 150)
+      if (activeTab.value === 'account-notifications') {
+        setTimeout(() => focusNotifications(), 150)
       }
       if (route?.query?.gpt !== undefined) {
         setTimeout(() => focusGptCard(true), 400)

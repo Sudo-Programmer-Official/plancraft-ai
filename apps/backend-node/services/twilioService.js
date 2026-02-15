@@ -126,7 +126,8 @@ export async function makeCall(to, message, meta = {}) {
     console.warn('[Twilio] Missing credentials — skipping Voice call')
     return null
   }
-  const twiml = `<Response><Say voice="alice">${String(message || '')}</Say></Response>`
+  // Use a clearer neural voice for reminder calls
+  const twiml = `<Response><Say voice="Polly.Joanna-Neural" language="en-US">${String(message || '')}</Say></Response>`
   const statusCallback = `${API_BASE_URL}/api/twilio/call-status` +
     `?u=${encodeURIComponent(meta.userId || '')}&m=${encodeURIComponent(message || '')}`
   const res = await c.calls.create({

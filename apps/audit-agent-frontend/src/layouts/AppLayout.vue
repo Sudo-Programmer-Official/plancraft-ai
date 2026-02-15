@@ -75,13 +75,10 @@
 
       <!-- Workspace summary (dropdown removed) -->
       <div class="px-3 pb-3 border-b border-gray-800/70">
-        <div class="flex items-center gap-2 min-w-0">
-          <div class="w-9 h-9 rounded-lg bg-indigo-500/20 border border-indigo-400/40 flex items-center justify-center text-lg">
-            {{ activeWorkspace?.icon || '📦' }}
-          </div>
-          <div v-if="sidebarOpen" class="min-w-0">
-            <p class="text-[11px] uppercase tracking-[0.25em] text-slate-500">Workspace</p>
-            <p class="text-sm font-semibold truncate">{{ activeWorkspace?.name || 'Personal' }}</p>
+        <div class="flex items-center gap-3 min-w-0" :class="sidebarOpen ? 'justify-start' : 'justify-center'">
+          <div v-if="sidebarOpen" class="flex items-baseline gap-2 min-w-0">
+            <span class="text-[11px] uppercase tracking-[0.25em] text-slate-500">Workspace</span>
+            <span class="text-sm font-semibold truncate text-white">{{ activeWorkspace?.name || 'Personal' }}</span>
           </div>
         </div>
       </div>
@@ -219,12 +216,9 @@
             <button @click="mobileMenu = false" class="p-2 rounded hover:bg-gray-800">✖️</button>
           </div>
 
-          <div class="mb-4 flex items-center gap-3">
-            <div class="w-10 h-10 rounded-lg bg-indigo-500/20 border border-indigo-400/40 flex items-center justify-center text-lg">
-              {{ activeWorkspace?.icon || '📦' }}
-            </div>
-            <div class="min-w-0">
-              <p class="text-xs text-slate-400 mb-1">Workspace</p>
+          <div class="mb-4">
+            <div class="flex items-baseline gap-2 min-w-0">
+              <p class="text-xs text-slate-400">Workspace</p>
               <p class="text-sm font-semibold text-white truncate">{{ activeWorkspace?.name || 'Personal' }}</p>
             </div>
           </div>
@@ -619,6 +613,7 @@ const navGroups = [
       { label: 'Planner', icon: '🧭', to: '/planner' },
       { label: 'Meetings', icon: '📅', to: '/meetings' },
       { label: 'Quick Links', icon: '🔗', to: '/links' },
+      { label: 'Reminders', icon: '🔔', to: '/reminders' },
       { label: 'Napkin', icon: '🧾', to: '/napkin' },
     ],
   },
@@ -653,8 +648,8 @@ const navGroups = [
     collapsible: true,
     defaultOpen: false,
     children: [
+      { label: 'Notifications', icon: '🔔', to: '/settings?tab=account-notifications' },
       { label: 'Integrations', icon: '🔗', to: '/settings?tab=integrations' },
-      { label: 'Reminders', icon: '🔔', to: '/reminders' },
     ],
   },
   {

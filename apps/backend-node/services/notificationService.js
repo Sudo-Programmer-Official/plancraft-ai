@@ -203,15 +203,23 @@ function buildGroupedMessage(title, items, options = {}) {
 }
 
 function buildVoiceSummary(intro, items) {
-  const safeIntro = intro || 'Heads up'
+  const leadIn = intro || 'Here is your reminder summary'
   const titles = ensureArray(items)
     .map((item) => item?.title || item?.text || item?.message)
     .filter(Boolean)
 
-  if (!titles.length) return `${safeIntro}.`
-  if (titles.length === 1) return `${safeIntro}. ${titles[0]} is due now.`
+  if (!titles.length) return `${leadIn}. No specific reminder details available.`
+
+  if (titles.length === 1) {
+    const only = titles[0]
+    return `${leadIn}. The reminder says: ${only}. Repeating: ${only}.`
+  }
+
   const last = titles.pop()
-  return `${safeIntro}. ${titles.join(', ')} and ${last} are due now.`
+  const middle = titles.slice(1)
+  const first = titles[0]
+  const middleJoined = middle.length ? ` Then: ${middle.join('. Then: ')}.` : ''
+  return `${leadIn}. First: ${first}.${middleJoined} Finally: ${last}.`
 }
 
 async function sendWhatsAppWithFallback(userId, primary, fallback) {
@@ -471,7 +479,7 @@ export async function notifyReminderDue(userId, itemsInput = [], options = {}) {
     includeVoice &&
     (options.voiceMessage ||
       brandCopy?.voiceMessage ||
-      buildVoiceSummary('Heads up, you have reminders waiting', reminders))
+      buildVoiceSummary('Here is a quick summary of your reminder', reminders))
 
   const subject = options.subject || brandCopy?.subject || 'PlanCraftAI Reminder'
   const smsMessageBaseline = brandCopy?.sms || message.replace(/\*/g, '')
