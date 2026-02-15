@@ -59,21 +59,21 @@
         :class="sidebarOpen ? 'flex items-center justify-between p-4' : 'flex items-center justify-center p-2 h-14'"
       >
         <div v-if="sidebarOpen" class="flex items-center gap-2 min-w-0">
-          <img src=\"/logo-bg-remove.png\" alt=\"PlanCraftAI\" class=\"w-8 h-8\" />
-          <span class=\"text-lg font-semibold truncate\">PlanCraftAI</span>
+          <img src="/logo-bg-remove.png" alt="PlanCraftAI" class="w-8 h-8" />
+          <span class="text-lg font-semibold truncate">PlanCraftAI</span>
         </div>
         <button
-          @click=\"sidebarOpen = !sidebarOpen\"
-          class=\"p-2 rounded-lg hover:bg-indigo-600/40 transition-colors flex items-center justify-center\"
-          :class=\"sidebarOpen ? 'bg-indigo-600/20' : 'bg-transparent'\"
-          aria-label=\"Toggle sidebar\"
-          :title=\"sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'\"
+          @click="sidebarOpen = !sidebarOpen"
+          class="p-2 rounded-lg hover:bg-indigo-600/40 transition-colors flex items-center justify-center"
+          :class="sidebarOpen ? 'bg-indigo-600/20' : 'bg-transparent'"
+          aria-label="Toggle sidebar"
+          :title="sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'"
         >
-          <svg v-if=\"sidebarOpen\" xmlns=\"http://www.w3.org/2000/svg\" class=\"h-5 w-5 text-indigo-300\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\">
-            <path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M15 19l-7-7 7-7\" />
+          <svg v-if="sidebarOpen" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
           </svg>
-          <svg v-else xmlns=\"http://www.w3.org/2000/svg\" class=\"h-5 w-5 text-indigo-300\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\">
-            <path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M9 5l7 7-7 7\" />
+          <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
           </svg>
         </button>
       </div>
@@ -126,8 +126,10 @@
               :key="item.to"
               :to="item.to"
               class="flex items-center gap-3 w-full rounded transition hover:bg-gray-800 text-sm text-slate-200"
-              :class="sidebarOpen ? 'justify-start px-4 py-2' : 'justify-center px-0 py-2'"
-              :class="{ 'bg-indigo-600': isActive(item.to) }"
+              :class="[
+                sidebarOpen ? 'justify-start px-4 py-2' : 'justify-center px-0 py-2',
+                { 'bg-indigo-600': isActive(item.to) },
+              ]"
               :title="sidebarOpen ? '' : item.label"
               :aria-label="sidebarOpen ? item.label : item.label"
             >
@@ -143,8 +145,10 @@
             :key="item.to"
             :to="item.to"
             class="flex items-center gap-3 w-full rounded transition hover:bg-gray-800 text-sm text-slate-200"
-            :class="sidebarOpen ? 'justify-start px-3 py-2' : 'justify-center px-0 py-2'"
-            :class="{ 'bg-indigo-600': isActive(item.to) }"
+            :class="[
+              sidebarOpen ? 'justify-start px-3 py-2' : 'justify-center px-0 py-2',
+              { 'bg-indigo-600': isActive(item.to) },
+            ]"
             :title="sidebarOpen ? '' : item.label"
             :aria-label="item.label"
           >
