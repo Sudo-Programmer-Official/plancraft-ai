@@ -46,14 +46,22 @@ import '@/firebase/init'
 
 // ✅ PWA service worker registration
 import { registerSW } from 'virtual:pwa-register'
-registerSW({
+const updateSW = registerSW({
+  immediate: true,
   onNeedRefresh() {
-    console.log('New content available. Refresh!')
+    console.log('New content available. Updating PWA…')
+    updateSW(true)
   },
   onOfflineReady() {
     console.log('App ready to work offline.')
   },
 })
+
+// Background auto-refresh every 10 minutes to avoid stale cache on kiosk/iPad
+try {
+  const TEN_MIN = 10 * 60 * 1000
+  setInterval(() => updateSW(true), TEN_MIN)
+} catch (_) {}
 
 // Firebase auth export for quick token refreshes
 import { auth } from '@/firebase/init'

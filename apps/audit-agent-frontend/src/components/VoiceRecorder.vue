@@ -120,7 +120,7 @@ const {
   resetRecorder,
 } = useAudioRecorder({
   onTranscription: (text) => {
-    if (text) emit('transcribed', { text })
+    if (text) emit('transcribed', text)
     emit('processing-end')
   },
   logPrefix: '[VoiceRecorder]',

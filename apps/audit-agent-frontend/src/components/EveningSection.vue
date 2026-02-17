@@ -50,8 +50,9 @@ const reflectionText = ref("")
 const enhancedText = ref("")
 
 function handleTranscript(raw) {
-  reflectionText.value = raw
-  enhanceReflection(raw)
+  const text = typeof raw === 'string' ? raw : raw?.text || ''
+  reflectionText.value = text
+  enhanceReflection(text)
 }
 
 async function enhanceReflection(raw) {

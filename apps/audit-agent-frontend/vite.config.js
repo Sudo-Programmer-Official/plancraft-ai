@@ -23,6 +23,9 @@ export default defineConfig({
       workbox: {
         importScripts: ['sw-push.js'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB
+        clientsClaim: true,
+        skipWaiting: true,
+        cleanupOutdatedCaches: true,
         // Do NOT take over Firebase auth handler routes when using a
         // custom domain (e.g., plancraftai.com). If the SW serves
         // index.html for "/__/auth/handler", Google sign-in breaks.

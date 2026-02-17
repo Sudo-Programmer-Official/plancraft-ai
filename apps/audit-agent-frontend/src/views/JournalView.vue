@@ -386,7 +386,8 @@ function selectMood(mood) {
   selectedMood.value = mood
 }
 
-function handleTranscript(text) {
+function handleTranscript(raw) {
+  const text = typeof raw === 'string' ? raw : raw?.text || ''
   voiceTranscript.value = text
 }
 

@@ -1540,7 +1540,12 @@ function toggleChannel(id) {
 }
 
 function handleTranscript(result = {}) {
-  const value = typeof result?.text === 'string' ? result.text.trim() : ''
+  const value =
+    typeof result === 'string'
+      ? result.trim()
+      : typeof result?.text === 'string'
+      ? result.text.trim()
+      : ''
   if (!value) return
   assignText(input, value)
   if (!setReminder.value && reminderPrefs.value.enabled) setReminder.value = true

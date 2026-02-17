@@ -46,7 +46,8 @@ const { tasks, loadTasks, addTask } = useTasks()
 const planningInput = ref('')
 // No enhanced text shown in Morning Planning by design
 
-function handleTranscript(text) {
+function handleTranscript(raw) {
+  const text = typeof raw === 'string' ? raw : raw?.text || ''
   planningInput.value = text
   // Morning view does not show enhanced text; just capture raw
 }
