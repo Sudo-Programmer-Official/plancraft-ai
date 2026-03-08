@@ -31,12 +31,43 @@ const api = axios.create({
   withCredentials: false,
 })
 
+function withTimeout(promise, ms = 5000) {
+  return new Promise((resolve, reject) => {
+    let done = false
+    const timer = setTimeout(() => {
+      if (!done) {
+        done = true
+        reject(new Error('Request timed out'))
+      }
+    }, ms)
+    Promise.resolve(promise)
+      .then((value) => {
+        if (done) return
+        done = true
+        clearTimeout(timer)
+        resolve(value)
+      })
+      .catch((error) => {
+        if (done) return
+        done = true
+        clearTimeout(timer)
+        reject(error)
+      })
+  })
+}
+
 // Attach fresh auth token if present
 api.interceptors.request.use(async (config) => {
   try {
     const user = auth?.currentUser
     if (user) {
-      const token = await user.getIdToken() // Firebase auto-refreshes as needed
+      let token = null
+      try {
+        // Avoid hanging requests when Firebase token refresh stalls.
+        token = await withTimeout(user.getIdToken(), 4500)
+      } catch {
+        token = localStorage.getItem('token')
+      }
       if (token) config.headers.Authorization = `Bearer ${token}`
       // Optional pass-through user context
       if (user.email) config.headers['x-user-email'] = user.email

@@ -33,7 +33,7 @@ function normalizeWorkspace(payload = {}) {
 }
 
 export async function fetchWorkspaces() {
-  const { data } = await api.get('/workspaces')
+  const { data } = await api.get('/workspaces', { timeout: 12000 })
   const list = Array.isArray(data?.workspaces) ? data.workspaces : []
   return list.map((ws) => normalizeWorkspace(ws))
 }

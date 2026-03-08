@@ -96,15 +96,19 @@
             <button
               type="button"
               class="icon-btn mic-btn"
-              :class="{ 'mic-btn--active': loading }"
-              title="Dictate"
-              aria-label="Start voice input"
+              :class="{
+                'mic-btn--active': loading || plannerVoiceState === 'recording',
+                'mic-btn--processing': plannerVoiceState === 'transcribing',
+              }"
+              :title="plannerVoiceButtonLabel"
+              :aria-label="plannerVoiceButtonLabel"
             >
               <VoiceRecorder
                 :autoCommit="true"
                 :disabled="loading"
                 :reset-trigger="plannerVoiceReset"
                 @transcribed="handleTranscript"
+                @state-change="onPlannerVoiceStateChange"
               />
               <span class="mic-visual" aria-hidden="true"></span>
             </button>
@@ -558,6 +562,7 @@ const reminderAbsoluteIso = ref(null)
 const setReminder = ref(false)
 const reminderOptionsVisible = ref(false)
 const plannerVoiceReset = ref(0)
+const plannerVoiceState = ref('idle')
 const detailsVoiceReset = ref(0)
 const input = ref('')
 const details = ref('')
@@ -580,6 +585,7 @@ const featureAllowed = computed(() =>
 const generateDisabled = computed(() => {
   // Keep image-only flow valid: allow submit when attachments exist even if text is empty
   if (!featureAllowed.value) return true
+  if (plannerVoiceState.value === 'transcribing') return true
   if (loading.value || attachmentUploading.value) return true
   if (generationMode.value === 'imageAnalyzing' || generationMode.value === 'imageUploading') return true
   const hasText = !!getInputText().trim()
@@ -597,6 +603,11 @@ const generateState = computed(() => {
   if (pendingGeneratedTasks.value.length) return 'review'
   if (loading.value || generationMode.value === 'imageAnalyzing' || attachmentUploading.value) return 'loading'
   return 'idle'
+})
+const plannerVoiceButtonLabel = computed(() => {
+  if (plannerVoiceState.value === 'transcribing') return 'Transcribing audio'
+  if (plannerVoiceState.value === 'recording') return 'Stop recording'
+  return 'Start voice input'
 })
 
 function onReminderTimeChange() {
@@ -829,6 +840,7 @@ function resetNewTaskState() {
   setReminder.value = !!reminderPrefs.value.enabled
   reminderOptionsVisible.value = false
   plannerVoiceReset.value += 1
+  plannerVoiceState.value = 'idle'
   if (!allowedReminderChannels.value.length && reminderPrefs.value.channels.length) {
     allowedReminderChannels.value = reminderPrefs.value.channels.filter(ch => channelOptionIds.includes(ch))
   }
@@ -845,6 +857,7 @@ function hydrateFromTask(current) {
   assignText(link, current.link || '')
   reminderManuallyEdited.value = false
   plannerVoiceReset.value += 1
+  plannerVoiceState.value = 'idle'
   detailsVoiceReset.value += 1
 
   if (current.date) selectedDate.value = normalizeDateInput(current.date)
@@ -1506,6 +1519,7 @@ function closeDialog() {
   logTimeBrainDialog('close-dialog', { inputLength: getInputText().length })
   pendingGeneratedTasks.value = []
   visionStatus.value = ''
+  plannerVoiceState.value = 'idle'
   emit('close')
 }
 
@@ -1551,6 +1565,10 @@ function handleTranscript(result = {}) {
   if (!setReminder.value && reminderPrefs.value.enabled) setReminder.value = true
   logTimeBrainDialog('transcription:title', { length: value.length })
   plannerVoiceReset.value += 1
+}
+
+function onPlannerVoiceStateChange(nextState) {
+  plannerVoiceState.value = typeof nextState === 'string' ? nextState : 'idle'
 }
 
 function appendDetails(result = {}) {
@@ -1714,6 +1732,10 @@ function appendDetails(result = {}) {
   box-shadow: 0 0 0 6px rgba(79, 70, 229, 0.12), 0 10px 25px rgba(14, 165, 233, 0.2);
 }
 
+.mic-btn--processing {
+  box-shadow: 0 0 0 7px rgba(129, 140, 248, 0.16), 0 14px 30px rgba(59, 130, 246, 0.28);
+}
+
 .mic-btn:focus-visible {
   outline: 2px solid rgba(125, 211, 252, 0.8);
   outline-offset: 2px;
@@ -1747,8 +1769,15 @@ function appendDetails(result = {}) {
 }
 
 .mic-visual::before {
-  content: '🎤';
-  font-size: 1.1rem;
+  content: '';
+  width: 20px;
+  height: 20px;
+  background: linear-gradient(180deg, #f8fafc, #c7d2fe);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Zm5-3a1 1 0 1 0-2 0 3 3 0 1 1-6 0 1 1 0 1 0-2 0 5 5 0 0 0 4 4.9V20H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-2.1A5 5 0 0 0 17 11Z'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Zm5-3a1 1 0 1 0-2 0 3 3 0 1 1-6 0 1 1 0 1 0-2 0 5 5 0 0 0 4 4.9V20H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-2.1A5 5 0 0 0 17 11Z'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  transition: transform 0.2s ease, opacity 0.2s ease;
 }
 
 .mic-btn :deep(.voice-controller--recording) ~ .mic-visual {
@@ -1759,7 +1788,27 @@ function appendDetails(result = {}) {
 }
 
 .mic-btn :deep(.voice-controller--recording) ~ .mic-visual::before {
-  content: '⏹';
+  background: linear-gradient(180deg, #fee2e2, #fda4af);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9 7h2.75v10H9V7Zm4.25 0H16v10h-2.75V7Z'/%3E%3C/svg%3E")
+    center / 17px 17px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9 7h2.75v10H9V7Zm4.25 0H16v10h-2.75V7Z'/%3E%3C/svg%3E")
+    center / 17px 17px no-repeat;
+  animation: mic-icon-breathe 0.95s ease-in-out infinite;
+}
+
+.mic-btn :deep(.voice-controller--transcribing) ~ .mic-visual {
+  animation: mic-processing 0.95s ease-in-out infinite;
+  box-shadow: 0 0 0 8px rgba(99, 102, 241, 0.2), 0 12px 28px rgba(59, 130, 246, 0.3);
+  border: 1px solid rgba(165, 180, 252, 0.95);
+}
+
+.mic-btn :deep(.voice-controller--transcribing) ~ .mic-visual::before {
+  background: linear-gradient(180deg, #e0e7ff, #a5b4fc);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 4a8 8 0 1 0 7.75 10h-2.1A6 6 0 1 1 12 6v2.2l3.4-3.2L12 1.8V4Z'/%3E%3C/svg%3E")
+    center / 18px 18px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 4a8 8 0 1 0 7.75 10h-2.1A6 6 0 1 1 12 6v2.2l3.4-3.2L12 1.8V4Z'/%3E%3C/svg%3E")
+    center / 18px 18px no-repeat;
+  animation: mic-icon-spin 0.9s linear infinite;
 }
 
 @keyframes mic-pulse {
@@ -1774,6 +1823,39 @@ function appendDetails(result = {}) {
   100% {
     transform: scale(1);
     box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.02);
+  }
+}
+
+@keyframes mic-processing {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.35);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 10px rgba(99, 102, 241, 0.08);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.02);
+  }
+}
+
+@keyframes mic-icon-breathe {
+  0%,
+  100% {
+    transform: scale(0.92);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+}
+
+@keyframes mic-icon-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 

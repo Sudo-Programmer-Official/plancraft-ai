@@ -198,15 +198,7 @@
       v-if="showDaily"
       class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-3"
     >
-        <div class="dashboard-card daily-card space-y-5">
-          <button
-            v-if="isTodayFullscreen"
-            type="button"
-            class="today-exit-btn"
-            @click="toggleTodayFullscreen"
-          >
-            ✕ Exit Fullscreen
-          </button>
+        <div class="dashboard-card daily-card space-y-5" :class="{ 'daily-card--fullscreen': isTodayFullscreen }">
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div class="flex items-center gap-3">
               <div>
@@ -237,7 +229,7 @@
             </button>
           </div>
 
-          <div class="flex gap-2 sm:gap-3 overflow-x-auto pb-2 scrollbar-plan" :class="{ 'opacity-70 pointer-events-none': isTodayFullscreen }">
+          <div class="flex gap-2 sm:gap-3 overflow-x-auto pb-2 scrollbar-plan">
             <button
               v-for="category in categoryFilters"
               :key="category"
@@ -255,7 +247,7 @@
             </button>
           </div>
 
-          <div class="space-y-3" :class="{ 'today--fullscreen': isTodayFullscreen }">
+          <div class="space-y-3">
             <div class="progress-card bg-slate-900/50 border border-slate-700/40 rounded-xl px-4 py-3">
               <div class="flex items-center justify-between text-xs sm:text-sm text-slate-300 mb-2">
                 <span>Completion</span>
@@ -2963,15 +2955,19 @@ onUnmounted(() => {
   box-shadow: 0 10px 24px rgba(79, 70, 229, 0.25);
 }
 
-.today--fullscreen {
+.daily-card--fullscreen {
   position: fixed;
   inset: 0;
+  z-index: 80;
+  margin: 0 !important;
   width: 100vw;
-  height: 100vh;
-  z-index: 50;
+  min-height: 100vh;
   background: radial-gradient(circle at 20% 20%, rgba(79, 70, 229, 0.35), transparent 35%), radial-gradient(circle at 80% 0%, rgba(236, 72, 153, 0.25), transparent 32%), #0f172a;
-  padding: 4.5rem 1.25rem 2rem;
-  overflow-y: auto;
+  border-radius: 0;
+  padding: 1.25rem 1.25rem 1rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.65);
   transition: opacity 0.3s ease, transform 0.3s ease;
 }
@@ -2981,29 +2977,20 @@ onUnmounted(() => {
 }
 
 .today-list--fullscreen {
-  max-height: calc(100vh - 220px);
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
 }
 
-.today-exit-btn {
-  position: fixed;
-  top: 12px;
-  right: 14px;
-  z-index: 90;
-  min-height: 44px;
-  padding: 0.65rem 1.1rem;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(15, 23, 42, 0.9);
-  color: #e2e8f0;
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  box-shadow: 0 18px 38px rgba(15, 23, 42, 0.45);
-}
+@media (max-width: 768px) {
+  .daily-card--fullscreen {
+    padding: 1rem 0.85rem 0.85rem;
+  }
 
-.today-exit-btn:hover {
-  background: rgba(79, 70, 229, 0.2);
+  .today-list--fullscreen {
+    max-height: none;
+  }
 }
 
 :global(.today-fullscreen-mode aside) {

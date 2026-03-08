@@ -78,18 +78,42 @@
         </button>
       </div>
 
-      <!-- Workspace summary (dropdown removed) -->
-      <div v-if="sidebarOpen" class="px-3 pb-3 border-b border-gray-800/70">
-        <div class="flex items-center gap-3 min-w-0">
-          <div class="flex items-baseline gap-2 min-w-0">
-            <span class="text-[11px] uppercase tracking-[0.25em] text-slate-500">Workspace</span>
-            <span class="text-sm font-semibold truncate text-white">{{ activeWorkspace?.name || 'Personal' }}</span>
-          </div>
-        </div>
-      </div>
-
       <!-- Nav links -->
       <nav class="flex-1 mt-4 space-y-3 overflow-y-auto scrollbar-plan px-2">
+        <div class="space-y-1">
+          <RouterLink
+            v-for="item in coreNavItems"
+            :key="item.to"
+            :to="item.to"
+            class="flex items-center gap-3 w-full rounded transition hover:bg-gray-800 text-sm text-slate-200"
+            :class="[
+              sidebarOpen ? 'justify-start px-4 py-2' : 'justify-center px-0 py-2',
+              { 'bg-indigo-600': isActive(item.to) },
+            ]"
+            :title="sidebarOpen ? '' : item.label"
+            :aria-label="item.label"
+          >
+            <span class="inline-flex h-5 w-5 items-center justify-center">
+              <svg
+                v-if="item.iconType === 'grid-4-outline'"
+                class="h-4 w-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                aria-hidden="true"
+              >
+                <rect x="4" y="4" width="6" height="6" rx="1" />
+                <rect x="14" y="4" width="6" height="6" rx="1" />
+                <rect x="4" y="14" width="6" height="6" rx="1" />
+                <rect x="14" y="14" width="6" height="6" rx="1" />
+              </svg>
+              <span v-else>{{ item.icon }}</span>
+            </span>
+            <span v-if="sidebarOpen">{{ item.label }}</span>
+          </RouterLink>
+        </div>
+
         <div
           v-for="group in filteredNavGroups"
           :key="group.key"
@@ -200,15 +224,20 @@
             <button
               v-if="!isGuest"
               @click="handleLogout"
-              class="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-1.5 rounded-lg 
-                     bg-gradient-to-r from-red-600 to-pink-600 text-white shadow-md 
-                     hover:shadow-lg hover:from-red-500 hover:to-pink-500 
-                     transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98]"
+              class="inline-flex items-center justify-center py-2 rounded-md text-rose-200 hover:bg-rose-500/15 hover:text-rose-100 transition"
               title="Logout"
+              aria-label="Logout"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 -ml-[1px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-7.5A2.25 2.25 0 003.75 5.25v13.5A2.25 2.25 0 006 21h7.5a2.25 2.25 0 002.25-2.25V15" />
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h12m0 0l-3-3m3 3l-3 3" />
+              <svg
+                class="h-5 w-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                aria-hidden="true"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4.75 3.75h9.5a1.5 1.5 0 011.5 1.5v13.5a1.5 1.5 0 01-1.5 1.5h-9.5a1.5 1.5 0 01-1.5-1.5V5.25a1.5 1.5 0 011.5-1.5z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10 12h10m0 0-3-3m3 3-3 3" />
               </svg>
             </button>
             
@@ -219,11 +248,21 @@
             <button
               v-if="!isGuest"
               @click="handleLogout"
-              class="p-2 rounded-md hover:bg-gray-800 transition text-xl"
+              class="p-2 rounded-md text-rose-200 hover:bg-rose-500/15 hover:text-rose-100 transition"
               title="Logout"
               aria-label="Logout"
             >
-              🚪
+              <svg
+                class="h-5 w-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                aria-hidden="true"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4.75 3.75h9.5a1.5 1.5 0 011.5 1.5v13.5a1.5 1.5 0 01-1.5 1.5h-9.5a1.5 1.5 0 01-1.5-1.5V5.25a1.5 1.5 0 011.5-1.5z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10 12h10m0 0-3-3m3 3-3 3" />
+              </svg>
             </button>
           </div>
         </template>
@@ -247,15 +286,37 @@
             <button @click="mobileMenu = false" class="p-2 rounded hover:bg-gray-800">✖️</button>
           </div>
 
-          <div class="mb-4">
-            <div class="flex items-baseline gap-2 min-w-0">
-              <p class="text-xs text-slate-400">Workspace</p>
-              <p class="text-sm font-semibold text-white truncate">{{ activeWorkspace?.name || 'Personal' }}</p>
-            </div>
-          </div>
-
           <!-- Navigation -->
           <nav class="space-y-3 flex-1 overflow-y-auto scrollbar-plan">
+            <div class="space-y-1">
+              <RouterLink
+                v-for="item in coreNavItems"
+                :key="item.to"
+                :to="item.to"
+                class="flex items-center gap-3 px-4 py-2 rounded hover:bg-indigo-600"
+                @click="mobileMenu = false"
+              >
+                <span class="inline-flex h-5 w-5 items-center justify-center">
+                  <svg
+                    v-if="item.iconType === 'grid-4-outline'"
+                    class="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    aria-hidden="true"
+                  >
+                    <rect x="4" y="4" width="6" height="6" rx="1" />
+                    <rect x="14" y="4" width="6" height="6" rx="1" />
+                    <rect x="4" y="14" width="6" height="6" rx="1" />
+                    <rect x="14" y="14" width="6" height="6" rx="1" />
+                  </svg>
+                  <span v-else>{{ item.icon }}</span>
+                </span>
+                <span>{{ item.label }}</span>
+              </RouterLink>
+            </div>
+
             <div v-for="group in filteredNavGroups" :key="group.key" class="rounded-lg">
               <div
                 class="flex items-center justify-between px-3 py-2 text-sm font-semibold text-slate-200"
@@ -343,12 +404,23 @@
                 >💬</RouterLink
               >
               <button
-                v-if="authStore.isLoggedIn"
+                v-if="!isGuest"
                 @click="handleLogout"
-                class="text-xs py-2 rounded-md hover:bg-gray-800 transition"
+                class="inline-flex items-center justify-center py-2 rounded-md text-rose-200 hover:bg-rose-500/15 hover:text-rose-100 transition"
                 title="Logout"
+                aria-label="Logout"
               >
-                🚪
+                <svg
+                  class="h-5 w-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  aria-hidden="true"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4.75 3.75h9.5a1.5 1.5 0 011.5 1.5v13.5a1.5 1.5 0 01-1.5 1.5h-9.5a1.5 1.5 0 01-1.5-1.5V5.25a1.5 1.5 0 011.5-1.5z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M10 12h10m0 0-3-3m3 3-3 3" />
+                </svg>
               </button>
             </div>
           </div>
@@ -577,7 +649,6 @@ const feedbackStore = useFeedbackStore()
 const { isPremium, isGuest } = useAuthFlags()
 const authReady = computed(() => !authStore.loading)
 const activeWorkspace = computed(() => workspaceStore.activeWorkspace || {})
-const activeWorkspaceId = computed(() => workspaceStore.activeWorkspaceId)
 const activeWorkspaceSettings = computed(() => activeWorkspace.value?.settings || {})
 
 const isOnTalkPlanner = computed(() => route.path === '/talk-to-planner')
@@ -638,22 +709,16 @@ function isActive(path) {
   return route.path.startsWith(path)
 }
 
+const coreNavItems = [
+  { label: 'Dashboard', iconType: 'grid-4-outline', to: '/dashboard' },
+  { label: 'Planner', icon: '🧭', to: '/planner' },
+  { label: 'Meetings', icon: '📅', to: '/meetings' },
+  { label: 'Quick Links', icon: '🔗', to: '/links' },
+  { label: 'Reminders', icon: '🔔', to: '/reminders' },
+  { label: 'Napkin', icon: '🧾', to: '/napkin' },
+]
+
 const navGroups = [
-  {
-    key: 'core',
-    title: 'Core',
-    icon: '💎',
-    collapsible: false,
-    defaultOpen: true,
-    children: [
-      { label: 'Dashboard', icon: '📊', to: '/dashboard' },
-      { label: 'Planner', icon: '🧭', to: '/planner' },
-      { label: 'Meetings', icon: '📅', to: '/meetings' },
-      { label: 'Quick Links', icon: '🔗', to: '/links' },
-      { label: 'Reminders', icon: '🔔', to: '/reminders' },
-      { label: 'Napkin', icon: '🧾', to: '/napkin' },
-    ],
-  },
   {
     key: 'planning',
     title: 'Planning',

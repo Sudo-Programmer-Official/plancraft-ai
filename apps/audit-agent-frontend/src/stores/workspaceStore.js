@@ -35,8 +35,9 @@ export const useWorkspaceStore = defineStore('workspaceStore', () => {
     if (uid && id) {
       try {
         const ws = workspaces.value.find((w) => w.id === id)
-        if (ws?.role === 'admin') {
-          await touchWorkspaceOpened(uid, id)
+        if (ws?.role === 'admin' || ws?.role === 'owner') {
+          // Best effort: do not block workspace hydration on this patch call.
+          touchWorkspaceOpened(uid, id).catch(() => {})
         }
       } catch {}
     }
@@ -50,12 +51,29 @@ export const useWorkspaceStore = defineStore('workspaceStore', () => {
     return list
   }
 
+  function findPersonalWorkspace(list = []) {
+    const byExactName = list.find(
+      (ws) => String(ws?.name || '').trim().toLowerCase() === 'personal',
+    )
+    if (byExactName) return byExactName
+
+    const personalType = list.filter(
+      (ws) => String(ws?.workspaceType || '').trim().toLowerCase() === 'personal',
+    )
+    if (!personalType.length) return null
+
+    const bySparkleIcon = personalType.find((ws) => String(ws?.icon || '').includes('✨'))
+    if (bySparkleIcon) return bySparkleIcon
+
+    return personalType[0] || null
+  }
+
   async function init() {
     if (loading.value) return
     const uid = auth?.currentUser?.uid
+    let cachedWorkspaceId = null
     try {
-      const cached = localStorage.getItem('activeWorkspaceId')
-      if (cached) setLocalActive(cached)
+      cachedWorkspaceId = localStorage.getItem('activeWorkspaceId')
     } catch {}
     if (!uid) {
       hydrated.value = true
@@ -71,13 +89,12 @@ export const useWorkspaceStore = defineStore('workspaceStore', () => {
         list = seeded ? [seeded] : []
         workspaces.value = list
       }
-      const existing = list.find((w) => w.id === activeWorkspaceId.value)
-      const fallback = list[0]?.id || null
-      if (!existing) {
-        await setActive(activeWorkspaceId.value || fallback)
-      } else {
-        await setActive(existing.id)
-      }
+      const selectedId = activeWorkspaceId.value || cachedWorkspaceId
+      const existing = list.find((w) => w.id === selectedId)
+      const personal = findPersonalWorkspace(list)
+      // Keep user's current selection when available; only fallback to Personal.
+      const preferred = existing?.id || personal?.id || list[0]?.id || null
+      await setActive(preferred)
     } catch (err) {
       error.value = err?.message || 'Failed to load workspaces'
     } finally {
