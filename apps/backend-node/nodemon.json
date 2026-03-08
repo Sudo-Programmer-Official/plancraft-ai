@@ -1,0 +1,21 @@
+{
+  "watch": [
+    "index.js",
+    "controllers",
+    "middleware",
+    "routes",
+    "services",
+    "utils",
+    "jobs",
+    "config"
+  ],
+  "ext": "js,mjs,cjs,json",
+  "ignore": [
+    "node_modules/**",
+    "temp/**",
+    "**/*.log",
+    "coverage/**",
+    "dist/**"
+  ],
+  "delay": "500"
+}

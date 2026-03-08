@@ -88,8 +88,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onBeforeUnmount, watch } from 'vue'
-import api from '@/services/api'
+import { computed, watch } from 'vue'
+import { useAudioRecorder } from '@/composables/useAudioRecorder'
 
 const props = defineProps({
   disabled: Boolean,
@@ -103,15 +103,24 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['transcribed', 'state-change'])
+const emit = defineEmits(['transcribed', 'state-change', 'processing-start', 'processing-end', 'processing-error'])
 
-const state = ref('idle') // idle | recording | transcribing | done
-const transcript = ref('')
-const durationSeconds = ref(0)
-let mediaRecorder = null
-let stream = null
-let timerId = null
-let recordedChunks = []
+const {
+  state,
+  transcript,
+  durationSeconds,
+  isRecording,
+  isTranscribing,
+  startRecording,
+  stopRecording,
+  resetRecorder,
+} = useAudioRecorder({
+  onTranscription: (text) => {
+    emit('transcribed', { text })
+    emit('processing-end')
+  },
+  logPrefix: '[VoiceRecorder]',
+})
 
 const formattedDuration = computed(() => {
   const seconds = Math.max(0, durationSeconds.value || 0)
@@ -129,118 +138,18 @@ const primaryLabel = computed(() => {
 
 function handlePrimaryPress() {
   if (props.disabled || state.value === 'transcribing') return
-  if (state.value === 'recording') {
-    stopRecording()
-  } else {
-    startRecording()
-  }
+  if (state.value === 'recording') stopRecording()
+  else startRecording()
 }
 
-async function startRecording() {
-  if (state.value === 'recording' || props.disabled) return
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-  } catch (err) {
-    console.warn('[VoiceRecorder] microphone denied', err)
-    return
-  }
-  recordedChunks = []
-  transcript.value = ''
-  durationSeconds.value = 0
-  state.value = 'recording'
-  emit('state-change', state.value)
-  initRecorder()
-  startTimer()
-}
-
-function initRecorder() {
-  if (!stream) return
-  const options = { mimeType: 'audio/webm;codecs=opus' }
-  mediaRecorder = new MediaRecorder(stream, options)
-  mediaRecorder.ondataavailable = (event) => {
-    if (event?.data?.size) recordedChunks.push(event.data)
-  }
-  mediaRecorder.onstop = handleRecorderStop
-  mediaRecorder.start()
-}
-
-function stopRecording() {
-  if (!mediaRecorder || state.value !== 'recording') return
-  state.value = 'transcribing'
-  emit('state-change', state.value)
-  stopTimer()
-  if (mediaRecorder.state !== 'inactive') mediaRecorder.stop()
-}
-
-async function handleRecorderStop() {
-  try {
-    const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'audio/webm' })
-    const text = await transcribeBlob(blob)
-    transcript.value = text
-    state.value = 'done'
-    emit('state-change', state.value)
-    if (text) {
-      emit('transcribed', { text })
-    } else {
-      resetRecorder()
-    }
-  } catch (err) {
-    console.error('[VoiceRecorder] transcription failed', err)
-    resetRecorder()
-  } finally {
-    mediaRecorder = null
-    stopTracks()
-  }
-}
-
-async function transcribeBlob(blob) {
-  const fd = new FormData()
-  fd.append('file', blob, 'speech.webm')
-  const res = await api.post('/transcribe', fd, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  })
-  return res?.data?.text || ''
-}
-
-function resetRecorder() {
-  stopTimer()
-  stopTracks()
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-    mediaRecorder.stop()
-  }
-  mediaRecorder = null
-  recordedChunks = []
-  transcript.value = ''
-  durationSeconds.value = 0
-  state.value = 'idle'
-  emit('state-change', state.value)
-}
-
-function stopTracks() {
-  if (stream) {
-    stream.getTracks().forEach((track) => track.stop())
-    stream = null
-  }
-}
-
-function startTimer() {
-  stopTimer()
-  timerId = window.setInterval(() => {
-    durationSeconds.value += 1
-  }, 1000)
-}
-
-function stopTimer() {
-  if (timerId) {
-    clearInterval(timerId)
-    timerId = null
-  }
-}
-
-onBeforeUnmount(() => {
-  stopTimer()
-  stopTracks()
-})
+watch(
+  () => state.value,
+  (val) => {
+    emit('state-change', val)
+    if (val === 'transcribing') emit('processing-start')
+    if (val === 'idle' || val === 'done') emit('processing-end')
+  },
+)
 
 watch(
   () => props.resetTrigger,
