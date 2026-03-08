@@ -116,7 +116,6 @@
           </div>
           <el-button
             @click="generateTasks"
-            :loading="loading || generationMode === 'imageAnalyzing' || attachmentUploading"
             :disabled="generateDisabled"
             class="generate-btn"
           >

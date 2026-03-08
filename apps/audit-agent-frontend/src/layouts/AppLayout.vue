@@ -224,7 +224,7 @@
             <button
               v-if="!isGuest"
               @click="handleLogout"
-              class="inline-flex items-center justify-center py-2 rounded-md text-rose-200 hover:bg-rose-500/15 hover:text-rose-100 transition"
+              class="inline-flex items-center justify-center py-2 rounded-md text-red-400 hover:bg-red-500/15 hover:text-red-300 transition"
               title="Logout"
               aria-label="Logout"
             >
@@ -248,7 +248,7 @@
             <button
               v-if="!isGuest"
               @click="handleLogout"
-              class="p-2 rounded-md text-rose-200 hover:bg-rose-500/15 hover:text-rose-100 transition"
+              class="p-2 rounded-md text-red-400 hover:bg-red-500/15 hover:text-red-300 transition"
               title="Logout"
               aria-label="Logout"
             >
@@ -406,7 +406,7 @@
               <button
                 v-if="!isGuest"
                 @click="handleLogout"
-                class="inline-flex items-center justify-center py-2 rounded-md text-rose-200 hover:bg-rose-500/15 hover:text-rose-100 transition"
+                class="inline-flex items-center justify-center py-2 rounded-md text-red-400 hover:bg-red-500/15 hover:text-red-300 transition"
                 title="Logout"
                 aria-label="Logout"
               >
