@@ -1,6 +1,7 @@
 import 'element-plus/dist/index.css'
 import './styles/themes.css'
 import './assets/tailwind.scss'
+import './styles/soft-surfaces.css'
 
 import { ViteSSG } from 'vite-ssg'
 import App from './App.vue'
