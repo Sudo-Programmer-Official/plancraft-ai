@@ -246,40 +246,18 @@
         <button
           type="button"
           class="mic-btn"
-          :class="{ active: micActive }"
+          :class="{
+            active: micActive,
+            'mic-btn--recording': micState === MIC_STATES.listening,
+            'mic-btn--processing': micState === MIC_STATES.processing,
+          }"
           :disabled="assistantThinking && !micActive"
           :aria-pressed="micState === MIC_STATES.listening"
           :title="micButtonLabel"
           :aria-label="micButtonLabel"
           @click="handleMicButton"
         >
-          <span v-if="micState === MIC_STATES.processing" class="loader loader--tiny"></span>
-          <svg
-            v-else-if="micState === MIC_STATES.listening"
-            class="icon icon-stop"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-          >
-            <rect x="8" y="8" width="8" height="8" rx="2" />
-          </svg>
-          <svg
-            v-else
-            class="icon icon-mic"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.6"
-          >
-            <path
-              stroke-linecap="round"
-              d="M12 15.5a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v5.5a3 3 0 0 0 3 3Z"
-            />
-            <path d="M7.5 11.5V12a4.5 4.5 0 0 0 9 0v-.5" />
-            <path stroke-linecap="round" d="M12 16v3.5" />
-            <path stroke-linecap="round" d="M9.5 19.5h5" />
-          </svg>
+          <span class="mic-visual" aria-hidden="true"></span>
         </button>
         <input
           v-model="inputText"
@@ -1839,9 +1817,6 @@ onBeforeUnmount(() => {
 .mic-btn,
 .send-btn {
   position: relative;
-  padding: 0 1.3rem;
-  border-radius: 999px;
-  background: linear-gradient(120deg, #34d399, #10b981);
   border: none;
   color: #fff;
   height: 42px;
@@ -1851,8 +1826,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: opacity 0.2s ease;
-  box-shadow: 0 12px 24px rgba(16, 185, 129, 0.45);
+  transition: opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .mic-btn::after,
@@ -1874,30 +1848,125 @@ onBeforeUnmount(() => {
   opacity: 1;
 }
 
-.mic-btn .icon,
+.mic-btn {
+  width: 46px;
+  height: 46px;
+  min-width: 46px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(125, 211, 252, 0.38);
+  background: radial-gradient(circle at 30% 30%, rgba(79, 70, 229, 0.38), rgba(14, 165, 233, 0.18));
+  box-shadow: 0 10px 24px rgba(14, 165, 233, 0.28);
+}
+
+.mic-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px rgba(14, 165, 233, 0.36);
+}
+
+.mic-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.mic-btn.active {
+  border-color: rgba(167, 139, 250, 0.75);
+  box-shadow: 0 0 0 6px rgba(99, 102, 241, 0.16), 0 12px 28px rgba(99, 102, 241, 0.36);
+}
+
+.mic-visual {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.mic-visual::before {
+  content: '';
+  width: 20px;
+  height: 20px;
+  background: linear-gradient(180deg, #f8fafc, #c7d2fe);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Zm5-3a1 1 0 1 0-2 0 3 3 0 1 1-6 0 1 1 0 1 0-2 0 5 5 0 0 0 4 4.9V20H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-2.1A5 5 0 0 0 17 11Z'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Zm5-3a1 1 0 1 0-2 0 3 3 0 1 1-6 0 1 1 0 1 0-2 0 5 5 0 0 0 4 4.9V20H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-2.1A5 5 0 0 0 17 11Z'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+
+.mic-btn--recording .mic-visual::before {
+  background: linear-gradient(180deg, #fee2e2, #fda4af);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9 7h2.75v10H9V7Zm4.25 0H16v10h-2.75V7Z'/%3E%3C/svg%3E")
+    center / 17px 17px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9 7h2.75v10H9V7Zm4.25 0H16v10h-2.75V7Z'/%3E%3C/svg%3E")
+    center / 17px 17px no-repeat;
+  animation: mic-icon-breathe 0.95s ease-in-out infinite;
+}
+
+.mic-btn--processing .mic-visual::before {
+  background: linear-gradient(180deg, #e0e7ff, #a5b4fc);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 4a8 8 0 1 0 7.75 10h-2.1A6 6 0 1 1 12 6v2.2l3.4-3.2L12 1.8V4Z'/%3E%3C/svg%3E")
+    center / 18px 18px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 4a8 8 0 1 0 7.75 10h-2.1A6 6 0 1 1 12 6v2.2l3.4-3.2L12 1.8V4Z'/%3E%3C/svg%3E")
+    center / 18px 18px no-repeat;
+  animation: mic-icon-spin 0.9s linear infinite;
+}
+
+.mic-btn--processing .mic-visual {
+  animation: mic-processing 0.95s ease-in-out infinite;
+}
+
+.send-btn {
+  padding: 0 1.3rem;
+  border-radius: 999px;
+  background: linear-gradient(120deg, rgba(124, 58, 237, 0.5), rgba(14, 165, 233, 0.5));
+  border-color: rgba(165, 180, 252, 0.6);
+  color: #fdf4ff;
+  box-shadow: 0 12px 24px rgba(79, 70, 229, 0.4);
+}
+
 .send-btn .icon {
   width: 18px;
   height: 18px;
 }
 
-.mic-btn.active {
-  background: radial-gradient(circle at center, #a855f7, #6d28d9);
-  box-shadow: 0 0 15px rgba(168, 85, 247, 0.7);
-  color: #ffffff;
-  animation: pulse 1.5s infinite;
-}
-
-.mic-btn:hover,
 .send-btn:hover {
   background: rgba(140, 100, 255, 0.4);
   color: #ffffff;
   transform: translateY(-1px);
 }
 
-.send-btn {
-  background: linear-gradient(120deg, rgba(124, 58, 237, 0.5), rgba(14, 165, 233, 0.5));
-  border-color: rgba(165, 180, 252, 0.6);
-  color: #fdf4ff;
+@keyframes mic-processing {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.3);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 10px rgba(99, 102, 241, 0.08);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.02);
+  }
+}
+
+@keyframes mic-icon-breathe {
+  0%,
+  100% {
+    transform: scale(0.92);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+}
+
+@keyframes mic-icon-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* .send-btn:disabled {
@@ -1912,21 +1981,6 @@ onBeforeUnmount(() => {
   cursor: not-allowed;
   transform: none;
 } */
-
-@keyframes mic-breathe {
-  0% {
-    transform: scale(0.9);
-    opacity: 0.8;
-  }
-  50% {
-    transform: scale(1.14);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(0.9);
-    opacity: 0.8;
-  }
-}
 
 .icon-send path {
   stroke: currentColor;
@@ -2000,16 +2054,6 @@ onBeforeUnmount(() => {
   border-top-color: #ffffff;
   border-radius: 999px;
   animation: spin 0.9s linear infinite;
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 10px rgba(168, 85, 247, 0.4);
-  }
-  50% {
-    box-shadow: 0 0 25px rgba(168, 85, 247, 0.8);
-  }
 }
 
 @media (max-width: 768px) {

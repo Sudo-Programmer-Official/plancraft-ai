@@ -1,8 +1,15 @@
 import RecordRTC from "recordrtc"
 import api from '@/services/api'
 
-const PRIMARY_MIME = "audio/webm;codecs=opus"
-const FALLBACK_MIME = "audio/ogg;codecs=opus"
+const MIME_CANDIDATES = [
+  "audio/webm;codecs=opus",
+  "audio/ogg;codecs=opus",
+  "audio/mp4;codecs=mp4a.40.2",
+  "audio/mp4",
+  "audio/aac",
+  "audio/m4a",
+  "audio/webm",
+]
 const VOICE_STOP_DELAY_MS = 400
 
 function getExt(mime) {
@@ -22,9 +29,12 @@ function resolveMimeType() {
     (typeof MediaRecorder !== "undefined" && typeof MediaRecorder.isTypeSupported === "function"
       ? MediaRecorder.isTypeSupported(type)
       : false)
-  if (canUse(PRIMARY_MIME)) return PRIMARY_MIME
-  if (canUse(FALLBACK_MIME)) return FALLBACK_MIME
-  return PRIMARY_MIME
+  try {
+    const supported = MIME_CANDIDATES.find((type) => canUse(type))
+    return supported || null
+  } catch {
+    return null
+  }
 }
 
 function flushInternalRecorder(recorder) {
@@ -72,9 +82,8 @@ export async function recordAndSendToBackend(
     }
   }
 
-  const recorder = new RecordRTC(stream, {
+  const recorderConfig = {
     type: "audio",
-    mimeType,
     timeSlice: mode === "live" ? timeSliceMs : null, // only slice in live mode
     ondataavailable: async (blob) => {
       if (mode !== "live") return // ignore chunks in final mode
@@ -91,7 +100,10 @@ export async function recordAndSendToBackend(
         console.warn("⚠️ Live transcription failed", err)
       }
     },
-  })
+  }
+  if (mimeType) recorderConfig.mimeType = mimeType
+
+  const recorder = new RecordRTC(stream, recorderConfig)
 
   recorder.startRecording()
 
