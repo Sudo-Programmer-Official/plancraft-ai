@@ -9,6 +9,7 @@ import Contact from '@/views/ContactForm.vue'
 import { useAuthStore } from '@/stores/authStore'
 import CreatorLayout from '@/layouts/CreatorLayout.vue'
 import PublicLeaderLayout from '@/layouts/PublicLeaderLayout.vue'
+import NotFoundView from '@/views/NotFoundView.vue'
 
 const getCurrentUser = () =>
   new Promise((resolve) => {
@@ -165,17 +166,18 @@ const router = createRouter({
       ],
     },
 
-    // ✅ Fallback and misc
-    {
-      path: '/:pathMatch(.*)*',
-      name: 'NotFound',
-      redirect: '/',
-    },
-    { path: '/privacy-policy', component: () => import('@/views/PrivacyPolicy.vue') },
+    // ✅ Legacy and misc
+    { path: '/privacy-policy', redirect: '/privacy' },
     {
       path: '/data-deletion',
       name: 'data-deletion',
       component: () => import('@/views/DataDeletion.vue'),
+    },
+    { path: '/404', name: 'not-found', component: NotFoundView },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'NotFound',
+      component: NotFoundView,
     },
   ],
 })

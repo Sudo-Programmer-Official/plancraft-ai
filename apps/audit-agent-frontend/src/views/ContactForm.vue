@@ -3,7 +3,7 @@
     class="min-h-screen bg-gradient-to-b from-indigo-900 via-purple-900 to-slate-950 text-slate-100"
   >
     <router-link
-      to="/dashboard"
+      to="/"
       class="absolute top-6 left-6 z-20 flex items-center gap-2 cursor-pointer"
     >
       <img

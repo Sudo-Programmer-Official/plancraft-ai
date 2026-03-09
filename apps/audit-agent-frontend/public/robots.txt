@@ -9,7 +9,6 @@ Allow: /blog
 Allow: /pricing
 Allow: /contact
 Allow: /privacy
-Allow: /privacy-policy
 Allow: /terms
 Allow: /data-deletion
 Allow: /help

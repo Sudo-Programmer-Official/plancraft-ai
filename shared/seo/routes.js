@@ -62,12 +62,6 @@ export const marketingPages = [
     priority: 0.4,
   },
   {
-    path: '/privacy-policy',
-    label: 'Privacy Policy Legacy',
-    changefreq: 'yearly',
-    priority: 0.4,
-  },
-  {
     path: '/terms',
     label: 'Terms of Service',
     changefreq: 'yearly',

@@ -1,4 +1,11 @@
 {
+  "redirects": [
+    {
+      "source": "/privacy-policy",
+      "destination": "/privacy",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/(.*)",

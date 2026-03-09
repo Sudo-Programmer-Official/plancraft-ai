@@ -557,7 +557,7 @@
           </div>
           <div class="flex items-center gap-4">
             <RouterLink to="/blog" class="hover:underline">Blog</RouterLink>
-            <RouterLink to="/privacy-policy" class="hover:underline">Privacy</RouterLink>
+            <RouterLink to="/privacy" class="hover:underline">Privacy</RouterLink>
             <RouterLink to="/terms" class="hover:underline">Terms</RouterLink>
             <RouterLink to="/contact" class="hover:underline">Contact</RouterLink>
             <a href="mailto:careers@plancraftai.com" class="hover:underline hidden sm:inline"

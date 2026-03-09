@@ -114,10 +114,12 @@ if (isInApp) {
 
 // 🧭 Keep canonical tag in sync with current route (prevents alternate/redirect warnings)
 try {
+  const rawSiteUrl = (import.meta?.env?.VITE_SITE_URL && String(import.meta.env.VITE_SITE_URL)) || ''
+  const canonicalBase = rawSiteUrl.replace(/\/+$/, '') || window?.location?.origin || ''
   const ensureCanonical = (path) => {
-    const origin = window?.location?.origin
-    if (!origin) return
-    const href = `${origin}${path || '/'}`
+    if (!canonicalBase) return
+    const normalizedPath = path && path.startsWith('/') ? path : path ? `/${path}` : '/'
+    const href = `${canonicalBase}${normalizedPath}`
     let link = document.querySelector("link[rel='canonical']")
     if (!link) {
       link = document.createElement('link')
@@ -126,7 +128,8 @@ try {
     }
     link.setAttribute('href', href)
   }
-  router.afterEach((to) => ensureCanonical(to.fullPath || '/'))
+  router.afterEach((to) => ensureCanonical(to.path || '/'))
+  ensureCanonical(router.currentRoute?.value?.path || '/')
 } catch {}
 
 // Mount app

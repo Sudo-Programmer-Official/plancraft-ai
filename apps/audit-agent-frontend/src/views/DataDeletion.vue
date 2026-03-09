@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen bg-gradient-to-b from-indigo-900 via-purple-900 to-slate-950 text-slate-100">
-    <!-- Logo / Back to Dashboard -->
-    <router-link to="/dashboard" class="absolute top-6 left-6 flex items-center gap-2">
+    <!-- Logo / Back to home -->
+    <router-link to="/" class="absolute top-6 left-6 flex items-center gap-2">
       <img src="/logo-bg-remove.png" alt="PlanCraftAI Logo" class="h-10 w-auto sm:h-12 drop-shadow-lg" />
       <span class="text-lg sm:text-xl md:text-2xl font-bold">PlanCraftAI</span>
     </router-link>
@@ -44,10 +44,10 @@
       <!-- Back to app button -->
       <div class="mt-10">
         <router-link
-          to="/dashboard"
+          to="/"
           class="inline-block px-6 py-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-lg transition"
         >
-          ← Back to PlanCraftAI
+          ← Back to Home
         </router-link>
       </div>
     </div>

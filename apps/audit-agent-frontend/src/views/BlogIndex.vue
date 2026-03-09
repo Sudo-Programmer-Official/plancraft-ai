@@ -119,9 +119,9 @@
             >Home</router-link
           >
           <router-link
-            to="/dashboard"
+            to="/features"
             class="hover:text-indigo-300 transition"
-            >App</router-link
+            >Features</router-link
           >
           <a
             href="mailto:hello@plancraftai.com"

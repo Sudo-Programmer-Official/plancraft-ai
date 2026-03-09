@@ -6,6 +6,15 @@
       "**/.*",
       "**/node_modules/**"
     ],
+    "cleanUrls": true,
+    "trailingSlash": false,
+    "redirects": [
+      {
+        "source": "/privacy-policy",
+        "destination": "/privacy",
+        "type": 301
+      }
+    ],
     "rewrites": [
       {
         "source": "**",
