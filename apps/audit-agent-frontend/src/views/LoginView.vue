@@ -91,14 +91,21 @@
             <div v-if="showPhone" class="auth-panel">
               <h2 class="text-lg font-semibold text-white mb-3">Phone OTP</h2>
               <div class="space-y-3">
-                <div class="flex items-center gap-3 bg-[#1e1b2e] border border-white/10 rounded-xl px-3 py-2">
+                <div
+                  class="flex items-center gap-3 bg-[#1e1b2e] border border-white/10 rounded-xl px-3 py-2"
+                  @click="focusPhoneField"
+                  @touchstart.passive="focusPhoneField"
+                >
                   <span class="text-2xl select-none" aria-label="Detected country flag">{{ detectedFlag }}</span>
                   <input
+                    ref="phoneFieldRef"
                     v-model="phoneInput"
                     type="tel"
                     placeholder="Enter phone e.g. +1 650 555 1234"
                     class="flex-1 bg-transparent text-white placeholder:text-indigo-200/60 focus:outline-none text-base py-2"
                     inputmode="tel"
+                    autocomplete="tel"
+                    enterkeyhint="send"
                     @input="onPhoneInput"
                   />
                 </div>
@@ -114,12 +121,15 @@
                 </div>
                 <div v-else class="space-y-2">
                   <input
+                    ref="otpFieldRef"
                     v-model="otp"
-                    type="text"
+                    type="tel"
                     inputmode="numeric"
+                    pattern="[0-9]*"
                     autocomplete="one-time-code"
                     placeholder="Enter OTP"
                     class="auth-input"
+                    enterkeyhint="done"
                     @input="sanitizeOtpInput"
                   />
                   <button
@@ -159,7 +169,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from "vue"
+import { ref, onMounted, computed, nextTick } from "vue"
 import { useRouter, useRoute } from "vue-router"
 import { useAuthStore } from "@/stores/authStore"
 import LoginFeatureSlider from '@/components/LoginFeatureSlider.vue'
@@ -291,8 +301,30 @@ const otp = ref('')
 const otpSent = ref(false)
 const sendingOtp = ref(false)
 const verifyingOtp = ref(false)
+const phoneFieldRef = ref(null)
+const otpFieldRef = ref(null)
 let confirmationResult = null
 const IS_LOCAL = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname)
+
+function focusPhoneField() {
+  const node = phoneFieldRef.value
+  if (!node?.focus) return
+  try {
+    node.focus({ preventScroll: true })
+  } catch {
+    node.focus()
+  }
+}
+
+function focusOtpField() {
+  const node = otpFieldRef.value
+  if (!node?.focus) return
+  try {
+    node.focus({ preventScroll: true })
+  } catch {
+    node.focus()
+  }
+}
 
 function resetRecaptcha() {
   try {
@@ -336,6 +368,7 @@ function togglePhone() {
   showPhone.value = !showPhone.value
   if (showPhone.value) {
     setTimeout(() => ensureRecaptcha(), 0)
+    nextTick(() => focusPhoneField())
   } else {
     resetRecaptcha()
   }
@@ -442,6 +475,7 @@ async function sendOtp() {
     // Use centralized store action
     confirmationResult = await authStore.sendPhoneOtp(formatted, verifier)
     otpSent.value = true
+    nextTick(() => focusOtpField())
     ElMessage.success('OTP sent successfully!')
   } catch (error) {
     console.error('[OTP] send failed', error)

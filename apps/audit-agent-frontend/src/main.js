@@ -112,6 +112,58 @@ if (isInApp) {
   window.location.href = '/inapp-fallback.html'
 }
 
+// iPad/iOS Safari can occasionally drop input focus on tap.
+// Force-focus editable fields within the same user gesture.
+function installIosInputFocusPatch() {
+  try {
+    const uaRaw = navigator?.userAgent || ''
+    const isiOSLike =
+      /iPad|iPhone|iPod/.test(uaRaw) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    if (!isiOSLike || typeof document === 'undefined') return
+
+    const targetSelector =
+      'input, textarea, select, [contenteditable=\"\"], [contenteditable=\"true\"]'
+    const blockedInputTypes = new Set([
+      'button',
+      'checkbox',
+      'radio',
+      'submit',
+      'reset',
+      'file',
+      'image',
+      'range',
+      'color',
+      'hidden',
+    ])
+
+    const tryFocus = (event) => {
+      const source = event?.target
+      if (!(source instanceof Element)) return
+      const target = source.closest(targetSelector)
+      if (!target) return
+      if (target.hasAttribute('readonly') || target.hasAttribute('disabled')) return
+      if (target instanceof HTMLInputElement) {
+        const type = String(target.getAttribute('type') || 'text').toLowerCase()
+        if (blockedInputTypes.has(type)) return
+      }
+      if (document.activeElement === target) return
+      try {
+        target.focus({ preventScroll: true })
+      } catch {
+        try { target.focus() } catch {}
+      }
+    }
+
+    document.addEventListener('touchstart', tryFocus, { capture: true, passive: true })
+    document.addEventListener('click', tryFocus, true)
+  } catch (err) {
+    console.warn('[iOS Focus Patch] setup failed', err)
+  }
+}
+
+installIosInputFocusPatch()
+
 // 🧭 Keep canonical tag in sync with current route (prevents alternate/redirect warnings)
 try {
   const rawSiteUrl = (import.meta?.env?.VITE_SITE_URL && String(import.meta.env.VITE_SITE_URL)) || ''
