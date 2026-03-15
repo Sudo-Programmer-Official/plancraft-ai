@@ -2149,8 +2149,13 @@ watch(
   }
 )
 
-function startTour() {
-  const tour = driver({
+async function startTour() {
+  try {
+    const mod = await import('driver.js')
+    const driver = mod?.driver
+    if (typeof driver !== 'function') return false
+
+    const tour = driver({
     animate: true,
     showProgress: true,
     steps: [
@@ -2202,17 +2207,22 @@ function startTour() {
           position: 'top',
         },
       },
-    ],
-  })
-  tour.drive()
+      ],
+    })
+    tour.drive()
+    return true
+  } catch (error) {
+    console.warn('Dashboard tour failed to start:', error)
+    return false
+  }
 }
 
 onMounted(() => {
   const hasSeenTour = localStorage.getItem('seenTour')
   if (!hasSeenTour) {
-    setTimeout(() => {
-      startTour()
-      localStorage.setItem('seenTour', 'true')
+    setTimeout(async () => {
+      const started = await startTour()
+      if (started) localStorage.setItem('seenTour', 'true')
     }, 800)
   }
 })
