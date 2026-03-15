@@ -133,6 +133,17 @@ api.interceptors.response.use(
   (error) => {
     try {
       const status = error?.response?.status
+      if (status === 401) {
+        console.error('[API] 401 response', {
+          url: error?.config?.baseURL
+            ? `${String(error.config.baseURL).replace(/\/+$/, '')}/${String(error?.config?.url || '').replace(/^\/+/, '')}`
+            : error?.config?.url || null,
+          method: error?.config?.method || null,
+          hasAuthHeader: !!(error?.config?.headers?.Authorization || error?.config?.headers?.authorization),
+          responseData: error?.response?.data || null,
+        })
+      }
+
       const msg = (error?.response?.data?.error || '').toString().toLowerCase()
       const isLimit = status === 403 && /limit|upgrade/.test(msg)
       if (isLimit && typeof window !== 'undefined') {

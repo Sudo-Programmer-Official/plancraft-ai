@@ -166,19 +166,31 @@ async function nativeIosPasswordSignIn(email, password) {
 }
 
 async function exchangeNativeSessionForCustomToken(idToken, provider = 'password', platform = 'ios') {
-  const response = await withTimeout(
-    api.post('/auth/native-session/exchange', {
-      idToken,
-      provider,
-      platform,
-    }),
-    12000,
-    'native session exchange',
-  )
+  try {
+    const response = await withTimeout(
+      api.post('/auth/native-session/exchange', {
+        idToken,
+        provider,
+        platform,
+      }),
+      12000,
+      'native session exchange',
+    )
 
-  const customToken = String(response?.data?.customToken || '')
-  if (!customToken) throw new Error('Missing Firebase custom token from native session exchange')
-  return response.data
+    const customToken = String(response?.data?.customToken || '')
+    if (!customToken) throw new Error('Missing Firebase custom token from native session exchange')
+    return response.data
+  } catch (error) {
+    console.error('[Auth] Native session exchange failed', {
+      endpoint: '/auth/native-session/exchange',
+      status: error?.response?.status || null,
+      code: error?.code || null,
+      message: error?.message || String(error),
+      responseData: error?.response?.data || null,
+      hasAuthorizationHeader: !!(error?.config?.headers?.Authorization || error?.config?.headers?.authorization),
+    })
+    throw error
+  }
 }
 
 function withTimeout(promise, ms, label) {
