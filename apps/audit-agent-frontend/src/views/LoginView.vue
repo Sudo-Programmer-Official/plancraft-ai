@@ -285,12 +285,16 @@ async function onLoginEmail() {
     if (authStore.user) redirectAfterLogin()
   } catch (e) {
     const code = String(e?.code || e?.message || '')
+    console.error('[Auth] LoginView email login failed', {
+      code: e?.code || null,
+      message: e?.message || String(e),
+    })
     if (code.includes('auth/invalid-credential') || code.includes('auth/wrong-password') || code.includes('auth/user-not-found')) {
       alert('Login failed. Check your email and password.')
       return
     }
     if (code.includes('timed out')) {
-      alert('Login timed out. Please try again.')
+      alert(`Login timed out: ${code}`)
       return
     }
     alert(`Login failed: ${code || 'unknown error'}`)
