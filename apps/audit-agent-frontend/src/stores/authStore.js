@@ -193,6 +193,99 @@ async function exchangeNativeSessionForCustomToken(idToken, provider = 'password
   }
 }
 
+async function nativeIosSignInWithCustomToken(customToken) {
+  const apiKey = getFirebaseApiKey()
+  const response = await withTimeout(
+    CapacitorHttp.post({
+      url: `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${encodeURIComponent(apiKey)}`,
+      headers: { 'Content-Type': 'application/json' },
+      data: {
+        token: customToken,
+        returnSecureToken: true,
+      },
+      connectTimeout: 12000,
+      readTimeout: 12000,
+    }),
+    12000,
+    'native iOS custom token exchange',
+  )
+
+  const data = response?.data || {}
+  const errorMessage = data?.error?.message
+  if (errorMessage || !data?.idToken || !data?.localId) {
+    const mapped = mapIdentityToolkitError(errorMessage)
+    const err = new Error(mapped.message)
+    err.code = mapped.code
+    throw err
+  }
+
+  return data
+}
+
+async function hydrateNativeIosCustomTokenUser(idTokenResponse, fallbackEmail = '') {
+  const { _castAuth, UserImpl, updateCurrentUser } = await import('@firebase/auth/internal')
+  const authInternal = _castAuth(auth)
+  const now = String(Date.now())
+  const expirationTime = Date.now() + (Number(idTokenResponse?.expiresIn || 3600) * 1000)
+
+  const providerEmail = idTokenResponse?.email || fallbackEmail || null
+  const providerData = providerEmail
+    ? [{
+        providerId: 'password',
+        uid: providerEmail,
+        email: providerEmail,
+        displayName: idTokenResponse?.displayName || null,
+        photoURL: idTokenResponse?.photoUrl || null,
+        phoneNumber: idTokenResponse?.phoneNumber || null,
+      }]
+    : []
+
+  const user = UserImpl._fromJSON(authInternal, {
+    uid: idTokenResponse.localId,
+    email: providerEmail,
+    emailVerified: !!providerEmail,
+    displayName: idTokenResponse?.displayName || undefined,
+    isAnonymous: false,
+    photoURL: idTokenResponse?.photoUrl || undefined,
+    phoneNumber: idTokenResponse?.phoneNumber || undefined,
+    providerData,
+    stsTokenManager: {
+      accessToken: idTokenResponse.idToken,
+      refreshToken: idTokenResponse.refreshToken,
+      expirationTime,
+    },
+    createdAt: now,
+    lastLoginAt: now,
+  })
+
+  try {
+    await withTimeout(
+      updateCurrentUser(auth, user),
+      8000,
+      'native iOS updateCurrentUser',
+    )
+  } catch (error) {
+    const currentUser = auth.currentUser
+    if (currentUser?.uid === user.uid) {
+      console.warn('[Auth] Native iOS updateCurrentUser timed out, but auth.currentUser is already set; continuing', {
+        uid: currentUser.uid,
+      })
+      return currentUser
+    }
+
+    console.warn('[Auth] Native iOS updateCurrentUser timed out; applying in-memory auth fallback', {
+      uid: user.uid,
+      message: error?.message || String(error),
+    })
+    authInternal.currentUser = user
+    try { user._startProactiveRefresh?.() } catch {}
+    try { authInternal.notifyAuthListeners?.() } catch {}
+    return user
+  }
+
+  return auth.currentUser || user
+}
+
 function withTimeout(promise, ms, label) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -1127,30 +1220,18 @@ export const useAuthStore = defineStore('authStore', {
             uid: exchanged?.uid || session?.localId || null,
           })
 
-          let credential
-          try {
-            credential = await withTimeout(
-              signInWithCustomToken(auth, customToken),
-              12000,
-              'native iOS custom token sign-in',
-            )
-          } catch (error) {
-            const currentUser = auth.currentUser
-            if (currentUser?.uid && currentUser.uid === (exchanged?.uid || session?.localId || '')) {
-              console.warn('[Auth] Native iOS custom token sign-in timed out, but auth.currentUser is set; continuing', {
-                uid: currentUser.uid,
-              })
-              credential = { user: currentUser }
-            } else {
-              throw error
-            }
-          }
-
-          console.info('[Auth] Native iOS signInWithCustomToken resolved', {
-            uid: credential?.user?.uid || null,
+          const tokenSession = await nativeIosSignInWithCustomToken(customToken)
+          console.info('[Auth] Native iOS Identity Toolkit custom token sign-in resolved', {
+            uid: tokenSession?.localId || null,
           })
 
-          const user = credential?.user
+          const user = await hydrateNativeIosCustomTokenUser(tokenSession, email)
+          console.info('[Auth] Native iOS auth state hydrated from custom token', {
+            uid: user?.uid || null,
+            hasCurrentUser: !!auth.currentUser,
+            currentUid: auth.currentUser?.uid || null,
+          })
+
           if (!user?.uid) {
             throw new Error('Native iOS custom token sign-in did not return a Firebase user')
           }
