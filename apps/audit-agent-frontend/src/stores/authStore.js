@@ -101,6 +101,41 @@ function clearNativeGoogleHandoffIntent() {
   } catch {}
 }
 
+function readStoredToken() {
+  try {
+    return localStorage.getItem('token') || ''
+  } catch {
+    return ''
+  }
+}
+
+function withTimeout(promise, ms, label) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${ms}ms`))
+    }, ms)
+
+    Promise.resolve(promise)
+      .then((value) => {
+        clearTimeout(timer)
+        resolve(value)
+      })
+      .catch((error) => {
+        clearTimeout(timer)
+        reject(error)
+      })
+  })
+}
+
+async function withFallback(promise, { ms = 8000, label = 'auth operation', fallback = null } = {}) {
+  try {
+    return await withTimeout(promise, ms, label)
+  } catch (error) {
+    console.warn(`[Auth] ${label} failed or timed out`, error)
+    return typeof fallback === 'function' ? fallback() : fallback
+  }
+}
+
 export const useAuthStore = defineStore('authStore', {
   state: () => ({
     user: null,
@@ -244,8 +279,16 @@ export const useAuthStore = defineStore('authStore', {
       onIdTokenChanged(auth, async (user) => {
         try {
           if (user) {
-            const token = await user.getIdToken(true)
-            const profile = await fetchUserProfile(user.uid)
+            const token = await withFallback(user.getIdToken(), {
+              ms: 8000,
+              label: 'bootstrap id token',
+              fallback: () => readStoredToken(),
+            })
+            const profile = await withFallback(fetchUserProfile(user.uid), {
+              ms: 8000,
+              label: 'bootstrap profile fetch',
+              fallback: { role: this.user?.role || 'user' },
+            })
             this.user = {
               uid: user.uid,
               displayName: user.displayName,
@@ -256,7 +299,7 @@ export const useAuthStore = defineStore('authStore', {
             this.token = token
             identifyUser(this.user)
             localStorage.setItem('user', JSON.stringify(this.user))
-            localStorage.setItem('token', this.token)
+            if (this.token) localStorage.setItem('token', this.token)
             try {
               import('@/stores/workspaceStore').then((mod) => {
                 try { mod.useWorkspaceStore().init() } catch {}
@@ -308,9 +351,15 @@ export const useAuthStore = defineStore('authStore', {
           const user = auth.currentUser
           if (user) {
             try {
-              const token = await user.getIdToken(true)
-              this.token = token
-              localStorage.setItem('token', token)
+              const token = await withFallback(user.getIdToken(true), {
+                ms: 8000,
+                label: 'scheduled token refresh',
+                fallback: () => readStoredToken(),
+              })
+              if (token) {
+                this.token = token
+                localStorage.setItem('token', token)
+              }
               // Optionally refresh long-lived app token if enabled and nearing expiry
               try {
                 if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
@@ -957,31 +1006,60 @@ export const useAuthStore = defineStore('authStore', {
       if (current && !alreadyLinked) {
         // Link email/password to current session; abort on failure to avoid duplicate UIDs.
         const credential = EmailAuthProvider.credential(email, password)
-        const linkRes = await linkWithCredential(current, credential)
-        const user = linkRes?.user || current
-        await setDoc(
-          doc(db, 'users', user.uid),
-          {
-            email: user.email,
-            name: user.displayName || '',
-            mode: 'email',
-            lastLoginAt: Date.now(),
-            profileComplete: !!(user.displayName),
-          },
-          { merge: true },
+        const linkRes = await withTimeout(
+          linkWithCredential(current, credential),
+          12000,
+          'email link credential',
         )
-        const profile = await fetchUserProfile(user.uid)
+        const user = linkRes?.user || current
         this.user = {
           uid: user.uid,
           displayName: user.displayName,
           email: user.email,
           photoURL: user.photoURL,
-          role: profile?.role || this.user?.role || 'user',
+          role: this.user?.role || 'user',
         }
         this.guest = false
-        this.token = await user.getIdToken()
+        this.token = await withFallback(user.getIdToken(), {
+          ms: 8000,
+          label: 'email link token',
+          fallback: () => readStoredToken(),
+        })
         localStorage.setItem('user', JSON.stringify(this.user))
-        localStorage.setItem('token', this.token)
+        if (this.token) localStorage.setItem('token', this.token)
+        try {
+          setDoc(
+            doc(db, 'users', user.uid),
+            {
+              email: user.email,
+              name: user.displayName || '',
+              mode: 'email',
+              lastLoginAt: Date.now(),
+              profileComplete: !!(user.displayName),
+            },
+            { merge: true },
+          ).catch((err) => {
+            console.warn('[Auth] Deferred email link profile sync failed', err)
+          })
+        } catch {}
+        withFallback(fetchUserProfile(user.uid), {
+          ms: 8000,
+          label: 'email link profile fetch',
+          fallback: { role: this.user?.role || 'user' },
+        }).then((profile) => {
+          this.user = {
+            ...(this.user || {}),
+            role: profile?.role || this.user?.role || 'user',
+          }
+          try { localStorage.setItem('user', JSON.stringify(this.user)) } catch {}
+        }).catch(() => {})
+        try {
+          if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
+            const mod = await import('@/services/appTokenService.js')
+            mod.refreshAppToken().catch(() => {})
+          }
+        } catch {}
+        this.refreshPlan().catch(() => {})
         ElNotification({
           title: 'Email linked',
           message: 'Email/password added to your account.',
@@ -993,37 +1071,60 @@ export const useAuthStore = defineStore('authStore', {
       }
 
       // No active session or already linked: standard sign-in.
-      const cred = await signInWithEmailAndPassword(auth, email, password)
-      const user = cred.user
-      await setDoc(
-        doc(db, 'users', user.uid),
-        {
-          email: user.email,
-          name: user.displayName || '',
-          mode: 'email',
-          lastLoginAt: Date.now(),
-          ...(user.displayName ? { profileComplete: true } : {}),
-        },
-        { merge: true },
+      const cred = await withTimeout(
+        signInWithEmailAndPassword(auth, email, password),
+        12000,
+        'email sign-in',
       )
-      const profile = await fetchUserProfile(user.uid)
+      const user = cred.user
       this.user = {
         uid: user.uid,
         displayName: user.displayName,
         email: user.email,
         photoURL: user.photoURL,
-        role: profile?.role || 'user',
+        role: 'user',
       }
       this.guest = false
-      this.token = await user.getIdToken()
+      this.token = await withFallback(user.getIdToken(), {
+        ms: 8000,
+        label: 'email sign-in token',
+        fallback: () => readStoredToken(),
+      })
       localStorage.setItem('user', JSON.stringify(this.user))
-      localStorage.setItem('token', this.token)
+      if (this.token) localStorage.setItem('token', this.token)
+      try {
+        setDoc(
+          doc(db, 'users', user.uid),
+          {
+            email: user.email,
+            name: user.displayName || '',
+            mode: 'email',
+            lastLoginAt: Date.now(),
+            ...(user.displayName ? { profileComplete: true } : {}),
+          },
+          { merge: true },
+        ).catch((err) => {
+          console.warn('[Auth] Deferred email profile sync failed', err)
+        })
+      } catch {}
+      withFallback(fetchUserProfile(user.uid), {
+        ms: 8000,
+        label: 'email profile fetch',
+        fallback: { role: 'user' },
+      }).then((profile) => {
+        this.user = {
+          ...(this.user || {}),
+          role: profile?.role || this.user?.role || 'user',
+        }
+        try { localStorage.setItem('user', JSON.stringify(this.user)) } catch {}
+      }).catch(() => {})
       try {
         if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
           const mod = await import('@/services/appTokenService.js')
           mod.refreshAppToken().catch(() => {})
         }
       } catch {}
+      this.refreshPlan().catch(() => {})
       ElNotification({
         title: 'Signed in ✨',
         message: `Welcome ${this.user.displayName || this.user.email || ''}`,
