@@ -264,6 +264,11 @@ if (String(process.env.GOOGLE_OAUTH_DEBUG || '').toLowerCase() === '1' || String
 // Attach auth (prefer X-App-Token, fallback to Firebase) for all API routes
 app.use('/api', attachAuth)
 
+// Mount auth routes before generic "/api" routers that apply requireAuth globally.
+// Otherwise requests like /api/auth/native-session/exchange get intercepted early
+// and return a plain 401 before authRoutes can verify the provided body token.
+app.use("/api/auth", authRoutes)
+
 // Health checks
 app.get("/", (req, res) => res.send("Backend is live!"));
 app.get("/health", (req, res) => res.status(200).send("OK"));
@@ -287,7 +292,6 @@ app.use("/api", gptRoutes);
 app.use("/api/reminders", reminderRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api", carryoverRoutes);
-app.use("/api/auth", authRoutes);
 app.use("/api", parseRemindersRoutes);
 app.use("/api", testRoutes);
 app.use("/api", knowledgeRoutes);
