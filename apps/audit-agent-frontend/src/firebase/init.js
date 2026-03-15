@@ -43,15 +43,23 @@ function buildAuthPersistenceOrder() {
   return [browserLocalPersistence, indexedDBLocalPersistence, inMemoryPersistence]
 }
 
+function describePersistenceOrder(order) {
+  return order.map((entry) => entry?.type || entry?._delegate?._type || 'unknown')
+}
+
 let auth
 try {
+  const persistenceOrder = buildAuthPersistenceOrder()
   auth = initializeAuth(firebaseApp, {
-    persistence: buildAuthPersistenceOrder(),
+    persistence: persistenceOrder,
     popupRedirectResolver: browserPopupRedirectResolver,
   })
   console.info('[Auth] Firebase Auth initialized with persistence fallbacks', {
     native: isNative,
     platform: Capacitor?.getPlatform?.() || 'web',
+    origin: typeof window !== 'undefined' ? window.location.origin : 'server',
+    authDomain: firebaseConfig.authDomain,
+    persistence: describePersistenceOrder(persistenceOrder),
   })
 } catch (error) {
   auth = getAuth(firebaseApp)

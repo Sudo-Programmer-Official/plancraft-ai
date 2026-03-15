@@ -997,16 +997,34 @@ export const useAuthStore = defineStore('authStore', {
         const alreadyLinked = (current?.providerData || []).some((p) => p?.providerId === 'password')
         const canFallbackGuestLink =
           current?.isAnonymous === true || this.guest === true || this.user?.mode === 'guest'
+        console.info('[Auth] Email login start', {
+          email,
+          platform: Capacitor?.getPlatform?.() || 'web',
+          native: isNativePackagedApp(),
+          online: typeof navigator !== 'undefined' ? navigator.onLine : 'unknown',
+          origin: typeof window !== 'undefined' ? window.location.origin : 'server',
+          currentUid: current?.uid || null,
+          currentAnonymous: current?.isAnonymous === true,
+          providerIds: (current?.providerData || []).map((p) => p?.providerId).filter(Boolean),
+          authDomain: auth?.app?.options?.authDomain || null,
+        })
 
         if (current && !alreadyLinked) {
           // Link email/password to current session; abort on failure to avoid duplicate UIDs.
           const credential = EmailAuthProvider.credential(email, password)
           try {
+            console.info('[Auth] Email login using linkWithCredential for current session', {
+              currentUid: current.uid,
+              currentAnonymous: current?.isAnonymous === true,
+            })
             const linkRes = await withTimeout(
               linkWithCredential(current, credential),
               12000,
               'email link credential',
             )
+            console.info('[Auth] linkWithCredential resolved', {
+              linkedUid: linkRes?.user?.uid || current?.uid || null,
+            })
             const user = linkRes?.user || current
             this.user = {
               uid: user.uid,
@@ -1065,6 +1083,10 @@ export const useAuthStore = defineStore('authStore', {
             })
             return user
           } catch (error) {
+            console.error('[Auth] Email link credential failed', {
+              code: error?.code || null,
+              message: error?.message || String(error),
+            })
             const code = String(error?.code || '')
             const canFallbackToSignIn =
               canFallbackGuestLink &&
@@ -1079,11 +1101,18 @@ export const useAuthStore = defineStore('authStore', {
         }
 
         // No active session or already linked: standard sign-in.
+        console.info('[Auth] Calling signInWithEmailAndPassword', {
+          email,
+          hasCurrentUser: !!auth.currentUser,
+        })
         const cred = await withTimeout(
           signInWithEmailAndPassword(auth, email, password),
         12000,
         'email sign-in',
       )
+      console.info('[Auth] signInWithEmailAndPassword resolved', {
+        uid: cred?.user?.uid || null,
+      })
       const user = cred.user
       this.user = {
         uid: user.uid,
@@ -1140,6 +1169,16 @@ export const useAuthStore = defineStore('authStore', {
         duration: 2400,
         offset: 80,
       })
+      console.info('[Auth] Email login completed', {
+        uid: this.user?.uid || null,
+        email: this.user?.email || null,
+      })
+    } catch (error) {
+      console.error('[Auth] Email login failed', {
+        code: error?.code || null,
+        message: error?.message || String(error),
+      })
+      throw error
     } finally {
       this.loading = false
     }
