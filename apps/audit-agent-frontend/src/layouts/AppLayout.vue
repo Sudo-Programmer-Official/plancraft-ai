@@ -3,11 +3,11 @@
   <FeedbackPrompt />
   <FeedbackDrawer />
   <div
-    class="flex min-h-screen w-full max-w-full overflow-x-hidden bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 text-white"
+    class="app-shell flex min-h-screen w-full max-w-full overflow-x-hidden bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 text-white"
   >
     <!-- Global upgrade banner -->
     <!-- Global Upgrade Banner -->
-    <div v-if="showUpgrade" class="fixed top-0 left-0 right-0 z-50 px-3 sm:px-6">
+    <div v-if="showUpgrade" class="app-upgrade-banner fixed top-0 left-0 right-0 z-50 px-3 sm:px-6">
       <div
         class="bg-gradient-to-r from-fuchsia-600/40 via-purple-600/40 to-indigo-600/40 backdrop-blur-xl border border-fuchsia-400/30 text-white rounded-b-xl shadow-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 py-2 sm:py-3 px-3 sm:px-5 animate-fade-in"
       >
@@ -276,7 +276,7 @@
         class="fixed inset-0 bg-black/50 z-40 md:hidden"
         @click.self="mobileMenu = false"
       >
-        <div class="absolute left-0 top-0 bottom-0 w-64 bg-gray-900 p-4 flex flex-col">
+        <div class="app-mobile-drawer absolute left-0 top-0 bottom-0 w-64 bg-gray-900 p-4 flex flex-col">
           <!-- Header -->
           <div class="flex justify-between items-center mb-6">
             <div class="flex items-center gap-2 min-w-0">
@@ -429,10 +429,10 @@
     </transition>
 
     <!-- Main Content -->
-    <div class="flex-1 flex flex-col w-full max-w-full h-screen overflow-x-hidden">
+    <div class="app-main-pane flex-1 flex flex-col w-full max-w-full overflow-x-hidden">
       <!-- Header -->
       <header
-        class="sticky top-0 z-10 bg-gray-950/60 backdrop-blur-xl border-b border-gray-800 p-4 flex justify-between items-center w-full"
+        class="app-header sticky top-0 z-10 bg-gray-950/60 backdrop-blur-xl border-b border-gray-800 p-4 flex justify-between items-center w-full"
       >
         <div class="flex items-center gap-3 min-w-0 flex-1">
           <!-- Hamburger (mobile only) -->
@@ -541,12 +541,12 @@
       </header>
 
       <!-- Dynamic content -->
-      <main class="p-6 flex-1 overflow-y-auto overflow-x-hidden scrollbar-plan">
+      <main class="app-content p-6 flex-1 overflow-y-auto overflow-x-hidden scrollbar-plan">
         <RouterView />
       </main>
       <!-- Compact sticky footer -->
       <footer
-        class="py-3 text-center text-xs sm:text-sm text-indigo-300 bg-slate-950/95 border-t border-gray-800"
+        class="app-footer py-3 text-center text-xs sm:text-sm text-indigo-300 bg-slate-950/95 border-t border-gray-800"
       >
         <div
           class="max-w-7xl mx-auto px-4 flex items-center justify-center sm:justify-between gap-3"
@@ -882,6 +882,50 @@ function startTour() {
 </script>
 
 <style>
+:root {
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+}
+
+.app-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding-left: var(--safe-area-left);
+  padding-right: var(--safe-area-right);
+}
+
+.app-main-pane {
+  min-height: 100vh;
+  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
+}
+
+.app-upgrade-banner {
+  left: var(--safe-area-left);
+  right: var(--safe-area-right);
+  padding-top: var(--safe-area-top);
+}
+
+.app-mobile-drawer {
+  padding-top: calc(var(--safe-area-top) + 1rem);
+  padding-bottom: calc(var(--safe-area-bottom) + 1rem);
+}
+
+.app-header {
+  padding-top: calc(var(--safe-area-top) + 1rem);
+}
+
+.app-content {
+  padding-bottom: calc(1.5rem + var(--safe-area-bottom));
+}
+
+.app-footer {
+  padding-bottom: calc(0.75rem + var(--safe-area-bottom));
+}
+
 .slide-enter-active,
 .slide-leave-active {
   transition: transform 0.3s ease;
