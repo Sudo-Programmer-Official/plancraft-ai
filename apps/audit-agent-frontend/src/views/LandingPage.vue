@@ -1,6 +1,6 @@
 <template>
   <div
-    class="relative min-h-screen flex flex-col text-gray-800 dark:text-slate-100 overflow-hidden"
+    class="landing-shell relative min-h-screen flex flex-col text-gray-800 dark:text-slate-100 overflow-hidden"
   >
     <!-- Animated Star Background -->
     <div
@@ -11,9 +11,9 @@
 
     <!-- Hero -->
     <section
-      class="relative py-32 md:py-40 bg-gradient-to-b from-indigo-900 via-purple-900 to-slate-950 overflow-hidden"
+      class="landing-hero relative py-32 md:py-40 bg-gradient-to-b from-indigo-900 via-purple-900 to-slate-950 overflow-hidden"
     >
-      <div class="absolute top-6 left-6 z-20 flex items-center gap-2">
+      <div class="landing-brand absolute top-6 left-6 z-20 flex items-center gap-2">
         <img
           src="/logo-bg-remove.png"
           alt="PlanCraftAI Logo"
@@ -544,7 +544,7 @@
 
     <!-- Footer -->
     <footer
-      class="py-8 text-center text-sm text-indigo-300 bg-slate-950 border-t border-indigo-500/10"
+      class="landing-footer py-8 text-center text-sm text-indigo-300 bg-slate-950 border-t border-indigo-500/10"
     >
       <div class="max-w-7xl mx-auto px-6">
         <p class="text-indigo-200 mb-2">Built for calm execution — solo or with a team.</p>
@@ -997,6 +997,30 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.landing-shell {
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding-left: var(--safe-area-left);
+  padding-right: var(--safe-area-right);
+}
+
+.landing-hero {
+  padding-top: calc(var(--safe-area-top) + 8rem);
+}
+
+.landing-brand {
+  top: calc(var(--safe-area-top) + 1.5rem);
+  left: calc(var(--safe-area-left) + 1.5rem);
+}
+
+.landing-footer {
+  padding-bottom: calc(2rem + var(--safe-area-bottom));
+}
+
 .star {
   position: absolute;
   width: 2px;

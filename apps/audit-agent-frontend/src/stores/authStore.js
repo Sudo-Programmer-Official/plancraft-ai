@@ -38,6 +38,7 @@ import { db } from '@/firebase/init'
 import { ElNotification } from 'element-plus'
 import { clearAppToken } from '@/services/appTokenService'
 import { Capacitor } from '@capacitor/core'
+import { isNativePackagedApp, getNativeAuthRestriction } from '@/utils/nativeAuthSupport'
 
 const auth = getAuth(firebaseApp)
 setPersistence(auth, browserLocalPersistence)
@@ -292,6 +293,11 @@ export const useAuthStore = defineStore('authStore', {
 
     // ✅ Fixed: Smart Google Login (Popup + Redirect Fallback)
     async loginWithGoogle() {
+      if (isNativePackagedApp()) {
+        const err = new Error(getNativeAuthRestriction('google'))
+        err.code = 'auth/native-google-unsupported'
+        throw err
+      }
       this.loading = true
       try {
         const provider = new GoogleAuthProvider()
@@ -475,6 +481,11 @@ export const useAuthStore = defineStore('authStore', {
 
     // 🍎 Sign in with Apple (iOS-only button will call this)
     async loginWithApple() {
+      if (isNativePackagedApp()) {
+        const err = new Error(getNativeAuthRestriction('apple'))
+        err.code = 'auth/native-apple-unsupported'
+        throw err
+      }
       this.loading = true
       try {
         const provider = new OAuthProvider('apple.com')
@@ -660,6 +671,11 @@ export const useAuthStore = defineStore('authStore', {
 
     // 📱 Phone OTP: send code
     async sendPhoneOtp(phone, recaptchaVerifier) {
+      if (isNativePackagedApp()) {
+        const err = new Error(getNativeAuthRestriction('phone'))
+        err.code = 'auth/native-phone-unsupported'
+        throw err
+      }
       if (!phone) throw new Error('Missing phone number')
       if (!recaptchaVerifier) throw new Error('Missing reCAPTCHA verifier')
       // Use Firebase auth directly for OTP

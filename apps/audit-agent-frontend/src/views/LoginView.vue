@@ -25,7 +25,7 @@
             <div class="space-y-3">
               <button
                 @click="loginGoogle"
-                :disabled="authStore.loading"
+                :disabled="authStore.loading || isNativeApp"
                 class="w-full flex items-center justify-center gap-3 bg-white text-gray-900 px-6 py-4 rounded-xl font-semibold shadow-lg hover:-translate-y-0.5 hover:shadow-2xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 disabled:opacity-70"
               >
                 <img src="https://www.svgrepo.com/show/355037/google.svg" alt="Google" class="w-5 h-5" />
@@ -34,7 +34,7 @@
               <button
                 v-if="isIosApp"
                 @click="loginApple"
-                :disabled="authStore.loading"
+                :disabled="authStore.loading || isNativeApp"
                 class="w-full flex items-center justify-center gap-3 bg-white text-gray-900 px-6 py-4 rounded-xl font-semibold shadow-lg hover:-translate-y-0.5 hover:shadow-2xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 disabled:opacity-70"
               >
                 <img src="https://www.svgrepo.com/show/303128/apple-logo.svg" alt="Apple" class="w-5 h-5" />
@@ -50,7 +50,7 @@
               </button>
               <button
                 type="button"
-                :disabled="authStore.loading"
+                :disabled="authStore.loading || isNativeApp"
                 class="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-xl font-semibold border border-white/10 text-white hover:border-indigo-300/70 hover:bg-white/5 transition disabled:opacity-70"
                 @click="togglePhone(true)"
               >
@@ -59,6 +59,11 @@
             </div>
 
             <p class="text-center text-sm text-indigo-200/80">Choose how you want to sign in. No spam. No passwords.</p>
+            <p v-if="isNativeApp" class="native-auth-banner">
+              This mobile app build is currently hardened to use email/password only. Google,
+              Apple, phone OTP, and magic link still need native auth wiring and deep-link return
+              handling.
+            </p>
 
             <div v-if="showEmail" class="auth-panel">
               <h2 class="text-lg font-semibold text-white mb-3">Email access</h2>
@@ -76,7 +81,7 @@
                 <button @click="onReset" class="text-xs text-indigo-300 hover:text-indigo-200 transition text-left">
                   Forgot password?
                 </button>
-                <div class="pt-3 border-t border-white/10">
+                <div v-if="!isNativeApp" class="pt-3 border-t border-white/10">
                   <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between text-sm gap-2">
                     <span class="text-indigo-100">Or get a magic link</span>
                     <button @click="onSendMagic" class="auth-action ghost px-4 py-2">
@@ -216,6 +221,10 @@ import { ElMessage } from 'element-plus'
 import { parsePhoneNumberFromString } from 'libphonenumber-js'
 import { sendMagicLink, completeMagicLinkSignIn } from '@/services/authService'
 import GoogleAuthDiagnostic from '@/components/GoogleAuthDiagnostic.vue'
+import { isNativePackagedApp, getNativeAuthRestriction } from '@/utils/nativeAuthSupport'
+
+const isNativeApp = computed(() => isNativePackagedApp())
+
 async function loginGoogle() {
   try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_SIGNIN_CLICK) } catch {}
   try {
@@ -223,6 +232,11 @@ async function loginGoogle() {
     if (authStore.user) redirectAfterLogin()
   } catch (err) {
     console.warn('Google login failed; offering OTP fallback', err)
+    if (err?.code === 'auth/native-google-unsupported') {
+      try { ElMessage.info(getNativeAuthRestriction('google')) } catch {}
+      showEmail.value = true
+      return
+    }
     showPhone.value = true
     try { ElMessage.info('Google sign-in unavailable. Try phone OTP.') } catch {}
   }
@@ -235,6 +249,11 @@ async function loginApple() {
     if (authStore.user) redirectAfterLogin()
   } catch (err) {
     console.warn('Apple login failed', err)
+    if (err?.code === 'auth/native-apple-unsupported') {
+      try { ElMessage.info(getNativeAuthRestriction('apple')) } catch {}
+      showEmail.value = true
+      return
+    }
     try { ElMessage.info('Apple sign-in unavailable. Try another method.') } catch {}
   }
 }
@@ -284,6 +303,10 @@ async function onReset() {
 }
 
 async function onSendMagic() {
+  if (isNativeApp.value) {
+    ElMessage.info(getNativeAuthRestriction('magic-link'))
+    return
+  }
   if (!email.value) return alert('Enter your email above to receive a link')
   try {
     await sendMagicLink(email.value)
@@ -365,6 +388,10 @@ async function ensureRecaptcha(force = false) {
 }
 
 function togglePhone() {
+  if (isNativeApp.value) {
+    ElMessage.info(getNativeAuthRestriction('phone'))
+    return
+  }
   showPhone.value = !showPhone.value
   if (showPhone.value) {
     setTimeout(() => ensureRecaptcha(), 0)
@@ -479,6 +506,11 @@ async function sendOtp() {
     ElMessage.success('OTP sent successfully!')
   } catch (error) {
     console.error('[OTP] send failed', error)
+    if (error?.code === 'auth/native-phone-unsupported') {
+      ElMessage.info(getNativeAuthRestriction('phone'))
+      showEmail.value = true
+      return
+    }
     resetRecaptcha()
     const msg = IS_LOCAL
       ? 'OTP send failed on localhost. Use a Firebase test number (e.g., +13614429376 code 123456) or try email/Google.'
@@ -561,6 +593,10 @@ onMounted(() => {
     requestAnimationFrame(animate)
   }
   animate()
+
+  if (isNativeApp.value) {
+    showEmail.value = true
+  }
 })
 
 // Handle magic-link return
@@ -690,6 +726,17 @@ onMounted(async () => {
 .feature-pill {
   background: rgba(255, 255, 255, 0.04);
   border-radius: 1.25rem;
+}
+
+.native-auth-banner {
+  margin-top: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: rgba(120, 53, 15, 0.22);
+  color: rgba(254, 240, 138, 0.95);
+  font-size: 0.9rem;
+  line-height: 1.5;
 }
 
 .auth-phone-row {
