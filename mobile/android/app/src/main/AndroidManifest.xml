@@ -22,7 +22,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Custom scheme used by Capacitor (androidScheme: 'plancraftai') -->
+            <!-- Custom fallback scheme used if verified app links do not fire -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -44,15 +44,19 @@
                     android:pathPrefix="/__/auth/handler" />
             </intent-filter>
 
-            <!-- Optional: keep custom domain handler if used on mobile -->
-            <intent-filter>
+            <!-- Verified app link for browser -> app auth handoff completion -->
+            <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
                     android:scheme="https"
                     android:host="plancraftai.com"
-                    android:pathPrefix="/__/auth/handler" />
+                    android:pathPrefix="/app-auth/complete" />
+                <data
+                    android:scheme="https"
+                    android:host="www.plancraftai.com"
+                    android:pathPrefix="/app-auth/complete" />
             </intent-filter>
           
         </activity>

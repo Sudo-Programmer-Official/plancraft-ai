@@ -1,0 +1,68 @@
+import api from '@/services/api'
+import { Capacitor } from '@capacitor/core'
+
+const DEFAULT_REDIRECT = '/dashboard'
+export const NATIVE_AUTH_CALLBACK_PATH = '/app-auth/complete'
+
+export function normalizeRedirectPath(target, fallback = DEFAULT_REDIRECT) {
+  if (typeof target !== 'string') return fallback
+  const trimmed = target.trim()
+  if (!trimmed) return fallback
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return fallback
+  if (trimmed.startsWith('//')) return fallback
+  return trimmed.startsWith('/') ? trimmed : `/${trimmed.replace(/^\/+/, '')}`
+}
+
+export function isNativeAndroidApp() {
+  try {
+    return !!Capacitor?.isNativePlatform?.() && Capacitor?.getPlatform?.() === 'android'
+  } catch {
+    return false
+  }
+}
+
+export function buildNativeAuthCallbackUrl({ code, redirect } = {}) {
+  const origin =
+    (typeof window !== 'undefined' && window.location?.origin) ||
+    'https://plancraftai.com'
+  const params = new URLSearchParams()
+  if (code) params.set('code', code)
+  params.set('redirect', normalizeRedirectPath(redirect))
+  return `${origin}${NATIVE_AUTH_CALLBACK_PATH}?${params.toString()}`
+}
+
+export function buildNativeAuthFallbackSchemeUrl({ code, redirect } = {}) {
+  const params = new URLSearchParams()
+  if (code) params.set('code', code)
+  params.set('redirect', normalizeRedirectPath(redirect))
+  return `plancraftai://localhost${NATIVE_AUTH_CALLBACK_PATH}?${params.toString()}`
+}
+
+export function parseNativeAuthCallbackUrl(rawUrl = '') {
+  try {
+    const parsed = new URL(rawUrl)
+    if ((parsed.pathname || '/') !== NATIVE_AUTH_CALLBACK_PATH) return null
+    const code = parsed.searchParams.get('code')
+    if (!code) return null
+    return {
+      code,
+      redirect: normalizeRedirectPath(parsed.searchParams.get('redirect')),
+    }
+  } catch {
+    return null
+  }
+}
+
+export async function createMobileAuthHandoff(payload = {}) {
+  const res = await api.post('/auth/mobile-handoff/create', {
+    redirect: normalizeRedirectPath(payload.redirect),
+    platform: payload.platform || 'android',
+    provider: payload.provider || 'google',
+  })
+  return res?.data || {}
+}
+
+export async function consumeMobileAuthHandoff(code) {
+  const res = await api.post('/auth/mobile-handoff/consume', { code })
+  return res?.data || {}
+}

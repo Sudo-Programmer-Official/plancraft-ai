@@ -25,7 +25,7 @@
             <div class="space-y-3">
               <button
                 @click="loginGoogle"
-                :disabled="authStore.loading || isNativeApp"
+                :disabled="authStore.loading || (isNativeApp && !canUseNativeGoogle)"
                 class="w-full flex items-center justify-center gap-3 bg-white text-gray-900 px-6 py-4 rounded-xl font-semibold shadow-lg hover:-translate-y-0.5 hover:shadow-2xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 disabled:opacity-70"
               >
                 <img src="https://www.svgrepo.com/show/355037/google.svg" alt="Google" class="w-5 h-5" />
@@ -60,9 +60,7 @@
 
             <p class="text-center text-sm text-indigo-200/80">Choose how you want to sign in. No spam. No passwords.</p>
             <p v-if="isNativeApp" class="native-auth-banner">
-              This mobile app build is currently hardened to use email/password only. Google,
-              Apple, phone OTP, and magic link still need native auth wiring and deep-link return
-              handling.
+              {{ nativeAuthBanner }}
             </p>
 
             <div v-if="showEmail" class="auth-panel">
@@ -221,9 +219,21 @@ import { ElMessage } from 'element-plus'
 import { parsePhoneNumberFromString } from 'libphonenumber-js'
 import { sendMagicLink, completeMagicLinkSignIn } from '@/services/authService'
 import GoogleAuthDiagnostic from '@/components/GoogleAuthDiagnostic.vue'
-import { isNativePackagedApp, getNativeAuthRestriction } from '@/utils/nativeAuthSupport'
+import {
+  isNativePackagedApp,
+  getNativeAuthRestriction,
+  supportsNativeGoogleRedirectBridge,
+} from '@/utils/nativeAuthSupport'
 
 const isNativeApp = computed(() => isNativePackagedApp())
+const canUseNativeGoogle = computed(() => supportsNativeGoogleRedirectBridge())
+const nativeAuthBanner = computed(() => {
+  if (!isNativeApp.value) return ''
+  if (canUseNativeGoogle.value) {
+    return 'Android Google sign-in now returns to the app through the browser handoff bridge. Apple, phone OTP, and magic link still need additional native wiring.'
+  }
+  return 'This mobile app build is currently hardened to use email/password only. Google, Apple, phone OTP, and magic link still need native auth wiring and deep-link return handling.'
+})
 
 async function loginGoogle() {
   try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_SIGNIN_CLICK) } catch {}
@@ -235,6 +245,10 @@ async function loginGoogle() {
     if (err?.code === 'auth/native-google-unsupported') {
       try { ElMessage.info(getNativeAuthRestriction('google')) } catch {}
       showEmail.value = true
+      return
+    }
+    if (err?.code === 'auth/native-google-link-unsupported') {
+      try { ElMessage.info('Google account linking from inside the Android app is not available yet. Sign in directly instead.') } catch {}
       return
     }
     showPhone.value = true

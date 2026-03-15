@@ -8,9 +8,28 @@ export function isNativePackagedApp() {
   }
 }
 
+export function getNativePlatform() {
+  try {
+    return Capacitor?.getPlatform?.() || 'web'
+  } catch {
+    return 'web'
+  }
+}
+
+export function isAndroidPackagedApp() {
+  return isNativePackagedApp() && getNativePlatform() === 'android'
+}
+
+export function supportsNativeGoogleRedirectBridge() {
+  return isAndroidPackagedApp()
+}
+
 export function getNativeAuthRestriction(method = 'provider') {
   switch (method) {
     case 'google':
+      if (supportsNativeGoogleRedirectBridge()) {
+        return 'Google sign-in on Android uses the browser return-to-app bridge. If it fails, update the Android app links and deep-link handoff configuration.'
+      }
       return 'Google sign-in in the packaged mobile app still depends on Firebase Web popup/redirect flow. Use the browser or PWA build until native Google auth is wired.'
     case 'apple':
       return 'Apple sign-in in the packaged mobile app still depends on Firebase Web popup/redirect flow. Use the browser or PWA build until native Apple auth is wired.'

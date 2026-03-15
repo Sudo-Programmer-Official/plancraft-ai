@@ -60,6 +60,7 @@
 
 <script setup>
 import { ref, onMounted } from "vue"
+import { isNativePackagedApp } from "@/utils/nativeAuthSupport"
 
 const visible = ref(false)
 const iosHint = ref(false)
@@ -80,6 +81,7 @@ function markDismissed() {
 
 // --- PWA prompt for Chrome/Android ---
 onMounted(() => {
+  if (isNativePackagedApp()) return
   if (alreadyDismissed()) return
   window.addEventListener(
     "beforeinstallprompt",

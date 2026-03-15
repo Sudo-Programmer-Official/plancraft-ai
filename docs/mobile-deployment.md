@@ -31,6 +31,32 @@ npx cap open android
 ```
 Then build/sign from Android Studio (standard release flow).
 
+### Android auth return-to-app links
+
+The Android shell now expects a dedicated callback path:
+
+- `https://plancraftai.com/app-auth/complete`
+
+Required production pieces:
+
+1. Deploy `/.well-known/assetlinks.json`
+2. Keep the Android package name as `com.sudoprogrammer.plancraftai`
+3. Keep the SHA-256 fingerprint in `assetlinks.json` in sync with the release keystore
+4. Re-run `cap sync android` after any manifest or web change
+
+Current release SHA-256 in the repo:
+
+```text
+EE:3F:BD:BF:2E:2F:A6:73:20:92:FC:33:88:2C:2B:72:2D:BA:D6:A9:8C:26:25:3C:21:81:94:6D:0B:75:FB:03
+```
+
+Quick verification after deploy:
+
+1. Open `https://plancraftai.com/.well-known/assetlinks.json`
+2. Confirm the JSON contains the package name and SHA-256 above
+3. Reinstall the Android app if app links were previously cached incorrectly
+4. Test Google sign-in from the Android app again
+
 CLI bundle (alternative to Android Studio):
 ```bash
 cd android
@@ -67,6 +93,7 @@ Artifact: `android/app/build/outputs/bundle/release/app-release.aab`
 Notes:
 - Ensure `.env.production` points to the real API (no localhost) before `npm run build`.
 - Google/Bing “ping” 404/410 warnings during build are harmless; they don’t affect Android output.
+- If you rotate the Android release keystore, update `apps/audit-agent-frontend/public/.well-known/assetlinks.json` before the next release or verified app links will stop returning to the app.
 
 ### Phase 2 — Prep the iOS build (commands)
 

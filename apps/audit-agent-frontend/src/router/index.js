@@ -10,18 +10,45 @@ import { useAuthStore } from '@/stores/authStore'
 import CreatorLayout from '@/layouts/CreatorLayout.vue'
 import PublicLeaderLayout from '@/layouts/PublicLeaderLayout.vue'
 import NotFoundView from '@/views/NotFoundView.vue'
+import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
 
 const getCurrentUser = () =>
   new Promise((resolve) => {
-    const removeListener = onAuthStateChanged(
+    const existingUser = getAuth().currentUser
+    if (existingUser) {
+      resolve(existingUser)
+      return
+    }
+
+    let settled = false
+    let timeoutId = null
+    let removeListener = null
+    const finish = (user) => {
+      if (settled) return
+      settled = true
+      try {
+        if (timeoutId) clearTimeout(timeoutId)
+      } catch {}
+      try {
+        if (removeListener) removeListener()
+      } catch {}
+      resolve(user)
+    }
+
+    try {
+      timeoutId = window.setTimeout(() => {
+        console.warn('[Router] Timed out waiting for Firebase auth state; continuing with fallback checks')
+        finish(getAuth().currentUser || null)
+      }, isNativePackagedApp() ? 4000 : 7000)
+    } catch {}
+
+    removeListener = onAuthStateChanged(
       getAuth(),
       (user) => {
-        removeListener()
-        resolve(user)
+        finish(user)
       },
       () => {
-        removeListener()
-        resolve(null)
+        finish(null)
       },
     )
   })
@@ -33,6 +60,7 @@ const router = createRouter({
     { path: '/', name: 'landing', component: LandingPage },
     { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue') },
     { path: '/signup', name: 'signup', component: () => import('@/views/GuestOnboarding.vue') },
+    { path: '/app-auth/complete', name: 'native-auth-complete', component: () => import('@/views/NativeAuthCompleteView.vue') },
     { path: '/billing/upgrade', name: 'billing-upgrade', component: () => import('@/views/BillingUpgradeView.vue') },
     { path: '/privacy', component: PrivacyPolicy },
     { path: '/terms', component: Terms },

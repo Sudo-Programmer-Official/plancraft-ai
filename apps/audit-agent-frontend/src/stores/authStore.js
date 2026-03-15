@@ -26,6 +26,7 @@ import {
   getRedirectResult,
   signInWithPhoneNumber,
   signInWithEmailAndPassword,
+  signInWithCustomToken,
   EmailAuthProvider,
   PhoneAuthProvider,
 } from 'firebase/auth'
@@ -38,7 +39,17 @@ import { db } from '@/firebase/init'
 import { ElNotification } from 'element-plus'
 import { clearAppToken } from '@/services/appTokenService'
 import { Capacitor } from '@capacitor/core'
-import { isNativePackagedApp, getNativeAuthRestriction } from '@/utils/nativeAuthSupport'
+import {
+  isNativePackagedApp,
+  getNativeAuthRestriction,
+  supportsNativeGoogleRedirectBridge,
+} from '@/utils/nativeAuthSupport'
+import {
+  buildNativeAuthCallbackUrl,
+  consumeMobileAuthHandoff,
+  createMobileAuthHandoff,
+  normalizeRedirectPath,
+} from '@/services/mobileAuthHandoffService'
 
 const auth = getAuth(firebaseApp)
 setPersistence(auth, browserLocalPersistence)
@@ -55,6 +66,39 @@ function isIosCapacitorApp() {
   } catch {
     return false
   }
+}
+
+function getPostLoginTarget() {
+  try {
+    const stored = localStorage.getItem('postLoginRedirect')
+    if (stored) return normalizeRedirectPath(stored)
+  } catch {}
+  try {
+    const params = new URLSearchParams(window.location.search)
+    const q = params.get('redirect')
+    if (q) return normalizeRedirectPath(q)
+  } catch {}
+  return '/dashboard'
+}
+
+function markNativeGoogleHandoffIntent(redirectTarget) {
+  try {
+    const url = new URL(window.location.href)
+    url.searchParams.set('native_handoff', 'android-google')
+    url.searchParams.set('native_provider', 'google')
+    url.searchParams.set('native_redirect', normalizeRedirectPath(redirectTarget))
+    window.history.replaceState({}, '', url.toString())
+  } catch {}
+}
+
+function clearNativeGoogleHandoffIntent() {
+  try {
+    const url = new URL(window.location.href)
+    url.searchParams.delete('native_handoff')
+    url.searchParams.delete('native_provider')
+    url.searchParams.delete('native_redirect')
+    window.history.replaceState({}, '', url.toString())
+  } catch {}
 }
 
 export const useAuthStore = defineStore('authStore', {
@@ -140,6 +184,43 @@ export const useAuthStore = defineStore('authStore', {
     },
 
     async init() {
+      const bootstrapTimeoutMs = isNativePackagedApp() ? 4000 : 7000
+      let bootstrapSettled = false
+      let bootstrapTimer = null
+      const settleBootstrap = (reason) => {
+        if (bootstrapSettled) return
+        bootstrapSettled = true
+        this.loading = false
+        try {
+          if (bootstrapTimer) {
+            clearTimeout(bootstrapTimer)
+            bootstrapTimer = null
+          }
+        } catch {}
+        try {
+          console.info('[Auth] Bootstrap settled:', reason)
+        } catch {}
+      }
+
+      try {
+        bootstrapTimer = window.setTimeout(() => {
+          if (bootstrapSettled) return
+          console.warn('[Auth] Bootstrap timed out; falling back to cached session or login screen')
+          try {
+            const cachedUser = localStorage.getItem('user')
+            const cachedToken = localStorage.getItem('token')
+            if (!this.user && cachedUser && cachedToken) {
+              this.user = JSON.parse(cachedUser)
+              this.token = cachedToken
+              this.guest = false
+            }
+          } catch (e) {
+            console.warn('[Auth] Bootstrap fallback restore failed', e)
+          }
+          settleBootstrap('timeout')
+        }, bootstrapTimeoutMs)
+      } catch {}
+
       // 🧩 Attempt fast bootstrap from local backup (helps iOS PWA)
       try {
         const cachedUser = localStorage.getItem('user')
@@ -148,8 +229,8 @@ export const useAuthStore = defineStore('authStore', {
           this.user = JSON.parse(cachedUser)
           this.token = cachedToken
           this.guest = false
-          this.loading = false
           console.log('[Auth] Restored session from local backup')
+          settleBootstrap('local-backup')
         }
       } catch (e) {
         console.warn('[Auth] Failed to restore local session', e)
@@ -157,7 +238,7 @@ export const useAuthStore = defineStore('authStore', {
 
       onAuthStateChanged(auth, async (user) => {
         if (!user) this.resetAuth()
-        this.loading = false
+        settleBootstrap(user ? 'auth-state:user' : 'auth-state:none')
       })
 
       onIdTokenChanged(auth, async (user) => {
@@ -208,8 +289,10 @@ export const useAuthStore = defineStore('authStore', {
           } else {
             this.resetAuth()
           }
+          settleBootstrap(user ? 'id-token:user' : 'id-token:none')
         } catch {
           this.resetAuth()
+          settleBootstrap('id-token:error')
         }
       })
 
@@ -293,18 +376,39 @@ export const useAuthStore = defineStore('authStore', {
 
     // ✅ Fixed: Smart Google Login (Popup + Redirect Fallback)
     async loginWithGoogle() {
+      const provider = new GoogleAuthProvider()
+      provider.setCustomParameters({ prompt: 'select_account' })
+      const current = auth.currentUser
+      const alreadyLinked = (current?.providerData || []).some((p) => p?.providerId === 'google.com')
+
       if (isNativePackagedApp()) {
-        const err = new Error(getNativeAuthRestriction('google'))
-        err.code = 'auth/native-google-unsupported'
-        throw err
+        if (!supportsNativeGoogleRedirectBridge()) {
+          const err = new Error(getNativeAuthRestriction('google'))
+          err.code = 'auth/native-google-unsupported'
+          throw err
+        }
+        if (current && !alreadyLinked) {
+          const err = new Error('Google account linking inside the packaged Android app is not wired yet.')
+          err.code = 'auth/native-google-link-unsupported'
+          throw err
+        }
+
+        this.loading = true
+        try {
+          const redirectTarget = getPostLoginTarget()
+          markNativeGoogleHandoffIntent(redirectTarget)
+          console.info('[Auth] Android native bridge detected; starting Google redirect handoff', { redirectTarget })
+          await signInWithRedirect(auth, provider)
+          return
+        } catch (err) {
+          clearNativeGoogleHandoffIntent()
+          this.loading = false
+          throw err
+        }
       }
+
       this.loading = true
       try {
-        const provider = new GoogleAuthProvider()
-        provider.setCustomParameters({ prompt: 'select_account' })
-
-        const current = auth.currentUser
-        const alreadyLinked = (current?.providerData || []).some((p) => p?.providerId === 'google.com')
         const isNative = !!Capacitor?.isNativePlatform?.()
         if (isNative) {
           console.info('[Auth] Native platform detected; using redirect Google sign-in', { linking: !!current && !alreadyLinked })
@@ -640,6 +744,36 @@ export const useAuthStore = defineStore('authStore', {
             offset: 80,
           })
 
+          const params = new URLSearchParams(window.location.search)
+          const nativeHandoff = params.get('native_handoff')
+          const nativeProvider = params.get('native_provider') || 'google'
+          const nativeRedirect = normalizeRedirectPath(
+            params.get('native_redirect') ||
+            localStorage.getItem('postLoginRedirect') ||
+            params.get('redirect') ||
+            '/dashboard',
+          )
+
+          if (!isNativePackagedApp() && nativeHandoff === 'android-google' && nativeProvider === 'google') {
+            try {
+              const handoff = await createMobileAuthHandoff({
+                redirect: nativeRedirect,
+                platform: 'android',
+                provider: 'google',
+              })
+              clearNativeGoogleHandoffIntent()
+              window.location.replace(
+                buildNativeAuthCallbackUrl({
+                  code: handoff?.code,
+                  redirect: handoff?.redirect || nativeRedirect,
+                }),
+              )
+              return
+            } catch (handoffErr) {
+              console.error('[Auth] Failed to create Android mobile handoff', handoffErr)
+            }
+          }
+
           // After a successful redirect sign‑in, navigate away from /login to
           // prevent a stuck screen. Prefer an explicit redirect param or any
           // stored intent; otherwise fall back to dashboard.
@@ -648,14 +782,13 @@ export const useAuthStore = defineStore('authStore', {
             const stored = localStorage.getItem('postLoginRedirect')
             if (stored) {
               localStorage.removeItem('postLoginRedirect')
-              window.location.replace(stored)
+              window.location.replace(normalizeRedirectPath(stored))
               return
             }
             // 2) redirect query param
-            const params = new URLSearchParams(window.location.search)
             const q = params.get('redirect')
             if (q) {
-              window.location.replace(q)
+              window.location.replace(normalizeRedirectPath(q))
               return
             }
             // 3) default
@@ -666,6 +799,54 @@ export const useAuthStore = defineStore('authStore', {
         }
       } catch (err) {
         console.warn('Redirect sign-in restore failed:', err)
+      }
+    },
+
+    async completeNativeAuthHandoff(code, redirectTarget = '/dashboard') {
+      this.loading = true
+      try {
+        const handoff = await consumeMobileAuthHandoff(code)
+        const customToken = String(handoff?.customToken || '')
+        if (!customToken) throw new Error('Missing Firebase custom token for native handoff')
+
+        const credential = await signInWithCustomToken(auth, customToken)
+        const user = credential?.user
+        if (!user?.uid) throw new Error('Native handoff did not return a Firebase user')
+
+        const profile = await fetchUserProfile(user.uid)
+        this.user = {
+          uid: user.uid,
+          displayName: user.displayName || profile?.name || '',
+          email: user.email || profile?.email || null,
+          photoURL: user.photoURL || null,
+          role: profile?.role || 'user',
+        }
+        this.guest = false
+        this.token = await user.getIdToken(true)
+        identifyUser(this.user)
+        localStorage.setItem('user', JSON.stringify(this.user))
+        localStorage.setItem('token', this.token)
+        try {
+          if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
+            const mod = await import('@/services/appTokenService.js')
+            mod.refreshAppToken().catch(() => {})
+          }
+        } catch {}
+        this.refreshPlan().catch(() => {})
+        ElNotification({
+          title: 'Welcome back ✨',
+          message: `Signed in as ${this.user.displayName || this.user.email || 'User'}`,
+          type: 'success',
+          duration: 2500,
+          offset: 80,
+        })
+        return {
+          redirect: normalizeRedirectPath(
+            redirectTarget || handoff?.redirect || localStorage.getItem('postLoginRedirect') || '/dashboard',
+          ),
+        }
+      } finally {
+        this.loading = false
       }
     },
 

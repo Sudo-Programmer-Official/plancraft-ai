@@ -1,1 +1,0 @@
-import{listBlogs as l}from"./blogService-CthLclJW.js";import{r as a,o as r}from"./index-Bk6ni3fC.js";function f(e=!1){const s=a([]),o=a(!0),t=async()=>{o.value=!0;try{s.value=await l(e)}finally{o.value=!1}};return r(t),{blogs:s,loading:o,fetchBlogs:t}}export{f as u};

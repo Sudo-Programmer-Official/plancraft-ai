@@ -17,6 +17,8 @@ import { initAnalytics, bindRouter } from '@/services/analytics'
 import 'driver.js/dist/driver.css'
 import { handleAuthError } from '@/services/firebaseService'
 import { setupLinkedInTag } from './analytics/linkedin.js'
+import { Capacitor } from '@capacitor/core'
+import { parseNativeAuthCallbackUrl } from '@/services/mobileAuthHandoffService'
 
 // Day.js timezone defaults
 import dayjs from 'dayjs'
@@ -186,6 +188,63 @@ try {
 
 // Mount app
 app.mount('#app')
+
+// Android app links / native callback handling
+async function installNativeAppUrlBridge() {
+  try {
+    if (!Capacitor?.isNativePlatform?.()) return
+    const { App: CapacitorApp } = await import('@capacitor/app')
+    let lastHandledUrl = ''
+
+    const handleIncomingUrl = async (incomingUrl) => {
+      if (!incomingUrl || incomingUrl === lastHandledUrl) return
+      lastHandledUrl = incomingUrl
+
+      try {
+        await router.isReady()
+      } catch {}
+
+      const handoff = parseNativeAuthCallbackUrl(incomingUrl)
+      if (handoff?.code) {
+        try {
+          const result = await authStore.completeNativeAuthHandoff(
+            handoff.code,
+            handoff.redirect,
+          )
+          await router.replace(result?.redirect || handoff.redirect || '/dashboard')
+          return
+        } catch (err) {
+          console.error('[NativeAuth] Failed to complete Android auth handoff', err)
+          await router.replace('/login')
+          return
+        }
+      }
+
+      try {
+        const parsed = new URL(incomingUrl)
+        const target = `${parsed.pathname || '/'}${parsed.search || ''}${parsed.hash || ''}`
+        if (target && target !== router.currentRoute.value.fullPath) {
+          await router.replace(target)
+        }
+      } catch (err) {
+        console.warn('[NativeAuth] Failed to route incoming app URL', err)
+      }
+    }
+
+    await CapacitorApp.addListener('appUrlOpen', ({ url }) => {
+      handleIncomingUrl(url)
+    })
+
+    const launch = await CapacitorApp.getLaunchUrl()
+    if (launch?.url) {
+      await handleIncomingUrl(launch.url)
+    }
+  } catch (err) {
+    console.warn('[NativeAuth] App URL bridge setup failed', err)
+  }
+}
+
+installNativeAppUrlBridge().catch(() => {})
 
 // 🧩 Persist session data + auth backup in iOS/Safari PWA
 try {

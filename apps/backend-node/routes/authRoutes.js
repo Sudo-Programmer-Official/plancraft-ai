@@ -1,9 +1,22 @@
 import express from 'express'
 import admin from 'firebase-admin'
 import '../services/firebaseAdmin.js' // ensure admin is initialized
+import { db } from '../services/firebaseAdmin.js'
 import { signHS256 } from '../utils/jwt.js'
+import crypto from 'crypto'
 
 const router = express.Router()
+const MOBILE_HANDOFF_COLLECTION = 'mobileAuthHandoffs'
+const MOBILE_HANDOFF_TTL_MS = 5 * 60 * 1000
+
+function normalizeRedirectPath(target, fallback = '/dashboard') {
+  if (typeof target !== 'string') return fallback
+  const trimmed = target.trim()
+  if (!trimmed) return fallback
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return fallback
+  if (trimmed.startsWith('//')) return fallback
+  return trimmed.startsWith('/') ? trimmed : `/${trimmed.replace(/^\/+/, '')}`
+}
 
 // POST /api/auth/refresh
 router.post('/refresh', async (req, res) => {
@@ -57,6 +70,91 @@ router.post('/refresh', async (req, res) => {
   } catch (err) {
     console.error('[auth/refresh] unexpected error:', err)
     return res.status(401).json({ ok: false, error: 'Unauthorized', detail: err?.message })
+  }
+})
+
+router.post('/mobile-handoff/create', async (req, res) => {
+  try {
+    const uid = req?.user?.uid
+    if (!uid) {
+      return res.status(401).json({ ok: false, error: 'Unauthorized' })
+    }
+
+    const redirect = normalizeRedirectPath(req?.body?.redirect)
+    const provider = String(req?.body?.provider || 'google')
+    const platform = String(req?.body?.platform || 'android')
+    const code = crypto.randomBytes(24).toString('hex')
+    const now = Date.now()
+    const expiresAt = now + MOBILE_HANDOFF_TTL_MS
+
+    await db.collection(MOBILE_HANDOFF_COLLECTION).doc(code).set({
+      uid,
+      email: req?.user?.email || null,
+      redirect,
+      provider,
+      platform,
+      createdAt: now,
+      expiresAt,
+    })
+
+    return res.json({
+      ok: true,
+      code,
+      redirect,
+      expiresAt,
+    })
+  } catch (err) {
+    console.error('[auth/mobile-handoff/create] error:', err?.message || err)
+    return res.status(500).json({ ok: false, error: 'Failed to create mobile handoff' })
+  }
+})
+
+router.post('/mobile-handoff/consume', async (req, res) => {
+  try {
+    const code = String(req?.body?.code || '').trim()
+    if (!code) {
+      return res.status(400).json({ ok: false, error: 'Missing handoff code' })
+    }
+
+    const ref = db.collection(MOBILE_HANDOFF_COLLECTION).doc(code)
+    const snap = await ref.get()
+    if (!snap.exists) {
+      return res.status(404).json({ ok: false, error: 'Mobile handoff not found' })
+    }
+
+    const data = snap.data() || {}
+    const expiresAt = Number(data.expiresAt || 0)
+    if (!expiresAt || expiresAt < Date.now()) {
+      try { await ref.delete() } catch {}
+      return res.status(410).json({ ok: false, error: 'Mobile handoff expired' })
+    }
+
+    const uid = String(data.uid || '')
+    if (!uid) {
+      try { await ref.delete() } catch {}
+      return res.status(400).json({ ok: false, error: 'Mobile handoff is invalid' })
+    }
+
+    const customToken = await admin.auth().createCustomToken(uid, {
+      source: 'mobile-handoff',
+      provider: String(data.provider || 'google'),
+      platform: String(data.platform || 'android'),
+    })
+
+    try { await ref.delete() } catch {}
+
+    return res.json({
+      ok: true,
+      customToken,
+      redirect: normalizeRedirectPath(String(data.redirect || '/dashboard')),
+      uid,
+      email: data.email || null,
+      provider: String(data.provider || 'google'),
+      platform: String(data.platform || 'android'),
+    })
+  } catch (err) {
+    console.error('[auth/mobile-handoff/consume] error:', err?.message || err)
+    return res.status(500).json({ ok: false, error: 'Failed to consume mobile handoff' })
   }
 })
 

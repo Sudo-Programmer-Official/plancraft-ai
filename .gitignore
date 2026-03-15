@@ -1,84 +1,12 @@
 # Root .gitignore for Prompt2 Monorepo
 
-# Node
-node_modules/
-npm-debug.log*
-pnpm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Logs
-logs/
-*.log
-*.log.*
-
-# Environment
-.env
-.env.*
-.env.local
-
-# Vite
-dist/
-.cache/
-.vite/
-*.local
-
-# Mac system files
-.DS_Store
-
-# IDEs
-.vscode/
-.idea/
-*.sw?
-
-# Output
-*.zip
-*.tgz
-coverage/
-build/
-
-# Firebase (if added)
-.firebase/
-.firebaserc
-
-# Temporary
-tmp/
-temp/
-*.tmp
-*.temp
-
-/apps/backend-node/firebase-service-account.json
-/apps/audit-agent-frontend/scripts/firebase-service-account.json
-/apps/audit-agent-frontend/firebase-service-account.json
-
-# VS Code settings
-*.code-workspace
-
-# Tailwind CSS build artifacts
-# tailwind.config.js
-# postcss.config.js
-# prettier.config.js
-
-# Python cache (if ever used in shared utils)
-__pycache__/
-*.py[cod]
-
-# Optional: Ignore backend uploads/data folders
-# apps/backend-node/uploads/
-# apps/backend-node/node_modules/
-# apps/backend-node/results_*.json
-# apps/backend-node/results_*.csv
-
-# Ignore ALL node_modules in monorepo (root, apps, shared)
-# **/node_modules/
-# node_modules/
-# apps/*/node_modules/
-# shared/*/node_modules/
-### Monorepo ignores (appended)
+# -----------------------------
 # OS / Editor
+# -----------------------------
 .DS_Store
 .AppleDouble
 .LSOverride
+
 .idea/
 .vscode/*
 !.vscode/extensions.json
@@ -86,23 +14,82 @@ __pycache__/
 !.vscode/tasks.json
 !.vscode/launch.json
 
-# Package managers / logs
-node_modules/
+*.sw?
+*.iml
+*.code-workspace
+
+# -----------------------------
+# Logs
+# -----------------------------
+logs/
+*.log
+*.log.*
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+firebase-debug.log
+
+# -----------------------------
+# Dependencies / Package managers
+# -----------------------------
+node_modules/
 .pnpm-store/
 
-# Build outputs
+# Monorepo nested dependencies
+apps/**/node_modules/
+dev-toolkit/**/node_modules/
+
+# -----------------------------
+# Environment / secrets
+# -----------------------------
+.env
+.env.*
+!.env.example
+.env.local
+.env.*.local
+.env.test
+.env.test.local
+.envrc
+.direnv/
+
+# Explicit local secret files
+/apps/backend-node/firebase-service-account.json
+/apps/audit-agent-frontend/scripts/firebase-service-account.json
+/apps/audit-agent-frontend/firebase-service-account.json
+
+# General secret/key files
+**/firebase-service-account.json
+**/*service-account*.json
+*.pem
+*.p12
+*.key
+*.crt
+
+# -----------------------------
+# Build / output artifacts
+# -----------------------------
 dist/
 build/
 lib/
 out/
+coverage/
 storybook-static/
 .cache/
 .tmp/
 .temp/
+tmp/
+temp/
+*.tmp
+*.temp
+*.zip
+*.tgz
+
+# Monorepo nested build artifacts
+apps/**/dist/
+apps/**/build/
+apps/**/coverage/
+dev-toolkit/**/dist/
 
 # Framework caches
 .next/
@@ -114,7 +101,6 @@ storybook-static/
 .vitepress/dist
 
 # Testing / coverage
-coverage/
 .nyc_output/
 cypress/screenshots/
 cypress/videos/
@@ -127,46 +113,26 @@ test-results/
 .eslintcache
 .stylelintcache
 
-# Monorepo nested artifacts
-apps/**/node_modules/
-apps/**/dist/
-apps/**/.next/
-apps/**/.nuxt/
-apps/**/.vite/
-apps/**/coverage/
-apps/**/build/
-dev-toolkit/**/node_modules/
-dev-toolkit/**/dist/
+# -----------------------------
+# Python
+# -----------------------------
+__pycache__/
+*.py[cod]
+*.pyc
+.python-version
 
-# Environment files (local variants only)
-.env.local
-.env.*.local
-.env.test
-.env.test.local
-.envrc
-.direnv/
-# If you intentionally commit canonical env files, keep them tracked:
-#!.env
-#!.env.development
-#!.env.production
-
-# Firebase / secrets
-firebase-debug.log
+# -----------------------------
+# Firebase / local cloud tooling
+# -----------------------------
 .firebase/
-**/firebase-service-account.json
-**/*service-account*.json
+.firebaserc
+.config/
+.credentials/
 
-# Keys (general)
-*.pem
-*.p12
-*.key
-*.crt
-
-
-# --- Google Cloud SDK / CLI Artifacts ---
+# -----------------------------
+# Google Cloud SDK / CLI artifacts
+# -----------------------------
 google-cloud-sdk/
-bin/
-install/
 bq.*
 core.*
 gcloud.*
@@ -177,50 +143,46 @@ gsutil.*
 *.install
 *.deps.json
 
-# --- Firebase / gcloud local configs ---
-.config/
-.cache/
-.credentials/
-.python-version
-*.pyc
-
-# --- Local shell & setup scripts ---
+# -----------------------------
+# Local shell/setup scripts
+# -----------------------------
 fix_cors.sh
 setup_env.sh
 
-# --- Requested ignores (Consolidated) ---
-# Node
-node_modules/
-.pnpm-store/
-
-# Env files (VERY IMPORTANT)
-.env
-.env.*
-!.env.example
-
-# Vite / build output
-dist/
-apps/**/dist/
-
+# -----------------------------
 # Capacitor / Android
+# -----------------------------
 mobile/android/.gradle/
 mobile/android/build/
 mobile/android/**/build/
 mobile/android/local.properties
+mobile/android/capacitor-cordova-android-plugins/
+mobile/android/app/src/main/assets/public/
+mobile/android/app/src/main/assets/capacitor.config.json
+mobile/android/app/src/main/assets/capacitor.plugins.json
 
-# Android Studio
-*.iml
-.idea/
-.DS_Store
-
-# iOS (future-proof)
+# -----------------------------
+# Capacitor / iOS
+# -----------------------------
 mobile/ios/Pods/
 mobile/ios/build/
+mobile/ios/capacitor-cordova-ios-plugins/
+mobile/ios/App/App/public/
+mobile/ios/App/App/capacitor.config.json
+mobile/ios/App/App/capacitor.plugins.json
 
-# Firebase local tools
-.firebase/
-firebase-debug.log
+# Xcode user-specific
+mobile/ios/App/App.xcworkspace/xcuserdata/
+mobile/ios/App/xcuserdata/
+mobile/ios/**/*.xcuserstate
 
-# Logs
-npm-debug.log*
-pnpm-debug.log*
+# CocoaPods
+mobile/ios/App/Pods/
+mobile/ios/App/Podfile.lock
+
+# -----------------------------
+# Optional app data ignores
+# -----------------------------
+# apps/backend-node/uploads/
+# apps/backend-node/results_*.json
+# apps/backend-node/results_*.csv
