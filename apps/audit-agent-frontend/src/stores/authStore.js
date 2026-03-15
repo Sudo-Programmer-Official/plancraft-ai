@@ -107,6 +107,22 @@ function getFirebaseApiKey() {
   return import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDI0qFImSxQFYkT5CRu2K1yEZuPX1W2xEY"
 }
 
+function parseJwtPayload(token) {
+  try {
+    const payload = String(token || '').split('.')[1]
+    if (!payload) return {}
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
+    const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4)
+    const binary = atob(padded)
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0))
+    const json = new TextDecoder().decode(bytes)
+    const parsed = JSON.parse(json)
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
 function mapIdentityToolkitError(rawMessage) {
   const code = String(rawMessage || '').trim()
   switch (code) {
@@ -212,14 +228,44 @@ async function nativeIosSignInWithCustomToken(customToken) {
 
   const data = response?.data || {}
   const errorMessage = data?.error?.message
-  if (errorMessage || !data?.idToken || !data?.localId) {
+  const claims = parseJwtPayload(data?.idToken)
+  const localId = String(data?.localId || claims?.user_id || claims?.sub || '')
+  const email = typeof data?.email === 'string'
+    ? data.email
+    : typeof claims?.email === 'string'
+      ? claims.email
+      : undefined
+  const displayName = typeof data?.displayName === 'string'
+    ? data.displayName
+    : typeof claims?.name === 'string'
+      ? claims.name
+      : undefined
+  const photoUrl = typeof data?.photoUrl === 'string'
+    ? data.photoUrl
+    : typeof data?.photoURL === 'string'
+      ? data.photoURL
+      : typeof claims?.picture === 'string'
+        ? claims.picture
+        : undefined
+  const emailVerified = typeof data?.emailVerified === 'boolean'
+    ? data.emailVerified
+    : claims?.email_verified === true
+
+  if (errorMessage || !data?.idToken || !data?.refreshToken || !localId) {
     const mapped = mapIdentityToolkitError(errorMessage)
     const err = new Error(mapped.message)
     err.code = mapped.code
     throw err
   }
 
-  return data
+  return {
+    ...data,
+    localId,
+    email,
+    displayName,
+    photoUrl,
+    emailVerified,
+  }
 }
 
 async function hydrateNativeIosCustomTokenUser(idTokenResponse, fallbackEmail = '') {
@@ -243,7 +289,7 @@ async function hydrateNativeIosCustomTokenUser(idTokenResponse, fallbackEmail = 
   const user = UserImpl._fromJSON(authInternal, {
     uid: idTokenResponse.localId,
     email: providerEmail,
-    emailVerified: !!providerEmail,
+    emailVerified: idTokenResponse?.emailVerified === true || !!providerEmail,
     displayName: idTokenResponse?.displayName || undefined,
     isAnonymous: false,
     photoURL: idTokenResponse?.photoUrl || undefined,
