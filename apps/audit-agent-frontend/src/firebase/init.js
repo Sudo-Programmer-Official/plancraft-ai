@@ -43,7 +43,9 @@ export const db = getFirestore(firebaseApp);
 
 function buildAuthPersistenceOrder() {
   if (isNative && Capacitor?.getPlatform?.() === 'ios') {
-    return [indexedDBLocalPersistence, browserLocalPersistence, inMemoryPersistence]
+    // WKWebView + custom/native origins can hang on IndexedDB-backed auth writes.
+    // Keep iOS on localStorage/memory so email and redirect auth can settle reliably.
+    return [browserLocalPersistence, inMemoryPersistence]
   }
   return [browserLocalPersistence, indexedDBLocalPersistence, inMemoryPersistence]
 }
