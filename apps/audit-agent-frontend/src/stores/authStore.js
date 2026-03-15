@@ -10,11 +10,8 @@ import {
   fetchUserProfile,
 } from '@/services/authService'
 import {
-  getAuth,
   onAuthStateChanged,
   onIdTokenChanged,
-  setPersistence,
-  browserLocalPersistence,
   GoogleAuthProvider,
   OAuthProvider,
   signInWithPopup,
@@ -30,12 +27,11 @@ import {
   EmailAuthProvider,
   PhoneAuthProvider,
 } from 'firebase/auth'
-import firebaseApp from '@/firebase/init'
+import { auth, db } from '@/firebase/init'
 import { identifyUser, trackEvent } from '@/services/analytics'
 import { getSubscriptionStatus } from '@/services/stripeService'
 import { getUsageStatus } from '@/services/planService'
 import { doc, updateDoc, setDoc, onSnapshot } from 'firebase/firestore'
-import { db } from '@/firebase/init'
 import { ElNotification } from 'element-plus'
 import { clearAppToken } from '@/services/appTokenService'
 import { Capacitor } from '@capacitor/core'
@@ -50,9 +46,6 @@ import {
   createMobileAuthHandoff,
   normalizeRedirectPath,
 } from '@/services/mobileAuthHandoffService'
-
-const auth = getAuth(firebaseApp)
-setPersistence(auth, browserLocalPersistence)
 
 // 🧠 Helper: detect in-app / insecure browsers (LinkedIn, Instagram, etc.)
 function isInAppBrowser() {

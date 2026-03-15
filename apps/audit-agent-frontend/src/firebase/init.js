@@ -3,7 +3,14 @@ import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAnalytics, isSupported as analyticsIsSupported } from "firebase/analytics";
 import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check'
-import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
+import {
+  getAuth,
+  initializeAuth,
+  browserLocalPersistence,
+  indexedDBLocalPersistence,
+  inMemoryPersistence,
+  browserPopupRedirectResolver,
+} from "firebase/auth";
 import { Capacitor } from '@capacitor/core';
 
 // Build Firebase config from environment with safe fallbacks
@@ -28,8 +35,29 @@ const firebaseConfig = {
 // Initialize Firebase
 const firebaseApp = initializeApp(firebaseConfig);
 export const db = getFirestore(firebaseApp);
-export const auth = getAuth(firebaseApp);
-setPersistence(auth, browserLocalPersistence);
+
+function buildAuthPersistenceOrder() {
+  if (isNative && Capacitor?.getPlatform?.() === 'ios') {
+    return [indexedDBLocalPersistence, browserLocalPersistence, inMemoryPersistence]
+  }
+  return [browserLocalPersistence, indexedDBLocalPersistence, inMemoryPersistence]
+}
+
+let auth
+try {
+  auth = initializeAuth(firebaseApp, {
+    persistence: buildAuthPersistenceOrder(),
+    popupRedirectResolver: browserPopupRedirectResolver,
+  })
+  console.info('[Auth] Firebase Auth initialized with persistence fallbacks', {
+    native: isNative,
+    platform: Capacitor?.getPlatform?.() || 'web',
+  })
+} catch (error) {
+  auth = getAuth(firebaseApp)
+  console.warn('[Auth] initializeAuth fallback to getAuth()', error)
+}
+export { auth }
 
 // Analytics is only available in browser environments.
 let analytics = null;
