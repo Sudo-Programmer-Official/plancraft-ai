@@ -1,6 +1,5 @@
 // src/services/authService.js
 import {
-  getAuth,
   signInAnonymously,
   signInWithPopup,
   GoogleAuthProvider,
@@ -15,9 +14,7 @@ import {
   signInWithEmailLink,
 } from 'firebase/auth'
 import { doc, setDoc, getDoc } from "firebase/firestore";
-import { db } from "@/firebase/init"; // Already initialized
-
-const auth = getAuth();
+import { auth, db } from "@/firebase/init"; // Already initialized
 
 export async function signInAsGuest() {
   const result = await signInAnonymously(auth);
