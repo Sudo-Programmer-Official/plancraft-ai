@@ -222,15 +222,20 @@ import GoogleAuthDiagnostic from '@/components/GoogleAuthDiagnostic.vue'
 import {
   isNativePackagedApp,
   getNativeAuthRestriction,
+  supportsNativeGoogleSignIn,
   supportsNativeGoogleRedirectBridge,
 } from '@/utils/nativeAuthSupport'
+import { normalizeRedirectPath } from '@/services/mobileAuthHandoffService'
 
 const isNativeApp = computed(() => isNativePackagedApp())
-const canUseNativeGoogle = computed(() => supportsNativeGoogleRedirectBridge())
+const canUseNativeGoogle = computed(() => supportsNativeGoogleSignIn())
 const nativeAuthBanner = computed(() => {
   if (!isNativeApp.value) return ''
-  if (canUseNativeGoogle.value) {
+  if (supportsNativeGoogleRedirectBridge()) {
     return 'Android Google sign-in now returns to the app through the browser handoff bridge. Apple, phone OTP, and magic link still need additional native wiring.'
+  }
+  if (canUseNativeGoogle.value) {
+    return 'Google sign-in is enabled in the iOS app through Firebase redirect flow. Apple, phone OTP, and magic link still need additional native wiring.'
   }
   return 'This mobile app build is currently hardened to use email/password only. Google, Apple, phone OTP, and magic link still need native auth wiring and deep-link return handling.'
 })
@@ -574,20 +579,25 @@ async function verifyOtp() {
 
 function redirectAfterLogin() {
   const nextParam = typeof route?.query?.next === 'string' && route.query.next.length ? route.query.next : null
+  if (nextParam) return router.push(normalizeRedirectPath(nextParam))
+  // Priority 1: redirect query from guard
+  const q = route?.query?.redirect
+  if (typeof q === 'string' && q.length) return router.push(normalizeRedirectPath(q))
+  const routeMode = typeof route?.query?.mode === 'string' ? route.query.mode : ''
+  const canUseStoredIntent =
+    routeMode === 'team' ||
+    routeMode === 'signIn' ||
+    typeof route?.query?.oobCode === 'string' ||
+    typeof route?.query?.apiKey === 'string'
   try {
-    // Priority 1: stored intent
-    const stored = localStorage.getItem('postLoginRedirect')
+    // Priority 2: stored intent for flows that round-trip outside the login route
+    const stored = canUseStoredIntent ? localStorage.getItem('postLoginRedirect') : ''
     if (stored) {
       localStorage.removeItem('postLoginRedirect')
-      return router.push(stored)
+      return router.push(normalizeRedirectPath(stored))
     }
   } catch {}
-  if (nextParam) return router.push(nextParam)
-  // Priority 2: redirect query from guard
-  const q = route?.query?.redirect
-  if (typeof q === 'string' && q.length) return router.push(q)
-  // Default: team onboarding
-  router.push('/workspaces/new')
+  router.push('/dashboard')
 }
 
 // --- Star animation ---

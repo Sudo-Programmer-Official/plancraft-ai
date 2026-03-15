@@ -20,6 +20,10 @@ export function isAndroidPackagedApp() {
   return isNativePackagedApp() && getNativePlatform() === 'android'
 }
 
+export function supportsNativeGoogleSignIn() {
+  return isNativePackagedApp() && ['android', 'ios'].includes(getNativePlatform())
+}
+
 export function supportsNativeGoogleRedirectBridge() {
   return isAndroidPackagedApp()
 }
@@ -29,6 +33,9 @@ export function getNativeAuthRestriction(method = 'provider') {
     case 'google':
       if (supportsNativeGoogleRedirectBridge()) {
         return 'Google sign-in on Android uses the browser return-to-app bridge. If it fails, update the Android app links and deep-link handoff configuration.'
+      }
+      if (supportsNativeGoogleSignIn()) {
+        return 'Google sign-in on iOS currently uses Firebase redirect flow inside the packaged app. If it fails, verify iOS Firebase auth domain, redirect handling, and native app configuration.'
       }
       return 'Google sign-in in the packaged mobile app still depends on Firebase Web popup/redirect flow. Use the browser or PWA build until native Google auth is wired.'
     case 'apple':

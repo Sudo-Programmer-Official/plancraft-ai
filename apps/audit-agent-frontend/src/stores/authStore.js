@@ -424,26 +424,34 @@ export const useAuthStore = defineStore('authStore', {
       const alreadyLinked = (current?.providerData || []).some((p) => p?.providerId === 'google.com')
 
       if (isNativePackagedApp()) {
-        if (!supportsNativeGoogleRedirectBridge()) {
-          const err = new Error(getNativeAuthRestriction('google'))
-          err.code = 'auth/native-google-unsupported'
-          throw err
-        }
-        if (current && !alreadyLinked) {
-          const err = new Error('Google account linking inside the packaged Android app is not wired yet.')
-          err.code = 'auth/native-google-link-unsupported'
-          throw err
-        }
-
+        const nativePlatform = Capacitor?.getPlatform?.() || 'web'
         this.loading = true
         try {
-          const redirectTarget = getPostLoginTarget()
-          markNativeGoogleHandoffIntent(redirectTarget)
-          console.info('[Auth] Android native bridge detected; starting Google redirect handoff', { redirectTarget })
-          await signInWithRedirect(auth, provider)
+          if (supportsNativeGoogleRedirectBridge()) {
+            if (current && !alreadyLinked) {
+              const err = new Error('Google account linking inside the packaged Android app is not wired yet.')
+              err.code = 'auth/native-google-link-unsupported'
+              throw err
+            }
+            const redirectTarget = getPostLoginTarget()
+            markNativeGoogleHandoffIntent(redirectTarget)
+            console.info('[Auth] Android native bridge detected; starting Google redirect handoff', { redirectTarget })
+            await signInWithRedirect(auth, provider)
+            return
+          }
+
+          console.info('[Auth] Native iOS detected; using redirect Google sign-in', {
+            platform: nativePlatform,
+            linking: !!current && !alreadyLinked,
+          })
+          if (current && !alreadyLinked) {
+            await linkWithRedirect(current, provider)
+          } else {
+            await signInWithRedirect(auth, provider)
+          }
           return
         } catch (err) {
-          clearNativeGoogleHandoffIntent()
+          if (supportsNativeGoogleRedirectBridge()) clearNativeGoogleHandoffIntent()
           this.loading = false
           throw err
         }

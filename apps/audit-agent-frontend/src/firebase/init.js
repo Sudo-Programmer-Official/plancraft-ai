@@ -17,9 +17,14 @@ import { Capacitor } from '@capacitor/core';
 // This lets us swap projects (e.g., PlanCraftAI) without code changes.
 // For native (Capacitor) builds, prefer a dedicated mobile auth domain if provided.
 const isNative = !!Capacitor?.isNativePlatform?.()
+const nativePlatform = Capacitor?.getPlatform?.() || 'web'
+const baseAuthDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "audit-agent-66451.firebaseapp.com"
+const mobileAuthDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN_MOBILE || baseAuthDomain
+// iOS uses email/password only right now; keep it aligned with the app's public host.
+// Android retains the dedicated mobile override for the Google redirect handoff bridge.
 const safeAuthDomain = isNative
-  ? (import.meta.env.VITE_FIREBASE_AUTH_DOMAIN_MOBILE || import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "audit-agent-66451.firebaseapp.com")
-  : (import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "audit-agent-66451.firebaseapp.com")
+  ? (nativePlatform === 'ios' ? baseAuthDomain : mobileAuthDomain)
+  : baseAuthDomain
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDI0qFImSxQFYkT5CRu2K1yEZuPX1W2xEY",
@@ -50,16 +55,20 @@ function describePersistenceOrder(order) {
 let auth
 try {
   const persistenceOrder = buildAuthPersistenceOrder()
-  auth = initializeAuth(firebaseApp, {
+  const authOptions = {
     persistence: persistenceOrder,
     popupRedirectResolver: browserPopupRedirectResolver,
-  })
+  }
+  auth = initializeAuth(firebaseApp, authOptions)
   console.info('[Auth] Firebase Auth initialized with persistence fallbacks', {
     native: isNative,
-    platform: Capacitor?.getPlatform?.() || 'web',
+    platform: nativePlatform,
     origin: typeof window !== 'undefined' ? window.location.origin : 'server',
     authDomain: firebaseConfig.authDomain,
+    baseAuthDomain,
+    mobileAuthDomain,
     persistence: describePersistenceOrder(persistenceOrder),
+    popupRedirectResolver: true,
   })
 } catch (error) {
   auth = getAuth(firebaseApp)
