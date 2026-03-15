@@ -20,14 +20,6 @@ const config: CapacitorConfig = {
     '*.firebaseapp.com',
     '*.google.com',
   ],
-
-  plugins: {
-    // Patch fetch/XMLHttpRequest through native networking in packaged apps.
-    // This avoids custom-scheme/WKWebView request issues that can stall Firebase Auth on iOS.
-    CapacitorHttp: {
-      enabled: true,
-    },
-  },
 };
 
 export default config;

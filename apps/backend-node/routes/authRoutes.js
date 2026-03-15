@@ -158,4 +158,44 @@ router.post('/mobile-handoff/consume', async (req, res) => {
   }
 })
 
+router.post('/native-session/exchange', async (req, res) => {
+  try {
+    const idToken = String(req?.body?.idToken || '').trim()
+    if (!idToken) {
+      return res.status(400).json({ ok: false, error: 'Missing Firebase ID token' })
+    }
+
+    let decoded
+    try {
+      decoded = await admin.auth().verifyIdToken(idToken)
+    } catch (err) {
+      console.error('[auth/native-session/exchange] verifyIdToken failed:', err?.message || err)
+      return res.status(401).json({ ok: false, error: 'Invalid Firebase ID token' })
+    }
+
+    const uid = String(decoded?.uid || '')
+    if (!uid) {
+      return res.status(400).json({ ok: false, error: 'Firebase token did not contain a uid' })
+    }
+
+    const customToken = await admin.auth().createCustomToken(uid, {
+      source: 'native-session-exchange',
+      provider: String(req?.body?.provider || 'password'),
+      platform: String(req?.body?.platform || 'ios'),
+    })
+
+    return res.json({
+      ok: true,
+      customToken,
+      uid,
+      email: decoded?.email || null,
+      provider: String(req?.body?.provider || 'password'),
+      platform: String(req?.body?.platform || 'ios'),
+    })
+  } catch (err) {
+    console.error('[auth/native-session/exchange] error:', err?.message || err)
+    return res.status(500).json({ ok: false, error: 'Failed to exchange native session' })
+  }
+})
+
 export default router

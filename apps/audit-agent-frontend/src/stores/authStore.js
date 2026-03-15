@@ -34,7 +34,8 @@ import { getUsageStatus } from '@/services/planService'
 import { doc, updateDoc, setDoc, onSnapshot } from 'firebase/firestore'
 import { ElNotification } from 'element-plus'
 import { clearAppToken } from '@/services/appTokenService'
-import { Capacitor } from '@capacitor/core'
+import api from '@/services/api'
+import { Capacitor, CapacitorHttp } from '@capacitor/core'
 import {
   isNativePackagedApp,
   getNativeAuthRestriction,
@@ -100,6 +101,84 @@ function readStoredToken() {
   } catch {
     return ''
   }
+}
+
+function getFirebaseApiKey() {
+  return import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDI0qFImSxQFYkT5CRu2K1yEZuPX1W2xEY"
+}
+
+function mapIdentityToolkitError(rawMessage) {
+  const code = String(rawMessage || '').trim()
+  switch (code) {
+    case 'EMAIL_NOT_FOUND':
+    case 'INVALID_LOGIN_CREDENTIALS':
+    case 'INVALID_PASSWORD':
+      return {
+        code: 'auth/invalid-credential',
+        message: 'Invalid email or password.',
+      }
+    case 'USER_DISABLED':
+      return {
+        code: 'auth/user-disabled',
+        message: 'This account has been disabled.',
+      }
+    case 'TOO_MANY_ATTEMPTS_TRY_LATER':
+      return {
+        code: 'auth/too-many-requests',
+        message: 'Too many login attempts. Please try again later.',
+      }
+    default:
+      return {
+        code: code ? `auth/${code.toLowerCase().replace(/_/g, '-')}` : null,
+        message: code || 'Native sign-in failed.',
+      }
+  }
+}
+
+async function nativeIosPasswordSignIn(email, password) {
+  const apiKey = getFirebaseApiKey()
+  const response = await withTimeout(
+    CapacitorHttp.post({
+      url: `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${encodeURIComponent(apiKey)}`,
+      headers: { 'Content-Type': 'application/json' },
+      data: {
+        email,
+        password,
+        returnSecureToken: true,
+      },
+      connectTimeout: 12000,
+      readTimeout: 12000,
+    }),
+    12000,
+    'native iOS password verification',
+  )
+
+  const data = response?.data || {}
+  const errorMessage = data?.error?.message
+  if (errorMessage || !data?.idToken) {
+    const mapped = mapIdentityToolkitError(errorMessage)
+    const err = new Error(mapped.message)
+    err.code = mapped.code
+    throw err
+  }
+
+  return data
+}
+
+async function exchangeNativeSessionForCustomToken(idToken, provider = 'password', platform = 'ios') {
+  const response = await withTimeout(
+    api.post('/auth/native-session/exchange', {
+      idToken,
+      provider,
+      platform,
+    }),
+    12000,
+    'native session exchange',
+  )
+
+  const customToken = String(response?.data?.customToken || '')
+  if (!customToken) throw new Error('Missing Firebase custom token from native session exchange')
+  return response.data
 }
 
 function withTimeout(promise, ms, label) {
@@ -1005,6 +1084,7 @@ export const useAuthStore = defineStore('authStore', {
         const alreadyLinked = (current?.providerData || []).some((p) => p?.providerId === 'password')
         const canFallbackGuestLink =
           current?.isAnonymous === true || this.guest === true || this.user?.mode === 'guest'
+        const useNativeIosDirectEmail = isNativePackagedApp() && isIosCapacitorApp()
         console.info('[Auth] Email login start', {
           email,
           platform: Capacitor?.getPlatform?.() || 'web',
@@ -1016,6 +1096,110 @@ export const useAuthStore = defineStore('authStore', {
           providerIds: (current?.providerData || []).map((p) => p?.providerId).filter(Boolean),
           authDomain: auth?.app?.options?.authDomain || null,
         })
+
+        if (useNativeIosDirectEmail) {
+          console.info('[Auth] Native iOS email login via Identity Toolkit + custom token exchange', {
+            email,
+            currentUid: current?.uid || null,
+            currentAnonymous: current?.isAnonymous === true,
+          })
+
+          const session = await nativeIosPasswordSignIn(email, password)
+          console.info('[Auth] Native iOS password verification resolved', {
+            uid: session?.localId || null,
+          })
+
+          const exchanged = await exchangeNativeSessionForCustomToken(session.idToken, 'password', 'ios')
+          const customToken = String(exchanged?.customToken || '')
+          console.info('[Auth] Native iOS custom token exchange resolved', {
+            uid: exchanged?.uid || session?.localId || null,
+          })
+
+          let credential
+          try {
+            credential = await withTimeout(
+              signInWithCustomToken(auth, customToken),
+              12000,
+              'native iOS custom token sign-in',
+            )
+          } catch (error) {
+            const currentUser = auth.currentUser
+            if (currentUser?.uid && currentUser.uid === (exchanged?.uid || session?.localId || '')) {
+              console.warn('[Auth] Native iOS custom token sign-in timed out, but auth.currentUser is set; continuing', {
+                uid: currentUser.uid,
+              })
+              credential = { user: currentUser }
+            } else {
+              throw error
+            }
+          }
+
+          console.info('[Auth] Native iOS signInWithCustomToken resolved', {
+            uid: credential?.user?.uid || null,
+          })
+
+          const user = credential?.user
+          if (!user?.uid) {
+            throw new Error('Native iOS custom token sign-in did not return a Firebase user')
+          }
+
+          this.user = {
+            uid: user.uid,
+            displayName: user.displayName || session?.displayName || '',
+            email: user.email || session?.email || email,
+            photoURL: user.photoURL,
+            role: 'user',
+          }
+          this.guest = false
+          this.token = await withFallback(user.getIdToken(), {
+            ms: 8000,
+            label: 'native iOS email sign-in token',
+            fallback: () => session?.idToken || readStoredToken(),
+          })
+          localStorage.setItem('user', JSON.stringify(this.user))
+          if (this.token) localStorage.setItem('token', this.token)
+          try {
+            setDoc(
+              doc(db, 'users', user.uid),
+              {
+                email: this.user.email,
+                name: this.user.displayName || '',
+                mode: 'email',
+                lastLoginAt: Date.now(),
+                ...(this.user.displayName ? { profileComplete: true } : {}),
+              },
+              { merge: true },
+            ).catch((err) => {
+              console.warn('[Auth] Deferred native iOS email profile sync failed', err)
+            })
+          } catch {}
+          withFallback(fetchUserProfile(user.uid), {
+            ms: 8000,
+            label: 'native iOS email profile fetch',
+            fallback: { role: 'user' },
+          }).then((profile) => {
+            this.user = {
+              ...(this.user || {}),
+              role: profile?.role || this.user?.role || 'user',
+            }
+            try { localStorage.setItem('user', JSON.stringify(this.user)) } catch {}
+          }).catch(() => {})
+          try {
+            if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
+              const mod = await import('@/services/appTokenService.js')
+              mod.refreshAppToken().catch(() => {})
+            }
+          } catch {}
+          this.refreshPlan().catch(() => {})
+          ElNotification({
+            title: 'Signed in ✨',
+            message: `Welcome ${this.user.displayName || this.user.email || ''}`,
+            type: 'success',
+            duration: 2200,
+            offset: 80,
+          })
+          return user
+        }
 
         if (current && !alreadyLinked) {
           // Link email/password to current session; abort on failure to avoid duplicate UIDs.
