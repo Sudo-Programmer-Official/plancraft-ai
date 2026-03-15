@@ -1,5 +1,5 @@
 <template>
-  <NotificationBanner :user-id="currentUserId" />
+  <NotificationBanner v-if="showNotificationBanner" :user-id="currentUserId" />
   <FeedbackPrompt />
   <FeedbackDrawer />
   <div
@@ -589,7 +589,9 @@ import { db } from '@/firebase/init'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { trackLinkedInConversion } from '@/utils/ads'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
+import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
 const currentUserId = ref(null)
+const showNotificationBanner = computed(() => !isNativePackagedApp())
 
 function deriveUidFromStorage() {
   try {
@@ -615,6 +617,7 @@ onMounted(() => {
   // Optional auto-registration if permission already granted
   setTimeout(async () => {
     try {
+      if (isNativePackagedApp()) return
       if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
         const uid = currentUserId.value
         if (uid && !(await hasSubscription())) {

@@ -35,11 +35,16 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { isPushSupported, ensurePermission, hasSubscription, registerPushSubscription } from '@/services/pushService'
+import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
 
 const props = defineProps({ userId: String })
 const open = ref(false)
 const loading = ref(false)
-const permission = ref(typeof Notification !== 'undefined' ? Notification.permission : 'default')
+const permission = ref(
+  typeof globalThis !== 'undefined' && typeof globalThis.Notification !== 'undefined'
+    ? globalThis.Notification.permission
+    : 'default'
+)
 
 function dismiss() {
   open.value = false
@@ -47,6 +52,7 @@ function dismiss() {
 }
 
 async function enable() {
+  if (isNativePackagedApp()) return
   if (!props.userId) return
   loading.value = true
   try {
@@ -60,10 +66,14 @@ async function enable() {
 }
 
 onMounted(async () => {
+  if (isNativePackagedApp()) return
   if (localStorage.getItem('notifDismissed')) return
   const supported = isPushSupported()
   const subscribed = await hasSubscription()
-  permission.value = Notification.permission
+  permission.value =
+    typeof globalThis !== 'undefined' && typeof globalThis.Notification !== 'undefined'
+      ? globalThis.Notification.permission
+      : 'default'
   if (supported && !subscribed && permission.value !== 'granted') {
     open.value = true
   }

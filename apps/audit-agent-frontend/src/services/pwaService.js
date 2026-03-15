@@ -1,6 +1,11 @@
 // src/services/pwaService.js
 import api from '@/services/api'
 
+function getNotificationApi() {
+  if (typeof globalThis === 'undefined') return null
+  return typeof globalThis.Notification !== 'undefined' ? globalThis.Notification : null
+}
+
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
@@ -51,7 +56,8 @@ export async function unsubscribeUserFromPush(userId) {
 }
 
 export async function ensurePushSubscription(userId) {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+  const NotificationApi = getNotificationApi()
+  if (!NotificationApi || !('serviceWorker' in navigator) || !('PushManager' in window)) {
     return { ok: false, error: 'Push not supported' }
   }
   const publicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY
@@ -60,7 +66,7 @@ export async function ensurePushSubscription(userId) {
   const reg = await navigator.serviceWorker.ready
   let sub = await reg.pushManager.getSubscription()
   if (!sub) {
-    if (Notification.permission === 'denied') return { ok: false, error: 'Notifications permission denied' }
+    if (NotificationApi.permission === 'denied') return { ok: false, error: 'Notifications permission denied' }
     sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(publicKey),

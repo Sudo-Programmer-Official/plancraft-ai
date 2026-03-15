@@ -2,9 +2,15 @@
 // Requires env: VITE_VAPID_PUBLIC_KEY
 import api from '@/services/api'
 
+function getNotificationApi() {
+  if (typeof globalThis === 'undefined') return null
+  return typeof globalThis.Notification !== 'undefined' ? globalThis.Notification : null
+}
+
 export function isPushSupported() {
   return (
     typeof window !== 'undefined' &&
+    !!getNotificationApi() &&
     'serviceWorker' in navigator &&
     'PushManager' in window
   )
@@ -33,9 +39,11 @@ export async function hasSubscription() {
 
 export async function ensurePermission() {
   if (!isPushSupported()) return false
-  if (Notification.permission === 'granted') return true
-  if (Notification.permission === 'denied') return false
-  const res = await Notification.requestPermission()
+  const NotificationApi = getNotificationApi()
+  if (!NotificationApi) return false
+  if (NotificationApi.permission === 'granted') return true
+  if (NotificationApi.permission === 'denied') return false
+  const res = await NotificationApi.requestPermission()
   return res === 'granted'
 }
 
