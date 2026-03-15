@@ -10,7 +10,7 @@ import { useAuthStore } from '@/stores/authStore'
 import CreatorLayout from '@/layouts/CreatorLayout.vue'
 import PublicLeaderLayout from '@/layouts/PublicLeaderLayout.vue'
 import NotFoundView from '@/views/NotFoundView.vue'
-import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
+import { isIosPackagedApp, isNativePackagedApp } from '@/utils/nativeAuthSupport'
 
 const getCurrentUser = () =>
   new Promise((resolve) => {
@@ -236,7 +236,8 @@ router.beforeEach(async (to, from, next) => {
       const nextTarget =
         (typeof to.query?.next === 'string' && to.query.next.length && to.query.next) ||
         '/dashboard'
-      if (authStore?.user && !isGuest) return next(nextTarget)
+      const hasStrictSession = !isIosPackagedApp() || !!getAuth().currentUser
+      if (authStore?.user && !isGuest && hasStrictSession) return next(nextTarget)
     } catch {}
     return next()
   }
@@ -247,13 +248,15 @@ router.beforeEach(async (to, from, next) => {
   const user = await getCurrentUser()
   if (!user) {
     // Allow offline fallback if we have cached identity
-    try {
-      const cachedUser = localStorage.getItem('user')
-      const cachedToken = localStorage.getItem('token')
-      if (authStore?.user || (cachedUser && cachedToken)) {
-        return next()
-      }
-    } catch {}
+    if (!isIosPackagedApp()) {
+      try {
+        const cachedUser = localStorage.getItem('user')
+        const cachedToken = localStorage.getItem('token')
+        if (authStore?.user || (cachedUser && cachedToken)) {
+          return next()
+        }
+      } catch {}
+    }
     if (to.path === '/workspaces/new') {
       return next({ path: '/signup', query: { mode: 'team', next: '/workspaces/new' } })
     }

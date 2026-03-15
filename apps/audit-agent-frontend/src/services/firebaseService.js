@@ -22,6 +22,7 @@ import api from '@/services/api'
 import { db, auth } from '@/firebase/init'
 import { updateStreakOnEntry } from '@/services/streakService'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
+import { clearStoredAuthArtifacts } from '@/utils/authStorage'
 
 const tasksRef = collection(db, "tasks");
 const journalRef = collection(db, "journalEntries");
@@ -130,6 +131,25 @@ async function recoverFromFirestoreInternalError(error) {
 // Prevent spamming multiple auth-expired dialogs at once
 let authDialogOpen = false
 
+function clearSessionAndRouteToLogin() {
+  clearStoredAuthArtifacts()
+  try {
+    import('@/stores/authStore').then((mod) => {
+      try {
+        mod.useAuthStore().resetAuth()
+      } catch {}
+    }).catch(() => {})
+  } catch {}
+
+  Promise.resolve(signOut(auth)).catch(() => {}).finally(() => {
+    try {
+      window.location.replace('/login?expired=1')
+    } catch {
+      window.location.href = '/login?expired=1'
+    }
+  })
+}
+
 /**
  * Global auth-expiry handler for Firestore/auth errors.
  * Shows a blocking alert prompting user to reload and sign in again.
@@ -183,22 +203,13 @@ export function handleAuthError(error) {
         confirmButtonText: 'Reload & Login',
         type: 'warning',
         callback: () => {
-          try {
-            signOut(auth).finally(() => {
-              window.location.reload()
-            })
-          } catch {
-            window.location.reload()
-          }
+          clearSessionAndRouteToLogin()
         },
       },
     )
   } catch {
     // If UI libs not ready, fallback to hard reload
-    try { signOut(auth) } catch {
-      // ignore
-    }
-    window.location.reload()
+    clearSessionAndRouteToLogin()
   }
 }
 

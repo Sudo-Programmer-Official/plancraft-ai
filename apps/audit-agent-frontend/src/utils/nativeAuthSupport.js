@@ -20,6 +20,10 @@ export function isAndroidPackagedApp() {
   return isNativePackagedApp() && getNativePlatform() === 'android'
 }
 
+export function isIosPackagedApp() {
+  return isNativePackagedApp() && getNativePlatform() === 'ios'
+}
+
 export function supportsNativeGoogleSignIn() {
   return isNativePackagedApp() && ['android', 'ios'].includes(getNativePlatform())
 }

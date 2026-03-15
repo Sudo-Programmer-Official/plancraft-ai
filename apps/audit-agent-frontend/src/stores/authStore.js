@@ -41,6 +41,7 @@ import {
   getNativeAuthRestriction,
   supportsNativeGoogleRedirectBridge,
 } from '@/utils/nativeAuthSupport'
+import { clearStoredAuthArtifacts } from '@/utils/authStorage'
 import {
   buildNativeAuthCallbackUrl,
   consumeMobileAuthHandoff,
@@ -388,12 +389,7 @@ export const useAuthStore = defineStore('authStore', {
           this._profileUnsub = null
         }
       } catch {}
-      try {
-        localStorage.removeItem('user')
-        localStorage.removeItem('token')
-        localStorage.removeItem('authStore')
-        localStorage.removeItem('sessionBackup')
-      } catch {}
+      clearStoredAuthArtifacts()
       try { clearAppToken() } catch {}
       try {
         import('@/stores/subscriptionStore').then((mod) => {
@@ -443,6 +439,7 @@ export const useAuthStore = defineStore('authStore', {
 
     async init() {
       const bootstrapTimeoutMs = isNativePackagedApp() ? 4000 : 7000
+      const allowCachedSessionFallback = !isIosCapacitorApp()
       let bootstrapSettled = false
       let bootstrapTimer = null
       const settleBootstrap = (reason) => {
@@ -464,16 +461,18 @@ export const useAuthStore = defineStore('authStore', {
         bootstrapTimer = window.setTimeout(() => {
           if (bootstrapSettled) return
           console.warn('[Auth] Bootstrap timed out; falling back to cached session or login screen')
-          try {
-            const cachedUser = localStorage.getItem('user')
-            const cachedToken = localStorage.getItem('token')
-            if (!this.user && cachedUser && cachedToken) {
-              this.user = JSON.parse(cachedUser)
-              this.token = cachedToken
-              this.guest = false
+          if (allowCachedSessionFallback) {
+            try {
+              const cachedUser = localStorage.getItem('user')
+              const cachedToken = localStorage.getItem('token')
+              if (!this.user && cachedUser && cachedToken) {
+                this.user = JSON.parse(cachedUser)
+                this.token = cachedToken
+                this.guest = false
+              }
+            } catch (e) {
+              console.warn('[Auth] Bootstrap fallback restore failed', e)
             }
-          } catch (e) {
-            console.warn('[Auth] Bootstrap fallback restore failed', e)
           }
           settleBootstrap('timeout')
         }, bootstrapTimeoutMs)
@@ -481,14 +480,16 @@ export const useAuthStore = defineStore('authStore', {
 
       // 🧩 Attempt fast bootstrap from local backup (helps iOS PWA)
       try {
-        const cachedUser = localStorage.getItem('user')
-        const cachedToken = localStorage.getItem('token')
-        if (!auth.currentUser && cachedUser && cachedToken) {
-          this.user = JSON.parse(cachedUser)
-          this.token = cachedToken
-          this.guest = false
-          console.log('[Auth] Restored session from local backup')
-          settleBootstrap('local-backup')
+        if (allowCachedSessionFallback) {
+          const cachedUser = localStorage.getItem('user')
+          const cachedToken = localStorage.getItem('token')
+          if (!auth.currentUser && cachedUser && cachedToken) {
+            this.user = JSON.parse(cachedUser)
+            this.token = cachedToken
+            this.guest = false
+            console.log('[Auth] Restored session from local backup')
+            settleBootstrap('local-backup')
+          }
         }
       } catch (e) {
         console.warn('[Auth] Failed to restore local session', e)
@@ -599,14 +600,16 @@ export const useAuthStore = defineStore('authStore', {
             }
           } else {
             // Try to nudge a restore from backup when Firebase layer is null
-            try {
-              const cachedUser = localStorage.getItem('user')
-              const cachedToken = localStorage.getItem('token')
-              if (!this.user && cachedUser && cachedToken) {
-                this.user = JSON.parse(cachedUser)
-                this.token = cachedToken
-              }
-            } catch {}
+            if (allowCachedSessionFallback) {
+              try {
+                const cachedUser = localStorage.getItem('user')
+                const cachedToken = localStorage.getItem('token')
+                if (!this.user && cachedUser && cachedToken) {
+                  this.user = JSON.parse(cachedUser)
+                  this.token = cachedToken
+                }
+              } catch {}
+            }
           }
         }, 45 * 60 * 1000) // every 45 minutes
       } catch {}

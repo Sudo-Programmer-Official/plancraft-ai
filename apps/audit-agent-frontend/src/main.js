@@ -257,7 +257,7 @@ try {
   const isStandalone =
     window.matchMedia?.('(display-mode: standalone)').matches ||
     window.navigator.standalone
-  if (isStandalone) {
+  if (isStandalone && !Capacitor?.isNativePlatform?.()) {
     // Restore any prior session backup
     try {
       const raw = localStorage.getItem('sessionBackup') || '{}'
