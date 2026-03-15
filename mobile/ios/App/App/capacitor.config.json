@@ -5,7 +5,16 @@
 	"bundledWebRuntime": false,
 	"npmClient": "pnpm",
 	"server": {
-		"cleartext": false
+		"cleartext": false,
+		"hostname": "plancraftai.com",
+		"iosScheme": "https",
+		"androidScheme": "https"
 	},
+	"allowNavigation": [
+		"accounts.google.com",
+		"*.googleusercontent.com",
+		"*.firebaseapp.com",
+		"*.google.com"
+	],
 	"packageClassList": []
 }
