@@ -9,6 +9,20 @@ const router = express.Router()
 const MOBILE_HANDOFF_COLLECTION = 'mobileAuthHandoffs'
 const MOBILE_HANDOFF_TTL_MS = 5 * 60 * 1000
 
+function decodeJwtClaims(token) {
+  try {
+    const parts = String(token || '').split('.')
+    if (parts.length < 2) return null
+    const payload = parts[1]
+      .replace(/-/g, '+')
+      .replace(/_/g, '/')
+      .padEnd(Math.ceil(parts[1].length / 4) * 4, '=')
+    return JSON.parse(Buffer.from(payload, 'base64').toString('utf8'))
+  } catch {
+    return null
+  }
+}
+
 function normalizeRedirectPath(target, fallback = '/dashboard') {
   if (typeof target !== 'string') return fallback
   const trimmed = target.trim()
@@ -169,7 +183,15 @@ router.post('/native-session/exchange', async (req, res) => {
     try {
       decoded = await admin.auth().verifyIdToken(idToken)
     } catch (err) {
-      console.error('[auth/native-session/exchange] verifyIdToken failed:', err?.message || err)
+      const claims = decodeJwtClaims(idToken)
+      console.error('[auth/native-session/exchange] verifyIdToken failed:', {
+        message: err?.message || String(err),
+        code: err?.code || null,
+        aud: claims?.aud || null,
+        iss: claims?.iss || null,
+        sub: claims?.sub || null,
+        email: claims?.email || null,
+      })
       return res.status(401).json({ ok: false, error: 'Invalid Firebase ID token' })
     }
 
