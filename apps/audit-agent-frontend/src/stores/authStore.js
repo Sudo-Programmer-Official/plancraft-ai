@@ -997,82 +997,97 @@ export const useAuthStore = defineStore('authStore', {
       }
     },
 
-  async loginWithEmail(email, password) {
-    this.loading = true
-    try {
-      const current = auth.currentUser
-      const alreadyLinked = (current?.providerData || []).some((p) => p?.providerId === 'password')
+    async loginWithEmail(email, password) {
+      this.loading = true
+      try {
+        const current = auth.currentUser
+        const alreadyLinked = (current?.providerData || []).some((p) => p?.providerId === 'password')
+        const canFallbackGuestLink =
+          current?.isAnonymous === true || this.guest === true || this.user?.mode === 'guest'
 
-      if (current && !alreadyLinked) {
-        // Link email/password to current session; abort on failure to avoid duplicate UIDs.
-        const credential = EmailAuthProvider.credential(email, password)
-        const linkRes = await withTimeout(
-          linkWithCredential(current, credential),
-          12000,
-          'email link credential',
-        )
-        const user = linkRes?.user || current
-        this.user = {
-          uid: user.uid,
-          displayName: user.displayName,
-          email: user.email,
-          photoURL: user.photoURL,
-          role: this.user?.role || 'user',
-        }
-        this.guest = false
-        this.token = await withFallback(user.getIdToken(), {
-          ms: 8000,
-          label: 'email link token',
-          fallback: () => readStoredToken(),
-        })
-        localStorage.setItem('user', JSON.stringify(this.user))
-        if (this.token) localStorage.setItem('token', this.token)
-        try {
-          setDoc(
-            doc(db, 'users', user.uid),
-            {
+        if (current && !alreadyLinked) {
+          // Link email/password to current session; abort on failure to avoid duplicate UIDs.
+          const credential = EmailAuthProvider.credential(email, password)
+          try {
+            const linkRes = await withTimeout(
+              linkWithCredential(current, credential),
+              12000,
+              'email link credential',
+            )
+            const user = linkRes?.user || current
+            this.user = {
+              uid: user.uid,
+              displayName: user.displayName,
               email: user.email,
-              name: user.displayName || '',
-              mode: 'email',
-              lastLoginAt: Date.now(),
-              profileComplete: !!(user.displayName),
-            },
-            { merge: true },
-          ).catch((err) => {
-            console.warn('[Auth] Deferred email link profile sync failed', err)
-          })
-        } catch {}
-        withFallback(fetchUserProfile(user.uid), {
-          ms: 8000,
-          label: 'email link profile fetch',
-          fallback: { role: this.user?.role || 'user' },
-        }).then((profile) => {
-          this.user = {
-            ...(this.user || {}),
-            role: profile?.role || this.user?.role || 'user',
+              photoURL: user.photoURL,
+              role: this.user?.role || 'user',
+            }
+            this.guest = false
+            this.token = await withFallback(user.getIdToken(), {
+              ms: 8000,
+              label: 'email link token',
+              fallback: () => readStoredToken(),
+            })
+            localStorage.setItem('user', JSON.stringify(this.user))
+            if (this.token) localStorage.setItem('token', this.token)
+            try {
+              setDoc(
+                doc(db, 'users', user.uid),
+                {
+                  email: user.email,
+                  name: user.displayName || '',
+                  mode: 'email',
+                  lastLoginAt: Date.now(),
+                  profileComplete: !!(user.displayName),
+                },
+                { merge: true },
+              ).catch((err) => {
+                console.warn('[Auth] Deferred email link profile sync failed', err)
+              })
+            } catch {}
+            withFallback(fetchUserProfile(user.uid), {
+              ms: 8000,
+              label: 'email link profile fetch',
+              fallback: { role: this.user?.role || 'user' },
+            }).then((profile) => {
+              this.user = {
+                ...(this.user || {}),
+                role: profile?.role || this.user?.role || 'user',
+              }
+              try { localStorage.setItem('user', JSON.stringify(this.user)) } catch {}
+            }).catch(() => {})
+            try {
+              if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
+                const mod = await import('@/services/appTokenService.js')
+                mod.refreshAppToken().catch(() => {})
+              }
+            } catch {}
+            this.refreshPlan().catch(() => {})
+            ElNotification({
+              title: 'Email linked',
+              message: 'Email/password added to your account.',
+              type: 'success',
+              duration: 2200,
+              offset: 80,
+            })
+            return user
+          } catch (error) {
+            const code = String(error?.code || '')
+            const canFallbackToSignIn =
+              canFallbackGuestLink &&
+              (
+                code === 'auth/email-already-in-use' ||
+                code === 'auth/credential-already-in-use' ||
+                code === 'auth/account-exists-with-different-credential'
+              )
+            if (!canFallbackToSignIn) throw error
+            console.info('[Auth] Existing email account detected during guest link; falling back to direct sign-in')
           }
-          try { localStorage.setItem('user', JSON.stringify(this.user)) } catch {}
-        }).catch(() => {})
-        try {
-          if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
-            const mod = await import('@/services/appTokenService.js')
-            mod.refreshAppToken().catch(() => {})
-          }
-        } catch {}
-        this.refreshPlan().catch(() => {})
-        ElNotification({
-          title: 'Email linked',
-          message: 'Email/password added to your account.',
-          type: 'success',
-          duration: 2200,
-          offset: 80,
-        })
-        return user
-      }
+        }
 
-      // No active session or already linked: standard sign-in.
-      const cred = await withTimeout(
-        signInWithEmailAndPassword(auth, email, password),
+        // No active session or already linked: standard sign-in.
+        const cred = await withTimeout(
+          signInWithEmailAndPassword(auth, email, password),
         12000,
         'email sign-in',
       )

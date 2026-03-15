@@ -284,7 +284,16 @@ async function onLoginEmail() {
     await authStore.loginWithEmail(email.value, password.value)
     if (authStore.user) redirectAfterLogin()
   } catch (e) {
-    alert('Login failed. Please check your credentials.')
+    const code = String(e?.code || e?.message || '')
+    if (code.includes('auth/invalid-credential') || code.includes('auth/wrong-password') || code.includes('auth/user-not-found')) {
+      alert('Login failed. Check your email and password.')
+      return
+    }
+    if (code.includes('timed out')) {
+      alert('Login timed out. Please try again.')
+      return
+    }
+    alert(`Login failed: ${code || 'unknown error'}`)
   }
 }
 
