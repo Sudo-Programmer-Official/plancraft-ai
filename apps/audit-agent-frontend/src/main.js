@@ -88,13 +88,58 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 }
 app.component('VoiceRecorder', VoiceRecorder)
 
-app.config.errorHandler = (err, vm, info) => {
-  console.error('Global error handler:', err, info)
-  if (err.message.includes('auth')) {
-    handleAuthError(err)
+function normalizeRuntimeError(err) {
+  const rawMessage =
+    typeof err === 'string'
+      ? err
+      : typeof err?.message === 'string'
+        ? err.message
+        : typeof err?.reason?.message === 'string'
+          ? err.reason.message
+          : ''
+
+  const code =
+    (typeof err?.code === 'string' && err.code) ||
+    (typeof err?.reason?.code === 'string' && err.reason.code) ||
+    null
+
+  return {
+    message: rawMessage,
+    code,
+    name: typeof err?.name === 'string' ? err.name : typeof err?.reason?.name === 'string' ? err.reason.name : null,
+    stack:
+      typeof err?.stack === 'string'
+        ? err.stack
+        : typeof err?.reason?.stack === 'string'
+          ? err.reason.stack
+          : null,
+    payload: err,
   }
-  console.error('Unhandled error:', err)
 }
+
+app.config.errorHandler = (err, vm, info) => {
+  const normalized = normalizeRuntimeError(err)
+  console.error('Global error handler:', normalized, info)
+  const authHint = `${normalized.code || ''} ${normalized.message || ''}`.toLowerCase()
+  if (authHint.includes('auth') || authHint.includes('token') || authHint.includes('unauth')) {
+    try {
+      handleAuthError(err)
+    } catch (authErr) {
+      console.warn('[Auth] Global auth error handling failed', authErr)
+    }
+  }
+  console.error('Unhandled error:', normalized)
+}
+
+window.addEventListener('error', (event) => {
+  const normalized = normalizeRuntimeError(event?.error || event)
+  console.error('Window error:', normalized)
+})
+
+window.addEventListener('unhandledrejection', (event) => {
+  const normalized = normalizeRuntimeError(event?.reason || event)
+  console.error('Unhandled rejection:', normalized)
+})
 
 // Analytics
 initAnalytics()
