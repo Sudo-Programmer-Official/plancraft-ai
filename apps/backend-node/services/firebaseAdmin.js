@@ -11,11 +11,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 let serviceAccount = null;
+let credentialSource = "none";
 
 // 1. If FIREBASE_SERVICE_ACCOUNT env is set (Render style), parse it
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   try {
     serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    credentialSource = "env:FIREBASE_SERVICE_ACCOUNT";
   } catch (err) {
     console.error("❌ Failed to parse FIREBASE_SERVICE_ACCOUNT env", err);
   }
@@ -26,6 +28,7 @@ if (!serviceAccount) {
   try {
     const localPath = path.resolve(__dirname, "../firebase-service-account.json");
     serviceAccount = JSON.parse(fs.readFileSync(localPath, "utf-8"));
+    credentialSource = "file:firebase-service-account.json";
   } catch (err) {
     console.error("❌ Failed to load local firebase-service-account.json", err);
   }
@@ -35,8 +38,13 @@ if (!serviceAccount) {
 const PROJECT_ID = process.env.FIREBASE_PROJECT_ID || undefined;
 const ENV_BUCKET = "audit-agent-66451.firebasestorage.app";
 
-console.log("🚨 Using Firebase Project ID:", PROJECT_ID || (serviceAccount ? serviceAccount.project_id : "none"))
-console.log("🚨 Using Firebase Storage Bucket:", ENV_BUCKET || "none")
+console.log("🚨 Firebase Admin config:", {
+  envProjectId: PROJECT_ID || null,
+  serviceAccountProjectId: serviceAccount?.project_id || null,
+  serviceAccountClientEmail: serviceAccount?.client_email || null,
+  credentialSource,
+  storageBucket: ENV_BUCKET || null,
+})
 if (!admin.apps.length) {
   try {
     if (serviceAccount && typeof serviceAccount === "object") {
@@ -47,6 +55,7 @@ if (!admin.apps.length) {
       });
     } else {
       // Fallback to ADC if available (e.g., GOOGLE_APPLICATION_CREDENTIALS)
+      credentialSource = "applicationDefault";
       console.warn(
         "⚠️ No explicit Firebase service account found. Attempting applicationDefault credentials."
       );
