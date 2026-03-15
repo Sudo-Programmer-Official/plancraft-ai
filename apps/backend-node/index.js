@@ -155,14 +155,20 @@ const allowedOrigins = [
       .filter(Boolean)
   )
 
+function isNativeAppOrigin(origin) {
+  return typeof origin === 'string' && /^(capacitor|ionic):\/\/[a-z0-9.-]+$/i.test(origin)
+}
+
 // CORS setup
 const corsOptions = {
   origin: function (origin, callback) {
     const allowAny = process.env.ALLOW_DEV_ANY_ORIGIN === "1";
     const isDevVite = !!origin && /:5173$/.test(origin);
-    if (!origin || allowAny || allowedOrigins.includes(origin) || isDevVite) {
+    const isNativeOrigin = isNativeAppOrigin(origin)
+    if (!origin || allowAny || allowedOrigins.includes(origin) || isDevVite || isNativeOrigin) {
       callback(null, true);
     } else {
+      console.warn('[CORS] Blocked origin', { origin: origin || null })
       callback(new Error("Not allowed by CORS"));
     }
   },
@@ -193,7 +199,7 @@ app.options("*", cors(corsOptions))
 function isAllowedOrigin(origin) {
   const allowAny = process.env.ALLOW_DEV_ANY_ORIGIN === "1"
   const isDevVite = !!origin && /:5173$/.test(origin)
-  return !origin || allowAny || allowedOrigins.includes(origin) || isDevVite
+  return !origin || allowAny || allowedOrigins.includes(origin) || isDevVite || isNativeAppOrigin(origin)
 }
 
 app.use((req, res, next) => {

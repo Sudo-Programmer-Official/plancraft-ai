@@ -30,12 +30,16 @@ const allowedOrigins = [
   "https://api.plancraftai.com",
 ]
 
+function isNativeAppOrigin(origin) {
+  return typeof origin === 'string' && /^(capacitor|ionic):\/\/[a-z0-9.-]+$/i.test(origin)
+}
+
 const router = express.Router();
 router.use((req, res, next) => {
   const origin = req.headers.origin || "";
   const allowAny = process.env.ALLOW_DEV_ANY_ORIGIN === "1";
   const isDevVite = /:5173$/.test(origin);
-  if (allowAny || allowedOrigins.includes(origin) || isDevVite) {
+  if (allowAny || allowedOrigins.includes(origin) || isDevVite || isNativeAppOrigin(origin)) {
     res.set("Access-Control-Allow-Origin", origin);
   }
   res.set(

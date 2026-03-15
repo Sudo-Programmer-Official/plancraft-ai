@@ -37,10 +37,14 @@ const allowedOrigins = [
   "https://api.plancraftai.com",
 ]
 
+function isNativeAppOrigin(origin) {
+  return typeof origin === 'string' && /^(capacitor|ionic):\/\/[a-z0-9.-]+$/i.test(origin)
+}
+
 // Middleware: CORS
 router.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
+  if (allowedOrigins.includes(origin) || isNativeAppOrigin(origin)) {
     res.set("Access-Control-Allow-Origin", origin);
   }
   res.set(
