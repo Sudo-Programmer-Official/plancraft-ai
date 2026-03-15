@@ -130,6 +130,9 @@ const integrationsDir = path.join(projectRoot, "integrations");
 const allowedOrigins = [
   "https://plancraftai.com",
   "https://www.plancraftai.com",
+  "capacitor://plancraftai.com",
+  "capacitor://localhost",
+  "ionic://localhost",
   "https://audit-agent-66451.web.app",
   "https://api.plancraftai.com", 
   "https://audit-agent-66451.firebaseapp.com",
