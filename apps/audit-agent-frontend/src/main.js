@@ -243,17 +243,25 @@ try {
 
 // Mount app
 async function bootstrapApp() {
+  console.info('[Startup] before auth init')
   try {
     await authStore.init()
   } catch (err) {
     console.warn('[Auth] Initial bootstrap failed before router install', err)
   }
+  console.info('[Startup] after auth init', {
+    loading: authStore.loading,
+    authStoreUser: authStore.user?.uid || null,
+    firebaseUser: auth?.currentUser?.uid || null,
+  })
 
+  console.info('[Startup] before app.use(router)')
   app.use(router)
   app.use(createHead())
 
   let routerReady = false
   try {
+    console.info('[Startup] before router.isReady')
     const waitForReady = router.isReady().then(() => {
       routerReady = true
     })
@@ -270,6 +278,10 @@ async function bootstrapApp() {
     }
 
     if (routerReady) {
+      console.info('[Startup] after router.isReady', {
+        route: router.currentRoute.value?.fullPath || null,
+        name: router.currentRoute.value?.name || null,
+      })
       console.info('[Router] Initial route ready', {
         currentRoute: router.currentRoute.value?.fullPath || null,
         name: router.currentRoute.value?.name || null,
@@ -289,7 +301,13 @@ async function bootstrapApp() {
     })
   }
 
+  console.info('[Startup] before mount')
   app.mount('#app')
+  console.info('[Startup] after mount', {
+    route: router.currentRoute.value?.fullPath || null,
+    name: router.currentRoute.value?.name || null,
+    authStoreUser: authStore.user?.uid || null,
+  })
 
   if (!routerReady && isNativeApp && Capacitor?.getPlatform?.() === 'ios') {
     try {

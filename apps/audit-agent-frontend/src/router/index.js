@@ -224,6 +224,19 @@ const router = createRouter({
 
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
+  try {
+    console.info('[Router] navigating', {
+      to: to.fullPath,
+      from: from.fullPath,
+      authStoreUser: authStore.user?.uid || null,
+      firebaseUser: getAuth().currentUser?.uid || null,
+      loading: authStore.loading,
+      nativeSnapshotUser:
+        isIosPackagedApp() && readNativeIosAuthSnapshot()?.localId
+          ? readNativeIosAuthSnapshot().localId
+          : null,
+    })
+  } catch {}
 
   const wantsTeamSignup = to.path === '/signup' && to.query?.mode === 'team'
   if (wantsTeamSignup) {
