@@ -1,1 +1,6 @@
-[]
+[
+	{
+		"pkg": "@capgo/capacitor-audio-recorder",
+		"classpath": "app.capgo.audiorecorder.CapacitorAudioRecorderPlugin"
+	}
+]

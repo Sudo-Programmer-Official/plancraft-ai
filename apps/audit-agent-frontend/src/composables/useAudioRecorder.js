@@ -1,4 +1,10 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
+import { Capacitor } from '@capacitor/core'
+import {
+  AudioSessionCategoryOption,
+  AudioSessionMode,
+  CapacitorAudioRecorder,
+} from '@capgo/capacitor-audio-recorder'
 import api from '@/services/api'
 import { recordAndSendToBackend } from '@/utils/backendRecorder'
 
@@ -8,6 +14,25 @@ const MIME_CANDIDATES = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'aud
 
 function canUseBrowserAudioCapture() {
   return !!navigator?.mediaDevices?.getUserMedia
+}
+
+function canUseNativeAudioRecorder() {
+  return !!Capacitor?.isNativePlatform?.()
+}
+
+function inferAudioFilename(blob, fallbackExt = 'webm') {
+  const blobType = String(blob?.type || '').toLowerCase()
+  if (blobType.includes('ogg')) return 'speech.ogg'
+  if (blobType.includes('mp4') || blobType.includes('mpeg') || blobType.includes('aac') || blobType.includes('m4a')) {
+    return 'speech.m4a'
+  }
+  if (blobType.includes('wav')) return 'speech.wav'
+  return `speech.${fallbackExt}`
+}
+
+function inferFileExtFromUri(uri) {
+  const match = String(uri || '').match(/\.([a-z0-9]+)(?:\?|#|$)/i)
+  return match?.[1]?.toLowerCase() || 'm4a'
 }
 
 function pickMimeType() {
@@ -40,6 +65,7 @@ export function useAudioRecorder(options = {}) {
   let stopTimeoutId = null
   let stopRequested = false
   let stopHandled = false
+  let nativeRecorderActive = false
 
   const clearTimers = (resetDuration = false) => {
     if (tickId) {
@@ -75,11 +101,15 @@ export function useAudioRecorder(options = {}) {
     } catch (_) {}
     mediaRecorder = null
     backendRecorder = null
+    nativeRecorderActive = false
   }
 
   const cleanup = (resetTranscript = false) => {
     clearTimers(false)
     stopStreams()
+    if (nativeRecorderActive) {
+      Promise.resolve(CapacitorAudioRecorder.cancelRecording()).catch(() => {})
+    }
     releaseRecorder()
     recordedChunks = []
     stopRequested = false
@@ -87,16 +117,55 @@ export function useAudioRecorder(options = {}) {
     if (resetTranscript) transcript.value = ''
   }
 
-  const transcribeBlob = async (blob) => {
+  const transcribeBlob = async (blob, fileName = null) => {
     console.log(`${logPrefix} transcription request`, { size: blob?.size, type: blob?.type })
     const fd = new FormData()
-    const ext = blob?.type?.includes('ogg') ? 'ogg' : blob?.type?.includes('mp4') ? 'm4a' : 'webm'
-    fd.append('file', blob, `speech.${ext}`)
+    const fallbackExt = inferFileExtFromUri(fileName || '')
+    fd.append('file', blob, fileName || inferAudioFilename(blob, fallbackExt))
     const res = await api.post('/transcribe', fd, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
     console.log(`${logPrefix} transcription response`, res?.data)
     return res?.data?.text || ''
+  }
+
+  const transcribeNativeRecording = async (uri) => {
+    const webPath = Capacitor.convertFileSrc(uri)
+    const response = await fetch(webPath)
+    if (!response.ok) {
+      throw new Error(`Failed to read native recording (${response.status})`)
+    }
+    const blob = await response.blob()
+    return transcribeBlob(blob, `speech.${inferFileExtFromUri(uri)}`)
+  }
+
+  const startNativeRecording = async () => {
+    const status = await CapacitorAudioRecorder.checkPermissions()
+    let permission = status?.recordAudio
+    if (permission !== 'granted') {
+      const requested = await CapacitorAudioRecorder.requestPermissions()
+      permission = requested?.recordAudio
+    }
+    if (permission !== 'granted') {
+      throw new Error('Microphone permission not granted')
+    }
+
+    await CapacitorAudioRecorder.startRecording({
+      sampleRate: 44100,
+      bitRate: 128000,
+      audioSessionMode: AudioSessionMode.SpokenAudio,
+      audioSessionCategoryOptions: [
+        AudioSessionCategoryOption.DefaultToSpeaker,
+      ],
+    })
+
+    nativeRecorderActive = true
+    state.value = 'recording'
+    console.log(`${logPrefix} native recording started`, {
+      platform: Capacitor.getPlatform?.() || 'native',
+    })
+    tickId = window.setInterval(() => (durationSeconds.value += 1), 1000)
+    if (autoStopMs > 0) autoStopId = window.setTimeout(() => stopRecording('auto'), autoStopMs)
   }
 
   const startFallbackRecorder = async () => {
@@ -120,6 +189,20 @@ export function useAudioRecorder(options = {}) {
     durationSeconds.value = 0
     stopRequested = false
     stopHandled = false
+
+    if (canUseNativeAudioRecorder()) {
+      try {
+        await startNativeRecording()
+        return
+      } catch (nativeError) {
+        console.warn(`${logPrefix} native recorder unavailable, falling back`, nativeError)
+        if (!canUseBrowserAudioCapture()) {
+          console.error(`${logPrefix} start failed`, new Error('Voice recording is not available on this device'))
+          state.value = 'error'
+          return
+        }
+      }
+    }
 
     try {
       if (!navigator?.mediaDevices?.getUserMedia) throw new Error('Microphone unavailable')
@@ -212,6 +295,21 @@ export function useAudioRecorder(options = {}) {
     console.log(`${logPrefix} stop requested`, { reason })
 
     try {
+      if (nativeRecorderActive) {
+        const result = await CapacitorAudioRecorder.stopRecording()
+        nativeRecorderActive = false
+        stopHandled = true
+        const uri = result?.uri
+        if (!uri) {
+          throw new Error('Native recording did not produce a file')
+        }
+        const text = await transcribeNativeRecording(uri)
+        transcript.value = text
+        state.value = text ? 'done' : 'idle'
+        if (text && typeof onTranscription === 'function') await onTranscription(text)
+        return
+      }
+
       if (backendRecorder && typeof backendRecorder._stop === 'function') {
         await backendRecorder._stop()
         stopHandled = true

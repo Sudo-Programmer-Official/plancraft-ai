@@ -129,22 +129,35 @@
     </script>
 
     <!-- LinkedIn Insight Tag is initialized in src/analytics/linkedin.js via Vite env -->
-    <script type="module" crossorigin src="/assets/index-Pk9gXHDx.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-CjFI6VMj.css">
+    <script type="module" crossorigin src="/assets/index-B2notBSE.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-16NeXFJ-.css">
   <link rel="manifest" href="/manifest.webmanifest"></head>
 
   <body>
     <div id="app"></div>
 
-    <!-- Google Analytics -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-N8V946JNDH"></script>
     <script>
-      window.dataLayer = window.dataLayer || []
-      function gtag() {
-        dataLayer.push(arguments)
-      }
-      gtag('js', new Date())
-      gtag('config', 'G-N8V946JNDH', { anonymize_ip: true })
+      ;(() => {
+        try {
+          const isNativeCapacitor =
+            typeof window !== 'undefined' &&
+            typeof window.location?.protocol === 'string' &&
+            window.location.protocol === 'capacitor:'
+          if (isNativeCapacitor) return
+
+          const script = document.createElement('script')
+          script.async = true
+          script.src = 'https://www.googletagmanager.com/gtag/js?id=G-N8V946JNDH'
+          document.head.appendChild(script)
+
+          window.dataLayer = window.dataLayer || []
+          window.gtag = window.gtag || function () {
+            window.dataLayer.push(arguments)
+          }
+          window.gtag('js', new Date())
+          window.gtag('config', 'G-N8V946JNDH', { anonymize_ip: true })
+        } catch {}
+      })()
     </script>
 
     <!-- Fallback for users without JS -->

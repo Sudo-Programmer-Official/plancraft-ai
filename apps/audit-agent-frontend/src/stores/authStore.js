@@ -1519,15 +1519,14 @@ export const useAuthStore = defineStore('authStore', {
 
     async loginWithEmail(email, password) {
       this.loading = true
-      try {
-        const current = auth.currentUser
-        const alreadyLinked = (current?.providerData || []).some((p) => p?.providerId === 'password')
-        const canFallbackGuestLink =
-          current?.isAnonymous === true || this.guest === true || this.user?.mode === 'guest'
-        const nativePlatform = Capacitor?.getPlatform?.() || 'web'
-        const useNativeDirectEmail = isNativePackagedApp() && isIosCapacitorApp()
+      const current = auth.currentUser
+      const alreadyLinked = (current?.providerData || []).some((p) => p?.providerId === 'password')
+      const canFallbackGuestLink =
+        current?.isAnonymous === true || this.guest === true || this.user?.mode === 'guest'
+      const nativePlatform = Capacitor?.getPlatform?.() || 'web'
+      const useNativeDirectEmail = isNativePackagedApp() && isIosCapacitorApp()
 
-        const completeNativeDirectEmailLogin = async (platform = nativePlatform) => {
+      const completeNativeDirectEmailLogin = async (platform = nativePlatform) => {
           console.info('[Auth] Native packaged app email login via Identity Toolkit + custom token exchange', {
             email,
             platform,
@@ -1639,6 +1638,8 @@ export const useAuthStore = defineStore('authStore', {
           })
           return user
         }
+
+      try {
 
         console.info('[Auth] Email login start', {
           email,
