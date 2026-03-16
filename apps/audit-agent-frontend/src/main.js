@@ -133,12 +133,12 @@ app.config.errorHandler = (err, vm, info) => {
 }
 
 window.addEventListener('error', (event) => {
-  const isGenericScriptError =
-    isNativeApp &&
-    !event?.error &&
-    String(event?.message || '').trim().toLowerCase() === 'script error.'
-  if (isGenericScriptError) return
   const normalized = normalizeRuntimeError(event?.error || event)
+  const isGenericNativeScriptError =
+    isNativeApp &&
+    String(normalized?.message || '').trim().toLowerCase() === 'script error.' &&
+    !normalized?.stack
+  if (isGenericNativeScriptError) return
   console.error('Window error:', normalized)
 })
 
@@ -148,10 +148,12 @@ window.addEventListener('unhandledrejection', (event) => {
 })
 
 // Analytics
-initAnalytics()
-bindRouter(router)
-// LinkedIn Insight Tag (env-driven)
-try { setupLinkedInTag() } catch {}
+if (!isNativeApp) {
+  initAnalytics()
+  bindRouter(router)
+  // LinkedIn Insight Tag (env-driven)
+  try { setupLinkedInTag() } catch {}
+}
 
 // 🆕 Restore Google redirect login results (fix for Safari / LinkedIn)
 try {
