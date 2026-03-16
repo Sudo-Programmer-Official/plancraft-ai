@@ -251,6 +251,21 @@ async function bootstrapApp() {
 
   app.use(router)
   app.use(createHead())
+
+  try {
+    await router.isReady()
+    console.info('[Router] Initial route ready', {
+      currentRoute: router.currentRoute.value?.fullPath || null,
+      name: router.currentRoute.value?.name || null,
+    })
+  } catch (err) {
+    console.error('[Router] Initial route failed before mount', {
+      message: err?.message || String(err || ''),
+      name: err?.name || null,
+      stack: err?.stack || null,
+    })
+  }
+
   app.mount('#app')
 }
 
