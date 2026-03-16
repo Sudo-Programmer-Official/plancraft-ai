@@ -252,12 +252,35 @@ async function bootstrapApp() {
   app.use(router)
   app.use(createHead())
 
+  let routerReady = false
   try {
-    await router.isReady()
-    console.info('[Router] Initial route ready', {
-      currentRoute: router.currentRoute.value?.fullPath || null,
-      name: router.currentRoute.value?.name || null,
+    const waitForReady = router.isReady().then(() => {
+      routerReady = true
     })
+    const shouldTimeout = isNativeApp && Capacitor?.getPlatform?.() === 'ios'
+    if (shouldTimeout) {
+      await Promise.race([
+        waitForReady,
+        new Promise((resolve) => {
+          window.setTimeout(resolve, 2500)
+        }),
+      ])
+    } else {
+      await waitForReady
+    }
+
+    if (routerReady) {
+      console.info('[Router] Initial route ready', {
+        currentRoute: router.currentRoute.value?.fullPath || null,
+        name: router.currentRoute.value?.name || null,
+      })
+    } else {
+      console.warn('[Router] Initial route readiness timed out before mount', {
+        currentRoute: router.currentRoute.value?.fullPath || null,
+        name: router.currentRoute.value?.name || null,
+        hasAuthStoreUser: !!authStore.user?.uid,
+      })
+    }
   } catch (err) {
     console.error('[Router] Initial route failed before mount', {
       message: err?.message || String(err || ''),
@@ -267,6 +290,20 @@ async function bootstrapApp() {
   }
 
   app.mount('#app')
+
+  if (!routerReady && isNativeApp && Capacitor?.getPlatform?.() === 'ios') {
+    try {
+      const currentPath = router.currentRoute.value?.fullPath || '/'
+      if (authStore.user?.uid && (currentPath === '/' || currentPath.startsWith('/login'))) {
+        await router.replace('/dashboard')
+        console.info('[Router] Forced native iOS post-mount redirect', {
+          currentRoute: router.currentRoute.value?.fullPath || null,
+        })
+      }
+    } catch (err) {
+      console.warn('[Router] Native iOS post-mount redirect failed', err)
+    }
+  }
 }
 
 bootstrapApp().catch((err) => {
