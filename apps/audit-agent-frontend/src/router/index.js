@@ -312,4 +312,13 @@ router.beforeEach(async (to, from, next) => {
   next()
 })
 
+router.onError((error, to) => {
+  console.error('[Router] Navigation error', {
+    to: to?.fullPath || to?.path || null,
+    message: error?.message || String(error || ''),
+    name: error?.name || null,
+    stack: error?.stack || null,
+  })
+})
+
 export default router

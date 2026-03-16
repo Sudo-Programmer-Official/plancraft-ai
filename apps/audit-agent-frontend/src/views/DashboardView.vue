@@ -2795,8 +2795,14 @@ async function onReminderClick(task) {
 
 onMounted(() => {
   try {
-    onAuthStateChanged(auth, () => {
+    const restoredUser = auth.currentUser || authStore?.user || null
+    if (restoredUser?.uid) {
       checkingAuth.value = false
+      attachTaskListener(restoredUser)
+    }
+    onAuthStateChanged(auth, (user) => {
+      checkingAuth.value = false
+      attachTaskListener(user || authStore?.user || null)
     })
   } catch {
     checkingAuth.value = false
@@ -2812,6 +2818,10 @@ onMounted(() => {
 watch(
   () => authStore?.user?.uid,
   async (uid) => {
+    if (uid) {
+      checkingAuth.value = false
+      attachTaskListener(auth.currentUser || authStore?.user || null)
+    }
     try {
       if (!uid) {
         userStreak.value = 0
