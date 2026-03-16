@@ -40,6 +40,21 @@ function currentWorkspaceId() {
   }
 }
 
+function withTimeout(promise, ms = 6000, label = 'request') {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    Promise.resolve(promise)
+      .then((value) => {
+        clearTimeout(timer)
+        resolve(value)
+      })
+      .catch((error) => {
+        clearTimeout(timer)
+        reject(error)
+      })
+  })
+}
+
 function resolveTasksRef() {
   // Shared task collection keyed by workspaceId
   return tasksRef
@@ -403,7 +418,7 @@ export async function fetchUnfinishedTasksBefore(ymd) {
 async function syncTaskNotification(userId, taskId, payload) {
   try {
     const clientNow = new Date().toISOString()
-    const res = await api.post('/tasks/announce', {
+    const request = api.post('/tasks/announce', {
       userId,
       task: {
         id: taskId,
@@ -420,6 +435,7 @@ async function syncTaskNotification(userId, taskId, payload) {
       schedule: payload.reminderTime != null || payload.scheduledTime != null,
       clientNow,
     })
+    const res = await withTimeout(request, 6000, 'task notification sync')
     return res?.data || null
   } catch (err) {
     console.warn('[TaskSync] notify failed', err?.response?.data || err?.message || err)
@@ -427,7 +443,7 @@ async function syncTaskNotification(userId, taskId, payload) {
   }
 }
 
-export async function addTaskToFirebase(task) {
+export async function addTaskToFirebase(task, options = {}) {
   const user = auth.currentUser;
   if (!user) {
     handleAuthError({ code: 'unauthenticated', message: 'User not logged in' })
@@ -487,8 +503,14 @@ export async function addTaskToFirebase(task) {
   const scopedTasks = resolveTasksRef()
   payload.workspaceId = wsId
   const docRef = await safeAction(addDoc(scopedTasks, payload));
+  const shouldAwaitNotificationSync = options?.awaitNotificationSync !== false
 
-  const notifyMeta = await syncTaskNotification(user.uid, docRef.id, payload)
+  let notifyMeta = null
+  if (shouldAwaitNotificationSync) {
+    notifyMeta = await syncTaskNotification(user.uid, docRef.id, payload)
+  } else {
+    Promise.resolve(syncTaskNotification(user.uid, docRef.id, payload)).catch(() => {})
+  }
 
   // Return task with Firestore's doc ID
   return { id: docRef.id, ...payload, __notifyMeta: notifyMeta };

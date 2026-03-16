@@ -1,3 +1,8 @@
+/* Shared mobile overlay spacing */
+:root {
+  --app-mobile-overlay-top-offset: calc(env(safe-area-inset-top, 0px) + 3.5rem);
+}
+
 /* === PlanCraftAI Toast Theme === */
 .el-notification {
   border-radius: 0.75rem !important;
@@ -33,9 +38,23 @@
   border-image-slice: 1;
 }
 
+@media (max-width: 768px) {
+  .el-notification {
+    margin-top: var(--app-mobile-overlay-top-offset);
+    max-width: calc(100vw - 1.5rem) !important;
+    width: calc(100vw - 1.5rem) !important;
+    right: 0.75rem !important;
+  }
+
+  .el-message {
+    top: var(--app-mobile-overlay-top-offset) !important;
+    max-width: calc(100vw - 1.5rem) !important;
+    min-width: 0 !important;
+  }
+}
+
 /* Subtle slide-in animation */
 @keyframes toastSlideIn {
   0% { opacity: 0; transform: translateY(-10px) scale(0.98); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
-

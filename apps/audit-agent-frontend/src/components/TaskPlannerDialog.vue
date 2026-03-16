@@ -1377,6 +1377,7 @@ async function generateTasks() {
 async function persistPreparedTasks(prepared = []) {
   if (!prepared.length) return []
   const baseOrder = tasks.value.length
+  logTimeBrainDialog('generate:persist:start', { count: prepared.length })
   const saved = await Promise.all(
     prepared.map(async (task, idx) => {
       const payload = {
@@ -1387,10 +1388,11 @@ async function persistPreparedTasks(prepared = []) {
       }
       if (!payload.attachments || !payload.attachments.length) delete payload.attachments
       if (payload.metadata && !Object.keys(payload.metadata || {}).length) delete payload.metadata
-      return await addTaskToFirebase(payload)
+      return await addTaskToFirebase(payload, { awaitNotificationSync: false })
     }),
   )
 
+  logTimeBrainDialog('generate:persist:completed', { saved: saved.length })
   ElNotification({
     title: 'Success',
     message: `${saved.length} task${saved.length > 1 ? 's' : ''} created`,
