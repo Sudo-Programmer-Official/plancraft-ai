@@ -29,7 +29,6 @@ import {
 } from 'firebase/auth'
 import { auth, db } from '@/firebase/init'
 import { identifyUser, trackEvent } from '@/services/analytics'
-import { getSubscriptionStatus } from '@/services/stripeService'
 import { getUsageStatus } from '@/services/planService'
 import { doc, updateDoc, setDoc, onSnapshot } from 'firebase/firestore'
 import { ElNotification } from 'element-plus'
@@ -558,19 +557,62 @@ export const useAuthStore = defineStore('authStore', {
       }
     },
 
-    async refreshPlan() {
+    async refreshPlan(options = {}) {
       try {
-        if (!this.user?.uid) return
-        const [status, usage] = await Promise.all([
-          getSubscriptionStatus(this.user.uid),
-          getUsageStatus(this.user.uid),
-        ])
-        const plan = (status?.plan || 'free').toLowerCase()
-        this.user = { ...(this.user || {}), plan, usage }
-        try {
-          await updateDoc(doc(db, 'users', this.user.uid), { plan })
-        } catch {}
+        const uid = this.user?.uid
+        if (!uid) return
+        const force = options?.force === true
+        const minIntervalMs = Number(options?.minIntervalMs ?? 15000)
+        const now = Date.now()
+
+        if (!force && this._refreshPlanPromise && this._refreshPlanUid === uid) {
+          return this._refreshPlanPromise
+        }
+
+        if (
+          !force &&
+          this._lastPlanRefreshUid === uid &&
+          this._lastPlanRefreshAt &&
+          now - this._lastPlanRefreshAt < minIntervalMs
+        ) {
+          return this.user
+        }
+
+        this._refreshPlanUid = uid
+        this._refreshPlanPromise = (async () => {
+          let status = null
+          let usage = null
+          try {
+            const [subStoreModule, usageResult] = await Promise.all([
+              import('@/stores/subscriptionStore'),
+              getUsageStatus(uid).catch(() => null),
+            ])
+            usage = usageResult
+            try {
+              status = await subStoreModule.useSubscriptionStore().fetchStatus(uid, {
+                force,
+                minIntervalMs,
+              })
+            } catch {}
+          } catch {}
+
+          const plan = String(status?.plan || this.user?.plan || 'free').toLowerCase()
+          this.user = { ...(this.user || {}), plan, usage: usage || this.user?.usage }
+          try {
+            await updateDoc(doc(db, 'users', uid), { plan })
+          } catch {}
+          return this.user
+        })()
+
+        const result = await this._refreshPlanPromise
+        this._lastPlanRefreshAt = Date.now()
+        this._lastPlanRefreshUid = uid
+        return result
       } catch {}
+      finally {
+        this._refreshPlanPromise = null
+        this._refreshPlanUid = null
+      }
     },
 
     async init() {

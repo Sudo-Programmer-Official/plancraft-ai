@@ -31,10 +31,8 @@ export function useIsPremium() {
   })
 
   async function refresh() {
-    try { authStore.refreshPlan?.() } catch {}
     try {
-      const uid = authStore?.user?.uid
-      if (uid) await subStore.fetchStatus(uid)
+      await authStore.refreshPlan?.()
     } catch {}
   }
 

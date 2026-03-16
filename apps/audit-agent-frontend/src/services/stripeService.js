@@ -4,6 +4,9 @@ import api from '@/services/api'
 const DEFAULT_STATUS = Object.freeze({ plan: 'free', status: 'free', remainingDays: 0, cancelAt: null })
 const CACHE_KEY = 'subscription_status_cache'
 const CACHE_TTL_MS = 1000 * 60 * 5 // 5 minutes
+const TIMEOUT_BACKOFF_MS = 1000 * 30
+const inFlightStatusRequests = new Map()
+const timeoutBackoffUntil = new Map()
 
 function loadCacheMap() {
   if (typeof window === 'undefined' || !window.localStorage) return {}
@@ -78,8 +81,9 @@ export async function createCheckoutSession(plan, userId) {
   }
 }
 
-export async function getSubscriptionStatus(userId) {
+export async function getSubscriptionStatus(userId, options = {}) {
   if (!userId) return { ...DEFAULT_STATUS }
+  const force = options?.force === true
 
   // Best effort: skip remote lookup if offline and cached data exists
   if (typeof navigator !== 'undefined' && navigator.onLine === false) {
@@ -88,35 +92,56 @@ export async function getSubscriptionStatus(userId) {
     return { ...DEFAULT_STATUS }
   }
 
-  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null
-  const timeoutMs = 12000
-  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null
-
-  try {
-    const res = await api.get('/subscription/status', {
-      params: { userId },
-      signal: controller?.signal,
-      timeout: timeoutMs,
-    })
-    const normalized = normalizeStatus(res?.data)
-    writeCachedStatus(userId, normalized)
-    return normalized
-  } catch (err) {
-    const cached = readCachedStatus(userId)
-    if (cached) {
-      console.info('Subscription status fallback to cache:', err?.message || err)
-      return normalizeStatus(cached)
-    }
-    const message = err?.response?.data || err?.message || err
-    if (err?.code === 'ERR_CANCELED') {
-      console.warn('Subscription status request timed out, using defaults')
-    } else {
-      console.error('Subscription status error:', message)
-    }
-    return { ...DEFAULT_STATUS }
-  } finally {
-    if (timer) clearTimeout(timer)
+  if (!force && inFlightStatusRequests.has(userId)) {
+    return inFlightStatusRequests.get(userId)
   }
+
+  const backoffUntil = timeoutBackoffUntil.get(userId) || 0
+  if (!force && backoffUntil > Date.now()) {
+    const cachedDuringBackoff = readCachedStatus(userId)
+    return cachedDuringBackoff ? normalizeStatus(cachedDuringBackoff) : { ...DEFAULT_STATUS }
+  }
+
+  const request = (async () => {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null
+    const timeoutMs = 12000
+    const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null
+
+    try {
+      const res = await api.get('/subscription/status', {
+        params: { userId },
+        signal: controller?.signal,
+        timeout: timeoutMs,
+      })
+      const normalized = normalizeStatus(res?.data)
+      writeCachedStatus(userId, normalized)
+      timeoutBackoffUntil.delete(userId)
+      return normalized
+    } catch (err) {
+      const cached = readCachedStatus(userId)
+      if (cached) {
+        console.info('Subscription status fallback to cache:', err?.message || err)
+        if (err?.code === 'ERR_CANCELED') {
+          timeoutBackoffUntil.set(userId, Date.now() + TIMEOUT_BACKOFF_MS)
+        }
+        return normalizeStatus(cached)
+      }
+      const message = err?.response?.data || err?.message || err
+      if (err?.code === 'ERR_CANCELED') {
+        timeoutBackoffUntil.set(userId, Date.now() + TIMEOUT_BACKOFF_MS)
+        console.warn('Subscription status request timed out, using defaults')
+      } else {
+        console.error('Subscription status error:', message)
+      }
+      return { ...DEFAULT_STATUS }
+    } finally {
+      if (timer) clearTimeout(timer)
+      inFlightStatusRequests.delete(userId)
+    }
+  })()
+
+  inFlightStatusRequests.set(userId, request)
+  return request
 }
 
 export async function cancelSubscription(userId) {
