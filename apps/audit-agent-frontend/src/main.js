@@ -254,7 +254,7 @@ bootstrapApp().catch((err) => {
 // Android app links / native callback handling
 async function installNativeAppUrlBridge() {
   try {
-    if (!Capacitor?.isNativePlatform?.()) return
+    if (!Capacitor?.isNativePlatform?.() || Capacitor?.getPlatform?.() !== 'android') return
     const { App: CapacitorApp } = await import('@capacitor/app')
     let lastHandledUrl = ''
 

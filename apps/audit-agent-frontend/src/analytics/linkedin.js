@@ -1,7 +1,10 @@
 // Lightweight initializer for LinkedIn Insight Tag
 // Reads partner id from Vite env and injects the script at runtime.
+import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
+
 export function setupLinkedInTag() {
   try {
+    if (isNativePackagedApp()) return
     const partnerId = import.meta.env.VITE_LINKEDIN_PARTNER_ID
     if (!partnerId) return
 
@@ -27,4 +30,3 @@ export function setupLinkedInTag() {
     })(window.lintrk)
   } catch {}
 }
-
