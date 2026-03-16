@@ -6,6 +6,10 @@ const MAX_DURATION_MS = 60_000
 const STOP_FALLBACK_MS = 1_800
 const MIME_CANDIDATES = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4', 'audio/webm']
 
+function canUseBrowserAudioCapture() {
+  return !!navigator?.mediaDevices?.getUserMedia
+}
+
 function pickMimeType() {
   try {
     if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') {
@@ -147,13 +151,18 @@ export function useAudioRecorder(options = {}) {
     } catch (err) {
       console.warn(`${logPrefix} native recorder unavailable, falling back`, err)
       stopStreams()
+      if (!canUseBrowserAudioCapture()) {
+        console.error(`${logPrefix} start failed`, new Error('Voice recording is not available on this device'))
+        state.value = 'error'
+        return
+      }
       try {
         await startFallbackRecorder()
         console.log(`${logPrefix} fallback recorder active`)
       } catch (fallbackError) {
         console.error(`${logPrefix} start failed`, fallbackError)
         state.value = 'error'
-        throw fallbackError
+        return
       }
     }
   }
@@ -185,7 +194,7 @@ export function useAudioRecorder(options = {}) {
     } catch (err) {
       console.error(`${logPrefix} transcription failed`, err)
       state.value = 'error'
-      throw err
+      return
     } finally {
       releaseRecorder()
       if (state.value === 'error') {

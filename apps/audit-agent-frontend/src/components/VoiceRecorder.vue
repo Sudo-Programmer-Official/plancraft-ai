@@ -143,10 +143,14 @@ const primaryLabel = computed(() => {
   return 'Start recording'
 })
 
-function handlePrimaryPress() {
+async function handlePrimaryPress() {
   if (props.disabled || state.value === 'transcribing') return
-  if (state.value === 'recording') stopRecording()
-  else startRecording()
+  try {
+    if (state.value === 'recording') await stopRecording()
+    else await startRecording()
+  } catch (error) {
+    console.warn('[VoiceRecorder] primary action failed', error)
+  }
 }
 
 watch(

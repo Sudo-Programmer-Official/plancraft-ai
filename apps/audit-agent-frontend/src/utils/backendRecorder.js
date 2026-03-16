@@ -65,6 +65,10 @@ export async function recordAndSendToBackend(
   onResult,
   { timeSliceMs = 4000, mode = "final", emitFinalResult = mode === "final" } = {}
 ) {
+  if (!navigator?.mediaDevices?.getUserMedia) {
+    throw new Error("Browser microphone APIs unavailable")
+  }
+
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
 
   const mimeType = resolveMimeType()
