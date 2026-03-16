@@ -3,6 +3,7 @@ import { Capacitor } from '@capacitor/core'
 
 const DEFAULT_REDIRECT = '/dashboard'
 export const NATIVE_AUTH_CALLBACK_PATH = '/app-auth/complete'
+export const ANDROID_APP_PACKAGE = 'com.sudoprogrammer.plancraftai'
 
 export function normalizeRedirectPath(target, fallback = DEFAULT_REDIRECT) {
   if (typeof target !== 'string') return fallback
@@ -36,6 +37,13 @@ export function buildNativeAuthFallbackSchemeUrl({ code, redirect } = {}) {
   if (code) params.set('code', code)
   params.set('redirect', normalizeRedirectPath(redirect))
   return `plancraftai://localhost${NATIVE_AUTH_CALLBACK_PATH}?${params.toString()}`
+}
+
+export function buildNativeAuthAndroidIntentUrl({ code, redirect } = {}) {
+  const params = new URLSearchParams()
+  if (code) params.set('code', code)
+  params.set('redirect', normalizeRedirectPath(redirect))
+  return `intent://localhost${NATIVE_AUTH_CALLBACK_PATH}?${params.toString()}#Intent;scheme=plancraftai;package=${ANDROID_APP_PACKAGE};end`
 }
 
 export function parseNativeAuthCallbackUrl(rawUrl = '') {

@@ -315,6 +315,7 @@ import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
 import { useSeoMeta } from '@/composables/useSeoMeta'
+import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -335,8 +336,9 @@ const inputText = ref('')
 const chatContainer = ref(null)
 const messageSeed = ref(0)
 const isTranscribing = ref(false)
+const prefersNativeVoiceFallback = isNativePackagedApp()
 const SpeechRecognitionClass =
-  typeof window !== 'undefined'
+  !prefersNativeVoiceFallback && typeof window !== 'undefined'
     ? window.SpeechRecognition || window.webkitSpeechRecognition
     : null
 const hasSpeechRecognitionInput = Boolean(SpeechRecognitionClass)
@@ -390,7 +392,7 @@ const isVoiceOn = ref(DEFAULT_VOICE_ENABLED)
 const voiceRequestingFor = ref(null)
 const activeAudio = ref(null)
 const audioCleanupMap = new WeakMap()
-const hasWebSpeech = supportsWebSpeech()
+const hasWebSpeech = !prefersNativeVoiceFallback && supportsWebSpeech()
 let voiceRequestToken = 0
 const lastAutoSpokenMessageId = ref(null)
 const VOICE_PLAYBACK_RATE = Number(import.meta.env.VITE_ASSISTANT_VOICE_RATE || 0.92)

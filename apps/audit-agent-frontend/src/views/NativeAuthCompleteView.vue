@@ -31,6 +31,7 @@
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  buildNativeAuthAndroidIntentUrl,
   buildNativeAuthFallbackSchemeUrl,
   normalizeRedirectPath,
 } from '@/services/mobileAuthHandoffService'
@@ -49,10 +50,18 @@ const fallbackUrl = computed(() =>
     redirect: redirectTarget.value,
   }),
 )
+const androidIntentUrl = computed(() =>
+  buildNativeAuthAndroidIntentUrl({
+    code: code.value,
+    redirect: redirectTarget.value,
+  }),
+)
 
 function openApp() {
   if (!code.value) return
-  window.location.assign(fallbackUrl.value)
+  const ua = String(navigator.userAgent || '').toLowerCase()
+  const isAndroid = ua.includes('android')
+  window.location.assign(isAndroid ? androidIntentUrl.value : fallbackUrl.value)
 }
 
 function continueOnWeb() {
@@ -67,14 +76,31 @@ onMounted(() => {
 
   const ua = String(navigator.userAgent || '').toLowerCase()
   const isAndroid = ua.includes('android')
+  let appLaunchDetected = false
+
+  const markAppLaunch = () => {
+    appLaunchDetected = document.visibilityState === 'hidden'
+  }
+
+  document.addEventListener('visibilitychange', markAppLaunch)
+  window.addEventListener('pagehide', () => {
+    appLaunchDetected = true
+  }, { once: true })
+
   if (isAndroid && code.value) {
     window.setTimeout(() => {
-      openApp()
-    }, 180)
+      if (appLaunchDetected) return
+      window.location.assign(androidIntentUrl.value)
+    }, 120)
+    window.setTimeout(() => {
+      if (appLaunchDetected) return
+      window.location.assign(fallbackUrl.value)
+    }, 900)
   }
 
   window.setTimeout(() => {
+    if (appLaunchDetected) return
     continueOnWeb()
-  }, 1800)
+  }, 3200)
 })
 </script>

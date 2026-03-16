@@ -1,6 +1,32 @@
+const NATIVE_IOS_AUTH_SNAPSHOT_KEY = 'nativeIosAuthSnapshot'
+
+export function readNativeIosAuthSnapshot() {
+  try {
+    const raw = localStorage.getItem(NATIVE_IOS_AUTH_SNAPSHOT_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+export function writeNativeIosAuthSnapshot(snapshot) {
+  try {
+    if (!snapshot || typeof snapshot !== 'object') return
+    localStorage.setItem(NATIVE_IOS_AUTH_SNAPSHOT_KEY, JSON.stringify(snapshot))
+  } catch {}
+}
+
+export function clearNativeIosAuthSnapshot() {
+  try {
+    localStorage.removeItem(NATIVE_IOS_AUTH_SNAPSHOT_KEY)
+  } catch {}
+}
+
 export function clearStoredAuthArtifacts() {
   try {
-    const localKeys = ['user', 'token', 'authStore', 'sessionBackup', 'auth', 'authUser']
+    const localKeys = ['user', 'token', 'authStore', 'sessionBackup', 'auth', 'authUser', NATIVE_IOS_AUTH_SNAPSHOT_KEY]
     localKeys.forEach((key) => localStorage.removeItem(key))
 
     const dynamicLocalKeys = []

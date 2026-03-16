@@ -90,6 +90,7 @@ import {
   setSocialEnabled,
 } from '@/services/social'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
+import { openExternalUrl } from '@/utils/nativeUi'
 
 const authStore = useAuthStore()
 const workspaceStore = useWorkspaceStore()
@@ -142,7 +143,9 @@ async function connectLinkedIn() {
     if (!authStore.user?.uid) throw new Error('Sign in to connect LinkedIn')
     const url = await getLinkedInAuthUrl()
     if (!url) throw new Error('No LinkedIn auth URL returned')
-    window.location.href = url
+    if (!openExternalUrl(url)) {
+      throw new Error('Unable to open LinkedIn auth')
+    }
   } catch (e: any) {
     const msg = e?.response?.data?.error || e?.message || 'Failed to connect LinkedIn'
     state.linkedin.error = msg
@@ -159,7 +162,9 @@ async function connectInstagram() {
     if (!authStore.user?.uid) throw new Error('Sign in to connect Instagram')
     const url = await getInstagramAuthUrl()
     if (!url) throw new Error('No Instagram auth URL returned')
-    window.location.href = url
+    if (!openExternalUrl(url)) {
+      throw new Error('Unable to open Instagram auth')
+    }
   } catch (e: any) {
     const msg = e?.response?.data?.error || e?.message || 'Failed to connect Instagram'
     state.instagram.error = msg
@@ -176,7 +181,9 @@ async function connectTwitter() {
     if (!authStore.user?.uid) throw new Error('Sign in to connect Twitter')
     const url = await getTwitterAuthUrl()
     if (!url) throw new Error('No Twitter auth URL returned')
-    window.location.href = url
+    if (!openExternalUrl(url)) {
+      throw new Error('Unable to open Twitter auth')
+    }
   } catch (e: any) {
     const msg = e?.response?.data?.error || e?.message || 'Failed to connect Twitter'
     state.twitter.error = msg

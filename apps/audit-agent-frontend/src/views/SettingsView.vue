@@ -227,11 +227,11 @@
             <input type="checkbox" v-model="prefs.email" class="accent-indigo-500" @change="dirty = true" />
             <span>Email Notifications</span>
           </label>
-          <label class="flex items-center gap-3">
+          <label class="flex items-center gap-3" v-if="canUseBrowserPush">
             <input type="checkbox" v-model="prefs.pwa" class="accent-indigo-500" @change="dirty = true" />
             <span>Push Notifications (PWA)</span>
           </label>
-          <div v-if="prefs.pwa" class="pl-7 mt-2">
+          <div v-if="canUseBrowserPush && prefs.pwa" class="pl-7 mt-2">
             <el-button size="small" @click="enablePush" class="bg-slate-800 hover:bg-slate-700">Enable Browser Push</el-button>
           </div>
           <label class="flex items-center gap-3">
@@ -613,6 +613,8 @@ import { db } from '@/firebase/init'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import AvatarUploader from '@/components/AvatarUploader.vue'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
+import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
+import { copyText, openExternalUrl } from '@/utils/nativeUi'
 import dayjs from 'dayjs'
 
 const authStore = useAuthStore()
@@ -621,6 +623,7 @@ const route = useRoute()
 const subStore = useSubscriptionStore()
 const { refresh: refreshPremium } = useIsPremium()
 const workspaceStore = useWorkspaceStore()
+const canUseBrowserPush = computed(() => !isNativePackagedApp())
 const teamWorkspaces = computed(() =>
   (workspaceStore.workspaces || []).filter((w) => (w.workspaceType || w.type) === 'team'),
 )
@@ -784,7 +787,7 @@ const cooldownDefault = getCooldownSeconds()
 // Notification preferences state
 const prefs = reactive({
   email: true,
-  pwa: true,
+  pwa: canUseBrowserPush.value,
   whatsapp: true,
   sms: false,
   voice_call: false,
@@ -830,14 +833,14 @@ onMounted(async () => {
       if (chans) {
         const set = new Set(chans)
         prefs.email = set.has('email') || !!n.email || true
-        prefs.pwa = set.has('pwa') || !!n.push || true
+        prefs.pwa = canUseBrowserPush.value ? (set.has('pwa') || !!n.push || true) : false
         prefs.whatsapp = set.has('whatsapp') || !!n.whatsapp || true
         prefs.sms = set.has('sms') || !!n.sms || false
         prefs.voice_call = set.has('voice_call') || !!n.voice_call || false
       } else {
         // default to all if not specified
         prefs.email = n.email !== undefined ? !!n.email : true
-        prefs.pwa = n.push !== undefined ? !!n.push : true
+        prefs.pwa = canUseBrowserPush.value ? (n.push !== undefined ? !!n.push : true) : false
         prefs.whatsapp = n.whatsapp !== undefined ? !!n.whatsapp : true
         prefs.sms = !!n.sms
         prefs.voice_call = !!n.voice_call
@@ -954,10 +957,10 @@ async function generateGptCode() {
 async function copyGptCode() {
   if (!gptLink.code) return
   try {
-    if (typeof navigator === 'undefined' || !navigator?.clipboard?.writeText) {
+    const copied = await copyText(gptLink.code)
+    if (!copied) {
       throw new Error('Clipboard unavailable')
     }
-    await navigator.clipboard.writeText(gptLink.code)
     if (gptCopyTimer) clearTimeout(gptCopyTimer)
     gptLink.copied = true
     gptCopyTimer = setTimeout(() => {
@@ -992,7 +995,10 @@ function focusGptCard(autoGenerate = false) {
 
 function openChatGpt() {
   if (!gptLaunchUrl) return
-  window.open(gptLaunchUrl, '_blank', 'noopener,noreferrer')
+  const opened = openExternalUrl(gptLaunchUrl)
+  if (!opened) {
+    ElMessage.error('Unable to open ChatGPT right now')
+  }
 }
 
 // Delivery endpoints (per-channel identifiers)
@@ -1051,8 +1057,14 @@ async function connectGoogle() {
   try {
     if (!authStore.user?.uid) return
     const url = await requestGoogleConnectUrl(authStore.user.uid)
-    if (url) window.location.href = url
-    else ElMessage.error('Failed to get Google consent URL')
+    if (!url) {
+      ElMessage.error('Failed to get Google consent URL')
+      return
+    }
+    const opened = openExternalUrl(url)
+    if (!opened) {
+      ElMessage.error('Unable to open Google consent right now')
+    }
   } catch (e) {
     ElMessage.error(e?.response?.data?.error || 'Failed to start Google connect')
   }
@@ -1252,6 +1264,7 @@ async function saveSettings() {
   try {
     // Normalize phone before persisting
     try {
+      if (!canUseBrowserPush.value) prefs.pwa = false
       const cc = guessCountryFromLocale()
       const rawSms = integrationEndpoints.value?.sms?.phone
       const normSms = normalizePhone(rawSms, cc)
@@ -1262,13 +1275,13 @@ async function saveSettings() {
     } catch {}
     const channels = []
     if (prefs.email) channels.push('email')
-    if (prefs.pwa) channels.push('pwa')
+    if (canUseBrowserPush.value && prefs.pwa) channels.push('pwa')
     if (prefs.whatsapp) channels.push('whatsapp')
     if (prefs.sms) channels.push('sms')
   if (prefs.voice_call) channels.push('voice_call')
   const notifications = {
     email: !!prefs.email,
-    push: !!prefs.pwa,
+    push: !!(canUseBrowserPush.value && prefs.pwa),
     whatsapp: !!prefs.whatsapp,
     sms: !!prefs.sms,
     discord: !!prefs.discord,
@@ -1544,6 +1557,7 @@ function resetReauth() {
 async function enablePush() {
   try {
     if (!authStore.user?.uid) throw new Error('Not signed in')
+    if (!canUseBrowserPush.value) throw new Error('Browser push is only available in the web/PWA app.')
     await subscribeUserToPush(authStore.user.uid)
     ElMessage.success('🔔 Push notifications enabled')
   } catch (e) {

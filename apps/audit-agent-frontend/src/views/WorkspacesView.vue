@@ -508,6 +508,7 @@ import {
   updateMemberRole,
 } from '@/services/workspaceService'
 import { canUseFeature } from '@/utils/entitlements'
+import { copyText } from '@/utils/nativeUi'
 
 const workspaceStore = useWorkspaceStore()
 const authStore = useAuthStore()
@@ -771,7 +772,8 @@ async function sendInvite() {
       ElMessage.warning('Email failed — copy the invite link below.')
     } else if (link) {
       try {
-        await navigator.clipboard.writeText(link)
+        const copied = await copyText(link)
+        if (!copied) throw new Error('Clipboard unavailable')
         ElMessage.success('Invite link copied')
       } catch {
         ElMessage.success('Invite created')
@@ -791,7 +793,8 @@ async function copyInviteLink(link = null) {
   const value = link || inviteLink.value
   if (!value) return
   try {
-    await navigator.clipboard.writeText(value)
+    const copied = await copyText(value)
+    if (!copied) throw new Error('Clipboard unavailable')
     ElMessage.success('Invite link copied')
   } catch {
     ElMessage.success('Invite link ready')

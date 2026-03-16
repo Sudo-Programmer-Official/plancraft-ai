@@ -15,7 +15,7 @@
 
       <div class="flex flex-col gap-3">
         <RouterLink
-          to="/settings?tab=notifications"
+          to="/settings?tab=account-notifications"
           class="bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-400 hover:to-violet-400
                  text-white px-5 py-2.5 rounded-xl text-center font-medium transition-all duration-200
                  shadow-md hover:shadow-violet-500/30 active:scale-[0.98]"

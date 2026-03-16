@@ -74,11 +74,17 @@ try {
 import { auth } from '@/firebase/init'
 
 const app = createApp(App)
+const pinia = createPinia()
 
 // Plugins
 app.use(ElementPlus)
+app.use(pinia)
+
+// ✅ Auth store init
+const authStore = useAuthStore(pinia)
+authStore.init()
+
 app.use(router)
-app.use(createPinia())
 app.use(createHead())
 
 // Global components
@@ -145,10 +151,6 @@ initAnalytics()
 bindRouter(router)
 // LinkedIn Insight Tag (env-driven)
 try { setupLinkedInTag() } catch {}
-
-// ✅ Auth store init
-const authStore = useAuthStore()
-authStore.init()
 
 // 🆕 Restore Google redirect login results (fix for Safari / LinkedIn)
 try {

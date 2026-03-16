@@ -41,7 +41,12 @@ import {
   getNativeAuthRestriction,
   supportsNativeGoogleRedirectBridge,
 } from '@/utils/nativeAuthSupport'
-import { clearStoredAuthArtifacts } from '@/utils/authStorage'
+import {
+  clearNativeIosAuthSnapshot,
+  clearStoredAuthArtifacts,
+  readNativeIosAuthSnapshot,
+  writeNativeIosAuthSnapshot,
+} from '@/utils/authStorage'
 import {
   buildNativeAuthCallbackUrl,
   consumeMobileAuthHandoff,
@@ -150,6 +155,134 @@ function mapIdentityToolkitError(rawMessage) {
         message: code || 'Native sign-in failed.',
       }
   }
+}
+
+function buildNativeIosSnapshotFromIdentityToolkitSession(data, fallback = {}) {
+  const claims = parseJwtPayload(data?.idToken || data?.id_token || fallback?.idToken || '')
+  const expiresInRaw = Number(data?.expiresIn || data?.expires_in || fallback?.expiresIn || 3600)
+  const expiresIn = Number.isFinite(expiresInRaw) && expiresInRaw > 0 ? expiresInRaw : 3600
+  const obtainedAt = Date.now()
+  return {
+    localId: String(data?.localId || data?.local_id || data?.user_id || claims?.user_id || claims?.sub || fallback?.localId || ''),
+    idToken: String(data?.idToken || data?.id_token || fallback?.idToken || ''),
+    refreshToken: String(data?.refreshToken || data?.refresh_token || fallback?.refreshToken || ''),
+    expiresIn,
+    expiresAt: obtainedAt + (expiresIn * 1000),
+    obtainedAt,
+    email:
+      (typeof data?.email === 'string' && data.email) ||
+      (typeof claims?.email === 'string' && claims.email) ||
+      fallback?.email ||
+      '',
+    displayName:
+      (typeof data?.displayName === 'string' && data.displayName) ||
+      (typeof claims?.name === 'string' && claims.name) ||
+      fallback?.displayName ||
+      '',
+    photoUrl:
+      (typeof data?.photoUrl === 'string' && data.photoUrl) ||
+      (typeof data?.photoURL === 'string' && data.photoURL) ||
+      (typeof claims?.picture === 'string' && claims.picture) ||
+      fallback?.photoUrl ||
+      '',
+    phoneNumber:
+      (typeof data?.phoneNumber === 'string' && data.phoneNumber) ||
+      (typeof claims?.phone_number === 'string' && claims.phone_number) ||
+      fallback?.phoneNumber ||
+      '',
+    emailVerified:
+      typeof data?.emailVerified === 'boolean'
+        ? data.emailVerified
+        : claims?.email_verified === true || fallback?.emailVerified === true,
+  }
+}
+
+function buildNativeIosSnapshotFromFirebaseUser(user, token = '') {
+  const expiresAt = Number(user?.stsTokenManager?.expirationTime || 0)
+  const expiresIn = Math.max(300, Math.round((expiresAt - Date.now()) / 1000) || 3600)
+  const existing = readNativeIosAuthSnapshot() || {}
+  return {
+    localId: user?.uid || existing?.localId || '',
+    idToken: token || existing?.idToken || '',
+    refreshToken: user?.stsTokenManager?.refreshToken || existing?.refreshToken || '',
+    expiresIn,
+    expiresAt: expiresAt > 0 ? expiresAt : Date.now() + (expiresIn * 1000),
+    obtainedAt: Date.now(),
+    email: user?.email || existing?.email || '',
+    displayName: user?.displayName || existing?.displayName || '',
+    photoUrl: user?.photoURL || existing?.photoUrl || '',
+    phoneNumber: user?.phoneNumber || existing?.phoneNumber || '',
+    emailVerified: user?.emailVerified === true || existing?.emailVerified === true,
+  }
+}
+
+function persistNativeIosAuthSnapshot(snapshotLike, fallback = {}) {
+  const snapshot = buildNativeIosSnapshotFromIdentityToolkitSession(snapshotLike, fallback)
+  if (!snapshot.localId || !snapshot.idToken || !snapshot.refreshToken) return
+  writeNativeIosAuthSnapshot(snapshot)
+}
+
+async function refreshNativeIosAuthSnapshot(snapshot) {
+  const apiKey = getFirebaseApiKey()
+  const response = await withTimeout(
+    CapacitorHttp.post({
+      url: `https://securetoken.googleapis.com/v1/token?key=${encodeURIComponent(apiKey)}`,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      data: `grant_type=refresh_token&refresh_token=${encodeURIComponent(snapshot?.refreshToken || '')}`,
+      connectTimeout: 12000,
+      readTimeout: 12000,
+    }),
+    12000,
+    'native iOS token refresh',
+  )
+
+  const data = response?.data || {}
+  const errorMessage = data?.error?.message
+  if (errorMessage || !data?.id_token || !data?.refresh_token) {
+    const mapped = mapIdentityToolkitError(errorMessage)
+    const err = new Error(mapped.message)
+    err.code = mapped.code
+    throw err
+  }
+
+  return buildNativeIosSnapshotFromIdentityToolkitSession(
+    {
+      idToken: data.id_token,
+      refreshToken: data.refresh_token,
+      localId: data.user_id,
+      expiresIn: data.expires_in,
+    },
+    snapshot,
+  )
+}
+
+async function restoreNativeIosSessionFromSnapshot() {
+  const snapshot = readNativeIosAuthSnapshot()
+  if (!snapshot?.localId || !snapshot?.refreshToken) return null
+
+  let activeSnapshot = snapshot
+  const expiresAt = Number(snapshot?.expiresAt || 0)
+  if (!snapshot?.idToken || !expiresAt || expiresAt <= Date.now() + 60 * 1000) {
+    activeSnapshot = await refreshNativeIosAuthSnapshot(snapshot)
+    writeNativeIosAuthSnapshot(activeSnapshot)
+  }
+
+  const user = await hydrateNativeIosCustomTokenUser(activeSnapshot, activeSnapshot?.email || '', 2500)
+  return {
+    user,
+    token: activeSnapshot?.idToken || '',
+    snapshot: activeSnapshot,
+  }
+}
+
+async function forceClearNativeIosAuthState() {
+  try {
+    const { _castAuth } = await import('@firebase/auth/internal')
+    const authInternal = _castAuth(auth)
+    try { authInternal.currentUser?._stopProactiveRefresh?.() } catch {}
+    authInternal.currentUser = null
+    try { authInternal.notifyAuthListeners?.() } catch {}
+  } catch {}
 }
 
 async function nativeIosPasswordSignIn(email, password) {
@@ -269,7 +402,7 @@ async function nativeIosSignInWithCustomToken(customToken) {
   }
 }
 
-async function hydrateNativeIosCustomTokenUser(idTokenResponse, fallbackEmail = '') {
+async function hydrateNativeIosCustomTokenUser(idTokenResponse, fallbackEmail = '', updateTimeoutMs = 8000) {
   const { _castAuth, UserImpl, updateCurrentUser } = await import('@firebase/auth/internal')
   const authInternal = _castAuth(auth)
   const now = String(Date.now())
@@ -308,7 +441,7 @@ async function hydrateNativeIosCustomTokenUser(idTokenResponse, fallbackEmail = 
   try {
     await withTimeout(
       updateCurrentUser(auth, user),
-      8000,
+      updateTimeoutMs,
       'native iOS updateCurrentUser',
     )
   } catch (error) {
@@ -390,6 +523,9 @@ export const useAuthStore = defineStore('authStore', {
         }
       } catch {}
       clearStoredAuthArtifacts()
+      if (isIosCapacitorApp()) {
+        Promise.resolve(forceClearNativeIosAuthState()).catch(() => {})
+      }
       try { clearAppToken() } catch {}
       try {
         import('@/stores/subscriptionStore').then((mod) => {
@@ -440,6 +576,7 @@ export const useAuthStore = defineStore('authStore', {
     async init() {
       const bootstrapTimeoutMs = isNativePackagedApp() ? 4000 : 7000
       const allowCachedSessionFallback = !isIosCapacitorApp()
+      const allowNativeIosSnapshotRestore = isIosCapacitorApp()
       let bootstrapSettled = false
       let bootstrapTimer = null
       const settleBootstrap = (reason) => {
@@ -458,6 +595,42 @@ export const useAuthStore = defineStore('authStore', {
       }
 
       try {
+        if (allowNativeIosSnapshotRestore && !auth.currentUser) {
+          try {
+            const restored = await restoreNativeIosSessionFromSnapshot()
+            if (restored?.user?.uid) {
+              const cachedUser = (() => {
+                try {
+                  return JSON.parse(localStorage.getItem('user') || 'null')
+                } catch {
+                  return null
+                }
+              })()
+              this.user = {
+                uid: restored.user.uid,
+                displayName: restored.user.displayName || cachedUser?.displayName || restored.snapshot?.displayName || '',
+                email: restored.user.email || cachedUser?.email || restored.snapshot?.email || '',
+                photoURL: restored.user.photoURL || cachedUser?.photoURL || restored.snapshot?.photoUrl || '',
+                role: cachedUser?.role || 'user',
+              }
+              this.token = restored.token || readStoredToken()
+              this.guest = false
+              localStorage.setItem('user', JSON.stringify(this.user))
+              if (this.token) localStorage.setItem('token', this.token)
+              console.info('[Auth] Restored native iOS session from local snapshot', {
+                uid: restored.user.uid,
+              })
+            }
+          } catch (error) {
+            console.warn('[Auth] Native iOS snapshot restore failed', {
+              message: error?.message || String(error),
+            })
+            const looksInvalid =
+              /invalid|expired|revoked|disabled|not found|malformed/i.test(String(error?.message || '')) ||
+              /auth\//i.test(String(error?.code || ''))
+            if (looksInvalid) clearNativeIosAuthSnapshot()
+          }
+        }
         bootstrapTimer = window.setTimeout(() => {
           if (bootstrapSettled) return
           console.warn('[Auth] Bootstrap timed out; falling back to cached session or login screen')
@@ -524,6 +697,9 @@ export const useAuthStore = defineStore('authStore', {
             identifyUser(this.user)
             localStorage.setItem('user', JSON.stringify(this.user))
             if (this.token) localStorage.setItem('token', this.token)
+            if (isIosCapacitorApp()) {
+              persistNativeIosAuthSnapshot(buildNativeIosSnapshotFromFirebaseUser(user, this.token), this.user)
+            }
             try {
               import('@/stores/workspaceStore').then((mod) => {
                 try { mod.useWorkspaceStore().init() } catch {}
@@ -557,7 +733,15 @@ export const useAuthStore = defineStore('authStore', {
             this.resetAuth()
           }
           settleBootstrap(user ? 'id-token:user' : 'id-token:none')
-        } catch {
+        } catch (error) {
+          if (isIosCapacitorApp() && (auth.currentUser || this.user)) {
+            console.warn('[Auth] Native iOS id-token bootstrap failed; preserving hydrated session fallback', {
+              message: error?.message || String(error),
+              currentUid: auth.currentUser?.uid || this.user?.uid || null,
+            })
+            settleBootstrap('id-token:ios-fallback')
+            return
+          }
           this.resetAuth()
           settleBootstrap('id-token:error')
         }
@@ -583,6 +767,9 @@ export const useAuthStore = defineStore('authStore', {
               if (token) {
                 this.token = token
                 localStorage.setItem('token', token)
+                if (isIosCapacitorApp() && auth.currentUser) {
+                  persistNativeIosAuthSnapshot(buildNativeIosSnapshotFromFirebaseUser(auth.currentUser, token), this.user || {})
+                }
               }
               // Optionally refresh long-lived app token if enabled and nearing expiry
               try {
@@ -1273,6 +1460,11 @@ export const useAuthStore = defineStore('authStore', {
           console.info('[Auth] Native iOS Identity Toolkit custom token sign-in resolved', {
             uid: tokenSession?.localId || null,
           })
+          persistNativeIosAuthSnapshot(tokenSession, {
+            email,
+            displayName: session?.displayName || '',
+            photoUrl: session?.profilePicture || session?.photoUrl || '',
+          })
 
           const user = await hydrateNativeIosCustomTokenUser(tokenSession, email)
           console.info('[Auth] Native iOS auth state hydrated from custom token', {
@@ -1300,6 +1492,7 @@ export const useAuthStore = defineStore('authStore', {
           })
           localStorage.setItem('user', JSON.stringify(this.user))
           if (this.token) localStorage.setItem('token', this.token)
+          persistNativeIosAuthSnapshot(buildNativeIosSnapshotFromFirebaseUser(user, this.token), this.user)
           try {
             setDoc(
               doc(db, 'users', user.uid),
@@ -1563,7 +1756,7 @@ export const useAuthStore = defineStore('authStore', {
 
     async logout() {
       try {
-        await signOutUser()
+        await withTimeout(signOutUser(), isIosCapacitorApp() ? 5000 : 8000, 'logout sign-out')
       } catch (e) {
         console.warn('Sign-out failed:', e)
       } finally {
@@ -1580,7 +1773,7 @@ export const useAuthStore = defineStore('authStore', {
         this.resetAuth()
         setTimeout(() => {
           try {
-            window.location.href = '/login'
+            window.location.replace('/login')
           } catch {}
         }, 350)
       }

@@ -7,7 +7,8 @@
       "namespace": "android_app",
       "package_name": "com.sudoprogrammer.plancraftai",
       "sha256_cert_fingerprints": [
-        "EE:3F:BD:BF:2E:2F:A6:73:20:92:FC:33:88:2C:2B:72:2D:BA:D6:A9:8C:26:25:3C:21:81:94:6D:0B:75:FB:03"
+        "EE:3F:BD:BF:2E:2F:A6:73:20:92:FC:33:88:2C:2B:72:2D:BA:D6:A9:8C:26:25:3C:21:81:94:6D:0B:75:FB:03",
+        "FF:8E:E9:27:DA:06:67:BD:F4:48:DA:FE:2A:F9:9C:CD:B1:1B:D9:FF:E4:F3:8F:69:B4:53:37:53:3E:BC:84:6F"
       ]
     }
   }
