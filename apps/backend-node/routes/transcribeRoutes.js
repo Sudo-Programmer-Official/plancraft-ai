@@ -34,6 +34,19 @@ function isNativeAppOrigin(origin) {
   return typeof origin === 'string' && /^(capacitor|ionic):\/\/[a-z0-9.-]+$/i.test(origin)
 }
 
+const allowedHeaders = [
+  "Content-Type",
+  "Authorization",
+  "X-App-Token",
+  "X-User-Email",
+  "X-User-Id",
+  "X-User-Role",
+  "X-User-Tz",
+  "X-User-Country",
+  "X-Workspace-Id",
+  "X-Requested-With",
+].join(", ")
+
 const router = express.Router();
 router.use((req, res, next) => {
   const origin = req.headers.origin || "";
@@ -41,11 +54,9 @@ router.use((req, res, next) => {
   const isDevVite = /:5173$/.test(origin);
   if (allowAny || allowedOrigins.includes(origin) || isDevVite || isNativeAppOrigin(origin)) {
     res.set("Access-Control-Allow-Origin", origin);
+    res.set("Vary", "Origin");
   }
-  res.set(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, X-App-Token, X-User-Email, X-User-Id, X-User-Role, X-User-Tz, X-Requested-With"
-  );
+  res.set("Access-Control-Allow-Headers", req.headers["access-control-request-headers"] || allowedHeaders);
   res.set("Access-Control-Allow-Methods", "POST,OPTIONS");
   if (req.method === "OPTIONS") return res.sendStatus(204);
   next();
