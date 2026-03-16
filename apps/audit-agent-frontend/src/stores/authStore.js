@@ -1315,17 +1315,22 @@ export const useAuthStore = defineStore('authStore', {
               console.warn('[Auth] Deferred native iOS email profile sync failed', err)
             })
           } catch {}
-          withFallback(fetchUserProfile(user.uid), {
-            ms: 8000,
-            label: 'native iOS email profile fetch',
-            fallback: { role: 'user' },
-          }).then((profile) => {
-            this.user = {
-              ...(this.user || {}),
-              role: profile?.role || this.user?.role || 'user',
-            }
-            try { localStorage.setItem('user', JSON.stringify(this.user)) } catch {}
-          }).catch(() => {})
+          Promise.resolve()
+            .then(() => withTimeout(fetchUserProfile(user.uid), 5000, 'native iOS email profile fetch'))
+            .then((profile) => {
+              this.user = {
+                ...(this.user || {}),
+                role: profile?.role || this.user?.role || 'user',
+              }
+              try { localStorage.setItem('user', JSON.stringify(this.user)) } catch {}
+            })
+            .catch(() => {
+              this.user = {
+                ...(this.user || {}),
+                role: this.user?.role || 'user',
+              }
+              try { localStorage.setItem('user', JSON.stringify(this.user)) } catch {}
+            })
           try {
             if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
               const mod = await import('@/services/appTokenService.js')
