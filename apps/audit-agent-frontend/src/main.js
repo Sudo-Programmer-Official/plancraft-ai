@@ -82,7 +82,11 @@ app.use(pinia)
 
 // ✅ Auth store init
 const authStore = useAuthStore(pinia)
-authStore.init()
+try {
+  await authStore.init()
+} catch (err) {
+  console.warn('[Auth] Initial bootstrap failed before router install', err)
+}
 
 app.use(router)
 app.use(createHead())
