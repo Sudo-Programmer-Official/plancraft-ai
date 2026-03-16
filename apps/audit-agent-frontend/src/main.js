@@ -82,14 +82,6 @@ app.use(pinia)
 
 // ✅ Auth store init
 const authStore = useAuthStore(pinia)
-try {
-  await authStore.init()
-} catch (err) {
-  console.warn('[Auth] Initial bootstrap failed before router install', err)
-}
-
-app.use(router)
-app.use(createHead())
 
 // Global components
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
@@ -243,7 +235,21 @@ try {
 } catch {}
 
 // Mount app
-app.mount('#app')
+async function bootstrapApp() {
+  try {
+    await authStore.init()
+  } catch (err) {
+    console.warn('[Auth] Initial bootstrap failed before router install', err)
+  }
+
+  app.use(router)
+  app.use(createHead())
+  app.mount('#app')
+}
+
+bootstrapApp().catch((err) => {
+  console.error('[App] Bootstrap failed', err)
+})
 
 // Android app links / native callback handling
 async function installNativeAppUrlBridge() {
