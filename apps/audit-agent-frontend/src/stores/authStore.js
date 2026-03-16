@@ -619,6 +619,7 @@ export const useAuthStore = defineStore('authStore', {
       const bootstrapTimeoutMs = isNativePackagedApp() ? 4000 : 7000
       const allowCachedSessionFallback = !isIosCapacitorApp()
       const allowNativeIosSnapshotRestore = isIosCapacitorApp()
+      let restoredNativeIosSnapshot = false
       let bootstrapSettled = false
       let bootstrapTimer = null
       const settleBootstrap = (reason) => {
@@ -641,6 +642,7 @@ export const useAuthStore = defineStore('authStore', {
           try {
             const restored = await restoreNativeIosSessionFromSnapshot()
             if (restored?.user?.uid) {
+              restoredNativeIosSnapshot = true
               const cachedUser = (() => {
                 try {
                   return JSON.parse(localStorage.getItem('user') || 'null')
@@ -662,6 +664,14 @@ export const useAuthStore = defineStore('authStore', {
               console.info('[Auth] Restored native iOS session from local snapshot', {
                 uid: restored.user.uid,
               })
+              identifyUser(this.user)
+              try {
+                import('@/stores/workspaceStore').then((mod) => {
+                  try { mod.useWorkspaceStore().init() } catch {}
+                })
+              } catch {}
+              this.refreshPlan({ minIntervalMs: 15000 }).catch(() => {})
+              settleBootstrap('ios-snapshot')
             }
           } catch (error) {
             console.warn('[Auth] Native iOS snapshot restore failed', {
@@ -673,24 +683,26 @@ export const useAuthStore = defineStore('authStore', {
             if (looksInvalid) clearNativeIosAuthSnapshot()
           }
         }
-        bootstrapTimer = window.setTimeout(() => {
-          if (bootstrapSettled) return
-          console.warn('[Auth] Bootstrap timed out; falling back to cached session or login screen')
-          if (allowCachedSessionFallback) {
-            try {
-              const cachedUser = localStorage.getItem('user')
-              const cachedToken = localStorage.getItem('token')
-              if (!this.user && cachedUser && cachedToken) {
-                this.user = JSON.parse(cachedUser)
-                this.token = cachedToken
-                this.guest = false
+        if (!bootstrapSettled) {
+          bootstrapTimer = window.setTimeout(() => {
+            if (bootstrapSettled) return
+            console.warn('[Auth] Bootstrap timed out; falling back to cached session or login screen')
+            if (allowCachedSessionFallback) {
+              try {
+                const cachedUser = localStorage.getItem('user')
+                const cachedToken = localStorage.getItem('token')
+                if (!this.user && cachedUser && cachedToken) {
+                  this.user = JSON.parse(cachedUser)
+                  this.token = cachedToken
+                  this.guest = false
+                }
+              } catch (e) {
+                console.warn('[Auth] Bootstrap fallback restore failed', e)
               }
-            } catch (e) {
-              console.warn('[Auth] Bootstrap fallback restore failed', e)
             }
-          }
-          settleBootstrap('timeout')
-        }, bootstrapTimeoutMs)
+            settleBootstrap('timeout')
+          }, bootstrapTimeoutMs)
+        }
       } catch {}
 
       // 🧩 Attempt fast bootstrap from local backup (helps iOS PWA)
@@ -711,12 +723,37 @@ export const useAuthStore = defineStore('authStore', {
       }
 
       onAuthStateChanged(auth, async (user) => {
-        if (!user) this.resetAuth()
-        settleBootstrap(user ? 'auth-state:user' : 'auth-state:none')
+        if (!user) {
+          const nativeSnapshot = isIosCapacitorApp() ? readNativeIosAuthSnapshot() : null
+          const keepNativeSnapshotSession =
+            isIosCapacitorApp() &&
+            restoredNativeIosSnapshot &&
+            !!this.user?.uid &&
+            nativeSnapshot?.localId === this.user.uid
+
+          if (!keepNativeSnapshotSession) {
+            this.resetAuth()
+          }
+          settleBootstrap(keepNativeSnapshotSession ? 'auth-state:ios-snapshot' : 'auth-state:none')
+          return
+        }
+        settleBootstrap('auth-state:user')
       })
 
       onIdTokenChanged(auth, async (user) => {
         try {
+          if (!user) {
+            const nativeSnapshot = isIosCapacitorApp() ? readNativeIosAuthSnapshot() : null
+            const keepNativeSnapshotSession =
+              isIosCapacitorApp() &&
+              restoredNativeIosSnapshot &&
+              !!this.user?.uid &&
+              nativeSnapshot?.localId === this.user.uid
+            if (keepNativeSnapshotSession) {
+              settleBootstrap('id-token:ios-snapshot')
+              return
+            }
+          }
           if (user) {
             const token = await withFallback(user.getIdToken(), {
               ms: 8000,

@@ -11,12 +11,24 @@ import CreatorLayout from '@/layouts/CreatorLayout.vue'
 import PublicLeaderLayout from '@/layouts/PublicLeaderLayout.vue'
 import NotFoundView from '@/views/NotFoundView.vue'
 import { isIosPackagedApp, isNativePackagedApp } from '@/utils/nativeAuthSupport'
+import { readNativeIosAuthSnapshot } from '@/utils/authStorage'
 
-const getCurrentUser = () =>
+const getCurrentUser = (authStore = null) =>
   new Promise((resolve) => {
     const existingUser = getAuth().currentUser
     if (existingUser) {
       resolve(existingUser)
+      return
+    }
+
+    const nativeSnapshotUser =
+      isIosPackagedApp() &&
+      authStore?.user?.uid &&
+      readNativeIosAuthSnapshot()?.localId === authStore.user.uid
+        ? authStore.user
+        : null
+    if (nativeSnapshotUser) {
+      resolve(nativeSnapshotUser)
       return
     }
 
@@ -236,16 +248,33 @@ router.beforeEach(async (to, from, next) => {
       const nextTarget =
         (typeof to.query?.next === 'string' && to.query.next.length && to.query.next) ||
         '/dashboard'
-      const hasStrictSession = !isIosPackagedApp() || !!getAuth().currentUser
+      const hasNativeSnapshotSession =
+        isIosPackagedApp() &&
+        !!authStore?.user?.uid &&
+        readNativeIosAuthSnapshot()?.localId === authStore.user.uid
+      const hasStrictSession = !isIosPackagedApp() || !!getAuth().currentUser || hasNativeSnapshotSession
       if (authStore?.user && !isGuest && hasStrictSession) return next(nextTarget)
     } catch {}
     return next()
   }
 
+  if (to.path === '/') {
+    try {
+      const isGuest = authStore?.isGuest === true || authStore?.guest === true || authStore?.user?.mode === 'guest'
+      const hasNativeSnapshotSession =
+        isIosPackagedApp() &&
+        !!authStore?.user?.uid &&
+        readNativeIosAuthSnapshot()?.localId === authStore.user.uid
+      if (authStore?.user && !isGuest && (getAuth().currentUser || hasNativeSnapshotSession)) {
+        return next('/dashboard')
+      }
+    } catch {}
+  }
+
   // Skip auth guard for public routes
   if (!to.meta.requiresAuth || import.meta.env.SSR) return next()
 
-  const user = await getCurrentUser()
+  const user = await getCurrentUser(authStore)
   if (!user) {
     // Allow offline fallback if we have cached identity
     if (!isIosPackagedApp()) {
