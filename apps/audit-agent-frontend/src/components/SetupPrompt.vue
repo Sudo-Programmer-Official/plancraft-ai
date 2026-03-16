@@ -2,106 +2,194 @@
   <el-dialog
     v-model="open"
     class="setup-prompt"
-    width="520px"
+    width="620px"
     :close-on-click-modal="false"
     :show-close="true"
-     :style="{
+    :style="{
       background: 'linear-gradient(145deg, #1e1b4b, #312e81, #4c1d95)',
       color: '#e2e8f0',
-      borderRadius: '0.5rem',
-      boxShadow: '0 8px 30px rgba(0,0,0,0.6)',
+      borderRadius: '0.75rem',
+      boxShadow: '0 10px 40px rgba(0,0,0,0.6)',
       border: '1px solid rgba(255,255,255,0.08)',
       backdropFilter: 'blur(12px)'
     }"
   >
-    <!-- Header -->
     <template #header>
       <div class="text-center">
-        <h2 class="text-2xl font-bold text-white mb-1">✨ Quick Setup</h2>
+        <h2 class="text-2xl font-bold text-white mb-1">Quick Setup</h2>
         <p class="text-indigo-200 text-sm leading-snug">
-          Let’s sync your reminders and timezone for smoother, timely notifications.
-          <br />
-          <span class="text-slate-400">We only send notifications for your own work — never anything else.</span>
+          Set your timezone, reminder channels, and phone once so reminders work without another trip to settings.
         </p>
       </div>
     </template>
 
-    <!-- Steps -->
-    <div class="space-y-5 mt-5">
-      <!-- Browser Notifications -->
-      <div
-        class="rounded-xl p-5 bg-gradient-to-r from-indigo-950/60 to-purple-950/40 border border-indigo-400/20 backdrop-blur-lg shadow-lg"
-      >
-        <div class="flex items-center justify-between">
+    <div v-loading="loading" class="space-y-5 mt-4">
+      <section class="rounded-2xl border border-white/10 bg-slate-950/30 p-4 space-y-3">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div class="font-medium text-white flex items-center gap-2">
-              🔔 <span>Browser Notifications</span>
-            </div>
-            <p class="text-xs text-slate-400 mt-1 leading-snug">
-              Allow PlanCraftAI to send reminders directly on your device.
+            <p class="text-xs uppercase tracking-[0.28em] text-indigo-200/80">Progress</p>
+            <p class="text-sm text-slate-200">
+              {{ setupState.completedSteps }}/{{ setupState.totalSteps }} setup items complete
             </p>
           </div>
+          <span
+            class="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold"
+            :class="setupState.requiredComplete ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200' : 'border-amber-400/40 bg-amber-500/10 text-amber-100'"
+          >
+            {{ setupState.requiredComplete ? 'Core setup complete' : 'Setup in progress' }}
+          </span>
+        </div>
+        <div class="h-2 overflow-hidden rounded-full bg-white/10">
+          <div class="setup-progress-bar" :style="{ width: `${setupState.completionPercent}%` }" />
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <span
+            v-for="step in setupState.steps"
+            :key="step.key"
+            class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs"
+            :class="step.complete ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200' : 'border-white/10 bg-white/5 text-slate-300'"
+          >
+            <span>{{ step.complete ? '✓' : '•' }}</span>
+            <span>{{ step.label }}</span>
+            <span v-if="!step.required" class="text-[10px] uppercase tracking-[0.2em] text-slate-400">Optional</span>
+          </span>
+        </div>
+        <p v-if="missingRequiredLabels.length" class="text-xs text-amber-200/90">
+          Missing: {{ missingRequiredLabels.join(', ') }}
+        </p>
+      </section>
+
+      <section class="setup-card">
+        <div class="setup-card__header">
+          <div>
+            <div class="setup-card__title">🌎 Timezone</div>
+            <p class="setup-card__copy">Detected locally and used for reminders, meetings, and daily planning.</p>
+          </div>
+          <span class="setup-status" :class="timezoneReady ? 'setup-status--complete' : 'setup-status--pending'">
+            {{ timezoneReady ? 'Ready' : 'Needs review' }}
+          </span>
+        </div>
+        <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div class="rounded-xl border border-white/10 bg-slate-950/30 px-4 py-3 text-sm text-indigo-100">
+            {{ tz }}
+          </div>
+          <el-button size="small" class="!rounded-lg font-semibold" @click="confirmTimezone">
+            Confirm timezone
+          </el-button>
+        </div>
+      </section>
+
+      <section class="setup-card">
+        <div class="setup-card__header">
+          <div>
+            <div class="setup-card__title">📱 Reminder Phone</div>
+            <p class="setup-card__copy">
+              Used for WhatsApp, SMS, and voice reminders so you can finish setup without going to settings.
+            </p>
+          </div>
+          <span class="setup-status" :class="phoneReady ? 'setup-status--complete' : 'setup-status--pending'">
+            {{ phoneReady ? 'Saved' : 'Missing' }}
+          </span>
+        </div>
+        <div class="mt-3 space-y-2">
+          <el-input
+            v-model="reminderPhone"
+            placeholder="+1 234 567 8901"
+            clearable
+            class="w-full"
+            @input="markDirty"
+          />
+          <p class="text-xs text-slate-400">
+            Format as an international number. One phone is applied to your reminder channels by default.
+          </p>
+        </div>
+      </section>
+
+      <section class="setup-card">
+        <div class="setup-card__header">
+          <div>
+            <div class="setup-card__title">🔔 Reminder Channels</div>
+            <p class="setup-card__copy">Choose how PlanCraftAI should reach you first.</p>
+          </div>
+          <span class="setup-status" :class="channelsReady ? 'setup-status--complete' : 'setup-status--pending'">
+            {{ channelsReady ? 'Configured' : 'Pick at least one' }}
+          </span>
+        </div>
+        <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label
+            v-for="channel in channelOptions"
+            :key="channel.key"
+            class="channel-option"
+            :class="{ 'channel-option--active': channelState[channel.key] }"
+          >
+            <input
+              :checked="channelState[channel.key]"
+              type="checkbox"
+              class="accent-indigo-500"
+              @change="toggleChannel(channel.key, $event.target.checked)"
+            />
+            <span class="flex-1">
+              <span class="block text-sm font-medium text-white">{{ channel.label }}</span>
+              <span class="block text-xs text-slate-400">{{ channel.copy }}</span>
+            </span>
+          </label>
+        </div>
+      </section>
+
+      <section v-if="showBrowserNotifications" class="setup-card">
+        <div class="setup-card__header">
+          <div>
+            <div class="setup-card__title">🛎️ Browser Push</div>
+            <p class="setup-card__copy">Optional. Enable device push now if you want instant browser reminders.</p>
+          </div>
+          <span class="setup-status" :class="pushGranted ? 'setup-status--complete' : 'setup-status--pending'">
+            {{ pushGranted ? 'Enabled' : 'Optional' }}
+          </span>
+        </div>
+        <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p class="text-sm text-slate-300">
+            {{ pushGranted ? 'Browser push is ready on this device.' : 'You can skip this and still finish quick setup.' }}
+          </p>
           <el-button
             size="small"
             type="primary"
             class="!rounded-lg font-semibold"
-            @click="enablePush"
             :loading="loadingPush"
-            :disabled="permGranted"
+            :disabled="pushGranted"
+            @click="enablePush"
           >
-            {{ permGranted ? 'Enabled ✓' : 'Enable' }}
+            {{ pushGranted ? 'Enabled ✓' : 'Enable push' }}
           </el-button>
         </div>
-        <p v-if="pushError" class="text-xs text-red-400 mt-2">{{ pushError }}</p>
-      </div>
+      </section>
 
-      <!-- Timezone -->
-      <div
-        class="rounded-xl p-5 bg-gradient-to-r from-indigo-950/60 to-purple-950/40 border border-indigo-400/20 backdrop-blur-lg shadow-lg"
-      >
-        <div class="flex items-center justify-between">
-          <div>
-            <div class="font-medium text-white flex items-center gap-2">
-              🌎 <span>Timezone</span>
-            </div>
-            <p class="text-xs text-slate-400 mt-1 leading-snug">
-              Detected: <span class="text-indigo-300 font-medium">{{ tz }}</span>
-            </p>
-          </div>
-          <el-button
-            size="small"
-            class="!rounded-lg font-semibold"
-            @click="storeTz"
-            type="default"
-          >
-            Confirm
-          </el-button>
-        </div>
-      </div>
+      <p v-if="saveError" class="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+        {{ saveError }}
+      </p>
+      <p v-else-if="saveSuccess" class="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+        {{ saveSuccess }}
+      </p>
     </div>
 
-    <!-- Footer -->
     <template #footer>
-      <div class="flex flex-col sm:flex-row items-center justify-between gap-3 w-full mt-4">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <span class="text-xs text-slate-400 text-center sm:text-left">
-          You can change this anytime later in
-          <RouterLink
-            to="/settings?tab=notifications"
-            class="text-indigo-300 hover:text-indigo-200 underline"
-            >Settings → Notifications</RouterLink
-          >.
+          You can continue later from the dashboard setup banner or
+          <RouterLink to="/settings?tab=notifications" class="text-indigo-300 hover:text-indigo-200 underline">
+            Settings → Notifications
+          </RouterLink>.
         </span>
-        <div class="flex gap-2">
-          <RouterLink
-            v-if="isGuest"
-            to="/login"
-            class="el-button el-button--default !rounded-lg"
+        <div class="flex flex-wrap items-center justify-center gap-2">
+          <el-button class="!rounded-lg" :disabled="saving" @click="dismiss">
+            Later
+          </el-button>
+          <el-button
+            type="primary"
+            class="!rounded-lg font-semibold"
+            :loading="saving"
+            @click="saveAndClose"
           >
-            🔑 Sign in to save
-          </RouterLink>
-          <el-button @click="dismiss" class="!rounded-lg">Skip</el-button>
-          <el-button type="primary" @click="finish" class="!rounded-lg font-semibold">
-            Done
+            {{ setupState.requiredComplete ? 'Complete setup' : 'Save progress' }}
           </el-button>
         </div>
       </div>
@@ -110,83 +198,363 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { db } from '@/firebase/init'
 import { hasSubscription, registerPushSubscription } from '@/services/pushService'
+import { getIntegrations, getPreferences, updateIntegrations, updatePreferences } from '@/services/settingsService'
 import { useAuthFlags } from '@/composables/useAuthFlags'
 import { useAuthStore } from '@/stores/authStore'
-import { useRouter } from 'vue-router'
+import { guessCountryFromLocale, normalizePhone } from '@/utils/phoneUtils'
+import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
+import {
+  buildQuickSetupState,
+  clearQuickSetupSnooze,
+  dispatchQuickSetupUpdated,
+  getIncompleteQuickSetupLabels,
+  normalizeQuickSetupChannels,
+  readQuickSetupState,
+  snoozeQuickSetup,
+  writeQuickSetupState,
+} from '@/utils/quickSetup'
 
-const router = useRouter()
-
-const { isGuest } = useAuthFlags()
 const props = defineProps({ open: { type: Boolean, default: true } })
-const emit = defineEmits(['close', 'done'])
+const emit = defineEmits(['close', 'done', 'updated'])
+
+const authStore = useAuthStore()
+const { isGuest } = useAuthFlags()
 
 const open = ref(props.open)
+const loading = ref(false)
+const saving = ref(false)
 const loadingPush = ref(false)
-const permGranted = ref(false)
-const pushError = ref('')
+const saveError = ref('')
+const saveSuccess = ref('')
+const dirty = ref(false)
 const tz = ref('UTC')
+const reminderPhone = ref('')
+const pushGranted = ref(false)
 
-onMounted(async () => {
-  // Skip if already done
-  const done = localStorage.getItem('pcai_setup_done')
-  if (done === '1') {
-    open.value = false
-    return
-  }
+const showBrowserNotifications = computed(() => !isNativePackagedApp())
+const timezoneReady = computed(() => !!tz.value && tz.value !== 'UTC')
+const channelState = reactive({
+  email: true,
+  whatsapp: false,
+  sms: false,
+  voice_call: false,
+})
+const channelOptions = [
+  { key: 'email', label: 'Email', copy: 'Fallback reminders to your account email.' },
+  { key: 'whatsapp', label: 'WhatsApp', copy: 'Best for quick reminder nudges and async follow-ups.' },
+  { key: 'sms', label: 'SMS', copy: 'Text reminders to the phone you save here.' },
+  { key: 'voice_call', label: 'Voice Call', copy: 'Phone call reminders for time-sensitive tasks.' },
+]
 
-  try {
-    tz.value = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-  } catch {
-    tz.value = 'UTC'
-  }
-  try {
-    permGranted.value = (typeof Notification !== 'undefined' && Notification.permission === 'granted')
-  } catch {}
+const existingPreferenceIntegrations = ref({
+  googleCalendar: false,
+  slack: false,
+  discord: false,
+  outlook: false,
+  whatsapp: false,
+})
+const existingNotifications = ref({
+  discord: false,
+})
+const existingIntegrations = ref({
+  whatsapp: { phone: '' },
+  sms: { phone: '' },
+  discord: { webhook: '' },
+  slack: { userId: '', token: '' },
+  email: '',
 })
 
+const selectedChannels = computed(() =>
+  normalizeQuickSetupChannels(
+    [
+      channelState.email && 'email',
+      channelState.whatsapp && 'whatsapp',
+      channelState.sms && 'sms',
+      channelState.voice_call && 'voice_call',
+      showBrowserNotifications.value && pushGranted.value && 'pwa',
+    ].filter(Boolean)
+  )
+)
+const channelsReady = computed(() => selectedChannels.value.length > 0)
+const phoneReady = computed(() => !!String(reminderPhone.value || '').trim())
+const setupState = computed(() =>
+  buildQuickSetupState({
+    timezone: tz.value,
+    channels: selectedChannels.value,
+    phone: reminderPhone.value,
+    pushGranted: pushGranted.value,
+    isNative: isNativePackagedApp(),
+  })
+)
+const missingRequiredLabels = computed(() => getIncompleteQuickSetupLabels(setupState.value))
+
+function markDirty() {
+  dirty.value = true
+  saveError.value = ''
+  saveSuccess.value = ''
+}
+
+function emitSetupState(state = setupState.value) {
+  writeQuickSetupState(state)
+  dispatchQuickSetupUpdated(state)
+  emit('updated', state)
+}
+
+function applyChannels(channels) {
+  const set = new Set(normalizeQuickSetupChannels(channels))
+  channelState.email = set.has('email')
+  channelState.whatsapp = set.has('whatsapp')
+  channelState.sms = set.has('sms')
+  channelState.voice_call = set.has('voice_call')
+  pushGranted.value =
+    set.has('pwa') ||
+    (
+      showBrowserNotifications.value &&
+      typeof globalThis !== 'undefined' &&
+      typeof globalThis.Notification !== 'undefined' &&
+      globalThis.Notification.permission === 'granted'
+    )
+}
+
+function deriveChannels(notifications = {}) {
+  const direct = normalizeQuickSetupChannels(notifications?.channels)
+  if (direct.length) return direct
+  return normalizeQuickSetupChannels([
+    notifications?.email && 'email',
+    (notifications?.push || notifications?.pwa) && 'pwa',
+    notifications?.whatsapp && 'whatsapp',
+    notifications?.sms && 'sms',
+    notifications?.voice_call && 'voice_call',
+  ])
+}
+
+async function loadSetup() {
+  loading.value = true
+  saveError.value = ''
+  try {
+    const stored = readQuickSetupState()
+    const guessedTz = localStorage.getItem('user_timezone') || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+    tz.value = stored?.timezone || guessedTz || 'UTC'
+    reminderPhone.value = stored?.phone || ''
+    applyChannels(stored?.channels?.length ? stored.channels : ['email'])
+
+    const userId = authStore?.user?.uid || localStorage.getItem('uid')
+    if (userId) {
+      const [prefData, integrationsData, userSnap] = await Promise.all([
+        getPreferences(userId).catch(() => ({})),
+        getIntegrations(userId).catch(() => ({})),
+        getDoc(doc(db, 'users', userId)).catch(() => null),
+      ])
+
+      existingPreferenceIntegrations.value = {
+        googleCalendar: !!prefData?.integrations?.googleCalendar,
+        slack: !!prefData?.integrations?.slack,
+        discord: !!prefData?.integrations?.discord,
+        outlook: !!prefData?.integrations?.outlook,
+        whatsapp: !!prefData?.integrations?.whatsapp,
+      }
+      existingNotifications.value = {
+        discord: !!prefData?.notifications?.discord,
+      }
+
+      existingIntegrations.value = {
+        whatsapp: { ...(integrationsData?.whatsapp || {}), phone: integrationsData?.whatsapp?.phone || '' },
+        sms: { ...(integrationsData?.sms || {}), phone: integrationsData?.sms?.phone || '' },
+        discord: { ...(integrationsData?.discord || {}), webhook: integrationsData?.discord?.webhook || '' },
+        slack: {
+          ...(integrationsData?.slack || {}),
+          userId: integrationsData?.slack?.userId || '',
+          token: integrationsData?.slack?.token || '',
+        },
+        email: integrationsData?.email || authStore?.user?.email || '',
+      }
+
+      const loadedChannels = deriveChannels(prefData?.notifications || {})
+      if (loadedChannels.length) applyChannels(loadedChannels)
+
+      const userData = userSnap?.exists?.() ? (userSnap.data() || {}) : {}
+      reminderPhone.value =
+        integrationsData?.sms?.phone ||
+        integrationsData?.whatsapp?.phone ||
+        userData?.phone ||
+        authStore?.user?.phone ||
+        reminderPhone.value
+    }
+
+    emitSetupState()
+    if (setupState.value.completed) {
+      open.value = false
+      emit('done')
+    }
+  } catch (error) {
+    saveError.value = error?.message || 'Failed to load quick setup.'
+  } finally {
+    dirty.value = false
+    loading.value = false
+  }
+}
+
+function confirmTimezone() {
+  try {
+    localStorage.setItem('user_timezone', tz.value)
+  } catch {}
+  markDirty()
+  emitSetupState()
+}
+
+function toggleChannel(key, checked) {
+  channelState[key] = !!checked
+  markDirty()
+  emitSetupState()
+}
+
 async function enablePush() {
+  if (!showBrowserNotifications.value) return
   try {
     loadingPush.value = true
-    pushError.value = ''
-    if (typeof Notification !== 'undefined') {
-      const perm = await Notification.requestPermission()
-      permGranted.value = perm === 'granted'
+    saveError.value = ''
+    if (typeof globalThis === 'undefined' || typeof globalThis.Notification === 'undefined') {
+      throw new Error('Browser notifications are not supported on this device.')
     }
-    const uid = useAuthStore()?.user?.uid || localStorage.getItem('uid')
-    if (uid && !(await hasSubscription())) {
-      await registerPushSubscription(String(uid))
+    const permission = await globalThis.Notification.requestPermission()
+    pushGranted.value = permission === 'granted'
+    if (pushGranted.value) {
+      const uid = authStore?.user?.uid || localStorage.getItem('uid')
+      if (uid && !(await hasSubscription())) {
+        await registerPushSubscription(String(uid))
+      }
     }
-  } catch (e) {
-    pushError.value = e?.message || 'Failed to enable push notifications.'
+    markDirty()
+    emitSetupState()
+  } catch (error) {
+    saveError.value = error?.message || 'Failed to enable browser push.'
   } finally {
     loadingPush.value = false
   }
 }
 
-function storeTz() {
+async function persistQuickSetup() {
+  saveError.value = ''
+  saveSuccess.value = ''
+  saving.value = true
   try {
-    localStorage.setItem('user_timezone', tz.value)
-  } catch {}
+    const userId = authStore?.user?.uid || localStorage.getItem('uid')
+    const normalizedPhone = reminderPhone.value
+      ? normalizePhone(reminderPhone.value, guessCountryFromLocale())
+      : ''
+
+    reminderPhone.value = normalizedPhone
+    confirmTimezone()
+
+    if (userId) {
+      const channels = selectedChannels.value
+      await updatePreferences(userId, {
+        notifications: {
+          email: channels.includes('email'),
+          push: channels.includes('pwa'),
+          whatsapp: channels.includes('whatsapp'),
+          sms: channels.includes('sms'),
+          voice_call: channels.includes('voice_call'),
+          discord: existingNotifications.value.discord,
+          calls: channels.includes('sms') || channels.includes('voice_call'),
+          channels,
+        },
+        integrations: existingPreferenceIntegrations.value,
+        reminders: {
+          enabled: channels.length > 0,
+          channels,
+        },
+      })
+
+      const mergedIntegrations = {
+        ...existingIntegrations.value,
+        whatsapp: {
+          ...(existingIntegrations.value?.whatsapp || {}),
+          phone: normalizedPhone,
+        },
+        sms: {
+          ...(existingIntegrations.value?.sms || {}),
+          phone: normalizedPhone,
+        },
+      }
+
+      await updateIntegrations(userId, mergedIntegrations)
+      await setDoc(
+        doc(db, 'users', userId),
+        {
+          phone: normalizedPhone || undefined,
+          updatedAt: new Date(),
+        },
+        { merge: true }
+      )
+
+      authStore.user = {
+        ...(authStore.user || {}),
+        phone: normalizedPhone || null,
+      }
+      existingIntegrations.value = mergedIntegrations
+    }
+
+    clearQuickSetupSnooze()
+    const nextState = buildQuickSetupState({
+      timezone: tz.value,
+      channels: selectedChannels.value,
+      phone: reminderPhone.value,
+      pushGranted: pushGranted.value,
+      isNative: isNativePackagedApp(),
+    })
+    emitSetupState(nextState)
+    dirty.value = false
+    saveSuccess.value = nextState.requiredComplete
+      ? 'Quick setup complete.'
+      : 'Progress saved. You can finish the remaining items later.'
+    return nextState
+  } catch (error) {
+    saveError.value = error?.response?.data?.error || error?.message || 'Failed to save quick setup.'
+    return null
+  } finally {
+    saving.value = false
+  }
 }
 
-function finish() {
-  try {
-    localStorage.setItem('pcai_setup_done', '1')
-  } catch {}
+async function saveAndClose() {
+  const state = await persistQuickSetup()
+  if (!state) return
   open.value = false
-  emit('done')
+  if (state.completed) emit('done')
+  else emit('close')
 }
 
-function dismiss() {
+async function dismiss() {
+  if (dirty.value) {
+    await persistQuickSetup()
+  } else {
+    emitSetupState()
+  }
+  snoozeQuickSetup(24)
   open.value = false
   emit('close')
 }
+
+watch(
+  () => props.open,
+  (value) => {
+    open.value = value
+    if (value) clearQuickSetupSnooze()
+  }
+)
+
+onMounted(async () => {
+  clearQuickSetupSnooze()
+  await loadSetup()
+})
 </script>
 
 <style scoped>
-/* Smooth, dark glass theme matching PlanCraftAI dashboard */
 .setup-prompt :deep(.el-dialog) {
   background: radial-gradient(circle at top left, #1e1b4b 0%, #312e81 45%, #4c1d95 100%);
   color: #e2e8f0;
@@ -197,17 +565,84 @@ function dismiss() {
   animation: fadeIn 0.35s ease-out;
 }
 
-/* Remove default white backgrounds */
 .setup-prompt :deep(.el-dialog__header),
 .setup-prompt :deep(.el-dialog__footer) {
   background: transparent;
   border: none;
 }
 
-/* Smooth hover glow for consistency */
-.el-button--primary:hover {
-  box-shadow: 0 0 14px rgba(99, 102, 241, 0.45);
-  transition: all 0.25s ease;
+.setup-progress-bar {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 55%, #ec4899 100%);
+  transition: width 0.25s ease;
+}
+
+.setup-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.55), rgba(49, 46, 129, 0.32));
+  border-radius: 1rem;
+  padding: 1rem;
+  box-shadow: inset 0 1px 10px rgba(255, 255, 255, 0.03);
+}
+
+.setup-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.setup-card__title {
+  font-weight: 600;
+  color: #fff;
+}
+
+.setup-card__copy {
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: #cbd5f5;
+}
+
+.setup-status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.25rem 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.setup-status--complete {
+  border-color: rgba(52, 211, 153, 0.35);
+  background: rgba(16, 185, 129, 0.12);
+  color: #a7f3d0;
+}
+
+.setup-status--pending {
+  border-color: rgba(251, 191, 36, 0.25);
+  background: rgba(251, 191, 36, 0.1);
+  color: #fde68a;
+}
+
+.channel-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.36);
+  padding: 0.9rem 1rem;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.channel-option--active {
+  border-color: rgba(129, 140, 248, 0.45);
+  background: rgba(79, 70, 229, 0.18);
+  box-shadow: 0 0 0 1px rgba(129, 140, 248, 0.18);
 }
 
 @keyframes fadeIn {

@@ -244,7 +244,7 @@ async function loginGoogle() {
   try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_SIGNIN_CLICK) } catch {}
   try {
     await authStore.loginWithGoogle()
-    if (authStore.user) redirectAfterLogin()
+    if (authStore.user) await redirectAfterLogin()
   } catch (err) {
     console.warn('Google login failed; offering OTP fallback', err)
     if (err?.code === 'auth/native-google-unsupported') {
@@ -265,7 +265,7 @@ async function loginApple() {
   try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_SIGNIN_CLICK) } catch {}
   try {
     await authStore.loginWithApple()
-    if (authStore.user) redirectAfterLogin()
+    if (authStore.user) await redirectAfterLogin()
   } catch (err) {
     console.warn('Apple login failed', err)
     if (err?.code === 'auth/native-apple-unsupported') {
@@ -287,7 +287,7 @@ async function onLoginEmail() {
   try {
     try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_SIGNIN_CLICK) } catch {}
     await authStore.loginWithEmail(email.value, password.value)
-    if (authStore.user) redirectAfterLogin()
+    if (authStore.user) await redirectAfterLogin()
   } catch (e) {
     const code = String(e?.code || e?.message || '')
     console.error('[Auth] LoginView email login failed', {
@@ -310,7 +310,7 @@ async function onRegister() {
   try {
     try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_SIGNIN_CLICK) } catch {}
     await authStore.registerEmail(email.value, password.value)
-    if (authStore.user) redirectAfterLogin()
+    if (authStore.user) await redirectAfterLogin()
   } catch (e) {
     alert('Sign up failed. Try a different email.')
   }
@@ -577,27 +577,51 @@ async function verifyOtp() {
   }
 }
 
-function redirectAfterLogin() {
+async function redirectAfterLogin() {
+  let target = '/dashboard'
   const nextParam = typeof route?.query?.next === 'string' && route.query.next.length ? route.query.next : null
-  if (nextParam) return router.push(normalizeRedirectPath(nextParam))
-  // Priority 1: redirect query from guard
-  const q = route?.query?.redirect
-  if (typeof q === 'string' && q.length) return router.push(normalizeRedirectPath(q))
-  const routeMode = typeof route?.query?.mode === 'string' ? route.query.mode : ''
-  const canUseStoredIntent =
-    routeMode === 'team' ||
-    routeMode === 'signIn' ||
-    typeof route?.query?.oobCode === 'string' ||
-    typeof route?.query?.apiKey === 'string'
-  try {
-    // Priority 2: stored intent for flows that round-trip outside the login route
-    const stored = canUseStoredIntent ? localStorage.getItem('postLoginRedirect') : ''
-    if (stored) {
-      localStorage.removeItem('postLoginRedirect')
-      return router.push(normalizeRedirectPath(stored))
+  if (nextParam) {
+    target = normalizeRedirectPath(nextParam)
+  } else {
+    const q = route?.query?.redirect
+    if (typeof q === 'string' && q.length) {
+      target = normalizeRedirectPath(q)
+    } else {
+      const routeMode = typeof route?.query?.mode === 'string' ? route.query.mode : ''
+      const canUseStoredIntent =
+        routeMode === 'team' ||
+        routeMode === 'signIn' ||
+        typeof route?.query?.oobCode === 'string' ||
+        typeof route?.query?.apiKey === 'string'
+      try {
+        const stored = canUseStoredIntent ? localStorage.getItem('postLoginRedirect') : ''
+        if (stored) {
+          localStorage.removeItem('postLoginRedirect')
+          target = normalizeRedirectPath(stored)
+        }
+      } catch {}
     }
-  } catch {}
-  router.push('/dashboard')
+  }
+
+  try {
+    console.info('[Auth] Redirecting after login', {
+      target,
+      from: route?.fullPath || window.location.pathname,
+      hasAuthStoreUser: !!authStore.user,
+      currentUid: authStore.user?.uid || null,
+    })
+    await router.push(target)
+    console.info('[Auth] Redirect after login completed', {
+      target,
+      currentRoute: router.currentRoute.value?.fullPath || null,
+    })
+  } catch (error) {
+    console.error('[Auth] Redirect after login failed', {
+      target,
+      message: error?.message || String(error),
+    })
+    throw error
+  }
 }
 
 // --- Star animation ---

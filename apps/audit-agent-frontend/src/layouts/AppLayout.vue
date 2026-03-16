@@ -187,15 +187,8 @@
         <template v-if="sidebarOpen">
           <div
             class="grid gap-1 bg-gray-900/60 border border-gray-800 rounded-lg p-1"
-            :class="[authStore.user?.role === 'admin' ? 'grid-cols-7' : 'grid-cols-6']"
+            :class="[authStore.user?.role === 'admin' ? 'grid-cols-6' : 'grid-cols-5']"
           >
-            <button
-              @click="startTour"
-              class="text-xs py-2 rounded-md hover:bg-gray-800 transition"
-              title="Show Tour"
-            >
-              ❔
-            </button>
             <RouterLink
               to="/settings"
               class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
@@ -364,9 +357,9 @@
             Logout
           </button> -->
           <div class="p-4 border-t border-gray-800">
-            <!-- Grouped card: Settings | Tour | Profile | Billing | Help | Logout -->
+            <!-- Grouped card: Settings | Profile | Billing | Help | Logout -->
             <div
-              class="grid grid-cols-6 gap-1 bg-gray-900/60 border border-gray-800 rounded-lg p-1"
+              class="grid grid-cols-5 gap-1 bg-gray-900/60 border border-gray-800 rounded-lg p-1"
             >
               <RouterLink
                 to="/settings"
@@ -389,13 +382,6 @@
                 title="Billing"
                 >💳</RouterLink
               >
-              <button
-                @click="startTour"
-                class="text-xs py-2 rounded-md hover:bg-gray-800 transition"
-                title="Show Tour"
-              >
-                ❔
-              </button>
               <RouterLink
                 to="/help"
                 @click="mobileMenu = false"
@@ -870,18 +856,6 @@ onUnmounted(() => {
     upgradeHandler = null
   }
 })
-
-function startTour() {
-  mobileMenu.value = false
-  try {
-    if (typeof window === 'undefined') return
-    window.dispatchEvent(
-      new CustomEvent('pcai:onboarding:request', { detail: { source: 'sidebar-tour-button' } })
-    )
-  } catch (error) {
-    console.warn('Failed to trigger onboarding tour', error)
-  }
-}
 </script>
 
 <style>

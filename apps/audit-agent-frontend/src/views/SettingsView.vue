@@ -196,30 +196,6 @@
       </section>
 
       <section
-        v-show="activeTab === 'help-onboarding'"
-        class="settings-panel"
-      >
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h2 class="text-lg sm:text-xl font-semibold mb-2">🎬 Onboarding Walkthrough</h2>
-            <p class="text-sm text-indigo-200">
-              Replay the guided PlanCraftAI tour with the new voice-friendly highlights anytime.
-            </p>
-            <p v-if="onboardingLastCompleted" class="text-xs text-slate-300 mt-1">
-              Last completed {{ onboardingLastCompleted }}
-            </p>
-          </div>
-          <button
-            class="bg-gradient-to-r from-indigo-500 to-fuchsia-500 px-4 py-2 rounded-lg font-semibold shadow-lg hover:opacity-90 transition text-sm disabled:opacity-50"
-            :disabled="onboardingReplayBusy"
-            @click="replayOnboardingTour"
-          >
-            {{ onboardingReplayBusy ? 'Scheduling…' : 'Replay onboarding tour' }}
-          </button>
-        </div>
-      </section>
-
-      <section
         v-show="activeTab === 'account-profile'"
         class="settings-panel"
       >
@@ -621,7 +597,7 @@ import { useRouter, useRoute } from "vue-router"
 import { ElMessage } from "element-plus"
 import { normalizePhone, guessCountryFromLocale } from '@/utils/phoneUtils'
 import { getGoogleStatus, getGoogleCalendars, saveGoogleCalendarSelection, triggerGoogleSyncNow, requestGoogleConnectUrl, disconnectGoogleIntegration } from '@/stores/integrationsStore'
-import { getPreferences as apiGetPrefs, updatePreferences as apiUpdatePrefs, getIntegrations, updateIntegrations, updateOnboardingStatus } from "@/services/settingsService"
+import { getPreferences as apiGetPrefs, updatePreferences as apiUpdatePrefs, getIntegrations, updateIntegrations } from "@/services/settingsService"
 import { createGptLinkCode } from '@/services/gptService'
 import SocialIntegrationPanel from '@/components/settings/SocialIntegrationPanel.vue'
 import { subscribeUserToPush } from "@/services/pwaService"
@@ -679,9 +655,9 @@ function normalizeTab(tab) {
     subscription: 'billing-subscription',
     'subscription-usage': 'billing-subscription',
     'billing-subscription': 'billing-subscription',
-    help: 'help-onboarding',
-    onboarding: 'help-onboarding',
-    'help-onboarding': 'help-onboarding',
+    help: 'workspace-knowledge',
+    onboarding: 'workspace-knowledge',
+    'help-onboarding': 'workspace-knowledge',
   }
   return alias[t] || t
 }
@@ -712,11 +688,6 @@ const tabGroups = [
     label: 'Billing',
     tabs: [{ id: 'billing-subscription', label: 'Subscription & Usage' }],
   },
-  {
-    id: 'help',
-    label: 'Help',
-    tabs: [{ id: 'help-onboarding', label: 'Onboarding & Walkthrough' }],
-  },
 ]
 
 const activeTab = ref(normalizeTab(route.query?.tab) || 'workspace-knowledge')
@@ -739,20 +710,6 @@ function setActiveTab(id) {
 const dirty = ref(false) // tracks unsaved changes
 const notificationsSection = ref(null)
 const highlightNotifications = ref(false)
-const onboardingPref = ref({})
-const onboardingReplayBusy = ref(false)
-const onboardingLastCompleted = computed(() => {
-  const raw = onboardingPref.value?.completedAt
-  if (!raw) return ''
-  try {
-    if (typeof raw?.seconds === 'number') {
-      return dayjs.unix(raw.seconds).format('MMM D, YYYY • h:mm A')
-    }
-    return dayjs(raw).format('MMM D, YYYY • h:mm A')
-  } catch {
-    return typeof raw === 'string' ? raw : ''
-  }
-})
 
 function markDirty() {
   dirty.value = true
@@ -764,40 +721,6 @@ function focusNotifications() {
     highlightNotifications.value = true
     setTimeout(() => { highlightNotifications.value = false }, 1600)
   })
-}
-
-async function replayOnboardingTour() {
-  try {
-    if (!authStore.user?.uid) {
-      router.push('/login?redirect=/dashboard')
-      return
-    }
-    onboardingReplayBusy.value = true
-    const timestamp = new Date().toISOString()
-    await updateOnboardingStatus(authStore.user.uid, {
-      completed: false,
-      showLaterUntil: null,
-      replayRequestedAt: timestamp,
-    })
-    onboardingPref.value = {
-      ...onboardingPref.value,
-      completed: false,
-      completedAt: null,
-      showLaterUntil: null,
-      replayRequestedAt: timestamp,
-    }
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(
-        new CustomEvent('pcai:onboarding:request', { detail: { source: 'settings-panel' } })
-      )
-    }
-    ElMessage.success('✨ Tour scheduled — head to the dashboard to see it in action.')
-  } catch (error) {
-    console.warn('Replay onboarding failed', error)
-    ElMessage.error(error?.response?.data?.error || 'Failed to replay onboarding tour.')
-  } finally {
-    onboardingReplayBusy.value = false
-  }
 }
 
 const DEFAULT_MEETING_REMINDER = Number(import.meta.env.VITE_CALENDAR_REMINDER_MINUTES || 10)
@@ -900,7 +823,6 @@ onMounted(async () => {
     } catch {}
     if (authStore.user) {
       const res = await apiGetPrefs(authStore.user.uid)
-      onboardingPref.value = res?.onboarding || {}
       const n = res?.notifications || {}
       const ints = res?.integrations || {}
       // Prefer channels[] if present; fallback to boolean keys

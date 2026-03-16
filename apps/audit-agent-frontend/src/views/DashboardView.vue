@@ -3,15 +3,45 @@
   <div v-if="checkingAuth" class="px-4 py-8 text-center text-gray-400">
     Checking session…
   </div>
-  <SetupPrompt v-else-if="showSetup" @done="showSetup = false" @close="showSetup = false" />
+  <SetupPrompt
+    v-else-if="showSetup"
+    @done="handleQuickSetupDone"
+    @close="handleQuickSetupClosed"
+    @updated="handleQuickSetupUpdated"
+  />
   <main
     v-else
     class="min-h-screen px-2 py-6 sm:px-4 md:px-6 pb-12 transition-colors max-w-7xl mx-auto flex flex-col gap-6 lg:gap-8"
   >
     <GuestBanner :isGuest="authStore.guest" class="order-1" @login="redirectToLogin" />
 
+    <section
+      v-if="showQuickSetupBanner"
+      class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-2"
+    >
+      <div class="dashboard-card quick-setup-banner flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div class="space-y-2">
+          <p class="text-[11px] uppercase tracking-[0.3em] text-indigo-200/80">Quick setup</p>
+          <h2 class="text-lg sm:text-xl font-semibold text-slate-100">
+            {{ quickSetupState?.completedSteps || 0 }}/{{ quickSetupState?.totalSteps || 0 }} setup items complete
+          </h2>
+          <p class="text-sm text-indigo-100/85">
+            {{ quickSetupMissingLabels.length ? `Still needed: ${quickSetupMissingLabels.join(', ')}.` : 'You can finish the remaining optional setup any time.' }}
+          </p>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="quick-setup-banner__progress">
+            <div class="quick-setup-banner__bar" :style="{ width: `${quickSetupState?.completionPercent || 0}%` }" />
+          </div>
+          <el-button type="primary" class="!rounded-lg font-semibold" @click="openQuickSetup">
+            Continue setup
+          </el-button>
+        </div>
+      </div>
+    </section>
+
     <!-- Tier 1 · Overview -->
-    <section class="space-y-4 order-2">
+    <section class="space-y-4 order-3">
       <div class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4">
         <div class="dashboard-card greeting-card space-y-4">
           <div>
@@ -1158,6 +1188,13 @@ import { seedGuestStarterTasks } from '@/utils/guestTasks'
 import { subscribeToNapkinItems } from '@/services/napkinService'
 import { fetchDashboardPreferences, saveDashboardPreferences } from '@/services/dashboardPreferencesService'
 import { getGoogleStatus, triggerGoogleSyncNow } from '@/stores/integrationsStore'
+import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
+import {
+  clearQuickSetupSnooze,
+  getIncompleteQuickSetupLabels,
+  isQuickSetupSnoozed,
+  readQuickSetupState,
+} from '@/utils/quickSetup'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -1533,6 +1570,7 @@ const categoryFilters = TASK_CATEGORY_FILTERS
 const dashboardCategory = ref('All')
 
 const showSetup = ref(false)
+const quickSetupState = ref(readQuickSetupState())
 const reminderActiveByTask = ref({})
 const taskMeetingLink = (task) => resolveTaskMeetingLink(task)
 const checkingAuth = ref(true)
@@ -1675,6 +1713,35 @@ const userStreak = ref(0)
 const displayStreak = computed(() => userStreak.value || journalStreak.value || 0)
 const ONBOARDING_SNOOZE_HOURS = 24
 let onboardingTimer = null
+let quickSetupListener = null
+
+const quickSetupMissingLabels = computed(() => getIncompleteQuickSetupLabels(quickSetupState.value))
+const showQuickSetupBanner = computed(
+  () => !isGuest.value && !showSetup.value && !!quickSetupState.value && !quickSetupState.value.completed
+)
+
+function refreshQuickSetupState(nextState = null) {
+  quickSetupState.value = nextState && typeof nextState === 'object' ? nextState : readQuickSetupState()
+}
+
+function handleQuickSetupUpdated(nextState = null) {
+  refreshQuickSetupState(nextState)
+}
+
+function handleQuickSetupDone() {
+  refreshQuickSetupState()
+  showSetup.value = false
+}
+
+function handleQuickSetupClosed() {
+  refreshQuickSetupState()
+  showSetup.value = false
+}
+
+function openQuickSetup() {
+  clearQuickSetupSnooze()
+  showSetup.value = true
+}
 
 function normalizeTimestamp(value) {
   if (!value) return null
@@ -2002,11 +2069,10 @@ onMounted(async () => {
     carryoverDismissedToday.value = false
   }
   try {
-    const seen = localStorage.getItem('pcai_setup_done') === '1'
-    const tz = localStorage.getItem('user_timezone')
-    const needsTz = !tz || tz === 'UTC'
-    const needsPerm = typeof Notification !== 'undefined' && Notification.permission !== 'granted'
-    showSetup.value = !seen && (needsTz || needsPerm)
+    const storedSetup = readQuickSetupState()
+    quickSetupState.value = storedSetup
+    const seen = storedSetup?.completed || localStorage.getItem('pcai_setup_done') === '1'
+    showSetup.value = !isGuest.value && !seen && !isQuickSetupSnoozed()
   } catch {
     /* noop */
   }
@@ -2148,84 +2214,6 @@ watch(
     drawSparkline()
   }
 )
-
-async function startTour() {
-  try {
-    const mod = await import('driver.js')
-    const driver = mod?.driver
-    if (typeof driver !== 'function') return false
-
-    const tour = driver({
-    animate: true,
-    showProgress: true,
-    steps: [
-      {
-        element: '.daily-card',
-        popover: {
-          title: '📅 Daily Tasks',
-          description: 'Plan and track your tasks for today here.',
-          position: 'bottom',
-        },
-      },
-      {
-        element: '.quick-links-card',
-        popover: {
-          title: '🔗 Quick Links',
-          description: 'Save your frequently used websites or tools here.',
-          position: 'bottom',
-        },
-      },
-      {
-        element: '.weekly-card',
-        popover: {
-          title: '📆 Weekly Overview',
-          description: 'See what you’ve completed this week and upcoming tasks.',
-          position: 'left',
-        },
-      },
-      {
-        element: '.monthly-card',
-        popover: {
-          title: '🌙 Monthly Goals',
-          description: 'Track your long-term goals and progress here.',
-          position: 'left',
-        },
-      },
-      {
-        element: '.journal-card',
-        popover: {
-          title: '📖 Journal Snapshot',
-          description: 'Reflect daily and track your mood & streaks.',
-          position: 'top',
-        },
-      },
-      {
-        element: '.ai-card',
-        popover: {
-          title: '🤖 AI Insights',
-          description: 'AI analyzes your tasks and provides smart suggestions.',
-          position: 'top',
-        },
-      },
-      ],
-    })
-    tour.drive()
-    return true
-  } catch (error) {
-    console.warn('Dashboard tour failed to start:', error)
-    return false
-  }
-}
-
-onMounted(() => {
-  const hasSeenTour = localStorage.getItem('seenTour')
-  if (!hasSeenTour) {
-    setTimeout(async () => {
-      const started = await startTour()
-      if (started) localStorage.setItem('seenTour', 'true')
-    }, 800)
-  }
-})
 
 function openPlanner() {
   selectedTask.value = null
@@ -2481,8 +2469,9 @@ onUnmounted(() => {
   if (unsubscribe.value) unsubscribe.value()
   detachNapkinListener()
   if (insightIntervalId.value) clearInterval(insightIntervalId.value)
-  if (typeof window !== 'undefined') {
-    window.removeEventListener('pcai:onboarding:request', handleOnboardingReplayEvent)
+  if (quickSetupListener && typeof window !== 'undefined') {
+    window.removeEventListener('pcai:quick-setup-updated', quickSetupListener)
+    quickSetupListener = null
   }
   if (onboardingTimer) {
     clearTimeout(onboardingTimer)
@@ -2813,7 +2802,10 @@ onMounted(() => {
     checkingAuth.value = false
   }
   if (typeof window !== 'undefined') {
-    window.addEventListener('pcai:onboarding:request', handleOnboardingReplayEvent)
+    quickSetupListener = (event) => {
+      refreshQuickSetupState(event?.detail || null)
+    }
+    window.addEventListener('pcai:quick-setup-updated', quickSetupListener)
   }
 })
 
@@ -2869,6 +2861,29 @@ onUnmounted(() => {
   border-radius: 1.15rem;
   padding: 1rem 1.25rem;
   box-shadow: inset 0 1px 12px rgba(255, 255, 255, 0.06);
+}
+
+.quick-setup-banner {
+  border-radius: 1.15rem;
+  border: 1px solid rgba(129, 140, 248, 0.28);
+  background:
+    radial-gradient(circle at top right, rgba(236, 72, 153, 0.18), transparent 35%),
+    linear-gradient(135deg, rgba(15, 23, 42, 0.92), rgba(49, 46, 129, 0.8));
+}
+
+.quick-setup-banner__progress {
+  position: relative;
+  width: 140px;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.quick-setup-banner__bar {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 55%, #ec4899 100%);
 }
 
 .dashboard-section {
