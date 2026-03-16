@@ -133,6 +133,11 @@ app.config.errorHandler = (err, vm, info) => {
 }
 
 window.addEventListener('error', (event) => {
+  const isGenericScriptError =
+    isNativeApp &&
+    !event?.error &&
+    String(event?.message || '').trim().toLowerCase() === 'script error.'
+  if (isGenericScriptError) return
   const normalized = normalizeRuntimeError(event?.error || event)
   console.error('Window error:', normalized)
 })

@@ -81,7 +81,7 @@ export { auth }
 // Analytics is only available in browser environments.
 let analytics = null;
 try {
-  if (typeof window !== 'undefined') {
+  if (typeof window !== 'undefined' && !isNative) {
     // Guard for environments/browsers where Analytics isn't supported
     analyticsIsSupported().then((ok) => {
       if (ok) {
