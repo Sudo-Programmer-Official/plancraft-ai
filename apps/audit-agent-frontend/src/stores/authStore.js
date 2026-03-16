@@ -828,8 +828,22 @@ export const useAuthStore = defineStore('authStore', {
 
       // 🔁 Handle redirect sign-ins (Google fallback flow)
       try {
-        await this.checkRedirectResult()
-      } catch {}
+        console.info('[Auth] checkRedirectResult start', {
+          native: isNativePackagedApp(),
+          platform: Capacitor?.getPlatform?.() || 'web',
+        })
+        await withTimeout(
+          this.checkRedirectResult(),
+          isIosCapacitorApp() ? 2500 : 6000,
+          'checkRedirectResult bootstrap',
+        )
+        console.info('[Auth] checkRedirectResult completed')
+      } catch (error) {
+        console.warn('[Auth] checkRedirectResult skipped during bootstrap', {
+          message: error?.message || String(error),
+          code: error?.code || null,
+        })
+      }
 
       // 🧠 Silent token refresh to keep sessions alive in PWA contexts
       try {
