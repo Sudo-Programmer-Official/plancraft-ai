@@ -4,33 +4,40 @@ import { ensureUserProfile } from '../services/userService.js'
 import { verifyHS256 } from '../utils/jwt.js'
 
 export async function attachAuth(req, res, next) {
-  try {
-    // Prefer long-lived app token first
-    const appTok = req.headers['x-app-token']
-    const secret = process.env.APP_JWT_SECRET
-    if (secret && typeof appTok === 'string' && appTok.split('.').length === 3) {
+  // Prefer long-lived app token first, but never let a bad app token block
+  // a valid Firebase bearer token fallback.
+  const appTok = req.headers['x-app-token']
+  const secret = process.env.APP_JWT_SECRET
+  if (secret && typeof appTok === 'string' && appTok.split('.').length === 3) {
+    try {
       const payload = verifyHS256(appTok, secret)
       if (payload && payload.sub) {
         req.user = { uid: payload.sub, email: payload.email || null, source: 'app' }
         req.auth = { type: 'app', token: appTok, payload }
         return next()
       }
-    }
-
-    // Fallback to Firebase ID token from Authorization: Bearer
-    const hdr = req.headers.authorization || ''
-    if (/^bearer\s+/i.test(hdr)) {
-      const idToken = hdr.replace(/^bearer\s+/i, '').trim()
+    } catch (error) {
       try {
-        const decoded = await admin.auth().verifyIdToken(idToken)
-        req.user = { uid: decoded.uid, email: decoded.email || null, source: 'firebase' }
-        req.auth = { type: 'firebase', token: idToken, payload: decoded }
-        return next()
-      } catch (e) {
-        // ignore, proceed unauthenticated
-      }
+        console.warn('[auth] Invalid app token; falling back to Firebase bearer', {
+          message: error?.message || String(error),
+        })
+      } catch {}
     }
-  } catch {}
+  }
+
+  // Fallback to Firebase ID token from Authorization: Bearer
+  const hdr = req.headers.authorization || ''
+  if (/^bearer\s+/i.test(hdr)) {
+    const idToken = hdr.replace(/^bearer\s+/i, '').trim()
+    try {
+      const decoded = await admin.auth().verifyIdToken(idToken)
+      req.user = { uid: decoded.uid, email: decoded.email || null, source: 'firebase' }
+      req.auth = { type: 'firebase', token: idToken, payload: decoded }
+      return next()
+    } catch (e) {
+      // ignore, proceed unauthenticated
+    }
+  }
   return next()
 }
 

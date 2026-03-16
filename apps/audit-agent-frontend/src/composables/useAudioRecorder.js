@@ -20,6 +20,15 @@ function canUseNativeAudioRecorder() {
   return !!Capacitor?.isNativePlatform?.()
 }
 
+function formatRecorderError(error) {
+  if (!error) return { message: 'Unknown error', code: null }
+  return {
+    message: error?.message || error?.localizedMessage || String(error),
+    code: error?.code || error?.errorCode || null,
+    name: error?.name || null,
+  }
+}
+
 function inferAudioFilename(blob, fallbackExt = 'webm') {
   const blobType = String(blob?.type || '').toLowerCase()
   if (blobType.includes('ogg')) return 'speech.ogg'
@@ -140,6 +149,7 @@ export function useAudioRecorder(options = {}) {
   }
 
   const startNativeRecording = async () => {
+    await CapacitorAudioRecorder.getPluginVersion()
     const status = await CapacitorAudioRecorder.checkPermissions()
     let permission = status?.recordAudio
     if (permission !== 'granted') {
@@ -195,12 +205,11 @@ export function useAudioRecorder(options = {}) {
         await startNativeRecording()
         return
       } catch (nativeError) {
-        console.warn(`${logPrefix} native recorder unavailable, falling back`, nativeError)
-        if (!canUseBrowserAudioCapture()) {
-          console.error(`${logPrefix} start failed`, new Error('Voice recording is not available on this device'))
-          state.value = 'error'
-          return
-        }
+        const details = formatRecorderError(nativeError)
+        console.warn(`${logPrefix} native recorder start failed`, details)
+        console.error(`${logPrefix} start failed`, new Error(details.message || 'Native voice recording failed'))
+        state.value = 'error'
+        return
       }
     }
 
@@ -232,7 +241,7 @@ export function useAudioRecorder(options = {}) {
       tickId = window.setInterval(() => (durationSeconds.value += 1), 1000)
       if (autoStopMs > 0) autoStopId = window.setTimeout(() => stopRecording('auto'), autoStopMs)
     } catch (err) {
-      console.warn(`${logPrefix} native recorder unavailable, falling back`, err)
+      console.warn(`${logPrefix} browser recorder unavailable`, formatRecorderError(err))
       stopStreams()
       if (!canUseBrowserAudioCapture()) {
         console.error(`${logPrefix} start failed`, new Error('Voice recording is not available on this device'))

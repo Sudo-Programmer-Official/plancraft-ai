@@ -2,6 +2,7 @@
 import axios from 'axios'
 import { auth } from '@/firebase/init'
 import { getAppToken } from '@/services/appTokenService'
+import { readNativeIosAuthSnapshot } from '@/utils/authStorage'
 
 // Base API points to Vite proxy '/api' in dev
 // Prefer VITE_API_BASE_ROOT; if missing but VITE_API_BASE_URL is set (e.g. to /api/ai),
@@ -59,6 +60,7 @@ function withTimeout(promise, ms = 5000) {
 // Attach fresh auth token if present
 api.interceptors.request.use(async (config) => {
   try {
+    const nativeSnapshot = readNativeIosAuthSnapshot()
     const user = auth?.currentUser
     if (user) {
       let token = null
@@ -66,7 +68,7 @@ api.interceptors.request.use(async (config) => {
         // Avoid hanging requests when Firebase token refresh stalls.
         token = await withTimeout(user.getIdToken(), 4500)
       } catch {
-        token = localStorage.getItem('token')
+        token = localStorage.getItem('token') || nativeSnapshot?.idToken || null
       }
       if (token) config.headers.Authorization = `Bearer ${token}`
       // Optional pass-through user context
@@ -82,7 +84,7 @@ api.interceptors.request.use(async (config) => {
       } catch {}
     } else {
       // fallback to cached token if any
-      const token = localStorage.getItem('token')
+      const token = localStorage.getItem('token') || nativeSnapshot?.idToken || null
       if (token) config.headers.Authorization = `Bearer ${token}`
       const userStr = localStorage.getItem('user')
       if (userStr) {
@@ -90,6 +92,9 @@ api.interceptors.request.use(async (config) => {
         if (u?.email) config.headers['x-user-email'] = u.email
         if (u?.uid) config.headers['x-user-id'] = u.uid
         if (u?.role) config.headers['x-user-role'] = u.role
+      } else if (nativeSnapshot?.localId) {
+        config.headers['x-user-id'] = nativeSnapshot.localId
+        if (nativeSnapshot?.email) config.headers['x-user-email'] = nativeSnapshot.email
       }
     }
     // Optional: include long-lived app token for backend feature-flagged verification
