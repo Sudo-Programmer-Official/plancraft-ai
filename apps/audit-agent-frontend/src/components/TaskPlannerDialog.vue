@@ -14,324 +14,331 @@
         borderRadius: '0.5rem',
         boxShadow: '0 8px 30px rgba(0,0,0,0.6)',
         border: '1px solid rgba(255,255,255,0.08)',
-        backdropFilter: 'blur(12px)'
+        backdropFilter: 'blur(12px)',
       }"
       @close="closeDialog"
     >
-    <div class="planner-stack planner-stack--mobile-order">
-      <section class="planner-card section-date">
-        <div class="card-heading">
-          <div>
-            <p class="card-eyebrow">Plan basics</p>
-            <h3 class="card-title">Choose your day & reminder time</h3>
-          </div>
-        </div>
-        <div class="field-grid">
-          <div class="field">
-            <label class="field-label">Plan date</label>
-            <el-date-picker
-              v-model="selectedDate"
-              :disabled="props.readonly || props.lockDate"
-              type="date"
-              placeholder="Select a day"
-              format="YYYY-MM-DD"
-              value-format="YYYY-MM-DD"
-              class="w-full"
-            />
-          </div>
-          <div class="field">
-            <label class="field-label">Reminder time (optional)</label>
-            <el-time-picker
-              v-model="reminderTime"
-              placeholder="HH:mm"
-              :disabled="props.readonly || props.disableReminder"
-              format="HH:mm"
-              value-format="HH:mm"
-              class="w-full"
-              @change="onReminderTimeChange"
-            />
-          </div>
-        </div>
-      </section>
-
-      <section class="planner-card section-task">
-        <div class="card-heading">
-          <div>
-            <p class="card-eyebrow">Task idea</p>
-            <h3 class="card-title">What should we plan?</h3>
-          </div>
-        </div>
-        <el-input
-          v-model="input"
-          type="textarea"
-          :rows="textareaRows"
-          placeholder="Speak or type your task..."
-          resize="none"
-          class="task-textarea"
-        />
-        <p class="datetime-hint">Date and time can be detected automatically from what you type.</p>
-        <div class="assistive-bar">
-          <div class="assistive-actions">
+      <div class="planner-stack planner-stack--mobile-order">
+        <section class="planner-card section-date">
+          <div class="card-heading">
             <div>
-            <el-button
-              v-if="imageTasksEnabled"
-              size="small"
-            class="icon-btn attach-btn"
-            :disabled="loading || attachmentUploading"
-            :loading="attachmentUploading"
-            @click="openAttachmentPicker"
-            title="Attach image or PDF"
-          >
-              <span class="attach-svg" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                  <path
-                    d="M8.5 12.5l5.8-5.8a3 3 0 1 1 4.3 4.2l-7.1 7.1a4.5 4.5 0 0 1-6.4 0 4.5 4.5 0 0 1 0-6.4l7.6-7.6"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
-              </span>
-            </el-button>
+              <p class="card-eyebrow">Plan basics</p>
+              <h3 class="card-title">Choose your day & reminder time</h3>
             </div>
-            <div>
-            <button
-              type="button"
-              class="icon-btn mic-btn"
-              :class="{
-                'mic-btn--active': loading || plannerVoiceState === 'recording',
-                'mic-btn--processing': plannerVoiceState === 'transcribing',
-              }"
-              :title="plannerVoiceButtonLabel"
-              :aria-label="plannerVoiceButtonLabel"
-            >
-              <VoiceRecorder
-                :autoCommit="true"
-                :disabled="loading"
-                :reset-trigger="plannerVoiceReset"
-                @transcribed="handleTranscript"
-                @state-change="onPlannerVoiceStateChange"
+          </div>
+          <div class="field-grid">
+            <div class="field">
+              <label class="field-label">Plan date</label>
+              <el-date-picker
+                v-model="selectedDate"
+                :disabled="props.readonly || props.lockDate"
+                type="date"
+                placeholder="Select a day"
+                format="YYYY-MM-DD"
+                value-format="YYYY-MM-DD"
+                class="w-full"
               />
-              <span class="mic-visual" aria-hidden="true"></span>
-            </button>
             </div>
-            <div>
-            <el-button
-              size="small"
-              class="save-draft-btn"
-              :disabled="!getInputText().trim() || draftSaving"
-              :loading="draftSaving"
-              @click="saveDraftToNapkin"
-            >
-              Save Draft
-            </el-button>
-            </div>
-          </div>
-          <el-button
-            @click="generateTasks"
-            :disabled="generateDisabled"
-            class="generate-btn"
-          >
-            <span class="generate-inner">
-              <span class="generate-icon" aria-hidden="true">
-                <span v-if="generateState === 'idle'">+</span>
-                <span v-else-if="generateState === 'loading'" class="spinner"></span>
-                <span v-else>✔</span>
-              </span>
-              <span class="generate-text">{{ generateButtonLabel }}</span>
-            </span>
-          </el-button>
-        </div>
-        <div v-if="imageTasksEnabled" class="attachment-block">
-          <input
-            ref="attachmentInput"
-            type="file"
-            class="hidden"
-            accept="image/png,image/jpeg,image/jpg,application/pdf"
-            @change="onAttachmentChange"
-          />
-          <div v-if="attachmentUploading || visionStatus" class="attachment-status">
-            {{ visionStatus || 'Analyzing image…' }}
-          </div>
-          <div v-if="attachments.length" class="attachment-previews">
-            <div
-              v-for="(file, idx) in attachments"
-              :key="file.url || idx"
-              class="attachment-card compact"
-            >
-              <div class="attachment-thumb-wrap">
-                <img
-                  v-if="!isPdf(file)"
-                  :src="file.url"
-                  alt="Attachment preview"
-                  class="attachment-thumb"
-                />
-                <div v-else class="attachment-thumb attachment-thumb--pdf">📄</div>
-              </div>
-              <div class="attachment-meta">
-                <p class="attachment-name">{{ file.name || 'Attachment' }}</p>
-                <p class="attachment-source">From image</p>
-              </div>
-              <button type="button" class="attachment-remove" @click="removeAttachment(idx)">
-                Remove
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section v-if="pendingGeneratedTasks.length" class="planner-card">
-        <div class="card-heading">
-          <div>
-            <p class="card-eyebrow">Review</p>
-            <h3 class="card-title">Confirm generated tasks</h3>
-          </div>
-        </div>
-        <div class="generated-preview">
-          <div v-for="task in pendingGeneratedTasks" :key="task.title" class="generated-preview__item">
-            <div class="generated-preview__title">{{ task.title }}</div>
-            <div v-if="task.details" class="generated-preview__details">{{ task.details }}</div>
-            <div v-if="task.attachments?.length" class="generated-preview__badge">📎 From image</div>
-          </div>
-        </div>
-        <div class="preview-actions">
-          <el-button size="small" @click="clearGeneratedPreview">Discard</el-button>
-          <el-button type="primary" size="small" :loading="loading" @click="confirmGeneratedTasks">
-            Save tasks
-          </el-button>
-        </div>
-      </section>
-
-      <div class="section-divider" />
-      <section class="planner-card reminder-card section-reminder" :class="{ 'reminder-card--collapsed': !reminderOptionsVisible }">
-        <div class="card-heading">
-          <div>
-            <p class="card-eyebrow">Reminder</p>
-            <h3 class="card-title">Keep me on track</h3>
-          </div>
-          <button
-            class="card-toggle"
-            type="button"
-            @click="reminderOptionsVisible = !reminderOptionsVisible"
-          >
-            <span>{{ reminderOptionsVisible ? 'Hide options' : 'Show options' }}</span>
-            <svg
-              class="card-toggle__icon"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.6"
-            >
-              <path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-          </button>
-        </div>
-        <transition name="reminder-collapse">
-          <div v-show="reminderOptionsVisible">
-            <label class="reminder-toggle" :class="{ 'reminder-toggle--disabled': props.readonly || props.disableReminder }">
-              <el-switch
-                v-model="setReminder"
+            <div class="field">
+              <label class="field-label">Reminder time (optional)</label>
+              <el-time-picker
+                v-model="reminderTime"
+                placeholder="HH:mm"
                 :disabled="props.readonly || props.disableReminder"
+                format="HH:mm"
+                value-format="HH:mm"
+                class="w-full"
+                @change="onReminderTimeChange"
               />
-              <span class="reminder-toggle__label">Set reminder</span>
-            </label>
-            <div class="channel-icons">
-              <el-tooltip
-                v-for="option in channelOptions"
-                :key="option.id"
-                effect="dark"
-                placement="top"
-                :content="option.label"
-              >
-                <button
-                  class="channel-icon"
-                  type="button"
-                  :disabled="props.readonly || props.disableReminder || !setReminder"
-                  :class="{ 'channel-icon--active': isChannelSelected(option.id) }"
-                  @click="toggleChannel(option.id)"
-                >
-                  <span aria-hidden="true">{{ option.icon }}</span>
-                </button>
-              </el-tooltip>
             </div>
-            <p
-              v-if="setReminder && !(props.readonly || props.disableReminder)"
-              class="hint"
-            >
-              We’ll match your notification preferences. Calls only ring when it’s reminder time.
-            </p>
           </div>
-        </transition>
-      </section>
+        </section>
 
-      <section v-if="props.task" class="planner-card">
-        <div class="card-heading">
-          <div>
-            <p class="card-eyebrow">Extras</p>
-            <h3 class="card-title">Add details or link</h3>
+        <section class="planner-card section-task">
+          <div class="card-heading">
+            <div>
+              <p class="card-eyebrow">Task idea</p>
+              <h3 class="card-title">What should we plan?</h3>
+            </div>
           </div>
-        </div>
-        <el-input
-          v-model="details"
-          type="textarea"
-          :rows="4"
-          placeholder="Add more context or notes..."
-          resize="none"
-          class="mb-4"
-        />
-        <div class="planner-voice">
-          <label class="field-label">Add via voice</label>
-          <VoiceRecorder
-            :disabled="props.readonly"
-            :reset-trigger="detailsVoiceReset"
-            @transcribed="appendDetails"
+          <el-input
+            v-model="input"
+            type="textarea"
+            :rows="textareaRows"
+            placeholder="Speak or type your task..."
+            resize="none"
+            class="task-textarea"
           />
-        </div>
-        <div class="link-field">
-          <label class="field-label">Optional link</label>
-          <el-input v-model="link" type="text" placeholder="https://example.com" clearable />
-          <div v-if="link" class="link-preview">
-            <a
-              :href="link"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="text-indigo-400 hover:underline truncate inline-block max-w-full"
-            >
-              🔗 {{ displayLink }}
-            </a>
+          <p class="datetime-hint">
+            Date and time can be detected automatically from what you type.
+          </p>
+          <div class="assistive-bar">
+            <div class="assistive-actions">
+              <div>
+                <el-button
+                  v-if="imageTasksEnabled"
+                  size="small"
+                  class="icon-btn attach-btn"
+                  :disabled="loading || attachmentUploading"
+                  :loading="attachmentUploading"
+                  @click="openAttachmentPicker"
+                  title="Attach image or PDF"
+                >
+                  <span class="attach-svg" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                      <path
+                        d="M8.5 12.5l5.8-5.8a3 3 0 1 1 4.3 4.2l-7.1 7.1a4.5 4.5 0 0 1-6.4 0 4.5 4.5 0 0 1 0-6.4l7.6-7.6"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  </span>
+                </el-button>
+              </div>
+              <div>
+                <button
+                  type="button"
+                  class="icon-btn mic-btn"
+                  :class="{
+                    'mic-btn--active': loading || plannerVoiceState === 'recording',
+                    'mic-btn--processing': plannerVoiceState === 'transcribing',
+                  }"
+                  :title="plannerVoiceButtonLabel"
+                  :aria-label="plannerVoiceButtonLabel"
+                >
+                  <VoiceRecorder
+                    :autoCommit="true"
+                    :disabled="loading"
+                    :reset-trigger="plannerVoiceReset"
+                    @transcribed="handleTranscript"
+                    @state-change="onPlannerVoiceStateChange"
+                  />
+                  <span class="mic-visual" aria-hidden="true"></span>
+                </button>
+              </div>
+              <div>
+                <el-button
+                  size="small"
+                  class="save-draft-btn"
+                  :disabled="!getInputText().trim() || draftSaving"
+                  :loading="draftSaving"
+                  @click="saveDraftToNapkin"
+                >
+                  Save Draft
+                </el-button>
+              </div>
+            </div>
+            <el-button @click="generateTasks" :disabled="generateDisabled" class="generate-btn">
+              <span class="generate-inner">
+                <span class="generate-icon" aria-hidden="true">
+                  <span v-if="generateState === 'idle'">+</span>
+                  <span v-else-if="generateState === 'loading'" class="spinner"></span>
+                  <span v-else>✔</span>
+                </span>
+                <span class="generate-text">{{ generateButtonLabel }}</span>
+              </span>
+            </el-button>
           </div>
-        </div>
-      </section>
-    </div>
+          <div v-if="imageTasksEnabled" class="attachment-block">
+            <input
+              ref="attachmentInput"
+              type="file"
+              class="hidden"
+              accept="image/png,image/jpeg,image/jpg,application/pdf"
+              @change="onAttachmentChange"
+            />
+            <div v-if="attachmentUploading || visionStatus" class="attachment-status">
+              {{ visionStatus || 'Analyzing image…' }}
+            </div>
+            <div v-if="attachments.length" class="attachment-previews">
+              <div
+                v-for="(file, idx) in attachments"
+                :key="file.url || idx"
+                class="attachment-card compact"
+              >
+                <div class="attachment-thumb-wrap">
+                  <img
+                    v-if="!isPdf(file)"
+                    :src="file.url"
+                    alt="Attachment preview"
+                    class="attachment-thumb"
+                  />
+                  <div v-else class="attachment-thumb attachment-thumb--pdf">📄</div>
+                </div>
+                <div class="attachment-meta">
+                  <p class="attachment-name">{{ file.name || 'Attachment' }}</p>
+                  <p class="attachment-source">From image</p>
+                </div>
+                <button type="button" class="attachment-remove" @click="removeAttachment(idx)">
+                  Remove
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
 
-    <!-- Footer Slot -->
-    <template #footer>
-      <div v-if="props.editMode" class="flex flex-col sm:flex-row gap-3 w-full">
-        <el-button
-          @click="closeDialog"
-          class="flex-1 px-4 py-2 rounded-lg font-medium border border-gray-500 text-gray-300 hover:bg-gray-700"
+        <section v-if="pendingGeneratedTasks.length" class="planner-card">
+          <div class="card-heading">
+            <div>
+              <p class="card-eyebrow">Review</p>
+              <h3 class="card-title">Confirm generated tasks</h3>
+            </div>
+          </div>
+          <div class="generated-preview">
+            <div
+              v-for="task in pendingGeneratedTasks"
+              :key="task.title"
+              class="generated-preview__item"
+            >
+              <div class="generated-preview__title">{{ task.title }}</div>
+              <div v-if="task.details" class="generated-preview__details">{{ task.details }}</div>
+              <div v-if="task.attachments?.length" class="generated-preview__badge">
+                📎 From image
+              </div>
+            </div>
+          </div>
+          <div class="preview-actions">
+            <el-button size="small" @click="clearGeneratedPreview">Discard</el-button>
+            <el-button
+              type="primary"
+              size="small"
+              :loading="loading"
+              @click="confirmGeneratedTasks"
+            >
+              Save tasks
+            </el-button>
+          </div>
+        </section>
+
+        <div class="section-divider" />
+        <section
+          class="planner-card reminder-card section-reminder"
+          :class="{ 'reminder-card--collapsed': !reminderOptionsVisible }"
         >
-          Cancel
-        </el-button>
-        <el-button
-          type="primary"
-          @click="save"
-          class="flex-1 px-4 ml-0-custom py-2 rounded-lg text-white font-medium shadow-md
-            bg-gradient-to-r from-emerald-700 via-teal-800 to-cyan-700
-            hover:from-emerald-800 hover:via-teal-900 hover:to-cyan-800
-            transition-all duration-300"
-        >
-          {{ props.task ? "Update Task" : "Save Task" }}
-        </el-button>
+          <div class="card-heading">
+            <div>
+              <p class="card-eyebrow">Reminder</p>
+              <h3 class="card-title">Keep me on track</h3>
+            </div>
+            <button
+              class="card-toggle"
+              type="button"
+              @click="reminderOptionsVisible = !reminderOptionsVisible"
+            >
+              <span>{{ reminderOptionsVisible ? 'Hide options' : 'Show options' }}</span>
+              <svg
+                class="card-toggle__icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+          </div>
+          <transition name="reminder-collapse">
+            <div v-show="reminderOptionsVisible">
+              <label
+                class="reminder-toggle"
+                :class="{ 'reminder-toggle--disabled': props.readonly || props.disableReminder }"
+              >
+                <el-switch
+                  v-model="setReminder"
+                  :disabled="props.readonly || props.disableReminder"
+                />
+                <span class="reminder-toggle__label">Set reminder</span>
+              </label>
+              <div class="channel-icons">
+                <el-tooltip
+                  v-for="option in channelOptions"
+                  :key="option.id"
+                  effect="dark"
+                  placement="top"
+                  :content="option.label"
+                >
+                  <button
+                    class="channel-icon"
+                    type="button"
+                    :disabled="props.readonly || props.disableReminder || !setReminder"
+                    :class="{ 'channel-icon--active': isChannelSelected(option.id) }"
+                    @click="toggleChannel(option.id)"
+                  >
+                    <span aria-hidden="true">{{ option.icon }}</span>
+                  </button>
+                </el-tooltip>
+              </div>
+              <p v-if="setReminder && !(props.readonly || props.disableReminder)" class="hint">
+                We’ll match your notification preferences. Calls only ring when it’s reminder time.
+              </p>
+            </div>
+          </transition>
+        </section>
+
+        <section v-if="props.task" class="planner-card">
+          <div class="card-heading">
+            <div>
+              <p class="card-eyebrow">Extras</p>
+              <h3 class="card-title">Add details or link</h3>
+            </div>
+          </div>
+          <el-input
+            v-model="details"
+            type="textarea"
+            :rows="4"
+            placeholder="Add more context or notes..."
+            resize="none"
+            class="mb-4"
+          />
+          <div class="planner-voice">
+            <label class="field-label">Add via voice</label>
+            <VoiceRecorder
+              :disabled="props.readonly"
+              :reset-trigger="detailsVoiceReset"
+              @transcribed="appendDetails"
+            />
+          </div>
+          <div class="link-field">
+            <label class="field-label">Optional link</label>
+            <el-input v-model="link" type="text" placeholder="https://example.com" clearable />
+            <div v-if="link" class="link-preview">
+              <a
+                :href="link"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-indigo-400 hover:underline truncate inline-block max-w-full"
+              >
+                🔗 {{ displayLink }}
+              </a>
+            </div>
+          </div>
+        </section>
       </div>
-    </template>
+
+      <!-- Footer Slot -->
+      <template #footer>
+        <div v-if="props.editMode" class="flex flex-col sm:flex-row gap-3 w-full">
+          <el-button
+            @click="closeDialog"
+            class="flex-1 px-4 py-2 rounded-lg font-medium border border-gray-500 text-gray-300 hover:bg-gray-700"
+          >
+            Cancel
+          </el-button>
+          <el-button
+            type="primary"
+            @click="save"
+            class="flex-1 px-4 ml-0-custom py-2 rounded-lg text-white font-medium shadow-md bg-gradient-to-r from-emerald-700 via-teal-800 to-cyan-700 hover:from-emerald-800 hover:via-teal-900 hover:to-cyan-800 transition-all duration-300"
+          >
+            {{ props.task ? 'Update Task' : 'Save Task' }}
+          </el-button>
+        </div>
+      </template>
     </el-dialog>
   </Teleport>
 
   <!-- Local notification setup prompt -->
   <NotificationPrompt v-model="notifPromptOpen" />
 </template>
-
-
 
 <script setup>
 /* ---------------- Core Imports ---------------- */
@@ -347,7 +354,10 @@ import { useWorkspaceStore } from '@/stores/workspaceStore'
 /* ---------------- Services ---------------- */
 import { generateTasksFromText, extractReminderTime } from '@/services/aiService'
 import { addTaskToFirebase } from '@/services/firebaseService'
-import { getPreferences as getUserPreferences, getReminderPreferences } from '@/services/settingsService'
+import {
+  getPreferences as getUserPreferences,
+  getReminderPreferences,
+} from '@/services/settingsService'
 import { scheduleReminder, getReminderStatus } from '@/services/reminderService'
 import { createNapkinItem } from '@/services/napkinService'
 import { isFeatureAllowed } from '@/services/planService'
@@ -365,18 +375,33 @@ dayjs.extend(timezone)
 
 /* ---------------- Constants ---------------- */
 function parseEnvFlag(value) {
-  return String(value || '')
-    .split('#')[0]
-    .trim()
-    .toLowerCase() === 'true'
+  return (
+    String(value || '')
+      .split('#')[0]
+      .trim()
+      .toLowerCase() === 'true'
+  )
 }
 
 const DURATION_HINTS = {
-  class: 75, lecture: 60, exam: 120, study: 45, homework: 40,
-  assignment: 40, gym: 60, workout: 60, run: 45, dinner: 45,
-  lunch: 40, breakfast: 20, meeting: 30, call: 20, sleep: 480,
+  class: 75,
+  lecture: 60,
+  exam: 120,
+  study: 45,
+  homework: 40,
+  assignment: 40,
+  gym: 60,
+  workout: 60,
+  run: 45,
+  dinner: 45,
+  lunch: 40,
+  breakfast: 20,
+  meeting: 30,
+  call: 20,
+  sleep: 480,
 }
-const RELATIVE_HINT_PATTERN = /\b(in\s+\d+\s+\w+|after\s+\w+|before\s+\w+|later|then|next|from now|soon)\b/i
+const RELATIVE_HINT_PATTERN =
+  /\b(in\s+\d+\s+\w+|after\s+\w+|before\s+\w+|later|then|next|from now|soon)\b/i
 const REMINDER_CHANNEL_ALLOW_LIST = ['pwa', 'whatsapp', 'email', 'sms', 'voice_call']
 const CREATION_CHANNELS = ['pwa', 'whatsapp']
 const channelOptions = [
@@ -421,7 +446,6 @@ const task = computed(() => props.task || null)
 
 function logTimeBrainDialog(event, payload) {
   try {
-     
     console.log(`[TimeBrain][Dialog] ${event}`, payload)
   } catch {
     /* noop */
@@ -454,9 +478,12 @@ function setBodyScrollLocked(locked) {
   }
 }
 
-watch(() => props.open, (val) => {
-  internalOpen.value = val
-})
+watch(
+  () => props.open,
+  (val) => {
+    internalOpen.value = val
+  },
+)
 watch(internalOpen, (val) => {
   setBodyScrollLocked(val)
   if (!val) emit('close')
@@ -465,7 +492,7 @@ onBeforeUnmount(() => setBodyScrollLocked(false))
 onMounted(() => {
   if (internalOpen.value) setBodyScrollLocked(true)
 })
-const channelOptionIds = channelOptions.map(o => o.id)
+const channelOptionIds = channelOptions.map((o) => o.id)
 
 /* ---------------- Helper Functions ---------------- */
 function normalizeDateInput(value) {
@@ -486,9 +513,9 @@ function normalizeReminderPreferences(raw) {
     ? Array.from(
         new Set(
           raw.channels
-            .map(c => String(c || '').toLowerCase())
-            .filter(c => REMINDER_CHANNEL_ALLOW_LIST.includes(c))
-        )
+            .map((c) => String(c || '').toLowerCase())
+            .filter((c) => REMINDER_CHANNEL_ALLOW_LIST.includes(c)),
+        ),
       )
     : []
   const fallback = channels.length
@@ -504,31 +531,33 @@ function applyReminderDefaults(source) {
   const normalized = normalizeReminderPreferences(source)
   reminderPrefs.value = normalized
   setReminder.value = !!normalized.enabled
-  const valid = normalized.channels.filter(ch => channelOptionIds.includes(ch))
+  const valid = normalized.channels.filter((ch) => channelOptionIds.includes(ch))
   if (!normalized.enabled) {
     allowedReminderChannels.value = []
   } else if (valid.length) {
     allowedReminderChannels.value = valid
   } else {
-    allowedReminderChannels.value = DEFAULT_REMINDER_CHANNELS.filter(ch => channelOptionIds.includes(ch))
+    allowedReminderChannels.value = DEFAULT_REMINDER_CHANNELS.filter((ch) =>
+      channelOptionIds.includes(ch),
+    )
   }
 }
 
 function computeCreationChannels() {
-  const selected = new Set(allowedReminderChannels.value.map(c => c.toLowerCase()))
-  const defaults = reminderPrefs.value.channels.map(c => c.toLowerCase())
-  const combined = CREATION_CHANNELS.filter(c => selected.has(c) || defaults.includes(c))
+  const selected = new Set(allowedReminderChannels.value.map((c) => c.toLowerCase()))
+  const defaults = reminderPrefs.value.channels.map((c) => c.toLowerCase())
+  const combined = CREATION_CHANNELS.filter((c) => selected.has(c) || defaults.includes(c))
   return combined.slice(0, 2)
 }
 
 function computeReminderChannels() {
-  const base = new Set(reminderPrefs.value.channels.map(c => c.toLowerCase()))
-  const toggled = new Set(allowedReminderChannels.value.map(c => c.toLowerCase()))
+  const base = new Set(reminderPrefs.value.channels.map((c) => c.toLowerCase()))
+  const toggled = new Set(allowedReminderChannels.value.map((c) => c.toLowerCase()))
   for (const opt of channelOptions) {
     if (toggled.has(opt.id)) base.add(opt.id)
     else base.delete(opt.id)
   }
-  const merged = Array.from(base).filter(c => REMINDER_CHANNEL_ALLOW_LIST.includes(c))
+  const merged = Array.from(base).filter((c) => REMINDER_CHANNEL_ALLOW_LIST.includes(c))
   return merged.length ? merged : ['pwa']
 }
 
@@ -599,7 +628,8 @@ const generateDisabled = computed(() => {
   if (!featureAllowed.value) return true
   if (plannerVoiceState.value === 'transcribing') return true
   if (loading.value || attachmentUploading.value) return true
-  if (generationMode.value === 'imageAnalyzing' || generationMode.value === 'imageUploading') return true
+  if (generationMode.value === 'imageAnalyzing' || generationMode.value === 'imageUploading')
+    return true
   const hasText = !!getInputText().trim()
   if (hasAttachmentsComputed.value) return false
   return !hasText
@@ -613,7 +643,8 @@ const generateButtonLabel = computed(() => {
 })
 const generateState = computed(() => {
   if (pendingGeneratedTasks.value.length) return 'review'
-  if (loading.value || generationMode.value === 'imageAnalyzing' || attachmentUploading.value) return 'loading'
+  if (loading.value || generationMode.value === 'imageAnalyzing' || attachmentUploading.value)
+    return 'loading'
   return 'idle'
 })
 const plannerVoiceButtonLabel = computed(() => {
@@ -659,7 +690,9 @@ function openAttachmentPicker() {
 }
 
 function isPdf(file) {
-  return String(file?.mime || '').toLowerCase().includes('pdf')
+  return String(file?.mime || '')
+    .toLowerCase()
+    .includes('pdf')
 }
 
 function removeAttachment(index) {
@@ -720,7 +753,7 @@ onBeforeUnmount(() => {
     resizeHandler = null
   }
 })
-const dialogWidth = computed(() => (screenWidth.value < 640 ? '90vw' : '520px'))
+const dialogWidth = computed(() => (screenWidth.value < 768 ? '92vw' : '520px'))
 const isMobile = computed(() => screenWidth.value < 768)
 const textareaRows = computed(() => (isMobile.value ? 2 : 3))
 
@@ -755,7 +788,7 @@ watch(
     if (!task.value) {
       resetNewTaskState()
     }
-  }
+  },
 )
 watch(
   () => props.date,
@@ -763,7 +796,7 @@ watch(
     logTimeBrainDialog('date-prop-change', { value: val })
     if (task.value && props.lockDate) return
     selectedDate.value = normalizeDateInput(val)
-  }
+  },
 )
 watch(
   task,
@@ -775,9 +808,9 @@ watch(
       resetNewTaskState()
     }
   },
-  { immediate: true }
+  { immediate: true },
 )
-watch(selectedDate, val => {
+watch(selectedDate, (val) => {
   logTimeBrainDialog('selected-date-change', { value: val })
   if (props.lockDate && props?.task?.date && val !== props.task.date)
     selectedDate.value = props.task.date
@@ -785,7 +818,7 @@ watch(selectedDate, val => {
     reminderAbsoluteIso.value = null
   }
 })
-watch(reminderTime, val => {
+watch(reminderTime, (val) => {
   logTimeBrainDialog('reminder-time-change', { value: val, lock: props.disableReminder })
   if (props.disableReminder && props.task?.reminderTime && val !== props.task.reminderTime)
     reminderTime.value = props.task.reminderTime
@@ -793,13 +826,11 @@ watch(reminderTime, val => {
     reminderAbsoluteIso.value = null
   }
 })
-watch(setReminder, enabled => {
+watch(setReminder, (enabled) => {
   logTimeBrainDialog('set-reminder-toggle', { enabled })
-  const defaults = DEFAULT_REMINDER_CHANNELS.filter(ch => channelOptionIds.includes(ch))
-  if (enabled && !allowedReminderChannels.value.length)
-    allowedReminderChannels.value = defaults
-  if (!enabled && allowedReminderChannels.value.length)
-    allowedReminderChannels.value = []
+  const defaults = DEFAULT_REMINDER_CHANNELS.filter((ch) => channelOptionIds.includes(ch))
+  if (enabled && !allowedReminderChannels.value.length) allowedReminderChannels.value = defaults
+  if (!enabled && allowedReminderChannels.value.length) allowedReminderChannels.value = []
   reminderPrefs.value = {
     ...reminderPrefs.value,
     enabled,
@@ -808,14 +839,14 @@ watch(setReminder, enabled => {
     reminderAbsoluteIso.value = null
   }
 })
-watch(allowedReminderChannels, channels => {
+watch(allowedReminderChannels, (channels) => {
   logTimeBrainDialog('channel-change', { channels })
   const normalized = Array.from(
     new Set(
       channels
-        .map(ch => String(ch || '').toLowerCase())
-        .filter(ch => channelOptionIds.includes(ch))
-    )
+        .map((ch) => String(ch || '').toLowerCase())
+        .filter((ch) => channelOptionIds.includes(ch)),
+    ),
   )
   if (!normalized.length && setReminder.value) {
     setReminder.value = false
@@ -872,7 +903,9 @@ function resetNewTaskState() {
   plannerVoiceReset.value += 1
   plannerVoiceState.value = 'idle'
   if (!allowedReminderChannels.value.length && reminderPrefs.value.channels.length) {
-    allowedReminderChannels.value = reminderPrefs.value.channels.filter(ch => channelOptionIds.includes(ch))
+    allowedReminderChannels.value = reminderPrefs.value.channels.filter((ch) =>
+      channelOptionIds.includes(ch),
+    )
   }
   attachments.value = []
   pendingGeneratedTasks.value = []
@@ -919,7 +952,7 @@ function hydrateFromTask(current) {
       ? current.channels
       : []
   if (existingChannels.length) {
-    allowedReminderChannels.value = existingChannels.filter(ch => channelOptionIds.includes(ch))
+    allowedReminderChannels.value = existingChannels.filter((ch) => channelOptionIds.includes(ch))
   }
 
   setReminder.value = existingChannels.length > 0 || !!current.reminderTime
@@ -939,7 +972,7 @@ async function tryPrefillReminder(task) {
     const items = Array.isArray(res?.items) ? res.items : []
     if (!items.length) return
 
-    const toJSDate = v => {
+    const toJSDate = (v) => {
       try {
         if (!v) return null
         if (typeof v === 'string') return new Date(v)
@@ -952,7 +985,9 @@ async function tryPrefillReminder(task) {
       }
     }
 
-    const scheduled = items.filter(i => String(i.status).toLowerCase() === 'scheduled' && !i.sentAt)
+    const scheduled = items.filter(
+      (i) => String(i.status).toLowerCase() === 'scheduled' && !i.sentAt,
+    )
     const pool = scheduled.length ? scheduled : items
     pool.sort((a, b) => {
       const ad = toJSDate(a.createdAt) || toJSDate(a.scheduledTime) || new Date(0)
@@ -974,27 +1009,30 @@ async function tryPrefillReminder(task) {
 /* ---------------- Utility ---------------- */
 function buildLocalIso(ymd, hhmm) {
   const tzCandidate = getUserTimezone()
-  let tz = typeof tzCandidate === 'string' && tzCandidate.includes('/')
-    ? tzCandidate
-    : Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+  let tz =
+    typeof tzCandidate === 'string' && tzCandidate.includes('/')
+      ? tzCandidate
+      : Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
   return toUtcIso(String(ymd || ''), String(hhmm || '00:00'), tz)
 }
 
 function applyReminderIso(isoInput, options = {}) {
-  const {
-    allowDateChange = !props.lockDate,
-    timezoneOverride,
-  } = options
+  const { allowDateChange = !props.lockDate, timezoneOverride } = options
   if (!isoInput) return false
   try {
     const tzCandidate = timezoneOverride || getUserTimezone()
-    const tz = typeof tzCandidate === 'string' && tzCandidate.includes('/')
-      ? tzCandidate
-      : Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+    const tz =
+      typeof tzCandidate === 'string' && tzCandidate.includes('/')
+        ? tzCandidate
+        : Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
     const sourceValue = (() => {
       if (!isoInput && isoInput !== 0) return null
       if (typeof isoInput?.toDate === 'function') {
-        try { return isoInput.toDate() } catch { return null }
+        try {
+          return isoInput.toDate()
+        } catch {
+          return null
+        }
       }
       if (typeof isoInput?.seconds === 'number') return new Date(isoInput.seconds * 1000)
       if (typeof isoInput?._seconds === 'number') return new Date(isoInput._seconds * 1000)
@@ -1063,8 +1101,8 @@ function resolveTaskLocalEnd(task, tz, fallbackDate) {
 function collectContextTasks(dateStr, tz) {
   const normalizedDate = normalizeDateInput(dateStr)
   return tasks.value
-    .filter(t => normalizeDateInput(t?.date || normalizedDate) === normalizedDate)
-    .map(t => {
+    .filter((t) => normalizeDateInput(t?.date || normalizedDate) === normalizedDate)
+    .map((t) => {
       const endsAt = resolveTaskLocalEnd(t, tz, normalizedDate)
       return {
         id: t.id,
@@ -1081,7 +1119,7 @@ function collectContextTasks(dateStr, tz) {
 function computeLastTaskEndIso(contextTasks, tz) {
   if (!Array.isArray(contextTasks) || !contextTasks.length) return null
   const sorted = contextTasks
-    .map(t => t.ends_at ? { ...t, ends_at: dayjs(t.ends_at).tz(t.timezone || tz) } : null)
+    .map((t) => (t.ends_at ? { ...t, ends_at: dayjs(t.ends_at).tz(t.timezone || tz) } : null))
     .filter(Boolean)
     .sort((a, b) => a.ends_at.valueOf() - b.ends_at.valueOf())
   if (!sorted.length) return null
@@ -1095,9 +1133,10 @@ async function inferReminderTimeFromInput() {
     if (!raw) return null
 
     const tzCandidate = getUserTimezone()
-    const tz = typeof tzCandidate === 'string' && tzCandidate.includes('/')
-      ? tzCandidate
-      : Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+    const tz =
+      typeof tzCandidate === 'string' && tzCandidate.includes('/')
+        ? tzCandidate
+        : Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
 
     const isRelativeHint = RELATIVE_HINT_PATTERN.test(raw)
     const now = new Date()
@@ -1109,9 +1148,7 @@ async function inferReminderTimeFromInput() {
     const contextTasks = collectContextTasks(planDateKey, tz)
     const lastTaskEnd = computeLastTaskEndIso(contextTasks, tz)
     const planAnchor =
-      planDateKey === todayKey
-        ? now
-        : dayjs.tz(`${planDateKey}T12:00:00`, tz).toDate()
+      planDateKey === todayKey ? now : dayjs.tz(`${planDateKey}T12:00:00`, tz).toDate()
 
     const inferenceNow = isRelativeHint ? now : planAnchor
     if (isRelativeHint && !props.lockDate) {
@@ -1156,16 +1193,14 @@ function enrichTitle(task) {
   const displayTitle = task.displayTitle || ''
   const baseTitle = task.title || ''
 
-  const candidateList = [
-    displayTitle,
-    baseTitle,
-    rawPhrase,
-  ].map(v => (typeof v === 'string' ? v.trim() : '')).filter(Boolean)
+  const candidateList = [displayTitle, baseTitle, rawPhrase]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean)
 
   let chosen = candidateList[0] || ''
 
   if (chosen.split(/\s+/).length <= 1) {
-    const alt = candidateList.find(v => v.split(/\s+/).length > 1)
+    const alt = candidateList.find((v) => v.split(/\s+/).length > 1)
     if (alt) chosen = alt
   }
 
@@ -1208,22 +1243,25 @@ async function generateTasks() {
   loading.value = true
   generationMode.value = hasAttachments ? 'imageAnalyzing' : 'textGenerating'
   const attachmentPayload = hasAttachments
-    ? attachments.value.map((file) => ({
-        type: 'image',
-        url: file?.url,
-        mime: file?.mime,
-        name: file?.name,
-        path: file?.path,
-      })).filter((file) => file.url)
+    ? attachments.value
+        .map((file) => ({
+          type: 'image',
+          url: file?.url,
+          mime: file?.mime,
+          name: file?.name,
+          path: file?.path,
+        }))
+        .filter((file) => file.url)
     : []
   if (hasAttachments) {
     visionStatus.value = 'Analyzing image…'
   }
 
   const tzCandidate = getUserTimezone()
-  const tz = typeof tzCandidate === 'string' && tzCandidate.includes('/')
-    ? tzCandidate
-    : Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+  const tz =
+    typeof tzCandidate === 'string' && tzCandidate.includes('/')
+      ? tzCandidate
+      : Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
 
   const contextTasks = collectContextTasks(selectedDate.value, tz)
   const lastTaskEnd = computeLastTaskEndIso(contextTasks, tz)
@@ -1253,7 +1291,7 @@ async function generateTasks() {
       : null
 
     const revalidationMap = new Map(
-      (result?.revalidation || []).map(entry => [entry.task.sourceIndex, entry])
+      (result?.revalidation || []).map((entry) => [entry.task.sourceIndex, entry]),
     )
 
     let autoPlanDate = null
@@ -1321,16 +1359,18 @@ async function generateTasks() {
       logTimeBrainDialog('generate:empty', { reason: 'no-tasks-returned' })
       ElNotification({
         title: 'No Tasks Generated',
-        message: hasAttachments ? 'No clear actions — add manually?' : 'Try adding more detail or different phrasing.',
+        message: hasAttachments
+          ? 'No clear actions — add manually?'
+          : 'Try adding more detail or different phrasing.',
         type: 'warning',
         duration: 2500,
       })
       return
     }
 
-  if (!props.lockDate && autoPlanDate) {
-    selectedDate.value = normalizeDateInput(autoPlanDate)
-  }
+    if (!props.lockDate && autoPlanDate) {
+      selectedDate.value = normalizeDateInput(autoPlanDate)
+    }
     if (!reminderTime.value && autoReminderTime) {
       reminderTime.value = autoReminderTime
       reminderManuallyEdited.value = false
@@ -1345,8 +1385,8 @@ async function generateTasks() {
         perTaskAttachments.length && (task.metadata || task.metaData)
           ? { ...(task.metadata || task.metaData), attachmentUrl: perTaskAttachments[0]?.url }
           : perTaskAttachments.length
-          ? { attachmentUrl: perTaskAttachments[0]?.url }
-          : task.metadata || null
+            ? { attachmentUrl: perTaskAttachments[0]?.url }
+            : task.metadata || null
 
       const preparedTask = {
         title: task.finalTitle || task.title || `Task ${idx + 1}`,
@@ -1491,9 +1531,11 @@ async function save() {
   }
 
   const baseIso = reminderToSave
-    ? (reminderAbsoluteIso.value || buildLocalIso(dateToSave, reminderToSave))
+    ? reminderAbsoluteIso.value || buildLocalIso(dateToSave, reminderToSave)
     : null
-  const scheduledIso = baseIso ? enforceFutureReminder(baseIso, { allowDateChange: !props.lockDate }) : null
+  const scheduledIso = baseIso
+    ? enforceFutureReminder(baseIso, { allowDateChange: !props.lockDate })
+    : null
 
   const channelsToSave = setReminder.value ? computeReminderChannels() : []
 
@@ -1518,9 +1560,10 @@ function enforceFutureReminder(iso, { allowDateChange = true } = {}) {
   if (!iso) return null
   try {
     const tzCandidate = getUserTimezone()
-    const tz = typeof tzCandidate === 'string' && tzCandidate.includes('/')
-      ? tzCandidate
-      : Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+    const tz =
+      typeof tzCandidate === 'string' && tzCandidate.includes('/')
+        ? tzCandidate
+        : Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
 
     const local = dayjs(iso).tz(tz)
     if (!local.isValid()) return iso
@@ -1569,7 +1612,7 @@ function toggleChannel(id) {
   if (current.has(id)) {
     current.delete(id)
   } else {
-    const instantActive = Array.from(current).filter(ch => CREATION_CHANNELS.includes(ch)).length
+    const instantActive = Array.from(current).filter((ch) => CREATION_CHANNELS.includes(ch)).length
     const nextIsInstant = CREATION_CHANNELS.includes(id)
     if (nextIsInstant && instantActive >= MAX_INSTANT_ALERTS) {
       ElMessage({
@@ -1590,8 +1633,8 @@ function handleTranscript(result = {}) {
     typeof result === 'string'
       ? result.trim()
       : typeof result?.text === 'string'
-      ? result.text.trim()
-      : ''
+        ? result.text.trim()
+        : ''
   if (!value) return
   assignText(input, value)
   if (!setReminder.value && reminderPrefs.value.enabled) setReminder.value = true
@@ -1610,7 +1653,6 @@ function appendDetails(result = {}) {
   logTimeBrainDialog('transcription:details', { length: value.length })
   detailsVoiceReset.value += 1
 }
-
 </script>
 
 <style scoped>
@@ -1690,7 +1732,9 @@ function appendDetails(result = {}) {
   color: rgba(226, 232, 240, 0.85);
   background: rgba(255, 255, 255, 0.05);
   cursor: pointer;
-  transition: border-color 0.2s ease, color 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    color 0.2s ease;
 }
 
 .card-toggle:hover {
@@ -1747,7 +1791,11 @@ function appendDetails(result = {}) {
   display: grid;
   place-items: center;
   border: 1px solid rgba(255, 255, 255, 0.18);
-  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  background: radial-gradient(
+    circle at 30% 30%,
+    rgba(255, 255, 255, 0.06),
+    rgba(255, 255, 255, 0.02)
+  );
   color: #f8fafc;
 }
 
@@ -1761,11 +1809,15 @@ function appendDetails(result = {}) {
 }
 
 .mic-btn--active {
-  box-shadow: 0 0 0 6px rgba(79, 70, 229, 0.12), 0 10px 25px rgba(14, 165, 233, 0.2);
+  box-shadow:
+    0 0 0 6px rgba(79, 70, 229, 0.12),
+    0 10px 25px rgba(14, 165, 233, 0.2);
 }
 
 .mic-btn--processing {
-  box-shadow: 0 0 0 7px rgba(129, 140, 248, 0.16), 0 14px 30px rgba(59, 130, 246, 0.28);
+  box-shadow:
+    0 0 0 7px rgba(129, 140, 248, 0.16),
+    0 14px 30px rgba(59, 130, 246, 0.28);
 }
 
 .mic-btn:focus-visible {
@@ -1796,7 +1848,9 @@ function appendDetails(result = {}) {
   border-radius: 999px;
   background: radial-gradient(circle at 30% 30%, rgba(79, 70, 229, 0.35), rgba(14, 165, 233, 0.15));
   box-shadow: 0 6px 18px rgba(14, 165, 233, 0.2);
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
   pointer-events: none;
 }
 
@@ -1809,12 +1863,16 @@ function appendDetails(result = {}) {
     center / contain no-repeat;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Zm5-3a1 1 0 1 0-2 0 3 3 0 1 1-6 0 1 1 0 1 0-2 0 5 5 0 0 0 4 4.9V20H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-2.1A5 5 0 0 0 17 11Z'/%3E%3C/svg%3E")
     center / contain no-repeat;
-  transition: transform 0.2s ease, opacity 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    opacity 0.2s ease;
 }
 
 .mic-btn :deep(.voice-controller--recording) ~ .mic-visual {
   animation: mic-pulse 1.1s ease-in-out infinite;
-  box-shadow: 0 0 0 8px rgba(79, 70, 229, 0.18), 0 12px 28px rgba(14, 165, 233, 0.3);
+  box-shadow:
+    0 0 0 8px rgba(79, 70, 229, 0.18),
+    0 12px 28px rgba(14, 165, 233, 0.3);
   transform: scale(1.05);
   border: 1px solid rgba(125, 211, 252, 0.9);
 }
@@ -1830,7 +1888,9 @@ function appendDetails(result = {}) {
 
 .mic-btn :deep(.voice-controller--transcribing) ~ .mic-visual {
   animation: mic-processing 0.95s ease-in-out infinite;
-  box-shadow: 0 0 0 8px rgba(99, 102, 241, 0.2), 0 12px 28px rgba(59, 130, 246, 0.3);
+  box-shadow:
+    0 0 0 8px rgba(99, 102, 241, 0.2),
+    0 12px 28px rgba(59, 130, 246, 0.3);
   border: 1px solid rgba(165, 180, 252, 0.95);
 }
 
@@ -2052,7 +2112,9 @@ function appendDetails(result = {}) {
 
 .reminder-collapse-enter-active,
 .reminder-collapse-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
 }
 
 .reminder-collapse-enter-from,
@@ -2280,13 +2342,13 @@ function appendDetails(result = {}) {
 /* Inputs */
 .task-planner-dialog .el-input__inner,
 .task-planner-dialog .el-textarea__inner {
-  background-color: rgba(255, 255, 255, 0.1);  /* semi-transparent */
+  background-color: rgba(255, 255, 255, 0.1); /* semi-transparent */
   color: #f8fafc;
 }
 
 .task-planner-dialog .el-input__inner::placeholder,
 .task-planner-dialog .el-textarea__inner::placeholder {
-  color: #cbd5e1;  /* light slate */
+  color: #cbd5e1; /* light slate */
 }
 
 /* Voice + Generate buttons aligned */
@@ -2315,17 +2377,29 @@ function appendDetails(result = {}) {
 .task-planner-dialog .el-dialog__body {
   max-height: calc(100vh - 180px);
   overflow-y: auto;
+
+  @media (max-width: 768px) {
+    max-height: 65vh;
+  }
 }
 
-/* Mobile: limit height, sticky header/footer, scrollable body */
+/* Mobile: compact height, sticky header, scrollable body, narrower width */
 @media (max-width: 768px) {
   .task-planner-dialog .el-dialog {
-    max-height: 85vh;
+    max-height: 65vh;
     display: flex;
     flex-direction: column;
     margin: 0 auto !important;
+    width: 92vw !important;
   }
-  .task-planner-dialog .el-dialog__header,
+  .task-planner-dialog .el-dialog__header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    flex-shrink: 0;
+    background: linear-gradient(145deg, #1e1b4b, #312e81, #4c1d95);
+    border-radius: 0.5rem 0.5rem 0 0;
+  }
   .task-planner-dialog .el-dialog__footer {
     flex-shrink: 0;
   }
@@ -2340,11 +2414,23 @@ function appendDetails(result = {}) {
     display: flex;
     flex-direction: column;
   }
-  .task-planner-dialog .planner-stack--mobile-order .section-date { order: 2; }
-  .task-planner-dialog .planner-stack--mobile-order .section-task { order: 1; }
-  .task-planner-dialog .planner-stack--mobile-order .section-reminder { order: 3; }
-  .task-planner-dialog .planner-stack--mobile-order .section-divider { order: 4; }
-  .task-planner-dialog .planner-stack--mobile-order .planner-card:not(.section-date):not(.section-task):not(.section-reminder) { order: 5; }
+  .task-planner-dialog .planner-stack--mobile-order .section-date {
+    order: 2;
+  }
+  .task-planner-dialog .planner-stack--mobile-order .section-task {
+    order: 1;
+  }
+  .task-planner-dialog .planner-stack--mobile-order .section-reminder {
+    order: 3;
+  }
+  .task-planner-dialog .planner-stack--mobile-order .section-divider {
+    order: 4;
+  }
+  .task-planner-dialog
+    .planner-stack--mobile-order
+    .planner-card:not(.section-date):not(.section-task):not(.section-reminder) {
+    order: 5;
+  }
   /* Tighter spacing on mobile */
   .task-planner-dialog .planner-card {
     padding: 0.75rem 1rem;
@@ -2470,7 +2556,6 @@ function appendDetails(result = {}) {
 // }
 /* Inputs (title, details, link) */
 
-
 .task-planner-dialog .el-input__inner::placeholder,
 .task-planner-dialog .el-textarea__inner::placeholder {
   color: #cbd5e1; /* light slate */
@@ -2499,7 +2584,9 @@ function appendDetails(result = {}) {
   border: 1px solid rgba(255, 255, 255, 0.2) !important;
   border-radius: 0.5rem !important;
   box-shadow: none !important;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease;
 }
 
 /* Ensure inner input inherits styling correctly */

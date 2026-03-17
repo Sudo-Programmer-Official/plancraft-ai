@@ -231,16 +231,16 @@
         <div class="dashboard-card daily-card space-y-5" :class="{ 'daily-card--fullscreen': isTodayFullscreen }">
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div class="flex flex-1 flex-col gap-1 min-w-0">
-              <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
+              <div class="focus-date-row flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">
                 <button
                   type="button"
-                  class="flex items-center justify-center w-8 h-8 rounded-lg text-slate-300 hover:bg-slate-700/60 hover:text-slate-100 transition shrink-0"
-                  aria-label="Previous day"
+                  class="focus-date-calendar-btn hidden sm:flex items-center justify-center w-8 h-8 rounded-lg text-slate-300 hover:bg-slate-700/60 hover:text-slate-100 transition shrink-0"
+                  aria-label="Choose date"
                   @click="openFocusDatePicker"
                 >
                   <span class="text-lg leading-none" aria-hidden="true">📅</span>
                 </button>
-                <div class="flex items-center gap-1 rounded-lg bg-slate-800/60 border border-slate-700/50 px-1 py-0.5">
+                <div class="focus-date-pill flex items-center gap-1 rounded-xl bg-slate-800/60 border border-slate-700/50 px-1 py-0.5 shrink-0">
                   <button
                     type="button"
                     class="p-1.5 rounded-md text-slate-300 hover:bg-slate-700/60 hover:text-slate-100 transition"
@@ -264,14 +264,14 @@
                 <button
                   v-if="!isFocusToday"
                   type="button"
-                  class="text-xs font-medium text-indigo-300 hover:text-indigo-200 px-2 py-1 rounded-md hover:bg-indigo-900/40 transition shrink-0"
+                  class="jump-today-btn text-xs font-medium text-indigo-300 hover:text-indigo-200 px-2 py-1 rounded-md hover:bg-indigo-900/40 transition shrink-0 order-last sm:order-none"
                   @click="jumpFocusToToday"
                 >
                   Jump to Today
                 </button>
                 <button
                   type="button"
-                  class="today-fullscreen-btn ml-auto"
+                  class="today-fullscreen-btn ml-auto shrink-0"
                   :aria-pressed="isTodayFullscreen"
                   :title="isTodayFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'"
                   @click="toggleTodayFullscreen"
@@ -3140,6 +3140,17 @@ onUnmounted(() => {
 
   .today-list--fullscreen {
     max-height: none;
+  }
+
+  /* Date selector: one line, no wrap; date pill styling */
+  .focus-date-row {
+    flex-wrap: nowrap;
+  }
+  .focus-date-pill {
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 6px 14px;
+    background: rgba(255, 255, 255, 0.06);
   }
 }
 
