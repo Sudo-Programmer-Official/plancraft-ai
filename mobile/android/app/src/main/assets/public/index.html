@@ -128,6 +128,99 @@
       }
     </script>
 
+    <style>
+      :root {
+        --fullscreen-safe-top: max(calc(env(safe-area-inset-top, 0px) + 0.85rem), 3.75rem);
+        --fullscreen-safe-right: calc(env(safe-area-inset-right, 0px) + 0.85rem);
+        --fullscreen-safe-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.85rem);
+        --fullscreen-safe-left: calc(env(safe-area-inset-left, 0px) + 0.85rem);
+      }
+
+      .today-fullscreen-mode .daily-card--fullscreen {
+        min-height: 100vh !important;
+        min-height: 100dvh !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        max-height: 100dvh !important;
+        padding-top: var(--fullscreen-safe-top) !important;
+        padding-right: var(--fullscreen-safe-right) !important;
+        padding-bottom: var(--fullscreen-safe-bottom) !important;
+        padding-left: var(--fullscreen-safe-left) !important;
+      }
+
+      .today-fullscreen-mode .daily-card--fullscreen > .space-y-3 {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden !important;
+      }
+
+      .today-fullscreen-mode .today-list--fullscreen {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow-y: auto !important;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-y;
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem) !important;
+      }
+    </style>
+
+    <style>
+      @media (max-width: 640px) {
+        .planner-overlay {
+          align-items: flex-start !important;
+          padding-top: max(calc(env(safe-area-inset-top, 0px) + 0.85rem), 4rem) !important;
+          padding-right: 0.85rem !important;
+          padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.85rem) !important;
+          padding-left: 0.85rem !important;
+        }
+
+        .planner-overlay .el-overlay-dialog {
+          align-items: flex-start !important;
+        }
+
+        .task-planner-dialog .el-dialog {
+          max-height: calc(100dvh - max(calc(env(safe-area-inset-top, 0px) + 0.85rem), 4rem) - calc(env(safe-area-inset-bottom, 0px) + 0.85rem)) !important;
+          display: flex !important;
+          flex-direction: column !important;
+          overflow: hidden !important;
+        }
+
+        .task-planner-dialog .el-dialog__header {
+          flex: 0 0 auto !important;
+          padding-bottom: 0.75rem !important;
+        }
+
+        .task-planner-dialog .el-dialog__body {
+          flex: 1 1 auto !important;
+          min-height: 0 !important;
+          display: flex !important;
+          flex-direction: column !important;
+          max-height: none !important;
+          overflow: hidden !important;
+          padding-top: 0.85rem !important;
+          padding-bottom: 0.25rem !important;
+        }
+
+        .task-planner-dialog .el-dialog__footer {
+          flex: 0 0 auto !important;
+          padding-top: 0.75rem !important;
+        }
+
+        .task-planner-dialog .planner-stack {
+          min-height: 0 !important;
+          overflow-y: auto !important;
+          overscroll-behavior: contain;
+          -webkit-overflow-scrolling: touch;
+          padding-right: 0.15rem !important;
+          padding-bottom: 0.35rem !important;
+        }
+      }
+    </style>
+
     <!-- LinkedIn Insight Tag is initialized in src/analytics/linkedin.js via Vite env -->
     <script type="module" crossorigin src="/assets/index-CJbFZ5h8.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-16NeXFJ-.css">

@@ -229,8 +229,8 @@
       class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-3"
     >
         <div class="dashboard-card daily-card space-y-5" :class="{ 'daily-card--fullscreen': isTodayFullscreen }">
-          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div class="flex items-center gap-3">
+          <div class="daily-card__header">
+            <div class="daily-card__heading">
               <div>
                 <h3 class="text-lg sm:text-xl font-semibold text-slate-100">
                   📅 Today’s Focus
@@ -239,6 +239,8 @@
                   Prioritise, drag, and complete your most important work.
                 </p>
               </div>
+            </div>
+            <div class="daily-card__actions">
               <button
                 type="button"
                 class="today-fullscreen-btn"
@@ -249,14 +251,14 @@
                 <span v-if="!isTodayFullscreen">⤢</span>
                 <span v-else>⤡</span>
               </button>
+              <button
+                @click="openPlanner"
+                class="daily-card__plan-btn inline-flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg text-white bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 shadow-md transition"
+              >
+                <span class="text-base">＋</span>
+                Plan New Task
+              </button>
             </div>
-            <button
-              @click="openPlanner"
-              class="inline-flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg text-white bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 shadow-md transition"
-            >
-              <span class="text-base">＋</span>
-              Plan New Task
-            </button>
           </div>
 
           <div class="flex gap-2 sm:gap-3 overflow-x-auto pb-2 scrollbar-plan">
@@ -2969,6 +2971,34 @@ onUnmounted(() => {
   }
 }
 
+.daily-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.daily-card__heading {
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+
+.daily-card__actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-left: auto;
+  flex-wrap: nowrap;
+}
+
+.daily-card__plan-btn {
+  min-height: 44px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 .today-fullscreen-btn {
   width: 44px;
   height: 44px;
@@ -2981,6 +3011,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   font-size: 16px;
+  flex-shrink: 0;
   transition: all 0.2s ease;
 }
 
@@ -2997,14 +3028,29 @@ onUnmounted(() => {
   margin: 0 !important;
   width: 100vw;
   min-height: 100vh;
+  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
   background: radial-gradient(circle at 20% 20%, rgba(79, 70, 229, 0.35), transparent 35%), radial-gradient(circle at 80% 0%, rgba(236, 72, 153, 0.25), transparent 32%), #0f172a;
   border-radius: 0;
-  padding: 1.25rem 1.25rem 1rem;
+  padding-top: calc(var(--safe-area-top, env(safe-area-inset-top, 0px)) + 1.25rem);
+  padding-right: calc(var(--safe-area-right, env(safe-area-inset-right, 0px)) + 1.25rem);
+  padding-bottom: calc(var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 1rem);
+  padding-left: calc(var(--safe-area-left, env(safe-area-inset-left, 0px)) + 1.25rem);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.65);
   transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.daily-card--fullscreen > .space-y-3 {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .today-list {
@@ -3016,15 +3062,31 @@ onUnmounted(() => {
   min-height: 0;
   max-height: none;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  padding-bottom: calc(var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 0.5rem);
 }
 
 @media (max-width: 768px) {
   .daily-card--fullscreen {
-    padding: 1rem 0.85rem 0.85rem;
+    padding-top: max(calc(var(--safe-area-top, env(safe-area-inset-top, 0px)) + 0.85rem), 3.75rem);
+    padding-right: calc(var(--safe-area-right, env(safe-area-inset-right, 0px)) + 0.85rem);
+    padding-bottom: calc(var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 0.85rem);
+    padding-left: calc(var(--safe-area-left, env(safe-area-inset-left, 0px)) + 0.85rem);
   }
 
   .today-list--fullscreen {
     max-height: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .daily-card__actions {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 }
 

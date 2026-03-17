@@ -1609,6 +1609,10 @@ function appendDetails(result = {}) {
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .planner-card {
@@ -2234,10 +2238,14 @@ function appendDetails(result = {}) {
   padding: 1rem;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
   max-height: calc(100vh - 64px);
+  max-height: calc(100dvh - 64px);
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
 }
 /* Title */
 .task-planner-dialog .el-dialog__header {
+  flex: 0 0 auto;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   color: #f8fafc;
   font-weight: 600;
@@ -2278,12 +2286,59 @@ function appendDetails(result = {}) {
 
 /* Footer */
 .task-planner-dialog .el-dialog__footer {
+  flex: 0 0 auto;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   padding-top: 1rem;
 }
 .task-planner-dialog .el-dialog__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   max-height: calc(100vh - 180px);
-  overflow-y: auto;
+  max-height: calc(100dvh - 180px);
+  overflow: hidden;
+}
+
+@media (max-width: 640px) {
+  .planner-overlay {
+    align-items: flex-start;
+    padding-top: max(calc(var(--safe-area-top, env(safe-area-inset-top, 0px)) + 0.85rem), 4rem);
+    padding-right: 0.85rem;
+    padding-bottom: calc(var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 0.85rem);
+    padding-left: 0.85rem;
+  }
+
+  .planner-overlay .el-overlay-dialog {
+    align-items: flex-start;
+  }
+
+  .task-planner-dialog .el-dialog {
+    width: min(100%, 560px);
+    max-height: calc(100dvh - max(calc(var(--safe-area-top, env(safe-area-inset-top, 0px)) + 0.85rem), 4rem) - calc(var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 0.85rem));
+    border-radius: 1rem;
+    padding: 0.85rem;
+  }
+
+  .task-planner-dialog .el-dialog__header {
+    padding-bottom: 0.75rem;
+  }
+
+  .task-planner-dialog .el-dialog__body {
+    max-height: none;
+    padding-top: 0.85rem;
+    padding-bottom: 0.25rem;
+  }
+
+  .task-planner-dialog .el-dialog__footer {
+    padding-top: 0.75rem;
+  }
+
+  .planner-stack {
+    gap: 0.9rem;
+    padding-right: 0.15rem;
+    padding-bottom: 0.35rem;
+  }
 }
 /* TaskPlannerDialog.vue or global theme file */
 
