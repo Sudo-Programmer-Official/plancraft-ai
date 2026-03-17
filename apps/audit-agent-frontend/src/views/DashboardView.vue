@@ -229,37 +229,86 @@
       class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-3"
     >
         <div class="dashboard-card daily-card space-y-5" :class="{ 'daily-card--fullscreen': isTodayFullscreen }">
-          <div class="daily-card__header">
-            <div class="daily-card__heading">
-              <div>
-                <h3 class="text-lg sm:text-xl font-semibold text-slate-100">
-                  📅 Today’s Focus
-                </h3>
-                <p class="text-xs sm:text-sm text-indigo-200/80">
-                  Prioritise, drag, and complete your most important work.
-                </p>
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div class="flex flex-1 flex-col gap-1 min-w-0">
+              <div class="focus-date-row flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">
+                <button
+                  type="button"
+                  class="focus-date-calendar-btn hidden sm:flex items-center justify-center w-8 h-8 rounded-lg text-slate-300 hover:bg-slate-700/60 hover:text-slate-100 transition shrink-0"
+                  aria-label="Choose date"
+                  @click="openFocusDatePicker"
+                >
+                  <span class="text-lg leading-none" aria-hidden="true">📅</span>
+                </button>
+                <div class="focus-date-pill flex items-center gap-1 rounded-xl bg-slate-800/60 border border-slate-700/50 px-1 py-0.5 shrink-0">
+                  <button
+                    type="button"
+                    class="p-1.5 rounded-md text-slate-300 hover:bg-slate-700/60 hover:text-slate-100 transition"
+                    aria-label="Previous day"
+                    @click="prevFocusDay"
+                  >
+                    <span class="text-sm font-medium">&lt;</span>
+                  </button>
+                  <span class="px-2 py-1 text-sm font-medium text-slate-100 min-w-0 truncate max-w-[180px] sm:max-w-none">
+                    {{ focusDateLabel }}
+                  </span>
+                  <button
+                    type="button"
+                    class="p-1.5 rounded-md text-slate-300 hover:bg-slate-700/60 hover:text-slate-100 transition"
+                    aria-label="Next day"
+                    @click="nextFocusDay"
+                  >
+                    <span class="text-sm font-medium">&gt;</span>
+                  </button>
+                </div>
+                <button
+                  v-if="!isFocusToday"
+                  type="button"
+                  class="jump-today-btn text-xs font-medium text-indigo-300 hover:text-indigo-200 px-2 py-1 rounded-md hover:bg-indigo-900/40 transition shrink-0 order-last sm:order-none"
+                  @click="jumpFocusToToday"
+                >
+                  Jump to Today
+                </button>
+                <button
+                  type="button"
+                  class="today-fullscreen-btn ml-auto shrink-0"
+                  :aria-pressed="isTodayFullscreen"
+                  :title="isTodayFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'"
+                  @click="toggleTodayFullscreen"
+                >
+                  <span v-if="!isTodayFullscreen">⤢</span>
+                  <span v-else>⤡</span>
+                </button>
               </div>
+              <p class="text-xs sm:text-sm text-indigo-200/80">
+                Prioritise, drag, and complete your most important work.
+              </p>
             </div>
-            <div class="daily-card__actions">
-              <button
-                type="button"
-                class="today-fullscreen-btn"
-                :aria-pressed="isTodayFullscreen"
-                :title="isTodayFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'"
-                @click="toggleTodayFullscreen"
-              >
-                <span v-if="!isTodayFullscreen">⤢</span>
-                <span v-else>⤡</span>
-              </button>
-              <button
-                @click="openPlanner"
-                class="daily-card__plan-btn inline-flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg text-white bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 shadow-md transition"
-              >
-                <span class="text-base">＋</span>
-                Plan New Task
-              </button>
-            </div>
+            <button
+              @click="openPlanner"
+              class="inline-flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg text-white bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 shadow-md transition shrink-0"
+            >
+              <span class="text-base">＋</span>
+              Plan New Task
+            </button>
           </div>
+
+          <el-dialog
+            v-model="showFocusDatePicker"
+            title="Choose date"
+            width="auto"
+            class="focus-date-picker-dialog"
+            @close="showFocusDatePicker = false"
+          >
+            <el-date-picker
+              :model-value="focusSelectedDate ? parseLocalDateKey(focusSelectedDate) : null"
+              type="date"
+              :placeholder="'Pick a date'"
+              format="MMM D, YYYY"
+              value-format="YYYY-MM-DD"
+              @update:model-value="onFocusDatePicked"
+            />
+          </el-dialog>
 
           <div class="flex gap-2 sm:gap-3 overflow-x-auto pb-2 scrollbar-plan">
             <button
@@ -294,15 +343,15 @@
             </div>
 
             <div
-              v-if="filteredDaily.length"
               ref="dailyList"
               class="today-list overflow-y-auto max-h-[60vh] md:max-h-64 scrollbar-plan rounded-2xl pr-1"
               :class="{ 'today-list--fullscreen': isTodayFullscreen }"
             >
-              <ul class="space-y-2 text-sm">
-                <li
-                  v-for="task in filteredDaily"
-                  :key="task.id"
+              <transition name="focus-list-fade" mode="out-in">
+                <ul v-if="filteredDaily.length" :key="focusSelectedDate" class="space-y-2 text-sm">
+                  <li
+                    v-for="task in filteredDaily"
+                    :key="task.id"
                   :class="[
                     'flex items-center justify-between gap-3 p-3 rounded-xl transition border',
                     activeTaskId === task.id
@@ -375,17 +424,17 @@
                   </div>
                 </li>
               </ul>
+              <ul v-else :key="`empty-${focusSelectedDate}`" class="space-y-2 text-sm text-slate-400 text-center py-6">
+                <li>{{ dashboardCategory === 'All' ? 'No tasks for this day.' : 'No tasks in this category.' }}</li>
+              </ul>
+              </transition>
             </div>
-
-            <p v-else class="text-slate-400 text-sm">
-              {{ dashboardCategory === 'All' ? 'Nothing planned for today.' : 'No tasks in this category yet.' }}
-            </p>
           </div>
 
           <TaskPlannerDialog
             v-if="showPlanner"
             :open="showPlanner"
-            :date="selectedDate"
+            :date="selectedTask ? (selectedTask.date || focusSelectedDate) : focusSelectedDate"
             :task="selectedTask"
             :edit-mode="!!selectedTask"
             @close="closePlanner"
@@ -1159,7 +1208,7 @@ import { useRouter } from 'vue-router'
 import { collection, onSnapshot, updateDoc, doc, query, where, serverTimestamp, getDocs } from 'firebase/firestore'
 import { db, auth } from '@/firebase/init'
 import { onAuthStateChanged } from 'firebase/auth'
-import { toLocalDateKey } from '@/utils/dateHelper'
+import { toLocalDateKey, parseLocalDateKey } from '@/utils/dateHelper'
 import { summarizeTasks } from '@/services/aiService'
 import GuestBanner from '@/components/GuestBanner.vue'
 import { useAuthStore } from '@/stores/authStore'
@@ -2026,6 +2075,60 @@ function buildRotatingInsights() {
 const today = new Date()
 const selectedDate = toLocalDateKey(today)
 
+// Focus section date navigation (Today's Focus can show any day)
+const allWorkspaceTasksRef = ref([])
+const focusSelectedDate = ref(toLocalDateKey(new Date()))
+const showFocusDatePicker = ref(false)
+
+watch(
+  focusSelectedDate,
+  (ymd) => {
+    dailyTasks.value = allWorkspaceTasksRef.value.filter((t) => t.date === ymd)
+  },
+  { immediate: false }
+)
+
+const isFocusToday = computed(() => focusSelectedDate.value === todayKeyRef.value)
+
+const focusDateLabel = computed(() => {
+  const ymd = focusSelectedDate.value
+  if (!ymd) return 'Today'
+  const d = parseLocalDateKey(ymd)
+  const monDay = dayjs(d).format('MMM D')
+  if (isFocusToday.value) return `Today (${monDay})`
+  return dayjs(d).format('ddd, MMM D')
+})
+
+const focusDateLabelShort = computed(() => {
+  if (isFocusToday.value) return 'Today'
+  return focusDateLabel.value
+})
+
+function prevFocusDay() {
+  const d = parseLocalDateKey(focusSelectedDate.value)
+  d.setDate(d.getDate() - 1)
+  focusSelectedDate.value = toLocalDateKey(d)
+}
+
+function nextFocusDay() {
+  const d = parseLocalDateKey(focusSelectedDate.value)
+  d.setDate(d.getDate() + 1)
+  focusSelectedDate.value = toLocalDateKey(d)
+}
+
+function jumpFocusToToday() {
+  focusSelectedDate.value = todayKeyRef.value
+}
+
+function openFocusDatePicker() {
+  showFocusDatePicker.value = true
+}
+
+function onFocusDatePicked(date) {
+  if (date) focusSelectedDate.value = typeof date === 'string' ? date : toLocalDateKey(date)
+  showFocusDatePicker.value = false
+}
+
 function toYMD(date) {
   if (typeof date === 'string') return date
   return toLocalDateKey(date)
@@ -2421,7 +2524,8 @@ function handleTaskSnapshot(snapshot) {
       createdAt: data.createdAt?.toMillis?.() || data.createdAt || 0,
     }
   })
-  dailyTasks.value = userTasks.filter((t) => t.date === toYMD(today))
+  allWorkspaceTasksRef.value = userTasks
+  dailyTasks.value = userTasks.filter((t) => t.date === focusSelectedDate.value)
   const weekDays = ymdRange(startOfWeek, endOfWeek)
   weeklyTasks.value = userTasks.filter((t) => weekDays.includes(t.date))
   const monthDays = ymdRange(startOfMonth, endOfMonth)
@@ -3057,6 +3161,15 @@ onUnmounted(() => {
   transition: max-height 0.25s ease;
 }
 
+.focus-list-fade-enter-active,
+.focus-list-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.focus-list-fade-enter-from,
+.focus-list-fade-leave-to {
+  opacity: 0;
+}
+
 .today-list--fullscreen {
   flex: 1 1 auto;
   min-height: 0;
@@ -3078,6 +3191,17 @@ onUnmounted(() => {
 
   .today-list--fullscreen {
     max-height: none;
+  }
+
+  /* Date selector: one line, no wrap; date pill styling */
+  .focus-date-row {
+    flex-wrap: nowrap;
+  }
+  .focus-date-pill {
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 6px 14px;
+    background: rgba(255, 255, 255, 0.06);
   }
 }
 

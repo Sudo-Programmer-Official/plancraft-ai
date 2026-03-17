@@ -218,6 +218,7 @@ import { auth } from '@/firebase/init'
 import { ElMessage } from 'element-plus'
 import { parsePhoneNumberFromString } from 'libphonenumber-js'
 import { sendMagicLink, completeMagicLinkSignIn } from '@/services/authService'
+import { trackSignupCompleted } from '@/services/analytics'
 import GoogleAuthDiagnostic from '@/components/GoogleAuthDiagnostic.vue'
 import {
   isNativePackagedApp,
@@ -664,7 +665,10 @@ onMounted(() => {
 onMounted(async () => {
   try {
     const user = await completeMagicLinkSignIn(window.location.href)
-    if (user) redirectAfterLogin()
+    if (user) {
+      try { trackSignupCompleted({ method: 'email_link' }) } catch (_) {}
+      redirectAfterLogin()
+    }
   } catch (e) {
     // ignore when not a magic link
   }

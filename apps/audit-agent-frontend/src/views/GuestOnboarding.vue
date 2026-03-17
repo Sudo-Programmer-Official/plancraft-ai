@@ -157,7 +157,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter, useRoute, RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { ElMessage } from 'element-plus'
-import { trackGuestCompletedOnboarding, trackGuestReachedSignup } from '@/services/analytics'
+import { trackGuestCompletedOnboarding, trackGuestReachedSignup, trackSignupCompleted } from '@/services/analytics'
 import { seedGuestStarterTasks } from '@/utils/guestTasks'
 import { useSeoMeta } from '@/composables/useSeoMeta'
 
@@ -285,6 +285,7 @@ async function completeGuestSetup() {
       noteProvided: intentionNote.value.trim().length > 0,
       source: route.query.guestFromLanding === '1' ? 'landing' : 'direct',
     })
+    trackSignupCompleted({ method: 'guest' })
     router.push('/dashboard')
   } catch (error) {
     console.error('Guest onboarding failed', error)

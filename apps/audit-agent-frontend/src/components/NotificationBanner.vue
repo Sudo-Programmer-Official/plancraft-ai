@@ -9,8 +9,7 @@
   >
     <div class="content space-y-4 text-center">
       <p class="text-slate-300 leading-relaxed">
-        Get reminders and updates directly on this device.  
-        Allow notifications to never miss an alert again ✨
+        Receive reminders for your tasks. We only send notifications for your own plans.
       </p>
 
       <div v-if="permission === 'denied'" class="text-red-400 text-sm">
@@ -65,17 +64,10 @@ async function enable() {
   }
 }
 
-onMounted(async () => {
-  if (isNativePackagedApp()) return
-  if (localStorage.getItem('notifDismissed')) return
-  const supported = isPushSupported()
-  const subscribed = await hasSubscription()
-  permission.value =
-    typeof globalThis !== 'undefined' && typeof globalThis.Notification !== 'undefined'
-      ? globalThis.Notification.permission
-      : 'default'
-  if (supported && !subscribed && permission.value !== 'granted') {
-    open.value = true
+// No automatic popup: permission is only requested when user clicks "Enable" in Quick Setup or Settings.
+onMounted(() => {
+  if (typeof globalThis !== 'undefined' && typeof globalThis.Notification !== 'undefined') {
+    permission.value = globalThis.Notification.permission
   }
 })
 </script>

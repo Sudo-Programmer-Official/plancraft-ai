@@ -308,7 +308,7 @@ import { requestSpeechUrl, supportsWebSpeech, speakWithWebSpeech } from '@/servi
 import { useAuthStore } from '@/stores/authStore'
 import { recordAndSendToBackend } from '@/utils/backendRecorder'
 import { ElMessage } from 'element-plus'
-import { trackEvent } from '@/services/analytics'
+import { trackEvent, trackAISuggestionAccepted } from '@/services/analytics'
 import { auth } from '@/firebase/init'
 import { getAppToken } from '@/services/appTokenService'
 import dayjs from 'dayjs'
@@ -951,6 +951,12 @@ function runAction(_message, action) {
     ElMessage.info('This action needs a bit more detail. Let the assistant know how to proceed.')
     return
   }
+  try {
+    trackAISuggestionAccepted({
+      suggestion_type: action.type || 'planner_action',
+      label: action.label || undefined,
+    })
+  } catch (_) {}
   if (action.message) {
     ElMessage.info(action.message)
   }

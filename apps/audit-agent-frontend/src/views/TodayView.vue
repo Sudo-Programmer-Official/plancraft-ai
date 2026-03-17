@@ -76,6 +76,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useTasks } from '@/composables/useTasks'
 import { askWorkspaceSummary } from '@/services/workspaceAiService'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
+import { trackAISuggestionAccepted } from '@/services/analytics'
 
 const todayDate = new Date().toLocaleDateString()
 const { tasks, loadTasks, toggleComplete } = useTasks()
@@ -119,6 +120,9 @@ async function planMyDay() {
       question: 'Help me plan my day based on my tasks and events. Suggest the top 3 tasks and time blocks.',
     })
     aiPlan.value = answer || ''
+    if (answer) {
+      try { trackAISuggestionAccepted({ suggestion_type: 'daily_plan' }) } catch (_) {}
+    }
   } catch (err) {
     planError.value =
       err?.response?.data?.error || err?.message || 'Failed to generate a plan for your day.'

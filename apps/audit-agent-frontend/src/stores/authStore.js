@@ -28,7 +28,7 @@ import {
   PhoneAuthProvider,
 } from 'firebase/auth'
 import { auth, db } from '@/firebase/init'
-import { identifyUser, trackEvent } from '@/services/analytics'
+import { identifyUser, trackEvent, trackSignupCompleted } from '@/services/analytics'
 import { getUsageStatus } from '@/services/planService'
 import { doc, updateDoc, setDoc, onSnapshot } from 'firebase/firestore'
 import { ElNotification } from 'element-plus'
@@ -1300,6 +1300,11 @@ export const useAuthStore = defineStore('authStore', {
           localStorage.setItem('user', JSON.stringify(this.user))
           localStorage.setItem('token', this.token)
           try {
+            identifyUser(this.user)
+            const method = (result?.providerId || (result?.user?.providerData || [])[0]?.providerId || '').includes('apple') ? 'apple' : 'google'
+            trackSignupCompleted({ method })
+          } catch (_) {}
+          try {
             if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
               const mod = await import('@/services/appTokenService.js')
               mod.refreshAppToken().catch(() => {})
@@ -1395,6 +1400,9 @@ export const useAuthStore = defineStore('authStore', {
         identifyUser(this.user)
         localStorage.setItem('user', JSON.stringify(this.user))
         localStorage.setItem('token', this.token)
+        try {
+          trackSignupCompleted({ method: 'native' })
+        } catch (_) {}
         try {
           if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
             const mod = await import('@/services/appTokenService.js')
@@ -1875,6 +1883,9 @@ export const useAuthStore = defineStore('authStore', {
             mod.refreshAppToken().catch(() => {})
           }
         } catch {}
+        try {
+          trackSignupCompleted({ method: 'email' })
+        } catch (_) {}
         ElNotification({
           title: 'Account created 🎉',
           message: `Hi ${this.user.email || 'there'}!`,

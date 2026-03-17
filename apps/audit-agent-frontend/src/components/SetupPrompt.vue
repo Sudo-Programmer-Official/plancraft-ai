@@ -417,6 +417,7 @@ async function enablePush() {
   try {
     loadingPush.value = true
     saveError.value = ''
+    saveSuccess.value = ''
     if (typeof globalThis === 'undefined' || typeof globalThis.Notification === 'undefined') {
       throw new Error('Browser notifications are not supported on this device.')
     }
@@ -427,6 +428,10 @@ async function enablePush() {
       if (uid && !(await hasSubscription())) {
         await registerPushSubscription(String(uid))
       }
+      saveSuccess.value = 'Browser notifications enabled.'
+    } else if (permission === 'denied') {
+      saveError.value =
+        'Notifications were blocked. You can enable them later in your browser settings (e.g. click the lock or info icon in the address bar).'
     }
     markDirty()
     emitSetupState()

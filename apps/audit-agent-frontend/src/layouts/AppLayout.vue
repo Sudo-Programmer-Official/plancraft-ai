@@ -1,5 +1,4 @@
 <template>
-  <NotificationBanner v-if="showNotificationBanner" :user-id="currentUserId" />
   <FeedbackPrompt />
   <FeedbackDrawer />
   <div
@@ -433,9 +432,23 @@
               <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <h2 class="text-lg sm:text-2xl font-semibold capitalize truncate max-w-[50vw]">
-            {{ $route.name }}
-          </h2>
+          <div class="header-title flex items-center gap-2 min-w-0">
+            <h2 class="text-lg sm:text-2xl font-semibold capitalize truncate max-w-[36vw]">
+              {{ $route.name }}
+            </h2>
+            <button
+              v-if="activeWorkspace?.name"
+              type="button"
+              class="workspace-switcher hidden md:inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-indigo-500/60 bg-indigo-500/10 text-xs font-medium text-indigo-100 hover:bg-indigo-500/20 transition"
+              @click="router.push('/workspaces')"
+            >
+              <span aria-hidden="true">📦</span>
+              <span class="truncate max-w-[12rem]">
+                {{ activeWorkspace.name }}
+              </span>
+              <span aria-hidden="true">▼</span>
+            </button>
+          </div>
         </div>
 
         <!-- Right Section -->
@@ -561,7 +574,6 @@
 <script setup>
 import { ref, onMounted, watch, onUnmounted, computed, reactive } from 'vue'
 import { hasSubscription, registerPushSubscription } from '@/services/pushService'
-import NotificationBanner from '@/components/NotificationBanner.vue'
 import FeedbackPrompt from '@/components/feedback/FeedbackPrompt.vue'
 import FeedbackDrawer from '@/components/feedback/FeedbackDrawer.vue'
 import { useRouter, useRoute } from 'vue-router'
@@ -575,10 +587,9 @@ import { db } from '@/firebase/init'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { trackLinkedInConversion } from '@/utils/ads'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
+import { ElMessage } from 'element-plus'
 import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
 const currentUserId = ref(null)
-const showNotificationBanner = computed(() => !isNativePackagedApp())
-
 function deriveUidFromStorage() {
   try {
     const direct = localStorage.getItem('uid')
@@ -655,6 +666,21 @@ watch(
     }
   },
   { immediate: true },
+)
+
+// Toast when workspace context changes (desktop + mobile)
+watch(
+  () => workspaceStore.activeWorkspaceId,
+  (next, prev) => {
+    if (!prev || !next || next === prev) return
+    const name = workspaceStore.activeWorkspace?.name
+    if (!name) return
+    try {
+      ElMessage.success(`Switched to workspace: ${name}`)
+    } catch {
+      /* noop */
+    }
+  },
 )
 
 async function maybePromptProfile() {
