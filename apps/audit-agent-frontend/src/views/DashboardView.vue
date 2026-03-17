@@ -3,12 +3,6 @@
   <div v-if="checkingAuth" class="px-4 py-8 text-center text-gray-400">
     Checking session…
   </div>
-  <SetupPrompt
-    v-else-if="showSetup"
-    @done="handleQuickSetupDone"
-    @close="handleQuickSetupClosed"
-    @updated="handleQuickSetupUpdated"
-  />
   <main
     v-else
     class="min-h-screen px-2 py-6 sm:px-4 md:px-6 pb-12 transition-colors max-w-7xl mx-auto flex flex-col gap-6 lg:gap-8"
@@ -229,8 +223,8 @@
       class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-3"
     >
         <div class="dashboard-card daily-card space-y-5" :class="{ 'daily-card--fullscreen': isTodayFullscreen }">
-          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div class="flex flex-1 flex-col gap-1 min-w-0">
+          <div class="daily-card__header">
+            <div class="daily-card__heading flex flex-col gap-1">
               <div class="focus-date-row flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">
                 <button
                   type="button"
@@ -269,28 +263,30 @@
                 >
                   Jump to Today
                 </button>
-                <button
-                  type="button"
-                  class="today-fullscreen-btn ml-auto shrink-0"
-                  :aria-pressed="isTodayFullscreen"
-                  :title="isTodayFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'"
-                  @click="toggleTodayFullscreen"
-                >
-                  <span v-if="!isTodayFullscreen">⤢</span>
-                  <span v-else>⤡</span>
-                </button>
               </div>
               <p class="text-xs sm:text-sm text-indigo-200/80">
                 Prioritise, drag, and complete your most important work.
               </p>
             </div>
-            <button
-              @click="openPlanner"
-              class="inline-flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg text-white bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 shadow-md transition shrink-0"
-            >
-              <span class="text-base">＋</span>
-              Plan New Task
-            </button>
+            <div class="daily-card__actions">
+              <button
+                type="button"
+                class="today-fullscreen-btn"
+                :aria-pressed="isTodayFullscreen"
+                :title="isTodayFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'"
+                @click="toggleTodayFullscreen"
+              >
+                <span v-if="!isTodayFullscreen">⤢</span>
+                <span v-else>⤡</span>
+              </button>
+              <button
+                @click="openPlanner"
+                class="daily-card__plan-btn inline-flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg text-white bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 shadow-md transition"
+              >
+                <span class="text-base">＋</span>
+                <span class="whitespace-nowrap">Plan New Task</span>
+              </button>
+            </div>
           </div>
 
           <el-dialog
@@ -1216,8 +1212,8 @@ import TaskPlannerDialog from '@/components/TaskPlannerDialog.vue'
 import { useTasks } from '@/composables/useTasks'
 import { addTaskToFirebase, updateTaskInFirebase, fetchEntries } from '@/services/firebaseService'
 import QuickLinksCard from '@/components/QuickLinksCard.vue'
-import SetupPrompt from '@/components/SetupPrompt.vue'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
+import { useQuickSetupStore } from '@/stores/quickSetupStore'
 import { reactivateSubscription } from '@/services/stripeService'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
@@ -1241,7 +1237,6 @@ import { fetchDashboardPreferences, saveDashboardPreferences } from '@/services/
 import { getGoogleStatus, triggerGoogleSyncNow } from '@/stores/integrationsStore'
 import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
 import {
-  clearQuickSetupSnooze,
   getIncompleteQuickSetupLabels,
   isQuickSetupSnoozed,
   readQuickSetupState,
@@ -1620,8 +1615,7 @@ const sparklineCanvas = ref(null)
 const categoryFilters = TASK_CATEGORY_FILTERS
 const dashboardCategory = ref('All')
 
-const showSetup = ref(false)
-const quickSetupState = ref(readQuickSetupState())
+const quickSetupStore = useQuickSetupStore()
 const reminderActiveByTask = ref({})
 const taskMeetingLink = (task) => resolveTaskMeetingLink(task)
 const checkingAuth = ref(true)
@@ -1764,34 +1758,23 @@ const userStreak = ref(0)
 const displayStreak = computed(() => userStreak.value || journalStreak.value || 0)
 const ONBOARDING_SNOOZE_HOURS = 24
 let onboardingTimer = null
-let quickSetupListener = null
-
+const quickSetupState = computed(() => quickSetupStore.setupState)
 const quickSetupMissingLabels = computed(() => getIncompleteQuickSetupLabels(quickSetupState.value))
 const showQuickSetupBanner = computed(
-  () => !isGuest.value && !showSetup.value && !!quickSetupState.value && !quickSetupState.value.completed
+  () =>
+    !isGuest.value &&
+    !quickSetupStore.quickSetupOpen &&
+    !!quickSetupState.value &&
+    !quickSetupState.value.completed
 )
 
 function refreshQuickSetupState(nextState = null) {
-  quickSetupState.value = nextState && typeof nextState === 'object' ? nextState : readQuickSetupState()
-}
-
-function handleQuickSetupUpdated(nextState = null) {
-  refreshQuickSetupState(nextState)
-}
-
-function handleQuickSetupDone() {
-  refreshQuickSetupState()
-  showSetup.value = false
-}
-
-function handleQuickSetupClosed() {
-  refreshQuickSetupState()
-  showSetup.value = false
+  quickSetupStore.refreshQuickSetupState(nextState)
 }
 
 function openQuickSetup() {
-  clearQuickSetupSnooze()
-  showSetup.value = true
+  quickSetupStore.refreshQuickSetupState()
+  quickSetupStore.openQuickSetup({ source: 'manual' })
 }
 
 function normalizeTimestamp(value) {
@@ -2175,9 +2158,11 @@ onMounted(async () => {
   }
   try {
     const storedSetup = readQuickSetupState()
-    quickSetupState.value = storedSetup
+    refreshQuickSetupState(storedSetup)
     const seen = storedSetup?.completed || localStorage.getItem('pcai_setup_done') === '1'
-    showSetup.value = !isGuest.value && !seen && !isQuickSetupSnoozed()
+    if (!isGuest.value && !seen && !isQuickSetupSnoozed()) {
+      quickSetupStore.openQuickSetup({ clearSnooze: false, source: 'auto' })
+    }
   } catch {
     /* noop */
   }
@@ -2575,10 +2560,6 @@ onUnmounted(() => {
   if (unsubscribe.value) unsubscribe.value()
   detachNapkinListener()
   if (insightIntervalId.value) clearInterval(insightIntervalId.value)
-  if (quickSetupListener && typeof window !== 'undefined') {
-    window.removeEventListener('pcai:quick-setup-updated', quickSetupListener)
-    quickSetupListener = null
-  }
   if (onboardingTimer) {
     clearTimeout(onboardingTimer)
     onboardingTimer = null
@@ -2913,12 +2894,6 @@ onMounted(() => {
   } catch {
     checkingAuth.value = false
   }
-  if (typeof window !== 'undefined') {
-    quickSetupListener = (event) => {
-      refreshQuickSetupState(event?.detail || null)
-    }
-    window.addEventListener('pcai:quick-setup-updated', quickSetupListener)
-  }
 })
 
 watch(
@@ -3095,6 +3070,7 @@ onUnmounted(() => {
   gap: 0.75rem;
   margin-left: auto;
   flex-wrap: nowrap;
+  flex-shrink: 0;
 }
 
 .daily-card__plan-btn {
@@ -3207,10 +3183,9 @@ onUnmounted(() => {
 
 @media (max-width: 640px) {
   .daily-card__actions {
-    width: 100%;
-    margin-left: 0;
-    justify-content: flex-start;
-    flex-wrap: wrap;
+    width: auto;
+    margin-left: auto;
+    justify-content: flex-end;
   }
 }
 

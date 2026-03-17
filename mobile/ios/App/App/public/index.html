@@ -172,7 +172,7 @@
       @media (max-width: 640px) {
         .planner-overlay {
           align-items: flex-start !important;
-          padding-top: max(calc(env(safe-area-inset-top, 0px) + 0.85rem), 4rem) !important;
+          padding-top: 0.85rem !important;
           padding-right: 0.85rem !important;
           padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.85rem) !important;
           padding-left: 0.85rem !important;
@@ -183,14 +183,19 @@
         }
 
         .task-planner-dialog .el-dialog {
-          max-height: calc(100dvh - max(calc(env(safe-area-inset-top, 0px) + 0.85rem), 4rem) - calc(env(safe-area-inset-bottom, 0px) + 0.85rem)) !important;
+          top: auto !important;
+          margin: 0 auto !important;
+          margin-top: max(calc(env(safe-area-inset-top, 0px) + 0.85rem), 1rem) !important;
+          max-height: calc(100dvh - max(calc(env(safe-area-inset-top, 0px) + 0.85rem), 1rem) - calc(env(safe-area-inset-bottom, 0px) + 0.85rem)) !important;
           display: flex !important;
           flex-direction: column !important;
+          position: relative !important;
           overflow: hidden !important;
         }
 
         .task-planner-dialog .el-dialog__header {
           flex: 0 0 auto !important;
+          flex-shrink: 0 !important;
           padding-bottom: 0.75rem !important;
         }
 
@@ -200,21 +205,24 @@
           display: flex !important;
           flex-direction: column !important;
           max-height: none !important;
-          overflow: hidden !important;
+          overflow-y: auto !important;
+          overflow-x: hidden !important;
+          overscroll-behavior: contain !important;
+          -webkit-overflow-scrolling: touch !important;
+          touch-action: pan-y !important;
           padding-top: 0.85rem !important;
           padding-bottom: 0.25rem !important;
         }
 
         .task-planner-dialog .el-dialog__footer {
           flex: 0 0 auto !important;
+          flex-shrink: 0 !important;
           padding-top: 0.75rem !important;
         }
 
         .task-planner-dialog .planner-stack {
+          flex: 1 1 auto !important;
           min-height: 0 !important;
-          overflow-y: auto !important;
-          overscroll-behavior: contain;
-          -webkit-overflow-scrolling: touch;
           padding-right: 0.15rem !important;
           padding-bottom: 0.35rem !important;
         }

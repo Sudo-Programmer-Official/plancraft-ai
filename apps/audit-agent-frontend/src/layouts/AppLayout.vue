@@ -1,6 +1,13 @@
 <template>
   <FeedbackPrompt />
   <FeedbackDrawer />
+  <SetupPrompt
+    :open="quickSetupStore.quickSetupOpen"
+    :launch-source="quickSetupStore.quickSetupLaunchSource"
+    @close="handleQuickSetupClose"
+    @done="handleQuickSetupDone"
+    @updated="handleQuickSetupUpdated"
+  />
   <div
     class="app-shell flex min-h-screen w-full max-w-full overflow-x-hidden bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 text-white"
   >
@@ -576,10 +583,12 @@ import { ref, onMounted, watch, onUnmounted, computed, reactive } from 'vue'
 import { hasSubscription, registerPushSubscription } from '@/services/pushService'
 import FeedbackPrompt from '@/components/feedback/FeedbackPrompt.vue'
 import FeedbackDrawer from '@/components/feedback/FeedbackDrawer.vue'
+import SetupPrompt from '@/components/SetupPrompt.vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useFeedbackStore } from '@/stores/feedbackStore'
+import { useQuickSetupStore } from '@/stores/quickSetupStore'
 import { useAuthFlags } from '@/composables/useAuthFlags'
 import PlanSummaryModal from '@/components/PlanSummaryModal.vue'
 import ProfileSetup from '@/components/ProfileSetup.vue'
@@ -605,6 +614,7 @@ function deriveUidFromStorage() {
 
 onMounted(() => {
   currentUserId.value = deriveUidFromStorage()
+  quickSetupStore.refreshQuickSetupState()
   window.addEventListener('storage', () => {
     currentUserId.value = deriveUidFromStorage()
   })
@@ -643,6 +653,7 @@ const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const workspaceStore = useWorkspaceStore()
+const quickSetupStore = useQuickSetupStore()
 // Subscription state via store
 const subStore = useSubscriptionStore()
 const feedbackStore = useFeedbackStore()
@@ -653,6 +664,20 @@ const activeWorkspaceSettings = computed(() => activeWorkspace.value?.settings |
 
 const isOnTalkPlanner = computed(() => route.path === '/talk-to-planner')
 let upgradeHandler = null
+
+function handleQuickSetupUpdated(nextState = null) {
+  quickSetupStore.refreshQuickSetupState(nextState)
+}
+
+function handleQuickSetupClose() {
+  quickSetupStore.refreshQuickSetupState()
+  quickSetupStore.closeQuickSetup()
+}
+
+function handleQuickSetupDone() {
+  quickSetupStore.refreshQuickSetupState()
+  quickSetupStore.closeQuickSetup()
+}
 
 // Prompt for profile setup if incomplete + hydrate workspace store
 watch(

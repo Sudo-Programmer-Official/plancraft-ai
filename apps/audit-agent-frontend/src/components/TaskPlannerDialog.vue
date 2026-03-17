@@ -4,7 +4,6 @@
       v-model="internalOpen"
       :title="task ? `✏️ Edit Task` : `📅 Plan for ${formattedDate}`"
       :width="dialogWidth"
-      :top="dialogTop"
       class="task-planner-dialog"
       modal-class="planner-overlay"
       destroy-on-close
@@ -756,7 +755,6 @@ onBeforeUnmount(() => {
 })
 const dialogWidth = computed(() => (screenWidth.value < 768 ? '92vw' : '520px'))
 const isMobile = computed(() => screenWidth.value < 768)
-const dialogTop = computed(() => (isMobile.value ? '10vh' : '15vh'))
 const textareaRows = computed(() => (isMobile.value ? 2 : 3))
 
 const draftSaving = ref(false)
@@ -1684,10 +1682,8 @@ function appendDetails(result = {}) {
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
+  flex: 1 1 auto;
   min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
 }
 
 .planner-card {
@@ -2336,11 +2332,13 @@ function appendDetails(result = {}) {
   max-height: calc(100dvh - 64px);
   display: flex;
   flex-direction: column;
+  position: relative;
   overflow: hidden;
 }
 /* Title */
 .task-planner-dialog .el-dialog__header {
   flex: 0 0 auto;
+  flex-shrink: 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   color: #f8fafc;
   font-weight: 600;
@@ -2382,6 +2380,7 @@ function appendDetails(result = {}) {
 /* Footer */
 .task-planner-dialog .el-dialog__footer {
   flex: 0 0 auto;
+  flex-shrink: 0;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   padding-top: 1rem;
 }
@@ -2392,13 +2391,17 @@ function appendDetails(result = {}) {
   flex-direction: column;
   max-height: calc(100vh - 180px);
   max-height: calc(100dvh - 180px);
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 
 @media (max-width: 640px) {
   .planner-overlay {
     align-items: flex-start;
-    padding-top: max(calc(var(--safe-area-top, env(safe-area-inset-top, 0px)) + 0.85rem), 4rem);
+    padding-top: 0.85rem;
     padding-right: 0.85rem;
     padding-bottom: calc(var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 0.85rem);
     padding-left: 0.85rem;
@@ -2410,7 +2413,10 @@ function appendDetails(result = {}) {
 
   .task-planner-dialog .el-dialog {
     width: min(100%, 560px);
-    max-height: calc(100dvh - max(calc(var(--safe-area-top, env(safe-area-inset-top, 0px)) + 0.85rem), 4rem) - calc(var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 0.85rem));
+    top: auto !important;
+    margin: 0 auto !important;
+    margin-top: max(calc(var(--safe-area-top, env(safe-area-inset-top, 0px)) + 0.85rem), 1rem) !important;
+    max-height: calc(100dvh - max(calc(var(--safe-area-top, env(safe-area-inset-top, 0px)) + 0.85rem), 1rem) - calc(var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 0.85rem));
     border-radius: 1rem;
     padding: 0.85rem;
   }
@@ -2420,7 +2426,11 @@ function appendDetails(result = {}) {
   }
 
   .task-planner-dialog .el-dialog__body {
+    flex: 1 1 auto;
+    min-height: 0;
     max-height: none;
+    overflow-y: auto;
+    overflow-x: hidden;
     padding-top: 0.85rem;
     padding-bottom: 0.25rem;
   }
@@ -2452,29 +2462,29 @@ function appendDetails(result = {}) {
   scrollbar-color: rgba(248, 250, 252, 0.28) transparent;
 }
 
- /* Mobile: compact height, sticky header, scrollable body, narrower width */
+ /* Mobile: safe-area offset, fixed header/footer, scrollable body */
 @media (max-width: 768px) {
   .planner-overlay {
     align-items: flex-start;
     justify-content: center;
-    padding-top: max(16px, env(safe-area-inset-top, 16px));
-    padding-bottom: max(16px, env(safe-area-inset-bottom, 16px));
+    padding-top: 0.85rem;
+    padding-right: 0.85rem;
+    padding-bottom: calc(var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 0.85rem);
+    padding-left: 0.85rem;
   }
 
   .task-planner-dialog .el-dialog {
-    max-height: 65vh;
+    top: auto !important;
     display: flex;
     flex-direction: column;
     margin: 0 auto !important;
+    margin-top: max(calc(var(--safe-area-top, env(safe-area-inset-top, 0px)) + 0.85rem), 1rem) !important;
     width: 92vw !important;
+    max-width: 560px !important;
+    max-height: calc(100dvh - max(calc(var(--safe-area-top, env(safe-area-inset-top, 0px)) + 0.85rem), 1rem) - calc(var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 0.85rem));
   }
   .task-planner-dialog .el-dialog__header {
-    position: sticky;
-    top: 0;
-    z-index: 10;
     flex-shrink: 0;
-    background: linear-gradient(145deg, #1e1b4b, #312e81, #4c1d95);
-    border-radius: 0.5rem 0.5rem 0 0;
   }
   .task-planner-dialog .el-dialog__footer {
     flex-shrink: 0;
@@ -2484,6 +2494,7 @@ function appendDetails(result = {}) {
     min-height: 0;
     max-height: none;
     overflow-y: auto;
+    overflow-x: hidden;
   }
   /* Reorder: task idea first, then date, then reminder */
   .task-planner-dialog .planner-stack--mobile-order {

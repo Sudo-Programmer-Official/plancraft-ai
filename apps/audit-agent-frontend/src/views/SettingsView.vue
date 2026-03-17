@@ -26,7 +26,10 @@
                   ]"
                   @click="setActiveTab(tab.id)"
                 >
-                  {{ tab.label }}
+                  <span class="inline-flex items-center gap-2">
+                    <span v-if="tab.icon" aria-hidden="true">{{ tab.icon }}</span>
+                    <span>{{ tab.label }}</span>
+                  </span>
                 </button>
               </div>
             </div>
@@ -210,6 +213,72 @@
       >
         <h2 class="text-lg sm:text-xl font-semibold mb-2">⚙️ Preferences</h2>
         <p class="text-sm text-indigo-200">Workspace-specific preferences (theme, locale, AI persona) will be managed here soon.</p>
+      </section>
+
+      <section
+        v-show="activeTab === 'account-quick-setup'"
+        class="settings-panel space-y-5"
+      >
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div class="space-y-2">
+            <p class="text-xs uppercase tracking-[0.25em] text-indigo-200/80">Setup Assistant</p>
+            <h2 class="text-lg sm:text-xl font-semibold text-white">✨ Quick Setup</h2>
+            <p class="text-sm text-indigo-100/85 max-w-2xl">
+              Reopen the onboarding assistant any time to finish reminder channels, timezone, and phone setup.
+            </p>
+          </div>
+          <button
+            type="button"
+            class="inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-fuchsia-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:from-indigo-400 hover:to-fuchsia-500"
+            @click="openQuickSetupPanel"
+          >
+            <span aria-hidden="true">✨</span>
+            <span>{{ quickSetupState?.completed ? 'Review setup' : 'Finish setup' }}</span>
+          </button>
+        </div>
+
+        <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-4 space-y-4">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p class="text-xs uppercase tracking-[0.24em] text-slate-300">Progress</p>
+              <p class="text-sm text-slate-100">
+                {{ quickSetupState?.completedSteps || 0 }}/{{ quickSetupState?.totalSteps || 0 }} setup items complete
+              </p>
+            </div>
+            <span
+              class="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold"
+              :class="quickSetupState?.requiredComplete ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200' : 'border-amber-400/40 bg-amber-500/10 text-amber-100'"
+            >
+              {{ quickSetupState?.requiredComplete ? 'Core setup complete' : 'Setup incomplete' }}
+            </span>
+          </div>
+
+          <div class="h-2 overflow-hidden rounded-full bg-white/10">
+            <div
+              class="h-full rounded-full bg-gradient-to-r from-indigo-400 via-violet-500 to-fuchsia-500 transition-all"
+              :style="{ width: `${quickSetupState?.completionPercent || 0}%` }"
+            />
+          </div>
+
+          <div class="flex flex-wrap gap-2">
+            <span
+              v-for="step in quickSetupState?.steps || []"
+              :key="step.key"
+              class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs"
+              :class="step.complete ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200' : 'border-white/10 bg-white/5 text-slate-300'"
+            >
+              <span>{{ step.complete ? '✓' : '•' }}</span>
+              <span>{{ step.label }}</span>
+            </span>
+          </div>
+
+          <p v-if="quickSetupMissingLabels.length" class="rounded-xl border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+            Finish setup to unlock calmer reminders: {{ quickSetupMissingLabels.join(', ') }}.
+          </p>
+          <p v-else class="rounded-xl border border-emerald-400/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+            Quick Setup is complete. You can reopen it any time to review or change your setup.
+          </p>
+        </div>
       </section>
 
       <!-- Notification Preferences -->
@@ -613,8 +682,10 @@ import { db } from '@/firebase/init'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import AvatarUploader from '@/components/AvatarUploader.vue'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
+import { useQuickSetupStore } from '@/stores/quickSetupStore'
 import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
 import { copyText, openExternalUrl } from '@/utils/nativeUi'
+import { getIncompleteQuickSetupLabels } from '@/utils/quickSetup'
 import dayjs from 'dayjs'
 
 const authStore = useAuthStore()
@@ -623,7 +694,10 @@ const route = useRoute()
 const subStore = useSubscriptionStore()
 const { refresh: refreshPremium } = useIsPremium()
 const workspaceStore = useWorkspaceStore()
+const quickSetupStore = useQuickSetupStore()
 const canUseBrowserPush = computed(() => !isNativePackagedApp())
+const quickSetupState = computed(() => quickSetupStore.setupState)
+const quickSetupMissingLabels = computed(() => getIncompleteQuickSetupLabels(quickSetupState.value))
 const teamWorkspaces = computed(() =>
   (workspaceStore.workspaces || []).filter((w) => (w.workspaceType || w.type) === 'team'),
 )
@@ -652,6 +726,9 @@ function normalizeTab(tab) {
     'account-profile': 'account-profile',
     preferences: 'account-preferences',
     'account-preferences': 'account-preferences',
+    'quick-setup': 'account-quick-setup',
+    quicksetup: 'account-quick-setup',
+    'account-quick-setup': 'account-quick-setup',
     social: 'account-social',
     'account-social': 'account-social',
     billing: 'billing-subscription',
@@ -682,6 +759,7 @@ const tabGroups = [
     tabs: [
       { id: 'account-profile', label: 'Profile' },
       { id: 'account-preferences', label: 'Preferences' },
+      { id: 'account-quick-setup', label: 'Quick Setup', icon: '✨' },
       { id: 'account-notifications', label: 'Notifications' },
       { id: 'account-social', label: 'Social' },
     ],
@@ -709,6 +787,11 @@ function setActiveTab(id) {
   if (activeTab.value !== target) activeTab.value = target
   router.replace({ query: { ...route.query, tab: target } }).catch(() => {})
   if (target === 'account-notifications') focusNotifications()
+}
+
+function openQuickSetupPanel() {
+  quickSetupStore.refreshQuickSetupState()
+  quickSetupStore.openQuickSetup({ source: 'manual' })
 }
 const dirty = ref(false) // tracks unsaved changes
 const notificationsSection = ref(null)
@@ -813,6 +896,7 @@ onMounted(async () => {
   try {
     // Ensure latest subscription state on entry
     try { await refreshPremium() } catch {}
+    quickSetupStore.refreshQuickSetupState()
     if (authStore?.user?.uid) {
       try { workspaceStore.init?.() } catch {}
     }

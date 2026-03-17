@@ -2,9 +2,11 @@
   <el-dialog
     v-model="open"
     class="setup-prompt"
+    modal-class="setup-prompt-overlay"
     width="620px"
     :close-on-click-modal="false"
     :show-close="true"
+    :destroy-on-close="false"
     :style="{
       background: 'linear-gradient(145deg, #1e1b4b, #312e81, #4c1d95)',
       color: '#e2e8f0',
@@ -13,6 +15,7 @@
       border: '1px solid rgba(255,255,255,0.08)',
       backdropFilter: 'blur(12px)'
     }"
+    @close="handleDialogClose"
   >
     <template #header>
       <div class="text-center">
@@ -23,8 +26,16 @@
       </div>
     </template>
 
-    <div v-loading="loading" class="space-y-5 mt-4">
-      <section class="rounded-2xl border border-white/10 bg-slate-950/30 p-4 space-y-3">
+    <div class="setup-prompt__shell">
+      <div v-if="showLoadingShell" class="setup-prompt__skeleton" aria-hidden="true">
+        <div class="setup-prompt__skeleton-block setup-prompt__skeleton-block--hero" />
+        <div class="setup-prompt__skeleton-block" />
+        <div class="setup-prompt__skeleton-block" />
+        <div class="setup-prompt__skeleton-block setup-prompt__skeleton-block--short" />
+      </div>
+
+      <div v-else v-loading="loading && contentReady" class="setup-prompt__content space-y-5 mt-4">
+        <section class="rounded-2xl border border-white/10 bg-slate-950/30 p-4 space-y-3">
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p class="text-xs uppercase tracking-[0.28em] text-indigo-200/80">Progress</p>
@@ -57,9 +68,9 @@
         <p v-if="missingRequiredLabels.length" class="text-xs text-amber-200/90">
           Missing: {{ missingRequiredLabels.join(', ') }}
         </p>
-      </section>
+        </section>
 
-      <section class="setup-card">
+        <section class="setup-card">
         <div class="setup-card__header">
           <div>
             <div class="setup-card__title">🌎 Timezone</div>
@@ -77,9 +88,9 @@
             Confirm timezone
           </el-button>
         </div>
-      </section>
+        </section>
 
-      <section class="setup-card">
+        <section class="setup-card">
         <div class="setup-card__header">
           <div>
             <div class="setup-card__title">📱 Reminder Phone</div>
@@ -103,9 +114,9 @@
             Format as an international number. One phone is applied to your reminder channels by default.
           </p>
         </div>
-      </section>
+        </section>
 
-      <section class="setup-card">
+        <section class="setup-card">
         <div class="setup-card__header">
           <div>
             <div class="setup-card__title">🔔 Reminder Channels</div>
@@ -134,9 +145,9 @@
             </span>
           </label>
         </div>
-      </section>
+        </section>
 
-      <section v-if="showBrowserNotifications" class="setup-card">
+        <section v-if="showBrowserNotifications" class="setup-card">
         <div class="setup-card__header">
           <div>
             <div class="setup-card__title">🛎️ Browser Push</div>
@@ -161,22 +172,23 @@
             {{ pushGranted ? 'Enabled ✓' : 'Enable push' }}
           </el-button>
         </div>
-      </section>
+        </section>
 
-      <p v-if="saveError" class="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
-        {{ saveError }}
-      </p>
-      <p v-else-if="saveSuccess" class="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
-        {{ saveSuccess }}
-      </p>
+        <p v-if="saveError" class="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+          {{ saveError }}
+        </p>
+        <p v-else-if="saveSuccess" class="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+          {{ saveSuccess }}
+        </p>
+      </div>
     </div>
 
     <template #footer>
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <span class="text-xs text-slate-400 text-center sm:text-left">
           You can continue later from the dashboard setup banner or
-          <RouterLink to="/settings?tab=notifications" class="text-indigo-300 hover:text-indigo-200 underline">
-            Settings → Notifications
+          <RouterLink to="/settings?tab=account-quick-setup" class="text-indigo-300 hover:text-indigo-200 underline">
+            Settings → Quick Setup
           </RouterLink>.
         </span>
         <div class="flex flex-wrap items-center justify-center gap-2">
@@ -218,13 +230,18 @@ import {
   writeQuickSetupState,
 } from '@/utils/quickSetup'
 
-const props = defineProps({ open: { type: Boolean, default: true } })
+const props = defineProps({
+  open: { type: Boolean, default: true },
+  launchSource: { type: String, default: 'manual' },
+})
 const emit = defineEmits(['close', 'done', 'updated'])
 
 const authStore = useAuthStore()
 const { isGuest } = useAuthFlags()
 
 const open = ref(props.open)
+const contentReady = ref(false)
+const hasLoadedOnce = ref(false)
 const loading = ref(false)
 const saving = ref(false)
 const loadingPush = ref(false)
@@ -234,6 +251,8 @@ const dirty = ref(false)
 const tz = ref('UTC')
 const reminderPhone = ref('')
 const pushGranted = ref(false)
+const showLoadingShell = computed(() => loading.value && !contentReady.value)
+let suppressDialogCloseEmit = false
 
 const showBrowserNotifications = computed(() => !isNativePackagedApp())
 const timezoneReady = computed(() => !!tz.value && tz.value !== 'UTC')
@@ -386,7 +405,8 @@ async function loadSetup() {
     }
 
     emitSetupState()
-    if (setupState.value.completed) {
+    if (setupState.value.completed && props.launchSource === 'auto') {
+      suppressDialogCloseEmit = true
       open.value = false
       emit('done')
     }
@@ -395,7 +415,19 @@ async function loadSetup() {
   } finally {
     dirty.value = false
     loading.value = false
+    contentReady.value = true
+    hasLoadedOnce.value = true
   }
+}
+
+async function ensureSetupLoaded(force = false) {
+  if (loading.value) return
+  if (hasLoadedOnce.value && !force) {
+    contentReady.value = true
+    return
+  }
+  contentReady.value = false
+  await loadSetup()
 }
 
 function confirmTimezone() {
@@ -529,6 +561,7 @@ async function persistQuickSetup() {
 async function saveAndClose() {
   const state = await persistQuickSetup()
   if (!state) return
+  suppressDialogCloseEmit = true
   open.value = false
   if (state.completed) emit('done')
   else emit('close')
@@ -541,25 +574,45 @@ async function dismiss() {
     emitSetupState()
   }
   snoozeQuickSetup(24)
+  suppressDialogCloseEmit = true
   open.value = false
+  emit('close')
+}
+
+function handleDialogClose() {
+  if (suppressDialogCloseEmit) {
+    suppressDialogCloseEmit = false
+    return
+  }
+  emitSetupState()
   emit('close')
 }
 
 watch(
   () => props.open,
-  (value) => {
+  async (value) => {
     open.value = value
-    if (value) clearQuickSetupSnooze()
+    if (value) {
+      clearQuickSetupSnooze()
+      await ensureSetupLoaded()
+    }
   }
 )
 
 onMounted(async () => {
-  clearQuickSetupSnooze()
-  await loadSetup()
+  if (props.open) {
+    clearQuickSetupSnooze()
+    await ensureSetupLoaded()
+  }
 })
 </script>
 
 <style scoped>
+:deep(.setup-prompt-overlay) {
+  background: rgba(2, 6, 23, 0.72);
+  backdrop-filter: blur(10px);
+}
+
 .setup-prompt :deep(.el-dialog) {
   background: radial-gradient(circle at top left, #1e1b4b 0%, #312e81 45%, #4c1d95 100%);
   color: #e2e8f0;
@@ -567,6 +620,7 @@ onMounted(async () => {
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(14px);
+  overflow: hidden;
   animation: fadeIn 0.35s ease-out;
 }
 
@@ -574,6 +628,44 @@ onMounted(async () => {
 .setup-prompt :deep(.el-dialog__footer) {
   background: transparent;
   border: none;
+}
+
+.setup-prompt :deep(.el-dialog__body) {
+  min-height: 24rem;
+  background: radial-gradient(circle at top left, rgba(30, 27, 75, 0.98), rgba(76, 29, 149, 0.9));
+}
+
+.setup-prompt__shell {
+  min-height: 24rem;
+}
+
+.setup-prompt__content {
+  min-height: 24rem;
+}
+
+.setup-prompt__skeleton {
+  min-height: 24rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-top: 1rem;
+}
+
+.setup-prompt__skeleton-block {
+  height: 5rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.7), rgba(67, 56, 202, 0.22));
+  box-shadow: inset 0 1px 10px rgba(255, 255, 255, 0.03);
+  animation: setupPulse 1.1s ease-in-out infinite alternate;
+}
+
+.setup-prompt__skeleton-block--hero {
+  height: 7rem;
+}
+
+.setup-prompt__skeleton-block--short {
+  height: 3.5rem;
 }
 
 .setup-progress-bar {
@@ -658,6 +750,15 @@ onMounted(async () => {
   to {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+@keyframes setupPulse {
+  from {
+    opacity: 0.58;
+  }
+  to {
+    opacity: 0.92;
   }
 }
 </style>
