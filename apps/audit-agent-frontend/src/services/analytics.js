@@ -33,11 +33,12 @@ export function identifyUser(user) {
   try {
     if (user && user.uid) {
       mixpanel.identify(user.uid)
-      mixpanel.people?.set?.({
+      const traits = {
         $name: user.displayName || 'User',
-        $email: user.email || undefined,
         isGuest: !!user.isAnonymous,
-      })
+      }
+      if (user.email) traits.$email = user.email
+      mixpanel.people?.set?.(traits)
     } else {
       let anonId =
         localStorage.getItem('anonId') || `guest_${Date.now()}`
@@ -86,6 +87,36 @@ export function trackPageView(path) {
   trackEvent('Page View', { path: path || safePath() })
 }
 
+/** Fire once per session after identify; use in bootstrap after auth init. Pass platform 'native' | 'web' from app. */
+export function trackAppOpened(platform = 'web') {
+  trackEvent('App Opened', {
+    platform,
+    version: import.meta.env?.VITE_APP_VERSION || '1.0',
+  })
+}
+
+/** Call when user completes signup (redirect, email, native handoff, guest). */
+export function trackSignupCompleted(props = {}) {
+  trackEvent('Signup Completed', { platform: 'web', ...props })
+}
+
+/** Call when user closes app or leaves tab; session_length in seconds. */
+let sessionStartMs = null
+export function getSessionStartMs() {
+  if (sessionStartMs == null) sessionStartMs = Date.now()
+  return sessionStartMs
+}
+export function trackSessionEnded() {
+  const start = getSessionStartMs()
+  const session_length = Math.round((Date.now() - start) / 1000)
+  trackEvent('Session Ended', { session_length })
+}
+
+/** Call when user accepts an AI suggestion (e.g. daily plan, planner action). */
+export function trackAISuggestionAccepted(props = {}) {
+  trackEvent('AI Suggestion Accepted', props)
+}
+
 export function bindRouter(router) {
   if (!router) return
   safeInit()
@@ -118,6 +149,10 @@ export const Analytics = {
   identify: identifyUser,
   track: trackEvent,
   page: trackPageView,
+  trackAppOpened,
+  trackSignupCompleted,
+  trackSessionEnded,
+  trackAISuggestionAccepted,
   bindRouter,
   guest: {
     startFromLanding: trackGuestStartFromLanding,

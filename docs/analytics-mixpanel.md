@@ -54,6 +54,22 @@ Event Naming (suggested)
 - Productivity: `Task Created`, `Task Completed`, `Voice Transcribed`, `Reflection Added`
 - Engagement: `Daily Streak Started`, `Guest Banner Dismissed`, `Plan My Day Used`
 
+Five core funnel events (activation)
+- **App Opened** – Fired once per session after auth init and identify (so Mixpanel never sees "User – undefined"). Props: `platform`, `version`.
+- **Signup Completed** – Fired when user completes signup (redirect Google/Apple, email, native handoff, guest, magic link). Props: `method` (`google` | `apple` | `email` | `email_link` | `native` | `guest`).
+- **Task Created** – Props: `source`, `task_type` (category), `guest`.
+- **Task Completed** – Props: `taskId`, `completion_time` (`morning` | `afternoon` | `evening`).
+- **Session Ended** – Fired on `beforeunload`. Props: `session_length` (seconds).
+
+Recommended Mixpanel funnel: **App Opened → Signup Completed → Task Created → Task Completed**.
+
+Identify-before-track (fix for "User – undefined")
+- Analytics init runs at app load; **identify** and **App Opened** run in `bootstrapApp()` after `authStore.init()`, then **bindRouter**. So the first events (App Opened, then Page View) are always sent after the user is identified (or as Guest).
+- `identifyUser(user)` sets `$name` and `$email` only when present (no `undefined` in Mixpanel profile).
+
+Helpers
+- `trackAppOpened(platform)`, `trackSignupCompleted({ method })`, `trackSessionEnded()`, `trackAISuggestionAccepted({ suggestion_type })` – use from analytics service where appropriate.
+
 Notes
 - The service is defensive and will no-op if not initialized; still call `initAnalytics()` at app start.
 - Debug is enabled in dev via `import.meta.env.DEV`.

@@ -18,8 +18,8 @@
       }"
       @close="closeDialog"
     >
-    <div class="planner-stack">
-      <section class="planner-card">
+    <div class="planner-stack planner-stack--mobile-order">
+      <section class="planner-card section-date">
         <div class="card-heading">
           <div>
             <p class="card-eyebrow">Plan basics</p>
@@ -54,7 +54,7 @@
         </div>
       </section>
 
-      <section class="planner-card">
+      <section class="planner-card section-task">
         <div class="card-heading">
           <div>
             <p class="card-eyebrow">Task idea</p>
@@ -64,11 +64,12 @@
         <el-input
           v-model="input"
           type="textarea"
-          :rows="3"
+          :rows="textareaRows"
           placeholder="Speak or type your task..."
           resize="none"
           class="task-textarea"
         />
+        <p class="datetime-hint">Date and time can be detected automatically from what you type.</p>
         <div class="assistive-bar">
           <div class="assistive-actions">
             <div>
@@ -112,6 +113,17 @@
               />
               <span class="mic-visual" aria-hidden="true"></span>
             </button>
+            </div>
+            <div>
+            <el-button
+              size="small"
+              class="save-draft-btn"
+              :disabled="!getInputText().trim() || draftSaving"
+              :loading="draftSaving"
+              @click="saveDraftToNapkin"
+            >
+              Save Draft
+            </el-button>
             </div>
           </div>
           <el-button
@@ -190,7 +202,7 @@
       </section>
 
       <div class="section-divider" />
-      <section class="planner-card reminder-card" :class="{ 'reminder-card--collapsed': !reminderOptionsVisible }">
+      <section class="planner-card reminder-card section-reminder" :class="{ 'reminder-card--collapsed': !reminderOptionsVisible }">
         <div class="card-heading">
           <div>
             <p class="card-eyebrow">Reminder</p>
@@ -337,6 +349,7 @@ import { generateTasksFromText, extractReminderTime } from '@/services/aiService
 import { addTaskToFirebase } from '@/services/firebaseService'
 import { getPreferences as getUserPreferences, getReminderPreferences } from '@/services/settingsService'
 import { scheduleReminder, getReminderStatus } from '@/services/reminderService'
+import { createNapkinItem } from '@/services/napkinService'
 import { isFeatureAllowed } from '@/services/planService'
 import { hasNotificationSetup } from '@/utils/notificationCheck'
 
@@ -708,6 +721,24 @@ onBeforeUnmount(() => {
   }
 })
 const dialogWidth = computed(() => (screenWidth.value < 640 ? '90vw' : '520px'))
+const isMobile = computed(() => screenWidth.value < 768)
+const textareaRows = computed(() => (isMobile.value ? 2 : 3))
+
+const draftSaving = ref(false)
+async function saveDraftToNapkin() {
+  const text = getInputText().trim()
+  if (!text) return
+  draftSaving.value = true
+  try {
+    await createNapkinItem({ text, source: 'draft' })
+    ElMessage.success('Saved. You can find this in Napkin.')
+  } catch (err) {
+    console.warn('Save draft to Napkin failed', err)
+    ElMessage.error('Could not save draft. Try again.')
+  } finally {
+    draftSaving.value = false
+  }
+}
 
 /* ---------------- Watchers ---------------- */
 watch(
@@ -2284,6 +2315,71 @@ function appendDetails(result = {}) {
 .task-planner-dialog .el-dialog__body {
   max-height: calc(100vh - 180px);
   overflow-y: auto;
+}
+
+/* Mobile: limit height, sticky header/footer, scrollable body */
+@media (max-width: 768px) {
+  .task-planner-dialog .el-dialog {
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    margin: 0 auto !important;
+  }
+  .task-planner-dialog .el-dialog__header,
+  .task-planner-dialog .el-dialog__footer {
+    flex-shrink: 0;
+  }
+  .task-planner-dialog .el-dialog__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+  }
+  /* Reorder: task idea first, then date, then reminder */
+  .task-planner-dialog .planner-stack--mobile-order {
+    display: flex;
+    flex-direction: column;
+  }
+  .task-planner-dialog .planner-stack--mobile-order .section-date { order: 2; }
+  .task-planner-dialog .planner-stack--mobile-order .section-task { order: 1; }
+  .task-planner-dialog .planner-stack--mobile-order .section-reminder { order: 3; }
+  .task-planner-dialog .planner-stack--mobile-order .section-divider { order: 4; }
+  .task-planner-dialog .planner-stack--mobile-order .planner-card:not(.section-date):not(.section-task):not(.section-reminder) { order: 5; }
+  /* Tighter spacing on mobile */
+  .task-planner-dialog .planner-card {
+    padding: 0.75rem 1rem;
+  }
+  .task-planner-dialog .card-heading {
+    margin-bottom: 0.5rem;
+  }
+  .task-planner-dialog .task-textarea textarea {
+    min-height: 4rem;
+  }
+}
+
+/* Hint above Generate Tasks */
+.task-planner-dialog .datetime-hint {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.55);
+  margin: 0.25rem 0 0.5rem;
+  line-height: 1.3;
+}
+
+/* Save Draft: secondary action */
+.task-planner-dialog .save-draft-btn {
+  font-size: 0.75rem;
+  padding: 0.35rem 0.6rem;
+  border-color: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.08);
+}
+.task-planner-dialog .save-draft-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #f1f5f9;
+}
+.task-planner-dialog .save-draft-btn:disabled {
+  opacity: 0.5;
 }
 /* TaskPlannerDialog.vue or global theme file */
 

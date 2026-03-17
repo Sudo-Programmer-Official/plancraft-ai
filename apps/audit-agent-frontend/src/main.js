@@ -13,7 +13,7 @@ import { useAuthStore } from '@/stores/authStore'
 import VoiceRecorder from '@/components/VoiceRecorder.vue'
 import { createHead } from '@vueuse/head'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
-import { initAnalytics, bindRouter } from '@/services/analytics'
+import { initAnalytics, bindRouter, identifyUser, trackAppOpened, trackSessionEnded, getSessionStartMs } from '@/services/analytics'
 import { handleAuthError } from '@/services/firebaseService'
 import { setupLinkedInTag } from './analytics/linkedin.js'
 import { Capacitor } from '@capacitor/core'
@@ -147,10 +147,9 @@ window.addEventListener('unhandledrejection', (event) => {
   console.error('Unhandled rejection:', normalized)
 })
 
-// Analytics
+// Analytics: init only here; identify + App Opened + bindRouter run after auth (so identify runs before any track)
 if (!isNativeApp) {
   initAnalytics()
-  bindRouter(router)
   // LinkedIn Insight Tag (env-driven)
   try { setupLinkedInTag() } catch {}
 }
@@ -254,6 +253,21 @@ async function bootstrapApp() {
     authStoreUser: authStore.user?.uid || null,
     firebaseUser: auth?.currentUser?.uid || null,
   })
+
+  // Identify before any track so Mixpanel never sees "User – undefined"
+  if (!isNativeApp) {
+    try {
+      identifyUser(authStore.user || null)
+      getSessionStartMs()
+      trackAppOpened(isNativeApp ? 'native' : 'web')
+      bindRouter(router)
+      window.addEventListener('beforeunload', () => {
+        try { trackSessionEnded() } catch {}
+      })
+    } catch (e) {
+      console.warn('[Analytics] post-auth identify/track failed', e)
+    }
+  }
 
   console.info('[Startup] before app.use(router)')
   app.use(router)

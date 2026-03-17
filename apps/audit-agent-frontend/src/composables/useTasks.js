@@ -301,7 +301,8 @@ export function useTasks() {
       syncFiltered()
       try {
         trackEvent('Task Created', {
-          source: newTask?.source || 'journal',
+          source: newTask?.source || 'manual',
+          task_type: normalized?.category || 'Uncategorized',
           guest: !!authStore?.isGuest,
         })
       } catch (e) {
@@ -331,7 +332,9 @@ export function useTasks() {
       syncFiltered()
       if (task.completed) {
         try {
-          trackEvent('Task Completed', { taskId: task.id })
+          const hour = new Date().getHours()
+          const completion_time = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
+          trackEvent('Task Completed', { taskId: task.id, completion_time })
         } catch (e) {
           console.warn('analytics: Task Completed track failed', e)
         }
