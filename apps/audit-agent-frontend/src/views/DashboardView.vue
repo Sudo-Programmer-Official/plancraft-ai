@@ -1551,6 +1551,9 @@ const onboardingStatus = ref({
 })
 const onboardingSessionPlayed = ref(false)
 
+// Feature flag: disable dashboard tour completely.
+const ENABLE_DASHBOARD_TOUR = false
+
 const onboardingSteps = computed(() => [
   {
     id: 'daily',
@@ -2155,6 +2158,7 @@ watch(
 )
 
 async function startTour() {
+  if (!ENABLE_DASHBOARD_TOUR) return false
   try {
     const mod = await import('driver.js')
     const driver = mod?.driver
