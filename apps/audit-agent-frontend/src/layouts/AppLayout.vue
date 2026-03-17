@@ -1,5 +1,4 @@
 <template>
-  <NotificationBanner v-if="showNotificationBanner" :user-id="currentUserId" />
   <FeedbackPrompt />
   <FeedbackDrawer />
   <div
@@ -561,7 +560,6 @@
 <script setup>
 import { ref, onMounted, watch, onUnmounted, computed, reactive } from 'vue'
 import { hasSubscription, registerPushSubscription } from '@/services/pushService'
-import NotificationBanner from '@/components/NotificationBanner.vue'
 import FeedbackPrompt from '@/components/feedback/FeedbackPrompt.vue'
 import FeedbackDrawer from '@/components/feedback/FeedbackDrawer.vue'
 import { useRouter, useRoute } from 'vue-router'
@@ -577,8 +575,6 @@ import { trackLinkedInConversion } from '@/utils/ads'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
 const currentUserId = ref(null)
-const showNotificationBanner = computed(() => !isNativePackagedApp())
-
 function deriveUidFromStorage() {
   try {
     const direct = localStorage.getItem('uid')
