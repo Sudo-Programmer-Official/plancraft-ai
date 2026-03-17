@@ -4,6 +4,7 @@
       v-model="internalOpen"
       :title="task ? `✏️ Edit Task` : `📅 Plan for ${formattedDate}`"
       :width="dialogWidth"
+      :top="dialogTop"
       class="task-planner-dialog"
       modal-class="planner-overlay"
       destroy-on-close
@@ -755,6 +756,7 @@ onBeforeUnmount(() => {
 })
 const dialogWidth = computed(() => (screenWidth.value < 768 ? '92vw' : '520px'))
 const isMobile = computed(() => screenWidth.value < 768)
+const dialogTop = computed(() => (isMobile.value ? '10vh' : '15vh'))
 const textareaRows = computed(() => (isMobile.value ? 2 : 3))
 
 const draftSaving = ref(false)
@@ -2296,7 +2298,7 @@ function appendDetails(result = {}) {
 </style>
 
 <style lang="scss">
-.planner-overlay {
+ .planner-overlay {
   position: fixed;
   inset: 0;
   display: flex;
@@ -2326,7 +2328,7 @@ function appendDetails(result = {}) {
   border-radius: 1rem;
   padding: 1rem;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
-  max-height: calc(100vh - 64px);
+  max-height: 80vh;
   overflow: hidden;
 }
 /* Title */
@@ -2374,17 +2376,36 @@ function appendDetails(result = {}) {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   padding-top: 1rem;
 }
-.task-planner-dialog .el-dialog__body {
+ .task-planner-dialog .el-dialog__body {
   max-height: calc(100vh - 180px);
   overflow-y: auto;
-
-  @media (max-width: 768px) {
-    max-height: 65vh;
-  }
 }
 
-/* Mobile: compact height, sticky header, scrollable body, narrower width */
+/* Subtle scrollbar styling inside planner (keep scroll behavior, soften visuals) */
+.task-planner-dialog .el-dialog__body::-webkit-scrollbar {
+  width: 6px;
+}
+.task-planner-dialog .el-dialog__body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.task-planner-dialog .el-dialog__body::-webkit-scrollbar-thumb {
+  background: rgba(248, 250, 252, 0.22); /* soft white */
+  border-radius: 999px;
+}
+.task-planner-dialog .el-dialog__body {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(248, 250, 252, 0.28) transparent;
+}
+
+ /* Mobile: compact height, sticky header, scrollable body, narrower width */
 @media (max-width: 768px) {
+  .planner-overlay {
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: max(16px, env(safe-area-inset-top, 16px));
+    padding-bottom: max(16px, env(safe-area-inset-bottom, 16px));
+  }
+
   .task-planner-dialog .el-dialog {
     max-height: 65vh;
     display: flex;
