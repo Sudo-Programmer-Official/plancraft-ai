@@ -3,15 +3,45 @@
   <div v-if="checkingAuth" class="px-4 py-8 text-center text-gray-400">
     Checking session…
   </div>
-  <SetupPrompt v-else-if="showSetup" @done="showSetup = false" @close="showSetup = false" />
+  <SetupPrompt
+    v-else-if="showSetup"
+    @done="handleQuickSetupDone"
+    @close="handleQuickSetupClosed"
+    @updated="handleQuickSetupUpdated"
+  />
   <main
     v-else
     class="min-h-screen px-2 py-6 sm:px-4 md:px-6 pb-12 transition-colors max-w-7xl mx-auto flex flex-col gap-6 lg:gap-8"
   >
     <GuestBanner :isGuest="authStore.guest" class="order-1" @login="redirectToLogin" />
 
+    <section
+      v-if="showQuickSetupBanner"
+      class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-2"
+    >
+      <div class="dashboard-card quick-setup-banner flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div class="space-y-2">
+          <p class="text-[11px] uppercase tracking-[0.3em] text-indigo-200/80">Quick setup</p>
+          <h2 class="text-lg sm:text-xl font-semibold text-slate-100">
+            {{ quickSetupState?.completedSteps || 0 }}/{{ quickSetupState?.totalSteps || 0 }} setup items complete
+          </h2>
+          <p class="text-sm text-indigo-100/85">
+            {{ quickSetupMissingLabels.length ? `Still needed: ${quickSetupMissingLabels.join(', ')}.` : 'You can finish the remaining optional setup any time.' }}
+          </p>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="quick-setup-banner__progress">
+            <div class="quick-setup-banner__bar" :style="{ width: `${quickSetupState?.completionPercent || 0}%` }" />
+          </div>
+          <el-button type="primary" class="!rounded-lg font-semibold" @click="openQuickSetup">
+            Continue setup
+          </el-button>
+        </div>
+      </div>
+    </section>
+
     <!-- Tier 1 · Overview -->
-    <section class="space-y-4 order-2">
+    <section class="space-y-4 order-3">
       <div class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4">
         <div class="dashboard-card greeting-card space-y-4">
           <div>
@@ -199,37 +229,88 @@
       class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-3"
     >
         <div class="dashboard-card daily-card space-y-5" :class="{ 'daily-card--fullscreen': isTodayFullscreen }">
-          <div class="dashboard-actions flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div class="flex items-center gap-3">
-              <div>
-                <h3 class="text-lg sm:text-xl font-semibold text-slate-100">
-                  📅 Today’s Focus
-                </h3>
-                <p class="text-xs sm:text-sm text-indigo-200/80">
-                  Prioritise, drag, and complete your most important work.
-                </p>
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div class="flex flex-1 flex-col gap-1 min-w-0">
+              <div class="focus-date-row flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">
+                <button
+                  type="button"
+                  class="focus-date-calendar-btn hidden sm:flex items-center justify-center w-8 h-8 rounded-lg text-slate-300 hover:bg-slate-700/60 hover:text-slate-100 transition shrink-0"
+                  aria-label="Choose date"
+                  @click="openFocusDatePicker"
+                >
+                  <span class="text-lg leading-none" aria-hidden="true">📅</span>
+                </button>
+                <div class="focus-date-pill flex items-center gap-1 rounded-xl bg-slate-800/60 border border-slate-700/50 px-1 py-0.5 shrink-0">
+                  <button
+                    type="button"
+                    class="p-1.5 rounded-md text-slate-300 hover:bg-slate-700/60 hover:text-slate-100 transition"
+                    aria-label="Previous day"
+                    @click="prevFocusDay"
+                  >
+                    <span class="text-sm font-medium">&lt;</span>
+                  </button>
+                  <span class="px-2 py-1 text-sm font-medium text-slate-100 min-w-0 truncate max-w-[180px] sm:max-w-none">
+                    {{ focusDateLabel }}
+                  </span>
+                  <button
+                    type="button"
+                    class="p-1.5 rounded-md text-slate-300 hover:bg-slate-700/60 hover:text-slate-100 transition"
+                    aria-label="Next day"
+                    @click="nextFocusDay"
+                  >
+                    <span class="text-sm font-medium">&gt;</span>
+                  </button>
+                </div>
+                <button
+                  v-if="!isFocusToday"
+                  type="button"
+                  class="jump-today-btn text-xs font-medium text-indigo-300 hover:text-indigo-200 px-2 py-1 rounded-md hover:bg-indigo-900/40 transition shrink-0 order-last sm:order-none"
+                  @click="jumpFocusToToday"
+                >
+                  Jump to Today
+                </button>
+                <button
+                  type="button"
+                  class="today-fullscreen-btn ml-auto shrink-0"
+                  :aria-pressed="isTodayFullscreen"
+                  :title="isTodayFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'"
+                  @click="toggleTodayFullscreen"
+                >
+                  <span v-if="!isTodayFullscreen">⤢</span>
+                  <span v-else>⤡</span>
+                </button>
               </div>
-              <button
-                type="button"
-                class="today-fullscreen-btn"
-                :aria-pressed="isTodayFullscreen"
-                :title="isTodayFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'"
-                @click="toggleTodayFullscreen"
-              >
-                <span v-if="!isTodayFullscreen">⤢</span>
-                <span v-else>⤡</span>
-              </button>
+              <p class="text-xs sm:text-sm text-indigo-200/80">
+                Prioritise, drag, and complete your most important work.
+              </p>
             </div>
             <button
               @click="openPlanner"
-              class="plan-new-task-btn inline-flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg text-white bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 shadow-md transition"
+              class="inline-flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg text-white bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 shadow-md transition shrink-0"
             >
               <span class="text-base">＋</span>
               Plan New Task
             </button>
           </div>
 
-          <div class="category-tabs flex gap-2 sm:gap-3 overflow-x-auto pb-2 scrollbar-plan">
+          <el-dialog
+            v-model="showFocusDatePicker"
+            title="Choose date"
+            width="auto"
+            class="focus-date-picker-dialog"
+            @close="showFocusDatePicker = false"
+          >
+            <el-date-picker
+              :model-value="focusSelectedDate ? parseLocalDateKey(focusSelectedDate) : null"
+              type="date"
+              :placeholder="'Pick a date'"
+              format="MMM D, YYYY"
+              value-format="YYYY-MM-DD"
+              @update:model-value="onFocusDatePicked"
+            />
+          </el-dialog>
+
+          <div class="flex gap-2 sm:gap-3 overflow-x-auto pb-2 scrollbar-plan">
             <button
               v-for="category in categoryFilters"
               :key="category"
@@ -266,89 +347,86 @@
               class="today-list overflow-y-auto max-h-[60vh] md:max-h-64 scrollbar-plan rounded-2xl pr-1"
               :class="{ 'today-list--fullscreen': isTodayFullscreen }"
             >
-              <div v-if="dailyLoading" class="space-y-2">
-                <div v-for="i in 3" :key="i" class="task-skeleton"></div>
-              </div>
-              <transition v-else name="focus-list-fade" mode="out-in">
-                <ul v-if="filteredDaily.length" key="tasks" class="space-y-2 text-sm">
+              <transition name="focus-list-fade" mode="out-in">
+                <ul v-if="filteredDaily.length" :key="focusSelectedDate" class="space-y-2 text-sm">
                   <li
                     v-for="task in filteredDaily"
                     :key="task.id"
-                    :class="[
-                      'flex items-center justify-between gap-3 p-3 rounded-xl transition border',
-                      activeTaskId === task.id
-                        ? 'bg-indigo-900/60 border-indigo-400/70 shadow-[0_0_12px_rgba(99,102,241,0.35)]'
-                        : 'bg-slate-900/70 border-slate-800/80 hover:border-indigo-500/40',
-                    ]"
-                  >
-                    <div class="flex flex-1 items-start gap-3">
-                      <input
-                        type="checkbox"
-                        :checked="task.completed"
-                        @change="() => toggleComplete(task)"
-                        class="mt-0.5 w-4 h-4 cursor-pointer accent-indigo-500"
-                      />
-                      <div class="flex-1 space-y-1">
-                        <div class="flex flex-wrap items-center gap-2">
-                          <span
-                            class="font-medium"
-                            :class="{ 'line-through text-slate-500': task.completed, 'text-slate-100': !task.completed }"
-                          >
-                            {{ task.title }}
-                          </span>
-                          <div
-                            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/80 text-[11px] font-medium shadow-sm"
-                            :class="categoryColor(task.category)"
-                          >
-                            <span class="leading-none">{{ categoryIcon(task.category) }}</span>
-                            <span>{{ categoryLabel(task.category) }}</span>
-                          </div>
-                        </div>
-                        <div class="flex flex-wrap items-center gap-2 text-xs text-slate-400">
-                          <small>{{ task.date }}</small>
-                          <a
-                            v-if="taskMeetingLink(task)"
-                            :href="taskMeetingLink(task).url"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-700/80 text-white hover:bg-emerald-800 transition text-[11px]"
-                            :title="taskMeetingLink(task).label"
-                          >
-                            🔗 {{ taskMeetingLink(task).label }}
-                          </a>
+                  :class="[
+                    'flex items-center justify-between gap-3 p-3 rounded-xl transition border',
+                    activeTaskId === task.id
+                      ? 'bg-indigo-900/60 border-indigo-400/70 shadow-[0_0_12px_rgba(99,102,241,0.35)]'
+                      : 'bg-slate-900/70 border-slate-800/80 hover:border-indigo-500/40',
+                  ]"
+                >
+                  <div class="flex flex-1 items-start gap-3">
+                    <input
+                      type="checkbox"
+                      :checked="task.completed"
+                      @change="() => toggleComplete(task)"
+                      class="mt-0.5 w-4 h-4 cursor-pointer accent-indigo-500"
+                    />
+                    <div class="flex-1 space-y-1">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span
+                          class="font-medium"
+                          :class="{ 'line-through text-slate-500': task.completed, 'text-slate-100': !task.completed }"
+                        >
+                          {{ task.title }}
+                        </span>
+                        <div
+                          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/80 text-[11px] font-medium shadow-sm"
+                          :class="categoryColor(task.category)"
+                        >
+                          <span class="leading-none">{{ categoryIcon(task.category) }}</span>
+                          <span>{{ categoryLabel(task.category) }}</span>
                         </div>
                       </div>
+                      <div class="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                        <small>{{ task.date }}</small>
+                        <a
+                          v-if="taskMeetingLink(task)"
+                          :href="taskMeetingLink(task).url"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-700/80 text-white hover:bg-emerald-800 transition text-[11px]"
+                          :title="taskMeetingLink(task).label"
+                        >
+                          🔗 {{ taskMeetingLink(task).label }}
+                        </a>
+                      </div>
                     </div>
-                    <div class="flex items-center gap-2">
-                      <button
-                        v-if="!task.completed"
-                        @click.stop="markTaskActive(task)"
-                        class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold border transition"
-                        :class="activeTaskId === task.id ? 'border-indigo-400 bg-indigo-900/60 text-indigo-100' : 'border-slate-600 bg-slate-800/70 text-slate-200 hover:border-indigo-400 hover:text-white'"
-                      >
-                        <span class="text-xs">{{ activeTaskId === task.id ? '▶ Active' : 'Start' }}</span>
-                      </button>
-                      <button
-                        v-if="reminderActiveByTask[task.id]"
-                        @click.stop="onReminderClick(task)"
-                        class="text-yellow-400 hover:opacity-80 text-lg"
-                        title="Reminder active — click to manage"
-                      >
-                        🔔
-                      </button>
-                      <button
-                        @click.stop="openDialog(task)"
-                        class="text-slate-300 hover:text-indigo-300 text-sm"
-                        title="Edit Task"
-                      >
-                        ✏️
-                      </button>
-                    </div>
-                  </li>
-                </ul>
-                <p v-else key="empty" class="text-slate-400 text-sm">
-                  {{ dashboardCategory === 'All' ? 'Nothing planned for today.' : 'No tasks in this category yet.' }}
-                </p>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button
+                      v-if="!task.completed"
+                      @click.stop="markTaskActive(task)"
+                      class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold border transition"
+                      :class="activeTaskId === task.id ? 'border-indigo-400 bg-indigo-900/60 text-indigo-100' : 'border-slate-600 bg-slate-800/70 text-slate-200 hover:border-indigo-400 hover:text-white'"
+                    >
+                      <span class="text-xs">{{ activeTaskId === task.id ? '▶ Active' : 'Start' }}</span>
+                    </button>
+                    <button
+                      v-if="reminderActiveByTask[task.id]"
+                      @click.stop="onReminderClick(task)"
+                      class="text-yellow-400 hover:opacity-80 text-lg"
+                      title="Reminder active — click to manage"
+                    >
+                      🔔
+                    </button>
+                    <button
+                      @click.stop="openDialog(task)"
+                      class="text-slate-300 hover:text-indigo-300 text-sm"
+                      title="Edit Task"
+                    >
+                      ✏️
+                    </button>
+                  </div>
+                </li>
+              </ul>
+              <ul v-else :key="`empty-${focusSelectedDate}`" class="space-y-2 text-sm text-slate-400 text-center py-6">
+                <li>{{ dashboardCategory === 'All' ? 'No tasks for this day.' : 'No tasks in this category.' }}</li>
+              </ul>
               </transition>
             </div>
           </div>
@@ -356,7 +434,7 @@
           <TaskPlannerDialog
             v-if="showPlanner"
             :open="showPlanner"
-            :date="selectedDate"
+            :date="selectedTask ? (selectedTask.date || focusSelectedDate) : focusSelectedDate"
             :task="selectedTask"
             :edit-mode="!!selectedTask"
             @close="closePlanner"
@@ -1130,7 +1208,7 @@ import { useRouter } from 'vue-router'
 import { collection, onSnapshot, updateDoc, doc, query, where, serverTimestamp, getDocs } from 'firebase/firestore'
 import { db, auth } from '@/firebase/init'
 import { onAuthStateChanged } from 'firebase/auth'
-import { toLocalDateKey } from '@/utils/dateHelper'
+import { toLocalDateKey, parseLocalDateKey } from '@/utils/dateHelper'
 import { summarizeTasks } from '@/services/aiService'
 import GuestBanner from '@/components/GuestBanner.vue'
 import { useAuthStore } from '@/stores/authStore'
@@ -1161,6 +1239,13 @@ import { seedGuestStarterTasks } from '@/utils/guestTasks'
 import { subscribeToNapkinItems } from '@/services/napkinService'
 import { fetchDashboardPreferences, saveDashboardPreferences } from '@/services/dashboardPreferencesService'
 import { getGoogleStatus, triggerGoogleSyncNow } from '@/stores/integrationsStore'
+import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
+import {
+  clearQuickSetupSnooze,
+  getIncompleteQuickSetupLabels,
+  isQuickSetupSnoozed,
+  readQuickSetupState,
+} from '@/utils/quickSetup'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -1521,8 +1606,6 @@ const aiSummary = ref(null)
 const dailyTasks = ref([])
 const weeklyTasks = ref([])
 const monthlyTasks = ref([])
-const dailyLoading = ref(true)
-const dailyFirstLoad = ref(true)
 const activeTaskId = ref(null)
 const showPlanner = ref(false)
 const isTodayFullscreen = ref(false)
@@ -1538,6 +1621,7 @@ const categoryFilters = TASK_CATEGORY_FILTERS
 const dashboardCategory = ref('All')
 
 const showSetup = ref(false)
+const quickSetupState = ref(readQuickSetupState())
 const reminderActiveByTask = ref({})
 const taskMeetingLink = (task) => resolveTaskMeetingLink(task)
 const checkingAuth = ref(true)
@@ -1550,9 +1634,6 @@ const onboardingStatus = ref({
   completedAt: null,
 })
 const onboardingSessionPlayed = ref(false)
-
-// Feature flag: disable dashboard tour completely.
-const ENABLE_DASHBOARD_TOUR = false
 
 const onboardingSteps = computed(() => [
   {
@@ -1683,6 +1764,35 @@ const userStreak = ref(0)
 const displayStreak = computed(() => userStreak.value || journalStreak.value || 0)
 const ONBOARDING_SNOOZE_HOURS = 24
 let onboardingTimer = null
+let quickSetupListener = null
+
+const quickSetupMissingLabels = computed(() => getIncompleteQuickSetupLabels(quickSetupState.value))
+const showQuickSetupBanner = computed(
+  () => !isGuest.value && !showSetup.value && !!quickSetupState.value && !quickSetupState.value.completed
+)
+
+function refreshQuickSetupState(nextState = null) {
+  quickSetupState.value = nextState && typeof nextState === 'object' ? nextState : readQuickSetupState()
+}
+
+function handleQuickSetupUpdated(nextState = null) {
+  refreshQuickSetupState(nextState)
+}
+
+function handleQuickSetupDone() {
+  refreshQuickSetupState()
+  showSetup.value = false
+}
+
+function handleQuickSetupClosed() {
+  refreshQuickSetupState()
+  showSetup.value = false
+}
+
+function openQuickSetup() {
+  clearQuickSetupSnooze()
+  showSetup.value = true
+}
 
 function normalizeTimestamp(value) {
   if (!value) return null
@@ -1965,6 +2075,60 @@ function buildRotatingInsights() {
 const today = new Date()
 const selectedDate = toLocalDateKey(today)
 
+// Focus section date navigation (Today's Focus can show any day)
+const allWorkspaceTasksRef = ref([])
+const focusSelectedDate = ref(toLocalDateKey(new Date()))
+const showFocusDatePicker = ref(false)
+
+watch(
+  focusSelectedDate,
+  (ymd) => {
+    dailyTasks.value = allWorkspaceTasksRef.value.filter((t) => t.date === ymd)
+  },
+  { immediate: false }
+)
+
+const isFocusToday = computed(() => focusSelectedDate.value === todayKeyRef.value)
+
+const focusDateLabel = computed(() => {
+  const ymd = focusSelectedDate.value
+  if (!ymd) return 'Today'
+  const d = parseLocalDateKey(ymd)
+  const monDay = dayjs(d).format('MMM D')
+  if (isFocusToday.value) return `Today (${monDay})`
+  return dayjs(d).format('ddd, MMM D')
+})
+
+const focusDateLabelShort = computed(() => {
+  if (isFocusToday.value) return 'Today'
+  return focusDateLabel.value
+})
+
+function prevFocusDay() {
+  const d = parseLocalDateKey(focusSelectedDate.value)
+  d.setDate(d.getDate() - 1)
+  focusSelectedDate.value = toLocalDateKey(d)
+}
+
+function nextFocusDay() {
+  const d = parseLocalDateKey(focusSelectedDate.value)
+  d.setDate(d.getDate() + 1)
+  focusSelectedDate.value = toLocalDateKey(d)
+}
+
+function jumpFocusToToday() {
+  focusSelectedDate.value = todayKeyRef.value
+}
+
+function openFocusDatePicker() {
+  showFocusDatePicker.value = true
+}
+
+function onFocusDatePicked(date) {
+  if (date) focusSelectedDate.value = typeof date === 'string' ? date : toLocalDateKey(date)
+  showFocusDatePicker.value = false
+}
+
 function toYMD(date) {
   if (typeof date === 'string') return date
   return toLocalDateKey(date)
@@ -2010,11 +2174,10 @@ onMounted(async () => {
     carryoverDismissedToday.value = false
   }
   try {
-    const seen = localStorage.getItem('pcai_setup_done') === '1'
-    const tz = localStorage.getItem('user_timezone')
-    const needsTz = !tz || tz === 'UTC'
-    const needsPerm = typeof Notification !== 'undefined' && Notification.permission !== 'granted'
-    showSetup.value = !seen && (needsTz || needsPerm)
+    const storedSetup = readQuickSetupState()
+    quickSetupState.value = storedSetup
+    const seen = storedSetup?.completed || localStorage.getItem('pcai_setup_done') === '1'
+    showSetup.value = !isGuest.value && !seen && !isQuickSetupSnoozed()
   } catch {
     /* noop */
   }
@@ -2156,85 +2319,6 @@ watch(
     drawSparkline()
   }
 )
-
-async function startTour() {
-  if (!ENABLE_DASHBOARD_TOUR) return false
-  try {
-    const mod = await import('driver.js')
-    const driver = mod?.driver
-    if (typeof driver !== 'function') return false
-
-    const tour = driver({
-    animate: true,
-    showProgress: true,
-    steps: [
-      {
-        element: '.daily-card',
-        popover: {
-          title: '📅 Daily Tasks',
-          description: 'Plan and track your tasks for today here.',
-          position: 'bottom',
-        },
-      },
-      {
-        element: '.quick-links-card',
-        popover: {
-          title: '🔗 Quick Links',
-          description: 'Save your frequently used websites or tools here.',
-          position: 'bottom',
-        },
-      },
-      {
-        element: '.weekly-card',
-        popover: {
-          title: '📆 Weekly Overview',
-          description: 'See what you’ve completed this week and upcoming tasks.',
-          position: 'left',
-        },
-      },
-      {
-        element: '.monthly-card',
-        popover: {
-          title: '🌙 Monthly Goals',
-          description: 'Track your long-term goals and progress here.',
-          position: 'left',
-        },
-      },
-      {
-        element: '.journal-card',
-        popover: {
-          title: '📖 Journal Snapshot',
-          description: 'Reflect daily and track your mood & streaks.',
-          position: 'top',
-        },
-      },
-      {
-        element: '.ai-card',
-        popover: {
-          title: '🤖 AI Insights',
-          description: 'AI analyzes your tasks and provides smart suggestions.',
-          position: 'top',
-        },
-      },
-      ],
-    })
-    tour.drive()
-    return true
-  } catch (error) {
-    console.warn('Dashboard tour failed to start:', error)
-    return false
-  }
-}
-
-onMounted(() => {
-  const hasSeenTour = localStorage.getItem('seenTour')
-  if (!hasSeenTour) {
-    setTimeout(async () => {
-      const started = await startTour()
-      if (started) localStorage.setItem('seenTour', 'true')
-    }, 800)
-  }
-})
 
 function openPlanner() {
   selectedTask.value = null
@@ -2440,13 +2524,12 @@ function handleTaskSnapshot(snapshot) {
       createdAt: data.createdAt?.toMillis?.() || data.createdAt || 0,
     }
   })
-  dailyTasks.value = userTasks.filter((t) => t.date === toYMD(today))
+  allWorkspaceTasksRef.value = userTasks
+  dailyTasks.value = userTasks.filter((t) => t.date === focusSelectedDate.value)
   const weekDays = ymdRange(startOfWeek, endOfWeek)
   weeklyTasks.value = userTasks.filter((t) => weekDays.includes(t.date))
   const monthDays = ymdRange(startOfMonth, endOfMonth)
   monthlyTasks.value = userTasks.filter((t) => monthDays.includes(t.date))
-  dailyLoading.value = false
-  dailyFirstLoad.value = false
   buildRotatingInsights()
 }
 
@@ -2492,8 +2575,9 @@ onUnmounted(() => {
   if (unsubscribe.value) unsubscribe.value()
   detachNapkinListener()
   if (insightIntervalId.value) clearInterval(insightIntervalId.value)
-  if (typeof window !== 'undefined') {
-    window.removeEventListener('pcai:onboarding:request', handleOnboardingReplayEvent)
+  if (quickSetupListener && typeof window !== 'undefined') {
+    window.removeEventListener('pcai:quick-setup-updated', quickSetupListener)
+    quickSetupListener = null
   }
   if (onboardingTimer) {
     clearTimeout(onboardingTimer)
@@ -2817,20 +2901,33 @@ async function onReminderClick(task) {
 
 onMounted(() => {
   try {
-    onAuthStateChanged(auth, () => {
+    const restoredUser = auth.currentUser || authStore?.user || null
+    if (restoredUser?.uid) {
       checkingAuth.value = false
+      attachTaskListener(restoredUser)
+    }
+    onAuthStateChanged(auth, (user) => {
+      checkingAuth.value = false
+      attachTaskListener(user || authStore?.user || null)
     })
   } catch {
     checkingAuth.value = false
   }
   if (typeof window !== 'undefined') {
-    window.addEventListener('pcai:onboarding:request', handleOnboardingReplayEvent)
+    quickSetupListener = (event) => {
+      refreshQuickSetupState(event?.detail || null)
+    }
+    window.addEventListener('pcai:quick-setup-updated', quickSetupListener)
   }
 })
 
 watch(
   () => authStore?.user?.uid,
   async (uid) => {
+    if (uid) {
+      checkingAuth.value = false
+      attachTaskListener(auth.currentUser || authStore?.user || null)
+    }
     try {
       if (!uid) {
         userStreak.value = 0
@@ -2880,6 +2977,29 @@ onUnmounted(() => {
   border-radius: 1.15rem;
   padding: 1rem 1.25rem;
   box-shadow: inset 0 1px 12px rgba(255, 255, 255, 0.06);
+}
+
+.quick-setup-banner {
+  border-radius: 1.15rem;
+  border: 1px solid rgba(129, 140, 248, 0.28);
+  background:
+    radial-gradient(circle at top right, rgba(236, 72, 153, 0.18), transparent 35%),
+    linear-gradient(135deg, rgba(15, 23, 42, 0.92), rgba(49, 46, 129, 0.8));
+}
+
+.quick-setup-banner__progress {
+  position: relative;
+  width: 140px;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.quick-setup-banner__bar {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 55%, #ec4899 100%);
 }
 
 .dashboard-section {
@@ -2976,27 +3096,6 @@ onUnmounted(() => {
   box-shadow: 0 10px 24px rgba(79, 70, 229, 0.25);
 }
 
-.dashboard-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.plan-new-task-btn {
-  display: inline-flex;
-  align-items: center;
-}
-
-.category-tabs {
-  display: flex;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-.category-tabs::-webkit-scrollbar {
-  display: none;
-}
-
 .daily-card--fullscreen {
   position: fixed;
   inset: 0;
@@ -3018,6 +3117,15 @@ onUnmounted(() => {
   transition: max-height 0.25s ease;
 }
 
+.focus-list-fade-enter-active,
+.focus-list-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.focus-list-fade-enter-from,
+.focus-list-fade-leave-to {
+  opacity: 0;
+}
+
 .today-list--fullscreen {
   flex: 1 1 auto;
   min-height: 0;
@@ -3034,21 +3142,22 @@ onUnmounted(() => {
     max-height: none;
   }
 
-  .dashboard-actions {
-    gap: 8px;
+  /* Date selector: one line, no wrap; date pill styling */
+  .focus-date-row {
+    flex-wrap: nowrap;
   }
-
-  .plan-new-task-btn {
-    padding: 10px 14px;
-  }
-
-  .category-tabs {
-    gap: 8px;
-    padding-bottom: 6px;
+  .focus-date-pill {
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 6px 14px;
+    background: rgba(255, 255, 255, 0.06);
   }
 }
 
 :global(.today-fullscreen-mode aside) {
+  display: none !important;
+}
+:global(.today-fullscreen-mode header.sticky) {
   display: none !important;
 }
 :global(.today-fullscreen-mode footer) {
@@ -3056,12 +3165,6 @@ onUnmounted(() => {
 }
 :global(.today-fullscreen-mode body) {
   overflow: hidden;
-}
-
-/* Fullscreen: keep content from sliding under sticky header */
-:global(.today-fullscreen-mode .daily-card--fullscreen) {
-  margin-top: 70px;
-  height: calc(100vh - 70px);
 }
 
 .move-card--full {
