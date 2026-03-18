@@ -49,6 +49,79 @@ import '@/firebase/init'
 import { registerSW } from 'virtual:pwa-register'
 const isNativeApp = !!Capacitor?.isNativePlatform?.()
 let updateSW = () => {}
+let pwaLastUpdateCheckAt = 0
+let pwaUpdateIntervalId = null
+const PWA_UPDATE_MIN_GAP_MS = 15 * 1000
+const PWA_UPDATE_INTERVAL_MS =
+  typeof window !== 'undefined' && window.innerWidth >= 768 ? 60 * 1000 : 2 * 60 * 1000
+
+async function checkForPwaUpdates(reason = 'manual', { force = false } = {}) {
+  if (isNativeApp || typeof window === 'undefined' || !('serviceWorker' in navigator)) return
+  if (!force && typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+
+  const now = Date.now()
+  if (!force && now - pwaLastUpdateCheckAt < PWA_UPDATE_MIN_GAP_MS) return
+  pwaLastUpdateCheckAt = now
+
+  try {
+    const registration = await navigator.serviceWorker.getRegistration()
+    if (!registration) return
+    console.info(`[PWA] Checking for updates (${reason})`)
+    await registration.update()
+    if (registration.waiting) {
+      console.info(`[PWA] Applying waiting update (${reason})`)
+      updateSW(true)
+    }
+  } catch (err) {
+    console.warn(`[PWA] Update check failed (${reason})`, err)
+  }
+}
+
+function installPwaUpdateChecks() {
+  if (isNativeApp || typeof window === 'undefined' || !('serviceWorker' in navigator)) return
+
+  const onVisible = () => {
+    if (document.visibilityState === 'visible') {
+      checkForPwaUpdates('visible')
+    }
+  }
+
+  window.addEventListener('focus', () => {
+    checkForPwaUpdates('focus')
+  })
+  window.addEventListener('online', () => {
+    checkForPwaUpdates('online', { force: true })
+  })
+  window.addEventListener('pageshow', (event) => {
+    checkForPwaUpdates(event?.persisted ? 'pageshow-bfcache' : 'pageshow', {
+      force: !!event?.persisted,
+    })
+  })
+  document.addEventListener('visibilitychange', onVisible)
+  router.afterEach(() => {
+    checkForPwaUpdates('route')
+  })
+
+  pwaUpdateIntervalId = window.setInterval(() => {
+    checkForPwaUpdates('interval')
+  }, PWA_UPDATE_INTERVAL_MS)
+
+  window.setTimeout(() => {
+    checkForPwaUpdates('startup', { force: true })
+  }, 12 * 1000)
+
+  window.addEventListener(
+    'beforeunload',
+    () => {
+      if (pwaUpdateIntervalId) {
+        window.clearInterval(pwaUpdateIntervalId)
+        pwaUpdateIntervalId = null
+      }
+    },
+    { once: true }
+  )
+}
+
 if (!isNativeApp) {
   updateSW = registerSW({
     immediate: true,
@@ -60,16 +133,10 @@ if (!isNativeApp) {
       console.log('App ready to work offline.')
     },
   })
+  installPwaUpdateChecks()
 }
 
 // Background auto-refresh every 10 minutes to avoid stale cache on kiosk/iPad
-try {
-  if (!isNativeApp) {
-    const TEN_MIN = 10 * 60 * 1000
-    setInterval(() => updateSW(true), TEN_MIN)
-  }
-} catch (_) {}
-
 // Firebase auth export for quick token refreshes
 import { auth } from '@/firebase/init'
 

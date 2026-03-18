@@ -251,7 +251,7 @@
             'mic-btn--recording': micState === MIC_STATES.listening,
             'mic-btn--processing': micState === MIC_STATES.processing,
           }"
-          :disabled="assistantThinking && !micActive"
+          :disabled="(assistantThinking && !micActive) || micState === MIC_STATES.processing"
           :aria-pressed="micState === MIC_STATES.listening"
           :title="micButtonLabel"
           :aria-label="micButtonLabel"
@@ -259,13 +259,15 @@
         >
           <span class="mic-visual" aria-hidden="true"></span>
         </button>
-        <input
+        <textarea
+          ref="chatInputRef"
           v-model="inputText"
           :disabled="assistantThinking"
+          rows="1"
           placeholder="Ask your planner..."
           class="chat-input"
-          @keydown.enter="sendMessage"
-        />
+          @keydown="handleComposerKeydown"
+        ></textarea>
         <button
           type="button"
           @click="sendMessage"
@@ -302,7 +304,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { queryPlannerAssistant } from '@/services/plannerService'
 import { requestSpeechUrl, supportsWebSpeech, speakWithWebSpeech } from '@/services/ttsService'
 import { useAuthStore } from '@/stores/authStore'
@@ -334,6 +336,7 @@ useSeoMeta({
 const assistantThinking = ref(false)
 const inputText = ref('')
 const chatContainer = ref(null)
+const chatInputRef = ref(null)
 const messageSeed = ref(0)
 const isTranscribing = ref(false)
 const prefersNativeVoiceFallback = isNativePackagedApp()
@@ -663,6 +666,25 @@ watch(
 
 const sendDisabled = computed(() => assistantThinking.value || !inputText.value.trim())
 
+function syncComposerHeight() {
+  const composer = chatInputRef.value
+  if (!(composer instanceof HTMLTextAreaElement)) return
+  const maxHeight = typeof window !== 'undefined' && window.innerWidth <= 768 ? 160 : 192
+  composer.style.height = 'auto'
+  composer.style.height = `${Math.min(composer.scrollHeight, maxHeight)}px`
+  composer.style.overflowY = composer.scrollHeight > maxHeight ? 'auto' : 'hidden'
+}
+
+function handleComposerKeydown(event) {
+  if (event.key !== 'Enter' || event.shiftKey) return
+  const shouldSendOnEnter = typeof window === 'undefined' ? true : window.innerWidth > 768
+  if (!shouldSendOnEnter) return
+  event.preventDefault()
+  if (!sendDisabled.value) {
+    sendMessage()
+  }
+}
+
 function clearChat() {
   messages.value = [createWelcomeMessage(userDisplayName.value)]
   lastAutoSpokenMessageId.value = null
@@ -687,6 +709,7 @@ async function sendMessage() {
 }
 
 async function handleMicButton() {
+  if (micState.value === MIC_STATES.processing) return
   await startRecording()
 }
 
@@ -1085,30 +1108,58 @@ async function beginContinuousListening() {
 }
 
 async function stopRecording() {
+  const bufferedTranscript = String(pendingSegmentText || latestPreviewText || '').trim()
   keepListeningHot = false
   manualStopRequested = true
-  pendingSegmentText = ''
-  latestPreviewText = ''
   clearSilenceTimer()
   clearRestartTimer()
   clearIdleDisengageTimer()
   if (voiceEngine === 'web') {
     if (speechRecognitionInstance) {
+      pendingSegmentText = bufferedTranscript
+      latestPreviewText = bufferedTranscript
+      if (bufferedTranscript) {
+        webStopping = true
+        applyMicState(MIC_STATES.processing)
+      }
       try {
         speechRecognitionInstance.stop()
-      } catch {}
+      } catch (err) {
+        console.warn('[TalkToPlanner] Failed to stop recognition cleanly', err)
+        speechRecognitionInstance = null
+        webStopping = false
+        if (bufferedTranscript) {
+          await commitVoiceSegment(bufferedTranscript)
+        } else {
+          applyMicState(MIC_STATES.idle)
+        }
+      }
     } else {
-      applyMicState(MIC_STATES.idle)
+      if (bufferedTranscript) {
+        await commitVoiceSegment(bufferedTranscript)
+      } else {
+        applyMicState(MIC_STATES.idle)
+      }
     }
-    webStopping = false
   } else if (backendRecorderInstance) {
+    backendStopping = true
     try {
+      applyMicState(MIC_STATES.processing)
       await backendRecorderInstance._stop()
-    } catch {}
-    backendRecorderInstance = null
+    } catch {
+      /* noop */
+    } finally {
+      backendRecorderInstance = null
+      backendStopping = false
+      if (!keepListeningHot || manualStopRequested) {
+        applyMicState(MIC_STATES.idle)
+      }
+    }
+  } else if (bufferedTranscript) {
+    await commitVoiceSegment(bufferedTranscript)
+  } else {
+    applyMicState(MIC_STATES.idle)
   }
-  applyMicState(MIC_STATES.idle)
-  isTranscribing.value = false
 }
 
 function applyMicState(state) {
@@ -1238,11 +1289,28 @@ async function processVoiceSegment(text) {
   trackEvent('Voice Transcribed', { length: cleaned.length })
 }
 
+async function commitVoiceSegment(text) {
+  const cleaned = String(text || '').trim()
+  pendingSegmentText = ''
+  latestPreviewText = ''
+  if (!cleaned) {
+    applyMicState(MIC_STATES.idle)
+    return false
+  }
+  applyMicState(MIC_STATES.processing)
+  await processVoiceSegment(cleaned)
+  manualStopRequested = false
+  applyMicState(MIC_STATES.idle)
+  return true
+}
+
 function stageVoiceResult(text) {
   const cleaned = String(text || '').trim()
   if (!cleaned) return
   const existing = inputText.value ? inputText.value.trim() : ''
   inputText.value = existing ? `${existing} ${cleaned}`.trim() : cleaned
+  latestPreviewText = ''
+  pendingSegmentText = ''
   applyMicState(MIC_STATES.paused)
   scheduleIdleDisengage()
   keepListeningHot = false
@@ -1321,8 +1389,7 @@ function startWebSpeechSession() {
     let shouldRestart = keepListeningHot && !manualStopRequested
     if (segmentToSend) {
       try {
-        applyMicState(MIC_STATES.processing)
-        await processVoiceSegment(segmentToSend)
+        await commitVoiceSegment(segmentToSend)
       } finally {
         shouldRestart = keepListeningHot && !manualStopRequested
       }
@@ -1386,6 +1453,28 @@ onBeforeUnmount(() => {
   stopVoicePlayback()
   clearIdleDisengageTimer()
   stopRecording().catch(() => {})
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('resize', syncComposerHeight)
+  }
+})
+
+watch(
+  inputText,
+  () => {
+    nextTick(() => {
+      syncComposerHeight()
+    })
+  },
+  { flush: 'post' },
+)
+
+onMounted(() => {
+  nextTick(() => {
+    syncComposerHeight()
+  })
+  if (typeof window !== 'undefined') {
+    window.addEventListener('resize', syncComposerHeight, { passive: true })
+  }
 })
 </script>
 
@@ -1520,6 +1609,7 @@ onBeforeUnmount(() => {
   align-items: flex-start;
   gap: 0.75rem;
   max-width: 78%;
+  min-width: 0;
   padding: 0.78rem 1rem;
   border-radius: 1rem;
   line-height: 1.45;
@@ -1565,6 +1655,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
 }
 
 .ai-icon {
@@ -1594,7 +1685,9 @@ onBeforeUnmount(() => {
 }
 
 .chat-text {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
   color: rgba(243, 244, 255, 0.9);
 }
 
@@ -1602,6 +1695,11 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: flex-start;
   gap: 0.5rem;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .chat-text__content--assistant {
@@ -1609,10 +1707,13 @@ onBeforeUnmount(() => {
 }
 
 .message-text {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
   margin: 0;
-  white-space: pre-wrap;
+  white-space: normal;
   word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .voice-replay-btn {
@@ -1797,9 +1898,10 @@ onBeforeUnmount(() => {
 
 .chat-input-row {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 0.6rem;
   flex: 1;
+  min-width: 0;
   padding: 0.35rem 0.6rem;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.05);
@@ -1808,14 +1910,26 @@ onBeforeUnmount(() => {
 }
 
 .chat-input {
-  flex-grow: 1;
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  flex: 1 1 auto;
   min-width: 0;
+  min-height: 1.5rem;
+  max-height: 12rem;
   background: transparent;
   border: none;
   color: #ffffff;
+  font-family: inherit;
   font-size: 1rem;
   padding: 0.35rem 0.2rem;
   outline: none;
+  resize: none;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  overflow-y: hidden;
 }
 
 .chat-input::placeholder {

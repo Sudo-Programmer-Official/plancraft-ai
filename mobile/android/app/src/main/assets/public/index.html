@@ -461,6 +461,57 @@
 
     <script>
       ;(() => {
+        if (!('serviceWorker' in navigator)) return
+
+        const MIN_GAP_MS = 15 * 1000
+        const INTERVAL_MS = window.innerWidth >= 768 ? 60 * 1000 : 2 * 60 * 1000
+        let lastCheckAt = 0
+        let reloadTriggered = false
+
+        const checkForUpdates = async (reason, force = false) => {
+          if (!force && document.visibilityState === 'hidden') return
+
+          const now = Date.now()
+          if (!force && now - lastCheckAt < MIN_GAP_MS) return
+          lastCheckAt = now
+
+          try {
+            const registration = await navigator.serviceWorker.getRegistration()
+            if (!registration) return
+            console.info(`[PWA] Checking for updates (${reason})`)
+            await registration.update()
+            if (registration.waiting) {
+              registration.waiting.postMessage({ type: 'SKIP_WAITING' })
+            }
+          } catch (err) {
+            console.warn(`[PWA] Update check failed (${reason})`, err)
+          }
+        }
+
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (reloadTriggered) return
+          reloadTriggered = true
+          window.location.reload()
+        })
+
+        window.addEventListener('focus', () => checkForUpdates('focus'))
+        window.addEventListener('online', () => checkForUpdates('online', true))
+        window.addEventListener('pageshow', (event) =>
+          checkForUpdates(event?.persisted ? 'pageshow-bfcache' : 'pageshow', !!event?.persisted)
+        )
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') {
+            checkForUpdates('visible')
+          }
+        })
+
+        window.setInterval(() => checkForUpdates('interval'), INTERVAL_MS)
+        window.setTimeout(() => checkForUpdates('startup', true), 12 * 1000)
+      })()
+    </script>
+
+    <script>
+      ;(() => {
         try {
           const isNativeCapacitor =
             typeof window !== 'undefined' &&
