@@ -341,7 +341,25 @@
               :class="{ 'today-list--fullscreen': isTodayFullscreen }"
             >
               <transition name="focus-list-fade" mode="out-in">
-                <ul v-if="filteredDaily.length" :key="focusSelectedDate" class="space-y-2 text-sm">
+                <div
+                  v-if="dashboardTasksLoading"
+                  :key="`daily-loading-${focusSelectedDate}`"
+                  class="dashboard-task-skeleton-list"
+                  aria-label="Loading tasks"
+                >
+                  <div v-for="index in 3" :key="`daily-skeleton-${index}`" class="dashboard-task-skeleton-card">
+                    <span class="dashboard-task-skeleton-check" aria-hidden="true" />
+                    <div class="dashboard-task-skeleton-content">
+                      <span class="dashboard-task-skeleton-line dashboard-task-skeleton-line--title" />
+                      <div class="dashboard-task-skeleton-meta">
+                        <span class="dashboard-task-skeleton-pill" />
+                        <span class="dashboard-task-skeleton-line dashboard-task-skeleton-line--meta" />
+                      </div>
+                    </div>
+                    <span class="dashboard-task-skeleton-action" aria-hidden="true" />
+                  </div>
+                </div>
+                <ul v-else-if="filteredDaily.length" :key="focusSelectedDate" class="space-y-2 text-sm">
                   <li
                     v-for="task in filteredDaily"
                     :key="task.id"
@@ -552,7 +570,24 @@
           </div>
 
           <div
-            v-if="filteredAllTasks.length"
+            v-if="dashboardTasksLoading"
+            class="dashboard-task-skeleton-list"
+            aria-label="Loading all tasks"
+          >
+            <div v-for="index in 4" :key="`all-skeleton-${index}`" class="dashboard-task-skeleton-card">
+              <span class="dashboard-task-skeleton-check" aria-hidden="true" />
+              <div class="dashboard-task-skeleton-content">
+                <span class="dashboard-task-skeleton-line dashboard-task-skeleton-line--title" />
+                <div class="dashboard-task-skeleton-meta">
+                  <span class="dashboard-task-skeleton-pill" />
+                  <span class="dashboard-task-skeleton-line dashboard-task-skeleton-line--meta" />
+                </div>
+              </div>
+              <span class="dashboard-task-skeleton-action" aria-hidden="true" />
+            </div>
+          </div>
+          <div
+            v-else-if="filteredAllTasks.length"
             class="overflow-y-auto max-h-[60vh] md:max-h-72 scrollbar-plan rounded-2xl pr-1"
           >
             <ul class="space-y-2 text-sm">
@@ -669,7 +704,23 @@
           </p>
 
           <div
-            v-if="filteredWeeklyPreview.length"
+            v-if="dashboardTasksLoading"
+            class="dashboard-task-skeleton-list"
+            aria-label="Loading weekly tasks"
+          >
+            <div v-for="index in 3" :key="`weekly-skeleton-${index}`" class="dashboard-task-skeleton-card">
+              <span class="dashboard-task-skeleton-check" aria-hidden="true" />
+              <div class="dashboard-task-skeleton-content">
+                <span class="dashboard-task-skeleton-line dashboard-task-skeleton-line--title" />
+                <div class="dashboard-task-skeleton-meta">
+                  <span class="dashboard-task-skeleton-pill" />
+                  <span class="dashboard-task-skeleton-line dashboard-task-skeleton-line--meta" />
+                </div>
+              </div>
+            </div>
+          </div>
+          <div
+            v-else-if="filteredWeeklyPreview.length"
             class="overflow-y-auto max-h-[60vh] md:max-h-56 scrollbar-plan rounded-2xl pr-1"
           >
             <ul class="space-y-2 text-sm">
@@ -1616,6 +1667,7 @@ const quickSetupStore = useQuickSetupStore()
 const reminderActiveByTask = ref({})
 const taskMeetingLink = (task) => resolveTaskMeetingLink(task)
 const checkingAuth = ref(true)
+const dashboardTasksLoading = ref(true)
 const userPrefs = ref({ notifications: {}, integrations: {} })
 const onboardingTourVisible = ref(false)
 const onboardingStatus = ref({
@@ -2146,7 +2198,11 @@ watch(
 )
 
 onMounted(async () => {
-  await refreshAllTasks().catch(() => {})
+  const seeded = await refreshAllTasks().then(() => true).catch(() => false)
+  if (seeded && (allTasks.value.length || activeWorkspaceId.value)) {
+    syncDashboardTaskBuckets(allTasks.value)
+    dashboardTasksLoading.value = false
+  }
   try {
     carryoverDismissedToday.value =
       localStorage.getItem(`carryover:dismiss:${todayKeyRef.value}`) === '1'
@@ -2360,6 +2416,34 @@ function ymdRange(start, end) {
   return days
 }
 
+function normalizeDashboardTask(task = {}) {
+  return {
+    ...task,
+    category: resolveCategory(task?.category),
+    date: typeof task?.date === 'string' ? task.date : toYMD(task?.date?.toDate?.() || task?.date || new Date()),
+    createdAt: task?.createdAt?.toMillis?.() || task?.createdAt || 0,
+  }
+}
+
+function syncDashboardTaskBuckets(sourceTasks = []) {
+  const userTasks = Array.from(
+    new Map(
+      (Array.isArray(sourceTasks) ? sourceTasks : [])
+        .map((task) => normalizeDashboardTask(task))
+        .filter((task) => task?.id)
+        .map((task) => [task.id, task]),
+    ).values(),
+  )
+
+  allWorkspaceTasksRef.value = userTasks
+  dailyTasks.value = userTasks.filter((t) => t.date === focusSelectedDate.value)
+  const weekDays = ymdRange(startOfWeek, endOfWeek)
+  weeklyTasks.value = userTasks.filter((t) => weekDays.includes(t.date))
+  const monthDays = ymdRange(startOfMonth, endOfMonth)
+  monthlyTasks.value = userTasks.filter((t) => monthDays.includes(t.date))
+  buildRotatingInsights()
+}
+
 const startOfWeek = new Date(today)
 startOfWeek.setDate(today.getDate() - (today.getDay() === 0 ? 6 : today.getDay() - 1))
 startOfWeek.setHours(0, 0, 0, 0)
@@ -2506,38 +2590,39 @@ function handleTaskSnapshot(snapshot) {
       createdAt: data.createdAt?.toMillis?.() || data.createdAt || 0,
     }
   })
-  allWorkspaceTasksRef.value = userTasks
-  dailyTasks.value = userTasks.filter((t) => t.date === focusSelectedDate.value)
-  const weekDays = ymdRange(startOfWeek, endOfWeek)
-  weeklyTasks.value = userTasks.filter((t) => weekDays.includes(t.date))
-  const monthDays = ymdRange(startOfMonth, endOfMonth)
-  monthlyTasks.value = userTasks.filter((t) => monthDays.includes(t.date))
-  buildRotatingInsights()
+  syncDashboardTaskBuckets(userTasks)
+  dashboardTasksLoading.value = false
 }
 
 async function attachTaskListener(user) {
   if (unsubscribe.value) unsubscribe.value()
   if (!user) {
-    dailyTasks.value = []
-    weeklyTasks.value = []
-    monthlyTasks.value = []
+    syncDashboardTaskBuckets([])
+    dashboardTasksLoading.value = false
     return
   }
   const wsId = activeWorkspaceId.value
   if (!wsId) {
-    dailyTasks.value = []
-    weeklyTasks.value = []
-    monthlyTasks.value = []
+    syncDashboardTaskBuckets([])
+    dashboardTasksLoading.value = true
     return
   }
+  dashboardTasksLoading.value = true
   const tasksQuery = query(tasksCollection(), where('workspaceId', '==', wsId))
   try {
     unsubscribe.value = onSnapshot(tasksQuery, async (snapshot) => {
       handleTaskSnapshot(snapshot)
+    }, async (error) => {
+      console.warn('Live tasks listener failed; falling back to one-time load', error?.message || error)
+      const seeded = await refreshAllTasks(true).then(() => true).catch(() => false)
+      if (seeded) syncDashboardTaskBuckets(allTasks.value)
+      dashboardTasksLoading.value = false
     })
   } catch (error) {
     console.warn('Live tasks listener failed; falling back to one-time load', error?.message || error)
-    loadTasks().catch(() => {})
+    const seeded = await refreshAllTasks(true).then(() => true).catch(() => false)
+    if (seeded) syncDashboardTaskBuckets(allTasks.value)
+    dashboardTasksLoading.value = false
   }
 }
 
@@ -3112,6 +3197,96 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
+.dashboard-task-skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-top: 0.2rem;
+}
+
+.dashboard-task-skeleton-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 0.95rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(99, 102, 241, 0.12);
+  background: rgba(15, 23, 42, 0.62);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.dashboard-task-skeleton-check,
+.dashboard-task-skeleton-line,
+.dashboard-task-skeleton-pill,
+.dashboard-task-skeleton-action {
+  position: relative;
+  overflow: hidden;
+  background: rgba(99, 102, 241, 0.16);
+}
+
+.dashboard-task-skeleton-check::after,
+.dashboard-task-skeleton-line::after,
+.dashboard-task-skeleton-pill::after,
+.dashboard-task-skeleton-action::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  animation: dashboardSkeletonPulse 1.25s ease-in-out infinite;
+}
+
+.dashboard-task-skeleton-check {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 1rem;
+  margin-top: 0.2rem;
+  border-radius: 0.3rem;
+}
+
+.dashboard-task-skeleton-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.dashboard-task-skeleton-line {
+  display: block;
+  border-radius: 999px;
+}
+
+.dashboard-task-skeleton-line--title {
+  width: min(72%, 18rem);
+  height: 0.95rem;
+}
+
+.dashboard-task-skeleton-line--meta {
+  width: 6rem;
+  height: 0.72rem;
+}
+
+.dashboard-task-skeleton-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.dashboard-task-skeleton-pill {
+  width: 5.6rem;
+  height: 1.6rem;
+  border-radius: 999px;
+}
+
+.dashboard-task-skeleton-action {
+  width: 3.9rem;
+  height: 2.15rem;
+  border-radius: 0.8rem;
+  flex: 0 0 auto;
+}
+
 .today-fullscreen-btn {
   width: 44px;
   height: 44px;
@@ -3138,6 +3313,12 @@ onUnmounted(() => {
   background: rgba(99, 102, 241, 0.25);
   transform: translateY(-1px);
   box-shadow: 0 10px 24px rgba(79, 70, 229, 0.25);
+}
+
+@keyframes dashboardSkeletonPulse {
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 @media (min-width: 641px) {
