@@ -2323,6 +2323,13 @@ function appendDetails(result = {}) {
 
 /* Dialog background */
 .task-planner-dialog .el-dialog {
+  --planner-mobile-top-gap: max(
+    calc(var(--safe-area-top, env(safe-area-inset-top, 0px)) + 0.85rem),
+    2rem
+  );
+  --planner-mobile-bottom-gap: calc(
+    var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 0.85rem
+  );
   background: linear-gradient(145deg, #1e1b4b, #312e81, #4c1d95);
   color: #e2e8f0;
   border-radius: 1rem;
@@ -2339,12 +2346,51 @@ function appendDetails(result = {}) {
 .task-planner-dialog .el-dialog__header {
   flex: 0 0 auto;
   flex-shrink: 0;
+  margin: 0;
+  padding: 1.1rem 4.25rem 0.85rem 1rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   color: #f8fafc;
   font-weight: 600;
   .el-dialog__title {
     color: #f1f5f9 !important;
   }
+}
+
+:deep(.task-planner-dialog .el-dialog__title) {
+  display: block;
+  color: #f1f5f9 !important;
+  font-size: clamp(1.55rem, 4vw, 2.25rem);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  padding-right: 0.25rem;
+}
+
+:deep(.task-planner-dialog .el-dialog__headerbtn) {
+  top: 1rem;
+  right: 1rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+:deep(.task-planner-dialog .el-dialog__headerbtn:hover) {
+  background: rgba(129, 140, 248, 0.22);
+  border-color: rgba(255, 255, 255, 0.24);
+  transform: translateY(-1px);
+}
+
+:deep(.task-planner-dialog .el-dialog__headerbtn .el-dialog__close) {
+  color: #f8fafc;
+  font-size: 1.1rem;
 }
 
 /* Inputs */
@@ -2401,7 +2447,7 @@ function appendDetails(result = {}) {
 @media (max-width: 640px) {
   .planner-overlay {
     align-items: flex-start;
-    padding-top: 0.85rem;
+    padding-top: 1rem;
     padding-right: 0.85rem;
     padding-bottom: calc(var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 0.85rem);
     padding-left: 0.85rem;
@@ -2415,14 +2461,14 @@ function appendDetails(result = {}) {
     width: min(100%, 560px);
     top: auto !important;
     margin: 0 auto !important;
-    margin-top: max(calc(var(--safe-area-top, env(safe-area-inset-top, 0px)) + 0.85rem), 1rem) !important;
-    max-height: calc(100dvh - max(calc(var(--safe-area-top, env(safe-area-inset-top, 0px)) + 0.85rem), 1rem) - calc(var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 0.85rem));
+    margin-top: var(--planner-mobile-top-gap) !important;
+    max-height: calc(100dvh - var(--planner-mobile-top-gap) - var(--planner-mobile-bottom-gap));
     border-radius: 1rem;
     padding: 0.85rem;
   }
 
   .task-planner-dialog .el-dialog__header {
-    padding-bottom: 0.75rem;
+    padding: 1.1rem 4rem 0.75rem 1rem;
   }
 
   .task-planner-dialog .el-dialog__body {
@@ -2467,7 +2513,7 @@ function appendDetails(result = {}) {
   .planner-overlay {
     align-items: flex-start;
     justify-content: center;
-    padding-top: 0.85rem;
+    padding-top: 1rem;
     padding-right: 0.85rem;
     padding-bottom: calc(var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 0.85rem);
     padding-left: 0.85rem;
@@ -2478,13 +2524,14 @@ function appendDetails(result = {}) {
     display: flex;
     flex-direction: column;
     margin: 0 auto !important;
-    margin-top: max(calc(var(--safe-area-top, env(safe-area-inset-top, 0px)) + 0.85rem), 1rem) !important;
+    margin-top: var(--planner-mobile-top-gap) !important;
     width: 92vw !important;
     max-width: 560px !important;
-    max-height: calc(100dvh - max(calc(var(--safe-area-top, env(safe-area-inset-top, 0px)) + 0.85rem), 1rem) - calc(var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 0.85rem));
+    max-height: calc(100dvh - var(--planner-mobile-top-gap) - var(--planner-mobile-bottom-gap));
   }
   .task-planner-dialog .el-dialog__header {
     flex-shrink: 0;
+    padding: 1.1rem 4rem 0.75rem 1rem;
   }
   .task-planner-dialog .el-dialog__footer {
     flex-shrink: 0;
@@ -2527,6 +2574,17 @@ function appendDetails(result = {}) {
   }
   .task-planner-dialog .task-textarea textarea {
     min-height: 4rem;
+  }
+
+  :deep(.task-planner-dialog .el-dialog__title) {
+    font-size: clamp(1.4rem, 5.8vw, 1.95rem);
+  }
+
+  :deep(.task-planner-dialog .el-dialog__headerbtn) {
+    top: 0.95rem;
+    right: 0.95rem;
+    width: 2.5rem;
+    height: 2.5rem;
   }
 }
 

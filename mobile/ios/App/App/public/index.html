@@ -278,10 +278,12 @@
         }
 
         .task-planner-dialog .el-dialog {
+          --planner-mobile-top-gap: max(calc(env(safe-area-inset-top, 0px) + 0.85rem), 2rem);
+          --planner-mobile-bottom-gap: calc(env(safe-area-inset-bottom, 0px) + 0.85rem);
           top: auto !important;
           margin: 0 auto !important;
-          margin-top: max(calc(env(safe-area-inset-top, 0px) + 0.85rem), 1rem) !important;
-          max-height: calc(100dvh - max(calc(env(safe-area-inset-top, 0px) + 0.85rem), 1rem) - calc(env(safe-area-inset-bottom, 0px) + 0.85rem)) !important;
+          margin-top: var(--planner-mobile-top-gap) !important;
+          max-height: calc(100dvh - var(--planner-mobile-top-gap) - var(--planner-mobile-bottom-gap)) !important;
           display: flex !important;
           flex-direction: column !important;
           position: relative !important;
@@ -291,7 +293,35 @@
         .task-planner-dialog .el-dialog__header {
           flex: 0 0 auto !important;
           flex-shrink: 0 !important;
+          margin: 0 !important;
+          padding: 1.1rem 4rem 0.75rem 1rem !important;
           padding-bottom: 0.75rem !important;
+        }
+
+        .task-planner-dialog .el-dialog__title {
+          display: block !important;
+          font-size: clamp(1.4rem, 5.8vw, 1.95rem) !important;
+          line-height: 1.15 !important;
+          overflow-wrap: anywhere !important;
+          padding-right: 0.25rem !important;
+        }
+
+        .task-planner-dialog .el-dialog__headerbtn {
+          top: 0.95rem !important;
+          right: 0.95rem !important;
+          width: 2.5rem !important;
+          height: 2.5rem !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          border-radius: 999px !important;
+          background: rgba(99, 102, 241, 0.14) !important;
+          border: 1px solid rgba(255, 255, 255, 0.14) !important;
+        }
+
+        .task-planner-dialog .el-dialog__headerbtn .el-dialog__close {
+          color: #f8fafc !important;
+          font-size: 1.1rem !important;
         }
 
         .task-planner-dialog .el-dialog__body {

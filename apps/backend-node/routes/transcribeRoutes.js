@@ -79,6 +79,16 @@ const DEFAULT_TRANSCRIBE_MODELS = [
   "gpt-4o-transcribe"
 ];
 
+const TRANSCRIBE_MAX_ATTEMPTS = Math.max(
+  1,
+  Number.parseInt(process.env.OPENAI_TRANSCRIBE_MAX_ATTEMPTS || "3", 10) || 3
+);
+
+const TRANSCRIBE_RETRY_DELAY_MS = Math.max(
+  200,
+  Number.parseInt(process.env.OPENAI_TRANSCRIBE_RETRY_DELAY_MS || "500", 10) || 500
+);
+
 function resolveModelList() {
   const primary = (process.env.OPENAI_TRANSCRIBE_MODEL || "").trim();
   const fallbacks = (process.env.OPENAI_TRANSCRIBE_FALLBACKS || "")
@@ -154,6 +164,47 @@ function guessExtension(mimetype) {
   return MIME_TO_EXTENSION[mimetype] || "webm";
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableTranscriptionError(err) {
+  const status = err?.status;
+  if (status === 408 || status === 409 || status === 429) return true;
+  if (typeof status === "number" && status >= 500) return true;
+  if (typeof status === "number" && status >= 400 && status < 500) return false;
+
+  const retryableCodes = new Set([
+    "ECONNRESET",
+    "ECONNREFUSED",
+    "ETIMEDOUT",
+    "ECONNABORTED",
+    "EPIPE",
+    "UND_ERR_CONNECT_TIMEOUT",
+    "UND_ERR_HEADERS_TIMEOUT",
+    "UND_ERR_SOCKET",
+  ]);
+
+  const codes = [err?.code, err?.error?.code, err?.cause?.code]
+    .filter(Boolean)
+    .map((value) => String(value).toUpperCase());
+  if (codes.some((code) => retryableCodes.has(code))) return true;
+
+  const names = [err?.name, err?.type, err?.error?.type]
+    .filter(Boolean)
+    .map((value) => String(value).toLowerCase());
+  if (names.some((value) => value.includes("connection"))) return true;
+
+  const message = [err?.message, err?.error?.message, err?.cause?.message]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return /connection error|network error|socket hang up|timed out|timeout|econnreset|fetch failed|temporarily unavailable/.test(
+    message
+  );
+}
+
 async function transcodeToWav(inputBuffer) {
   const tempDir = await fs.mkdtemp(path.join(tmpdir(), "transcribe-"));
   const inputPath = path.join(tempDir, "input");
@@ -195,31 +246,48 @@ function runFfmpeg(inputPath, outputPath) {
 }
 
 async function transcribeWithFallback(fileBuffer, filename) {
-  const file = await toFile(fileBuffer, filename);
   const models = resolveModelList();
   let lastErr;
   for (const model of models) {
-    try {
-      const resp = await openai.audio.transcriptions.create({
-        file,
-        model,
-        language: "en",
-      });
-      return { text: resp.text, model };
-    } catch (err) {
-      lastErr = err;
-      const code = err?.code || err?.error?.code;
-      const status = err?.status;
-      const msg = err?.error?.message || err?.message || "";
-      const isAccess =
-        code === "model_not_found" ||
-        status === 403 ||
-        /does not have access to model/i.test(msg);
-      if (isAccess) {
-        console.warn(`[transcribe] Model '${model}' unavailable. Trying next…`);
-        continue;
+    for (let attempt = 1; attempt <= TRANSCRIBE_MAX_ATTEMPTS; attempt += 1) {
+      try {
+        const file = await toFile(fileBuffer, filename);
+        const resp = await openai.audio.transcriptions.create({
+          file,
+          model,
+          language: "en",
+        });
+        return { text: resp.text, model };
+      } catch (err) {
+        lastErr = err;
+        const code = err?.code || err?.error?.code;
+        const status = err?.status;
+        const msg = err?.error?.message || err?.message || err?.cause?.message || "";
+        const isAccess =
+          code === "model_not_found" ||
+          status === 403 ||
+          /does not have access to model/i.test(msg);
+
+        if (isAccess) {
+          console.warn(`[transcribe] Model '${model}' unavailable. Trying next...`);
+          break;
+        }
+
+        const shouldRetry =
+          attempt < TRANSCRIBE_MAX_ATTEMPTS && isRetryableTranscriptionError(err);
+
+        if (shouldRetry) {
+          const delay = TRANSCRIBE_RETRY_DELAY_MS * attempt;
+          console.warn(
+            `[transcribe] Model '${model}' failed on attempt ${attempt}/${TRANSCRIBE_MAX_ATTEMPTS} ` +
+              `with a retryable connection error. Retrying in ${delay}ms...`
+          );
+          await sleep(delay);
+          continue;
+        }
+
+        throw err;
       }
-      throw err;
     }
   }
   const friendly = new Error(
