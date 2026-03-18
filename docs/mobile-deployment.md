@@ -2,15 +2,17 @@
 
 This is a quick, repeatable checklist to ship the web app into native shells. Keep `appId` stable after first upload.
 
+Capacitor 8 requires Node 22+. Run `nvm use` inside [`mobile`](/Users/abhishekkumarjha/Documents/sudo-programmer-official/audit-agent/mobile) before `npx cap ...`.
+
 ### Phase 1 — Prep the Android build (codebase)
 
 1) Update Capacitor config (if needed)
 ```ts
-// capacitor.config.ts
+// mobile/capacitor.config.ts
 export default {
-  appId: 'com.plancraftai.app',
+  appId: 'com.sudoprogrammer.plancraftai',
   appName: 'PlanCraftAI',
-  webDir: 'dist',
+  webDir: '../apps/audit-agent-frontend/dist',
   bundledWebRuntime: false,
 }
 ```
@@ -18,14 +20,17 @@ export default {
 
 2) Build the web app
 ```bash
+cd apps/audit-agent-frontend
 npm run build
 ```
 Confirm:
 - No console errors
-- `/dist` generated correctly
+- `apps/audit-agent-frontend/dist` generated correctly
 
 3) Sync Capacitor → Android
 ```bash
+cd ../../mobile
+nvm use
 npx cap sync android
 npx cap open android
 ```
@@ -67,20 +72,33 @@ cd android
 
 1) Web + Capacitor layer (run here):
 ```
-audit-agent-frontend/
+apps/audit-agent-frontend/
 ├─ dist/
-├─ capacitor.config.*      # appId/appName/webDir
 ├─ .env.production         # prod API/auth keys
 └─ package.json
 ```
 Commands:
 - `npm run build`
+
+2) Capacitor shell layer (run here):
+```
+mobile/
+├─ capacitor.config.ts     # appId/appName/webDir
+├─ android/
+├─ ios/
+├─ .nvmrc                  # Node 22 for Capacitor 8
+└─ package.json
+```
+Commands:
+- `nvm use`
 - `npx cap sync android`
 - `npx cap open android`
+- `npx cap sync ios`
+- `npx cap open ios`
 
-2) Native Android layer (run here):
+3) Native Android layer (run here):
 ```
-audit-agent-frontend/android/
+mobile/android/
 ├─ app/
 └─ gradlew
 ```
@@ -99,6 +117,8 @@ Notes:
 
 1) Sync iOS project
 ```bash
+cd mobile
+nvm use
 npx cap sync ios
 ```
 
@@ -120,4 +140,4 @@ Then export/sign via Xcode Organizer or `xcodebuild -exportArchive` with your pr
 
 ### Notes
 - Ensure environment values (e.g., `VITE_API_BASE_URL`, `VITE_ENABLE_IMAGE_TASKS`) are set before `npm run build`.
-- After any web change, rerun `npm run build` and `npx cap sync <platform>` so `dist` is embedded into native shells.
+- After any web change, rerun `npm run build` in `apps/audit-agent-frontend` and `npx cap sync <platform>` in `mobile` so `dist` is embedded into native shells.

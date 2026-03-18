@@ -15,8 +15,5 @@
 		"*.googleusercontent.com",
 		"*.firebaseapp.com",
 		"*.google.com"
-	],
-	"packageClassList": [
-		"CapacitorAudioRecorderPlugin"
 	]
 }

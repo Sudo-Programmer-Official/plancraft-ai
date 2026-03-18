@@ -2,7 +2,15 @@
   "name": "audit-agent-mobile",
   "version": "0.0.0",
   "private": true,
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "dependencies": {
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/app": "^8.0.0",
+    "@capacitor/cli": "^8.0.0",
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/ios": "^8.0.0",
     "@capgo/capacitor-audio-recorder": "^8.0.12"
   }
 }
