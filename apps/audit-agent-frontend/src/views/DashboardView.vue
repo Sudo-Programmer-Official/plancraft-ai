@@ -224,8 +224,8 @@
     >
         <div class="dashboard-card daily-card space-y-5" :class="{ 'daily-card--fullscreen': isTodayFullscreen }">
           <div class="daily-card__header">
-            <div class="daily-card__heading flex flex-col gap-1">
-              <div class="focus-date-row flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">
+            <div class="daily-card__heading">
+              <div class="focus-date-row flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap w-full">
                 <button
                   type="button"
                   class="focus-date-calendar-btn hidden sm:flex items-center justify-center w-8 h-8 rounded-lg text-slate-300 hover:bg-slate-700/60 hover:text-slate-100 transition shrink-0"
@@ -234,7 +234,7 @@
                 >
                   <span class="text-lg leading-none" aria-hidden="true">📅</span>
                 </button>
-                <div class="focus-date-pill flex items-center gap-1 rounded-xl bg-slate-800/60 border border-slate-700/50 px-1 py-0.5 shrink-0">
+                <div class="focus-date-pill flex w-full sm:w-auto flex-1 sm:flex-none items-center gap-1 rounded-xl bg-slate-800/60 border border-slate-700/50 px-1 py-0.5 min-w-0">
                   <button
                     type="button"
                     class="p-1.5 rounded-md text-slate-300 hover:bg-slate-700/60 hover:text-slate-100 transition"
@@ -243,7 +243,7 @@
                   >
                     <span class="text-sm font-medium">&lt;</span>
                   </button>
-                  <span class="px-2 py-1 text-sm font-medium text-slate-100 min-w-0 truncate max-w-[180px] sm:max-w-none">
+                  <span class="px-2 py-1 text-sm font-medium text-slate-100 min-w-0 flex-1 text-center truncate max-w-[180px] sm:max-w-none">
                     {{ focusDateLabel }}
                   </span>
                   <button
@@ -264,9 +264,6 @@
                   Jump to Today
                 </button>
               </div>
-              <p class="text-xs sm:text-sm text-indigo-200/80">
-                Prioritise, drag, and complete your most important work.
-              </p>
             </div>
             <div class="daily-card__actions">
               <button
@@ -306,14 +303,14 @@
             />
           </el-dialog>
 
-          <div class="flex gap-2 sm:gap-3 overflow-x-auto pb-2 scrollbar-plan">
+          <div class="category-filter-strip flex gap-2 sm:gap-3 overflow-x-auto pb-2 scrollbar-plan">
             <button
               v-for="category in categoryFilters"
               :key="category"
               type="button"
               @click="dashboardCategory = category"
               :class="[
-                'flex-shrink-0 px-3 py-1.5 rounded-lg font-medium text-xs transition-all duration-300 ease-in-out',
+                'category-filter-chip flex-shrink-0 px-3 py-1.5 rounded-lg font-medium text-xs transition-all duration-300 ease-in-out',
                 dashboardCategory === category
                   ? 'bg-indigo-700 text-white shadow-[0_0_14px_rgba(99,102,241,0.5)]'
                   : 'bg-slate-800/70 text-slate-300 hover:bg-slate-700/80',
@@ -371,7 +368,7 @@
                           {{ task.title }}
                         </span>
                         <div
-                          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/80 text-[11px] font-medium shadow-sm"
+                          class="task-category-pill inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/80 text-[11px] font-medium shadow-sm"
                           :class="categoryColor(task.category)"
                         >
                           <span class="leading-none">{{ categoryIcon(task.category) }}</span>
@@ -585,7 +582,7 @@
                         {{ task.title }}
                       </span>
                       <div
-                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/80 text-[11px] font-medium shadow-sm"
+                        class="task-category-pill inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/80 text-[11px] font-medium shadow-sm"
                         :class="categoryColor(task.category)"
                       >
                         <span class="leading-none">{{ categoryIcon(task.category) }}</span>
@@ -687,7 +684,7 @@
                       {{ task.title }}
                     </span>
                     <div
-                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/80 text-[11px] font-medium shadow-sm"
+                      class="task-category-pill inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/80 text-[11px] font-medium shadow-sm"
                       :class="categoryColor(task.category)"
                     >
                       <span class="leading-none">{{ categoryIcon(task.category) }}</span>
@@ -3052,29 +3049,65 @@ onUnmounted(() => {
 
 .daily-card__header {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 0.85rem;
 }
 
 .daily-card__heading {
-  flex: 1 1 18rem;
+  width: 100%;
   min-width: 0;
 }
 
 .daily-card__actions {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 0.75rem;
-  margin-left: auto;
-  flex-wrap: nowrap;
-  flex-shrink: 0;
+  width: 100%;
 }
 
 .daily-card__plan-btn {
   min-height: 44px;
+  white-space: nowrap;
+  flex: 1 1 auto;
+  width: 100%;
+}
+
+.focus-date-row {
+  width: 100%;
+  align-items: center;
+}
+
+.focus-date-pill {
+  justify-content: space-between;
+}
+
+.category-filter-strip {
+  align-items: stretch;
+  min-height: 3rem;
+  overflow-y: visible;
+  padding-top: 0.35rem;
+  padding-bottom: 0.6rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.category-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 2.5rem;
+  line-height: 1.1;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.task-category-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.7rem;
+  max-width: 100%;
+  line-height: 1;
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -3083,6 +3116,7 @@ onUnmounted(() => {
   width: 44px;
   height: 44px;
   min-height: 44px;
+  flex: 0 0 44px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.15);
   background: rgba(79, 70, 229, 0.15);
@@ -3095,10 +3129,49 @@ onUnmounted(() => {
   transition: all 0.2s ease;
 }
 
+.jump-today-btn {
+  display: inline-flex;
+  align-items: center;
+}
+
 .today-fullscreen-btn:hover {
   background: rgba(99, 102, 241, 0.25);
   transform: translateY(-1px);
   box-shadow: 0 10px 24px rgba(79, 70, 229, 0.25);
+}
+
+@media (min-width: 641px) {
+  .daily-card__header {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .daily-card__heading {
+    flex: 1 1 18rem;
+  }
+
+  .daily-card__actions {
+    justify-content: flex-end;
+    width: auto;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+
+  .daily-card__plan-btn {
+    flex: 0 0 auto;
+    width: auto;
+  }
+
+  .focus-date-row {
+    width: auto;
+  }
+
+  .focus-date-pill {
+    flex: 0 0 auto;
+    justify-content: flex-start;
+  }
 }
 
 .daily-card--fullscreen {
@@ -3169,10 +3242,6 @@ onUnmounted(() => {
     max-height: none;
   }
 
-  /* Date selector: one line, no wrap; date pill styling */
-  .focus-date-row {
-    flex-wrap: nowrap;
-  }
   .focus-date-pill {
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 12px;
@@ -3183,9 +3252,34 @@ onUnmounted(() => {
 
 @media (max-width: 640px) {
   .daily-card__actions {
-    width: auto;
-    margin-left: auto;
-    justify-content: flex-end;
+    width: 100%;
+  }
+
+  .focus-date-row {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .focus-date-pill {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+
+  .jump-today-btn {
+    order: 3;
+    width: 100%;
+    justify-content: flex-start;
+    padding-left: 0;
+  }
+
+  .category-filter-strip {
+    min-height: 2.85rem;
+    padding-top: 0.25rem;
+    padding-bottom: 0.5rem;
+  }
+
+  .category-filter-chip {
+    min-height: 2.35rem;
   }
 }
 

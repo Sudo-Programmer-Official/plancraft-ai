@@ -22,14 +22,14 @@
       </button>
     </div>
 
-    <div class="flex gap-3 overflow-x-auto pb-2 mb-4 mt-2">
+    <div class="category-filter-strip flex gap-3 overflow-x-auto pb-2 mb-4 mt-2">
       <button
         v-for="category in categories"
         :key="category"
         type="button"
         @click="activeCategory = category"
         :class="[
-          'flex-shrink-0 px-3 py-1 rounded-lg font-medium text-sm transition-all duration-300 ease-in-out',
+          'category-filter-chip flex-shrink-0 px-3 py-1 rounded-lg font-medium text-sm transition-all duration-300 ease-in-out',
           activeCategory === category
             ? 'bg-indigo-700 text-white shadow-[0_0_10px_rgba(99,102,241,0.5)]'
             : 'bg-slate-800 text-slate-300 hover:bg-slate-700',
@@ -67,7 +67,7 @@
                   <div class="flex items-center gap-3">
                     <span class="text-base sm:text-lg font-semibold text-white">{{ task.title }}</span>
                     <div
-                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/70 text-xs font-medium shadow-sm"
+                      class="task-category-pill inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/70 text-xs font-medium shadow-sm"
                       :class="categoryColor(task.category)"
                     >
                       <span class="text-base leading-none">{{ categoryIcon(task.category) }}</span>
@@ -417,3 +417,45 @@ const deleteTask = async (task) => {
   await deleteTaskFn(task)
 }
 </script>
+
+<style scoped>
+.category-filter-strip {
+  align-items: stretch;
+  min-height: 3rem;
+  overflow-y: visible;
+  padding-top: 0.35rem;
+  padding-bottom: 0.6rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.category-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 2.5rem;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.task-category-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.7rem;
+  line-height: 1;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .category-filter-strip {
+    min-height: 2.85rem;
+    padding-top: 0.25rem;
+    padding-bottom: 0.5rem;
+  }
+
+  .category-filter-chip {
+    min-height: 2.35rem;
+  }
+}
+</style>
