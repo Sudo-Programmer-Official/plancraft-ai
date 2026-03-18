@@ -983,6 +983,16 @@ body {
   padding-bottom: calc(0.75rem + var(--safe-area-bottom));
 }
 
+@media (max-width: 1024px) {
+  .app-content {
+    padding-bottom: calc(1rem + var(--safe-area-bottom));
+  }
+
+  .app-footer {
+    display: none;
+  }
+}
+
 .slide-enter-active,
 .slide-leave-active {
   transition: transform 0.3s ease;

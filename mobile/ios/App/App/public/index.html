@@ -255,6 +255,16 @@
         }
       }
 
+      @media (max-width: 1024px) {
+        .app-content {
+          padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem) !important;
+        }
+
+        .app-footer {
+          display: none !important;
+        }
+      }
+
       .daily-card > .scrollbar-plan {
         display: flex !important;
         align-items: stretch !important;
