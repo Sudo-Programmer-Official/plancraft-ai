@@ -320,7 +320,7 @@
         <div v-if="props.editMode" class="flex flex-col sm:flex-row gap-3 w-full">
           <el-button
             @click="closeDialog"
-            class="flex-1 px-4 py-2 rounded-lg font-medium border border-gray-500 text-gray-300 hover:bg-gray-700"
+            class="planner-cancel-btn flex-1 px-4 py-2 rounded-lg font-medium"
           >
             Cancel
           </el-button>
@@ -335,7 +335,7 @@
         <div v-else-if="isMobile" class="w-full">
           <el-button
             @click="closeDialog"
-            class="planner-mobile-cancel-btn w-full ml-0-custom"
+            class="planner-cancel-btn planner-mobile-cancel-btn w-full ml-0-custom"
           >
             Cancel
           </el-button>
@@ -2621,20 +2621,29 @@ function appendDetails(result = {}) {
   opacity: 0.5;
 }
 
+.task-planner-dialog .planner-cancel-btn {
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  background: linear-gradient(135deg, rgba(127, 29, 29, 0.9), rgba(153, 27, 27, 0.8));
+  color: #fee2e2;
+  font-weight: 700;
+  box-shadow: 0 10px 24px rgba(127, 29, 29, 0.25);
+}
+
+.task-planner-dialog .planner-cancel-btn:hover {
+  border-color: rgba(252, 165, 165, 0.7);
+  background: linear-gradient(135deg, rgba(153, 27, 27, 0.96), rgba(185, 28, 28, 0.88));
+  color: #fff1f2;
+}
+
 .task-planner-dialog .planner-mobile-cancel-btn {
   width: 100%;
   min-height: 2.85rem;
   border-radius: 0.9rem;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  background: rgba(15, 23, 42, 0.55);
-  color: #e2e8f0;
-  font-weight: 600;
+  font-size: 0.95rem;
 }
 
 .task-planner-dialog .planner-mobile-cancel-btn:hover {
-  background: rgba(30, 41, 59, 0.78);
-  border-color: rgba(148, 163, 184, 0.5);
-  color: #f8fafc;
+  color: #fff1f2;
 }
 /* TaskPlannerDialog.vue or global theme file */
 
