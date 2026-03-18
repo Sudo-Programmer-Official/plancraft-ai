@@ -917,9 +917,35 @@ onUnmounted(() => {
   --safe-area-left: env(safe-area-inset-left, 0px);
 }
 
+html {
+  height: -webkit-fill-available;
+  background: #050816;
+}
+
+body,
+#app {
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
+  background: #050816;
+}
+
+body {
+  margin: 0;
+  overflow-x: hidden;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+}
+
 .app-shell {
   min-height: 100vh;
   min-height: 100dvh;
+  min-height: -webkit-fill-available;
+  width: 100%;
   padding-left: var(--safe-area-left);
   padding-right: var(--safe-area-right);
 }
@@ -927,8 +953,10 @@ onUnmounted(() => {
 .app-main-pane {
   min-height: 100vh;
   min-height: 100dvh;
+  min-height: -webkit-fill-available;
   height: 100vh;
   height: 100dvh;
+  height: -webkit-fill-available;
 }
 
 .app-upgrade-banner {
@@ -951,6 +979,7 @@ onUnmounted(() => {
 }
 
 .app-footer {
+  margin-top: auto;
   padding-bottom: calc(0.75rem + var(--safe-area-bottom));
 }
 

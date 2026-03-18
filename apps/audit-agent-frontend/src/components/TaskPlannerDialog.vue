@@ -332,6 +332,14 @@
             {{ props.task ? 'Update Task' : 'Save Task' }}
           </el-button>
         </div>
+        <div v-else-if="isMobile" class="w-full">
+          <el-button
+            @click="closeDialog"
+            class="planner-mobile-cancel-btn w-full ml-0-custom"
+          >
+            Cancel
+          </el-button>
+        </div>
       </template>
     </el-dialog>
   </Teleport>
@@ -2611,6 +2619,22 @@ function appendDetails(result = {}) {
 }
 .task-planner-dialog .save-draft-btn:disabled {
   opacity: 0.5;
+}
+
+.task-planner-dialog .planner-mobile-cancel-btn {
+  width: 100%;
+  min-height: 2.85rem;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.55);
+  color: #e2e8f0;
+  font-weight: 600;
+}
+
+.task-planner-dialog .planner-mobile-cancel-btn:hover {
+  background: rgba(30, 41, 59, 0.78);
+  border-color: rgba(148, 163, 184, 0.5);
+  color: #f8fafc;
 }
 /* TaskPlannerDialog.vue or global theme file */
 
