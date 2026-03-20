@@ -166,6 +166,7 @@ APPLE_TEAM_ID=YOUR_APPLE_TEAM_ID
 APPLE_CLIENT_ID=YOUR_SERVICES_ID
 APPLE_KEY_ID=YOUR_APPLE_KEY_ID
 APPLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYOUR_PRIVATE_KEY\n-----END PRIVATE KEY-----"
+APPLE_PRIVATE_KEY_PATH=/absolute/path/to/AuthKey_XXXXXXXXXX.p8
 APPLE_REDIRECT_URI=https://api.plancraftai.com/api/auth/apple/callback
 
 # Needed if the backend must link Apple identities through Firebase Identity Toolkit
@@ -183,6 +184,7 @@ Notes:
 - Leave `VITE_USE_SERVER_APPLE_AUTH_MOBILE=0` to keep the existing Firebase redirect hybrid flow on iOS.
 - Web Apple auth is unchanged; the server-driven path is only for packaged mobile when the frontend flag is enabled.
 - After changing auth code or env, rebuild the web bundle and run `npx cap sync ios`.
+- For hosted envs like Render, `APPLE_PRIVATE_KEY` may be pasted with escaped `\n` or surrounding quotes; the backend now normalizes that. For local/dev, `APPLE_PRIVATE_KEY_PATH` can point to the `.p8` file instead.
 
 ### Notes
 - Ensure environment values (e.g., `VITE_API_BASE_URL`, `VITE_ENABLE_IMAGE_TASKS`) are set before `npm run build`.

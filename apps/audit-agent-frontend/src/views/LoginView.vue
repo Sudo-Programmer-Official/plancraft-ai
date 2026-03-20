@@ -245,6 +245,10 @@ function mapAppleAuthErrorMessage(errorCode) {
       return 'Apple sign-in was cancelled.'
     case 'apple_start_failed':
       return 'Apple sign-in could not be started. Check the mobile auth configuration and try again.'
+    case 'apple_key_invalid':
+      return 'Apple sign-in server key is invalid. Fix APPLE_PRIVATE_KEY or APPLE_PRIVATE_KEY_PATH on the backend and try again.'
+    case 'invalid_client':
+      return 'Apple sign-in server credentials are mismatched. Check APPLE_CLIENT_ID, APPLE_KEY_ID, APPLE_TEAM_ID, APPLE_PRIVATE_KEY, and APPLE_REDIRECT_URI.'
     case 'apple_callback_failed':
       return 'Apple sign-in did not finish correctly. Please try again.'
     default:

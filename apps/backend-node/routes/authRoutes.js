@@ -278,7 +278,10 @@ async function handleAppleCallback(req, res) {
       code: err?.code || null,
       error: err?.responseData || null,
     })
-    return redirectToNativeAuthFailure(res, err?.code || 'apple_callback_failed')
+    return redirectToNativeAuthFailure(
+      res,
+      err?.code || err?.responseData?.error || 'apple_callback_failed',
+    )
   }
 }
 

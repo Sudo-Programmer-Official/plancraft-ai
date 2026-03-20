@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import fs from 'fs'
 import {
   base64urlDecode,
 } from '../utils/jwt.js'
@@ -39,12 +40,67 @@ function decodeJwtPart(part) {
   return value ? JSON.parse(value) : {}
 }
 
+function stripMatchingQuotes(value) {
+  const text = String(value || '').trim()
+  if (!text) return ''
+  if (
+    (text.startsWith('"') && text.endsWith('"')) ||
+    (text.startsWith("'") && text.endsWith("'"))
+  ) {
+    return text.slice(1, -1).trim()
+  }
+  return text
+}
+
+function normalizePemBlock(value) {
+  const text = String(value || '').trim()
+  if (!text.includes('-----BEGIN PRIVATE KEY-----') || !text.includes('-----END PRIVATE KEY-----')) {
+    return text
+  }
+
+  const match = text.match(/-----BEGIN PRIVATE KEY-----\s*([\s\S]*?)\s*-----END PRIVATE KEY-----/)
+  if (!match) return text
+  const body = String(match[1] || '')
+    .replace(/\s+/g, '')
+    .trim()
+  if (!body) return text
+  return `-----BEGIN PRIVATE KEY-----\n${body}\n-----END PRIVATE KEY-----`
+}
+
+function resolveApplePrivateKey() {
+  const explicitPath = stripMatchingQuotes(process.env.APPLE_PRIVATE_KEY_PATH || '')
+  if (explicitPath) {
+    try {
+      if (fs.existsSync(explicitPath)) {
+        return normalizePemBlock(fs.readFileSync(explicitPath, 'utf8'))
+      }
+    } catch {}
+  }
+
+  const rawValue = stripMatchingQuotes(process.env.APPLE_PRIVATE_KEY || '')
+  if (!rawValue) return ''
+
+  let normalized = rawValue
+    .replace(/\\r/g, '')
+    .replace(/\\n/g, '\n')
+    .replace(/\r\n?/g, '\n')
+    .trim()
+
+  if (!normalized.includes('-----BEGIN PRIVATE KEY-----') && fs.existsSync(normalized)) {
+    try {
+      normalized = fs.readFileSync(normalized, 'utf8')
+    } catch {}
+  }
+
+  return normalizePemBlock(normalized)
+}
+
 function getAppleAuthConfig() {
   const config = {
     teamId: String(process.env.APPLE_TEAM_ID || '').trim(),
     clientId: String(process.env.APPLE_CLIENT_ID || '').trim(),
     keyId: String(process.env.APPLE_KEY_ID || '').trim(),
-    privateKey: String(process.env.APPLE_PRIVATE_KEY || '').replace(/\\n/g, '\n').trim(),
+    privateKey: resolveApplePrivateKey(),
     redirectUri: String(process.env.APPLE_REDIRECT_URI || '').trim(),
     enabled: isEnabled(process.env.APPLE_SERVER_AUTH_ENABLED),
   }
@@ -95,11 +151,20 @@ function buildAppleClientSecret(config) {
   const encodedHeader = base64urlEncodeBuffer(JSON.stringify(header))
   const encodedPayload = base64urlEncodeBuffer(JSON.stringify(payload))
   const unsigned = `${encodedHeader}.${encodedPayload}`
-  const signature = crypto.sign(
-    'sha256',
-    Buffer.from(unsigned),
-    crypto.createPrivateKey(config.privateKey),
-  )
+  let signature
+  try {
+    signature = crypto.sign(
+      'sha256',
+      Buffer.from(unsigned),
+      crypto.createPrivateKey(config.privateKey),
+    )
+  } catch (error) {
+    const err = new Error('Apple private key is invalid or improperly formatted')
+    err.code = 'apple_key_invalid'
+    err.status = 500
+    err.cause = error
+    throw err
+  }
   return `${unsigned}.${base64urlEncodeBuffer(signature)}`
 }
 
