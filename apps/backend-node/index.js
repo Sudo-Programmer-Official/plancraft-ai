@@ -147,6 +147,7 @@ const allowedOrigins = [
   // ✅ Optional API subdomain (if backend runs separately)
   "https://api.plancraftai.com",
   "https://chat.openai.com",
+  "https://appleid.apple.com",
 ]
   .concat(
     (process.env.CORS_ORIGINS || "")
