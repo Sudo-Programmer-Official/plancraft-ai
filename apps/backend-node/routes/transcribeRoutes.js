@@ -145,6 +145,13 @@ const PASSTHROUGH_AUDIO_TYPES = new Set([
 
 const MINIMUM_AUDIO_BYTES = 1024;
 
+function sanitizeTranscriptText(value) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  if (!text) return "";
+  const meaningful = text.replace(/[^\p{L}\p{N}]+/gu, "");
+  return meaningful ? text : "";
+}
+
 async function normalizeAudioUpload(buffer, mimetype) {
   if (!buffer || buffer.length < MINIMUM_AUDIO_BYTES) {
     throw new Error("Uploaded audio file is too small or empty.");
@@ -360,7 +367,18 @@ router.post("/transcribe", upload.single("file"), async (req, res) => {
       normalizedBuffer,
       filename
     );
-    res.json({ text, model });
+    const sanitizedText = sanitizeTranscriptText(text);
+    if (!sanitizedText) {
+      console.warn("🎤 Skipping transcription: no meaningful speech detected");
+      return res.status(200).json({
+        ok: true,
+        skipped: true,
+        reason: "no_speech",
+        transcript: "",
+        model,
+      });
+    }
+    res.json({ text: sanitizedText, model });
   } catch (err) {
     console.error("❌ Transcription failed:", err);
     // res

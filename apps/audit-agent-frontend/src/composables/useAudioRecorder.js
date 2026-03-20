@@ -10,6 +10,7 @@ import { recordAndSendToBackend } from '@/utils/backendRecorder'
 
 const MAX_DURATION_MS = 60_000
 const STOP_FALLBACK_MS = 1_800
+const NATIVE_STOP_TIMEOUT_MS = 8_000
 const MINIMUM_AUDIO_BYTES = 1_024
 const MINIMUM_RECORDING_SECONDS = 1
 const MIME_CANDIDATES = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4', 'audio/webm']
@@ -61,22 +62,59 @@ function isIosSimulatorUri(uri) {
   return Capacitor.getPlatform?.() === 'ios' && /CoreSimulator/i.test(String(uri || ''))
 }
 
+function createRecorderError(message, code = null) {
+  const error = new Error(message)
+  if (code) error.code = code
+  return error
+}
+
+function isExpectedRecorderError(error) {
+  return ['no_audio_captured', 'audio_too_short', 'no_speech'].includes(String(error?.code || ''))
+}
+
+function stringifyLogPayload(payload) {
+  try {
+    return JSON.stringify(payload)
+  } catch {
+    return String(payload)
+  }
+}
+
 function buildNoAudioCapturedError(uri, duration = 0) {
   if (isIosSimulatorUri(uri)) {
-    return new Error('No microphone audio was captured in the iOS Simulator. Test on a physical iPhone, or verify Simulator microphone access in macOS privacy settings.')
+    return createRecorderError(
+      'No microphone audio was captured in the iOS Simulator. Test on a physical iPhone, or verify Simulator microphone access in macOS privacy settings.',
+      'no_audio_captured',
+    )
   }
   if (Number(duration || 0) <= 0) {
-    return new Error('No microphone audio was captured. Hold the record button a little longer and try again.')
+    return createRecorderError(
+      'No microphone audio was captured. Hold the record button a little longer and try again.',
+      'no_audio_captured',
+    )
   }
-  return new Error('No microphone audio was captured. Please try again.')
+  return createRecorderError('No microphone audio was captured. Please try again.', 'no_audio_captured')
 }
 
 function buildShortRecordingError() {
-  return new Error('Recording too short. Hold the mic for at least a second and try again.')
+  return createRecorderError(
+    'Recording too short. Hold the mic for at least a second and try again.',
+    'audio_too_short',
+  )
 }
 
 function buildEmptyTranscriptError() {
-  return new Error('We could not detect any speech in that recording. Try again in a quieter place or speak for a little longer.')
+  return createRecorderError(
+    'We could not detect any speech in that recording. Try again in a quieter place or speak for a little longer.',
+    'no_speech',
+  )
+}
+
+function sanitizeTranscriptText(value) {
+  const text = String(value || '').replace(/\s+/g, ' ').trim()
+  if (!text) return ''
+  const meaningful = text.replace(/[^\p{L}\p{N}]+/gu, '')
+  return meaningful ? text : ''
 }
 
 function decodeBase64ToBlob(base64, mimeType = 'application/octet-stream') {
@@ -133,6 +171,11 @@ export function useAudioRecorder(options = {}) {
   let stopHandled = false
   let nativeRecorderActive = false
   let activeRecorderStrategy = 'none'
+  let nativeStopListenerHandle = null
+  let nativeErrorListenerHandle = null
+  let nativeStopEventPromise = null
+  let nativeStopEventResolve = null
+  let nativeStopEventReject = null
 
   const clearTimers = (resetDuration = false) => {
     if (tickId) {
@@ -172,6 +215,108 @@ export function useAudioRecorder(options = {}) {
     activeRecorderStrategy = 'none'
   }
 
+  const resetNativeStopEvent = () => {
+    nativeStopEventPromise = new Promise((resolve, reject) => {
+      nativeStopEventResolve = resolve
+      nativeStopEventReject = reject
+    })
+  }
+
+  const clearNativeStopEvent = () => {
+    nativeStopEventPromise = null
+    nativeStopEventResolve = null
+    nativeStopEventReject = null
+  }
+
+  const ensureNativeRecorderListeners = async () => {
+    if (!canUseNativeAudioRecorder()) return
+
+    if (!nativeStopListenerHandle) {
+      nativeStopListenerHandle = await CapacitorAudioRecorder.addListener('recordingStopped', (event) => {
+        console.log(`${logPrefix} native stop event received ${stringifyLogPayload({
+          uri: event?.uri || '',
+          duration: Number(event?.duration || 0),
+        })}`)
+        if (typeof nativeStopEventResolve === 'function') {
+          nativeStopEventResolve(event || {})
+        }
+      })
+    }
+
+    if (!nativeErrorListenerHandle) {
+      nativeErrorListenerHandle = await CapacitorAudioRecorder.addListener('recordingError', (event) => {
+        console.warn(`${logPrefix} native recorder error event ${stringifyLogPayload(event || {})}`)
+        if (typeof nativeStopEventReject === 'function') {
+          nativeStopEventReject(new Error(event?.message || 'Native recorder error'))
+        }
+      })
+    }
+  }
+
+  const removeNativeRecorderListeners = async () => {
+    try {
+      await nativeStopListenerHandle?.remove?.()
+    } catch (_) {}
+    try {
+      await nativeErrorListenerHandle?.remove?.()
+    } catch (_) {}
+    nativeStopListenerHandle = null
+    nativeErrorListenerHandle = null
+    clearNativeStopEvent()
+  }
+
+  const validateNativeStopResult = (result) => {
+    const uri = result?.uri
+    if (!uri) {
+      throw new Error('Native recording did not produce a file')
+    }
+    return result
+  }
+
+  const waitForNativeStopResult = async () => {
+    const attempts = [
+      Promise.resolve(CapacitorAudioRecorder.stopRecording()).then((result) => {
+        console.log(`${logPrefix} native stop promise resolved ${stringifyLogPayload({
+          uri: result?.uri || '',
+          duration: Number(result?.duration || 0),
+        })}`)
+        return validateNativeStopResult(result)
+      }),
+    ]
+
+    if (nativeStopEventPromise) {
+      attempts.push(
+        nativeStopEventPromise.then((result) => validateNativeStopResult(result))
+      )
+    }
+
+    let timeoutId = null
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = window.setTimeout(() => {
+        reject(new Error(`Native recording stop timed out after ${NATIVE_STOP_TIMEOUT_MS}ms`))
+      }, NATIVE_STOP_TIMEOUT_MS)
+    })
+
+    try {
+      if (typeof Promise.any === 'function') {
+        return await Promise.race([Promise.any(attempts), timeoutPromise])
+      }
+
+      return await Promise.race([
+        Promise.allSettled(attempts).then((results) => {
+          for (const result of results) {
+            if (result.status === 'fulfilled') return result.value
+          }
+          throw results.find((result) => result.status === 'rejected')?.reason || new Error('Native recording stop failed')
+        }),
+        timeoutPromise,
+      ])
+    } finally {
+      if (timeoutId) window.clearTimeout(timeoutId)
+      clearNativeStopEvent()
+    }
+  }
+
   const cleanup = (resetTranscript = false) => {
     clearTimers(false)
     stopStreams()
@@ -188,15 +333,16 @@ export function useAudioRecorder(options = {}) {
   const setRecorderError = (err, fallbackMessage = 'Voice recording failed') => {
     const details = formatRecorderError(err)
     errorMessage.value = details.message || fallbackMessage
-    console.error(`${logPrefix} error`, {
+    const logger = isExpectedRecorderError(err) ? console.warn : console.error
+    logger(`${logPrefix} error ${stringifyLogPayload({
       ...details,
       fallbackMessage,
-    })
+    })}`)
     state.value = 'error'
   }
 
   const transcribeBlob = async (blob, fileName = null) => {
-    console.log(`${logPrefix} transcription request`, { size: blob?.size, type: blob?.type, fileName })
+    console.log(`${logPrefix} transcription request ${stringifyLogPayload({ size: blob?.size, type: blob?.type, fileName })}`)
     const fd = new FormData()
     const fallbackExt = inferFileExtFromUri(fileName || '')
     fd.append('file', blob, fileName || inferAudioFilename(blob, fallbackExt))
@@ -204,11 +350,14 @@ export function useAudioRecorder(options = {}) {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
     const payload = res?.data || {}
-    console.log(`${logPrefix} transcription response`, payload)
+    console.log(`${logPrefix} transcription response ${stringifyLogPayload(payload)}`)
     if (payload?.skipped && payload?.reason === 'audio_too_short') {
       throw buildShortRecordingError()
     }
-    const text = String(payload?.text || payload?.transcript || '').trim()
+    if (payload?.skipped && payload?.reason === 'no_speech') {
+      throw buildEmptyTranscriptError()
+    }
+    const text = sanitizeTranscriptText(payload?.text || payload?.transcript || '')
     if (!text) {
       throw buildEmptyTranscriptError()
     }
@@ -315,7 +464,7 @@ export function useAudioRecorder(options = {}) {
 
   const transcribeNativeRecording = async ({ uri, webPath = '', duration = 0 } = {}) => {
     const resolvedWebPath = webPath || Capacitor.convertFileSrc(uri)
-    console.log(`${logPrefix} native recording file`, { uri, webPath: resolvedWebPath, duration })
+    console.log(`${logPrefix} native recording file ${stringifyLogPayload({ uri, webPath: resolvedWebPath, duration })}`)
     let blobResult = null
     try {
       blobResult = await readNativeRecordingBlob(uri, resolvedWebPath)
@@ -326,13 +475,13 @@ export function useAudioRecorder(options = {}) {
       throw error
     }
     const { blob, status, reader, src } = blobResult
-    console.log(`${logPrefix} native recording blob`, {
+    console.log(`${logPrefix} native recording blob ${stringifyLogPayload({
       size: blob?.size || 0,
       type: blob?.type || 'unknown',
       status,
       reader,
       src,
-    })
+    })}`)
     if (!blob || blob.size < 1024) {
       throw buildNoAudioCapturedError(uri, duration)
     }
@@ -340,6 +489,8 @@ export function useAudioRecorder(options = {}) {
   }
 
   const startNativeRecording = async () => {
+    await ensureNativeRecorderListeners()
+    resetNativeStopEvent()
     await CapacitorAudioRecorder.getPluginVersion()
     const status = await CapacitorAudioRecorder.checkPermissions()
     let permission = status?.recordAudio
@@ -553,17 +704,13 @@ export function useAudioRecorder(options = {}) {
     stopRequested = true
     state.value = 'transcribing'
     clearTimers()
-    console.log(`${logPrefix} stop requested`, { reason })
+    console.log(`${logPrefix} stop requested ${stringifyLogPayload({ reason })}`)
 
     try {
       if (nativeRecorderActive) {
-        const result = await CapacitorAudioRecorder.stopRecording()
+        const result = await waitForNativeStopResult()
         nativeRecorderActive = false
         stopHandled = true
-        const uri = result?.uri
-        if (!uri) {
-          throw new Error('Native recording did not produce a file')
-        }
         const text = await transcribeNativeRecording(result)
         transcript.value = text
         state.value = text ? 'done' : 'idle'
@@ -600,7 +747,8 @@ export function useAudioRecorder(options = {}) {
       }
     } catch (err) {
       const details = formatRecorderError(err)
-      console.error(`${logPrefix} stop failed`, details)
+      const logger = isExpectedRecorderError(err) ? console.warn : console.error
+      logger(`${logPrefix} stop failed ${stringifyLogPayload(details)}`)
       releaseRecorder()
       stopStreams()
       clearTimers()
@@ -618,6 +766,7 @@ export function useAudioRecorder(options = {}) {
 
   onBeforeUnmount(() => {
     cleanup(false)
+    Promise.resolve(removeNativeRecorderListeners()).catch(() => {})
   })
 
   return {

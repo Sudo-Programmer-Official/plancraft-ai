@@ -1637,12 +1637,13 @@ function toggleChannel(id) {
 }
 
 function handleTranscript(result = {}) {
-  const value =
+  const rawValue =
     typeof result === 'string'
       ? result.trim()
       : typeof result?.text === 'string'
         ? result.text.trim()
         : ''
+  const value = rawValue.replace(/[^\p{L}\p{N}\s]+/gu, '').trim() ? rawValue : ''
   if (!value) return
   assignText(input, value)
   if (!setReminder.value && reminderPrefs.value.enabled) setReminder.value = true
@@ -1655,7 +1656,8 @@ function onPlannerVoiceStateChange(nextState) {
 }
 
 function appendDetails(result = {}) {
-  const value = typeof result?.text === 'string' ? result.text.trim() : ''
+  const rawValue = typeof result?.text === 'string' ? result.text.trim() : ''
+  const value = rawValue.replace(/[^\p{L}\p{N}\s]+/gu, '').trim() ? rawValue : ''
   if (!value) return
   details.value = details.value ? `${details.value}\n${value}` : value
   logTimeBrainDialog('transcription:details', { length: value.length })

@@ -13,6 +13,13 @@ const MIME_CANDIDATES = [
 const VOICE_STOP_DELAY_MS = 400
 const MINIMUM_AUDIO_BYTES = 1024
 
+function sanitizeTranscriptText(value) {
+  const text = String(value || "").replace(/\s+/g, " ").trim()
+  if (!text) return ""
+  const meaningful = text.replace(/[^\p{L}\p{N}]+/gu, "")
+  return meaningful ? text : ""
+}
+
 function getExt(mime) {
   if (!mime) return "wav"
   if (mime.includes("mp4") || mime.includes("aac") || mime.includes("m4a"))
@@ -100,7 +107,8 @@ export async function recordAndSendToBackend(
           headers: { "Content-Type": "multipart/form-data" },
         })
         const data = res?.data || {}
-        if (data?.text) await invokeCallback(data.text, false) // partial result
+        const partialText = sanitizeTranscriptText(data?.text || data?.transcript || "")
+        if (partialText) await invokeCallback(partialText, false) // partial result
       } catch (err) {
         console.warn("⚠️ Live transcription failed", err)
       }
@@ -157,13 +165,17 @@ export async function recordAndSendToBackend(
                 })
                 const data = res?.data || {}
                 finalState = {
-                  transcript: String(data?.text || data?.transcript || "").trim(),
+                  transcript: sanitizeTranscriptText(data?.text || data?.transcript || ""),
                   skipped: !!data?.skipped,
                   reason: data?.reason || null,
                   error: null,
                 }
                 if (finalState.skipped && finalState.reason === "audio_too_short") {
                   finalState.error = new Error("Recording too short. Hold the mic for at least a second and try again.")
+                  return
+                }
+                if (finalState.skipped && finalState.reason === "no_speech") {
+                  finalState.error = new Error("We could not detect any speech in that recording. Try again in a quieter place or speak for a little longer.")
                   return
                 }
                 if (finalState.transcript) {

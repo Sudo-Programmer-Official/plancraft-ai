@@ -2,19 +2,13 @@ import express from 'express'
 import admin from 'firebase-admin'
 import '../services/firebaseAdmin.js'
 import { signHS256 } from '../utils/jwt.js'
-import {
-  buildAppleMobileAuthFailureUrl,
-  createAppleMobileAuthStart,
-  completeAppleMobileAuthCallback,
-  isServerDrivenAppleMobileAuthEnabled,
-} from '../services/appleAuthService.js'
-import {
-  consumeMobileAuthHandoffForCode,
-  createMobileAuthHandoffForUser,
-  normalizeMobileAuthRedirectPath,
-} from '../services/mobileAuthHandoffService.js'
 
 const router = express.Router()
+const APPLE_AUTH_SERVICE_MODULE = '../services/appleAuthService.js'
+const MOBILE_HANDOFF_SERVICE_MODULE = '../services/mobileAuthHandoffService.js'
+
+let appleAuthServicePromise = null
+let mobileAuthHandoffServicePromise = null
 
 function decodeJwtClaims(token) {
   try {
@@ -36,8 +30,52 @@ function readBodyOrQuery(req, key) {
   return req?.query?.[key]
 }
 
+function normalizeMobileAuthRedirectPath(target, fallback = '/dashboard') {
+  if (typeof target !== 'string') return fallback
+  const trimmed = target.trim()
+  if (!trimmed) return fallback
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return fallback
+  if (trimmed.startsWith('//')) return fallback
+  return trimmed.startsWith('/') ? trimmed : `/${trimmed.replace(/^\/+/, '')}`
+}
+
+async function loadAppleAuthService() {
+  if (!appleAuthServicePromise) {
+    appleAuthServicePromise = import(APPLE_AUTH_SERVICE_MODULE).catch((error) => {
+      appleAuthServicePromise = null
+      throw error
+    })
+  }
+  return appleAuthServicePromise
+}
+
+async function loadMobileAuthHandoffService() {
+  if (!mobileAuthHandoffServicePromise) {
+    mobileAuthHandoffServicePromise = import(MOBILE_HANDOFF_SERVICE_MODULE).catch((error) => {
+      mobileAuthHandoffServicePromise = null
+      throw error
+    })
+  }
+  return mobileAuthHandoffServicePromise
+}
+
+async function isServerDrivenAppleMobileAuthEnabledSafe() {
+  try {
+    const { isServerDrivenAppleMobileAuthEnabled } = await loadAppleAuthService()
+    return isServerDrivenAppleMobileAuthEnabled()
+  } catch (error) {
+    console.warn('[auth/apple] service unavailable while checking enablement', {
+      message: error?.message || String(error),
+      code: error?.code || null,
+    })
+    return false
+  }
+}
+
 function redirectToNativeAuthFailure(res, errorCode = 'apple_auth_failed') {
-  return res.redirect(302, buildAppleMobileAuthFailureUrl(errorCode))
+  const params = new URLSearchParams()
+  params.set('appleAuthError', String(errorCode || 'apple_auth_failed'))
+  return res.redirect(302, `plancraftai://localhost/login?${params.toString()}`)
 }
 
 router.post('/refresh', async (req, res) => {
@@ -99,6 +137,7 @@ router.post('/mobile-handoff/create', async (req, res) => {
       return res.status(401).json({ ok: false, error: 'Unauthorized' })
     }
 
+    const { createMobileAuthHandoffForUser } = await loadMobileAuthHandoffService()
     const handoff = await createMobileAuthHandoffForUser({
       uid,
       email: req?.user?.email || null,
@@ -129,6 +168,7 @@ router.post('/mobile-handoff/create', async (req, res) => {
 
 router.post('/mobile-handoff/consume', async (req, res) => {
   try {
+    const { consumeMobileAuthHandoffForCode } = await loadMobileAuthHandoffService()
     const handoff = await consumeMobileAuthHandoffForCode(req?.body?.code)
     const customToken = await admin.auth().createCustomToken(handoff.uid, {
       source: 'mobile-handoff',
@@ -162,13 +202,15 @@ router.post('/mobile-handoff/consume', async (req, res) => {
 router.get('/apple/start', async (req, res) => {
   const redirect = normalizeMobileAuthRedirectPath(readBodyOrQuery(req, 'redirect'))
   const platform = String(readBodyOrQuery(req, 'platform') || 'ios')
+  const enabled = await isServerDrivenAppleMobileAuthEnabledSafe()
   console.info('[auth/apple/start] request', {
     platform,
     redirect,
-    enabled: isServerDrivenAppleMobileAuthEnabled(),
+    enabled,
   })
 
   try {
+    const { createAppleMobileAuthStart } = await loadAppleAuthService()
     const session = await createAppleMobileAuthStart({ redirect, platform })
     console.info('[auth/apple/start] success', {
       platform: session.platform,
@@ -211,6 +253,7 @@ async function handleAppleCallback(req, res) {
   }
 
   try {
+    const { completeAppleMobileAuthCallback } = await loadAppleAuthService()
     const result = await completeAppleMobileAuthCallback({
       state,
       code,
