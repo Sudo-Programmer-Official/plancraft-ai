@@ -2,6 +2,7 @@ import express from 'express'
 import admin from 'firebase-admin'
 import '../services/firebaseAdmin.js'
 import { signHS256 } from '../utils/jwt.js'
+import { normalizePhone } from '../utils/phone.js'
 
 const router = express.Router()
 const APPLE_AUTH_SERVICE_MODULE = '../services/appleAuthService.js'
@@ -37,6 +38,110 @@ function normalizeMobileAuthRedirectPath(target, fallback = '/dashboard') {
   if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return fallback
   if (trimmed.startsWith('//')) return fallback
   return trimmed.startsWith('/') ? trimmed : `/${trimmed.replace(/^\/+/, '')}`
+}
+
+const PHONE_IDENTITY_MATCH_FIELDS = [
+  { field: 'phone', source: 'profile.phone', score: 100 },
+  { field: 'preferences.notifications.phone_sms', source: 'preferences.notifications.phone_sms', score: 80 },
+  { field: 'preferences.notifications.phone_voice', source: 'preferences.notifications.phone_voice', score: 75 },
+  { field: 'integrations.sms.phone', source: 'integrations.sms.phone', score: 70 },
+  { field: 'integrations.whatsapp.phone', source: 'integrations.whatsapp.phone', score: 60 },
+]
+
+async function resolveCanonicalUidForPhone(phoneNumber, fallbackUid = '') {
+  const normalized = normalizePhone(phoneNumber)
+  if (!normalized) {
+    return {
+      phoneNumber: '',
+      uid: fallbackUid || null,
+      email: null,
+      resolvedBy: fallbackUid ? 'token_uid' : null,
+      canonicalized: false,
+    }
+  }
+
+  const candidates = new Map()
+
+  for (const spec of PHONE_IDENTITY_MATCH_FIELDS) {
+    try {
+      const snap = await admin
+        .firestore()
+        .collection('users')
+        .where(spec.field, '==', normalized)
+        .limit(5)
+        .get()
+
+      snap.forEach((doc) => {
+        const uid = String(doc.id || '')
+        if (!uid) return
+        const data = doc.data() || {}
+        const score =
+          spec.score +
+          (data?.email ? 20 : 0) +
+          (data?.mode && data.mode !== 'phone' ? 10 : 0) +
+          (data?.profileComplete ? 5 : 0)
+
+        const existing = candidates.get(uid)
+        if (!existing || score > existing.score) {
+          candidates.set(uid, {
+            uid,
+            email: typeof data?.email === 'string' ? data.email : null,
+            resolvedBy: spec.source,
+            score,
+          })
+        }
+      })
+    } catch (error) {
+      console.warn('[auth/phone-session] candidate query failed', {
+        field: spec.field,
+        message: error?.message || String(error),
+      })
+    }
+  }
+
+  const ranked = [...candidates.values()]
+    .filter((candidate) => candidate.uid && candidate.uid !== fallbackUid)
+    .sort((a, b) => b.score - a.score)
+
+  if (!ranked.length) {
+    return {
+      phoneNumber: normalized,
+      uid: fallbackUid || null,
+      email: null,
+      resolvedBy: fallbackUid ? 'token_uid' : null,
+      canonicalized: false,
+    }
+  }
+
+  const [best, second] = ranked
+  if (second && second.score === best.score && second.uid !== best.uid) {
+    console.warn('[auth/phone-session] ambiguous phone ownership', {
+      phoneNumber: normalized,
+      fallbackUid: fallbackUid || null,
+      candidates: ranked.slice(0, 3).map((entry) => ({
+        uid: entry.uid,
+        email: entry.email,
+        resolvedBy: entry.resolvedBy,
+        score: entry.score,
+      })),
+    })
+    return {
+      phoneNumber: normalized,
+      uid: fallbackUid || null,
+      email: null,
+      resolvedBy: fallbackUid ? 'token_uid' : null,
+      canonicalized: false,
+      ambiguous: true,
+    }
+  }
+
+  return {
+    phoneNumber: normalized,
+    uid: best.uid,
+    email: best.email || null,
+    resolvedBy: best.resolvedBy,
+    canonicalized: best.uid !== fallbackUid,
+  }
 }
 
 async function loadAppleAuthService() {
@@ -316,19 +421,54 @@ router.post('/native-session/exchange', async (req, res) => {
       return res.status(400).json({ ok: false, error: 'Firebase token did not contain a uid' })
     }
 
-    const customToken = await admin.auth().createCustomToken(uid, {
+    const provider = String(req?.body?.provider || 'password')
+    const platform = String(req?.body?.platform || 'ios')
+    const phoneNumber =
+      typeof decoded?.phone_number === 'string'
+        ? decoded.phone_number
+        : typeof decoded?.phoneNumber === 'string'
+          ? decoded.phoneNumber
+          : ''
+
+    let resolvedUid = uid
+    let resolvedEmail = decoded?.email || null
+    let resolvedBy = 'token_uid'
+    let canonicalized = false
+
+    if (provider === 'phone' && phoneNumber) {
+      const resolved = await resolveCanonicalUidForPhone(phoneNumber, uid)
+      resolvedUid = String(resolved?.uid || uid)
+      resolvedEmail = resolved?.email || resolvedEmail
+      resolvedBy = resolved?.resolvedBy || resolvedBy
+      canonicalized = resolved?.canonicalized === true && resolvedUid !== uid
+
+      console.info('[auth/native-session/exchange] phone identity resolved', {
+        sourceUid: uid,
+        resolvedUid,
+        phoneNumber: resolved?.phoneNumber || phoneNumber,
+        canonicalized,
+        resolvedBy,
+        ambiguous: resolved?.ambiguous === true,
+      })
+    }
+
+    const customToken = await admin.auth().createCustomToken(resolvedUid, {
       source: 'native-session-exchange',
-      provider: String(req?.body?.provider || 'password'),
-      platform: String(req?.body?.platform || 'ios'),
+      provider,
+      platform,
     })
 
     return res.json({
       ok: true,
       customToken,
-      uid,
-      email: decoded?.email || null,
-      provider: String(req?.body?.provider || 'password'),
-      platform: String(req?.body?.platform || 'ios'),
+      uid: resolvedUid,
+      sourceUid: uid,
+      email: resolvedEmail,
+      phoneNumber: phoneNumber || null,
+      provider,
+      platform,
+      canonicalized,
+      resolvedBy,
     })
   } catch (err) {
     console.error('[auth/native-session/exchange] error:', err?.message || err)

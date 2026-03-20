@@ -1527,6 +1527,10 @@ export const useAuthStore = defineStore('authStore', {
         const alreadyLinked = (current?.providerData || []).some((p) => p?.providerId === 'phone')
 
         let user = null
+        let resolvedPhoneNumber = ''
+        let providerLinked = false
+        let canonicalized = false
+        let resolvedBy = 'phone-auth'
         if (current && !alreadyLinked) {
           // Link phone credential to existing session to avoid duplicate UIDs.
           const verificationId = confirmationResult?.verificationId
@@ -1547,23 +1551,68 @@ export const useAuthStore = defineStore('authStore', {
               throw err
             }
           }
+          resolvedPhoneNumber = user?.phoneNumber || current?.phoneNumber || ''
+          providerLinked = true
         } else {
           const result = await confirmationResult.confirm(otp)
-          user = result?.user
+          const phoneUser = result?.user
+          if (!phoneUser?.uid) throw new Error('Phone sign-in failed')
+          resolvedPhoneNumber = phoneUser.phoneNumber || ''
+
+          const token = await phoneUser.getIdToken()
+          const platform = Capacitor?.getPlatform?.() || 'web'
+          const exchanged = await exchangeNativeSessionForCustomToken(token, 'phone', platform)
+          const customToken = String(exchanged?.customToken || '')
+
+          canonicalized =
+            exchanged?.canonicalized === true ||
+            (typeof exchanged?.sourceUid === 'string' &&
+              typeof exchanged?.uid === 'string' &&
+              exchanged.sourceUid !== exchanged.uid)
+          resolvedBy = String(exchanged?.resolvedBy || 'phone-auth')
+
+          if (customToken) {
+            const tokenCredential = await signInWithCustomToken(auth, customToken)
+            user = tokenCredential?.user || phoneUser
+          } else {
+            user = phoneUser
+          }
+
+          if (!resolvedPhoneNumber) {
+            resolvedPhoneNumber =
+              String(exchanged?.phoneNumber || '').trim() ||
+              user?.phoneNumber ||
+              ''
+          }
+          providerLinked = !canonicalized
         }
         if (!user?.uid) throw new Error('Phone sign-in failed')
 
         // Ensure Firestore profile exists/updated
         try {
+          const now = Date.now()
+          const profilePayload = {
+            phone: resolvedPhoneNumber || null,
+            lastLoginAt: now,
+            authProviders: {
+              phone: {
+                phoneNumber: resolvedPhoneNumber || null,
+                providerLinked,
+                source: resolvedBy,
+                lastLoginAt: new Date(),
+              },
+            },
+          }
+
+          if (!canonicalized) {
+            profilePayload.mode = 'phone'
+            profilePayload.createdAt = now
+            profilePayload.profileComplete = false
+          }
+
           await setDoc(
             doc(db, 'users', user.uid),
-            {
-              phone: user.phoneNumber || null,
-              mode: 'phone',
-              lastLoginAt: Date.now(),
-              createdAt: Date.now(),
-              profileComplete: false,
-            },
+            profilePayload,
             { merge: true },
           )
         } catch {}
@@ -1576,7 +1625,7 @@ export const useAuthStore = defineStore('authStore', {
           email: user.email,
           photoURL: user.photoURL,
           role: profile?.role || 'user',
-          phone: user.phoneNumber || profile?.phone || undefined,
+          phone: resolvedPhoneNumber || user.phoneNumber || profile?.phone || undefined,
         }
         this.guest = false
         this.token = await user.getIdToken()
