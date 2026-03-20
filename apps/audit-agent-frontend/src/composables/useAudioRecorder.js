@@ -58,6 +58,50 @@ function inferFileExtFromUri(uri) {
   return match?.[1]?.toLowerCase() || 'm4a'
 }
 
+function mimeTypeForExtension(ext) {
+  switch (String(ext || '').toLowerCase()) {
+    case 'm4a':
+      return 'audio/x-m4a'
+    case 'mp4':
+      return 'audio/mp4'
+    case 'aac':
+      return 'audio/aac'
+    case 'mp3':
+      return 'audio/mpeg'
+    case 'wav':
+      return 'audio/wav'
+    case 'webm':
+      return 'audio/webm'
+    case 'ogg':
+    case 'oga':
+      return 'audio/ogg'
+    case 'flac':
+      return 'audio/flac'
+    default:
+      return ''
+  }
+}
+
+function normalizeNativeMimeType(mimeType, filePath = '') {
+  const ext = inferFileExtFromUri(filePath)
+  const extMimeType = mimeTypeForExtension(ext)
+  const cleanedMimeType = String(mimeType || '').split(';')[0].trim().toLowerCase()
+
+  if (!extMimeType) {
+    return cleanedMimeType || mimeType || 'application/octet-stream'
+  }
+
+  if (!cleanedMimeType || cleanedMimeType === 'application/octet-stream') {
+    return extMimeType
+  }
+
+  if (ext === 'm4a' && cleanedMimeType === 'audio/mpeg') {
+    return extMimeType
+  }
+
+  return cleanedMimeType
+}
+
 function isIosSimulatorUri(uri) {
   return Capacitor.getPlatform?.() === 'ios' && /CoreSimulator/i.test(String(uri || ''))
 }
@@ -402,7 +446,8 @@ export function useAudioRecorder(options = {}) {
       throw new Error('Native file reader unavailable')
     }
     const result = await NativeFileReader.readFileBase64({ path: uri })
-    const blob = decodeBase64ToBlob(result?.base64 || '', result?.mimeType || 'audio/m4a')
+    const normalizedMimeType = normalizeNativeMimeType(result?.mimeType || '', uri)
+    const blob = decodeBase64ToBlob(result?.base64 || '', normalizedMimeType || 'audio/x-m4a')
     return {
       blob,
       status: 200,
@@ -436,10 +481,10 @@ export function useAudioRecorder(options = {}) {
         if (result?.blob?.size || Number(result?.status || 0) === 0) {
           return result
         }
-      } catch (error) {
-        lastError = error
-      }
+    } catch (error) {
+      lastError = error
     }
+  }
 
     throw lastError || new Error('Failed to read native recording')
   }
@@ -477,17 +522,23 @@ export function useAudioRecorder(options = {}) {
       throw error
     }
     const { blob, status, reader, src } = blobResult
+    const normalizedMimeType = normalizeNativeMimeType(blob?.type || '', uri)
+    const normalizedBlob =
+      normalizedMimeType && normalizedMimeType !== String(blob?.type || '').toLowerCase()
+        ? new Blob([blob], { type: normalizedMimeType })
+        : blob
     console.log(`${logPrefix} native recording blob ${stringifyLogPayload({
-      size: blob?.size || 0,
-      type: blob?.type || 'unknown',
+      size: normalizedBlob?.size || 0,
+      type: normalizedBlob?.type || 'unknown',
+      originalType: blob?.type || 'unknown',
       status,
       reader,
       src,
     })}`)
-    if (!blob || blob.size < 1024) {
+    if (!normalizedBlob || normalizedBlob.size < 1024) {
       throw buildNoAudioCapturedError(uri, duration)
     }
-    return transcribeBlob(blob, `speech.${inferFileExtFromUri(uri)}`)
+    return transcribeBlob(normalizedBlob, `speech.${inferFileExtFromUri(uri)}`)
   }
 
   const startNativeRecording = async () => {

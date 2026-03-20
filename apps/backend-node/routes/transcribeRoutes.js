@@ -132,6 +132,18 @@ const MIME_TO_EXTENSION = {
   "audio/flac": "flac",
 };
 
+const EXTENSION_TO_MIME = {
+  webm: "audio/webm",
+  mp3: "audio/mpeg",
+  m4a: "audio/x-m4a",
+  mp4: "audio/mp4",
+  ogg: "audio/ogg",
+  oga: "audio/ogg",
+  wav: "audio/wav",
+  aac: "audio/aac",
+  flac: "audio/flac",
+};
+
 const PASSTHROUGH_AUDIO_TYPES = new Set([
   "audio/mp3",
   "audio/mpeg",
@@ -150,6 +162,35 @@ function sanitizeTranscriptText(value) {
   if (!text) return "";
   const meaningful = text.replace(/[^\p{L}\p{N}]+/gu, "");
   return meaningful ? text : "";
+}
+
+function getExtensionFromFilename(filename) {
+  const match = String(filename || "").match(/\.([a-z0-9]+)(?:\?|#|$)/i);
+  return match?.[1]?.toLowerCase() || "";
+}
+
+function resolveIncomingMimeType(mimetype, originalName = "") {
+  const cleanedMime = String(mimetype || "").split(";")[0].trim().toLowerCase();
+  const extension = getExtensionFromFilename(originalName);
+  const extensionMime = EXTENSION_TO_MIME[extension] || "";
+
+  if (!extensionMime) {
+    return cleanedMime;
+  }
+
+  if (!cleanedMime || cleanedMime === "application/octet-stream") {
+    return extensionMime;
+  }
+
+  if (extension === "m4a" && cleanedMime === "audio/mpeg") {
+    return extensionMime;
+  }
+
+  if (!SUPPORTED_AUDIO_TYPES.has(cleanedMime) && SUPPORTED_AUDIO_TYPES.has(extensionMime)) {
+    return extensionMime;
+  }
+
+  return cleanedMime;
 }
 
 async function normalizeAudioUpload(buffer, mimetype) {
@@ -353,14 +394,16 @@ router.post("/transcribe", upload.single("file"), async (req, res) => {
       });
     }
 
+    const originalName = req.file.originalname || "";
     const mime = req.file.mimetype || "";
+    const resolvedMime = resolveIncomingMimeType(mime, originalName);
     const { buffer: normalizedBuffer, filename } = await normalizeAudioUpload(
       req.file.buffer,
-      mime
+      resolvedMime
     );
 
     console.log(
-      `🎤 Received file -> mimetype: ${mime}, normalized to: ${filename}`
+      `🎤 Received file -> mimetype: ${mime}, effective: ${resolvedMime || "unknown"}, original: ${originalName || "unknown"}, normalized to: ${filename}`
     );
 
     const { text, model } = await transcribeWithFallback(
