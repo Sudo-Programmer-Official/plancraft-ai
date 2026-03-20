@@ -38,7 +38,6 @@ import { Capacitor, CapacitorHttp } from '@capacitor/core'
 import {
   isNativePackagedApp,
   getNativeAuthRestriction,
-  supportsNativeGoogleRedirectBridge,
 } from '@/utils/nativeAuthSupport'
 import {
   clearNativeIosAuthSnapshot,
@@ -65,29 +64,6 @@ function isIosCapacitorApp() {
   } catch {
     return false
   }
-}
-
-function getPostLoginTarget() {
-  try {
-    const stored = localStorage.getItem('postLoginRedirect')
-    if (stored) return normalizeRedirectPath(stored)
-  } catch {}
-  try {
-    const params = new URLSearchParams(window.location.search)
-    const q = params.get('redirect')
-    if (q) return normalizeRedirectPath(q)
-  } catch {}
-  return '/dashboard'
-}
-
-function markNativeGoogleHandoffIntent(redirectTarget) {
-  try {
-    const url = new URL(window.location.href)
-    url.searchParams.set('native_handoff', 'android-google')
-    url.searchParams.set('native_provider', 'google')
-    url.searchParams.set('native_redirect', normalizeRedirectPath(redirectTarget))
-    window.history.replaceState({}, '', url.toString())
-  } catch {}
 }
 
 function clearNativeGoogleHandoffIntent() {
@@ -935,46 +911,18 @@ export const useAuthStore = defineStore('authStore', {
       }
     },
 
-    // ✅ Fixed: Smart Google Login (Popup + Redirect Fallback)
+    // Web-only Google Login
     async loginWithGoogle() {
+      if (isNativePackagedApp()) {
+        const err = new Error(getNativeAuthRestriction('google'))
+        err.code = 'auth/native-google-unsupported'
+        throw err
+      }
+
       const provider = new GoogleAuthProvider()
       provider.setCustomParameters({ prompt: 'select_account' })
       const current = auth.currentUser
       const alreadyLinked = (current?.providerData || []).some((p) => p?.providerId === 'google.com')
-
-      if (isNativePackagedApp()) {
-        const nativePlatform = Capacitor?.getPlatform?.() || 'web'
-        this.loading = true
-        try {
-          if (supportsNativeGoogleRedirectBridge()) {
-            if (current && !alreadyLinked) {
-              const err = new Error('Google account linking inside the packaged Android app is not wired yet.')
-              err.code = 'auth/native-google-link-unsupported'
-              throw err
-            }
-            const redirectTarget = getPostLoginTarget()
-            markNativeGoogleHandoffIntent(redirectTarget)
-            console.info('[Auth] Android native bridge detected; starting Google redirect handoff', { redirectTarget })
-            await signInWithRedirect(auth, provider)
-            return
-          }
-
-          console.info('[Auth] Native iOS detected; using redirect Google sign-in', {
-            platform: nativePlatform,
-            linking: !!current && !alreadyLinked,
-          })
-          if (current && !alreadyLinked) {
-            await linkWithRedirect(current, provider)
-          } else {
-            await signInWithRedirect(auth, provider)
-          }
-          return
-        } catch (err) {
-          if (supportsNativeGoogleRedirectBridge()) clearNativeGoogleHandoffIntent()
-          this.loading = false
-          throw err
-        }
-      }
 
       this.loading = true
       try {

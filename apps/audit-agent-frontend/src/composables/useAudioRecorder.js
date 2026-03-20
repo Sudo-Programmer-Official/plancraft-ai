@@ -10,6 +10,8 @@ import { recordAndSendToBackend } from '@/utils/backendRecorder'
 
 const MAX_DURATION_MS = 60_000
 const STOP_FALLBACK_MS = 1_800
+const MINIMUM_AUDIO_BYTES = 1_024
+const MINIMUM_RECORDING_SECONDS = 1
 const MIME_CANDIDATES = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4', 'audio/webm']
 
 function canUseBrowserAudioCapture() {
@@ -25,7 +27,7 @@ function getPlatformName() {
 }
 
 function prefersNativeAudioRecorder() {
-  return canUseNativeAudioRecorder() && getPlatformName() === 'ios'
+  return canUseNativeAudioRecorder()
 }
 
 function formatRecorderError(error) {
@@ -66,6 +68,14 @@ function buildNoAudioCapturedError(uri, duration = 0) {
   return new Error('No microphone audio was captured. Please try again.')
 }
 
+function buildShortRecordingError() {
+  return new Error('Recording too short. Hold the mic for at least a second and try again.')
+}
+
+function buildEmptyTranscriptError() {
+  return new Error('We could not detect any speech in that recording. Try again in a quieter place or speak for a little longer.')
+}
+
 function pickMimeType() {
   try {
     if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') {
@@ -98,6 +108,7 @@ export function useAudioRecorder(options = {}) {
   let stopRequested = false
   let stopHandled = false
   let nativeRecorderActive = false
+  let activeRecorderStrategy = 'none'
 
   const clearTimers = (resetDuration = false) => {
     if (tickId) {
@@ -134,6 +145,7 @@ export function useAudioRecorder(options = {}) {
     mediaRecorder = null
     backendRecorder = null
     nativeRecorderActive = false
+    activeRecorderStrategy = 'none'
   }
 
   const cleanup = (resetTranscript = false) => {
@@ -160,15 +172,23 @@ export function useAudioRecorder(options = {}) {
   }
 
   const transcribeBlob = async (blob, fileName = null) => {
-    console.log(`${logPrefix} transcription request`, { size: blob?.size, type: blob?.type })
+    console.log(`${logPrefix} transcription request`, { size: blob?.size, type: blob?.type, fileName })
     const fd = new FormData()
     const fallbackExt = inferFileExtFromUri(fileName || '')
     fd.append('file', blob, fileName || inferAudioFilename(blob, fallbackExt))
     const res = await api.post('/transcribe', fd, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
-    console.log(`${logPrefix} transcription response`, res?.data)
-    return res?.data?.text || ''
+    const payload = res?.data || {}
+    console.log(`${logPrefix} transcription response`, payload)
+    if (payload?.skipped && payload?.reason === 'audio_too_short') {
+      throw buildShortRecordingError()
+    }
+    const text = String(payload?.text || payload?.transcript || '').trim()
+    if (!text) {
+      throw buildEmptyTranscriptError()
+    }
+    return text
   }
 
   const readBlobWithXhr = (src) => new Promise((resolve, reject) => {
@@ -277,6 +297,7 @@ export function useAudioRecorder(options = {}) {
     })
 
     nativeRecorderActive = true
+    activeRecorderStrategy = 'native'
     state.value = 'recording'
     console.log(`${logPrefix} native recording started`, {
       platform: Capacitor.getPlatform?.() || 'native',
@@ -294,6 +315,7 @@ export function useAudioRecorder(options = {}) {
         if (typeof onTranscription === 'function') await onTranscription(text)
       }
     })
+    activeRecorderStrategy = 'recordrtc'
     state.value = 'recording'
     tickId = window.setInterval(() => (durationSeconds.value += 1), 1000)
     if (autoStopMs > 0) autoStopId = window.setTimeout(() => stopRecording('auto'), autoStopMs)
@@ -306,6 +328,7 @@ export function useAudioRecorder(options = {}) {
     recordedChunks = []
 
     mediaRecorder = new MediaRecorder(stream, { mimeType })
+    activeRecorderStrategy = 'mediarecorder'
 
     const onData = (event) => {
       if (event?.data?.size) recordedChunks.push(event.data)
@@ -423,7 +446,28 @@ export function useAudioRecorder(options = {}) {
         return
       }
 
+      const totalBytes = recordedChunks.reduce((sum, chunk) => sum + Number(chunk?.size || 0), 0)
+      console.log(`${logPrefix} finalize`, {
+        trigger,
+        strategy: activeRecorderStrategy,
+        durationSeconds: durationSeconds.value,
+        chunkCount: recordedChunks.length,
+        chunkBytes: recordedChunks.map((chunk) => Number(chunk?.size || 0)).slice(0, 8),
+        totalBytes,
+      })
+      if (durationSeconds.value < MINIMUM_RECORDING_SECONDS && totalBytes < MINIMUM_AUDIO_BYTES) {
+        throw buildShortRecordingError()
+      }
+
       const blob = new Blob(recordedChunks, { type: mediaRecorder?.mimeType || 'audio/webm' })
+      console.log(`${logPrefix} browser recording blob`, {
+        size: blob?.size || 0,
+        type: blob?.type || 'unknown',
+        strategy: activeRecorderStrategy,
+      })
+      if (!blob || blob.size < MINIMUM_AUDIO_BYTES) {
+        throw buildShortRecordingError()
+      }
       const text = await transcribeBlob(blob)
       transcript.value = text
       state.value = text ? 'done' : 'idle'
@@ -461,10 +505,16 @@ export function useAudioRecorder(options = {}) {
       }
 
       if (backendRecorder && typeof backendRecorder._stop === 'function') {
-        await backendRecorder._stop()
+        const result = await backendRecorder._stop()
         stopHandled = true
         stopStreams()
         backendRecorder = null
+        if (result?.error) {
+          throw result.error
+        }
+        if (!String(result?.transcript || '').trim()) {
+          throw buildEmptyTranscriptError()
+        }
         return
       }
 

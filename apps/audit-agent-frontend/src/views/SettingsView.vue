@@ -609,7 +609,7 @@
     <div v-if="reauthStep === 0" class="space-y-3">
       <p class="text-sm text-slate-300">Choose a method to verify your identity.</p>
       <el-radio-group v-model="reauthMethod" class="flex flex-col gap-2">
-        <el-radio v-if="reauthHasGoogle" label="google">Google Popup</el-radio>
+        <el-radio v-if="reauthHasGoogle && !isNativePackagedApp()" label="google">Google Popup</el-radio>
         <el-radio v-if="reauthHasPhone" label="phone">Phone ({{ maskedPhone }})</el-radio>
       </el-radio-group>
       <div class="flex justify-end gap-2 pt-2">
@@ -683,7 +683,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore'
 import AvatarUploader from '@/components/AvatarUploader.vue'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { useQuickSetupStore } from '@/stores/quickSetupStore'
-import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
+import { getNativeAuthRestriction, isNativePackagedApp } from '@/utils/nativeAuthSupport'
 import { copyText, openExternalUrl } from '@/utils/nativeUi'
 import { getIncompleteQuickSetupLabels } from '@/utils/quickSetup'
 import dayjs from 'dayjs'
@@ -1527,7 +1527,13 @@ function reauthenticate() {
   const providers = (u.providerData || []).map(p => p.providerId)
   reauthHasGoogle.value = providers.includes('google.com')
   reauthHasPhone.value = providers.includes('phone') && !!u.phoneNumber
-  reauthMethod.value = reauthHasGoogle.value && !reauthHasPhone.value ? 'google' : (!reauthHasGoogle.value && reauthHasPhone.value ? 'phone' : '')
+  if (isNativePackagedApp() && reauthHasGoogle.value && !reauthHasPhone.value) {
+    ElMessage.info(getNativeAuthRestriction('google'))
+    return
+  }
+  reauthMethod.value = isNativePackagedApp()
+    ? (reauthHasPhone.value ? 'phone' : '')
+    : (reauthHasGoogle.value && !reauthHasPhone.value ? 'google' : (!reauthHasGoogle.value && reauthHasPhone.value ? 'phone' : ''))
   reauthStep.value = 0
   otp.value = ''
   reauthVerificationId.value = ''
@@ -1668,6 +1674,10 @@ onBeforeUnmount(() => {
 async function doGoogleReauth() {
   const u = auth.currentUser
   if (!u) return
+  if (isNativePackagedApp()) {
+    ElMessage.info(getNativeAuthRestriction('google'))
+    return
+  }
   try {
     reauthLoading.value = true
     const gp = new GoogleAuthProvider()

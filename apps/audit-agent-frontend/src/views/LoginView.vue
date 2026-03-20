@@ -24,8 +24,9 @@
 <div class="mt-10 space-y-4">
             <div class="space-y-3">
               <button
+                v-if="!isNativeApp"
                 @click="loginGoogle"
-                :disabled="authStore.loading || (isNativeApp && !canUseNativeGoogle)"
+                :disabled="authStore.loading"
                 class="w-full flex items-center justify-center gap-3 bg-white text-gray-900 px-6 py-4 rounded-xl font-semibold shadow-lg hover:-translate-y-0.5 hover:shadow-2xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 disabled:opacity-70"
               >
                 <img src="https://www.svgrepo.com/show/355037/google.svg" alt="Google" class="w-5 h-5" />
@@ -164,7 +165,7 @@
           </p>
 
           <p v-if="authStore.loading" class="text-sm text-gray-300 mt-6 text-center">✨ Preparing your space...</p>
-          <GoogleAuthDiagnostic class="mt-6" />
+          <GoogleAuthDiagnostic v-if="!isNativeApp" class="mt-6" />
         </div>
       </div>
     </div>
@@ -223,22 +224,13 @@ import GoogleAuthDiagnostic from '@/components/GoogleAuthDiagnostic.vue'
 import {
   isNativePackagedApp,
   getNativeAuthRestriction,
-  supportsNativeGoogleSignIn,
-  supportsNativeGoogleRedirectBridge,
 } from '@/utils/nativeAuthSupport'
 import { normalizeRedirectPath } from '@/services/mobileAuthHandoffService'
 
 const isNativeApp = computed(() => isNativePackagedApp())
-const canUseNativeGoogle = computed(() => supportsNativeGoogleSignIn())
 const nativeAuthBanner = computed(() => {
   if (!isNativeApp.value) return ''
-  if (supportsNativeGoogleRedirectBridge()) {
-    return 'Android Google sign-in now returns to the app through the browser handoff bridge. Apple, phone OTP, and magic link still need additional native wiring.'
-  }
-  if (canUseNativeGoogle.value) {
-    return 'Google sign-in is enabled in the iOS app through Firebase redirect flow. Apple, phone OTP, and magic link still need additional native wiring.'
-  }
-  return 'This mobile app build is currently hardened to use email/password only. Google, Apple, phone OTP, and magic link still need native auth wiring and deep-link return handling.'
+  return 'Google sign-in is disabled in packaged iOS and Android builds. Use email/password in the mobile app; Google sign-in remains available on the web.'
 })
 
 async function loginGoogle() {

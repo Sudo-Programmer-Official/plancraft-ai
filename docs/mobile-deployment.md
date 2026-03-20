@@ -42,6 +42,8 @@ The Android shell now expects a dedicated callback path:
 
 - `https://plancraftai.com/app-auth/complete`
 
+Google sign-in is currently disabled in packaged Android and iOS builds. Use email/password inside the native shells; Google sign-in remains available on the web build.
+
 Required production pieces:
 
 1. Deploy `/.well-known/assetlinks.json`
@@ -60,7 +62,7 @@ Quick verification after deploy:
 1. Open `https://plancraftai.com/.well-known/assetlinks.json`
 2. Confirm the JSON contains the package name and SHA-256 above
 3. Reinstall the Android app if app links were previously cached incorrectly
-4. Test Google sign-in from the Android app again
+4. Test email/password sign-in from the Android app
 
 CLI bundle (alternative to Android Studio):
 ```bash

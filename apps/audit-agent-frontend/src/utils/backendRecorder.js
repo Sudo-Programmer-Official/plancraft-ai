@@ -11,6 +11,7 @@ const MIME_CANDIDATES = [
   "audio/webm",
 ]
 const VOICE_STOP_DELAY_MS = 400
+const MINIMUM_AUDIO_BYTES = 1024
 
 function getExt(mime) {
   if (!mime) return "wav"
@@ -113,10 +114,16 @@ export async function recordAndSendToBackend(
 
   // 🔹 Finalizer
   let stopped = false
+  let finalState = {
+    transcript: "",
+    skipped: false,
+    reason: null,
+    error: null,
+  }
   recorder._stop = ({ skipFinalUpload = false } = {}) =>
     new Promise((resolve) => {
       if (stopped) {
-        resolve()
+        resolve(finalState)
         return
       }
       stopped = true
@@ -128,6 +135,20 @@ export async function recordAndSendToBackend(
             const shouldSendFinal = !skipFinalUpload && emitFinalResult
             if (shouldSendFinal) {
               const blob = recorder.getBlob()
+              console.log("[backendRecorder] final blob", {
+                size: blob?.size || 0,
+                type: blob?.type || "unknown",
+                ext,
+              })
+              if (!blob || blob.size < MINIMUM_AUDIO_BYTES) {
+                finalState = {
+                  transcript: "",
+                  skipped: true,
+                  reason: "audio_too_short",
+                  error: new Error("Recording too short. Hold the mic for at least a second and try again."),
+                }
+                return
+              }
               try {
                 const fd = new FormData()
                 fd.append("file", blob, `speech.${ext}`)
@@ -135,14 +156,29 @@ export async function recordAndSendToBackend(
                   headers: { "Content-Type": "multipart/form-data" },
                 })
                 const data = res?.data || {}
-                if (data?.text) await invokeCallback(data.text, true) // final result
+                finalState = {
+                  transcript: String(data?.text || data?.transcript || "").trim(),
+                  skipped: !!data?.skipped,
+                  reason: data?.reason || null,
+                  error: null,
+                }
+                if (finalState.skipped && finalState.reason === "audio_too_short") {
+                  finalState.error = new Error("Recording too short. Hold the mic for at least a second and try again.")
+                  return
+                }
+                if (finalState.transcript) {
+                  await invokeCallback(finalState.transcript, true) // final result
+                } else {
+                  finalState.error = new Error("Transcription returned empty text")
+                }
               } catch (err) {
+                finalState.error = err
                 console.error("❌ Final transcription failed", err)
               }
             }
           } finally {
             stream.getTracks().forEach((t) => t.stop())
-            resolve()
+            resolve(finalState)
           }
         })
       }
