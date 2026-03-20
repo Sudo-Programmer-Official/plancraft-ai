@@ -1,5 +1,5 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
-import { Capacitor } from '@capacitor/core'
+import { Capacitor, registerPlugin } from '@capacitor/core'
 import {
   AudioSessionCategoryOption,
   AudioSessionMode,
@@ -13,6 +13,9 @@ const STOP_FALLBACK_MS = 1_800
 const MINIMUM_AUDIO_BYTES = 1_024
 const MINIMUM_RECORDING_SECONDS = 1
 const MIME_CANDIDATES = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4', 'audio/webm']
+const BASE64_DECODE_CHUNK_SIZE = 8_192
+
+const NativeFileReader = registerPlugin('NativeFileReader')
 
 function canUseBrowserAudioCapture() {
   return !!navigator?.mediaDevices?.getUserMedia
@@ -74,6 +77,27 @@ function buildShortRecordingError() {
 
 function buildEmptyTranscriptError() {
   return new Error('We could not detect any speech in that recording. Try again in a quieter place or speak for a little longer.')
+}
+
+function decodeBase64ToBlob(base64, mimeType = 'application/octet-stream') {
+  const sanitized = String(base64 || '').trim()
+  if (!sanitized) {
+    throw new Error('Native file reader returned empty data')
+  }
+  const binary = atob(sanitized)
+  const totalLength = binary.length
+  const chunks = []
+
+  for (let offset = 0; offset < totalLength; offset += BASE64_DECODE_CHUNK_SIZE) {
+    const slice = binary.slice(offset, offset + BASE64_DECODE_CHUNK_SIZE)
+    const bytes = new Uint8Array(slice.length)
+    for (let idx = 0; idx < slice.length; idx += 1) {
+      bytes[idx] = slice.charCodeAt(idx)
+    }
+    chunks.push(bytes)
+  }
+
+  return new Blob(chunks, { type: mimeType || 'application/octet-stream' })
 }
 
 function pickMimeType() {
@@ -222,8 +246,26 @@ export function useAudioRecorder(options = {}) {
     throw new Error(`Failed to read native recording (${status})`)
   }
 
+  const readBlobWithNativePlugin = async (uri) => {
+    if (getPlatformName() !== 'android' || !uri) {
+      throw new Error('Native file reader unavailable')
+    }
+    const result = await NativeFileReader.readFileBase64({ path: uri })
+    const blob = decodeBase64ToBlob(result?.base64 || '', result?.mimeType || 'audio/m4a')
+    return {
+      blob,
+      status: 200,
+      reader: 'native-plugin',
+      src: uri,
+    }
+  }
+
   const readNativeSource = async (src) => {
-    const attempts = [readBlobWithXhr(src), readBlobWithFetch(src)]
+    const attempts = []
+    if (getPlatformName() === 'android' && /^file:\/\//i.test(String(src || ''))) {
+      attempts.push(readBlobWithNativePlugin(src))
+    }
+    attempts.push(readBlobWithXhr(src), readBlobWithFetch(src))
     let lastError = null
 
     if (typeof Promise.any === 'function') {
@@ -396,6 +438,9 @@ export function useAudioRecorder(options = {}) {
         const details = formatRecorderError(nativeError)
         console.warn(`${logPrefix} native recorder start failed`, { ...details, platform, strategy: 'native-first' })
         cleanup(false)
+        errorMessage.value = details.message || 'Native voice recording failed'
+        state.value = 'error'
+        return
       }
     }
 

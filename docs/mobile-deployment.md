@@ -139,6 +139,51 @@ xcodebuild -workspace App/App.xcworkspace \
 ```
 Then export/sign via Xcode Organizer or `xcodebuild -exportArchive` with your provisioning profile.
 
+### iOS Apple sign-in (server-driven mobile flow)
+
+The packaged iPhone app can now use a backend-owned Apple OAuth loop behind a feature flag:
+
+1. App launches `GET /api/auth/apple/start`
+2. Backend redirects to Apple
+3. Apple returns to `POST /api/auth/apple/callback`
+4. Backend maps the Apple identity to Firebase and creates a mobile auth handoff
+5. Backend redirects to `plancraftai://localhost/app-auth/complete?...`
+6. The app consumes the handoff and restores the Firebase session locally
+
+Frontend flag:
+
+```bash
+# apps/audit-agent-frontend
+VITE_USE_SERVER_APPLE_AUTH_MOBILE=1
+```
+
+Backend flags and required placeholders:
+
+```bash
+# apps/backend-node
+APPLE_SERVER_AUTH_ENABLED=1
+APPLE_TEAM_ID=YOUR_APPLE_TEAM_ID
+APPLE_CLIENT_ID=YOUR_SERVICES_ID
+APPLE_KEY_ID=YOUR_APPLE_KEY_ID
+APPLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYOUR_PRIVATE_KEY\n-----END PRIVATE KEY-----"
+APPLE_REDIRECT_URI=https://api.plancraftai.com/api/auth/apple/callback
+
+# Needed if the backend must link Apple identities through Firebase Identity Toolkit
+FIREBASE_API_KEY=YOUR_FIREBASE_WEB_API_KEY
+```
+
+Apple-side setup:
+
+1. Create a Services ID for Apple Sign In
+2. Register the backend callback URL exactly as `APPLE_REDIRECT_URI`
+3. Ensure the iOS app bundle keeps the `plancraftai` URL scheme so the backend callback can return to the app
+4. Keep `Sign in with Apple` enabled in Firebase Auth and in the Apple developer console
+
+Notes:
+- Leave `VITE_USE_SERVER_APPLE_AUTH_MOBILE=0` to keep the existing Firebase redirect hybrid flow on iOS.
+- Web Apple auth is unchanged; the server-driven path is only for packaged mobile when the frontend flag is enabled.
+- After changing auth code or env, rebuild the web bundle and run `npx cap sync ios`.
+
 ### Notes
 - Ensure environment values (e.g., `VITE_API_BASE_URL`, `VITE_ENABLE_IMAGE_TASKS`) are set before `npm run build`.
 - After any web change, rerun `npm run build` in `apps/audit-agent-frontend` and `npx cap sync <platform>` in `mobile` so `dist` is embedded into native shells.

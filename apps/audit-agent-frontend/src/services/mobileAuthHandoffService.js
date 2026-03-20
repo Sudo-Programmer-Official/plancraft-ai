@@ -5,6 +5,24 @@ const DEFAULT_REDIRECT = '/dashboard'
 export const NATIVE_AUTH_CALLBACK_PATH = '/app-auth/complete'
 export const ANDROID_APP_PACKAGE = 'com.sudoprogrammer.plancraftai'
 
+function isEnabledFlag(value) {
+  return ['1', 'true', 'yes', 'on'].includes(String(value || '').trim().toLowerCase())
+}
+
+function buildApiUrl(pathname = '/') {
+  const path = String(pathname || '/')
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  const base = String(api?.defaults?.baseURL || '/api').trim() || '/api'
+  try {
+    return new URL(
+      `${base.replace(/\/+$/, '')}${normalizedPath}`,
+      window.location.origin,
+    ).toString()
+  } catch {
+    return `${base.replace(/\/+$/, '')}${normalizedPath}`
+  }
+}
+
 export function normalizeRedirectPath(target, fallback = DEFAULT_REDIRECT) {
   if (typeof target !== 'string') return fallback
   const trimmed = target.trim()
@@ -20,6 +38,10 @@ export function isNativeAndroidApp() {
   } catch {
     return false
   }
+}
+
+export function isServerDrivenNativeAppleAuthEnabled() {
+  return isEnabledFlag(import.meta.env.VITE_USE_SERVER_APPLE_AUTH_MOBILE)
 }
 
 export function buildNativeAuthCallbackUrl({ code, redirect } = {}) {
@@ -44,6 +66,33 @@ export function buildNativeAuthAndroidIntentUrl({ code, redirect } = {}) {
   if (code) params.set('code', code)
   params.set('redirect', normalizeRedirectPath(redirect))
   return `intent://localhost${NATIVE_AUTH_CALLBACK_PATH}?${params.toString()}#Intent;scheme=plancraftai;package=${ANDROID_APP_PACKAGE};end`
+}
+
+export function buildServerDrivenAppleStartUrl({ redirect, platform = 'ios' } = {}) {
+  const url = new URL(buildApiUrl('/auth/apple/start'))
+  url.searchParams.set('platform', String(platform || 'ios'))
+  url.searchParams.set('redirect', normalizeRedirectPath(redirect))
+  return url.toString()
+}
+
+export function launchNativeAuthRoute(targetUrl) {
+  const url = String(targetUrl || '').trim()
+  if (!url) throw new Error('Missing native auth launch URL')
+
+  let launchedWithWindowOpen = false
+  try {
+    const opened = window.open(url, '_blank', 'noopener,noreferrer')
+    launchedWithWindowOpen = !!opened
+  } catch {}
+
+  if (!launchedWithWindowOpen) {
+    window.location.assign(url)
+  }
+
+  return {
+    url,
+    launchMethod: launchedWithWindowOpen ? 'window.open' : 'location.assign',
+  }
 }
 
 export function parseNativeAuthCallbackUrl(rawUrl = '') {

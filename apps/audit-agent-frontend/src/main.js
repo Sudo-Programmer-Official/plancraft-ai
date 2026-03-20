@@ -409,16 +409,21 @@ bootstrapApp().catch((err) => {
   console.error('[App] Bootstrap failed', err)
 })
 
-// Android app links / native callback handling
+// Native app links / auth callback handling
 async function installNativeAppUrlBridge() {
   try {
-    if (!Capacitor?.isNativePlatform?.() || Capacitor?.getPlatform?.() !== 'android') return
+    if (!Capacitor?.isNativePlatform?.()) return
     const { App: CapacitorApp } = await import('@capacitor/app')
+    const platform = Capacitor?.getPlatform?.() || 'native'
     let lastHandledUrl = ''
 
     const handleIncomingUrl = async (incomingUrl) => {
       if (!incomingUrl || incomingUrl === lastHandledUrl) return
       lastHandledUrl = incomingUrl
+      console.info('[NativeAuth] Return URL received', {
+        platform,
+        url: incomingUrl,
+      })
 
       try {
         await router.isReady()
@@ -427,14 +432,26 @@ async function installNativeAppUrlBridge() {
       const handoff = parseNativeAuthCallbackUrl(incomingUrl)
       if (handoff?.code) {
         try {
+          console.info('[NativeAuth] Handoff consume requested', {
+            platform,
+            redirect: handoff.redirect,
+            hasCode: true,
+          })
           const result = await authStore.completeNativeAuthHandoff(
             handoff.code,
             handoff.redirect,
           )
+          console.info('[NativeAuth] Handoff consume success', {
+            platform,
+            redirect: result?.redirect || handoff.redirect || '/dashboard',
+          })
           await router.replace(result?.redirect || handoff.redirect || '/dashboard')
           return
         } catch (err) {
-          console.error('[NativeAuth] Failed to complete Android auth handoff', err)
+          console.error('[NativeAuth] Handoff consume failed', {
+            platform,
+            message: err?.message || String(err),
+          })
           await router.replace('/login')
           return
         }

@@ -224,19 +224,36 @@ export function useTasks() {
   async function refreshAllTasks(force = false) {
     if (refreshPromise && !force) return refreshPromise
     refreshPromise = (async () => {
-      // Prefer a single fetch of all tasks for the workspace; fall back to today if needed
-      let raw = []
+      // Prefer a single fetch of all tasks for the workspace; fall back to today if needed.
+      // If both reads fail on mobile, keep the current in-memory task cache instead of
+      // throwing an unhandled rejection after task creation/transcription already succeeded.
+      const previousTasks = Array.isArray(allTasks.value) ? [...allTasks.value] : []
+      let raw = null
       try {
         raw = await fetchAllTasksForWorkspace()
-      } catch {
-        raw = await fetchTasksForToday()
+      } catch (workspaceErr) {
+        console.warn('[useTasks] workspace refresh failed', workspaceErr?.message || workspaceErr)
+        try {
+          raw = await fetchTasksForToday()
+        } catch (todayErr) {
+          console.warn('[useTasks] today fallback failed', todayErr?.message || todayErr)
+        }
       }
-      allTasks.value = sortTasks(normalizeList(uniqueById(raw)))
+
+      if (Array.isArray(raw)) {
+        allTasks.value = sortTasks(normalizeList(uniqueById(raw)))
+      } else if (!previousTasks.length) {
+        allTasks.value = []
+      } else {
+        allTasks.value = sortTasks(normalizeList(uniqueById(previousTasks)))
+      }
+
       syncFiltered()
       initialized = true
+      return allTasks.value
     })()
     try {
-      await refreshPromise
+      return await refreshPromise
     } finally {
       refreshPromise = null
     }
@@ -518,7 +535,11 @@ export function useTasks() {
   }
 
   // 🔹 Only load once when app starts
-  if (!initialized) loadTasks()
+  if (!initialized) {
+    loadTasks().catch((err) =>
+      console.warn('[useTasks] initial load failed', err?.message || err),
+    )
+  }
   if (!refreshListenerAttached) {
     try {
       window.addEventListener('tasks:refresh-request', (event) => {

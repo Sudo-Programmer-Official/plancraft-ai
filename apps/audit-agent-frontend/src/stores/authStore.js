@@ -47,8 +47,12 @@ import {
 } from '@/utils/authStorage'
 import {
   buildNativeAuthCallbackUrl,
+  buildNativeAuthFallbackSchemeUrl,
+  buildServerDrivenAppleStartUrl,
   consumeMobileAuthHandoff,
   createMobileAuthHandoff,
+  isServerDrivenNativeAppleAuthEnabled,
+  launchNativeAuthRoute,
   normalizeRedirectPath,
 } from '@/services/mobileAuthHandoffService'
 
@@ -74,6 +78,48 @@ function clearNativeGoogleHandoffIntent() {
     url.searchParams.delete('native_redirect')
     window.history.replaceState({}, '', url.toString())
   } catch {}
+}
+
+function readNativeAuthHandoffIntent() {
+  try {
+    const url = new URL(window.location.href)
+    const rawMode = String(url.searchParams.get('native_handoff') || '').trim().toLowerCase()
+    const provider = String(url.searchParams.get('native_provider') || '').trim().toLowerCase()
+    const redirect = normalizeRedirectPath(
+      url.searchParams.get('native_redirect') ||
+      localStorage.getItem('postLoginRedirect') ||
+      url.searchParams.get('redirect') ||
+      '/dashboard',
+    )
+    if (!rawMode || !provider) return null
+
+    const [platform = '', method = ''] = rawMode.split('-', 2)
+    return {
+      mode: rawMode,
+      platform: platform || null,
+      method: method || null,
+      provider,
+      redirect,
+    }
+  } catch {
+    return null
+  }
+}
+
+function writeNativeAuthHandoffIntent({ platform, provider, redirect } = {}) {
+  try {
+    const safePlatform = String(platform || '').trim().toLowerCase()
+    const safeProvider = String(provider || '').trim().toLowerCase()
+    if (!safePlatform || !safeProvider) return null
+    const url = new URL(window.location.href)
+    url.searchParams.set('native_handoff', `${safePlatform}-${safeProvider}`)
+    url.searchParams.set('native_provider', safeProvider)
+    url.searchParams.set('native_redirect', normalizeRedirectPath(redirect))
+    window.history.replaceState({}, '', url.toString())
+    return url.toString()
+  } catch {
+    return null
+  }
 }
 
 function readStoredToken() {
@@ -1102,11 +1148,6 @@ export const useAuthStore = defineStore('authStore', {
 
     // 🍎 Sign in with Apple (iOS-only button will call this)
     async loginWithApple() {
-      if (isNativePackagedApp()) {
-        const err = new Error(getNativeAuthRestriction('apple'))
-        err.code = 'auth/native-apple-unsupported'
-        throw err
-      }
       this.loading = true
       try {
         const provider = new OAuthProvider('apple.com')
@@ -1133,6 +1174,64 @@ export const useAuthStore = defineStore('authStore', {
             offset: 80,
           })
           return current
+        }
+
+        if (isNativePackagedApp() && isIosCapacitorApp()) {
+          const redirectTarget = normalizeRedirectPath(
+            localStorage.getItem('postLoginRedirect') ||
+            (() => {
+              try {
+                return new URL(window.location.href).searchParams.get('redirect')
+              } catch {
+                return null
+              }
+            })() ||
+            '/dashboard',
+          )
+          const shouldUseServerDrivenFlow =
+            !current &&
+            isServerDrivenNativeAppleAuthEnabled()
+
+          if (shouldUseServerDrivenFlow) {
+            clearNativeGoogleHandoffIntent()
+            const startUrl = buildServerDrivenAppleStartUrl({
+              redirect: redirectTarget,
+              platform: 'ios',
+            })
+            console.info('[Auth] Native Apple auth start', {
+              platform: 'ios',
+              provider: 'apple',
+              redirect: redirectTarget,
+              mode: 'server-handoff',
+            })
+            const launch = launchNativeAuthRoute(startUrl)
+            console.info('[Auth] Native Apple auth handoff launch', {
+              platform: 'ios',
+              provider: 'apple',
+              redirect: redirectTarget,
+              startUrl,
+              launchMethod: launch.launchMethod,
+            })
+            return
+          }
+
+          writeNativeAuthHandoffIntent({
+            platform: 'ios',
+            provider: 'apple',
+            redirect: redirectTarget,
+          })
+          console.info('[Auth] Native Apple auth start', {
+            platform: 'ios',
+            provider: 'apple',
+            redirect: redirectTarget,
+            mode: 'firebase-redirect-hybrid',
+          })
+          if (current) {
+            await linkWithRedirect(current, provider)
+          } else {
+            await signInWithRedirect(auth, provider)
+          }
+          return
         }
 
         let result = null
@@ -1267,32 +1366,45 @@ export const useAuthStore = defineStore('authStore', {
           })
 
           const params = new URLSearchParams(window.location.search)
-          const nativeHandoff = params.get('native_handoff')
-          const nativeProvider = params.get('native_provider') || 'google'
-          const nativeRedirect = normalizeRedirectPath(
-            params.get('native_redirect') ||
-            localStorage.getItem('postLoginRedirect') ||
-            params.get('redirect') ||
-            '/dashboard',
-          )
+          const nativeHandoff = readNativeAuthHandoffIntent()
 
-          if (!isNativePackagedApp() && nativeHandoff === 'android-google' && nativeProvider === 'google') {
+          if (nativeHandoff?.platform && nativeHandoff?.provider) {
             try {
+              console.info('[Auth] Native auth handoff create:start', {
+                platform: nativeHandoff.platform,
+                provider: nativeHandoff.provider,
+                redirect: nativeHandoff.redirect,
+              })
               const handoff = await createMobileAuthHandoff({
-                redirect: nativeRedirect,
-                platform: 'android',
-                provider: 'google',
+                redirect: nativeHandoff.redirect,
+                platform: nativeHandoff.platform,
+                provider: nativeHandoff.provider,
+              })
+              const handoffRedirect = nativeHandoff.platform === 'ios'
+                ? buildNativeAuthFallbackSchemeUrl({
+                    code: handoff?.code,
+                    redirect: handoff?.redirect || nativeHandoff.redirect,
+                  })
+                : buildNativeAuthCallbackUrl({
+                    code: handoff?.code,
+                    redirect: handoff?.redirect || nativeHandoff.redirect,
+                  })
+              console.info('[Auth] Native auth handoff create:success', {
+                platform: nativeHandoff.platform,
+                provider: nativeHandoff.provider,
+                hasCode: !!handoff?.code,
+                returnUrl: handoffRedirect,
               })
               clearNativeGoogleHandoffIntent()
-              window.location.replace(
-                buildNativeAuthCallbackUrl({
-                  code: handoff?.code,
-                  redirect: handoff?.redirect || nativeRedirect,
-                }),
-              )
+              window.location.replace(handoffRedirect)
               return
             } catch (handoffErr) {
-              console.error('[Auth] Failed to create Android mobile handoff', handoffErr)
+              console.error('[Auth] Native auth handoff create:failed', {
+                platform: nativeHandoff.platform,
+                provider: nativeHandoff.provider,
+                message: handoffErr?.message || String(handoffErr),
+              })
+              clearNativeGoogleHandoffIntent()
             }
           }
 
@@ -1327,6 +1439,10 @@ export const useAuthStore = defineStore('authStore', {
     async completeNativeAuthHandoff(code, redirectTarget = '/dashboard') {
       this.loading = true
       try {
+        console.info('[Auth] Native auth handoff consume:start', {
+          hasCode: !!code,
+          redirect: normalizeRedirectPath(redirectTarget),
+        })
         const handoff = await consumeMobileAuthHandoff(code)
         const customToken = String(handoff?.customToken || '')
         if (!customToken) throw new Error('Missing Firebase custom token for native handoff')
@@ -1365,11 +1481,25 @@ export const useAuthStore = defineStore('authStore', {
           duration: 2500,
           offset: 80,
         })
+        console.info('[Auth] Native auth success', {
+          uid: user.uid,
+          provider: handoff?.provider || 'unknown',
+          platform: handoff?.platform || 'unknown',
+          redirect: normalizeRedirectPath(
+            redirectTarget || handoff?.redirect || localStorage.getItem('postLoginRedirect') || '/dashboard',
+          ),
+        })
         return {
           redirect: normalizeRedirectPath(
             redirectTarget || handoff?.redirect || localStorage.getItem('postLoginRedirect') || '/dashboard',
           ),
         }
+      } catch (error) {
+        console.error('[Auth] Native auth handoff consume:failed', {
+          message: error?.message || String(error),
+          code: error?.code || null,
+        })
+        throw error
       } finally {
         this.loading = false
       }

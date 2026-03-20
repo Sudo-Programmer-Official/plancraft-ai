@@ -35,7 +35,7 @@
               <button
                 v-if="isIosApp"
                 @click="loginApple"
-                :disabled="authStore.loading || isNativeApp"
+                :disabled="authStore.loading"
                 class="w-full flex items-center justify-center gap-3 bg-white text-gray-900 px-6 py-4 rounded-xl font-semibold shadow-lg hover:-translate-y-0.5 hover:shadow-2xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 disabled:opacity-70"
               >
                 <img src="https://www.svgrepo.com/show/303128/apple-logo.svg" alt="Apple" class="w-5 h-5" />
@@ -173,7 +173,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, nextTick } from "vue"
+import { ref, onMounted, computed, nextTick, watch } from "vue"
 import { useRouter, useRoute } from "vue-router"
 import { useAuthStore } from "@/stores/authStore"
 import LoginFeatureSlider from '@/components/LoginFeatureSlider.vue'
@@ -230,8 +230,43 @@ import { normalizeRedirectPath } from '@/services/mobileAuthHandoffService'
 const isNativeApp = computed(() => isNativePackagedApp())
 const nativeAuthBanner = computed(() => {
   if (!isNativeApp.value) return ''
+  if (isIosApp.value) {
+    return 'Google sign-in is disabled in the packaged iPhone app. Use Continue with Apple or email/password on mobile; Google sign-in remains available on the web.'
+  }
   return 'Google sign-in is disabled in packaged iOS and Android builds. Use email/password in the mobile app; Google sign-in remains available on the web.'
 })
+
+function mapAppleAuthErrorMessage(errorCode) {
+  const code = String(errorCode || '').trim()
+  if (!code) return ''
+  switch (code) {
+    case 'user_cancelled_authorize':
+    case 'access_denied':
+      return 'Apple sign-in was cancelled.'
+    case 'apple_start_failed':
+      return 'Apple sign-in could not be started. Check the mobile auth configuration and try again.'
+    case 'apple_callback_failed':
+      return 'Apple sign-in did not finish correctly. Please try again.'
+    default:
+      return `Apple sign-in failed: ${code}`
+  }
+}
+
+function clearAppleAuthErrorQuery() {
+  const nextQuery = { ...route.query }
+  delete nextQuery.appleAuthError
+  router.replace({
+    path: route.path,
+    query: nextQuery,
+  }).catch(() => {})
+}
+
+function surfaceAppleAuthError(errorCode) {
+  const message = mapAppleAuthErrorMessage(errorCode)
+  if (!message) return
+  ElMessage.error(message)
+  clearAppleAuthErrorQuery()
+}
 
 async function loginGoogle() {
   try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_SIGNIN_CLICK) } catch {}
@@ -269,6 +304,16 @@ async function loginApple() {
     try { ElMessage.info('Apple sign-in unavailable. Try another method.') } catch {}
   }
 }
+
+watch(
+  () => route.query.appleAuthError,
+  (value) => {
+    if (typeof value === 'string' && value) {
+      surfaceAppleAuthError(value)
+    }
+  },
+  { immediate: true },
+)
 
 // Email auth
 const showEmail = ref(false)
