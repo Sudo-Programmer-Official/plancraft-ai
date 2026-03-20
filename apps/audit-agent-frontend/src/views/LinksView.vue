@@ -341,12 +341,25 @@ async function hydrateData() {
   })
 }
 
-onMounted(() => {
-  hydrateData()
-})
+watch(
+  () => authStore.user?.uid,
+  (uid) => {
+    if (!uid) {
+      links.value = []
+      categories.value = []
+      try {
+        stopLinks.value?.()
+        stopCategories.value?.()
+      } catch {}
+      return
+    }
+    hydrateData()
+  },
+  { immediate: true },
+)
 
 watch(activeWorkspaceId, () => {
-  hydrateData()
+  if (authStore.user?.uid) hydrateData()
 })
 
 onBeforeUnmount(() => {

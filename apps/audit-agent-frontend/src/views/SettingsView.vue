@@ -878,6 +878,115 @@ const prefs = reactive({
   calls: false, // legacy toggle, derived below
 })
 
+function withTimeout(promise, ms = 8000, label = 'request') {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    Promise.resolve(promise)
+      .then((value) => {
+        clearTimeout(timer)
+        resolve(value)
+      })
+      .catch((error) => {
+        clearTimeout(timer)
+        reject(error)
+      })
+  })
+}
+
+function applySettingsPreferences(res = {}) {
+  const n = res?.notifications || {}
+  const ints = res?.integrations || {}
+  const chans = Array.isArray(n?.channels) ? n.channels : null
+  if (chans) {
+    const set = new Set(chans)
+    prefs.email = set.has('email') || !!n.email || true
+    prefs.pwa = canUseBrowserPush.value ? (set.has('pwa') || !!n.push || true) : false
+    prefs.whatsapp = set.has('whatsapp') || !!n.whatsapp || true
+    prefs.sms = set.has('sms') || !!n.sms || false
+    prefs.voice_call = set.has('voice_call') || !!n.voice_call || false
+  } else {
+    prefs.email = n.email !== undefined ? !!n.email : true
+    prefs.pwa = canUseBrowserPush.value ? (n.push !== undefined ? !!n.push : true) : false
+    prefs.whatsapp = n.whatsapp !== undefined ? !!n.whatsapp : true
+    prefs.sms = !!n.sms
+    prefs.voice_call = !!n.voice_call
+  }
+  prefs.discord = !!n.discord
+  prefs.calls = !!(n.calls || prefs.sms || prefs.voice_call)
+
+  notifPhones.value = { sms: n.phone_sms || '', voice: n.phone_voice || '' }
+  integrationOptions.forEach((i) => { i.selected = !!ints[i.key] })
+
+  const meetingsPref = res?.meetings || {}
+  meetingPrefs.autoCreate = meetingsPref.autoCreateCalendarTasks !== false
+  meetingPrefs.defaultReminderMinutes = sanitizeReminderMinutes(
+    meetingsPref.defaultReminderMinutes ?? meetingsPref.defaultMeetingReminderMinutes ?? DEFAULT_MEETING_REMINDER,
+  )
+}
+
+function applyIntegrationEndpoints(resInts = {}) {
+  integrationEndpoints.value = {
+    whatsapp: { phone: resInts?.whatsapp?.phone || '' },
+    sms: { phone: resInts?.sms?.phone || '' },
+    discord: { webhook: resInts?.discord?.webhook || '' },
+    slack: { userId: resInts?.slack?.userId || '', token: resInts?.slack?.token || '' },
+    email: resInts?.email || authStore.user?.email || ''
+  }
+}
+
+function applyProfileFields(user, data = {}) {
+  profileForm.name = data?.name || user?.displayName || ''
+  profileForm.email = data?.email || user?.email || ''
+  profileForm.phone = data?.phone || user?.phoneNumber || authStore.user?.phone || ''
+  profileComplete.value = !!(data?.name || user?.displayName)
+}
+
+async function loadSettingsProfile(uid) {
+  const user = auth.currentUser || authStore.user || null
+  if (!uid) {
+    applyProfileFields(user, {})
+    return
+  }
+  try {
+    const uref = doc(db, 'users', uid)
+    const usnap = await withTimeout(getDoc(uref), 8000, 'settings profile')
+    const udata = usnap.exists() ? (usnap.data() || {}) : {}
+    applyProfileFields(user, udata)
+  } catch (error) {
+    console.warn('[Settings] profile load fallback', error?.message || error)
+    applyProfileFields(user, {})
+  }
+}
+
+const loadedSettingsUid = ref('')
+const settingsLoadInFlight = ref(false)
+
+async function hydrateSettingsForUser(uid) {
+  if (!uid || settingsLoadInFlight.value) return
+  settingsLoadInFlight.value = true
+  try {
+    try { workspaceStore.init?.() } catch {}
+
+    const prefRes = await apiGetPrefs(uid).catch((error) => {
+      console.warn('[Settings] preferences load failed', error?.message || error)
+      return {}
+    })
+    applySettingsPreferences(prefRes || {})
+
+    const resInts = await getIntegrations(uid).catch((error) => {
+      console.warn('[Settings] integrations load failed', error?.message || error)
+      return {}
+    })
+    applyIntegrationEndpoints(resInts || {})
+
+    await loadSettingsProfile(uid)
+    await loadGoogle({ suppressLoader: false })
+    loadedSettingsUid.value = uid
+  } finally {
+    settingsLoadInFlight.value = false
+  }
+}
+
 const isPremium = computed(() => {
   try {
     const planCandidates = [
@@ -897,9 +1006,6 @@ onMounted(async () => {
     // Ensure latest subscription state on entry
     try { await refreshPremium() } catch {}
     quickSetupStore.refreshQuickSetupState()
-    if (authStore?.user?.uid) {
-      try { workspaceStore.init?.() } catch {}
-    }
     try {
       if (activeTab.value === 'account-notifications') {
         setTimeout(() => focusNotifications(), 150)
@@ -908,68 +1014,13 @@ onMounted(async () => {
         setTimeout(() => focusGptCard(true), 400)
       }
     } catch {}
-    if (authStore.user) {
-      const res = await apiGetPrefs(authStore.user.uid)
-      const n = res?.notifications || {}
-      const ints = res?.integrations || {}
-      // Prefer channels[] if present; fallback to boolean keys
-      const chans = Array.isArray(n?.channels) ? n.channels : null
-      if (chans) {
-        const set = new Set(chans)
-        prefs.email = set.has('email') || !!n.email || true
-        prefs.pwa = canUseBrowserPush.value ? (set.has('pwa') || !!n.push || true) : false
-        prefs.whatsapp = set.has('whatsapp') || !!n.whatsapp || true
-        prefs.sms = set.has('sms') || !!n.sms || false
-        prefs.voice_call = set.has('voice_call') || !!n.voice_call || false
-      } else {
-        // default to all if not specified
-        prefs.email = n.email !== undefined ? !!n.email : true
-        prefs.pwa = canUseBrowserPush.value ? (n.push !== undefined ? !!n.push : true) : false
-        prefs.whatsapp = n.whatsapp !== undefined ? !!n.whatsapp : true
-        prefs.sms = !!n.sms
-        prefs.voice_call = !!n.voice_call
-      }
-      prefs.discord = !!n.discord
-      // derive legacy calls flag for UI blocks that reference it
-      prefs.calls = !!(n.calls || prefs.sms || prefs.voice_call)
-
-      notifPhones.value = { sms: n.phone_sms || '', voice: n.phone_voice || '' }
-
-      integrationOptions.forEach(i => { i.selected = !!ints[i.key] })
-
-      const resInts = await getIntegrations(authStore.user.uid)
-      integrationEndpoints.value = {
-        whatsapp: { phone: resInts?.whatsapp?.phone || '' },
-        sms: { phone: resInts?.sms?.phone || '' },
-        discord: { webhook: resInts?.discord?.webhook || '' },
-        slack: { userId: resInts?.slack?.userId || '', token: resInts?.slack?.token || '' },
-        email: resInts?.email || authStore.user.email || ''
-      }
-
-      const meetingsPref = res?.meetings || {}
-      meetingPrefs.autoCreate = meetingsPref.autoCreateCalendarTasks !== false
-      meetingPrefs.defaultReminderMinutes = sanitizeReminderMinutes(
-        meetingsPref.defaultReminderMinutes ?? meetingsPref.defaultMeetingReminderMinutes ?? DEFAULT_MEETING_REMINDER,
-      )
-
-      // Load profile fields and compute profile completion
-      try {
-        const u = auth.currentUser
-        if (u?.uid) {
-          const uref = doc(db, 'users', u.uid)
-          const usnap = await getDoc(uref)
-          const udata = usnap.exists() ? (usnap.data() || {}) : {}
-          profileForm.name = udata.name || u.displayName || ''
-          profileForm.email = udata.email || u.email || ''
-          profileForm.phone = udata.phone || u.phoneNumber || ''
-          profileComplete.value = !!(udata.name || u.displayName)
-        }
-      } catch {}
-    }
   } catch (e) {
     console.warn('Failed to load preferences', e)
   }
-  try { await loadGoogle() } catch {}
+  if (!authStore.user?.uid) {
+    googleLoading.value = false
+    applyProfileFields(auth.currentUser || authStore.user || null, {})
+  }
 })
 
 // Optional: auto-save debounce can be added later. For now, use Save button.
@@ -1239,6 +1290,20 @@ async function loadGoogle(options = {}) {
     if (!suppressLoader) googleLoading.value = false
   }
 }
+
+watch(
+  () => authStore.user?.uid,
+  async (uid) => {
+    if (!uid) {
+      loadedSettingsUid.value = ''
+      googleLoading.value = false
+      return
+    }
+    if (loadedSettingsUid.value === uid && !settingsLoadInFlight.value) return
+    await hydrateSettingsForUser(uid)
+  },
+  { immediate: true },
+)
 
 async function saveSelection() {
   try {

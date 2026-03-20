@@ -542,11 +542,16 @@ async function submitReflection() {
   }
 }
 
-onMounted(() => {
-  loadGoals()
-  loadSummary()
-  loadReflections()
-})
+watch(
+  () => authStore.user?.uid,
+  (uid) => {
+    if (!uid) return
+    loadGoals()
+    loadSummary()
+    loadReflections()
+  },
+  { immediate: true },
+)
 </script>
 
 <style scoped>

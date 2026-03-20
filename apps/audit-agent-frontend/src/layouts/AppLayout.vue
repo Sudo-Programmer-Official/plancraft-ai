@@ -746,7 +746,18 @@ function toggleGroup(key) {
 }
 
 function isActive(path) {
-  return route.path.startsWith(path)
+  const target = String(path || '').trim()
+  if (!target) return false
+  const [pathname, search = ''] = target.split('?')
+  if (!pathname || !route.path.startsWith(pathname)) return false
+  if (!search) return true
+
+  try {
+    const expectedParams = new URLSearchParams(search)
+    return Array.from(expectedParams.entries()).every(([key, value]) => String(route.query?.[key] ?? '') === value)
+  } catch {
+    return route.path.startsWith(pathname)
+  }
 }
 
 const coreNavItems = [
@@ -790,6 +801,7 @@ const navGroups = [
     collapsible: true,
     defaultOpen: false,
     children: [
+      { label: 'Quick Setup', icon: '✨', to: '/settings?tab=account-quick-setup' },
       { label: 'Notifications', icon: '🔔', to: '/settings?tab=account-notifications' },
       { label: 'Integrations', icon: '🔗', to: '/settings?tab=integrations' },
     ],
@@ -833,7 +845,6 @@ const navGroups = [
     defaultOpen: false,
     children: [
       { label: 'Talk to Planner', icon: '🎤', to: '/talk-to-planner' },
-      { label: 'Napkin', icon: '🧾', to: '/napkin' },
     ],
   },
 ]

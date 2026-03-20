@@ -341,9 +341,26 @@ async function getVisionUploader() {
   return visionUploadLoader
 }
 
-onMounted(async () => {
-  logs.value = await fetchEntries()
-})
+async function loadJournalEntries() {
+  try {
+    logs.value = await fetchEntries()
+  } catch (err) {
+    console.warn('[JournalView] entry load failed', err?.message || err)
+    logs.value = []
+  }
+}
+
+watch(
+  () => authStore.user?.uid,
+  (uid) => {
+    if (!uid) {
+      logs.value = []
+      return
+    }
+    loadJournalEntries()
+  },
+  { immediate: true },
+)
 
 const filteredLogs = computed(() =>
   [...logs.value].sort((a, b) => (b.timestamp || b.createdAt || 0) - (a.timestamp || a.createdAt || 0)),

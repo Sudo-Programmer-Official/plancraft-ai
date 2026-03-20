@@ -3,7 +3,7 @@
     v-model="open"
     class="setup-prompt"
     modal-class="setup-prompt-overlay"
-    width="620px"
+    width="min(620px, calc(100vw - 24px))"
     :close-on-click-modal="false"
     :show-close="true"
     :destroy-on-close="false"
@@ -53,6 +53,9 @@
         <div class="h-2 overflow-hidden rounded-full bg-white/10">
           <div class="setup-progress-bar" :style="{ width: `${setupState.completionPercent}%` }" />
         </div>
+        <p v-if="refreshingRemote" class="text-xs text-indigo-200/80">
+          Syncing your saved setup details...
+        </p>
         <div class="flex flex-wrap gap-2">
           <span
             v-for="step in setupState.steps"
@@ -184,20 +187,24 @@
     </div>
 
     <template #footer>
-      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <span class="text-xs text-slate-400 text-center sm:text-left">
+      <div class="setup-prompt__footer">
+        <span class="setup-prompt__footer-copy">
           You can continue later from the dashboard setup banner or
           <RouterLink to="/settings?tab=account-quick-setup" class="text-indigo-300 hover:text-indigo-200 underline">
             Settings → Quick Setup
           </RouterLink>.
         </span>
-        <div class="flex flex-wrap items-center justify-center gap-2">
-          <el-button class="!rounded-lg" :disabled="saving" @click="dismiss">
+        <div class="setup-prompt__footer-actions">
+          <el-button
+            class="setup-prompt__footer-button setup-prompt__footer-button--secondary !rounded-lg"
+            :disabled="saving"
+            @click="dismiss"
+          >
             Later
           </el-button>
           <el-button
             type="primary"
-            class="!rounded-lg font-semibold"
+            class="setup-prompt__footer-button !rounded-lg font-semibold"
             :loading="saving"
             @click="saveAndClose"
           >
@@ -243,6 +250,7 @@ const open = ref(props.open)
 const contentReady = ref(false)
 const hasLoadedOnce = ref(false)
 const loading = ref(false)
+const refreshingRemote = ref(false)
 const saving = ref(false)
 const loadingPush = ref(false)
 const saveError = ref('')
@@ -253,6 +261,7 @@ const reminderPhone = ref('')
 const pushGranted = ref(false)
 const showLoadingShell = computed(() => loading.value && !contentReady.value)
 let suppressDialogCloseEmit = false
+const loadedRemoteUserId = ref('')
 
 const showBrowserNotifications = computed(() => !isNativePackagedApp())
 const timezoneReady = computed(() => !!tz.value && tz.value !== 'UTC')
@@ -311,6 +320,25 @@ const setupState = computed(() =>
 )
 const missingRequiredLabels = computed(() => getIncompleteQuickSetupLabels(setupState.value))
 
+function withTimeout(promise, ms = 8000, label = 'request') {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    Promise.resolve(promise)
+      .then((value) => {
+        clearTimeout(timer)
+        resolve(value)
+      })
+      .catch((error) => {
+        clearTimeout(timer)
+        reject(error)
+      })
+  })
+}
+
+function getSetupUserId() {
+  return authStore?.user?.uid || localStorage.getItem('uid') || ''
+}
+
 function markDirty() {
   dirty.value = true
   saveError.value = ''
@@ -360,14 +388,35 @@ async function loadSetup() {
     tz.value = stored?.timezone || guessedTz || 'UTC'
     reminderPhone.value = stored?.phone || ''
     applyChannels(stored?.channels?.length ? stored.channels : ['email'])
+    emitSetupState()
+    contentReady.value = true
+    hasLoadedOnce.value = true
+    dirty.value = false
+    loading.value = false
 
-    const userId = authStore?.user?.uid || localStorage.getItem('uid')
+    const userId = getSetupUserId()
+    loadedRemoteUserId.value = userId || ''
     if (userId) {
-      const [prefData, integrationsData, userSnap] = await Promise.all([
-        getPreferences(userId).catch(() => ({})),
-        getIntegrations(userId).catch(() => ({})),
-        getDoc(doc(db, 'users', userId)).catch(() => null),
+      refreshingRemote.value = true
+      const [prefResult, integrationsResult, userResult] = await Promise.allSettled([
+        withTimeout(getPreferences(userId), 8000, 'quick setup preferences'),
+        withTimeout(getIntegrations(userId), 8000, 'quick setup integrations'),
+        withTimeout(getDoc(doc(db, 'users', userId)), 8000, 'quick setup profile'),
       ])
+
+      const prefData = prefResult.status === 'fulfilled' ? (prefResult.value || {}) : {}
+      const integrationsData = integrationsResult.status === 'fulfilled' ? (integrationsResult.value || {}) : {}
+      const userSnap = userResult.status === 'fulfilled' ? userResult.value : null
+
+      if (prefResult.status === 'rejected') {
+        console.warn('[QuickSetup] preferences load failed', prefResult.reason?.message || prefResult.reason)
+      }
+      if (integrationsResult.status === 'rejected') {
+        console.warn('[QuickSetup] integrations load failed', integrationsResult.reason?.message || integrationsResult.reason)
+      }
+      if (userResult.status === 'rejected') {
+        console.warn('[QuickSetup] profile load failed', userResult.reason?.message || userResult.reason)
+      }
 
       existingPreferenceIntegrations.value = {
         googleCalendar: !!prefData?.integrations?.googleCalendar,
@@ -392,19 +441,21 @@ async function loadSetup() {
         email: integrationsData?.email || authStore?.user?.email || '',
       }
 
-      const loadedChannels = deriveChannels(prefData?.notifications || {})
-      if (loadedChannels.length) applyChannels(loadedChannels)
+      if (!dirty.value) {
+        const loadedChannels = deriveChannels(prefData?.notifications || {})
+        if (loadedChannels.length) applyChannels(loadedChannels)
 
-      const userData = userSnap?.exists?.() ? (userSnap.data() || {}) : {}
-      reminderPhone.value =
-        integrationsData?.sms?.phone ||
-        integrationsData?.whatsapp?.phone ||
-        userData?.phone ||
-        authStore?.user?.phone ||
-        reminderPhone.value
+        const userData = userSnap?.exists?.() ? (userSnap.data() || {}) : {}
+        reminderPhone.value =
+          integrationsData?.sms?.phone ||
+          integrationsData?.whatsapp?.phone ||
+          userData?.phone ||
+          authStore?.user?.phone ||
+          reminderPhone.value
+      }
+      emitSetupState()
     }
 
-    emitSetupState()
     if (setupState.value.completed && props.launchSource === 'auto') {
       suppressDialogCloseEmit = true
       open.value = false
@@ -413,7 +464,7 @@ async function loadSetup() {
   } catch (error) {
     saveError.value = error?.message || 'Failed to load quick setup.'
   } finally {
-    dirty.value = false
+    refreshingRemote.value = false
     loading.value = false
     contentReady.value = true
     hasLoadedOnce.value = true
@@ -489,7 +540,7 @@ async function persistQuickSetup() {
 
     if (userId) {
       const channels = selectedChannels.value
-      await updatePreferences(userId, {
+      await withTimeout(updatePreferences(userId, {
         notifications: {
           email: channels.includes('email'),
           push: channels.includes('pwa'),
@@ -505,7 +556,7 @@ async function persistQuickSetup() {
           enabled: channels.length > 0,
           channels,
         },
-      })
+      }), 10000, 'quick setup preferences save')
 
       const mergedIntegrations = {
         ...existingIntegrations.value,
@@ -519,14 +570,18 @@ async function persistQuickSetup() {
         },
       }
 
-      await updateIntegrations(userId, mergedIntegrations)
-      await setDoc(
-        doc(db, 'users', userId),
-        {
-          phone: normalizedPhone || undefined,
-          updatedAt: new Date(),
-        },
-        { merge: true }
+      await withTimeout(updateIntegrations(userId, mergedIntegrations), 10000, 'quick setup integrations save')
+      await withTimeout(
+        setDoc(
+          doc(db, 'users', userId),
+          {
+            phone: normalizedPhone || undefined,
+            updatedAt: new Date(),
+          },
+          { merge: true }
+        ),
+        10000,
+        'quick setup profile save'
       )
 
       authStore.user = {
@@ -567,12 +622,11 @@ async function saveAndClose() {
   else emit('close')
 }
 
-async function dismiss() {
-  if (dirty.value) {
-    await persistQuickSetup()
-  } else {
-    emitSetupState()
-  }
+function dismiss() {
+  saveError.value = ''
+  saveSuccess.value = ''
+  emitSetupState()
+  dirty.value = false
   snoozeQuickSetup(24)
   suppressDialogCloseEmit = true
   open.value = false
@@ -605,6 +659,14 @@ onMounted(async () => {
     await ensureSetupLoaded()
   }
 })
+
+watch(
+  () => authStore.user?.uid,
+  async (uid) => {
+    if (!open.value || !uid || uid === loadedRemoteUserId.value) return
+    await ensureSetupLoaded(true)
+  }
+)
 </script>
 
 <style scoped>
@@ -614,6 +676,8 @@ onMounted(async () => {
 }
 
 .setup-prompt :deep(.el-dialog) {
+  width: min(620px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
   background: radial-gradient(circle at top left, #1e1b4b 0%, #312e81 45%, #4c1d95 100%);
   color: #e2e8f0;
   border-radius: 1rem;
@@ -740,6 +804,83 @@ onMounted(async () => {
   border-color: rgba(129, 140, 248, 0.45);
   background: rgba(79, 70, 229, 0.18);
   box-shadow: 0 0 0 1px rgba(129, 140, 248, 0.18);
+}
+
+.setup-prompt__footer {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.85rem;
+}
+
+.setup-prompt__footer-copy {
+  font-size: 0.75rem;
+  line-height: 1.45;
+  text-align: center;
+  color: #94a3b8;
+}
+
+.setup-prompt__footer-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.setup-prompt__footer-button {
+  width: 100%;
+  min-height: 2.75rem;
+  margin: 0 !important;
+}
+
+.setup-prompt__footer-button--secondary {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.96);
+  color: #4338ca;
+}
+
+@media (min-width: 640px) {
+  .setup-prompt__footer {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .setup-prompt__footer-copy {
+    flex: 1;
+    text-align: left;
+  }
+
+  .setup-prompt__footer-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    width: auto;
+  }
+
+  .setup-prompt__footer-button {
+    width: auto;
+    min-width: 8.5rem;
+  }
+}
+
+@media (max-width: 639px) {
+  .setup-prompt :deep(.el-dialog) {
+    margin-top: 3vh !important;
+  }
+
+  .setup-prompt :deep(.el-dialog__body) {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .setup-prompt :deep(.el-dialog__footer) {
+    padding-top: 0.5rem;
+  }
+
+  .setup-card__header {
+    flex-direction: column;
+  }
 }
 
 @keyframes fadeIn {

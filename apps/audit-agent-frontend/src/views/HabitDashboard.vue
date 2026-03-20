@@ -356,9 +356,14 @@ function goToPlanner() {
   router.push('/talk-to-planner')
 }
 
-onMounted(() => {
-  loadData()
-})
+watch(
+  () => authStore.user?.uid,
+  (uid) => {
+    if (!uid) return
+    loadData()
+  },
+  { immediate: true },
+)
 
 onBeforeUnmount(() => {
   if (audioRef.value) {

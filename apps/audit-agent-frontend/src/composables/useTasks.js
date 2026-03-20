@@ -23,6 +23,7 @@ const activeFilter = ref(makeDefaultFilter())
 let initialized = false
 let refreshListenerAttached = false
 let workspaceWatchAttached = false
+let authWatchAttached = false
 let refreshPromise = null
 let lastRolloverKey = null
 
@@ -506,6 +507,30 @@ export function useTasks() {
       workspaceWatchAttached = true
     } catch (err) {
       console.warn('[useTasks] failed to attach workspace watcher', err?.message || err)
+    }
+  }
+  if (!authWatchAttached) {
+    try {
+      watch(
+        () => authStore.user?.uid,
+        async (uid) => {
+          if (!uid) {
+            allTasks.value = []
+            tasks.value = []
+            initialized = false
+            return
+          }
+          initialized = false
+          await refreshAllTasks(true).catch((err) =>
+            console.warn('[useTasks] auth refresh failed', err?.message || err),
+          )
+          syncFiltered()
+        },
+        { immediate: true },
+      )
+      authWatchAttached = true
+    } catch (err) {
+      console.warn('[useTasks] failed to attach auth watcher', err?.message || err)
     }
   }
 
