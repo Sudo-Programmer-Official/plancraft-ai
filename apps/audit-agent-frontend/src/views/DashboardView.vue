@@ -1644,7 +1644,7 @@ watch(
 )
 
 /* -------------- Tasks + Journal state -------------- */
-const { loadTasks, allTasks, moveTasks, refreshAllTasks } = useTasks()
+const { allTasks, moveTasks, refreshAllTasks, mergeTasksLocally } = useTasks()
 const aiSummary = ref(null)
 const dailyTasks = ref([])
 const weeklyTasks = ref([])
@@ -2392,27 +2392,32 @@ function toggleTodayFullscreen() {
   }
 }
 
-function reloadDaily() {
-  return loadTasks().then(() => {
-    syncDashboardTaskBuckets(allTasks.value)
-    dashboardTasksLoading.value = false
-  })
+function applySavedTasksToDashboard(taskEntries = []) {
+  const applied = mergeTasksLocally(taskEntries)
+  syncDashboardTaskBuckets(allTasks.value)
+  dashboardTasksLoading.value = false
+  return applied
 }
 
 async function handleSave(payload) {
   if (Array.isArray(payload)) {
     console.info('[TaskCreate] dashboard received generated tasks', { count: payload.length })
-    await loadTasks()
-    return reloadDaily()
+    applySavedTasksToDashboard(payload)
+    closePlanner()
+    await nextTick()
+    if (dailyList.value) dailyList.value.scrollTop = 0
+    return
   }
+  let savedPayload = payload
   if (payload.id) {
     await updateTaskInFirebase(payload)
   } else {
     const saved = await addTaskToFirebase(payload)
     payload.id = saved.id
     if (saved?.__notifyMeta) payload.__notifyMeta = saved.__notifyMeta
+    savedPayload = saved
   }
-  await reloadDaily()
+  applySavedTasksToDashboard([savedPayload])
   closePlanner()
   await nextTick()
   if (dailyList.value) dailyList.value.scrollTop = 0

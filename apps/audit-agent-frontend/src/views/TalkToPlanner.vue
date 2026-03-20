@@ -62,8 +62,8 @@
     </header>
 
     <transition name="toast-fade">
-      <div v-if="micState === MIC_STATES.listening" class="listening-toast">
-        Planner is listening…
+      <div v-if="micState === MIC_STATES.listening || micState === MIC_STATES.processing" class="listening-toast">
+        {{ micState === MIC_STATES.processing ? 'Planner is transcribing…' : 'Planner is listening… Tap again to stop.' }}
       </div>
     </transition>
 
@@ -308,7 +308,6 @@ import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { queryPlannerAssistant } from '@/services/plannerService'
 import { requestSpeechUrl, supportsWebSpeech, speakWithWebSpeech } from '@/services/ttsService'
 import { useAuthStore } from '@/stores/authStore'
-import { recordAndSendToBackend } from '@/utils/backendRecorder'
 import { ElMessage } from 'element-plus'
 import { trackEvent, trackAISuggestionAccepted } from '@/services/analytics'
 import { auth } from '@/firebase/init'
@@ -317,7 +316,7 @@ import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
 import { useSeoMeta } from '@/composables/useSeoMeta'
-import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
+import { useAudioRecorder } from '@/composables/useAudioRecorder'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -338,16 +337,6 @@ const inputText = ref('')
 const chatContainer = ref(null)
 const chatInputRef = ref(null)
 const messageSeed = ref(0)
-const isTranscribing = ref(false)
-const prefersNativeVoiceFallback = isNativePackagedApp()
-const SpeechRecognitionClass =
-  !prefersNativeVoiceFallback && typeof window !== 'undefined'
-    ? window.SpeechRecognition || window.webkitSpeechRecognition
-    : null
-const hasSpeechRecognitionInput = Boolean(SpeechRecognitionClass)
-const SILENCE_TIMEOUT_MS = Number(import.meta.env.VITE_PLANNER_SILENCE_TIMEOUT_MS || 2500)
-const AUTO_RESTART_DELAY_MS = Number(import.meta.env.VITE_PLANNER_RESTART_DELAY_MS || 900)
-const AUTO_IDLE_DISENGAGE_MS = Number(import.meta.env.VITE_PLANNER_IDLE_TIMEOUT_MS || 45000)
 const MIC_STATES = Object.freeze({
   idle: 'idle',
   listening: 'listening',
@@ -376,18 +365,6 @@ const micButtonLabel = computed(() => {
       return 'Start recording'
   }
 })
-let speechRecognitionInstance = null
-let backendRecorderInstance = null
-let silenceTimerId = null
-let restartTimerId = null
-let idleDisengageTimerId = null
-let pendingSegmentText = ''
-let latestPreviewText = ''
-let keepListeningHot = false
-let manualStopRequested = false
-let backendStopping = false
-let webStopping = false
-let voiceEngine = hasSpeechRecognitionInput ? 'web' : 'backend'
 
 const VOICE_PREF_KEY = 'planner_voice_enabled'
 const DEFAULT_VOICE_ENABLED = true
@@ -395,7 +372,7 @@ const isVoiceOn = ref(DEFAULT_VOICE_ENABLED)
 const voiceRequestingFor = ref(null)
 const activeAudio = ref(null)
 const audioCleanupMap = new WeakMap()
-const hasWebSpeech = !prefersNativeVoiceFallback && supportsWebSpeech()
+const hasWebSpeech = supportsWebSpeech()
 let voiceRequestToken = 0
 const lastAutoSpokenMessageId = ref(null)
 const VOICE_PLAYBACK_RATE = Number(import.meta.env.VITE_ASSISTANT_VOICE_RATE || 0.92)
@@ -406,6 +383,32 @@ const SILENT_AUDIO_DATA_URI =
   'data:audio/wav;base64,UklGRpYDAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YXIDAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
 let voicePlaybackUnlocked = false
 let voiceUnlockPromise = null
+
+const {
+  state: plannerRecorderState,
+  errorMessage: plannerRecorderError,
+  startRecording: startPlannerRecording,
+  stopRecording: stopPlannerRecording,
+  resetRecorder: resetPlannerRecording,
+} = useAudioRecorder({
+  logPrefix: '[TalkToPlanner][VoiceRecorder]',
+  onTranscription: async (text) => {
+    const cleaned = String(text || '').trim()
+    if (!cleaned) return
+    stageVoiceResult(cleaned)
+    try {
+      trackEvent('Voice Transcribed', { length: cleaned.length, surface: 'talk_to_planner' })
+    } catch (_) {}
+    await nextTick()
+    syncComposerHeight()
+    try {
+      chatInputRef.value?.focus?.()
+    } catch {
+      /* noop */
+    }
+    resetPlannerRecording()
+  },
+})
 
 function formatTextForVoice(text) {
   if (!text) return ''
@@ -664,7 +667,13 @@ watch(
   },
 )
 
-const sendDisabled = computed(() => assistantThinking.value || !inputText.value.trim())
+const sendDisabled = computed(
+  () =>
+    assistantThinking.value ||
+    micState.value === MIC_STATES.listening ||
+    micState.value === MIC_STATES.processing ||
+    !inputText.value.trim(),
+)
 
 function syncComposerHeight() {
   const composer = chatInputRef.value
@@ -692,24 +701,24 @@ function clearChat() {
   voiceRequestingFor.value = null
   inputText.value = ''
   stopVoicePlayback()
-  stopRecording().catch(() => {})
+  resetPlannerRecording()
+  applyMicState(MIC_STATES.idle)
 }
 
 async function sendMessage() {
   const payload = inputText.value.trim()
   if (!payload || assistantThinking.value) return
   await ensureVoicePlaybackUnlocked()
-  try {
-    await sendQuery(payload)
-  } finally {
-    if (!keepListeningHot) {
-      applyMicState(MIC_STATES.idle)
-    }
-  }
+  await sendQuery(payload)
+  applyMicState(MIC_STATES.idle)
 }
 
 async function handleMicButton() {
   if (micState.value === MIC_STATES.processing) return
+  if (plannerRecorderState.value === 'recording') {
+    await stopRecording()
+    return
+  }
   await startRecording()
 }
 
@@ -1060,248 +1069,37 @@ function formatResultMessage(action = {}) {
   return action?.message || null
 }
 
-function handleVoiceTranscript(text) {
-  if (!text) return
-  clearIdleDisengageTimer()
-  latestPreviewText = text
-}
-
-
 async function startRecording() {
-  try {
-    if (!keepListeningHot) {
-      await ensureVoicePlaybackUnlocked()
-      await beginContinuousListening()
-    } else {
-      await stopRecording()
-    }
-  } catch (err) {
-    console.error('🎤 Recording error:', err)
-    keepListeningHot = false
-    manualStopRequested = false
-    clearSilenceTimer()
-    clearRestartTimer()
-    applyMicState(MIC_STATES.error)
-    isTranscribing.value = false
-    ElMessage.error('Microphone unavailable. Please check permissions.')
-  }
-}
-
-async function beginContinuousListening() {
   if (assistantThinking.value) {
     ElMessage.info('Wait for the planner to finish before recording again.')
     return
   }
-  latestPreviewText = ''
-  pendingSegmentText = ''
-  keepListeningHot = true
-  manualStopRequested = false
-  clearSilenceTimer()
-  clearRestartTimer()
-  clearIdleDisengageTimer()
-  if (voiceEngine === 'web' && hasSpeechRecognitionInput) {
-    startWebSpeechSession()
-  } else {
-    voiceEngine = 'backend'
-    await startBackendSession()
+  try {
+    await ensureVoicePlaybackUnlocked()
+    voiceRequestToken += 1
+    voiceRequestingFor.value = null
+    stopVoicePlayback()
+    await startPlannerRecording()
+  } catch (err) {
+    console.error('[TalkToPlanner] recording start failed', err)
+    applyMicState(MIC_STATES.error)
+    ElMessage.error(plannerRecorderError.value || 'Microphone unavailable. Please check permissions.')
   }
 }
 
 async function stopRecording() {
-  const bufferedTranscript = String(pendingSegmentText || latestPreviewText || '').trim()
-  keepListeningHot = false
-  manualStopRequested = true
-  clearSilenceTimer()
-  clearRestartTimer()
-  clearIdleDisengageTimer()
-  if (voiceEngine === 'web') {
-    if (speechRecognitionInstance) {
-      pendingSegmentText = bufferedTranscript
-      latestPreviewText = bufferedTranscript
-      if (bufferedTranscript) {
-        webStopping = true
-        applyMicState(MIC_STATES.processing)
-      }
-      try {
-        speechRecognitionInstance.stop()
-      } catch (err) {
-        console.warn('[TalkToPlanner] Failed to stop recognition cleanly', err)
-        speechRecognitionInstance = null
-        webStopping = false
-        if (bufferedTranscript) {
-          await commitVoiceSegment(bufferedTranscript)
-        } else {
-          applyMicState(MIC_STATES.idle)
-        }
-      }
-    } else {
-      if (bufferedTranscript) {
-        await commitVoiceSegment(bufferedTranscript)
-      } else {
-        applyMicState(MIC_STATES.idle)
-      }
-    }
-  } else if (backendRecorderInstance) {
-    backendStopping = true
-    try {
-      applyMicState(MIC_STATES.processing)
-      await backendRecorderInstance._stop()
-    } catch {
-      /* noop */
-    } finally {
-      backendRecorderInstance = null
-      backendStopping = false
-      if (!keepListeningHot || manualStopRequested) {
-        applyMicState(MIC_STATES.idle)
-      }
-    }
-  } else if (bufferedTranscript) {
-    await commitVoiceSegment(bufferedTranscript)
-  } else {
-    applyMicState(MIC_STATES.idle)
+  try {
+    await stopPlannerRecording()
+  } catch (err) {
+    console.error('[TalkToPlanner] recording stop failed', err)
+    applyMicState(MIC_STATES.error)
+    ElMessage.error(plannerRecorderError.value || 'Stopping the recording failed.')
   }
 }
 
 function applyMicState(state) {
   if (micState.value === state) return
   micState.value = state
-  if (state === MIC_STATES.processing) {
-    isTranscribing.value = true
-  } else if (state === MIC_STATES.idle || state === MIC_STATES.error) {
-    isTranscribing.value = false
-  } else if (state === MIC_STATES.paused || state === MIC_STATES.listening) {
-    isTranscribing.value = false
-  }
-}
-
-function clearSilenceTimer() {
-  if (silenceTimerId) {
-    clearTimeout(silenceTimerId)
-    silenceTimerId = null
-  }
-}
-
-function clearRestartTimer() {
-  if (restartTimerId) {
-    clearTimeout(restartTimerId)
-    restartTimerId = null
-  }
-}
-
-function clearIdleDisengageTimer() {
-  if (idleDisengageTimerId) {
-    clearTimeout(idleDisengageTimerId)
-    idleDisengageTimerId = null
-  }
-}
-
-function scheduleIdleDisengage() {
-  if (AUTO_IDLE_DISENGAGE_MS <= 0) return
-  if (typeof window === 'undefined') return
-  if (!keepListeningHot) return
-  clearIdleDisengageTimer()
-  idleDisengageTimerId = window.setTimeout(() => {
-    idleDisengageTimerId = null
-    autoDisengageAfterIdle()
-  }, AUTO_IDLE_DISENGAGE_MS)
-}
-
-async function autoDisengageAfterIdle() {
-  if (!keepListeningHot) return
-  try {
-    await stopRecording()
-  } catch (err) {
-    console.warn('[TalkToPlanner] auto mic stop failed', err)
-  } finally {
-    // ElMessage.info('Planner stopped listening after a short pause.')
-  }
-}
-
-function scheduleSilenceCheck() {
-  if (typeof window === 'undefined') return
-  if (!latestPreviewText || !latestPreviewText.trim()) return
-  clearSilenceTimer()
-  silenceTimerId = window.setTimeout(() => {
-    finalizeCurrentSegment()
-  }, SILENCE_TIMEOUT_MS)
-}
-
-function finalizeCurrentSegment() {
-  if (!keepListeningHot || manualStopRequested) return
-  if (voiceEngine === 'web') {
-    if (!latestPreviewText || !latestPreviewText.trim()) return
-    finalizeWebSpeechSegment()
-  } else {
-    finalizeBackendSegment().catch((err) => {
-      console.error('[TalkToPlanner] backend finalize failed', err)
-    })
-  }
-}
-
-function finalizeWebSpeechSegment() {
-  if (!speechRecognitionInstance || webStopping) return
-  const transcript = (latestPreviewText || '').trim()
-  if (!transcript) return
-  pendingSegmentText = transcript
-  webStopping = true
-  applyMicState(MIC_STATES.processing)
-  clearSilenceTimer()
-  try {
-    speechRecognitionInstance.stop()
-  } catch (err) {
-    webStopping = false
-    console.error('[TalkToPlanner] failed to stop recognition', err)
-  }
-}
-
-async function finalizeBackendSegment() {
-  if (!backendRecorderInstance || backendStopping) return
-  backendStopping = true
-  clearSilenceTimer()
-  applyMicState(MIC_STATES.processing)
-  try {
-    await backendRecorderInstance._stop()
-  } catch (err) {
-    console.error('[TalkToPlanner] Whisper stop failed', err)
-  } finally {
-    backendRecorderInstance = null
-    backendStopping = false
-    if (keepListeningHot && !manualStopRequested) {
-      applyMicState(MIC_STATES.paused)
-      restartTimerId = window.setTimeout(() => {
-        if (!keepListeningHot) return
-        startBackendSession().catch((startErr) => {
-          console.error('[TalkToPlanner] failed to restart backend recorder', startErr)
-          keepListeningHot = false
-          applyMicState(MIC_STATES.error)
-        })
-      }, AUTO_RESTART_DELAY_MS)
-    } else if (!keepListeningHot) {
-      applyMicState(MIC_STATES.idle)
-    }
-  }
-}
-
-async function processVoiceSegment(text) {
-  const cleaned = String(text || '').trim()
-  if (!cleaned) return
-  stageVoiceResult(cleaned)
-  trackEvent('Voice Transcribed', { length: cleaned.length })
-}
-
-async function commitVoiceSegment(text) {
-  const cleaned = String(text || '').trim()
-  pendingSegmentText = ''
-  latestPreviewText = ''
-  if (!cleaned) {
-    applyMicState(MIC_STATES.idle)
-    return false
-  }
-  applyMicState(MIC_STATES.processing)
-  await processVoiceSegment(cleaned)
-  manualStopRequested = false
-  applyMicState(MIC_STATES.idle)
-  return true
 }
 
 function stageVoiceResult(text) {
@@ -1309,154 +1107,41 @@ function stageVoiceResult(text) {
   if (!cleaned) return
   const existing = inputText.value ? inputText.value.trim() : ''
   inputText.value = existing ? `${existing} ${cleaned}`.trim() : cleaned
-  latestPreviewText = ''
-  pendingSegmentText = ''
-  applyMicState(MIC_STATES.paused)
-  scheduleIdleDisengage()
-  keepListeningHot = false
-  manualStopRequested = true
-}
-
-function startWebSpeechSession() {
-  if (!hasSpeechRecognitionInput) {
-    voiceEngine = 'backend'
-    startBackendSession().catch((err) => {
-      console.error('[TalkToPlanner] fallback recorder failed', err)
-      applyMicState(MIC_STATES.error)
-    })
-    return
-  }
-  clearRestartTimer()
-  const recognition = new SpeechRecognitionClass()
-  speechRecognitionInstance = recognition
-  voiceEngine = 'web'
-  recognition.lang = navigator.language || 'en-US'
-  recognition.continuous = true
-  recognition.interimResults = true
-  let finalChunks = ''
-
-  recognition.onstart = () => {
-    finalChunks = ''
-    latestPreviewText = ''
-    applyMicState(MIC_STATES.listening)
-  }
-
-  recognition.onresult = (event) => {
-    let interim = ''
-    for (let i = event.resultIndex; i < event.results.length; i += 1) {
-      const transcript = event.results[i][0].transcript?.trim()
-      if (!transcript) continue
-      if (event.results[i].isFinal) {
-        finalChunks = `${finalChunks} ${transcript}`.trim()
-      } else {
-        interim = `${interim} ${transcript}`.trim()
-      }
-    }
-    latestPreviewText = `${finalChunks} ${interim}`.trim()
-    if (latestPreviewText) {
-      handleVoiceTranscript(latestPreviewText)
-      scheduleSilenceCheck()
-    }
-  }
-
-  recognition.onerror = (event) => {
-    console.error('[TalkToPlanner] Speech recognition error', event?.error || event)
-    if (event?.error === 'not-allowed' || event?.error === 'service-not-allowed') {
-      keepListeningHot = false
-      manualStopRequested = false
-      applyMicState(MIC_STATES.error)
-      return
-    }
-    voiceEngine = 'backend'
-    speechRecognitionInstance = null
-    clearSilenceTimer()
-    if (!keepListeningHot) {
-      applyMicState(MIC_STATES.idle)
-      return
-    }
-    startBackendSession().catch((errFallback) => {
-      console.error('[TalkToPlanner] fallback recorder failed', errFallback)
-      applyMicState(MIC_STATES.error)
-    })
-  }
-
-  recognition.onend = async () => {
-    clearSilenceTimer()
-    const segmentToSend = pendingSegmentText.trim()
-    pendingSegmentText = ''
-    speechRecognitionInstance = null
-    webStopping = false
-    let shouldRestart = keepListeningHot && !manualStopRequested
-    if (segmentToSend) {
-      try {
-        await commitVoiceSegment(segmentToSend)
-      } finally {
-        shouldRestart = keepListeningHot && !manualStopRequested
-      }
-    }
-    if (!shouldRestart) {
-      manualStopRequested = false
-      applyMicState(keepListeningHot ? MIC_STATES.paused : MIC_STATES.idle)
-      return
-    }
-    applyMicState(MIC_STATES.paused)
-    restartTimerId = window.setTimeout(() => {
-      if (keepListeningHot) {
-        startWebSpeechSession()
-      }
-    }, AUTO_RESTART_DELAY_MS)
-  }
-
-  try {
-    recognition.start()
-  } catch (err) {
-    console.error('[TalkToPlanner] Failed to start recognition', err)
-    speechRecognitionInstance = null
-    voiceEngine = 'backend'
-    if (keepListeningHot) {
-      startBackendSession().catch((startErr) => {
-        console.error('[TalkToPlanner] fallback recorder failed', startErr)
-        applyMicState(MIC_STATES.error)
-      })
-    } else {
-      applyMicState(MIC_STATES.idle)
-    }
-  }
-}
-
-async function startBackendSession() {
-  if (!keepListeningHot || backendRecorderInstance) return
-  clearRestartTimer()
-  latestPreviewText = ''
-  try {
-    backendRecorderInstance = await recordAndSendToBackend(handleBackendResult, {
-      emitFinalResult: true,
-    })
-    voiceEngine = 'backend'
-    applyMicState(MIC_STATES.listening)
-  } catch (err) {
-    backendRecorderInstance = null
-    keepListeningHot = false
-    applyMicState(MIC_STATES.error)
-    throw err
-  }
-}
-
-async function handleBackendResult(text, isFinal) {
-  const snippet = String(text || '').trim()
-  if (!snippet) return
-  latestPreviewText = snippet
-  await processVoiceSegment(snippet)
+  applyMicState(MIC_STATES.idle)
 }
 
 onBeforeUnmount(() => {
   stopVoicePlayback()
-  clearIdleDisengageTimer()
-  stopRecording().catch(() => {})
+  resetPlannerRecording()
   if (typeof window !== 'undefined') {
     window.removeEventListener('resize', syncComposerHeight)
   }
 })
+
+watch(
+  () => plannerRecorderState.value,
+  (state) => {
+    if (state === 'recording') {
+      applyMicState(MIC_STATES.listening)
+      return
+    }
+    if (state === 'transcribing') {
+      applyMicState(MIC_STATES.processing)
+      return
+    }
+    if (state === 'error') {
+      applyMicState(MIC_STATES.error)
+      if (plannerRecorderError.value) {
+        ElMessage.error(plannerRecorderError.value)
+      }
+      resetPlannerRecording()
+      return
+    }
+    if (state === 'idle') {
+      applyMicState(MIC_STATES.idle)
+    }
+  },
+)
 
 watch(
   inputText,

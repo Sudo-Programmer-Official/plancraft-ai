@@ -20,6 +20,14 @@ function canUseNativeAudioRecorder() {
   return !!Capacitor?.isNativePlatform?.()
 }
 
+function getPlatformName() {
+  return Capacitor.getPlatform?.() || 'web'
+}
+
+function prefersNativeAudioRecorder() {
+  return canUseNativeAudioRecorder() && getPlatformName() === 'ios'
+}
+
 function formatRecorderError(error) {
   if (!error) return { message: 'Unknown error', code: null }
   return {
@@ -291,6 +299,39 @@ export function useAudioRecorder(options = {}) {
     if (autoStopMs > 0) autoStopId = window.setTimeout(() => stopRecording('auto'), autoStopMs)
   }
 
+  const startBrowserRecording = async () => {
+    if (!navigator?.mediaDevices?.getUserMedia) throw new Error('Microphone unavailable')
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    const mimeType = pickMimeType()
+    recordedChunks = []
+
+    mediaRecorder = new MediaRecorder(stream, { mimeType })
+
+    const onData = (event) => {
+      if (event?.data?.size) recordedChunks.push(event.data)
+    }
+    const onStop = () => finalize('onstop')
+    const onError = (evt) => {
+      console.warn(`${logPrefix} recorder error`, evt?.error || evt)
+      finalize('error')
+    }
+
+    mediaRecorder.addEventListener('dataavailable', onData)
+    mediaRecorder.addEventListener('stop', onStop)
+    mediaRecorder.addEventListener('error', onError)
+    mediaRecorder.__listeners = { onData, onStop, onError }
+
+    mediaRecorder.start(1000)
+    state.value = 'recording'
+    console.log(`${logPrefix} recording started`, {
+      mimeType,
+      platform: getPlatformName(),
+      strategy: 'browser',
+    })
+    tickId = window.setInterval(() => (durationSeconds.value += 1), 1000)
+    if (autoStopMs > 0) autoStopId = window.setTimeout(() => stopRecording('auto'), autoStopMs)
+  }
+
   const startRecording = async () => {
     if (isRecording.value || isTranscribing.value) return
     cleanup(false)
@@ -299,67 +340,68 @@ export function useAudioRecorder(options = {}) {
     errorMessage.value = ''
     stopRequested = false
     stopHandled = false
+    const platform = getPlatformName()
+    const nativePreferred = prefersNativeAudioRecorder()
 
-    if (canUseNativeAudioRecorder()) {
+    if (nativePreferred) {
       try {
         await startNativeRecording()
         return
       } catch (nativeError) {
         const details = formatRecorderError(nativeError)
-        console.warn(`${logPrefix} native recorder start failed`, details)
-        console.error(`${logPrefix} start failed`, new Error(details.message || 'Native voice recording failed'))
-        errorMessage.value = details.message || 'Native voice recording failed'
-        state.value = 'error'
-        return
+        console.warn(`${logPrefix} native recorder start failed`, { ...details, platform, strategy: 'native-first' })
+        cleanup(false)
       }
     }
 
-    try {
-      if (!navigator?.mediaDevices?.getUserMedia) throw new Error('Microphone unavailable')
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mimeType = pickMimeType()
-      recordedChunks = []
-
-      mediaRecorder = new MediaRecorder(stream, { mimeType })
-
-      const onData = (event) => {
-        if (event?.data?.size) recordedChunks.push(event.data)
-      }
-      const onStop = () => finalize('onstop')
-      const onError = (evt) => {
-        console.warn(`${logPrefix} recorder error`, evt?.error || evt)
-        finalize('error')
-      }
-
-      mediaRecorder.addEventListener('dataavailable', onData)
-      mediaRecorder.addEventListener('stop', onStop)
-      mediaRecorder.addEventListener('error', onError)
-      mediaRecorder.__listeners = { onData, onStop, onError }
-
-      mediaRecorder.start(1000)
-      state.value = 'recording'
-      console.log(`${logPrefix} recording started`, { mimeType })
-      tickId = window.setInterval(() => (durationSeconds.value += 1), 1000)
-      if (autoStopMs > 0) autoStopId = window.setTimeout(() => stopRecording('auto'), autoStopMs)
-    } catch (err) {
-      console.warn(`${logPrefix} browser recorder unavailable`, formatRecorderError(err))
-      stopStreams()
-      if (!canUseBrowserAudioCapture()) {
-        console.error(`${logPrefix} start failed`, new Error('Voice recording is not available on this device'))
-        errorMessage.value = 'Voice recording is not available on this device'
-        state.value = 'error'
+    if (canUseBrowserAudioCapture()) {
+      try {
+        await startBrowserRecording()
         return
+      } catch (browserError) {
+        console.warn(`${logPrefix} browser recorder unavailable`, {
+          ...formatRecorderError(browserError),
+          platform,
+          strategy: nativePreferred ? 'native-then-browser' : 'browser-first',
+        })
+        cleanup(false)
       }
+    }
+
+    if (!nativePreferred && canUseNativeAudioRecorder()) {
+      try {
+        await startNativeRecording()
+        return
+      } catch (nativeError) {
+        const details = formatRecorderError(nativeError)
+        console.warn(`${logPrefix} native recorder fallback failed`, { ...details, platform, strategy: 'browser-then-native' })
+        cleanup(false)
+      }
+    }
+
+    if (canUseBrowserAudioCapture()) {
       try {
         await startFallbackRecorder()
-        console.log(`${logPrefix} fallback recorder active`)
-      } catch (fallbackError) {
-        console.error(`${logPrefix} start failed`, fallbackError)
-        errorMessage.value = formatRecorderError(fallbackError).message || 'Voice recording failed'
-        state.value = 'error'
+        console.log(`${logPrefix} fallback recorder active`, {
+          platform,
+          strategy: nativePreferred ? 'native-then-browser-fallback' : 'browser-fallback',
+        })
         return
+      } catch (fallbackError) {
+        console.error(`${logPrefix} fallback recorder failed`, {
+          ...formatRecorderError(fallbackError),
+          platform,
+        })
+        cleanup(false)
       }
     }
+
+    const unavailableMessage = nativePreferred
+      ? 'Voice recording is unavailable on this device'
+      : 'Voice recording failed to start on this device'
+    console.error(`${logPrefix} start failed`, new Error(unavailableMessage))
+    errorMessage.value = unavailableMessage
+    state.value = 'error'
   }
 
   const finalize = async (trigger) => {

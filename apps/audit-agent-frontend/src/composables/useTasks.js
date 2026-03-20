@@ -45,6 +45,11 @@ function makeDefaultFilter() {
   }
 }
 
+function normalizeWorkspaceId(value) {
+  const next = String(value || '').trim()
+  return next || null
+}
+
 export function useTasks() {
   const authStore = useAuthStore()
   const workspaceStore = useWorkspaceStore()
@@ -118,6 +123,17 @@ export function useTasks() {
   function normalizeList(raw) {
     const base = Array.isArray(raw) ? raw : []
     return base.map((task) => normalizeTask(task)).filter(Boolean)
+  }
+
+  function isCurrentWorkspaceTask(taskOrWorkspaceId) {
+    const activeWorkspaceId = normalizeWorkspaceId(workspaceStore?.activeWorkspaceId)
+    if (!activeWorkspaceId) return true
+    if (typeof taskOrWorkspaceId === 'string') {
+      const workspaceId = normalizeWorkspaceId(taskOrWorkspaceId)
+      return !workspaceId || workspaceId === activeWorkspaceId
+    }
+    const workspaceId = normalizeWorkspaceId(taskOrWorkspaceId?.workspaceId)
+    return !workspaceId || workspaceId === activeWorkspaceId
   }
 
   function sortTasks(list, sortBy = 'default', sortDir = 'desc') {
@@ -240,6 +256,31 @@ export function useTasks() {
     }
     await refreshAllTasks(true)
     syncFiltered(baseFilter)
+  }
+
+  function mergeTasksLocally(taskEntries = []) {
+    const normalized = normalizeList(taskEntries).filter((task) => task?.id && isCurrentWorkspaceTask(task))
+    if (!normalized.length) return false
+    const nextById = new Map(allTasks.value.map((task) => [task.id, task]))
+    normalized.forEach((task) => {
+      nextById.set(task.id, {
+        ...(nextById.get(task.id) || {}),
+        ...task,
+      })
+    })
+    allTasks.value = sortTasks(Array.from(nextById.values()))
+    syncFiltered()
+    initialized = true
+    return true
+  }
+
+  function removeTaskLocally(taskId, workspaceId = null) {
+    if (!taskId || !isCurrentWorkspaceTask(workspaceId)) return false
+    const nextAllTasks = allTasks.value.filter((task) => task.id !== taskId)
+    if (nextAllTasks.length === allTasks.value.length) return false
+    allTasks.value = nextAllTasks
+    syncFiltered()
+    return true
   }
 
   /**
@@ -480,7 +521,20 @@ export function useTasks() {
   if (!initialized) loadTasks()
   if (!refreshListenerAttached) {
     try {
-      window.addEventListener('tasks:refresh-request', () => {
+      window.addEventListener('tasks:refresh-request', (event) => {
+        const detail = event?.detail || {}
+        const incomingTasks = Array.isArray(detail?.tasks)
+          ? detail.tasks
+          : detail?.task
+            ? [detail.task]
+            : []
+
+        if (detail?.reason === 'task-deleted' && detail?.taskId) {
+          if (removeTaskLocally(detail.taskId, detail.workspaceId)) return
+        }
+
+        if (incomingTasks.length && mergeTasksLocally(incomingTasks)) return
+
         refreshAllTasks(true)
           .then(() => syncFiltered())
           .catch((err) => console.warn('[useTasks] refresh failed', err?.message || err))
@@ -550,5 +604,6 @@ export function useTasks() {
     moveTasks,
     ensureDailyRollover,
     getTaskPlannedDate,
+    mergeTasksLocally,
   }
 }

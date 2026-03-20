@@ -654,7 +654,7 @@ export async function addTaskToFirebase(task, options = {}) {
     Promise.resolve(syncTaskNotification(user.uid, savedTask.id, savedTask)).catch(() => {})
   }
 
-  dispatchTaskRefresh({ reason: 'task-created', taskId: savedTask.id, workspaceId: wsId })
+  dispatchTaskRefresh({ reason: 'task-created', taskId: savedTask.id, workspaceId: wsId, task: savedTask })
 
   // Return task with Firestore's doc ID
   return { ...savedTask, __notifyMeta: notifyMeta };
@@ -697,7 +697,16 @@ export async function updateTaskInFirebase(task) {
     ...updates,
     updatedAt: serverTimestamp(),
   }))
-  dispatchTaskRefresh({ reason: 'task-updated', taskId: id, workspaceId: normalizedWsId || currentWorkspaceId() })
+  dispatchTaskRefresh({
+    reason: 'task-updated',
+    taskId: id,
+    workspaceId: normalizedWsId || currentWorkspaceId(),
+    task: {
+      id,
+      workspaceId: normalizedWsId || currentWorkspaceId(),
+      ...updates,
+    },
+  })
   if (justCompleted) {
     try {
       console.log('[HabitTracker] frontend completion hook', { taskId: id })
