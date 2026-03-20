@@ -1204,6 +1204,7 @@ export const useAuthStore = defineStore('authStore', {
               redirect: redirectTarget,
               mode: 'server-handoff',
             })
+            this.loading = false
             const launch = launchNativeAuthRoute(startUrl)
             console.info('[Auth] Native Apple auth handoff launch', {
               platform: 'ios',
@@ -1226,6 +1227,7 @@ export const useAuthStore = defineStore('authStore', {
             redirect: redirectTarget,
             mode: 'firebase-redirect-hybrid',
           })
+          this.loading = false
           if (current) {
             await linkWithRedirect(current, provider)
           } else {

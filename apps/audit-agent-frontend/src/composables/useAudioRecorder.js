@@ -170,6 +170,7 @@ export function useAudioRecorder(options = {}) {
   let stopRequested = false
   let stopHandled = false
   let nativeRecorderActive = false
+  let nativeStopPending = false
   let activeRecorderStrategy = 'none'
   let nativeStopListenerHandle = null
   let nativeErrorListenerHandle = null
@@ -212,6 +213,7 @@ export function useAudioRecorder(options = {}) {
     mediaRecorder = null
     backendRecorder = null
     nativeRecorderActive = false
+    nativeStopPending = false
     activeRecorderStrategy = 'none'
   }
 
@@ -320,7 +322,7 @@ export function useAudioRecorder(options = {}) {
   const cleanup = (resetTranscript = false) => {
     clearTimers(false)
     stopStreams()
-    if (nativeRecorderActive) {
+    if (nativeRecorderActive && !nativeStopPending) {
       Promise.resolve(CapacitorAudioRecorder.cancelRecording()).catch(() => {})
     }
     releaseRecorder()
@@ -708,8 +710,10 @@ export function useAudioRecorder(options = {}) {
 
     try {
       if (nativeRecorderActive) {
+        nativeStopPending = true
         const result = await waitForNativeStopResult()
         nativeRecorderActive = false
+        nativeStopPending = false
         stopHandled = true
         const text = await transcribeNativeRecording(result)
         transcript.value = text
@@ -746,6 +750,7 @@ export function useAudioRecorder(options = {}) {
         await finalize('missing')
       }
     } catch (err) {
+      nativeStopPending = false
       const details = formatRecorderError(err)
       const logger = isExpectedRecorderError(err) ? console.warn : console.error
       logger(`${logPrefix} stop failed ${stringifyLogPayload(details)}`)

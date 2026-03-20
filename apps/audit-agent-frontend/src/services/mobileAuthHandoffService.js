@@ -41,7 +41,15 @@ export function isNativeAndroidApp() {
 }
 
 export function isServerDrivenNativeAppleAuthEnabled() {
-  return isEnabledFlag(import.meta.env.VITE_USE_SERVER_APPLE_AUTH_MOBILE)
+  const raw = String(import.meta.env.VITE_USE_SERVER_APPLE_AUTH_MOBILE ?? '').trim()
+  if (raw) {
+    return isEnabledFlag(raw)
+  }
+  try {
+    return !!Capacitor?.isNativePlatform?.() && Capacitor?.getPlatform?.() === 'ios'
+  } catch {
+    return false
+  }
 }
 
 export function buildNativeAuthCallbackUrl({ code, redirect } = {}) {
