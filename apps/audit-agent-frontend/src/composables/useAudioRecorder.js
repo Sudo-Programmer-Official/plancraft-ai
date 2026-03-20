@@ -61,6 +61,7 @@ export function useAudioRecorder(options = {}) {
   const state = ref('idle') // idle | recording | transcribing | done | error
   const transcript = ref('')
   const durationSeconds = ref(0)
+  const errorMessage = ref('')
 
   const isRecording = computed(() => state.value === 'recording')
   const isTranscribing = computed(() => state.value === 'transcribing')
@@ -126,6 +127,16 @@ export function useAudioRecorder(options = {}) {
     if (resetTranscript) transcript.value = ''
   }
 
+  const setRecorderError = (err, fallbackMessage = 'Voice recording failed') => {
+    const details = formatRecorderError(err)
+    errorMessage.value = details.message || fallbackMessage
+    console.error(`${logPrefix} error`, {
+      ...details,
+      fallbackMessage,
+    })
+    state.value = 'error'
+  }
+
   const transcribeBlob = async (blob, fileName = null) => {
     console.log(`${logPrefix} transcription request`, { size: blob?.size, type: blob?.type })
     const fd = new FormData()
@@ -140,11 +151,23 @@ export function useAudioRecorder(options = {}) {
 
   const transcribeNativeRecording = async (uri) => {
     const webPath = Capacitor.convertFileSrc(uri)
+    console.log(`${logPrefix} native recording file`, { uri, webPath })
     const response = await fetch(webPath)
     if (!response.ok) {
       throw new Error(`Failed to read native recording (${response.status})`)
     }
     const blob = await response.blob()
+    console.log(`${logPrefix} native recording blob`, {
+      size: blob?.size || 0,
+      type: blob?.type || 'unknown',
+    })
+    if (!blob || blob.size < 1024) {
+      const isIosSimulator = Capacitor.getPlatform?.() === 'ios' && /CoreSimulator/i.test(String(uri || ''))
+      if (isIosSimulator) {
+        throw new Error('No microphone audio was captured in the iOS Simulator. Test on a physical iPhone, or verify Simulator microphone access in macOS privacy settings.')
+      }
+      throw new Error('No microphone audio was captured. Please try again.')
+    }
     return transcribeBlob(blob, `speech.${inferFileExtFromUri(uri)}`)
   }
 
@@ -197,6 +220,7 @@ export function useAudioRecorder(options = {}) {
     cleanup(false)
     transcript.value = ''
     durationSeconds.value = 0
+    errorMessage.value = ''
     stopRequested = false
     stopHandled = false
 
@@ -208,6 +232,7 @@ export function useAudioRecorder(options = {}) {
         const details = formatRecorderError(nativeError)
         console.warn(`${logPrefix} native recorder start failed`, details)
         console.error(`${logPrefix} start failed`, new Error(details.message || 'Native voice recording failed'))
+        errorMessage.value = details.message || 'Native voice recording failed'
         state.value = 'error'
         return
       }
@@ -245,6 +270,7 @@ export function useAudioRecorder(options = {}) {
       stopStreams()
       if (!canUseBrowserAudioCapture()) {
         console.error(`${logPrefix} start failed`, new Error('Voice recording is not available on this device'))
+        errorMessage.value = 'Voice recording is not available on this device'
         state.value = 'error'
         return
       }
@@ -253,6 +279,7 @@ export function useAudioRecorder(options = {}) {
         console.log(`${logPrefix} fallback recorder active`)
       } catch (fallbackError) {
         console.error(`${logPrefix} start failed`, fallbackError)
+        errorMessage.value = formatRecorderError(fallbackError).message || 'Voice recording failed'
         state.value = 'error'
         return
       }
@@ -284,14 +311,10 @@ export function useAudioRecorder(options = {}) {
       state.value = text ? 'done' : 'idle'
       if (text && typeof onTranscription === 'function') await onTranscription(text)
     } catch (err) {
-      console.error(`${logPrefix} transcription failed`, err)
-      state.value = 'error'
+      setRecorderError(err, 'Transcription failed')
       return
     } finally {
       releaseRecorder()
-      if (state.value === 'error') {
-        state.value = 'idle'
-      }
     }
   }
 
@@ -341,8 +364,14 @@ export function useAudioRecorder(options = {}) {
         await finalize('missing')
       }
     } catch (err) {
-      console.error(`${logPrefix} stop failed`, err)
-      await finalize('stop-error')
+      const details = formatRecorderError(err)
+      console.error(`${logPrefix} stop failed`, details)
+      releaseRecorder()
+      stopStreams()
+      clearTimers()
+      stopRequested = false
+      stopHandled = false
+      setRecorderError(err, 'Stopping the recording failed')
     }
   }
 
@@ -363,6 +392,7 @@ export function useAudioRecorder(options = {}) {
     state,
     transcript,
     durationSeconds,
+    errorMessage,
     isRecording,
     isTranscribing,
   }

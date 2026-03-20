@@ -113,6 +113,7 @@ const {
   state,
   transcript,
   durationSeconds,
+  errorMessage,
   isRecording,
   isTranscribing,
   startRecording,
@@ -172,7 +173,7 @@ watch(
     } else if (val === 'error') {
       emit('processing-end')
       emit('processing-error')
-      ElMessage.error('Transcription failed. Try again.')
+      ElMessage.error(errorMessage.value || 'Transcription failed. Try again.')
     }
   },
 )

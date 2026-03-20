@@ -280,6 +280,7 @@ export async function createTask(userId, payload = {}, options = {}) {
     attachments: Array.isArray(payload.attachments) ? payload.attachments : [],
     date: toYMD(payload.date || payload.dueDate),
     reminderTime: payload.reminderTime || payload.time || null,
+    channels: Array.isArray(payload.channels) ? payload.channels : null,
     reminderChannels: Array.isArray(payload.reminderChannels)
       ? payload.reminderChannels
       : Array.isArray(payload.channels)
@@ -289,10 +290,17 @@ export async function createTask(userId, payload = {}, options = {}) {
     link: sanitizeString(payload.link || "", ""),
     priority: payload.priority || null,
     duration: Number.isFinite(payload.duration) ? payload.duration : null,
+    estimate_minutes: Number.isFinite(payload.estimate_minutes) ? payload.estimate_minutes : null,
     scheduledTime: payload.scheduledTime || null,
     metadata,
     timezone: payload.timezone || options.timezone || null,
     source: sanitizeString(payload.source || options.origin || "planner-assistant", "planner-assistant"),
+    timeHint: sanitizeString(payload.timeHint || payload.time_hint || "", "") || null,
+    timeRelation:
+      sanitizeString(payload.timeRelation || payload.relation || payload.time_relation || "", "") || null,
+    gapMinutes: Number.isFinite(payload.gapMinutes) ? payload.gapMinutes : null,
+    timeConfidence: Number.isFinite(payload.timeConfidence) ? payload.timeConfidence : null,
+    timeMeta: payload.timeMeta && typeof payload.timeMeta === "object" ? payload.timeMeta : null,
     userId: uid,
     workspaceId,
     createdAt: now,
@@ -316,11 +324,18 @@ export async function createTask(userId, payload = {}, options = {}) {
 
   if (!doc.link) delete doc.link;
   if (!doc.scheduledTime) delete doc.scheduledTime;
+  if (!doc.channels) delete doc.channels;
   if (!doc.reminderTime) delete doc.reminderTime;
   if (!doc.reminderChannels) delete doc.reminderChannels;
   if (!doc.priority) delete doc.priority;
   if (!doc.duration) delete doc.duration;
+  if (!doc.estimate_minutes) delete doc.estimate_minutes;
   if (!doc.timezone) delete doc.timezone;
+  if (!doc.timeHint) delete doc.timeHint;
+  if (!doc.timeRelation) delete doc.timeRelation;
+  if (!doc.gapMinutes && doc.gapMinutes !== 0) delete doc.gapMinutes;
+  if (!doc.timeConfidence && doc.timeConfidence !== 0) delete doc.timeConfidence;
+  if (!doc.timeMeta) delete doc.timeMeta;
   if (!doc.goalId) delete doc.goalId;
   if (!doc.goalTitle) delete doc.goalTitle;
   if (!doc.goalTargetDate) delete doc.goalTargetDate;

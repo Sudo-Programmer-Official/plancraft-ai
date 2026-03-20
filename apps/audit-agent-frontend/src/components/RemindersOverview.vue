@@ -501,11 +501,11 @@ async function onSnooze(r) {
 
 onMounted(() => {
   (async () => {
-    try {
-      await refreshAllTasks(true).catch(() => {})
-    } catch {}
-    await loadReminders()
-    fetchUsage()
+    await Promise.allSettled([
+      refreshAllTasks(true),
+      loadReminders(),
+      fetchUsage(),
+    ])
     refreshTimer = setInterval(loadReminders, 60 * 1000)
   })()
 })
@@ -535,6 +535,17 @@ watch(
   (uid) => {
     if (uid) loadReminders()
   }
+)
+
+watch(
+  activeWorkspaceId,
+  async (workspaceId) => {
+    if (!workspaceId) return
+    await Promise.allSettled([
+      refreshAllTasks(true),
+      loadReminders(),
+    ])
+  },
 )
 
 function goToPlanner() {

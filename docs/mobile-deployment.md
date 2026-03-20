@@ -92,7 +92,6 @@ mobile/
 Commands:
 - `nvm use`
 - `npx cap sync android`
-- `npx cap open android`
 - `npx cap sync ios`
 - `npx cap open ios`
 
@@ -141,3 +140,14 @@ Then export/sign via Xcode Organizer or `xcodebuild -exportArchive` with your pr
 ### Notes
 - Ensure environment values (e.g., `VITE_API_BASE_URL`, `VITE_ENABLE_IMAGE_TASKS`) are set before `npm run build`.
 - After any web change, rerun `npm run build` in `apps/audit-agent-frontend` and `npx cap sync <platform>` in `mobile` so `dist` is embedded into native shells.
+
+cd apps/audit-agent-frontend
+npm run build
+
+cd ../../mobile
+nvm use
+npx cap sync android
+npx cap open android
+
+npx cap sync ios
+npx cap open ios

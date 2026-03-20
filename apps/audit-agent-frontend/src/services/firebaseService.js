@@ -23,6 +23,7 @@ import { db, auth } from '@/firebase/init'
 import { updateStreakOnEntry } from '@/services/streakService'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { clearStoredAuthArtifacts } from '@/utils/authStorage'
+import { isIosPackagedApp } from '@/utils/nativeAuthSupport'
 
 const tasksRef = collection(db, "tasks");
 const journalRef = collection(db, "journalEntries");
@@ -143,6 +144,117 @@ async function recoverFromFirestoreInternalError(error) {
   })
 }
 
+async function createTaskViaApi(userId, workspaceId, payload) {
+  const request = api.post(
+    '/tasks/create',
+    {
+      userId,
+      workspaceId,
+      ...payload,
+      options: {
+        silent: true,
+        skipReminder: true,
+        origin: 'ios_client',
+      },
+    },
+    {
+      headers: {
+        'x-workspace-id': workspaceId,
+      },
+    },
+  )
+
+  const res = await withTimeout(request, 10000, 'task create api')
+  const task = res?.data?.task
+  if (!task?.id) {
+    throw new Error('Task create API did not return a task id')
+  }
+  return task
+}
+
+function dispatchTaskRefresh(detail = {}) {
+  try {
+    window.dispatchEvent(new CustomEvent('tasks:refresh-request', { detail }))
+  } catch {
+    /* noop */
+  }
+}
+
+function shouldUseTaskReadApi() {
+  return isIosPackagedApp()
+}
+
+function shouldFallbackTaskReadToApi(error) {
+  const code = String(error?.code || '').toLowerCase()
+  const message = String(error?.message || '').toLowerCase()
+  return (
+    shouldUseTaskReadApi() ||
+    looksLikeFirestoreInternalError(error) ||
+    code === 'unavailable' ||
+    code === 'deadline-exceeded' ||
+    message.includes('timed out') ||
+    message.includes('timeout')
+  )
+}
+
+function normalizeApiTaskRecord(task = {}) {
+  return {
+    ...task,
+    workspaceId: task?.workspaceId || currentWorkspaceId() || null,
+    date: normalizeTaskDate(task?.date || task?.dueDate),
+  }
+}
+
+async function fetchTasksViaApi({ date = null, startDate = null, endDate = null } = {}) {
+  const user = auth.currentUser
+  if (!user) return []
+  const wsId = currentWorkspaceId()
+  if (!wsId) return []
+
+  console.info('[TaskRead] using backend task list', {
+    workspaceId: wsId,
+    date: date || null,
+    startDate: startDate || null,
+    endDate: endDate || null,
+    nativeIos: shouldUseTaskReadApi(),
+  })
+
+  const params = {
+    userId: user.uid,
+    workspaceId: wsId,
+  }
+  if (date) params.date = date
+  if (startDate) params.startDate = startDate
+  if (endDate) params.endDate = endDate
+
+  const request = api.get('/tasks', {
+    params,
+    headers: {
+      'x-workspace-id': wsId,
+    },
+  })
+  const res = await withTimeout(request, 10000, 'task list api')
+  const items = Array.isArray(res?.data?.items) ? res.data.items : []
+  return items.map((task) => normalizeApiTaskRecord(task))
+}
+
+async function fetchTasksWithApiFallback(firestoreLoader, filters = {}, label = 'tasks') {
+  if (shouldUseTaskReadApi()) {
+    try {
+      return await fetchTasksViaApi(filters)
+    } catch (error) {
+      console.warn(`[TaskRead] ${label} api read failed; retrying firestore`, error?.message || error)
+    }
+  }
+  try {
+    return await firestoreLoader()
+  } catch (error) {
+    if (!shouldFallbackTaskReadToApi(error)) throw error
+    console.warn(`[TaskRead] ${label} falling back to backend api`, error?.message || error)
+    return fetchTasksViaApi(filters)
+  }
+}
+
 // Prevent spamming multiple auth-expired dialogs at once
 let authDialogOpen = false
 
@@ -254,27 +366,29 @@ export async function fetchTasksForToday() {
   const wsId = currentWorkspaceId()
   if (!wsId) return []
 
-  const scopedTasks = resolveTasksRef()
-  const q = query(
-    scopedTasks,
-    where("workspaceId", "==", wsId),
-    where("date", "==", today),
-    orderBy("order", "asc")
-  );
-
-  let snapshot = await safeAction(getDocs(q));
-  if (!snapshot.size) {
-    // Legacy personal tasks without workspaceId
-    const legacy = query(
+  return fetchTasksWithApiFallback(async () => {
+    const scopedTasks = resolveTasksRef()
+    const q = query(
       scopedTasks,
-      where('workspaceId', '==', null),
-      where('userId', '==', user.uid),
-      where('date', '==', today),
-      orderBy('order', 'asc'),
-    )
-    snapshot = await safeAction(getDocs(legacy))
-  }
-  return snapshot.docs.map(mapTaskDoc);
+      where("workspaceId", "==", wsId),
+      where("date", "==", today),
+      orderBy("order", "asc")
+    );
+
+    let snapshot = await safeAction(withTimeout(getDocs(q), 8000, 'task read today'))
+    if (!snapshot.size) {
+      // Legacy personal tasks without workspaceId
+      const legacy = query(
+        scopedTasks,
+        where('workspaceId', '==', null),
+        where('userId', '==', user.uid),
+        where('date', '==', today),
+        orderBy('order', 'asc'),
+      )
+      snapshot = await safeAction(withTimeout(getDocs(legacy), 8000, 'task read today legacy'))
+    }
+    return snapshot.docs.map(mapTaskDoc)
+  }, { date: today }, 'today')
 }
 
 /**
@@ -285,25 +399,27 @@ export async function fetchTasksByDate(dateStr) {
   if (!user) return [];
   const wsId = currentWorkspaceId()
   if (!wsId) return []
-  const scopedTasks = resolveTasksRef()
-  const qy = query(
-    scopedTasks,
-    where('workspaceId', '==', wsId),
-    where('date', '==', dateStr),
-    orderBy('order', 'asc'),
-  )
-  let snap = await safeAction(getDocs(qy))
-  if (!snap.size) {
-    const legacy = query(
+  return fetchTasksWithApiFallback(async () => {
+    const scopedTasks = resolveTasksRef()
+    const qy = query(
       scopedTasks,
-      where('workspaceId', '==', null),
-      where('userId', '==', user.uid),
+      where('workspaceId', '==', wsId),
       where('date', '==', dateStr),
       orderBy('order', 'asc'),
     )
-    snap = await safeAction(getDocs(legacy))
-  }
-  return snap.docs.map(mapTaskDoc)
+    let snap = await safeAction(withTimeout(getDocs(qy), 8000, 'task read date'))
+    if (!snap.size) {
+      const legacy = query(
+        scopedTasks,
+        where('workspaceId', '==', null),
+        where('userId', '==', user.uid),
+        where('date', '==', dateStr),
+        orderBy('order', 'asc'),
+      )
+      snap = await safeAction(withTimeout(getDocs(legacy), 8000, 'task read date legacy'))
+    }
+    return snap.docs.map(mapTaskDoc)
+  }, { date: dateStr }, 'date')
 }
 
 /**
@@ -314,29 +430,31 @@ export async function fetchTasksBetween(startYMD, endYMD) {
   if (!user) return [];
   const wsId = currentWorkspaceId()
   if (!wsId) return []
-  const scopedTasks = resolveTasksRef()
-  const qy = query(
-    scopedTasks,
-    where('workspaceId', '==', wsId),
-    where('date', '>=', startYMD),
-    where('date', '<=', endYMD),
-    orderBy('date', 'asc'),
-    orderBy('order', 'asc'),
-  )
-  let snap = await safeAction(getDocs(qy))
-  if (!snap.size) {
-    const legacy = query(
+  return fetchTasksWithApiFallback(async () => {
+    const scopedTasks = resolveTasksRef()
+    const qy = query(
       scopedTasks,
-      where('workspaceId', '==', null),
-      where('userId', '==', user.uid),
+      where('workspaceId', '==', wsId),
       where('date', '>=', startYMD),
       where('date', '<=', endYMD),
       orderBy('date', 'asc'),
       orderBy('order', 'asc'),
     )
-    snap = await safeAction(getDocs(legacy))
-  }
-  return snap.docs.map(mapTaskDoc)
+    let snap = await safeAction(withTimeout(getDocs(qy), 8000, 'task read range'))
+    if (!snap.size) {
+      const legacy = query(
+        scopedTasks,
+        where('workspaceId', '==', null),
+        where('userId', '==', user.uid),
+        where('date', '>=', startYMD),
+        where('date', '<=', endYMD),
+        orderBy('date', 'asc'),
+        orderBy('order', 'asc'),
+      )
+      snap = await safeAction(withTimeout(getDocs(legacy), 8000, 'task read range legacy'))
+    }
+    return snap.docs.map(mapTaskDoc)
+  }, { startDate: startYMD, endDate: endYMD }, 'range')
 }
 
 /**
@@ -347,20 +465,22 @@ export async function fetchAllTasksForWorkspace() {
   if (!user) return []
   const wsId = currentWorkspaceId()
   if (!wsId) return []
-  const scopedTasks = resolveTasksRef()
-  const primaryQuery = query(scopedTasks, where('workspaceId', '==', wsId))
-  const orphanQuery = query(scopedTasks, where('workspaceId', '==', null), where('userId', '==', user.uid))
+  return fetchTasksWithApiFallback(async () => {
+    const scopedTasks = resolveTasksRef()
+    const primaryQuery = query(scopedTasks, where('workspaceId', '==', wsId))
+    const orphanQuery = query(scopedTasks, where('workspaceId', '==', null), where('userId', '==', user.uid))
 
-  const [primarySnap, orphanSnap] = await Promise.all([
-    safeAction(getDocs(primaryQuery)),
-    safeAction(getDocs(orphanQuery)),
-  ])
-  const combined = [...(primarySnap?.docs || []), ...(orphanSnap?.docs || [])]
+    const [primarySnap, orphanSnap] = await Promise.all([
+      safeAction(withTimeout(getDocs(primaryQuery), 8000, 'task read workspace')),
+      safeAction(withTimeout(getDocs(orphanQuery), 8000, 'task read workspace legacy')),
+    ])
+    const combined = [...(primarySnap?.docs || []), ...(orphanSnap?.docs || [])]
 
-  // De-duplicate by id in case of overlap
-  const byId = new Map()
-  combined.forEach((doc) => byId.set(doc.id, doc))
-  return Array.from(byId.values()).map(mapTaskDoc)
+    // De-duplicate by id in case of overlap
+    const byId = new Map()
+    combined.forEach((doc) => byId.set(doc.id, doc))
+    return Array.from(byId.values()).map(mapTaskDoc)
+  }, {}, 'workspace')
 }
 
 /**
@@ -464,10 +584,6 @@ export async function addTaskToFirebase(task, options = {}) {
     attachments: Array.isArray(task?.attachments) ? task.attachments : [],
     date: normalizeTaskDate(task?.date || task?.dueDate), // YYYY-MM-DD
     order: task?.order ?? 0,
-    userId: user.uid,
-    createdBy: user.uid,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
   }
 
   if (typeof task?.link === 'string') payload.link = task.link.trim()
@@ -500,20 +616,48 @@ export async function addTaskToFirebase(task, options = {}) {
   }
   if ('meta' in task) payload.timeMeta = task.meta || null
 
-  const scopedTasks = resolveTasksRef()
   payload.workspaceId = wsId
-  const docRef = await safeAction(addDoc(scopedTasks, payload));
+  let savedTask
+  if (isIosPackagedApp()) {
+    console.info('[TaskCreate] using backend create route on native iOS', {
+      workspaceId: wsId,
+      title: payload.title,
+      date: payload.date,
+    })
+    const apiTask = await createTaskViaApi(user.uid, wsId, payload)
+    savedTask = {
+      ...payload,
+      ...apiTask,
+      id: apiTask.id,
+      workspaceId: apiTask.workspaceId || wsId,
+      userId: apiTask.userId || user.uid,
+      createdBy: apiTask.createdBy || user.uid,
+    }
+  } else {
+    const scopedTasks = resolveTasksRef()
+    const firestorePayload = {
+      ...payload,
+      userId: user.uid,
+      createdBy: user.uid,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }
+    const docRef = await safeAction(withTimeout(addDoc(scopedTasks, firestorePayload), 10000, 'task create'))
+    savedTask = { id: docRef.id, ...firestorePayload }
+  }
   const shouldAwaitNotificationSync = options?.awaitNotificationSync !== false
 
   let notifyMeta = null
   if (shouldAwaitNotificationSync) {
-    notifyMeta = await syncTaskNotification(user.uid, docRef.id, payload)
+    notifyMeta = await syncTaskNotification(user.uid, savedTask.id, savedTask)
   } else {
-    Promise.resolve(syncTaskNotification(user.uid, docRef.id, payload)).catch(() => {})
+    Promise.resolve(syncTaskNotification(user.uid, savedTask.id, savedTask)).catch(() => {})
   }
 
+  dispatchTaskRefresh({ reason: 'task-created', taskId: savedTask.id, workspaceId: wsId })
+
   // Return task with Firestore's doc ID
-  return { id: docRef.id, ...payload, __notifyMeta: notifyMeta };
+  return { ...savedTask, __notifyMeta: notifyMeta };
 }
 
 /**
@@ -553,6 +697,7 @@ export async function updateTaskInFirebase(task) {
     ...updates,
     updatedAt: serverTimestamp(),
   }))
+  dispatchTaskRefresh({ reason: 'task-updated', taskId: id, workspaceId: normalizedWsId || currentWorkspaceId() })
   if (justCompleted) {
     try {
       console.log('[HabitTracker] frontend completion hook', { taskId: id })
@@ -581,6 +726,7 @@ export async function deleteTaskFromFirebase(taskId) {
   }
   const ref = taskDocRef(taskId)
   await safeAction(deleteDoc(ref))
+  dispatchTaskRefresh({ reason: 'task-deleted', taskId, workspaceId: currentWorkspaceId() })
 }
 
 /**
@@ -654,6 +800,7 @@ export async function moveTasksToDate(taskPayloads = [], targetDate, extra = {})
   })
 
   await safeAction(batch.commit())
+  dispatchTaskRefresh({ reason: 'tasks-moved', taskIds: list.map((t) => t.id), workspaceId: wsId })
   return list.map((t) => ({ ...t, date: normalizedDate }))
 }
 

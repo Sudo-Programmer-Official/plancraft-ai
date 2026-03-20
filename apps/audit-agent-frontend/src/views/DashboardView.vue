@@ -2197,6 +2197,14 @@ watch(
   },
 )
 
+watch(
+  () => (allTasks.value || []).map((task) => `${task?.id || ''}:${task?.date || ''}:${task?.completed ? 1 : 0}`).join('|'),
+  () => {
+    syncDashboardTaskBuckets(allTasks.value)
+    dashboardTasksLoading.value = false
+  },
+)
+
 onMounted(async () => {
   const seeded = await refreshAllTasks().then(() => true).catch(() => false)
   if (seeded && (allTasks.value.length || activeWorkspaceId.value)) {
@@ -2385,11 +2393,15 @@ function toggleTodayFullscreen() {
 }
 
 function reloadDaily() {
-  return loadTasks()
+  return loadTasks().then(() => {
+    syncDashboardTaskBuckets(allTasks.value)
+    dashboardTasksLoading.value = false
+  })
 }
 
 async function handleSave(payload) {
   if (Array.isArray(payload)) {
+    console.info('[TaskCreate] dashboard received generated tasks', { count: payload.length })
     await loadTasks()
     return reloadDaily()
   }
