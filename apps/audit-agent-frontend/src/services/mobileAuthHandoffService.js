@@ -83,9 +83,31 @@ export function buildServerDrivenAppleStartUrl({ redirect, platform = 'ios' } = 
   return url.toString()
 }
 
-export function launchNativeAuthRoute(targetUrl) {
+export async function closeNativeAuthBrowser() {
+  if (!Capacitor?.isNativePlatform?.()) return false
+  try {
+    const { Browser } = await import('@capacitor/browser')
+    await Browser.close()
+    return true
+  } catch {
+    return false
+  }
+}
+
+export async function launchNativeAuthRoute(targetUrl) {
   const url = String(targetUrl || '').trim()
   if (!url) throw new Error('Missing native auth launch URL')
+
+  if (Capacitor?.isNativePlatform?.()) {
+    try {
+      const { Browser } = await import('@capacitor/browser')
+      await Browser.open({ url })
+      return {
+        url,
+        launchMethod: 'capacitor-browser',
+      }
+    } catch {}
+  }
 
   let launchedWithWindowOpen = false
   try {

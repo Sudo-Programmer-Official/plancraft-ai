@@ -49,6 +49,7 @@ import {
   buildNativeAuthCallbackUrl,
   buildNativeAuthFallbackSchemeUrl,
   buildServerDrivenAppleStartUrl,
+  closeNativeAuthBrowser,
   consumeMobileAuthHandoff,
   createMobileAuthHandoff,
   isServerDrivenNativeAppleAuthEnabled,
@@ -1205,7 +1206,7 @@ export const useAuthStore = defineStore('authStore', {
               mode: 'server-handoff',
             })
             this.loading = false
-            const launch = launchNativeAuthRoute(startUrl)
+            const launch = await launchNativeAuthRoute(startUrl)
             console.info('[Auth] Native Apple auth handoff launch', {
               platform: 'ios',
               provider: 'apple',
@@ -1445,6 +1446,7 @@ export const useAuthStore = defineStore('authStore', {
           hasCode: !!code,
           redirect: normalizeRedirectPath(redirectTarget),
         })
+        await closeNativeAuthBrowser()
         const handoff = await consumeMobileAuthHandoff(code)
         const customToken = String(handoff?.customToken || '')
         if (!customToken) throw new Error('Missing Firebase custom token for native handoff')

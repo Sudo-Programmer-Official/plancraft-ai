@@ -17,7 +17,7 @@ import { initAnalytics, bindRouter, identifyUser, trackAppOpened, trackSessionEn
 import { handleAuthError } from '@/services/firebaseService'
 import { setupLinkedInTag } from './analytics/linkedin.js'
 import { Capacitor } from '@capacitor/core'
-import { parseNativeAuthCallbackUrl } from '@/services/mobileAuthHandoffService'
+import { closeNativeAuthBrowser, parseNativeAuthCallbackUrl } from '@/services/mobileAuthHandoffService'
 
 // Day.js timezone defaults
 import dayjs from 'dayjs'
@@ -424,6 +424,10 @@ async function installNativeAppUrlBridge() {
         platform,
         url: incomingUrl,
       })
+
+      try {
+        await closeNativeAuthBrowser()
+      } catch {}
 
       try {
         await router.isReady()
