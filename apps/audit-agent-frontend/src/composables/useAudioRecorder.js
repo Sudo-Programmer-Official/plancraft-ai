@@ -222,6 +222,35 @@ export function useAudioRecorder(options = {}) {
     throw new Error(`Failed to read native recording (${status})`)
   }
 
+  const readNativeSource = async (src) => {
+    const attempts = [readBlobWithXhr(src), readBlobWithFetch(src)]
+    let lastError = null
+
+    if (typeof Promise.any === 'function') {
+      try {
+        const result = await Promise.any(attempts)
+        if (result?.blob?.size || Number(result?.status || 0) === 0) {
+          return result
+        }
+      } catch (error) {
+        lastError = error?.errors?.[0] || error
+      }
+    }
+
+    for (const attempt of attempts) {
+      try {
+        const result = await attempt
+        if (result?.blob?.size || Number(result?.status || 0) === 0) {
+          return result
+        }
+      } catch (error) {
+        lastError = error
+      }
+    }
+
+    throw lastError || new Error('Failed to read native recording')
+  }
+
   const readNativeRecordingBlob = async (uri, webPath = null) => {
     const sources = Array.from(new Set([
       webPath,
@@ -232,14 +261,7 @@ export function useAudioRecorder(options = {}) {
     let lastError = null
     for (const src of sources) {
       try {
-        const result = await readBlobWithFetch(src)
-        if (result?.blob?.size) return result
-      } catch (error) {
-        lastError = error
-      }
-
-      try {
-        const result = await readBlobWithXhr(src)
+        const result = await readNativeSource(src)
         if (result?.blob?.size || Number(result?.status || 0) === 0) return result
       } catch (error) {
         lastError = error

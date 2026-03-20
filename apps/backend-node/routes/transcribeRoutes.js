@@ -132,6 +132,17 @@ const MIME_TO_EXTENSION = {
   "audio/flac": "flac",
 };
 
+const PASSTHROUGH_AUDIO_TYPES = new Set([
+  "audio/mp3",
+  "audio/mpeg",
+  "audio/m4a",
+  "audio/mp4",
+  "audio/wav",
+  "audio/x-wav",
+  "audio/x-m4a",
+  "audio/flac",
+]);
+
 const MINIMUM_AUDIO_BYTES = 1024;
 
 async function normalizeAudioUpload(buffer, mimetype) {
@@ -145,6 +156,9 @@ async function normalizeAudioUpload(buffer, mimetype) {
   }
 
   const fallbackName = `speech.${guessExtension(cleanedMime)}`;
+  if (PASSTHROUGH_AUDIO_TYPES.has(cleanedMime)) {
+    return { buffer, filename: fallbackName };
+  }
   if (!ffmpegPath) {
     console.warn(`[transcribe] missing ffmpeg binary, sending original buffer.`);
     return { buffer, filename: fallbackName };
