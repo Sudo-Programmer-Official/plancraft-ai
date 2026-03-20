@@ -44,6 +44,20 @@ function inferFileExtFromUri(uri) {
   return match?.[1]?.toLowerCase() || 'm4a'
 }
 
+function isIosSimulatorUri(uri) {
+  return Capacitor.getPlatform?.() === 'ios' && /CoreSimulator/i.test(String(uri || ''))
+}
+
+function buildNoAudioCapturedError(uri, duration = 0) {
+  if (isIosSimulatorUri(uri)) {
+    return new Error('No microphone audio was captured in the iOS Simulator. Test on a physical iPhone, or verify Simulator microphone access in macOS privacy settings.')
+  }
+  if (Number(duration || 0) <= 0) {
+    return new Error('No microphone audio was captured. Hold the record button a little longer and try again.')
+  }
+  return new Error('No microphone audio was captured. Please try again.')
+}
+
 function pickMimeType() {
   try {
     if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') {
@@ -149,24 +163,86 @@ export function useAudioRecorder(options = {}) {
     return res?.data?.text || ''
   }
 
-  const transcribeNativeRecording = async (uri) => {
-    const webPath = Capacitor.convertFileSrc(uri)
-    console.log(`${logPrefix} native recording file`, { uri, webPath })
-    const response = await fetch(webPath)
-    if (!response.ok) {
-      throw new Error(`Failed to read native recording (${response.status})`)
+  const readBlobWithXhr = (src) => new Promise((resolve, reject) => {
+    try {
+      const xhr = new XMLHttpRequest()
+      xhr.open('GET', src, true)
+      xhr.responseType = 'blob'
+      xhr.onload = () => {
+        const status = Number(xhr.status || 0)
+        const blob = xhr.response
+        if ((status >= 200 && status < 300) || (status === 0 && blob)) {
+          resolve({ blob, status, reader: 'xhr', src })
+          return
+        }
+        reject(new Error(`Failed to read native recording (${status})`))
+      }
+      xhr.onerror = () => reject(new Error('Failed to read native recording (xhr)'))
+      xhr.send()
+    } catch (error) {
+      reject(error)
     }
+  })
+
+  const readBlobWithFetch = async (src) => {
+    const response = await fetch(src)
     const blob = await response.blob()
+    const status = Number(response?.status || 0)
+    if (response.ok || (status === 0 && blob)) {
+      return { blob, status, reader: 'fetch', src }
+    }
+    throw new Error(`Failed to read native recording (${status})`)
+  }
+
+  const readNativeRecordingBlob = async (uri, webPath = null) => {
+    const sources = Array.from(new Set([
+      webPath,
+      uri ? Capacitor.convertFileSrc(uri) : '',
+      uri,
+    ].filter(Boolean)))
+
+    let lastError = null
+    for (const src of sources) {
+      try {
+        const result = await readBlobWithFetch(src)
+        if (result?.blob?.size) return result
+      } catch (error) {
+        lastError = error
+      }
+
+      try {
+        const result = await readBlobWithXhr(src)
+        if (result?.blob?.size || Number(result?.status || 0) === 0) return result
+      } catch (error) {
+        lastError = error
+      }
+    }
+
+    throw lastError || new Error('Failed to read native recording')
+  }
+
+  const transcribeNativeRecording = async ({ uri, webPath = '', duration = 0 } = {}) => {
+    const resolvedWebPath = webPath || Capacitor.convertFileSrc(uri)
+    console.log(`${logPrefix} native recording file`, { uri, webPath: resolvedWebPath, duration })
+    let blobResult = null
+    try {
+      blobResult = await readNativeRecordingBlob(uri, resolvedWebPath)
+    } catch (error) {
+      if (Number(duration || 0) <= 0 || isIosSimulatorUri(uri)) {
+        throw buildNoAudioCapturedError(uri, duration)
+      }
+      throw error
+    }
+    const { blob, status, reader, src } = blobResult
     console.log(`${logPrefix} native recording blob`, {
       size: blob?.size || 0,
       type: blob?.type || 'unknown',
+      status,
+      reader,
+      src,
     })
     if (!blob || blob.size < 1024) {
-      const isIosSimulator = Capacitor.getPlatform?.() === 'ios' && /CoreSimulator/i.test(String(uri || ''))
-      if (isIosSimulator) {
-        throw new Error('No microphone audio was captured in the iOS Simulator. Test on a physical iPhone, or verify Simulator microphone access in macOS privacy settings.')
-      }
-      throw new Error('No microphone audio was captured. Please try again.')
+      throw buildNoAudioCapturedError(uri, duration)
     }
     return transcribeBlob(blob, `speech.${inferFileExtFromUri(uri)}`)
   }
@@ -335,7 +411,7 @@ export function useAudioRecorder(options = {}) {
         if (!uri) {
           throw new Error('Native recording did not produce a file')
         }
-        const text = await transcribeNativeRecording(uri)
+        const text = await transcribeNativeRecording(result)
         transcript.value = text
         state.value = text ? 'done' : 'idle'
         if (text && typeof onTranscription === 'function') await onTranscription(text)
