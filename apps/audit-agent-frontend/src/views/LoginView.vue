@@ -571,6 +571,15 @@ function mapPhoneOtpError(error) {
     }
     return 'Firebase phone auth verification failed in the mobile app. Test on a real device or enable VITE_FIREBASE_PHONE_AUTH_TESTING=1 for simulator testing with Firebase fictional numbers.'
   }
+  if (code === 'auth/internal-error') {
+    if (isNativeApp.value && isIosApp.value) {
+      if (phoneAuthTestingEnabled) {
+        return 'iPhone simulator OTP requires a Firebase fictional test number and verification code. Real SMS delivery will not work in this mode.'
+      }
+      return 'Real Firebase phone OTP will not work reliably on the iPhone simulator. Use a physical iPhone with Firebase APNs phone-auth setup, or enable VITE_FIREBASE_PHONE_AUTH_TESTING=1 and use Firebase fictional test numbers.'
+    }
+    return 'Firebase phone auth hit an internal verification error. Check the phone auth setup and try again.'
+  }
   if (code === 'auth/operation-not-allowed') {
     return 'Phone sign-in is not enabled in Firebase Authentication for this project.'
   }
