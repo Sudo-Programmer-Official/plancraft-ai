@@ -51,18 +51,13 @@
               </button>
               <button
                 type="button"
-                :disabled="authStore.loading || isNativeApp"
+                :disabled="authStore.loading"
                 class="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-xl font-semibold border border-white/10 text-white hover:border-indigo-300/70 hover:bg-white/5 transition disabled:opacity-70"
-                @click="togglePhone(true)"
+                @click="togglePhone"
               >
                 📱 Continue with Phone (OTP)
               </button>
             </div>
-
-            <p class="text-center text-sm text-indigo-200/80">Choose how you want to sign in. No spam. No passwords.</p>
-            <p v-if="isNativeApp" class="native-auth-banner">
-              {{ nativeAuthBanner }}
-            </p>
 
             <div v-if="showEmail" class="auth-panel">
               <h2 class="text-lg font-semibold text-white mb-3">Email access</h2>
@@ -228,13 +223,8 @@ import {
 import { normalizeRedirectPath } from '@/services/mobileAuthHandoffService'
 
 const isNativeApp = computed(() => isNativePackagedApp())
-const nativeAuthBanner = computed(() => {
-  if (!isNativeApp.value) return ''
-  if (isIosApp.value) {
-    return 'Google sign-in is disabled in the packaged iPhone app. Use Continue with Apple or email/password on mobile; Google sign-in remains available on the web.'
-  }
-  return 'Google sign-in is disabled in packaged iOS and Android builds. Use email/password in the mobile app; Google sign-in remains available on the web.'
-})
+const phoneAuthTestingEnabled =
+  import.meta.env.DEV || import.meta.env.VITE_FIREBASE_PHONE_AUTH_TESTING === '1'
 
 function mapAppleAuthErrorMessage(errorCode) {
   const code = String(errorCode || '').trim()
@@ -432,10 +422,18 @@ function resetRecaptcha() {
   } catch {}
 }
 
+function configurePhoneAuthTesting() {
+  try {
+    if (!auth?.settings) return
+    auth.settings.appVerificationDisabledForTesting = !!phoneAuthTestingEnabled
+  } catch {}
+}
+
 async function ensureRecaptcha(force = false) {
   try {
     const container = document.getElementById('recaptcha-container')
     if (!container) return null
+    configurePhoneAuthTesting()
 
     let v = window.recaptchaVerifier
     const needsNew = force || !v
@@ -462,10 +460,6 @@ async function ensureRecaptcha(force = false) {
 }
 
 function togglePhone() {
-  if (isNativeApp.value) {
-    ElMessage.info(getNativeAuthRestriction('phone'))
-    return
-  }
   showPhone.value = !showPhone.value
   if (showPhone.value) {
     setTimeout(() => ensureRecaptcha(), 0)
@@ -556,6 +550,37 @@ function sanitizeOtpInput() {
   otp.value = String(otp.value || '').replace(/\D/g, '')
 }
 
+function mapPhoneOtpError(error) {
+  const code = String(error?.code || '').trim()
+  const message = String(error?.message || '').trim()
+
+  if (code === 'auth/invalid-phone-number') {
+    return 'Enter a valid phone number in international format, for example +1 650 555 1234.'
+  }
+  if (code === 'auth/too-many-requests') {
+    return 'OTP requests were throttled. Wait a bit before requesting another code.'
+  }
+  if (
+    code === 'auth/captcha-check-failed' ||
+    code === 'auth/invalid-app-credential' ||
+    code === 'auth/app-not-authorized' ||
+    code === 'auth/missing-client-identifier'
+  ) {
+    if (phoneAuthTestingEnabled) {
+      return 'Firebase phone auth verification failed. For simulator testing, use a Firebase fictional phone number and verification code configured in the Firebase console.'
+    }
+    return 'Firebase phone auth verification failed in the mobile app. Test on a real device or enable VITE_FIREBASE_PHONE_AUTH_TESTING=1 for simulator testing with Firebase fictional numbers.'
+  }
+  if (code === 'auth/operation-not-allowed') {
+    return 'Phone sign-in is not enabled in Firebase Authentication for this project.'
+  }
+  if (code === 'auth/quota-exceeded') {
+    return 'The Firebase phone auth quota has been exceeded. Try again later.'
+  }
+  if (message) return message
+  return 'Failed to send OTP. Please check the phone auth configuration and try again.'
+}
+
 async function sendOtp() {
   if (!normalizedPhone.value) return ElMessage.error('Enter a valid phone number.')
   try {
@@ -579,16 +604,18 @@ async function sendOtp() {
     nextTick(() => focusOtpField())
     ElMessage.success('OTP sent successfully!')
   } catch (error) {
-    console.error('[OTP] send failed', error)
-    if (error?.code === 'auth/native-phone-unsupported') {
-      ElMessage.info(getNativeAuthRestriction('phone'))
-      showEmail.value = true
-      return
-    }
+    console.error('[OTP] send failed', {
+      code: error?.code || null,
+      message: error?.message || String(error),
+      native: isNativeApp.value,
+      ios: isIosApp.value,
+      testing: phoneAuthTestingEnabled,
+      phone: normalizedPhone.value,
+    })
     resetRecaptcha()
     const msg = IS_LOCAL
-      ? 'OTP send failed on localhost. Use a Firebase test number (e.g., +13614429376 code 123456) or try email/Google.'
-      : 'Failed to send OTP. Please check your number and try again.'
+      ? mapPhoneOtpError(error) || 'OTP send failed on localhost. Use a Firebase test number (e.g., +13614429376 code 123456) or try email/Google.'
+      : mapPhoneOtpError(error)
     ElMessage.error(msg)
   } finally {
     sendingOtp.value = false

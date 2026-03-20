@@ -1511,11 +1511,6 @@ export const useAuthStore = defineStore('authStore', {
 
     // 📱 Phone OTP: send code
     async sendPhoneOtp(phone, recaptchaVerifier) {
-      if (isNativePackagedApp()) {
-        const err = new Error(getNativeAuthRestriction('phone'))
-        err.code = 'auth/native-phone-unsupported'
-        throw err
-      }
       if (!phone) throw new Error('Missing phone number')
       if (!recaptchaVerifier) throw new Error('Missing reCAPTCHA verifier')
       // Use Firebase auth directly for OTP

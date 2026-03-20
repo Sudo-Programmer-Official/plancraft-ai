@@ -39,7 +39,7 @@ export function getNativeAuthRestriction(method = 'provider') {
     case 'apple':
       return 'Apple sign-in in the packaged mobile app still depends on Firebase Web popup/redirect flow. Use the browser or PWA build until native Apple auth is wired.'
     case 'phone':
-      return 'Phone OTP in the packaged mobile app still depends on RecaptchaVerifier and Firebase Web phone auth. Use the browser or PWA build until native phone auth is wired.'
+      return 'Phone OTP uses Firebase phone auth and app verification inside the mobile app. If sending the code fails, verify the phone auth configuration and reCAPTCHA/app verification setup.'
     case 'magic-link':
       return 'Magic-link sign-in in the packaged mobile app is not reliable yet because native deep-link return handling is not wired.'
     default:
