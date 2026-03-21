@@ -157,6 +157,7 @@ platform :ios do
     build_app(
       project: "ios/App/App.xcodeproj",
       scheme: "App",
+      export_method: "app-store",
       clean: true,
       skip_profile_detection: true,
       output_directory: "build/ios",
