@@ -1,3 +1,5 @@
+import groovy.json.JsonSlurper
+
 apply plugin: 'com.android.application'
 
 def keystoreProperties = new Properties()
@@ -21,8 +23,19 @@ def readReleaseConfig = { String key, String fallback = null ->
     return fallback
 }
 
+def versionFile = rootProject.file("../../version.json")
+if (!versionFile.exists()) {
+    throw new GradleException("Missing shared version file at ${versionFile}")
+}
+
+def versionData = new JsonSlurper().parse(versionFile)
+def sharedVersionName = versionData?.version?.toString()?.trim()
+if (!sharedVersionName) {
+    throw new GradleException("version.json must include a non-empty version field")
+}
+
 def androidVersionCode = (readReleaseConfig("ANDROID_VERSION_CODE", "13") as String).toInteger()
-def androidVersionName = readReleaseConfig("ANDROID_VERSION_NAME", "1.2.2")
+def androidVersionName = readReleaseConfig("ANDROID_VERSION_NAME", sharedVersionName)
 def releaseStoreFile = readReleaseConfig("ANDROID_KEYSTORE_PATH")
 def releaseStorePassword = readReleaseConfig("ANDROID_KEYSTORE_PASSWORD")
 def releaseKeyAlias = readReleaseConfig("ANDROID_KEY_ALIAS")

@@ -2,17 +2,14 @@ name: Android Release
 
 on:
   workflow_dispatch:
-    inputs:
-      version_name:
-        description: Optional Android versionName override
-        required: false
-        type: string
   push:
     branches:
       - main
     paths:
       - 'apps/audit-agent-frontend/**'
       - 'mobile/**'
+      - 'scripts/generate-release-metadata.mjs'
+      - 'version.json'
       - '.github/workflows/android-release.yml'
       - 'docs/mobile-deployment.md'
 
@@ -29,7 +26,6 @@ jobs:
         working-directory: mobile
     env:
       ANDROID_VERSION_CODE: ${{ github.run_number }}
-      ANDROID_VERSION_NAME: ${{ inputs.version_name }}
       ANDROID_KEYSTORE_PATH: release-upload.jks
       ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -62,6 +58,14 @@ jobs:
       - name: Install mobile dependencies
         run: npm ci
 
+      - name: Generate release metadata
+        env:
+          RELEASE_PLATFORM: android
+          RELEASE_BUILD: ${{ github.run_number }}
+          RELEASE_COMMIT: ${{ github.sha }}
+          RELEASE_OUTPUT: build/android-release.json
+        run: node ../scripts/generate-release-metadata.mjs
+
       - name: Restore Android signing keystore
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -70,6 +74,8 @@ jobs:
           echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/release-upload.jks
 
       - name: Build web bundle
+        env:
+          SKIP_SITEMAP_PING: "1"
         run: npm --prefix ../apps/audit-agent-frontend run build
 
       - name: Sync Capacitor Android
@@ -85,6 +91,14 @@ jobs:
         with:
           name: android-release-aab
           path: mobile/android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+
+      - name: Upload release metadata artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-metadata
+          path: mobile/build/android-release.json
           if-no-files-found: error
 
       - name: Upload to Play internal track

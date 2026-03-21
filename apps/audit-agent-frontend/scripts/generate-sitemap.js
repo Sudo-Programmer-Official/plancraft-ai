@@ -50,6 +50,30 @@ try {
   console.warn("⚠️ Firebase admin not initialized; skipping blog slug fetch.", err.message);
 }
 
+async function cleanupResources() {
+  try {
+    if (db && typeof db.terminate === "function") {
+      await db.terminate();
+    }
+  } catch (err) {
+    console.warn("⚠️ Firestore terminate skipped:", err.message);
+  }
+
+  if (admin.apps.length) {
+    await Promise.all(
+      admin.apps.map((app) =>
+        app.delete().catch((err) => {
+          console.warn("⚠️ Firebase app delete skipped:", err.message);
+        }),
+      ),
+    );
+  }
+
+  if (https.globalAgent && typeof https.globalAgent.destroy === "function") {
+    https.globalAgent.destroy();
+  }
+}
+
 async function getBlogSlugs() {
   if (!db) {
     console.warn("ℹ️ Firestore unavailable — sitemap will include marketing pages only.");
@@ -141,17 +165,21 @@ async function pingSearchEngines() {
 
   for (const ping of pingUrls) {
     await new Promise((resolve) => {
-      https
-        .get(ping, (res) => {
+      const request = https.get(ping, (res) => {
+          res.resume();
           const code = res.statusCode;
           const statusEmoji = code === 200 ? "✅" : code >= 400 ? "⚠️" : "ℹ️";
           console.log(`${statusEmoji} Pinged ${ping.split("/")[2]} (${code})`);
-          resolve();
+          res.on("end", resolve);
         })
         .on("error", (err) => {
           console.warn(`❌ Ping failed for ${ping}: ${err.message}`);
           resolve();
         });
+
+      request.setTimeout(5000, () => {
+        request.destroy(new Error("timeout"));
+      });
     });
   }
 }
@@ -165,5 +193,8 @@ generateSitemap()
   })
   .catch((e) => {
     console.error("❌ Sitemap generation failed:", e);
-    process.exit(1);
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    await cleanupResources();
   });

@@ -1,3 +1,5 @@
+require "json"
+
 default_platform(:ios)
 
 def mobile_root
@@ -10,6 +12,14 @@ end
 
 def frontend_root
   File.join(repo_root, "apps", "audit-agent-frontend")
+end
+
+def shared_version_name
+  version_file = File.join(repo_root, "version.json")
+  version_data = JSON.parse(File.read(version_file))
+  version = version_data["version"].to_s.strip
+  UI.user_error!("version.json must include a non-empty version field") if version.empty?
+  version
 end
 
 def app_store_api_key_from_env
@@ -70,6 +80,10 @@ platform :ios do
     end
 
     build_number = effective_build_number(api_key)
+    increment_version_number(
+      xcodeproj: "ios/App/App.xcodeproj",
+      version_number: shared_version_name,
+    )
     increment_build_number(
       xcodeproj: "ios/App/App.xcodeproj",
       build_number: build_number,

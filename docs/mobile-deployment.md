@@ -4,6 +4,31 @@ This is a quick, repeatable checklist to ship the web app into native shells. Ke
 
 Capacitor 8 requires Node 22+. Run `nvm use` inside [`mobile`](/Users/abhishekkumarjha/Documents/sudo-programmer-official/audit-agent/mobile) before `npx cap ...`.
 
+## Shared version source
+
+Mobile releases now use one repo-level version file:
+
+- [`version.json`](/Users/abhishekkumarjha/Documents/sudo-programmer-official/audit-agent/version.json)
+
+Current format:
+
+```json
+{
+  "version": "1.3.0"
+}
+```
+
+What uses it:
+
+1. Android `versionName`
+2. iOS marketing version
+3. CI-generated release metadata artifacts
+
+Build numbers stay CI-driven:
+
+- Android `versionCode` = `github.run_number`
+- iOS build number = `IOS_BUILD_NUMBER` / `github.run_number`
+
 ### Phase 1 — Prep the Android build (codebase)
 
 1) Update Capacitor config (if needed)
@@ -106,13 +131,13 @@ ANDROID_KEYSTORE_PASSWORD=...
 ANDROID_KEY_ALIAS=...
 ANDROID_KEY_PASSWORD=...
 ANDROID_VERSION_CODE=13
-ANDROID_VERSION_NAME=1.2.2
 ```
 
 Notes:
 
 - CI sets `ANDROID_VERSION_CODE` from `github.run_number` so each internal release is uploadable.
-- You can override `ANDROID_VERSION_NAME` when manually dispatching the workflow.
+- Android `versionName` is sourced from [`version.json`](/Users/abhishekkumarjha/Documents/sudo-programmer-official/audit-agent/version.json).
+- The Android workflow generates `mobile/build/android-release.json` and uploads it as a CI artifact.
 - If release signing values are missing, Gradle now fails with a clear error instead of silently using hardcoded secrets.
 - Debug builds are unchanged; signing is only enforced for release/publish tasks.
 
@@ -232,9 +257,10 @@ What the `beta` lane does:
 
 1. Builds the web bundle from `apps/audit-agent-frontend` unless `SKIP_FRONTEND_BUILD=1`
 2. Runs `npx cap sync ios`
-3. Calculates the next iOS build number
-4. Archives the real Capacitor iOS target (`App`)
-5. Uploads the resulting IPA to TestFlight
+3. Sets the iOS marketing version from [`version.json`](/Users/abhishekkumarjha/Documents/sudo-programmer-official/audit-agent/version.json)
+4. Calculates the next iOS build number
+5. Archives the real Capacitor iOS target (`App`)
+6. Uploads the resulting IPA to TestFlight
 
 Local run:
 
@@ -258,6 +284,9 @@ TESTFLIGHT_CHANGELOG="Bug fixes and improvements"
 ```
 
 Notes:
+
+- The iOS workflow generates `mobile/build/ios-release.json` and uploads it as a CI artifact.
+- Both mobile workflows use [`scripts/generate-release-metadata.mjs`](/Users/abhishekkumarjha/Documents/sudo-programmer-official/audit-agent/scripts/generate-release-metadata.mjs) for consistent release metadata output.
 
 - The lane supports `APP_STORE_CONNECT_API_KEY_PATH` as an alternative to inline key content for local use.
 - `IOS_BUILD_NUMBER` can be supplied explicitly; otherwise Fastlane computes the next build from the current Xcode project and latest TestFlight build.

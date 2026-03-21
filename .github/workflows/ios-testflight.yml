@@ -13,6 +13,8 @@ on:
     paths:
       - 'apps/audit-agent-frontend/**'
       - 'mobile/**'
+      - 'scripts/generate-release-metadata.mjs'
+      - 'version.json'
       - '.github/workflows/ios-testflight.yml'
       - 'docs/mobile-deployment.md'
 
@@ -62,7 +64,17 @@ jobs:
       - name: Install mobile dependencies
         run: npm ci
 
+      - name: Generate release metadata
+        env:
+          RELEASE_PLATFORM: ios
+          RELEASE_BUILD: ${{ github.run_number }}
+          RELEASE_COMMIT: ${{ github.sha }}
+          RELEASE_OUTPUT: build/ios-release.json
+        run: node ../scripts/generate-release-metadata.mjs
+
       - name: Build frontend bundle
+        env:
+          SKIP_SITEMAP_PING: "1"
         run: npm run build
         working-directory: apps/audit-agent-frontend
 
@@ -79,3 +91,11 @@ jobs:
           name: ios-ipa
           path: mobile/build/ios/PlanCraftAI.ipa
           if-no-files-found: ignore
+
+      - name: Upload release metadata artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-release-metadata
+          path: mobile/build/ios-release.json
+          if-no-files-found: error
