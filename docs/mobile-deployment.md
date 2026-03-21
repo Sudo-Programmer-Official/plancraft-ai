@@ -27,7 +27,7 @@ What uses it:
 Build numbers stay CI-driven:
 
 - Android `versionCode` = `github.run_number`
-- iOS build number = `IOS_BUILD_NUMBER` / `github.run_number`
+- iOS build number = `IOS_BUILD_NUMBER`, seeded in CI as `github.run_number + 100`
 
 ### Phase 1 — Prep the Android build (codebase)
 
@@ -135,7 +135,7 @@ ANDROID_VERSION_CODE=13
 
 Notes:
 
-- CI sets `ANDROID_VERSION_CODE` from `github.run_number` so each internal release is uploadable.
+- CI computes `ANDROID_VERSION_CODE` as `github.run_number + 100` to avoid collisions with earlier manual Play uploads.
 - Android `versionName` is sourced from [`version.json`](/Users/abhishekkumarjha/Documents/sudo-programmer-official/audit-agent/version.json).
 - The Android workflow generates `mobile/build/android-release.json` and uploads it as a CI artifact.
 - If release signing values are missing, Gradle now fails with a clear error instead of silently using hardcoded secrets.
@@ -285,11 +285,12 @@ TESTFLIGHT_CHANGELOG="Bug fixes and improvements"
 
 Notes:
 
+- `APP_STORE_CONNECT_API_KEY_CONTENT` can be stored as raw multiline `.p8` content, an escaped `\n` string, or base64-encoded `.p8` content. Fastlane now normalizes all three into a temporary key file before upload.
 - The iOS workflow generates `mobile/build/ios-release.json` and uploads it as a CI artifact.
 - Both mobile workflows use [`scripts/generate-release-metadata.mjs`](/Users/abhishekkumarjha/Documents/sudo-programmer-official/audit-agent/scripts/generate-release-metadata.mjs) for consistent release metadata output.
 
 - The lane supports `APP_STORE_CONNECT_API_KEY_PATH` as an alternative to inline key content for local use.
-- `IOS_BUILD_NUMBER` can be supplied explicitly; otherwise Fastlane computes the next build from the current Xcode project and latest TestFlight build.
+- CI seeds `IOS_BUILD_NUMBER` as `github.run_number + 100`, and Fastlane still takes the max of the current Xcode build, latest TestFlight build, and requested build number.
 - The lane assumes signing is already configured for the `App` target. Local Xcode automatic signing is enough for local runs.
 - CI sets `SKIP_FRONTEND_BUILD=1` and builds the frontend bundle in GitHub Actions before Fastlane runs. Local runs can leave that unset.
 
