@@ -826,6 +826,7 @@ export const useAuthStore = defineStore('authStore', {
         this._refreshPlanPromise = (async () => {
           let status = null
           let usage = null
+          const previousPlan = String(this.user?.plan || '').toLowerCase()
           try {
             const [subStoreModule, usageResult] = await Promise.all([
               import('@/stores/subscriptionStore'),
@@ -851,19 +852,27 @@ export const useAuthStore = defineStore('authStore', {
             } catch {}
           } catch {}
 
-          const plan = String(status?.plan || this.user?.plan || 'free').toLowerCase()
-          this.user = { ...(this.user || {}), plan, usage: usage || this.user?.usage }
+          const resolvedPlan = String(status?.plan || previousPlan || '').toLowerCase()
+          this.user = {
+            ...(this.user || {}),
+            ...(resolvedPlan ? { plan: resolvedPlan } : {}),
+            usage: usage || this.user?.usage,
+          }
           try { localStorage.setItem('user', JSON.stringify(this.user)) } catch {}
           try {
-            await updateDoc(doc(db, 'users', uid), { plan })
+            if (resolvedPlan) {
+              await updateDoc(doc(db, 'users', uid), { plan: resolvedPlan })
+            }
           } catch {}
-          return this.user
+          return { user: this.user, refreshed: !!(status || usage) }
         })()
 
         const result = await this._refreshPlanPromise
-        this._lastPlanRefreshAt = Date.now()
-        this._lastPlanRefreshUid = uid
-        return result
+        if (result?.refreshed) {
+          this._lastPlanRefreshAt = Date.now()
+          this._lastPlanRefreshUid = uid
+        }
+        return result?.user || this.user
       } catch {}
       finally {
         this._refreshPlanPromise = null
@@ -912,6 +921,7 @@ export const useAuthStore = defineStore('authStore', {
                 email: restored.user.email || cachedUser?.email || restored.snapshot?.email || '',
                 photoURL: restored.user.photoURL || cachedUser?.photoURL || restored.snapshot?.photoUrl || '',
                 role: cachedUser?.role || 'user',
+                plan: cachedUser?.plan || restored.snapshot?.plan || '',
               }
               this.token = restored.token || readStoredToken()
               this.guest = false
@@ -1027,6 +1037,7 @@ export const useAuthStore = defineStore('authStore', {
               email: user.email,
               photoURL: user.photoURL,
               role: profile?.role || 'user',
+              plan: profile?.plan || this.user?.plan || '',
             }
             this.token = token
             identifyUser(this.user)
@@ -1958,7 +1969,8 @@ export const useAuthStore = defineStore('authStore', {
             displayName: user.displayName || session?.displayName || '',
             email: user.email || session?.email || email,
             photoURL: user.photoURL,
-            role: 'user',
+            role: this.user?.role || 'user',
+            plan: this.user?.plan || '',
           }
           this.guest = false
           this.token = await withFallback(user.getIdToken(), {
@@ -1991,7 +2003,9 @@ export const useAuthStore = defineStore('authStore', {
             .then((profile) => {
               this.user = {
                 ...(this.user || {}),
+                ...profile,
                 role: profile?.role || this.user?.role || 'user',
+                plan: profile?.plan || this.user?.plan || '',
               }
               try { localStorage.setItem('user', JSON.stringify(this.user)) } catch {}
             })
@@ -1999,6 +2013,7 @@ export const useAuthStore = defineStore('authStore', {
               this.user = {
                 ...(this.user || {}),
                 role: this.user?.role || 'user',
+                plan: this.user?.plan || '',
               }
               try { localStorage.setItem('user', JSON.stringify(this.user)) } catch {}
             })

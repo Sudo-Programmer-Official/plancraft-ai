@@ -32,6 +32,8 @@ export const useWorkspaceStore = defineStore('workspaceStore', () => {
   const loading = ref(false)
   const error = ref(null)
   const hydrated = ref(false)
+  const lastAttemptAt = ref(0)
+  let initPromise = null
 
   function persistActive(id) {
     try {
@@ -85,37 +87,51 @@ export const useWorkspaceStore = defineStore('workspaceStore', () => {
   }
 
   async function init() {
-    if (loading.value) return
-    const uid = resolveSessionUid()
-    let cachedWorkspaceId = null
-    try {
-      cachedWorkspaceId = localStorage.getItem('activeWorkspaceId')
-    } catch {}
-    if (!uid) {
-      hydrated.value = true
-      return
-    }
-
-    loading.value = true
-    error.value = null
-    try {
-      let list = await loadWorkspaces()
-      if (!list.length) {
-        const seeded = await ensureDefaultWorkspace(uid)
-        list = seeded ? [seeded] : []
-        workspaces.value = list
+    if (initPromise) return initPromise
+    initPromise = (async () => {
+      const uid = resolveSessionUid()
+      let cachedWorkspaceId = null
+      try {
+        cachedWorkspaceId = localStorage.getItem('activeWorkspaceId')
+      } catch {}
+      if (!uid) {
+        hydrated.value = true
+        return null
       }
-      const selectedId = activeWorkspaceId.value || cachedWorkspaceId
-      const existing = list.find((w) => w.id === selectedId)
-      const personal = findPersonalWorkspace(list)
-      // Keep user's current selection when available; only fallback to Personal.
-      const preferred = existing?.id || personal?.id || list[0]?.id || null
-      await setActive(preferred)
-    } catch (err) {
-      error.value = err?.message || 'Failed to load workspaces'
+
+      loading.value = true
+      error.value = null
+      lastAttemptAt.value = Date.now()
+      try {
+        let list = await loadWorkspaces()
+        if (!list.length) {
+          const seeded = await ensureDefaultWorkspace(uid)
+          list = seeded ? [seeded] : []
+          workspaces.value = list
+        }
+        const selectedId = activeWorkspaceId.value || cachedWorkspaceId
+        const existing = list.find((w) => w.id === selectedId)
+        const personal = findPersonalWorkspace(list)
+        // Keep user's current selection when available; only fallback to Personal.
+        const preferred = existing?.id || personal?.id || list[0]?.id || null
+        if (preferred) {
+          await setActive(preferred)
+        } else {
+          setLocalActive(null)
+        }
+      } catch (err) {
+        error.value = err?.message || 'Failed to load workspaces'
+      } finally {
+        loading.value = false
+        hydrated.value = true
+      }
+      return activeWorkspaceId.value || null
+    })()
+
+    try {
+      return await initPromise
     } finally {
-      loading.value = false
-      hydrated.value = true
+      initPromise = null
     }
   }
 
@@ -164,6 +180,8 @@ export const useWorkspaceStore = defineStore('workspaceStore', () => {
     loading.value = false
     error.value = null
     hydrated.value = false
+    lastAttemptAt.value = 0
+    initPromise = null
   }
 
   const activeWorkspace = computed(() =>
@@ -179,6 +197,7 @@ export const useWorkspaceStore = defineStore('workspaceStore', () => {
     loading,
     error,
     hydrated,
+    lastAttemptAt,
     init,
     refresh,
     setActive,

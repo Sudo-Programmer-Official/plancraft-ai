@@ -31,7 +31,10 @@ function getPlatformName() {
 }
 
 function prefersNativeAudioRecorder() {
-  return canUseNativeAudioRecorder()
+  const platform = getPlatformName()
+  // Android shells have been more reliable with the WebView MediaRecorder path.
+  // Keep native recording preferred on iOS, and retain Android native as fallback only.
+  return platform === 'ios'
 }
 
 function formatRecorderError(error) {

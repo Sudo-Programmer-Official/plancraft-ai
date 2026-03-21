@@ -1297,7 +1297,13 @@ dayjs.extend(timezone)
 const authStore = useAuthStore()
 const { isPremium, isGuest } = useAuthFlags()
 const workspaceStore = useWorkspaceStore()
-const activeWorkspaceId = computed(() => workspaceStore.activeWorkspaceId)
+const activeWorkspaceId = computed(() => {
+  try {
+    return workspaceStore.activeWorkspaceId || localStorage.getItem('activeWorkspaceId') || null
+  } catch {
+    return workspaceStore.activeWorkspaceId || null
+  }
+})
 const routerNav = useRouter()
 const subStore = useSubscriptionStore()
 const isFirstVisit = computed(() => isGuest.value && authStore?.user?.firstVisitInitialized !== true)
@@ -2620,11 +2626,20 @@ async function attachTaskListener(user) {
     dashboardTasksLoading.value = false
     return
   }
-  const wsId = activeWorkspaceId.value
+  let wsId = activeWorkspaceId.value
   if (!wsId) {
-    syncDashboardTaskBuckets([])
     dashboardTasksLoading.value = true
-    return
+    try {
+      await workspaceStore.init()
+    } catch {
+      /* noop */
+    }
+    wsId = activeWorkspaceId.value
+    if (!wsId) {
+      syncDashboardTaskBuckets([])
+      dashboardTasksLoading.value = false
+      return
+    }
   }
   dashboardTasksLoading.value = true
   if (isIosPackagedApp()) {
@@ -2664,7 +2679,7 @@ watch(activeWorkspaceId, () => {
 })
 
 watch(
-  () => authStore.user?.uid,
+  () => [authStore.user?.uid, authStore.token],
   () => {
     attachTaskListener(auth.currentUser || authStore.user || null)
   },

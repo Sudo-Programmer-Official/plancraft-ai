@@ -662,6 +662,7 @@ const { isPremium, isGuest } = useAuthFlags()
 const authReady = computed(() => !authStore.loading)
 const activeWorkspace = computed(() => workspaceStore.activeWorkspace || {})
 const activeWorkspaceSettings = computed(() => activeWorkspace.value?.settings || {})
+let lastWorkspaceInitKickAt = 0
 
 const isOnTalkPlanner = computed(() => route.path === '/talk-to-planner')
 let upgradeHandler = null
@@ -680,13 +681,30 @@ function handleQuickSetupDone() {
   quickSetupStore.closeQuickSetup()
 }
 
+async function ensureWorkspaceHydrated() {
+  const uid = authStore.user?.uid
+  if (!uid) {
+    workspaceStore.reset()
+    return
+  }
+  if (workspaceStore.activeWorkspaceId) return
+  const now = Date.now()
+  if (now - lastWorkspaceInitKickAt < 1500) return
+  lastWorkspaceInitKickAt = now
+  try {
+    await workspaceStore.init()
+  } catch {
+    /* noop */
+  }
+}
+
 // Prompt for profile setup if incomplete + hydrate workspace store
 watch(
-  () => authStore.user?.uid,
-  (uid) => {
+  () => [authStore.user?.uid, authStore.token],
+  ([uid]) => {
     maybePromptProfile()
     if (uid) {
-      workspaceStore.init()
+      ensureWorkspaceHydrated()
     } else {
       workspaceStore.reset()
     }
@@ -917,6 +935,15 @@ watch(
     subStore.fetchStatus(uid, { force: true, minIntervalMs: 0 }).catch(() => {})
   },
   { immediate: true },
+)
+
+watch(
+  () => authStore.token,
+  () => {
+    if (!authStore.user?.uid) return
+    ensureWorkspaceHydrated()
+    subStore.fetchStatus(authStore.user.uid, { force: true, minIntervalMs: 0 }).catch(() => {})
+  },
 )
 
 onUnmounted(() => {

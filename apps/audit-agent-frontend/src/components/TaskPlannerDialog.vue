@@ -576,7 +576,13 @@ const tasks = computed(() => {
   return Array.isArray(value) ? value : []
 })
 const workspaceStore = useWorkspaceStore()
-const activeWorkspaceId = computed(() => workspaceStore.activeWorkspaceId)
+const activeWorkspaceId = computed(() => {
+  try {
+    return workspaceStore.activeWorkspaceId || localStorage.getItem('activeWorkspaceId') || null
+  } catch {
+    return workspaceStore.activeWorkspaceId || null
+  }
+})
 
 const imageTasksEnabled = parseEnvFlag(import.meta.env.VITE_ENABLE_IMAGE_TASKS)
 const attachments = ref([])
@@ -1275,6 +1281,24 @@ async function generateTasks() {
   const lastTaskEnd = computeLastTaskEndIso(contextTasks, tz)
 
   try {
+    if (!activeWorkspaceId.value) {
+      try {
+        await workspaceStore.init()
+      } catch {
+        /* noop */
+      }
+    }
+    const workspaceId = activeWorkspaceId.value
+    if (!workspaceId) {
+      ElNotification({
+        title: 'Workspace Not Ready',
+        message: 'Please wait a moment and try again.',
+        type: 'warning',
+        duration: 2500,
+      })
+      return
+    }
+
     logTimeBrainDialog('generate:start', {
       tz,
       planDate: selectedDate.value,
@@ -1290,7 +1314,7 @@ async function generateTasks() {
       existingTasks: contextTasks,
       debugLabel: 'TaskPlannerDialog',
       attachments: attachmentPayload,
-      workspaceId: activeWorkspaceId.value || null,
+      workspaceId,
       reminderTime: reminderTime.value || null,
     })
 

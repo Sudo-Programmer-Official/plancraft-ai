@@ -144,14 +144,13 @@ const EXTENSION_TO_MIME = {
   flac: "audio/flac",
 };
 
+// Re-encode AAC/MP4/M4A-style mobile recordings to WAV before transcription.
+// Android native shells have been the least reliable when sent through as-is.
 const PASSTHROUGH_AUDIO_TYPES = new Set([
   "audio/mp3",
   "audio/mpeg",
-  "audio/m4a",
-  "audio/mp4",
   "audio/wav",
   "audio/x-wav",
-  "audio/x-m4a",
   "audio/flac",
 ]);
 
