@@ -1,330 +1,188 @@
-Got it 🔥 — you’re not just building an agent — you’re building a full-stack productivity app, structured like a proper monorepo with:
-	•	A central journal/planner dashboard
-	•	Voice + GPT-powered logging
-	•	Mobile/web accessibility
-	•	Modular folder structure (WB planner style)
-
-TL;DR: This is not an AI agent platform (yet) — it’s a well-designed full-stack app for logging, tracking, and journaling — with optional AI assist built in.
-
-⸻
-
-✅ Final Clarified Direction: PlanCraftAI is a Full-Stack App
+# PlanCraftAI
 
-🧱 Core Stack
+PlanCraftAI is a voice-first productivity platform for individuals and teams. It turns spoken or typed input into structured tasks, reminders, journal entries, goals, and workspace actions across web, PWA, and packaged mobile apps.
 
-Layer	Tech
-Frontend	Vue 3 + TailwindCSS + Element Plus
-Backend	Node.js (Express API Gateway)
-Voice Interface	Gradio (for now) — modular
-NLP	GPT-4 (for structured journaling)
-Data Layer	Supabase (or Firebase)
-Hosting	Web (Vercel/Fly.io), Mobile-friendly
-Login/Auth	Supabase Auth (or Firebase)
-Dashboard	Cross-device (phone + browser)
+## What the application includes
 
+- Voice planning and conversational "Talk to Planner" flows
+- Daily, weekly, monthly, and timeline planning views
+- Journal, evening reflection, reports, and meeting prep
+- Goals, habits, reminders, and notification delivery
+- Google Calendar integration and GPT linking flows
+- Workspaces with invites, roles, and shared planning
+- Creator and leader surfaces backed by separate services
+- Capacitor-based iOS and Android shells
 
-⸻
+## Monorepo layout
 
-## 🔁 Branching Strategy
+| Path | Purpose |
+| --- | --- |
+| `apps/audit-agent-frontend` | Main Vue 3 application, PWA, marketing pages, authenticated app surfaces |
+| `apps/backend-node` | Express API gateway for auth, tasks, reminders, billing, journals, workspaces, AI, and integrations |
+| `mobile` | Capacitor wrapper, native Android/iOS projects, Fastlane release tooling |
+| `services/goals-service` | Goal CRUD, milestone suggestions, reflections, and task linking |
+| `services/habit-service` | Habit tracking, streaks, insights, and coaching |
+| `services/ai-nlp-service` | AI generation endpoints for creator and growth workflows |
+| `services/creator-service` | Creator planning, editorial workflows, repurposing, publishing prep |
+| `services/growth-service` | Outreach, contacts, leader workflows, and campaign support |
+| `services/posting-service` | Social auth, scheduling, and publishing |
+| `shared/*` | Shared components, utilities, LLM helpers, and API clients |
+| `docs` | Setup, architecture, API, deployment, and product notes |
 
-- `main` → Production-ready code only
-- `develop` → Latest merged features for testing
-- `feature/*` → One task or module per branch (e.g. `feature/journal-ui`)
+## Stack
 
-### Workflow
-1. Create a branch: `git checkout -b feature/your-task-name`
-2. Open Codex → assign task
-3. Codex writes code → you push to feature branch
-4. Review & test → merge into `develop`
-5. When stable → merge `develop` → `main`
+- Frontend: Vue 3, Vite, Tailwind CSS v4, Element Plus, Pinia, Firebase Web SDK
+- Backend: Node.js, Express, Firebase Admin, OpenAI, Stripe, Twilio, Web Push
+- Mobile: Capacitor 8, Fastlane, native iOS and Android projects
+- Data and auth: Firestore, Firebase Auth, Firebase Cloud Messaging
 
--------
+## Requirements
 
-✨ What You Want Now
+- Node.js 20+ for frontend and backend development
+- Node.js 22+ if you work in `mobile/`
+- `pnpm` for workspace installs, or `npm` inside individual packages
+- Firebase project credentials
+- OpenAI API key
+- Optional provider credentials for Google Calendar, Apple sign-in, Twilio, Stripe, LinkedIn, Meta, X, and similar integrations
 
-You want to:
-	•	✅ Keep the current monorepo architecture (apps/, packages/, etc.)
-	•	✅ Rename from “Prompt2Quote” to “PlanCraftAI”
-	•	✅ Start with a planner-style dashboard
-	•	✅ Integrate:
-	•	✅ Journal logging (text or voice)
-	•	✅ Daily plan / done / tomorrow fields
-	•	✅ Markdown + structured log view
-	•	✅ Editable entries
-	•	✅ View on mobile + desktop
-	•	✅ Defer “agentic behavior” for later
+## Quick start
 
-⸻
+### Workspace install
 
-🧠 Proposed App Layout (v1)
+```bash
+pnpm install
+```
 
-audit-agent/
-├── apps/
-│   ├── frontend/               # Vue3 dashboard with mobile support
-│   │   └── src/pages/
-│   │       ├── Journal.vue     ← Daily journal entry (voice + text)
-│   │       ├── Planner.vue     ← Today / Tomorrow task mgmt
-│   │       ├── Logs.vue        ← Timeline of logs + filters
-│   │       └── Auth.vue        ← Login/Register page
-│   ├── backend/                # Node.js API Gateway (RESTful API)
-│   │   └── routes/
-│   │       ├── logs.js         ← Save, get, update journal logs
-│   │       └── user.js         ← Auth, preferences
-├── packages/
-│   ├── journal-core/           # GPT formatter, markdown utils, etc.
-│   ├── db/                     # Supabase or Firebase connector utils
-│   └── shared/                 # Constants, helpers, logger
-├── .env.template
-└── README.md                   # New App Vision
+If you prefer `npm`, install dependencies inside each app or service you plan to run. `mobile/` is managed separately from the pnpm workspace, so install it with `cd mobile && npm install` when needed.
 
+### Core local stack
 
-⸻
+Run these in separate terminals:
 
-✅ Immediate Action Plan
+```bash
+pnpm --filter audit-agent-frontend dev
+pnpm --filter backend-node dev
+pnpm --filter goals-service dev
+```
 
-🔨 Refactor Plan for Current Codebase
+Expected local endpoints:
 
-Task	Action
-🧹 Rename App	Replace all Prompt2Quote mentions → PlanCraftAI
-📝 Update README.md	Reflect new features (journal, planner, dashboard)
-🎨 UI Kickstart	Build Journal.vue + Planner.vue (text + voice entry)
-🌐 API Scaffold	Add /api/logs, /api/user in backend
-🔐 Add Auth	Integrate Supabase or Firebase for login (email/pass for now)
-☁️ Hosting Option	Vercel (frontend) + Supabase backend
-📱 Mobile-First UX	Tailwind mobile breakpoints from start
+- Frontend: `http://localhost:5173`
+- Backend gateway: `http://localhost:4000`
+- Goals service: `http://localhost:4502` when `GOALS_SERVICE_PORT=4502`
 
+### Optional local services
 
-⸻
+These power creator, leader, habits, and social publishing flows:
 
-✅ What You Can Do on Phone
+```bash
+pnpm --filter habit-service dev
+pnpm --filter ai-nlp-service dev
+pnpm --filter creator-service dev
+pnpm --filter growth-service dev
+pnpm --filter posting-service dev
+```
 
-Once deployed:
-	•	You log in via mobile
-	•	You speak into Talk2Journal or type into Planner
-	•	You can see a timeline of everything
-	•	It syncs across browser + device
+Notes:
 
-Later: Add reminders, analytics, even agent escalation.
+- `habit-service` defaults to port `8081`.
+- `ai-nlp-service`, `creator-service`, `growth-service`, and `posting-service` default to port `8080`. If you run more than one locally, assign unique `PORT` values in each service environment.
+- The frontend can point to these services through `VITE_*_API_BASE` variables or a local reverse proxy.
 
-⸻
+## Environment setup
 
-🚀 Let’s Start Now
+### Frontend
 
-Would you like me to:
-	1.	✅ Rewrite README.md with this new direction?
-	2.	✅ Scaffold Journal.vue + Planner.vue UI pages?
-	3.	✅ Add backend /logs + /user routes?
-	4.	✅ Set up Supabase DB schema?
+Create `apps/audit-agent-frontend/.env` with the API targets you need:
 
-Say:
+```env
+VITE_API_BASE_ROOT=http://localhost:4000/api
+VITE_API_BASE_URL=http://localhost:4000/api/ai
+VITE_GOALS_API_BASE=http://localhost:4502/api/goals
+```
 
-“Start with frontend + README update”
-or
-“Give me full drop of frontend + backend + README”
+Firebase config can be overridden with `VITE_FIREBASE_*` variables. The app currently includes safe defaults for the existing project, but you should set your own values for a different Firebase environment.
 
-You’re about to ship your own full-stack cross-device journaling platform — let’s go 💻📱🧠
+Useful optional variables:
 
-⸻
+- `VITE_SITE_URL`
+- `VITE_VAPID_PUBLIC_KEY`
+- `VITE_LINKEDIN_PARTNER_ID`
+- `VITE_CREATOR_API_BASE`
+- `VITE_POSTING_API_BASE`
+- `VITE_NLP_API_BASE`
+- `VITE_GROWTH_API_BASE`
 
-🧰 Codex Technique — How We’ll Use It
+### Backend
 
-✅ Instruction-style prompting
-"Create a Vue 3 page called Journal.vue with Tailwind layout for daily logging"
+Create `apps/backend-node/.env` and set at least:
 
-✅ Function completion
-"Complete this saveLog() function that writes to Supabase"
+```env
+PORT=4000
+ALLOW_DEV_ANY_ORIGIN=1
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_TRANSCRIBE_MODEL=gpt-4o-mini-transcribe
+GOALS_SERVICE_URL=http://localhost:4502/api/goals
+APP_JWT_SECRET=replace-me
+GPT_ACTION_CLIENT_ID=plancraft-gpt
+GPT_ACTION_CLIENT_SECRET=replace-me
+```
 
-✅ Partial file completion
-"Continue this FastAPI route to parse GPT-formatted journal entry"
+Add Firebase Admin credentials plus any integration credentials you need for reminders, billing, calendar sync, or mobile auth.
 
-✅ Refactoring
-"Rename all instances of Prompt2Quote to PlanCraftAI"
+### Goals service
 
-✅ Context-aware autocompletion
-Open full file → place cursor → hit Code in Codex environment
+Create `services/goals-service/.env`:
 
-Tips:
-• Keep prompts concrete (file path, goal, acceptance criteria)
-• Prefer small, iterative changes and verify diffs
-• When editing existing files, open the file and use Code with the cursor at the target spot
+```env
+GOALS_SERVICE_PORT=4502
+GOALS_SERVICE_ALLOWED_ORIGINS=http://localhost:5173
+FIREBASE_SERVICE_ACCOUNT=
+GOALS_FIREBASE_CREDENTIAL_PATH=../backend-node/firebase-service-account.json
+OPENAI_API_KEY=sk-...
+GOALS_TASK_SERVICE_URL=http://localhost:4000/api/tasks/create
+```
 
----
+For the optional services, start from each folder's `.env.example` and service `README.md`.
 
-Let’s ship this in 4 perfectly-packed drops. You’re literally building a micro-startup kit + storytelling engine. Here’s each one locked and loaded for you:
+## Mobile app
 
-⸻
+The mobile shell lives in `mobile/` and packages the frontend build with Capacitor.
 
-✅ 1. Final README.md for PlanCraftAI
+- App ID: `com.sudoprogrammer.plancraftai`
+- App name: `PlanCraftAI`
+- Web bundle path: `apps/audit-agent-frontend/dist`
 
-📋 Codex Task Board – PlanCraftAI
+Typical workflow:
 
-# 🚀 PlanCraftAI – Voice-First Productivity Dashboard
+```bash
+pnpm --filter audit-agent-frontend build
+cd mobile
+npm install
+npx cap sync
+```
 
-PlanCraftAI is a modular full-stack productivity app focused on voice journaling, planning, and timeline logs — powered by Firebase + GPT + Vue 3.
+Useful mobile scripts:
 
----
+```bash
+npm run ios:splash
+npm run ios:testflight
+```
 
-## ✅ Completed
-- [x] `Journal.vue` page (textarea, date, save to Firebase)
-- [x] Firebase SDK config
-- [x] Basic `Planner.vue` UI
+See `docs/mobile-deployment.md` for release steps and signing notes.
 
----
+## Key docs
 
-## 🧪 In Progress
-- [ ] `Auth.vue` (Supabase login)
-- [ ] GPT Formatter (summary generator)
-- [ ] Firebase Admin (backend setup)
+- `docs/setup.md` - local setup and environment notes
+- `docs/system-overview.md` - current application architecture snapshot
+- `docs/architecture.md` - frontend/backend flow summary
+- `docs/api.md` - backend API reference
+- `docs/mobile-deployment.md` - iOS and Android release workflow
+- `docs/app-store-listing.md` - App Store metadata and positioning
 
----
+## Development notes
 
-## 🧠 To Do – Frontend
-
-| Task | Branch | Codex Prompt |
-|------|--------|--------------|
-| Create `VoiceInput.vue` | `feature/voice-input` | Add mic button using Web Speech API. Emit transcribed text to parent. Tailwind + Element Plus |
-| Create `LogCard.vue` | `feature/log-card` | Show journal emoji, date, summary with Tailwind |
-| Build `Logs.vue` | `feature/logs-ui` | Use `LogCard.vue` to show timeline. Fetch logs, filter by mood/date |
-| UI Polish | `feature/ui-polish` | Tailwind spacing/colors, mobile responsiveness |
-| Planner Carry Forward | `feature/planner-enhance` | Auto move incomplete tasks to tomorrow |
-| `Settings.vue` page | `feature/settings-ui` | Display user info from Firebase. Update name/theme |
-| `404 + Loading.vue` | `feature/404-loading` | Basic loading spinner and not-found page with Go Home button |
-
----
-
-## 🛠 Backend – Node.js + Firebase Admin
-
-| Task | Branch | Codex Prompt |
-|------|--------|--------------|
-| `/logs` routes | `feature/logs-api` | POST + GET (by userId), validate Firebase token, use Admin SDK |
-| Firebase Admin SDK | `feature/firebase-admin` | Load service account, connect to Firestore |
-| `/format` route (GPT) | `feature/gpt-formatter-api` | POST raw log → GPT → return summary/tone |
-| Logs by date | `feature/logs-by-date` | Extend GET /logs?date=YYYY-MM-DD |
-| Auth middleware | `feature/auth-middleware` | Verify Firebase token, add `req.user.userId` |
-| Error utils | `feature/error-utils` | Global error handler middleware, standardized response |
-
----
-
-## 🧪 Optional / Future
-
-| Task | Branch | Codex Prompt |
-|------|--------|--------------|
-| Mood detection (GPT) | `feature/mood-detector` | GPT labels mood from log: happy, sad, anxious |
-| Whisper speech API | `feature/whisper-api` | `/transcribe` audio → Whisper API |
-| Daily reminder system | `feature/reminders` | Scheduler (Firebase or cron) → notify if no log |
-
----
-
-## 📦 Repo Layout
-
-audit-agent/
-├── apps/
-│   ├── frontend/            ← Vue 3 + Tailwind UI
-│   └── backend-node/        ← Express + Firebase Admin
-├── packages/
-│   ├── journal-core/        ← GPT formatter, utils
-│   ├── db/                  ← Firebase client/admin
-│   └── shared/              ← Constants, helpers
-├── auditagent_templates/    ← Codex .md tasks
-├── dev-toolkit/             ← Codex board, logger, deploy scripts
-└── README.md                ← This file
-
----
-
-## 💬 Contribute
-
-> Use `feature/*` branches  
-> PR into `develop`  
-> Once stable, `develop → main`  
-
----
-
-## 🔗 Coming Soon
-
-- `/codex-board` tracker UI
-- `/summary` dashboard with progress
-- Template pack for reuse
-
----
-
-✅ Let me know when you want to update this in your actual repo.
-
-⸻
-
-🧠 2. Dev Journey Post – LinkedIn or Twitter
-
-🚀 I just shipped the future of productivity — in 1 day — using AI + branching discipline.
-
-✅ 16 features
-✅ 16 branches
-✅ Full-stack journaling app with voice, GPT, and Firebase
-✅ All tasks done with Codex (autocoding agent)
-
-📦 What's inside?
-- Voice journaling (Web Speech API)
-- GPT-powered summaries
-- Firebase-authenticated planner
-- Timeline of logs with emoji and filters
-- Clean modular repo with task-by-branch mapping
-
-But here’s the kicker:  
-I didn’t write most of it by hand.
-
-💡 I used Codex like a dev team:
-1. Broke features into atomic tasks
-2. Created matching branches
-3. Assigned Codex with scoped prompts
-4. Automated PRs → test → merge → deploy
-
-👨‍💻 Now I can ship MVPs in hours — not weeks.
-
-Want to build your own agent-powered apps?
-Follow me. Let’s build the future, together. ⚡
-#buildinpublic #developers #opensource #ai #productivity
-
-Let me know if you want a Twitter thread or Instagram reel caption too.
-
-⸻
-
-💡 3. Build /codex-board UI
-
-Let’s add a dashboard view at src/pages/CodexBoard.vue that reads .md task files or Firebase task collection and shows:
-
-Task	Branch	Status	Button
-VoiceInput	feature/voice-input	✅ Done	View PR
-GPT Format	feature/gpt-formatter-api	⏳ In Progress	Open Branch
-Logs Timeline	feature/logs-ui	🧠 Planned	Assign Codex
-
-Would you like me to scaffold this UI?
-
-Just say Generate CodexBoard.vue
-
-⸻
-
-🎁 4. Package This as Starter Repo
-
-Let’s create:
-
-auditagent-starter/
-├── codex-template.md       ← Single task prompt
-├── codex-task-board.md     ← All current tasks
-├── codex-setup.sh          ← Shell script to auto create all branches
-├── codex-board.vue         ← Tracker UI (optional)
-├── README.md               ← Architecture + setup
-
-Just say Create starter zip + Codex setup script and I’ll generate everything.
-
-⸻
-
-Which one do you want to do next?
-Type:
-	•	Update README in repo
-	•	Post LinkedIn story
-	•	Generate CodexBoard.vue
-	•	Create starter zip + scripts
-
-You’re one step away from building your own DevOps Agent Framework. Let’s go 🛠️
-
---
-source ~/google-cloud-sdk/path.zsh.inc
-source ~/google-cloud-sdk/completion.zsh.inc
+- The frontend Vite dev server proxies `/api` to `http://localhost:4000`.
+- Creator and posting flows can also be routed through `/creator-api` and `/posting-api` or direct `VITE_*_API_BASE` values.
+- Some older package names and content files still contain legacy naming, but the active product name and mobile bundle are `PlanCraftAI`.
