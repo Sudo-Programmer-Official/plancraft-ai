@@ -33,6 +33,7 @@ import { getUsageStatus } from '@/services/planService'
 import { doc, updateDoc, setDoc, onSnapshot } from 'firebase/firestore'
 import { ElNotification } from 'element-plus'
 import { clearAppToken } from '@/services/appTokenService'
+import { storeAppTokenData } from '@/services/appTokenService'
 import api from '@/services/api'
 import { Capacitor, CapacitorHttp } from '@capacitor/core'
 import {
@@ -386,9 +387,17 @@ async function exchangeNativeSessionForCustomToken(idToken, provider = 'password
       }))
     }
 
-    return payload && typeof payload === 'object'
+    const normalizedPayload = payload && typeof payload === 'object'
       ? { ...payload, customToken }
       : { customToken }
+
+    try {
+      if (normalizedPayload?.appToken) {
+        storeAppTokenData(normalizedPayload)
+      }
+    } catch {}
+
+    return normalizedPayload
   } catch (error) {
     console.error('[Auth] Native session exchange failed', JSON.stringify({
       endpoint: '/auth/native-session/exchange',
@@ -820,14 +829,25 @@ export const useAuthStore = defineStore('authStore', {
           try {
             const [subStoreModule, usageResult] = await Promise.all([
               import('@/stores/subscriptionStore'),
-              getUsageStatus(uid).catch(() => null),
+              withFallback(getUsageStatus(uid), {
+                ms: 5000,
+                label: 'usage status',
+                fallback: null,
+              }),
             ])
             usage = usageResult
             try {
-              status = await subStoreModule.useSubscriptionStore().fetchStatus(uid, {
-                force,
-                minIntervalMs,
-              })
+              status = await withFallback(
+                subStoreModule.useSubscriptionStore().fetchStatus(uid, {
+                  force,
+                  minIntervalMs,
+                }),
+                {
+                  ms: 5000,
+                  label: 'subscription status',
+                  fallback: null,
+                },
+              )
             } catch {}
           } catch {}
 

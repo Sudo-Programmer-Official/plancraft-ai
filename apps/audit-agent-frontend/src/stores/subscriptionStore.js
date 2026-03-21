@@ -36,6 +36,7 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     error.value = null
     inflightUserId = userId
     inflightPromise = (async () => {
+      const previous = { ...(subscription.value || {}) }
       try {
         const data = await getSubscriptionStatus(userId, { force })
         subscription.value = {
@@ -47,7 +48,7 @@ export const useSubscriptionStore = defineStore('subscription', () => {
       } catch (e) {
         console.warn('subscription status failed', e)
         error.value = e
-        subscription.value = { plan: 'free', status: 'free', cancelAt: null, remainingDays: 0 }
+        subscription.value = previous?.plan ? previous : subscription.value
       } finally {
         lastFetchedAt.value = Date.now()
         lastFetchedUserId.value = userId

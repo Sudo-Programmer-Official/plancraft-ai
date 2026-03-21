@@ -20,6 +20,30 @@ export function getAppToken() {
   }
 }
 
+export function storeAppTokenData(data = {}) {
+  try {
+    const token = typeof data?.appToken === 'string'
+      ? data.appToken
+      : typeof data?.token === 'string'
+        ? data.token
+        : ''
+    if (!token) return null
+
+    localStorage.setItem(KEY_TOKEN, token)
+
+    const expiresAt = data?.appTokenExpiresAt || data?.expiresAt || null
+    const expMs = expiresAt ? Date.parse(expiresAt) : 0
+    if (expMs) localStorage.setItem(KEY_EXP, String(expMs))
+
+    const uid = data?.uid || data?.sub || data?.userId || null
+    if (uid) localStorage.setItem(KEY_UID, String(uid))
+
+    return token
+  } catch {
+    return null
+  }
+}
+
 export async function refreshAppToken() {
   // Requires backend /api/auth/refresh to be enabled
   try {
@@ -43,10 +67,7 @@ export async function refreshAppToken() {
       return null
     }
     if (data?.token) {
-      localStorage.setItem(KEY_TOKEN, data.token)
-      const expMs = data.expiresAt ? Date.parse(data.expiresAt) : 0
-      if (expMs) localStorage.setItem(KEY_EXP, String(expMs))
-      if (data.uid) localStorage.setItem(KEY_UID, data.uid)
+      storeAppTokenData(data)
     }
     return data
   } catch (e) {

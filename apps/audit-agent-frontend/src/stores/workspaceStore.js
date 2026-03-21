@@ -10,6 +10,22 @@ import {
   updateWorkspaceSettings,
 } from '@/services/workspaceService'
 
+function resolveSessionUid() {
+  try {
+    if (auth?.currentUser?.uid) return auth.currentUser.uid
+  } catch {}
+
+  try {
+    const raw = localStorage.getItem('user')
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (parsed?.uid) return String(parsed.uid)
+    }
+  } catch {}
+
+  return null
+}
+
 export const useWorkspaceStore = defineStore('workspaceStore', () => {
   const workspaces = ref([])
   const activeWorkspaceId = ref(null)
@@ -31,7 +47,7 @@ export const useWorkspaceStore = defineStore('workspaceStore', () => {
 
   async function setActive(id) {
     setLocalActive(id)
-    const uid = auth?.currentUser?.uid
+    const uid = resolveSessionUid()
     if (uid && id) {
       try {
         const ws = workspaces.value.find((w) => w.id === id)
@@ -44,7 +60,7 @@ export const useWorkspaceStore = defineStore('workspaceStore', () => {
   }
 
   async function loadWorkspaces() {
-    const uid = auth?.currentUser?.uid
+    const uid = resolveSessionUid()
     if (!uid) return []
     const list = await fetchWorkspaces(uid)
     workspaces.value = list
@@ -70,7 +86,7 @@ export const useWorkspaceStore = defineStore('workspaceStore', () => {
 
   async function init() {
     if (loading.value) return
-    const uid = auth?.currentUser?.uid
+    const uid = resolveSessionUid()
     let cachedWorkspaceId = null
     try {
       cachedWorkspaceId = localStorage.getItem('activeWorkspaceId')
@@ -113,7 +129,7 @@ export const useWorkspaceStore = defineStore('workspaceStore', () => {
   }
 
   async function createWorkspace(payload) {
-    const uid = auth?.currentUser?.uid
+    const uid = resolveSessionUid()
     if (!uid) throw new Error('Not signed in')
     const workspace = await createWorkspaceDoc(uid, payload)
     workspaces.value = [...workspaces.value, workspace]
@@ -122,7 +138,7 @@ export const useWorkspaceStore = defineStore('workspaceStore', () => {
   }
 
   async function updateWorkspace(id, patch) {
-    const uid = auth?.currentUser?.uid
+    const uid = resolveSessionUid()
     if (!uid || !id) return
     const updated = await updateWorkspaceMeta(uid, id, patch)
     if (updated) {
@@ -133,7 +149,7 @@ export const useWorkspaceStore = defineStore('workspaceStore', () => {
   }
 
   async function applyWorkspaceSettings(id, settings) {
-    const uid = auth?.currentUser?.uid
+    const uid = resolveSessionUid()
     if (!uid || !id) return null
     const updated = await updateWorkspaceSettings(id, settings)
     if (updated) {

@@ -40,6 +40,25 @@ function normalizeMobileAuthRedirectPath(target, fallback = '/dashboard') {
   return trimmed.startsWith('/') ? trimmed : `/${trimmed.replace(/^\/+/, '')}`
 }
 
+function buildAppTokenPayload(uid, email = null) {
+  const secret = process.env.APP_JWT_SECRET
+  if (!secret) return null
+
+  const ttlDays = parseInt(process.env.APP_JWT_TTL_DAYS || '30', 10)
+  const ttlSec = Math.max(1, ttlDays) * 24 * 60 * 60
+  const token = signHS256(
+    { sub: uid, email: email || undefined, scope: 'app' },
+    secret,
+    ttlSec,
+  )
+
+  return {
+    token,
+    ttlDays,
+    expiresAt: new Date(Date.now() + ttlSec * 1000).toISOString(),
+  }
+}
+
 const PHONE_IDENTITY_MATCH_FIELDS = [
   { field: 'phone', source: 'profile.phone', score: 100 },
   { field: 'preferences.notifications.phone_sms', source: 'preferences.notifications.phone_sms', score: 80 },
@@ -218,17 +237,23 @@ router.post('/refresh', async (req, res) => {
 
     const uid = decoded.uid
     const email = decoded.email || null
-    const ttlDays = parseInt(process.env.APP_JWT_TTL_DAYS || '30', 10)
-    const ttlSec = Math.max(1, ttlDays) * 24 * 60 * 60
+    const appToken = buildAppTokenPayload(uid, email)
+    if (!appToken) {
+      return res.status(200).json({
+        ok: false,
+        disabled: true,
+        error: 'APP_JWT_SECRET not set; long-lived tokens disabled',
+      })
+    }
 
-    const token = signHS256(
-      { sub: uid, email: email || undefined, scope: 'app' },
-      secret,
-      ttlSec,
-    )
-
-    const expiresAt = new Date(Date.now() + ttlSec * 1000).toISOString()
-    return res.json({ ok: true, token, expiresAt, ttlDays, uid, email })
+    return res.json({
+      ok: true,
+      token: appToken.token,
+      expiresAt: appToken.expiresAt,
+      ttlDays: appToken.ttlDays,
+      uid,
+      email,
+    })
   } catch (err) {
     console.error('[auth/refresh] unexpected error:', err)
     return res.status(401).json({ ok: false, error: 'Unauthorized', detail: err?.message })
@@ -457,10 +482,14 @@ router.post('/native-session/exchange', async (req, res) => {
       provider,
       platform,
     })
+    const appToken = buildAppTokenPayload(resolvedUid, resolvedEmail)
 
     return res.json({
       ok: true,
       customToken,
+      appToken: appToken?.token || null,
+      appTokenExpiresAt: appToken?.expiresAt || null,
+      appTokenTtlDays: appToken?.ttlDays || null,
       uid: resolvedUid,
       sourceUid: uid,
       email: resolvedEmail,
