@@ -28,7 +28,13 @@ function resolveSessionUid() {
 
 export const useWorkspaceStore = defineStore('workspaceStore', () => {
   const workspaces = ref([])
-  const activeWorkspaceId = ref(null)
+  const activeWorkspaceId = ref((() => {
+    try {
+      return localStorage.getItem('activeWorkspaceId') || null
+    } catch {
+      return null
+    }
+  })())
   const loading = ref(false)
   const error = ref(null)
   const hydrated = ref(false)

@@ -500,7 +500,7 @@ export function useTasks() {
    */
   async function ensureDailyRollover() {
     const userId = authStore?.user?.uid || null
-    const wsId = workspaceStore?.activeWorkspaceId || null
+    const wsId = workspaceStore?.activeWorkspaceId || localStorage.getItem('activeWorkspaceId') || null
     if (!userId || !wsId) return
     const today = makeTodayKey()
     const storageKey = `tasks:last-rollover:${userId}:${wsId}`
@@ -587,8 +587,8 @@ export function useTasks() {
   if (!authWatchAttached) {
     try {
       watch(
-        () => authStore.user?.uid,
-        async (uid) => {
+        () => [authStore.user?.uid, authStore.token],
+        async ([uid]) => {
           if (!uid) {
             allTasks.value = []
             tasks.value = []
