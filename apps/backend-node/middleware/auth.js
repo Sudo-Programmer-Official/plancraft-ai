@@ -3,6 +3,20 @@ import '../services/firebaseAdmin.js' // ensure admin is initialized
 import { ensureUserProfile } from '../services/userService.js'
 import { verifyHS256 } from '../utils/jwt.js'
 
+function decodeJwtClaims(token) {
+  try {
+    const parts = String(token || '').split('.')
+    if (parts.length < 2) return null
+    const payload = parts[1]
+      .replace(/-/g, '+')
+      .replace(/_/g, '/')
+      .padEnd(Math.ceil(parts[1].length / 4) * 4, '=')
+    return JSON.parse(Buffer.from(payload, 'base64').toString('utf8'))
+  } catch {
+    return null
+  }
+}
+
 export async function attachAuth(req, res, next) {
   // Prefer long-lived app token first, but never let a bad app token block
   // a valid Firebase bearer token fallback.
@@ -35,7 +49,19 @@ export async function attachAuth(req, res, next) {
       req.auth = { type: 'firebase', token: idToken, payload: decoded }
       return next()
     } catch (e) {
-      // ignore, proceed unauthenticated
+      const claims = decodeJwtClaims(idToken)
+      try {
+        console.warn('[auth] Firebase bearer verifyIdToken failed', {
+          message: e?.message || String(e),
+          code: e?.code || null,
+          aud: claims?.aud || null,
+          iss: claims?.iss || null,
+          sub: claims?.sub || null,
+          uid: claims?.user_id || claims?.sub || null,
+          email: claims?.email || null,
+          path: req?.originalUrl || req?.url || null,
+        })
+      } catch {}
     }
   }
   return next()
