@@ -4,6 +4,7 @@ import LandingPage from '../views/LandingPage.vue'
 import AppLayout from '@/layouts/AppLayout.vue'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import PrivacyPolicy from '@/views/PrivacyPolicy.vue'
+import DeleteAccount from '@/views/DeleteAccount.vue'
 import Terms from '@/views/TermsOfService.vue'
 import Contact from '@/views/ContactForm.vue'
 import { useAuthStore } from '@/stores/authStore'
@@ -75,6 +76,7 @@ const router = createRouter({
     { path: '/app-auth/complete', name: 'native-auth-complete', component: () => import('@/views/NativeAuthCompleteView.vue') },
     { path: '/billing/upgrade', name: 'billing-upgrade', component: () => import('@/views/BillingUpgradeView.vue') },
     { path: '/privacy', component: PrivacyPolicy },
+    { path: '/delete-account', component: DeleteAccount },
     { path: '/terms', component: Terms },
     { path: '/contact', component: Contact },
     { path: '/features', name: 'features', component: () => import('@/views/FeaturesView.vue') },
@@ -208,11 +210,7 @@ const router = createRouter({
 
     // ✅ Legacy and misc
     { path: '/privacy-policy', redirect: '/privacy' },
-    {
-      path: '/data-deletion',
-      name: 'data-deletion',
-      component: () => import('@/views/DataDeletion.vue'),
-    },
+    { path: '/data-deletion', name: 'data-deletion', redirect: '/delete-account' },
     { path: '/404', name: 'not-found', component: NotFoundView },
     {
       path: '/:pathMatch(.*)*',

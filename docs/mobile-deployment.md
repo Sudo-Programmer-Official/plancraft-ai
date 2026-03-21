@@ -70,6 +70,52 @@ cd android
 ./gradlew bundleRelease
 ```
 
+### Android internal-track CI/CD
+
+The repo now includes [`android-release.yml`](/Users/abhishekkumarjha/Documents/sudo-programmer-official/audit-agent/.github/workflows/android-release.yml) for Play Console internal-track delivery on pushes to `main` and manual dispatches.
+
+What it does:
+
+1. Installs frontend and mobile dependencies
+2. Builds the web bundle from `apps/audit-agent-frontend`
+3. Runs `npx cap sync android`
+4. Builds `app-release.aab`
+5. Uploads the AAB to the Play internal track
+
+Required GitHub secrets:
+
+```bash
+ANDROID_KEYSTORE_BASE64
+ANDROID_KEYSTORE_PASSWORD
+ANDROID_KEY_ALIAS
+ANDROID_KEY_PASSWORD
+GPLAY_SERVICE_ACCOUNT_JSON
+```
+
+Local release setup:
+
+1. Copy [`keystore.properties.example`](/Users/abhishekkumarjha/Documents/sudo-programmer-official/audit-agent/mobile/android/keystore.properties.example) to `mobile/android/keystore.properties`
+2. Set the keystore path, passwords, and alias
+3. Confirm your keystore file is present under `mobile/android/app/`
+
+Local release signing is now read from environment variables or `mobile/android/keystore.properties` instead of hardcoded passwords. Start from [`keystore.properties.example`](/Users/abhishekkumarjha/Documents/sudo-programmer-official/audit-agent/mobile/android/keystore.properties.example):
+
+```bash
+ANDROID_KEYSTORE_PATH=plancraftai-release.jks
+ANDROID_KEYSTORE_PASSWORD=...
+ANDROID_KEY_ALIAS=...
+ANDROID_KEY_PASSWORD=...
+ANDROID_VERSION_CODE=13
+ANDROID_VERSION_NAME=1.2.2
+```
+
+Notes:
+
+- CI sets `ANDROID_VERSION_CODE` from `github.run_number` so each internal release is uploadable.
+- You can override `ANDROID_VERSION_NAME` when manually dispatching the workflow.
+- If release signing values are missing, Gradle now fails with a clear error instead of silently using hardcoded secrets.
+- Debug builds are unchanged; signing is only enforced for release/publish tasks.
+
 ## Build & sync flow (what runs where)
 
 1) Web + Capacitor layer (run here):
@@ -107,6 +153,18 @@ Commands:
 - `./gradlew clean`
 - `./gradlew bundleRelease`
 
+Local release test:
+
+```bash
+cd mobile
+nvm use
+npm ci
+npm --prefix ../apps/audit-agent-frontend run build
+npx cap sync android
+cd android
+./gradlew bundleRelease
+```
+
 Artifact: `android/app/build/outputs/bundle/release/app-release.aab`
 
 Notes:
@@ -138,6 +196,93 @@ xcodebuild -workspace App/App.xcworkspace \
   -archivePath build/PlanCraftAI.xcarchive archive
 ```
 Then export/sign via Xcode Organizer or `xcodebuild -exportArchive` with your provisioning profile.
+
+### iOS splash asset workflow
+
+The repo now includes a repeatable splash generator:
+
+- [`generate-ios-splash.sh`](/Users/abhishekkumarjha/Documents/sudo-programmer-official/audit-agent/mobile/scripts/generate-ios-splash.sh)
+
+It creates one branded 2732×2732 splash image from the web logo and updates the iOS asset catalog at:
+
+- [`Splash.imageset`](/Users/abhishekkumarjha/Documents/sudo-programmer-official/audit-agent/mobile/ios/App/App/Assets.xcassets/Splash.imageset)
+
+Run it with:
+
+```bash
+cd mobile
+npm run ios:splash
+```
+
+Notes:
+
+- The generator uses ImageMagick (`magick`).
+- The source logo is `apps/audit-agent-frontend/public/logo-bg-remove.png`.
+- After regenerating splash assets, rebuild and re-sync iOS before archiving.
+
+### iOS Fastlane + TestFlight CI/CD
+
+The repo now includes a minimal Fastlane pipeline under [`mobile/fastlane`](/Users/abhishekkumarjha/Documents/sudo-programmer-official/audit-agent/mobile/fastlane):
+
+- [`mobile/fastlane/Appfile`](/Users/abhishekkumarjha/Documents/sudo-programmer-official/audit-agent/mobile/fastlane/Appfile)
+- [`mobile/fastlane/Fastfile`](/Users/abhishekkumarjha/Documents/sudo-programmer-official/audit-agent/mobile/fastlane/Fastfile)
+- [`mobile/Gemfile`](/Users/abhishekkumarjha/Documents/sudo-programmer-official/audit-agent/mobile/Gemfile)
+
+What the `beta` lane does:
+
+1. Builds the web bundle from `apps/audit-agent-frontend`
+2. Runs `npx cap sync ios`
+3. Calculates the next iOS build number
+4. Archives the real Capacitor iOS target (`App`)
+5. Uploads the resulting IPA to TestFlight
+
+Local run:
+
+```bash
+cd mobile
+nvm use
+bundle install
+npm ci
+npm run ios:testflight
+```
+
+Required Fastlane/App Store Connect env vars:
+
+```bash
+IOS_APP_IDENTIFIER=com.sudoprogrammer.plancraftai
+IOS_DEVELOPER_TEAM_ID=GP9D55NRCM
+APP_STORE_CONNECT_API_KEY_ID=YOUR_KEY_ID
+APP_STORE_CONNECT_ISSUER_ID=YOUR_ISSUER_ID
+APP_STORE_CONNECT_API_KEY_CONTENT="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+TESTFLIGHT_CHANGELOG="Bug fixes and improvements"
+```
+
+Notes:
+
+- The lane supports `APP_STORE_CONNECT_API_KEY_PATH` as an alternative to inline key content for local use.
+- `IOS_BUILD_NUMBER` can be supplied explicitly; otherwise Fastlane computes the next build from the current Xcode project and latest TestFlight build.
+- The lane assumes signing is already configured for the `App` target. Local Xcode automatic signing is enough for local runs.
+
+### GitHub Actions workflow for iOS TestFlight
+
+The repo now includes [`ios-testflight.yml`](/Users/abhishekkumarjha/Documents/sudo-programmer-official/audit-agent/.github/workflows/ios-testflight.yml).
+
+Trigger modes:
+
+- Manual: GitHub Actions → `iOS TestFlight` → `Run workflow`
+- Automatic: pushes to `main` that touch `mobile/**`, `apps/audit-agent-frontend/**`, this workflow, or this deployment guide
+
+Required GitHub secrets:
+
+```bash
+APP_STORE_CONNECT_API_KEY_ID
+APP_STORE_CONNECT_ISSUER_ID
+APP_STORE_CONNECT_API_KEY_CONTENT
+```
+
+Important CI prerequisite:
+
+- GitHub Actions still needs signing to work on the runner. This workflow is configured for Xcode automatic signing and `-allowProvisioningUpdates`, but it still depends on your Apple account/signing setup being available through automatic/cloud-managed signing or imported certs/profiles.
 
 ### iOS Apple sign-in (server-driven mobile flow)
 

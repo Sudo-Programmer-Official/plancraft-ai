@@ -7,7 +7,7 @@
 
     <div class="max-w-4xl mx-auto py-16 px-6 text-gray-200">
       <h1 class="text-3xl font-bold mb-6">Privacy Policy</h1>
-      <p class="mb-4 text-sm text-gray-400">Last updated: October 1, 2025</p>
+      <p class="mb-4 text-sm text-gray-400">Last updated: March 20, 2026</p>
 
       <p class="mb-6">
         At <strong>PlanCraftAI</strong>, operated by <strong>Sudo Programmer Inc.</strong>, your privacy
@@ -28,19 +28,28 @@
       <ul class="list-disc pl-6 mb-6 space-y-2">
         <li>Deliver reminders via Email, Push, WhatsApp, Slack, or other integrations.</li>
         <li>Enable AI-based productivity and call features.</li>
+        <li>We request microphone (audio) access to enable voice-based features such as AI calls, transcription, and voice interactions.</li>
         <li>Process subscriptions and payments through Stripe.</li>
         <li>Maintain account security and prevent misuse.</li>
         <li>Improve features using anonymized analytics.</li>
       </ul>
 
-      <h2 class="text-xl font-semibold mt-8 mb-4">3. Data Storage & Security</h2>
+      <h2 class="text-xl font-semibold mt-8 mb-4">3. Permissions Used by the App</h2>
+      <ul class="list-disc pl-6 mb-6 space-y-2">
+        <li><strong>Microphone (RECORD_AUDIO)</strong> – used for voice recording, transcription, AI calls, and other voice interactions you initiate.</li>
+      </ul>
+
+      <h2 class="text-xl font-semibold mt-8 mb-4">4. Data Storage & Security</h2>
       <p class="mb-6">
         Data is stored on <strong>Firebase</strong> and <strong>Render</strong> with encryption in transit (HTTPS).
         Sensitive information such as payment details are processed directly by <strong>Stripe</strong>.
         Call data and integrations are secured and can be revoked at any time.
       </p>
+      <p class="mb-6">
+        We do not sell or rent your personal data to third parties.
+      </p>
 
-      <h2 class="text-xl font-semibold mt-8 mb-4">4. Third-Party Services</h2>
+      <h2 class="text-xl font-semibold mt-8 mb-4">5. Third-Party Services</h2>
       <ul class="list-disc pl-6 mb-6 space-y-2">
         <li><strong>Firebase</strong> – authentication, database, analytics</li>
         <li><strong>Stripe</strong> – payments & subscriptions</li>
@@ -51,7 +60,7 @@
         <li><strong>Mixpanel</strong> – usage analytics</li>
       </ul>
 
-      <h2 class="text-xl font-semibold mt-8 mb-4">5. Google Calendar Data Usage</h2>
+      <h2 class="text-xl font-semibold mt-8 mb-4">6. Google Calendar Data Usage</h2>
       <div class="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-5 text-slate-100/90">
         <div>
           <p class="font-semibold text-lg mb-2 text-white">Description of Data Access</p>
@@ -88,14 +97,14 @@
         </div>
       </div>
 
-      <h2 class="text-xl font-semibold mt-8 mb-4">6. Your Rights</h2>
+      <h2 class="text-xl font-semibold mt-8 mb-4">7. Your Rights</h2>
       <p class="mb-6">
-        You may request to <strong>access, update, or delete</strong> your data at any time.  
-        For data deletion, visit our <a href="/data-deletion" class="text-blue-400 underline">Data Deletion page</a>
+        You may request to <strong>access, update, or delete</strong> your data at any time.
+        For account deletion, visit our <a href="/delete-account" class="text-blue-400 underline">Delete Account page</a>
         or email us at <a href="mailto:help@sudoprogrammer.com" class="text-blue-400 underline">help@sudoprogrammer.com</a>.
       </p>
 
-      <h2 class="text-xl font-semibold mt-8 mb-4">7. Contact Us</h2>
+      <h2 class="text-xl font-semibold mt-8 mb-4">8. Contact Us</h2>
       <ul class="list-disc pl-6 mt-2 space-y-1">
         <li>Email: <a href="mailto:support@plancraftai.com" class="text-blue-400 underline">support@plancraftai.com</a></li>
         <li>Support: <a href="mailto:help@sudoprogrammer.com" class="text-blue-400 underline">help@sudoprogrammer.com</a></li>

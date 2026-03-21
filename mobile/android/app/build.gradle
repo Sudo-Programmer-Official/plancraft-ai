@@ -1,5 +1,38 @@
 apply plugin: 'com.android.application'
 
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+
+def readReleaseConfig = { String key, String fallback = null ->
+    if (project.hasProperty(key) && project.property(key)?.toString()?.trim()) {
+        return project.property(key).toString().trim()
+    }
+    def envValue = System.getenv(key)
+    if (envValue?.toString()?.trim()) {
+        return envValue.toString().trim()
+    }
+    def fileValue = keystoreProperties.getProperty(key)
+    if (fileValue?.toString()?.trim()) {
+        return fileValue.toString().trim()
+    }
+    return fallback
+}
+
+def androidVersionCode = (readReleaseConfig("ANDROID_VERSION_CODE", "13") as String).toInteger()
+def androidVersionName = readReleaseConfig("ANDROID_VERSION_NAME", "1.2.2")
+def releaseStoreFile = readReleaseConfig("ANDROID_KEYSTORE_PATH")
+def releaseStorePassword = readReleaseConfig("ANDROID_KEYSTORE_PASSWORD")
+def releaseKeyAlias = readReleaseConfig("ANDROID_KEY_ALIAS")
+def releaseKeyPassword = readReleaseConfig("ANDROID_KEY_PASSWORD")
+def hasReleaseSigning =
+        releaseStoreFile &&
+        releaseStorePassword &&
+        releaseKeyAlias &&
+        releaseKeyPassword
+
 android {
     namespace = "com.sudoprogrammer.plancraftai"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +40,8 @@ android {
         applicationId "com.sudoprogrammer.plancraftai"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 11
-        versionName "1.9.0"
+        versionCode androidVersionCode
+        versionName androidVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -18,18 +51,34 @@ android {
     }
     signingConfigs {
         release {
-            storeFile file("plancraftai-release.jks")
-            storePassword "PlancraftAI@Android#2025"
-            keyAlias "plancraftai"
-            keyPassword "PlancraftAI@Android#2025"
+            if (hasReleaseSigning) {
+                storeFile file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
         }
     }
     buildTypes {
         release {
-            signingConfig signingConfigs.release
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
+    }
+}
+
+gradle.taskGraph.whenReady { taskGraph ->
+    def needsReleaseSigning = taskGraph.allTasks.any { task ->
+        def taskName = task.name?.toLowerCase() ?: ""
+        taskName.contains("release") || taskName.contains("publish")
+    }
+    if (needsReleaseSigning && !hasReleaseSigning) {
+        throw new GradleException(
+            "Missing Android release signing configuration. Set ANDROID_KEYSTORE_PATH, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, and ANDROID_KEY_PASSWORD via environment variables or mobile/android/keystore.properties."
+        )
     }
 }
 

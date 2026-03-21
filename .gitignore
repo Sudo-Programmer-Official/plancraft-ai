@@ -157,6 +157,7 @@ mobile/android/.gradle/
 mobile/android/build/
 mobile/android/**/build/
 mobile/android/local.properties
+mobile/android/keystore.properties
 mobile/android/capacitor-cordova-android-plugins/
 mobile/android/app/src/main/assets/public/
 mobile/android/app/src/main/assets/capacitor.config.json
@@ -180,6 +181,11 @@ mobile/ios/**/*.xcuserstate
 # CocoaPods
 mobile/ios/App/Pods/
 mobile/ios/App/Podfile.lock
+mobile/build/ios/
+mobile/fastlane/Preview.html
+mobile/fastlane/report.xml
+mobile/fastlane/screenshots/
+mobile/fastlane/test_output/
 
 # -----------------------------
 # Optional app data ignores

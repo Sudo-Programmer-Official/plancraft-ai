@@ -5,6 +5,10 @@
   "engines": {
     "node": ">=22.0.0"
   },
+  "scripts": {
+    "ios:splash": "./scripts/generate-ios-splash.sh",
+    "ios:testflight": "bundle exec fastlane ios beta"
+  },
   "dependencies": {
     "@capacitor/android": "^8.2.0",
     "@capacitor/app": "^8.0.1",

@@ -1,0 +1,76 @@
+name: iOS TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      changelog:
+        description: TestFlight changelog
+        required: false
+        type: string
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/audit-agent-frontend/**'
+      - 'mobile/**'
+      - '.github/workflows/ios-testflight.yml'
+      - 'docs/mobile-deployment.md'
+
+concurrency:
+  group: ios-testflight
+  cancel-in-progress: false
+
+jobs:
+  beta:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      IOS_APP_IDENTIFIER: com.sudoprogrammer.plancraftai
+      IOS_DEVELOPER_TEAM_ID: GP9D55NRCM
+      IOS_BUILD_NUMBER: ${{ github.run_number }}
+      TESTFLIGHT_CHANGELOG: ${{ inputs.changelog || github.event.head_commit.message || 'Bug fixes and improvements' }}
+      APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: mobile/.nvmrc
+          cache: npm
+          cache-dependency-path: |
+            apps/audit-agent-frontend/package-lock.json
+            mobile/package-lock.json
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: apps/audit-agent-frontend
+
+      - name: Install mobile dependencies
+        run: npm ci
+
+      - name: Install Fastlane gems
+        run: bundle install
+
+      - name: Run Fastlane beta
+        run: bundle exec fastlane ios beta
+
+      - name: Upload IPA artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: mobile/build/ios/PlanCraftAI.ipa
+          if-no-files-found: ignore
