@@ -128,6 +128,8 @@ end
 platform :ios do
   desc "Build the Capacitor iOS app and upload it to TestFlight"
   lane :beta do |options|
+    setup_ci if ENV["CI"]
+
     api_key = app_store_api_key_from_env
     changelog = options[:changelog] || ENV["TESTFLIGHT_CHANGELOG"] || "Bug fixes and improvements"
     signing_xcargs = xcode_cloud_signing_xcargs
@@ -155,15 +157,19 @@ platform :ios do
     build_app(
       project: "ios/App/App.xcodeproj",
       scheme: "App",
-      export_method: "app-store",
       clean: true,
+      skip_profile_detection: true,
       output_directory: "build/ios",
       output_name: "PlanCraftAI.ipa",
       xcargs: signing_xcargs,
       export_xcargs: signing_xcargs,
       export_options: {
+        method: "app-store-connect",
+        destination: "export",
         signingStyle: "automatic",
         teamID: ENV["IOS_DEVELOPER_TEAM_ID"],
+        uploadSymbols: true,
+        manageAppVersionAndBuildNumber: false,
       },
     )
 
