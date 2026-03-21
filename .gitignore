@@ -193,3 +193,4 @@ mobile/fastlane/test_output/
 # apps/backend-node/uploads/
 # apps/backend-node/results_*.json
 # apps/backend-node/results_*.csv
+apps/audit-agent-frontend/public/release.json

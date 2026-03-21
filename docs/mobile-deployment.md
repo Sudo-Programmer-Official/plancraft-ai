@@ -23,6 +23,7 @@ What uses it:
 1. Android `versionName`
 2. iOS marketing version
 3. CI-generated release metadata artifacts
+4. Runtime release visibility via `/release.json` and `/api/version`
 
 Build numbers stay CI-driven:
 
@@ -295,6 +296,34 @@ Notes:
 - CI seeds `IOS_BUILD_NUMBER` as `github.run_number + 100`, and Fastlane still takes the max of the current Xcode build, latest TestFlight build, and requested build number.
 - The lane assumes signing is already configured for the `App` target. Local Xcode automatic signing is enough for local runs.
 - CI sets `SKIP_FRONTEND_BUILD=1` and builds the frontend bundle in GitHub Actions before Fastlane runs. Local runs can leave that unset.
+
+## Runtime release visibility
+
+Two runtime surfaces now expose release information:
+
+1. Static bundle file:
+   - `https://plancraftai.com/release.json`
+   - generated into `apps/audit-agent-frontend/public/release.json` before frontend builds
+2. Backend endpoint:
+   - `GET /api/version`
+   - served by [`versionRoutes.js`](/Users/abhishekkumarjha/Documents/sudo-programmer-official/audit-agent/apps/backend-node/routes/versionRoutes.js)
+
+Typical response shape:
+
+```json
+{
+  "version": "1.3.0",
+  "build": "42",
+  "commit": "abc123",
+  "date": "2026-03-21T18:35:27.930Z",
+  "platform": "web"
+}
+```
+
+Notes:
+
+- `public/release.json` is generated during frontend builds and ignored by git.
+- `/api/version` prefers runtime env values when present and otherwise falls back to the available release metadata file plus [`version.json`](/Users/abhishekkumarjha/Documents/sudo-programmer-official/audit-agent/version.json).
 
 ### GitHub Actions workflow for iOS TestFlight
 
