@@ -110,6 +110,20 @@ router.get('/settings/preferences', async (req, res) => {
   }
 })
 
+router.get('/settings/profile', async (req, res) => {
+  try {
+    const { userId } = req.query || {}
+    if (!userId) return res.status(400).json({ error: 'Missing userId' })
+
+    const snap = await db.collection('users').doc(String(userId)).get()
+    const data = snap.exists ? snap.data() : {}
+    res.json({ profile: data || {} })
+  } catch (err) {
+    console.error('❌ getProfile error:', err)
+    res.status(500).json({ error: 'Failed to fetch profile' })
+  }
+})
+
 // GET /api/settings/:userId/reminder-preferences
 router.get('/settings/:userId/reminder-preferences', async (req, res) => {
   try {

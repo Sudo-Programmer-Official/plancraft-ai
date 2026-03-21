@@ -218,10 +218,10 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { doc, setDoc } from 'firebase/firestore'
 import { db } from '@/firebase/init'
 import { hasSubscription, registerPushSubscription } from '@/services/pushService'
-import { getIntegrations, getPreferences, updateIntegrations, updatePreferences } from '@/services/settingsService'
+import { getIntegrations, getPreferences, getProfile, updateIntegrations, updatePreferences } from '@/services/settingsService'
 import { useAuthFlags } from '@/composables/useAuthFlags'
 import { useAuthStore } from '@/stores/authStore'
 import { guessCountryFromLocale, normalizePhone } from '@/utils/phoneUtils'
@@ -401,12 +401,12 @@ async function loadSetup() {
       const [prefResult, integrationsResult, userResult] = await Promise.allSettled([
         withTimeout(getPreferences(userId), 8000, 'quick setup preferences'),
         withTimeout(getIntegrations(userId), 8000, 'quick setup integrations'),
-        withTimeout(getDoc(doc(db, 'users', userId)), 8000, 'quick setup profile'),
+        withTimeout(getProfile(userId), 8000, 'quick setup profile'),
       ])
 
       const prefData = prefResult.status === 'fulfilled' ? (prefResult.value || {}) : {}
       const integrationsData = integrationsResult.status === 'fulfilled' ? (integrationsResult.value || {}) : {}
-      const userSnap = userResult.status === 'fulfilled' ? userResult.value : null
+      const userData = userResult.status === 'fulfilled' ? (userResult.value || {}) : {}
 
       if (prefResult.status === 'rejected') {
         console.warn('[QuickSetup] preferences load failed', prefResult.reason?.message || prefResult.reason)
@@ -445,7 +445,6 @@ async function loadSetup() {
         const loadedChannels = deriveChannels(prefData?.notifications || {})
         if (loadedChannels.length) applyChannels(loadedChannels)
 
-        const userData = userSnap?.exists?.() ? (userSnap.data() || {}) : {}
         reminderPhone.value =
           integrationsData?.sms?.phone ||
           integrationsData?.whatsapp?.phone ||
@@ -571,13 +570,16 @@ async function persistQuickSetup() {
       }
 
       await withTimeout(updateIntegrations(userId, mergedIntegrations), 10000, 'quick setup integrations save')
+      const profilePatch = {
+        updatedAt: new Date(),
+      }
+      if (normalizedPhone) {
+        profilePatch.phone = normalizedPhone
+      }
       await withTimeout(
         setDoc(
           doc(db, 'users', userId),
-          {
-            phone: normalizedPhone || undefined,
-            updatedAt: new Date(),
-          },
+          profilePatch,
           { merge: true }
         ),
         10000,

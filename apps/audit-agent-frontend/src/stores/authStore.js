@@ -589,6 +589,143 @@ async function withFallback(promise, { ms = 8000, label = 'auth operation', fall
   }
 }
 
+function kickOffPostLoginHydration(store, { platform = 'web', source = 'login' } = {}) {
+  Promise.resolve().then(async () => {
+    const uid = store?.user?.uid || auth.currentUser?.uid || null
+    if (!uid) return
+
+    try {
+      await withFallback(
+        store.refreshUser?.(),
+        {
+          ms: 5000,
+          label: `${source} profile refresh`,
+          fallback: null,
+        },
+      )
+    } catch {}
+
+    try {
+      const mod = await import('@/stores/workspaceStore')
+      const workspaceStore = mod.useWorkspaceStore()
+      await withFallback(
+        workspaceStore.init(),
+        {
+          ms: 8000,
+          label: `${source} workspace init`,
+          fallback: null,
+        },
+      )
+      console.info('[Auth] Post-login workspace hydration resolved', {
+        source,
+        platform,
+        uid,
+        workspaceId: workspaceStore.activeWorkspaceId || null,
+        hydrated: workspaceStore.hydrated === true,
+      })
+    } catch (error) {
+      console.warn('[Auth] Post-login workspace hydration failed', {
+        source,
+        platform,
+        uid,
+        message: error?.message || String(error),
+      })
+    }
+
+    try {
+      await withFallback(
+        store.refreshPlan?.({ force: true, minIntervalMs: 0 }),
+        {
+          ms: 8000,
+          label: `${source} plan refresh`,
+          fallback: null,
+        },
+      )
+    } catch {}
+
+    try {
+      const [
+        settingsModule,
+        quickSetupModule,
+        quickSetupStoreModule,
+      ] = await Promise.all([
+        import('@/services/settingsService'),
+        import('@/utils/quickSetup'),
+        import('@/stores/quickSetupStore'),
+      ])
+
+      const [preferences, integrations, profile] = await Promise.all([
+        withFallback(settingsModule.getPreferences(uid), {
+          ms: 6000,
+          label: `${source} quick setup preferences`,
+          fallback: {},
+        }),
+        withFallback(settingsModule.getIntegrations(uid), {
+          ms: 6000,
+          label: `${source} quick setup integrations`,
+          fallback: {},
+        }),
+        withFallback(settingsModule.getProfile(uid), {
+          ms: 6000,
+          label: `${source} quick setup profile`,
+          fallback: {},
+        }),
+      ])
+
+      const notifications = preferences?.notifications || {}
+      const channels = Array.isArray(notifications?.channels) && notifications.channels.length
+        ? notifications.channels
+        : [
+            notifications?.email && 'email',
+            (notifications?.push || notifications?.pwa) && 'pwa',
+            notifications?.whatsapp && 'whatsapp',
+            notifications?.sms && 'sms',
+            notifications?.voice_call && 'voice_call',
+          ].filter(Boolean)
+
+      const phone =
+        integrations?.sms?.phone ||
+        integrations?.whatsapp?.phone ||
+        profile?.phone ||
+        store?.user?.phone ||
+        ''
+
+      const nextState = quickSetupModule.buildQuickSetupState({
+        timezone:
+          profile?.timezone ||
+          profile?.preferences?.timezone ||
+          store?.user?.preferences?.timezone ||
+          localStorage.getItem('user_timezone') ||
+          Intl.DateTimeFormat().resolvedOptions().timeZone ||
+          'UTC',
+        channels,
+        phone,
+        pushGranted: false,
+        isNative: platform === 'ios' || platform === 'android',
+      })
+
+      quickSetupModule.writeQuickSetupState(nextState)
+      quickSetupStoreModule.useQuickSetupStore().refreshQuickSetupState(nextState)
+      console.info('[Auth] Post-login quick setup hydration resolved', {
+        source,
+        platform,
+        uid,
+        completed: nextState?.completed === true,
+        missing: Array.isArray(nextState?.steps)
+          ? nextState.steps.filter((step) => step.required && !step.complete).map((step) => step.key)
+          : [],
+      })
+    } catch (error) {
+      console.warn('[Auth] Post-login quick setup hydration failed', {
+        source,
+        platform,
+        uid,
+        message: error?.message || String(error),
+      })
+    }
+  })
+}
+
 export const useAuthStore = defineStore('authStore', {
   state: () => ({
     user: null,
@@ -649,6 +786,7 @@ export const useAuthStore = defineStore('authStore', {
           plan: profile?.plan || this.user?.plan,
           role: profile?.role || this.user?.role,
         }
+        try { localStorage.setItem('user', JSON.stringify(this.user)) } catch {}
       } catch {
         // no-op
       }
@@ -695,6 +833,7 @@ export const useAuthStore = defineStore('authStore', {
 
           const plan = String(status?.plan || this.user?.plan || 'free').toLowerCase()
           this.user = { ...(this.user || {}), plan, usage: usage || this.user?.usage }
+          try { localStorage.setItem('user', JSON.stringify(this.user)) } catch {}
           try {
             await updateDoc(doc(db, 'users', uid), { plan })
           } catch {}
@@ -1366,7 +1505,7 @@ export const useAuthStore = defineStore('authStore', {
             mod.refreshAppToken().catch(() => {})
           }
         } catch {}
-        this.refreshPlan().catch(() => {})
+        kickOffPostLoginHydration(this, { platform: 'apple', source: 'apple-sign-in' })
         ElNotification({
           title: current ? 'Apple linked' : 'Welcome back ✨',
           message: current ? 'Apple has been added to your account.' : `Signed in as ${this.user.displayName || this.user.email || 'User'}`,
@@ -1545,7 +1684,10 @@ export const useAuthStore = defineStore('authStore', {
             mod.refreshAppToken().catch(() => {})
           }
         } catch {}
-        this.refreshPlan().catch(() => {})
+        kickOffPostLoginHydration(this, {
+          platform: handoff?.platform || Capacitor?.getPlatform?.() || 'web',
+          source: 'native-handoff',
+        })
         ElNotification({
           title: 'Welcome back ✨',
           message: `Signed in as ${this.user.displayName || this.user.email || 'User'}`,
@@ -1705,7 +1847,10 @@ export const useAuthStore = defineStore('authStore', {
             mod.refreshAppToken().catch(() => {})
           }
         } catch {}
-        this.refreshPlan().catch(() => {})
+        kickOffPostLoginHydration(this, {
+          platform: Capacitor?.getPlatform?.() || 'web',
+          source: 'phone-otp',
+        })
         ElNotification({
           title: 'Welcome ✨',
           message: `Signed in with phone ${this.user.phone || ''}`,
@@ -1843,7 +1988,10 @@ export const useAuthStore = defineStore('authStore', {
               mod.refreshAppToken().catch(() => {})
             }
           } catch {}
-          this.refreshPlan().catch(() => {})
+          kickOffPostLoginHydration(this, {
+            platform,
+            source: `native-${platform}-email`,
+          })
           ElNotification({
             title: 'Signed in ✨',
             message: `Welcome ${this.user.displayName || this.user.email || ''}`,
@@ -1936,7 +2084,10 @@ export const useAuthStore = defineStore('authStore', {
                 mod.refreshAppToken().catch(() => {})
               }
             } catch {}
-            this.refreshPlan().catch(() => {})
+            kickOffPostLoginHydration(this, {
+              platform: nativePlatform,
+              source: 'email-link',
+            })
             ElNotification({
               title: 'Email linked',
               message: 'Email/password added to your account.',
@@ -2024,7 +2175,10 @@ export const useAuthStore = defineStore('authStore', {
           mod.refreshAppToken().catch(() => {})
         }
       } catch {}
-      this.refreshPlan().catch(() => {})
+      kickOffPostLoginHydration(this, {
+        platform: nativePlatform,
+        source: 'email-password',
+      })
       ElNotification({
         title: 'Signed in ✨',
         message: `Welcome ${this.user.displayName || this.user.email || ''}`,

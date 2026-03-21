@@ -15,6 +15,8 @@ import {
 } from 'firebase/auth'
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/firebase/init"; // Already initialized
+import api from '@/services/api'
+import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
 
 export async function signInAsGuest() {
   const result = await signInAnonymously(auth);
@@ -87,12 +89,24 @@ export async function sendResetEmail(email) {
 export async function fetchUserProfile(uid) {
   try {
     if (!uid) return { role: 'user' }
+    if (isNativePackagedApp()) {
+      const res = await api.get('/settings/profile', { params: { userId: uid } })
+      const profile = res?.data?.profile
+      return profile && typeof profile === 'object' ? profile : { role: 'user' }
+    }
     const ref = doc(db, 'users', uid)
     const snap = await getDoc(ref)
     return snap.exists() ? (snap.data() || {}) : { role: 'user' }
   } catch (e) {
     console.warn('fetchUserProfile failed:', e)
-    return { role: 'user' }
+    try {
+      if (!uid) return { role: 'user' }
+      const res = await api.get('/settings/profile', { params: { userId: uid } })
+      const profile = res?.data?.profile
+      return profile && typeof profile === 'object' ? profile : { role: 'user' }
+    } catch {
+      return { role: 'user' }
+    }
   }
 }
 

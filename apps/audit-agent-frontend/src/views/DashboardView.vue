@@ -1273,6 +1273,7 @@ import { getReminderStatus, scheduleReminder } from '@/services/reminderService'
 import { listReports, generateReport } from '@/services/reportsService'
 import api from '@/services/api'
 import { getPreferences as getUserPreferences, updateOnboardingStatus } from '@/services/settingsService'
+import { isIosPackagedApp } from '@/utils/nativeAuthSupport'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { ElMessage, ElNotification } from 'element-plus'
 import { TASK_CATEGORY_FILTERS, getCategoryIcon, getCategoryColor, resolveCategory } from '@/constants/taskCategories'
@@ -2613,7 +2614,8 @@ function handleTaskSnapshot(snapshot) {
 
 async function attachTaskListener(user) {
   if (unsubscribe.value) unsubscribe.value()
-  if (!user) {
+  const effectiveUser = user || auth.currentUser || authStore?.user || null
+  if (!effectiveUser?.uid) {
     syncDashboardTaskBuckets([])
     dashboardTasksLoading.value = false
     return
@@ -2625,6 +2627,13 @@ async function attachTaskListener(user) {
     return
   }
   dashboardTasksLoading.value = true
+  if (isIosPackagedApp()) {
+    const seeded = await refreshAllTasks(true).then(() => true).catch(() => false)
+    if (seeded) syncDashboardTaskBuckets(allTasks.value)
+    dashboardTasksLoading.value = false
+    unsubscribe.value = null
+    return
+  }
   const tasksQuery = query(tasksCollection(), where('workspaceId', '==', wsId))
   try {
     unsubscribe.value = onSnapshot(tasksQuery, async (snapshot) => {

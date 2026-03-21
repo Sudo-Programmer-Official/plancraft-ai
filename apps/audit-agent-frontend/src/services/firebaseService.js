@@ -22,7 +22,7 @@ import api from '@/services/api'
 import { db, auth } from '@/firebase/init'
 import { updateStreakOnEntry } from '@/services/streakService'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
-import { clearStoredAuthArtifacts } from '@/utils/authStorage'
+import { clearStoredAuthArtifacts, readNativeIosAuthSnapshot } from '@/utils/authStorage'
 import { isIosPackagedApp } from '@/utils/nativeAuthSupport'
 
 const tasksRef = collection(db, "tasks");
@@ -38,6 +38,50 @@ function currentWorkspaceId() {
     } catch {
       return null
     }
+  }
+}
+
+function currentSessionContext() {
+  try {
+    const firebaseUser = auth?.currentUser || null
+    if (firebaseUser?.uid) {
+      return {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email || null,
+        firebaseUser,
+      }
+    }
+  } catch {}
+
+  try {
+    const nativeSnapshot = readNativeIosAuthSnapshot()
+    if (nativeSnapshot?.localId) {
+      return {
+        uid: String(nativeSnapshot.localId),
+        email: nativeSnapshot.email || null,
+        firebaseUser: null,
+      }
+    }
+  } catch {}
+
+  try {
+    const raw = localStorage.getItem('user')
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (parsed?.uid) {
+        return {
+          uid: String(parsed.uid),
+          email: parsed.email || null,
+          firebaseUser: null,
+        }
+      }
+    }
+  } catch {}
+
+  return {
+    uid: null,
+    email: null,
+    firebaseUser: null,
   }
 }
 
@@ -206,8 +250,8 @@ function normalizeApiTaskRecord(task = {}) {
 }
 
 async function fetchTasksViaApi({ date = null, startDate = null, endDate = null } = {}) {
-  const user = auth.currentUser
-  if (!user) return []
+  const session = currentSessionContext()
+  if (!session?.uid) return []
   const wsId = currentWorkspaceId()
   if (!wsId) return []
 
@@ -220,7 +264,7 @@ async function fetchTasksViaApi({ date = null, startDate = null, endDate = null 
   })
 
   const params = {
-    userId: user.uid,
+    userId: session.uid,
     workspaceId: wsId,
   }
   if (date) params.date = date
@@ -235,6 +279,13 @@ async function fetchTasksViaApi({ date = null, startDate = null, endDate = null 
   })
   const res = await withTimeout(request, 10000, 'task list api')
   const items = Array.isArray(res?.data?.items) ? res.data.items : []
+  console.info('[TaskRead] backend task list resolved', {
+    workspaceId: wsId,
+    count: items.length,
+    date: date || null,
+    startDate: startDate || null,
+    endDate: endDate || null,
+  })
   return items.map((task) => normalizeApiTaskRecord(task))
 }
 
@@ -359,8 +410,8 @@ export async function fetchTasks() {
   return fetchTasksForToday();
 }
 export async function fetchTasksForToday() {
-  const user = auth.currentUser;
-  if (!user) return [];
+  const session = currentSessionContext()
+  if (!session?.uid) return []
 
   const today = toLocalDateKey(new Date()); // YYYY-MM-DD local
   const wsId = currentWorkspaceId()
@@ -381,7 +432,7 @@ export async function fetchTasksForToday() {
       const legacy = query(
         scopedTasks,
         where('workspaceId', '==', null),
-        where('userId', '==', user.uid),
+        where('userId', '==', session.uid),
         where('date', '==', today),
         orderBy('order', 'asc'),
       )
@@ -395,8 +446,8 @@ export async function fetchTasksForToday() {
  * 🗓 Fetch tasks for a specific date (YYYY-MM-DD)
  */
 export async function fetchTasksByDate(dateStr) {
-  const user = auth.currentUser;
-  if (!user) return [];
+  const session = currentSessionContext()
+  if (!session?.uid) return []
   const wsId = currentWorkspaceId()
   if (!wsId) return []
   return fetchTasksWithApiFallback(async () => {
@@ -412,7 +463,7 @@ export async function fetchTasksByDate(dateStr) {
       const legacy = query(
         scopedTasks,
         where('workspaceId', '==', null),
-        where('userId', '==', user.uid),
+        where('userId', '==', session.uid),
         where('date', '==', dateStr),
         orderBy('order', 'asc'),
       )
@@ -426,8 +477,8 @@ export async function fetchTasksByDate(dateStr) {
  * 📅 Fetch tasks between two dates inclusive (YYYY-MM-DD)
  */
 export async function fetchTasksBetween(startYMD, endYMD) {
-  const user = auth.currentUser;
-  if (!user) return [];
+  const session = currentSessionContext()
+  if (!session?.uid) return []
   const wsId = currentWorkspaceId()
   if (!wsId) return []
   return fetchTasksWithApiFallback(async () => {
@@ -445,7 +496,7 @@ export async function fetchTasksBetween(startYMD, endYMD) {
       const legacy = query(
         scopedTasks,
         where('workspaceId', '==', null),
-        where('userId', '==', user.uid),
+        where('userId', '==', session.uid),
         where('date', '>=', startYMD),
         where('date', '<=', endYMD),
         orderBy('date', 'asc'),
@@ -461,14 +512,14 @@ export async function fetchTasksBetween(startYMD, endYMD) {
  * 📚 Fetch every task for the active workspace (single source of truth)
  */
 export async function fetchAllTasksForWorkspace() {
-  const user = auth.currentUser
-  if (!user) return []
+  const session = currentSessionContext()
+  if (!session?.uid) return []
   const wsId = currentWorkspaceId()
   if (!wsId) return []
   return fetchTasksWithApiFallback(async () => {
     const scopedTasks = resolveTasksRef()
     const primaryQuery = query(scopedTasks, where('workspaceId', '==', wsId))
-    const orphanQuery = query(scopedTasks, where('workspaceId', '==', null), where('userId', '==', user.uid))
+    const orphanQuery = query(scopedTasks, where('workspaceId', '==', null), where('userId', '==', session.uid))
 
     const [primarySnap, orphanSnap] = await Promise.all([
       safeAction(withTimeout(getDocs(primaryQuery), 8000, 'task read workspace')),
@@ -487,8 +538,8 @@ export async function fetchAllTasksForWorkspace() {
  * ⏩ Find unfinished tasks scheduled before a given date (YYYY-MM-DD)
  */
 export async function fetchUnfinishedTasksBefore(ymd) {
-  const user = auth.currentUser
-  if (!user) return []
+  const session = currentSessionContext()
+  if (!session?.uid) return []
   const wsId = currentWorkspaceId()
   if (!wsId) return []
   const scopedTasks = resolveTasksRef()
@@ -498,7 +549,7 @@ export async function fetchUnfinishedTasksBefore(ymd) {
 
   async function runQuery(includeCompletedFilter = true, useLegacy = false) {
     const clauses = [where('workspaceId', '==', useLegacy ? null : wsId)]
-    if (useLegacy) clauses.push(where('userId', '==', user.uid))
+    if (useLegacy) clauses.push(where('userId', '==', session.uid))
     clauses.push(where('date', '<', target))
     if (includeCompletedFilter) clauses.push(where('completed', '==', false))
     const qy = query(scopedTasks, ...clauses, orderBy('date', 'asc'))

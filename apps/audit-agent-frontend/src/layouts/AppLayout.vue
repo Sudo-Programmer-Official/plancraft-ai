@@ -593,11 +593,12 @@ import { useAuthFlags } from '@/composables/useAuthFlags'
 import PlanSummaryModal from '@/components/PlanSummaryModal.vue'
 import ProfileSetup from '@/components/ProfileSetup.vue'
 import { db } from '@/firebase/init'
-import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { doc, setDoc } from 'firebase/firestore'
 import { trackLinkedInConversion } from '@/utils/ads'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { ElMessage } from 'element-plus'
 import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
+import { fetchUserProfile } from '@/services/authService'
 const currentUserId = ref(null)
 function deriveUidFromStorage() {
   try {
@@ -716,15 +717,14 @@ async function maybePromptProfile() {
     if (authStore?.isGuest || authStore?.guest === true) return
     const localKey = `profile_setup_done:${uid}`
     if (localStorage.getItem(localKey) === '1') return
-    const ref = doc(db, 'users', uid)
-    const snap = await getDoc(ref)
-    if (!snap.exists()) {
+    const data = await fetchUserProfile(uid)
+    if (!data || typeof data !== 'object' || !Object.keys(data).length) {
+      const ref = doc(db, 'users', uid)
       // Only prompt for phone-based accounts
       await setDoc(ref, { createdAt: new Date(), updatedAt: new Date(), profileComplete: false }, { merge: true })
       // Without a doc we don't yet know the mode; don't show until next fetch
       return
     }
-    const data = snap.data() || {}
     const signInMethod = String(data.mode || authStore?.user?.mode || authStore?.user?.signInMethod || '').toLowerCase()
     const isPhone = signInMethod === 'phone'
     const complete = !!data.profileComplete || !!data.name
