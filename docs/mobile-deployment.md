@@ -291,7 +291,7 @@ Notes:
 
 - The lane supports `APP_STORE_CONNECT_API_KEY_PATH` as an alternative to inline key content for local use.
 - CI passes the App Store Connect API key through to `xcodebuild` with automatic signing flags so archive/export can request signing assets without an interactive Xcode account on the runner.
-- IPA export stays Fastlane-compatible with `export_method: app-store`, while the generated Xcode export options still use automatic signing and skip Fastlane provisioning-profile detection to avoid manual profile mapping during CI exports.
+- Fastlane now archives the app and delegates IPA export to a direct `xcodebuild -exportArchive` call with automatic signing and App Store Connect authentication, which avoids gym’s provisioning-profile mapping issues during CI packaging.
 - CI seeds `IOS_BUILD_NUMBER` as `github.run_number + 100`, and Fastlane still takes the max of the current Xcode build, latest TestFlight build, and requested build number.
 - The lane assumes signing is already configured for the `App` target. Local Xcode automatic signing is enough for local runs.
 - CI sets `SKIP_FRONTEND_BUILD=1` and builds the frontend bundle in GitHub Actions before Fastlane runs. Local runs can leave that unset.

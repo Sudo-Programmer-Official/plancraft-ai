@@ -104,6 +104,74 @@ def xcode_cloud_signing_xcargs
   args.join(" ")
 end
 
+def ios_archive_path
+  File.join(mobile_root, "build", "ios", "PlanCraftAI.xcarchive")
+end
+
+def ios_export_directory
+  File.join(mobile_root, "build", "ios")
+end
+
+def ios_exported_ipa_path
+  File.join(ios_export_directory, "PlanCraftAI.ipa")
+end
+
+def ios_export_options_plist_path
+  plist_path = File.join(mobile_root, "build", "fastlane", "ExportOptions.plist")
+  FileUtils.mkdir_p(File.dirname(plist_path))
+  File.write(
+    plist_path,
+    <<~PLIST
+      <?xml version="1.0" encoding="UTF-8"?>
+      <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
+      <plist version="1.0">
+      <dict>
+        <key>method</key>
+        <string>app-store-connect</string>
+        <key>signingStyle</key>
+        <string>automatic</string>
+        <key>teamID</key>
+        <string>#{ENV["IOS_DEVELOPER_TEAM_ID"]}</string>
+        <key>uploadSymbols</key>
+        <true/>
+        <key>manageAppVersionAndBuildNumber</key>
+        <false/>
+      </dict>
+      </plist>
+    PLIST
+  )
+  plist_path
+end
+
+def export_archive_to_ipa(signing_xcargs)
+  export_dir = ios_export_directory
+  archive_path = ios_archive_path
+  export_plist = ios_export_options_plist_path
+
+  FileUtils.mkdir_p(export_dir)
+
+  sh(
+    [
+      "xcodebuild",
+      "-exportArchive",
+      "-archivePath #{Shellwords.escape(archive_path)}",
+      "-exportPath #{Shellwords.escape(export_dir)}",
+      "-exportOptionsPlist #{Shellwords.escape(export_plist)}",
+      signing_xcargs,
+    ].join(" "),
+  )
+
+  exported_ipa = Dir[File.join(export_dir, "*.ipa")].first
+  UI.user_error!("xcodebuild export succeeded but no IPA was found in #{export_dir}") unless exported_ipa
+
+  final_ipa = ios_exported_ipa_path
+  if exported_ipa != final_ipa
+    FileUtils.mv(exported_ipa, final_ipa)
+  end
+
+  final_ipa
+end
+
 def effective_build_number(api_key)
   app_identifier = ENV.fetch("IOS_APP_IDENTIFIER", "com.sudoprogrammer.plancraftai")
   local_build = get_build_number(xcodeproj: "ios/App/App.xcodeproj").to_i
@@ -159,24 +227,20 @@ platform :ios do
       scheme: "App",
       export_method: "app-store",
       clean: true,
+      skip_package_ipa: true,
+      skip_package_pkg: true,
       skip_profile_detection: true,
+      archive_path: ios_archive_path,
       output_directory: "build/ios",
       output_name: "PlanCraftAI.ipa",
       xcargs: signing_xcargs,
-      export_xcargs: signing_xcargs,
-      export_options: {
-        method: "app-store-connect",
-        destination: "export",
-        signingStyle: "automatic",
-        teamID: ENV["IOS_DEVELOPER_TEAM_ID"],
-        uploadSymbols: true,
-        manageAppVersionAndBuildNumber: false,
-      },
     )
+
+    ipa_path = export_archive_to_ipa(signing_xcargs)
 
     upload_to_testflight(
       api_key: api_key,
-      ipa: "build/ios/PlanCraftAI.ipa",
+      ipa: ipa_path,
       changelog: changelog,
       skip_waiting_for_build_processing: true,
     )
