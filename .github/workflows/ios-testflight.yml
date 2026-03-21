@@ -31,6 +31,7 @@ jobs:
       IOS_APP_IDENTIFIER: com.sudoprogrammer.plancraftai
       IOS_DEVELOPER_TEAM_ID: GP9D55NRCM
       IOS_BUILD_NUMBER: ${{ github.run_number }}
+      SKIP_FRONTEND_BUILD: "1"
       TESTFLIGHT_CHANGELOG: ${{ inputs.changelog || github.event.head_commit.message || 'Bug fixes and improvements' }}
       APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
       APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
@@ -61,6 +62,10 @@ jobs:
       - name: Install mobile dependencies
         run: npm ci
 
+      - name: Build frontend bundle
+        run: npm run build
+        working-directory: apps/audit-agent-frontend
+
       - name: Install Fastlane gems
         run: bundle install
 
@@ -68,7 +73,7 @@ jobs:
         run: bundle exec fastlane ios beta
 
       - name: Upload IPA artifact
-        if: always()
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: ios-ipa

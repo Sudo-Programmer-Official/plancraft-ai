@@ -230,7 +230,7 @@ The repo now includes a minimal Fastlane pipeline under [`mobile/fastlane`](/Use
 
 What the `beta` lane does:
 
-1. Builds the web bundle from `apps/audit-agent-frontend`
+1. Builds the web bundle from `apps/audit-agent-frontend` unless `SKIP_FRONTEND_BUILD=1`
 2. Runs `npx cap sync ios`
 3. Calculates the next iOS build number
 4. Archives the real Capacitor iOS target (`App`)
@@ -262,6 +262,7 @@ Notes:
 - The lane supports `APP_STORE_CONNECT_API_KEY_PATH` as an alternative to inline key content for local use.
 - `IOS_BUILD_NUMBER` can be supplied explicitly; otherwise Fastlane computes the next build from the current Xcode project and latest TestFlight build.
 - The lane assumes signing is already configured for the `App` target. Local Xcode automatic signing is enough for local runs.
+- CI sets `SKIP_FRONTEND_BUILD=1` and builds the frontend bundle in GitHub Actions before Fastlane runs. Local runs can leave that unset.
 
 ### GitHub Actions workflow for iOS TestFlight
 
@@ -279,6 +280,12 @@ APP_STORE_CONNECT_API_KEY_ID
 APP_STORE_CONNECT_ISSUER_ID
 APP_STORE_CONNECT_API_KEY_CONTENT
 ```
+
+Workflow behavior:
+
+1. Installs frontend and mobile dependencies
+2. Builds `apps/audit-agent-frontend`
+3. Runs Fastlane for Capacitor sync, archive, and TestFlight upload
 
 Important CI prerequisite:
 

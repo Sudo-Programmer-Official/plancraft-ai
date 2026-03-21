@@ -9,6 +9,9 @@
     "ios:splash": "./scripts/generate-ios-splash.sh",
     "ios:testflight": "bundle exec fastlane ios beta"
   },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  },
   "dependencies": {
     "@capacitor/android": "^8.2.0",
     "@capacitor/app": "^8.0.1",

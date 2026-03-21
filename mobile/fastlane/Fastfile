@@ -1,5 +1,17 @@
 default_platform(:ios)
 
+def mobile_root
+  File.expand_path("..", __dir__)
+end
+
+def repo_root
+  File.expand_path("..", mobile_root)
+end
+
+def frontend_root
+  File.join(repo_root, "apps", "audit-agent-frontend")
+end
+
 def app_store_api_key_from_env
   key_id = ENV["APP_STORE_CONNECT_API_KEY_ID"]
   issuer_id = ENV["APP_STORE_CONNECT_ISSUER_ID"]
@@ -47,8 +59,15 @@ platform :ios do
     api_key = app_store_api_key_from_env
     changelog = options[:changelog] || ENV["TESTFLIGHT_CHANGELOG"] || "Bug fixes and improvements"
 
-    sh("npm --prefix ../apps/audit-agent-frontend run build")
-    sh("npx cap sync ios")
+    unless ENV["SKIP_FRONTEND_BUILD"] == "1"
+      Dir.chdir(frontend_root) do
+        sh("npm run build")
+      end
+    end
+
+    Dir.chdir(mobile_root) do
+      sh("npx cap sync ios")
+    end
 
     build_number = effective_build_number(api_key)
     increment_build_number(
