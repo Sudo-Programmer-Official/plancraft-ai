@@ -349,9 +349,46 @@ async function exchangeNativeSessionForCustomToken(idToken, provider = 'password
       'native session exchange',
     )
 
-    const customToken = String(response?.data?.customToken || '')
-    if (!customToken) throw new Error('Missing Firebase custom token from native session exchange')
-    return response.data
+    let payload = response?.data
+    if (typeof payload === 'string') {
+      try {
+        payload = JSON.parse(payload)
+      } catch {}
+    }
+    if (
+      payload &&
+      typeof payload === 'object' &&
+      payload.data &&
+      typeof payload.data === 'object' &&
+      !payload.customToken
+    ) {
+      payload = {
+        ...payload.data,
+        ok: typeof payload.ok === 'boolean' ? payload.ok : payload.data.ok,
+      }
+    }
+
+    const customToken = String(
+      payload?.customToken ||
+      payload?.firebaseCustomToken ||
+      payload?.token ||
+      '',
+    )
+
+    if (!customToken) {
+      console.warn('[Auth] Native session exchange returned no custom token', JSON.stringify({
+        endpoint: '/auth/native-session/exchange',
+        status: response?.status || null,
+        provider,
+        platform,
+        payloadType: typeof payload,
+        payloadKeys: payload && typeof payload === 'object' ? Object.keys(payload) : [],
+      }))
+    }
+
+    return payload && typeof payload === 'object'
+      ? { ...payload, customToken }
+      : { customToken }
   } catch (error) {
     console.error('[Auth] Native session exchange failed', JSON.stringify({
       endpoint: '/auth/native-session/exchange',
@@ -363,6 +400,44 @@ async function exchangeNativeSessionForCustomToken(idToken, provider = 'password
       platform,
     }))
     throw error
+  }
+}
+
+function normalizeIdentityToolkitSession(data = {}, fallbackEmail = '') {
+  const claims = parseJwtPayload(data?.idToken)
+  const localId = String(data?.localId || claims?.user_id || claims?.sub || '')
+  const email = typeof data?.email === 'string'
+    ? data.email
+    : typeof claims?.email === 'string'
+      ? claims.email
+      : fallbackEmail || undefined
+  const displayName = typeof data?.displayName === 'string'
+    ? data.displayName
+    : typeof data?.name === 'string'
+      ? data.name
+      : typeof claims?.name === 'string'
+        ? claims.name
+        : undefined
+  const photoUrl = typeof data?.photoUrl === 'string'
+    ? data.photoUrl
+    : typeof data?.photoURL === 'string'
+      ? data.photoURL
+      : typeof data?.profilePicture === 'string'
+        ? data.profilePicture
+        : typeof claims?.picture === 'string'
+          ? claims.picture
+          : undefined
+  const emailVerified = typeof data?.emailVerified === 'boolean'
+    ? data.emailVerified
+    : claims?.email_verified === true
+
+  return {
+    ...data,
+    localId,
+    email,
+    displayName,
+    photoUrl,
+    emailVerified,
   }
 }
 
@@ -412,17 +487,10 @@ async function nativeIosSignInWithCustomToken(customToken, platform = 'ios') {
     const mapped = mapIdentityToolkitError(errorMessage)
     const err = new Error(mapped.message)
     err.code = mapped.code
-    throw err
+      throw err
   }
 
-  return {
-    ...data,
-    localId,
-    email,
-    displayName,
-    photoUrl,
-    emailVerified,
-  }
+  return normalizeIdentityToolkitSession(data)
 }
 
 async function hydrateNativeIosCustomTokenUser(idTokenResponse, fallbackEmail = '', updateTimeoutMs = 8000, platform = 'ios') {
@@ -1679,13 +1747,26 @@ export const useAuthStore = defineStore('authStore', {
           console.info('[Auth] Native packaged app custom token exchange resolved', {
             platform,
             uid: exchanged?.uid || session?.localId || null,
+            hasCustomToken: !!customToken,
           })
 
-          const tokenSession = await nativeIosSignInWithCustomToken(customToken, platform)
-          console.info('[Auth] Native packaged app Identity Toolkit custom token sign-in resolved', {
-            platform,
-            uid: tokenSession?.localId || null,
-          })
+          let tokenSession
+          if (customToken) {
+            tokenSession = await nativeIosSignInWithCustomToken(customToken, platform)
+            console.info('[Auth] Native packaged app Identity Toolkit custom token sign-in resolved', {
+              platform,
+              uid: tokenSession?.localId || null,
+            })
+          } else {
+            tokenSession = normalizeIdentityToolkitSession(session, email)
+            if (!tokenSession?.idToken || !tokenSession?.refreshToken || !tokenSession?.localId) {
+              throw new Error(`Native ${platform} password verification session did not return a Firebase user`)
+            }
+            console.warn('[Auth] Native packaged app custom token exchange missing token; using direct password session', {
+              platform,
+              uid: tokenSession?.localId || null,
+            })
+          }
 
           if (platform === 'ios') {
             persistNativeIosAuthSnapshot(tokenSession, {

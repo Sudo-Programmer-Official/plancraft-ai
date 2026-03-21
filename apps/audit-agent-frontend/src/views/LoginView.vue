@@ -574,9 +574,9 @@ function mapPhoneOtpError(error) {
   if (code === 'auth/internal-error') {
     if (isNativeApp.value && isIosApp.value) {
       if (phoneAuthTestingEnabled) {
-        return 'iPhone simulator OTP requires a Firebase fictional test number and verification code. Real SMS delivery will not work in this mode.'
+        return 'Firebase phone auth testing mode is enabled on iPhone. Use a Firebase fictional test number and verification code from the Firebase console.'
       }
-      return 'Real Firebase phone OTP will not work reliably on the iPhone simulator. Use a physical iPhone with Firebase APNs phone-auth setup, or enable VITE_FIREBASE_PHONE_AUTH_TESTING=1 and use Firebase fictional test numbers.'
+      return 'Firebase phone OTP failed on this iPhone build. If this is a simulator, real SMS delivery will not work; use a Firebase fictional test number instead. If this is a physical iPhone, verify Firebase APNs phone-auth setup and try again.'
     }
     return 'Firebase phone auth hit an internal verification error. Check the phone auth setup and try again.'
   }
