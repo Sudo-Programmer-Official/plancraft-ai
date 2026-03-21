@@ -16,6 +16,11 @@ export async function getProfile(userId) {
   return res?.data?.profile || {}
 }
 
+export async function updateProfile(userId, profile) {
+  const res = await api.post('/settings/profile', { userId, profile })
+  return res?.data?.profile || {}
+}
+
 // Back-compat helpers for views that expect preferences APIs here
 export async function getPreferences(userId) {
   const res = await api.get('/settings/preferences', { params: { userId } })

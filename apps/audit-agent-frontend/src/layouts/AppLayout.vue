@@ -899,7 +899,7 @@ function openFeedback() {
 }
 
 onMounted(() => {
-  if (authStore.user?.uid) subStore.fetchStatus(authStore.user.uid)
+  if (authStore.user?.uid) subStore.fetchStatus(authStore.user.uid, { force: true, minIntervalMs: 0 })
   feedbackStore.init()
   // Upgrade banner events
   try {
@@ -909,6 +909,15 @@ onMounted(() => {
     window.addEventListener('upgrade-required', upgradeHandler)
   } catch {}
 })
+
+watch(
+  () => authStore.user?.uid,
+  (uid, prev) => {
+    if (!uid || uid === prev) return
+    subStore.fetchStatus(uid, { force: true, minIntervalMs: 0 }).catch(() => {})
+  },
+  { immediate: true },
+)
 
 onUnmounted(() => {
   if (upgradeHandler) {

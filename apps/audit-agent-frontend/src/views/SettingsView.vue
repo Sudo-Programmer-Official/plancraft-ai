@@ -666,7 +666,7 @@ import { useRouter, useRoute } from "vue-router"
 import { ElMessage } from "element-plus"
 import { normalizePhone, guessCountryFromLocale } from '@/utils/phoneUtils'
 import { getGoogleStatus, getGoogleCalendars, saveGoogleCalendarSelection, triggerGoogleSyncNow, requestGoogleConnectUrl, disconnectGoogleIntegration } from '@/stores/integrationsStore'
-import { getPreferences as apiGetPrefs, updatePreferences as apiUpdatePrefs, getIntegrations, updateIntegrations } from "@/services/settingsService"
+import { getPreferences as apiGetPrefs, updatePreferences as apiUpdatePrefs, getIntegrations, updateIntegrations, getProfile as getSettingsProfile, updateProfile as updateSettingsProfile } from "@/services/settingsService"
 import { createGptLinkCode } from '@/services/gptService'
 import SocialIntegrationPanel from '@/components/settings/SocialIntegrationPanel.vue'
 import { subscribeUserToPush } from "@/services/pwaService"
@@ -677,9 +677,7 @@ import KnowledgePanel from "@/components/KnowledgePanel.vue"
 import ProposalInbox from "@/components/ProposalInbox.vue"
 import { useIsPremium } from "@/composables/useIsPremium"
 import { trackLinkedInConversion } from '@/utils/ads'
-import { getAuth, updateProfile, updateEmail, GoogleAuthProvider, reauthenticateWithPopup, RecaptchaVerifier, PhoneAuthProvider, reauthenticateWithCredential } from 'firebase/auth'
-import { db } from '@/firebase/init'
-import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { getAuth, updateProfile as updateFirebaseProfile, updateEmail, GoogleAuthProvider, reauthenticateWithPopup, RecaptchaVerifier, PhoneAuthProvider, reauthenticateWithCredential } from 'firebase/auth'
 import AvatarUploader from '@/components/AvatarUploader.vue'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { useQuickSetupStore } from '@/stores/quickSetupStore'
@@ -948,9 +946,7 @@ async function loadSettingsProfile(uid) {
     return
   }
   try {
-    const uref = doc(db, 'users', uid)
-    const usnap = await withTimeout(getDoc(uref), 8000, 'settings profile')
-    const udata = usnap.exists() ? (usnap.data() || {}) : {}
+    const udata = await withTimeout(getSettingsProfile(uid), 8000, 'settings profile')
     applyProfileFields(user, udata)
   } catch (error) {
     console.warn('[Settings] profile load fallback', error?.message || error)
@@ -1487,18 +1483,16 @@ async function saveProfile() {
   if (!u?.uid) return
   profileSaving.value = true
   try {
-    const ref = doc(db, 'users', u.uid)
     // Normalize phone before writing
     let phoneE164 = profileForm.phone || ''
     try { phoneE164 = normalizePhone(phoneE164, guessCountryFromLocale()) } catch {}
-    await setDoc(ref, {
-      name: profileForm.name || undefined,
-      email: profileForm.email || undefined,
-      phone: phoneE164 || undefined,
+    await updateSettingsProfile(u.uid, {
+      name: profileForm.name || null,
+      email: profileForm.email || null,
+      phone: phoneE164 || null,
       profileComplete: !!(profileForm.name && profileForm.name.trim().length),
-      updatedAt: new Date(),
-    }, { merge: true })
-    try { await updateProfile(u, { displayName: profileForm.name || '' }) } catch {}
+    })
+    try { await updateFirebaseProfile(u, { displayName: profileForm.name || '' }) } catch {}
     if (profileForm.email && profileForm.email !== u.email) {
       try {
         await updateEmail(u, profileForm.email)

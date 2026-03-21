@@ -2660,9 +2660,16 @@ onMounted(() => {
 })
 
 watch(activeWorkspaceId, () => {
-  const user = auth.currentUser
-  if (user) attachTaskListener(user)
+  attachTaskListener(auth.currentUser || authStore.user || null)
 })
+
+watch(
+  () => authStore.user?.uid,
+  () => {
+    attachTaskListener(auth.currentUser || authStore.user || null)
+  },
+  { immediate: true },
+)
 
 onUnmounted(() => {
   if (unsubscribe.value) unsubscribe.value()

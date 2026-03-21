@@ -124,6 +124,46 @@ router.get('/settings/profile', async (req, res) => {
   }
 })
 
+router.post('/settings/profile', async (req, res) => {
+  try {
+    const { userId, profile } = req.body || {}
+    if (!userId) return res.status(400).json({ error: 'Missing userId' })
+    if (!profile || typeof profile !== 'object') {
+      return res.status(400).json({ error: 'Missing or invalid profile payload' })
+    }
+
+    const patch = {
+      updatedAt: new Date(),
+    }
+
+    if (profile.name !== undefined) {
+      const value = String(profile.name || '').trim()
+      patch.name = value || null
+    }
+
+    if (profile.email !== undefined) {
+      const value = String(profile.email || '').trim()
+      patch.email = value || null
+    }
+
+    if (profile.phone !== undefined) {
+      const country = guessCountry(req)
+      const normalized = profile.phone ? normalizePhone(String(profile.phone), country) : ''
+      patch.phone = normalized || null
+    }
+
+    if (profile.profileComplete !== undefined) {
+      patch.profileComplete = !!profile.profileComplete
+    }
+
+    await db.collection('users').doc(String(userId)).set(patch, { merge: true })
+    res.json({ success: true, profile: patch })
+  } catch (err) {
+    console.error('❌ updateProfile error:', err)
+    res.status(500).json({ error: 'Failed to update profile' })
+  }
+})
+
 // GET /api/settings/:userId/reminder-preferences
 router.get('/settings/:userId/reminder-preferences', async (req, res) => {
   try {

@@ -60,6 +60,33 @@ function normalizeStatus(payload) {
   }
 }
 
+function readStoredUserFallbackStatus() {
+  if (typeof window === 'undefined' || !window.localStorage) return null
+  try {
+    const raw = window.localStorage.getItem('user')
+    if (!raw) return null
+    const user = JSON.parse(raw)
+    const role = String(user?.role || '').toLowerCase()
+    const plan = String(user?.plan || '').toLowerCase()
+    const looksPremium =
+      role === 'admin' ||
+      role === 'superadmin' ||
+      plan.includes('premium') ||
+      plan.includes('pro') ||
+      plan.includes('starter') ||
+      plan.includes('team')
+    if (!looksPremium) return null
+    return {
+      plan: 'premium',
+      status: 'active',
+      remainingDays: Number(user?.subscription?.remainingDays || 0),
+      cancelAt: user?.subscription?.cancelAt || null,
+    }
+  } catch {
+    return null
+  }
+}
+
 export async function createCheckoutSession(plan, userId) {
   try {
     const successUrl = window.location.origin + '/subscription?status=success'
@@ -89,7 +116,7 @@ export async function getSubscriptionStatus(userId, options = {}) {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) {
     const cachedOffline = readCachedStatus(userId)
     if (cachedOffline) return normalizeStatus(cachedOffline)
-    return { ...DEFAULT_STATUS }
+    return readStoredUserFallbackStatus() || { ...DEFAULT_STATUS }
   }
 
   if (!force && inFlightStatusRequests.has(userId)) {
@@ -99,7 +126,7 @@ export async function getSubscriptionStatus(userId, options = {}) {
   const backoffUntil = timeoutBackoffUntil.get(userId) || 0
   if (!force && backoffUntil > Date.now()) {
     const cachedDuringBackoff = readCachedStatus(userId)
-    return cachedDuringBackoff ? normalizeStatus(cachedDuringBackoff) : { ...DEFAULT_STATUS }
+    return cachedDuringBackoff ? normalizeStatus(cachedDuringBackoff) : (readStoredUserFallbackStatus() || { ...DEFAULT_STATUS })
   }
 
   const request = (async () => {
@@ -127,13 +154,14 @@ export async function getSubscriptionStatus(userId, options = {}) {
         return normalizeStatus(cached)
       }
       const message = err?.response?.data || err?.message || err
+      const storedFallback = readStoredUserFallbackStatus()
       if (err?.code === 'ERR_CANCELED') {
         timeoutBackoffUntil.set(userId, Date.now() + TIMEOUT_BACKOFF_MS)
         console.warn('Subscription status request timed out, using defaults')
       } else {
         console.error('Subscription status error:', message)
       }
-      return { ...DEFAULT_STATUS }
+      return storedFallback || { ...DEFAULT_STATUS }
     } finally {
       if (timer) clearTimeout(timer)
       inFlightStatusRequests.delete(userId)
