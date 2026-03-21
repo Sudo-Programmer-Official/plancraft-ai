@@ -117,21 +117,6 @@ const SUPPORTED_AUDIO_TYPES = new Set([
   "audio/x-m4a",
 ]);
 
-const MIME_TO_EXTENSION = {
-  "audio/webm": "webm",
-  "audio/mp3": "mp3",
-  "audio/mpeg": "mp3",
-  "audio/m4a": "m4a",
-  "audio/mp4": "mp4",
-  "audio/ogg": "ogg",
-  "audio/oga": "oga",
-  "audio/wav": "wav",
-  "audio/x-wav": "wav",
-  "audio/x-m4a": "m4a",
-  "audio/aac": "m4a",
-  "audio/flac": "flac",
-};
-
 const EXTENSION_TO_MIME = {
   webm: "audio/webm",
   mp3: "audio/mpeg",
@@ -143,16 +128,6 @@ const EXTENSION_TO_MIME = {
   aac: "audio/aac",
   flac: "audio/flac",
 };
-
-// Re-encode AAC/MP4/M4A-style mobile recordings to WAV before transcription.
-// Android native shells have been the least reliable when sent through as-is.
-const PASSTHROUGH_AUDIO_TYPES = new Set([
-  "audio/mp3",
-  "audio/mpeg",
-  "audio/wav",
-  "audio/x-wav",
-  "audio/flac",
-]);
 
 const MINIMUM_AUDIO_BYTES = 1024;
 
@@ -202,27 +177,16 @@ async function normalizeAudioUpload(buffer, mimetype) {
     console.warn(`[transcribe] unsupported mimetype "${cleanedMime}", continuing anyway.`);
   }
 
-  const fallbackName = `speech.${guessExtension(cleanedMime)}`;
-  if (PASSTHROUGH_AUDIO_TYPES.has(cleanedMime)) {
-    return { buffer, filename: fallbackName };
-  }
   if (!ffmpegPath) {
-    console.warn(`[transcribe] missing ffmpeg binary, sending original buffer.`);
-    return { buffer, filename: fallbackName };
+    throw new Error("[transcribe] ffmpeg binary is unavailable; cannot normalize uploaded audio.");
   }
 
-  try {
-    const converted = await transcodeToWav(buffer);
-    return { buffer: converted, filename: "speech.wav" };
-  } catch (err) {
-    console.warn(`[transcribe] ffmpeg re-encode failed (${err?.message || err}); sending original buffer.`);
-    return { buffer, filename: fallbackName };
+  const converted = await transcodeToWav(buffer);
+  if (!converted || converted.length < MINIMUM_AUDIO_BYTES) {
+    throw new Error("[transcribe] normalized audio is too small or empty.");
   }
-}
 
-function guessExtension(mimetype) {
-  if (!mimetype) return "webm";
-  return MIME_TO_EXTENSION[mimetype] || "webm";
+  return { buffer: converted, filename: "speech.wav" };
 }
 
 function sleep(ms) {
@@ -396,13 +360,19 @@ router.post("/transcribe", upload.single("file"), async (req, res) => {
     const originalName = req.file.originalname || "";
     const mime = req.file.mimetype || "";
     const resolvedMime = resolveIncomingMimeType(mime, originalName);
+    console.log("TRANSCRIBE INPUT:", {
+      mimetype: mime || "unknown",
+      effectiveMime: resolvedMime || "unknown",
+      size: Number(req.file.buffer?.length || 0),
+      filename: originalName || "unknown",
+    });
     const { buffer: normalizedBuffer, filename } = await normalizeAudioUpload(
       req.file.buffer,
       resolvedMime
     );
 
     console.log(
-      `🎤 Received file -> mimetype: ${mime}, effective: ${resolvedMime || "unknown"}, original: ${originalName || "unknown"}, normalized to: ${filename}`
+      `🎤 Received file -> mimetype: ${mime}, effective: ${resolvedMime || "unknown"}, original: ${originalName || "unknown"}, normalized to: ${filename}, normalized bytes: ${normalizedBuffer.length}`
     );
 
     const { text, model } = await transcribeWithFallback(
