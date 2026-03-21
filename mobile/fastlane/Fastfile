@@ -1,3 +1,5 @@
+require "base64"
+require "fileutils"
 require "json"
 
 default_platform(:ios)
@@ -12,6 +14,44 @@ end
 
 def frontend_root
   File.join(repo_root, "apps", "audit-agent-frontend")
+end
+
+def normalized_app_store_key_content(raw_key_content)
+  value = raw_key_content.to_s.strip
+  return nil if value.empty?
+
+  if (value.start_with?('"') && value.end_with?('"')) || (value.start_with?("'") && value.end_with?("'"))
+    value = value[1..-2]
+  end
+
+  value = value.gsub("\\n", "\n").gsub("\r\n", "\n").gsub("\r", "\n")
+
+  unless value.include?("BEGIN PRIVATE KEY")
+    begin
+      decoded = Base64.strict_decode64(value.gsub(/\s+/, ""))
+      value = decoded if decoded.include?("BEGIN PRIVATE KEY")
+    rescue ArgumentError
+      nil
+    end
+  end
+
+  value = value.gsub("\r\n", "\n").gsub("\r", "\n")
+  value = "#{value}\n" unless value.end_with?("\n")
+
+  unless value.include?("BEGIN PRIVATE KEY") && value.include?("END PRIVATE KEY")
+    UI.user_error!(
+      "App Store Connect API key content is malformed. Provide APP_STORE_CONNECT_API_KEY_CONTENT as the full .p8 content, an escaped \\n string, or a base64-encoded .p8 file."
+    )
+  end
+
+  value
+end
+
+def materialized_app_store_key_path(raw_key_content)
+  key_file = File.join(mobile_root, "build", "fastlane", "AuthKey.p8")
+  FileUtils.mkdir_p(File.dirname(key_file))
+  File.write(key_file, normalized_app_store_key_content(raw_key_content))
+  key_file
 end
 
 def shared_version_name
@@ -30,14 +70,14 @@ def app_store_api_key_from_env
 
   return nil if key_id.to_s.empty? || issuer_id.to_s.empty? || (key_content.to_s.empty? && key_path.to_s.empty?)
 
+  resolved_key_path = key_path.to_s.empty? ? materialized_app_store_key_path(key_content) : key_path
+
   api_key_options = {
     key_id: key_id,
     issuer_id: issuer_id,
-    is_key_content_base64: ENV["APP_STORE_CONNECT_API_KEY_IS_BASE64"] == "1",
+    key_filepath: resolved_key_path,
     duration: 1200,
   }
-  api_key_options[:key_content] = key_content unless key_content.to_s.empty?
-  api_key_options[:key_filepath] = key_path unless key_path.to_s.empty?
 
   app_store_connect_api_key(**api_key_options)
 end
