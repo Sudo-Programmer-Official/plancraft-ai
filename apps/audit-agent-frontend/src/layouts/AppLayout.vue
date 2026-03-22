@@ -776,7 +776,7 @@ async function ensureWorkspaceHydrated() {
   if (now - lastWorkspaceInitKickAt < 1500) return
   lastWorkspaceInitKickAt = now
   try {
-    await workspaceStore.init()
+    await workspaceStore.init(uid)
     if (workspaceStore.activeWorkspaceId) {
       workspaceRetryCount.value = 0
     }

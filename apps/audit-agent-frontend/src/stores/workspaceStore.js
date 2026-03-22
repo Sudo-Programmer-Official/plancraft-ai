@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { auth } from '@/firebase/init'
+import { useAuthStore } from '@/stores/authStore'
 import {
   createWorkspaceDoc,
   ensureDefaultWorkspace,
@@ -10,7 +11,14 @@ import {
   updateWorkspaceSettings,
 } from '@/services/workspaceService'
 
-function resolveSessionUid() {
+function resolveSessionUid(explicitUid = null) {
+  if (explicitUid) return String(explicitUid)
+
+  try {
+    const authStore = useAuthStore()
+    if (authStore?.user?.uid) return String(authStore.user.uid)
+  } catch {}
+
   try {
     if (auth?.currentUser?.uid) return auth.currentUser.uid
   } catch {}
@@ -53,9 +61,9 @@ export const useWorkspaceStore = defineStore('workspaceStore', () => {
     persistActive(id || null)
   }
 
-  async function setActive(id) {
+  async function setActive(id, sessionUid = null) {
     setLocalActive(id)
-    const uid = resolveSessionUid()
+    const uid = resolveSessionUid(sessionUid)
     if (uid && id) {
       try {
         const ws = workspaces.value.find((w) => w.id === id)
@@ -67,8 +75,8 @@ export const useWorkspaceStore = defineStore('workspaceStore', () => {
     }
   }
 
-  async function loadWorkspaces() {
-    const uid = resolveSessionUid()
+  async function loadWorkspaces(sessionUid = null) {
+    const uid = resolveSessionUid(sessionUid)
     if (!uid) return []
     const list = await fetchWorkspaces(uid)
     workspaces.value = list
@@ -92,10 +100,10 @@ export const useWorkspaceStore = defineStore('workspaceStore', () => {
     return personalType[0] || null
   }
 
-  async function init() {
+  async function init(sessionUid = null) {
     if (initPromise) return initPromise
     initPromise = (async () => {
-      const uid = resolveSessionUid()
+      const uid = resolveSessionUid(sessionUid)
       let cachedWorkspaceId = null
       try {
         cachedWorkspaceId = localStorage.getItem('activeWorkspaceId')
@@ -109,7 +117,7 @@ export const useWorkspaceStore = defineStore('workspaceStore', () => {
       error.value = null
       lastAttemptAt.value = Date.now()
       try {
-        let list = await loadWorkspaces()
+        let list = await loadWorkspaces(uid)
         if (!list.length) {
           const seeded = await ensureDefaultWorkspace(uid)
           list = seeded ? [seeded] : []
@@ -121,7 +129,7 @@ export const useWorkspaceStore = defineStore('workspaceStore', () => {
         // Keep user's current selection when available; only fallback to Personal.
         const preferred = existing?.id || personal?.id || list[0]?.id || null
         if (preferred) {
-          await setActive(preferred)
+          await setActive(preferred, uid)
         } else {
           setLocalActive(null)
         }
@@ -155,7 +163,7 @@ export const useWorkspaceStore = defineStore('workspaceStore', () => {
     if (!uid) throw new Error('Not signed in')
     const workspace = await createWorkspaceDoc(uid, payload)
     workspaces.value = [...workspaces.value, workspace]
-    await setActive(workspace.id)
+    await setActive(workspace.id, uid)
     return workspace
   }
 
