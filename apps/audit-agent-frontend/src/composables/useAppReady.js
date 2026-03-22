@@ -32,12 +32,26 @@ export function useAppReady() {
     return !!workspaceStore.hydrated && !!resolvedWorkspaceId.value
   })
 
+  const isWorkspaceHydrated = computed(() => {
+    if (isGuestSession.value) return true
+    return !!workspaceStore.hydrated
+  })
+
+  const hasResolvedWorkspace = computed(() => {
+    if (isGuestSession.value) return true
+    return !!resolvedWorkspaceId.value
+  })
+
+  const isShellReady = computed(() => isAuthReady.value && isWorkspaceHydrated.value)
   const isReady = computed(() => isAuthReady.value && isWorkspaceReady.value)
 
   return {
     isReady,
+    isShellReady,
     isAuthReady,
+    isWorkspaceHydrated,
     isWorkspaceReady,
+    hasResolvedWorkspace,
     isGuestSession,
     resolvedWorkspaceId,
   }

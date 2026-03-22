@@ -12,7 +12,7 @@
   <div
     class="app-shell flex min-h-screen w-full max-w-full overflow-x-hidden bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 text-white"
   >
-    <template v-if="!isReady">
+    <template v-if="!isShellReady">
       <div class="flex flex-1 items-center justify-center px-6">
         <div class="max-w-md text-center space-y-4">
           <div class="text-2xl font-semibold text-white">Preparing your workspace…</div>
@@ -571,7 +571,38 @@
 
       <!-- Dynamic content -->
       <main class="app-content p-6 flex-1 overflow-y-auto overflow-x-hidden scrollbar-plan">
-        <RouterView />
+        <div
+          v-if="showWorkspaceRecovery"
+          class="mx-auto flex min-h-[55vh] w-full max-w-2xl items-center justify-center"
+        >
+          <div class="w-full rounded-3xl border border-white/10 bg-slate-950/30 p-8 text-center shadow-2xl backdrop-blur-xl">
+            <div class="text-xs font-semibold uppercase tracking-[0.35em] text-indigo-200/70">Workspace</div>
+            <h2 class="mt-3 text-3xl font-semibold text-white">Workspace still loading</h2>
+            <p class="mt-3 text-sm text-indigo-100/80">
+              We restored your session, but this device still needs a workspace before tasks and planning can load.
+            </p>
+            <p v-if="workspaceStore.error" class="mt-3 text-sm text-amber-200/90">
+              {{ workspaceStore.error }}
+            </p>
+            <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                class="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white transition hover:bg-white/10"
+                @click="ensureWorkspaceHydrated"
+              >
+                Retry workspace load
+              </button>
+              <button
+                type="button"
+                class="rounded-xl bg-gradient-to-r from-fuchsia-500 via-purple-500 to-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:scale-[1.02]"
+                @click="router.push('/workspaces')"
+              >
+                Open workspaces
+              </button>
+            </div>
+          </div>
+        </div>
+        <RouterView v-else />
       </main>
       <!-- Compact sticky footer -->
       <footer
@@ -684,7 +715,7 @@ const quickSetupStore = useQuickSetupStore()
 const subStore = useSubscriptionStore()
 const feedbackStore = useFeedbackStore()
 const { isPremium, isGuest } = useAuthFlags()
-const { isReady, isAuthReady, isWorkspaceReady } = useAppReady()
+const { isReady, isShellReady, isAuthReady, isWorkspaceHydrated, isWorkspaceReady, hasResolvedWorkspace } = useAppReady()
 const authReady = computed(() => !authStore.loading)
 const activeWorkspace = computed(() => workspaceStore.activeWorkspace || {})
 const activeWorkspaceSettings = computed(() => activeWorkspace.value?.settings || {})
@@ -693,15 +724,22 @@ const workspaceRetryCount = ref(0)
 let workspaceRetryTimer = null
 const appReadyMessage = computed(() => {
   if (!isAuthReady.value) return 'Restoring your secure session…'
-  if (!isWorkspaceReady.value) return 'Loading your workspace context and tasks…'
+  if (!isWorkspaceHydrated.value) return 'Loading your workspace context and tasks…'
+  if (!hasResolvedWorkspace.value) return 'Looking for a workspace for this account…'
   return 'Finishing setup…'
 })
 const showWorkspaceRetry = computed(
   () =>
     !!isAuthReady.value &&
-    !isWorkspaceReady.value &&
+    !hasResolvedWorkspace.value &&
     !workspaceStore.loading &&
     (!!workspaceStore.error || workspaceRetryCount.value >= 2),
+)
+const showWorkspaceRecovery = computed(
+  () =>
+    !!isShellReady.value &&
+    !isGuest.value &&
+    !hasResolvedWorkspace.value,
 )
 
 const isOnTalkPlanner = computed(() => route.path === '/talk-to-planner')
@@ -757,7 +795,7 @@ function clearWorkspaceRetryTimer() {
 
 function scheduleWorkspaceHydrationRetry() {
   clearWorkspaceRetryTimer()
-  if (!isAuthReady.value || isWorkspaceReady.value) {
+  if (!isAuthReady.value || hasResolvedWorkspace.value) {
     workspaceRetryCount.value = 0
     return
   }
@@ -769,7 +807,7 @@ function scheduleWorkspaceHydrationRetry() {
     workspaceRetryTimer = null
     workspaceRetryCount.value += 1
     await ensureWorkspaceHydrated()
-    if (!isWorkspaceReady.value) {
+    if (!hasResolvedWorkspace.value) {
       scheduleWorkspaceHydrationRetry()
     }
   }, delay)
@@ -794,18 +832,19 @@ watch(
 )
 
 watch(
-  () => [isAuthReady.value, isWorkspaceReady.value, workspaceStore.loading, workspaceStore.error],
-  ([authReadyNow, workspaceReadyNow, workspaceLoading]) => {
+  () => [isAuthReady.value, isWorkspaceHydrated.value, hasResolvedWorkspace.value, workspaceStore.loading, workspaceStore.error],
+  ([authReadyNow, workspaceHydratedNow, workspaceResolvedNow, workspaceLoading]) => {
     if (!authReadyNow) {
       clearWorkspaceRetryTimer()
       workspaceRetryCount.value = 0
       return
     }
-    if (workspaceReadyNow) {
+    if (workspaceResolvedNow) {
       clearWorkspaceRetryTimer()
       workspaceRetryCount.value = 0
       return
     }
+    if (!workspaceHydratedNow && workspaceLoading) return
     if (workspaceLoading) return
     scheduleWorkspaceHydrationRetry()
   },
