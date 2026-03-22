@@ -298,7 +298,6 @@ import {
 } from '@/utils/nativeAuthSupport'
 import {
   buildNativeAuthCallbackUrl,
-  buildNativeAuthFallbackSchemeUrl,
   createMobileAuthHandoff,
   launchNativeAuthRoute,
   normalizeRedirectPath,
@@ -836,15 +835,12 @@ async function maybeReturnToNativeAppAfterLogin(target) {
       platform,
       provider,
     })
-    const returnUrl = platform === 'ios'
-      ? buildNativeAuthFallbackSchemeUrl({
-          code: handoff?.code,
-          redirect: handoff?.redirect || target,
-        })
-      : buildNativeAuthCallbackUrl({
-          code: handoff?.code,
-          redirect: handoff?.redirect || target,
-        })
+    const returnUrl = buildNativeAuthCallbackUrl({
+      code: handoff?.code,
+      redirect: handoff?.redirect || target,
+      platform,
+      provider,
+    })
     console.info('[Auth] Native browser handoff create:success', {
       platform,
       provider,

@@ -1,74 +1,75 @@
 <template>
-  <div class="talk-planner-wrapper">
-    <header class="talk-header">
-      <h2 class="talk-title">
-        <span class="text-pink-400">🧠</span>
-        Talk to Planner
-      </h2>
-      <div class="header-actions">
-        <button
-          type="button"
-          class="voice-toggle"
-          :class="{ active: isVoiceOn }"
-          :aria-pressed="isVoiceOn"
-          :title="isVoiceOn ? 'Mute voice responses' : 'Enable voice responses'"
-          @click="toggleVoice"
-        >
-          <span v-if="voiceRequestingFor" class="loader loader--tiny" aria-hidden="true"></span>
-          <template v-else>
-            <svg
-              v-if="isVoiceOn"
-              class="icon icon-speaker"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.6"
-            >
-              <path d="M5 9.2v5.6h3.4L12 18.5V5.5L8.4 9.2H5Z" fill="currentColor" stroke="none" />
-              <path d="M15 9.2c1 .9 1.5 2 1.5 3.3s-.5 2.5-1.5 3.3" stroke-linecap="round" />
-              <path d="M17.6 7.2C19.1 8.7 20 10.3 20 12s-.9 3.3-2.4 4.8" stroke-linecap="round" />
+  <div class="talk-planner-page">
+    <section class="talk-planner-wrapper">
+      <header class="talk-header">
+        <h2 class="talk-title">
+          <span class="text-pink-400">🧠</span>
+          Talk to Planner
+        </h2>
+        <div class="header-actions">
+          <button
+            type="button"
+            class="voice-toggle"
+            :class="{ active: isVoiceOn }"
+            :aria-pressed="isVoiceOn"
+            :title="isVoiceOn ? 'Mute voice responses' : 'Enable voice responses'"
+            @click="toggleVoice"
+          >
+            <span v-if="voiceRequestingFor" class="loader loader--tiny" aria-hidden="true"></span>
+            <template v-else>
+              <svg
+                v-if="isVoiceOn"
+                class="icon icon-speaker"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path d="M5 9.2v5.6h3.4L12 18.5V5.5L8.4 9.2H5Z" fill="currentColor" stroke="none" />
+                <path d="M15 9.2c1 .9 1.5 2 1.5 3.3s-.5 2.5-1.5 3.3" stroke-linecap="round" />
+                <path d="M17.6 7.2C19.1 8.7 20 10.3 20 12s-.9 3.3-2.4 4.8" stroke-linecap="round" />
+              </svg>
+              <svg
+                v-else
+                class="icon icon-speaker"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path d="M5 9.2v5.6h3.4L12 18.5V5.5L8.4 9.2H5Z" fill="currentColor" stroke="none" />
+                <path d="M16 9.5l4 5" stroke-linecap="round" />
+                <path d="M20 9.5l-4 5" stroke-linecap="round" />
+              </svg>
+            </template>
+          </button>
+          <button
+            type="button"
+            class="clear-btn"
+            @click="clearChat"
+            :disabled="assistantThinking"
+            title="Clear Conversation"
+          >
+            <svg class="icon icon-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.6"
+                d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.166L19.28 19.5a1.125 1.125 0 01-1.12 1.05H5.84a1.125 1.125 0 01-1.12-1.05L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .563c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.398m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+              />
             </svg>
-            <svg
-              v-else
-              class="icon icon-speaker"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.6"
-            >
-              <path d="M5 9.2v5.6h3.4L12 18.5V5.5L8.4 9.2H5Z" fill="currentColor" stroke="none" />
-              <path d="M16 9.5l4 5" stroke-linecap="round" />
-              <path d="M20 9.5l-4 5" stroke-linecap="round" />
-            </svg>
-          </template>
-        </button>
-        <button
-          type="button"
-          class="clear-btn"
-          @click="clearChat"
-          :disabled="assistantThinking"
-          title="Clear Conversation"
-        >
-          <svg class="icon icon-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="1.6"
-              d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.166L19.28 19.5a1.125 1.125 0 01-1.12 1.05H5.84a1.125 1.125 0 01-1.12-1.05L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .563c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.398m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-            />
-          </svg>
-        </button>
-      </div>
-    </header>
+          </button>
+        </div>
+      </header>
 
-    <transition name="toast-fade">
-      <div v-if="micState === MIC_STATES.listening || micState === MIC_STATES.processing" class="listening-toast">
-        {{ micState === MIC_STATES.processing ? 'Planner is transcribing…' : 'Planner is listening… Tap again to stop.' }}
-      </div>
-    </transition>
+      <transition name="toast-fade">
+        <div v-if="micState === MIC_STATES.listening || micState === MIC_STATES.processing" class="listening-toast">
+          {{ micState === MIC_STATES.processing ? 'Planner is transcribing…' : 'Planner is listening… Tap again to stop.' }}
+        </div>
+      </transition>
 
-    <div ref="chatContainer" class="chat-body scrollbar-plan">
-      <TransitionGroup name="fade-up" tag="div" class="chat-stream">
+      <div ref="chatContainer" class="chat-body scrollbar-plan">
+        <TransitionGroup name="fade-up" tag="div" class="chat-stream">
         <div
           v-for="message in messages"
           :key="message.id"
@@ -96,7 +97,12 @@
               class="chat-text__content"
               :class="{ 'chat-text__content--assistant': message.sender === 'assistant' }"
             >
-              <p class="message-text">{{ message.text }}</p>
+              <p
+                class="message-text"
+                :class="{ 'message-text--assistant': message.sender === 'assistant' }"
+              >
+                {{ formatMessageText(message.text, message.sender) }}
+              </p>
               <button
                 v-if="message.sender === 'assistant'"
                 type="button"
@@ -235,69 +241,75 @@
             </div>
           </div>
         </div>
-      </TransitionGroup>
-    </div>
+        </TransitionGroup>
+      </div>
+    </section>
 
     <footer
-      class="chat-input-bar"
-      :class="{ 'chat-input-bar--recording': micActive }"
+      class="chat-input-dock"
+      :class="{ 'chat-input-dock--recording': micActive }"
     >
-      <div class="chat-input-row">
-        <button
-          type="button"
-          class="mic-btn"
-          :class="{
-            active: micActive,
-            'mic-btn--recording': micState === MIC_STATES.listening,
-            'mic-btn--processing': micState === MIC_STATES.processing,
-          }"
-          :disabled="(assistantThinking && !micActive) || micState === MIC_STATES.processing"
-          :aria-pressed="micState === MIC_STATES.listening"
-          :title="micButtonLabel"
-          :aria-label="micButtonLabel"
-          @click="handleMicButton"
-        >
-          <span class="mic-visual" aria-hidden="true"></span>
-        </button>
-        <textarea
-          ref="chatInputRef"
-          v-model="inputText"
-          :disabled="assistantThinking"
-          rows="1"
-          placeholder="Ask your planner..."
-          class="chat-input"
-          @keydown="handleComposerKeydown"
-        ></textarea>
-        <button
-          type="button"
-          @click="sendMessage"
-          class="send-btn"
-          :disabled="sendDisabled"
-          :title="sendDisabled ? 'Enter a message first' : 'Send message'"
-          :aria-label="sendDisabled ? 'Enter a message first' : 'Send message'"
-        >
-          <span v-if="assistantThinking" class="loader"></span>
-          <svg
-            v-else
-            class="icon icon-send"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
+      <div
+        class="chat-input-bar"
+        :class="{ 'chat-input-bar--recording': micActive }"
+      >
+        <div class="chat-input-row">
+          <button
+            type="button"
+            class="mic-btn"
+            :class="{
+              active: micActive,
+              'mic-btn--recording': micState === MIC_STATES.listening,
+              'mic-btn--processing': micState === MIC_STATES.processing,
+            }"
+            :disabled="(assistantThinking && !micActive) || micState === MIC_STATES.processing"
+            :aria-pressed="micState === MIC_STATES.listening"
+            :title="micButtonLabel"
+            :aria-label="micButtonLabel"
+            @click="handleMicButton"
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="1.6"
-              d="M4.5 11.4L20.2 4.3c.9-.4 1.8.5 1.3 1.4l-6.2 12.3c-.4.7-1.4.8-1.9.1l-2.8-3.9-4-1.2c-.8-.2-.9-1.3-.1-1.6Z"
-            />
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="1.6"
-              d="M10.6 13.3L20.5 5"
-            />
-          </svg>
-        </button>
+            <span class="mic-visual" aria-hidden="true"></span>
+          </button>
+          <textarea
+            ref="chatInputRef"
+            v-model="inputText"
+            :disabled="assistantThinking"
+            rows="1"
+            placeholder="Ask your planner..."
+            class="chat-input"
+            @keydown="handleComposerKeydown"
+          ></textarea>
+          <button
+            type="button"
+            @click="sendMessage"
+            class="send-btn"
+            :disabled="sendDisabled"
+            :title="sendDisabled ? 'Enter a message first' : 'Send message'"
+            :aria-label="sendDisabled ? 'Enter a message first' : 'Send message'"
+          >
+            <span v-if="assistantThinking" class="loader"></span>
+            <svg
+              v-else
+              class="icon icon-send"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.6"
+                d="M4.5 11.4L20.2 4.3c.9-.4 1.8.5 1.3 1.4l-6.2 12.3c-.4.7-1.4.8-1.9.1l-2.8-3.9-4-1.2c-.8-.2-.9-1.3-.1-1.6Z"
+              />
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.6"
+                d="M10.6 13.3L20.5 5"
+              />
+            </svg>
+          </button>
+        </div>
       </div>
     </footer>
   </div>
@@ -977,6 +989,18 @@ function sanitizeAssistantText(text) {
   return String(text).replace(/```[\s\S]*?```/g, '').trim()
 }
 
+function formatMessageText(text, sender) {
+  const raw = String(text || '').trim()
+  if (!raw) return ''
+  if (sender !== 'assistant') return raw
+
+  return raw
+    .replace(/:\s+(?=\d+\.\s)/g, ':\n')
+    .replace(/\s(?=\d+\.\s)/g, '\n')
+    .replace(/([^.?!])\s+(?=(Would you|Do you|Should I|Can I|Need me|Let me know)\b)/g, '$1\n\n')
+    .replace(/\n{3,}/g, '\n\n')
+}
+
 function runAction(_message, action) {
   if (!action) return
   if (action.status === 'pending') {
@@ -1166,14 +1190,13 @@ onMounted(() => {
 <style scoped>
 .talk-planner-wrapper {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
-  height: 100%;
-  max-height: 100%;
+  grid-template-rows: auto auto minmax(0, 1fr);
   min-height: 0;
+  overflow: hidden;
   max-width: 900px;
+  width: 100%;
   margin: 0 auto;
   padding: 1rem;
-  overflow: hidden;
   background: linear-gradient(180deg, rgba(25, 20, 40, 0.95), rgba(20, 18, 35, 0.98));
   border: 1px solid rgba(138, 120, 210, 0.2);
   border-radius: 1.25rem;
@@ -1181,6 +1204,16 @@ onMounted(() => {
     0 0 30px rgba(90, 60, 150, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
   color: #f9f8ff;
+}
+
+.talk-planner-page {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  padding: 1rem;
+  gap: 0.9rem;
 }
 
 .talk-header {
@@ -1285,7 +1318,7 @@ onMounted(() => {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 0.85rem 0 0.5rem;
+  padding: 0.85rem 0 0;
   display: flex;
   flex-direction: column;
   overscroll-behavior: contain;
@@ -1304,6 +1337,7 @@ onMounted(() => {
   flex-direction: column;
   gap: 0.8rem;
   min-height: 100%;
+  padding-bottom: 0.5rem;
 }
 
 .chat-bubble {
@@ -1416,6 +1450,11 @@ onMounted(() => {
   white-space: normal;
   word-break: break-word;
   overflow-wrap: anywhere;
+}
+
+.message-text--assistant {
+  white-space: pre-line;
+  line-height: 1.6;
 }
 
 .voice-replay-btn {
@@ -1579,6 +1618,23 @@ onMounted(() => {
   animation-delay: 0.4s;
 }
 
+.chat-input-dock {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.2rem);
+  background:
+    linear-gradient(180deg, rgba(79, 42, 160, 0), rgba(44, 23, 90, 0.3) 25%, rgba(23, 18, 40, 0.88));
+}
+
+.chat-input-dock--recording {
+  background:
+    linear-gradient(180deg, rgba(111, 61, 187, 0), rgba(82, 39, 150, 0.38) 25%, rgba(23, 18, 40, 0.94));
+}
+
 .chat-input-bar {
   display: flex;
   align-items: stretch;
@@ -1589,7 +1645,6 @@ onMounted(() => {
   border: 1px solid rgba(126, 109, 212, 0.28);
   border-radius: 1.1rem;
   padding: 0.8rem;
-  margin-top: 0.85rem;
   box-shadow: 0 16px 32px rgba(20, 16, 40, 0.32);
   backdrop-filter: blur(12px);
 }
@@ -1895,6 +1950,11 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
+  .talk-planner-page {
+    padding: 0.75rem;
+    gap: 0.75rem;
+  }
+
   .talk-planner-wrapper {
     padding: 0.85rem;
     border-radius: 1rem;
@@ -1920,6 +1980,10 @@ onMounted(() => {
 }
 
 @media (max-width: 540px) {
+  .talk-planner-page {
+    padding: 0.55rem;
+  }
+
   .chat-input-bar {
     padding: 0.7rem;
   }

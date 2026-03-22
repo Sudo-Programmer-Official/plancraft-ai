@@ -78,211 +78,231 @@
     </div>
     <!-- Sidebar (desktop only) -->
     <aside
-      class="hidden md:flex flex-col h-full transition-all duration-200 bg-gray-950/70 backdrop-blur-xl"
-      :class="sidebarOpen ? 'w-64' : 'w-16'"
+      class="hidden md:flex h-full flex-col border-r border-white/5 bg-gray-950/72 backdrop-blur-xl transition-all duration-200"
+      :class="sidebarOpen ? 'w-72' : 'w-20'"
     >
       <div
-        class="flex-shrink-0 border-b border-gray-700"
-        :class="sidebarOpen ? 'flex items-center justify-between p-4' : 'flex items-center justify-center p-2 h-14'"
+        class="flex-shrink-0 border-b border-white/6"
+        :class="sidebarOpen ? 'flex items-center justify-between p-4' : 'flex h-16 items-center justify-center p-2'"
       >
-        <div v-if="sidebarOpen" class="flex items-center gap-2 min-w-0">
-          <img src="/logo-bg-remove.png" alt="PlanCraftAI" class="w-8 h-8" />
-          <span class="text-lg font-semibold truncate">PlanCraftAI</span>
+        <div v-if="sidebarOpen" class="flex min-w-0 items-center gap-3">
+          <img src="/logo-bg-remove.png" alt="PlanCraftAI" class="h-9 w-9" />
+          <div class="min-w-0">
+            <div class="truncate text-lg font-semibold text-white">PlanCraftAI</div>
+            <div class="text-[11px] uppercase tracking-[0.28em] text-slate-500">Workspace OS</div>
+          </div>
         </div>
         <button
           @click="sidebarOpen = !sidebarOpen"
-          class="p-2 rounded-lg hover:bg-indigo-600/40 transition-colors flex items-center justify-center"
-          :class="sidebarOpen ? 'bg-indigo-600/20' : 'bg-transparent'"
+          class="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 p-2 text-slate-300 transition hover:border-indigo-400/30 hover:bg-indigo-500/10 hover:text-white"
           aria-label="Toggle sidebar"
           :title="sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'"
         >
-          <svg v-if="sidebarOpen" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-          </svg>
-          <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-          </svg>
+          <SidebarIcon
+            name="chevron-right"
+            class="h-4 w-4"
+            :class="sidebarOpen ? 'rotate-180 text-indigo-200' : 'text-slate-300'"
+          />
         </button>
       </div>
 
-      <!-- Nav links -->
-      <nav class="flex-1 mt-4 space-y-3 overflow-y-auto scrollbar-plan px-2">
+      <nav class="flex-1 overflow-y-auto scrollbar-plan px-3 pb-4 pt-4">
         <div class="space-y-1">
           <RouterLink
             v-for="item in coreNavItems"
             :key="item.to"
             :to="item.to"
-            class="flex items-center gap-3 w-full rounded transition hover:bg-gray-800 text-sm text-slate-200"
-            :class="[
-              sidebarOpen ? 'justify-start px-4 py-2' : 'justify-center px-0 py-2',
-              { 'bg-indigo-600': isActive(item.to) },
-            ]"
+            :class="navLinkClasses(item.to, sidebarOpen)"
             :title="sidebarOpen ? '' : item.label"
             :aria-label="item.label"
           >
-            <span class="inline-flex h-5 w-5 items-center justify-center">
-              <svg
-                v-if="item.iconType === 'grid-4-outline'"
-                class="h-4 w-4"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.8"
-                aria-hidden="true"
-              >
-                <rect x="4" y="4" width="6" height="6" rx="1" />
-                <rect x="14" y="4" width="6" height="6" rx="1" />
-                <rect x="4" y="14" width="6" height="6" rx="1" />
-                <rect x="14" y="14" width="6" height="6" rx="1" />
-              </svg>
-              <span v-else>{{ item.icon }}</span>
+            <span
+              class="absolute inset-y-2 left-0 w-0.5 rounded-full bg-gradient-to-b from-fuchsia-300 via-violet-300 to-sky-300 transition-all duration-200"
+              :class="isActive(item.to) ? 'opacity-100' : 'opacity-0 group-hover:opacity-50'"
+            ></span>
+            <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/8 bg-white/5">
+              <SidebarIcon
+                :name="item.iconName"
+                class="h-5 w-5"
+                :class="iconClasses(isActive(item.to))"
+              />
             </span>
-            <span v-if="sidebarOpen">{{ item.label }}</span>
+            <span v-if="sidebarOpen" class="truncate font-medium">{{ item.label }}</span>
           </RouterLink>
         </div>
 
-        <div
-          v-for="group in filteredNavGroups"
-          :key="group.key"
-          class="rounded-lg"
-        >
-          <button
-            v-if="group.collapsible"
-            class="w-full flex items-center rounded text-slate-200 hover:bg-gray-800 transition"
-            :class="sidebarOpen ? 'justify-between px-3 py-2 text-sm font-semibold' : 'justify-center px-0 py-2 text-base'"
-            @click="toggleGroup(group.key)"
-            >
-            <span class="flex items-center gap-2">
-              <span>{{ group.icon }}</span>
-              <span v-if="sidebarOpen" class="flex items-center gap-2">
-                <span>{{ group.title }}</span>
-                <span v-if="group.beta" class="beta-pill">Beta</span>
-              </span>
-            </span>
-            <span v-if="sidebarOpen" class="text-xs text-slate-400">
-              {{ openGroups[group.key] ? '▾' : '▸' }}
-            </span>
-          </button>
-          <div v-else class="px-3 py-2 text-sm font-semibold text-slate-200 flex items-center gap-2">
-            <span>{{ group.icon }}</span>
-            <span v-if="sidebarOpen" class="flex items-center gap-2">
-              <span>{{ group.title }}</span>
-              <span v-if="group.beta" class="beta-pill">Beta</span>
-            </span>
-          </div>
+        <div class="mx-2 my-4 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
 
-          <div v-show="!group.collapsible || openGroups[group.key]" class="mt-1 space-y-1">
-            <RouterLink
-              v-for="item in group.children"
-              :key="item.to"
-              :to="item.to"
-              class="flex items-center gap-3 w-full rounded transition hover:bg-gray-800 text-sm text-slate-200"
-              :class="[
-                sidebarOpen ? 'justify-start px-4 py-2' : 'justify-center px-0 py-2',
-                { 'bg-indigo-600': isActive(item.to) },
-              ]"
-              :title="sidebarOpen ? '' : item.label"
-              :aria-label="sidebarOpen ? item.label : item.label"
-            >
-              <span>{{ item.icon }}</span>
-              <span v-if="sidebarOpen">{{ item.label }}</span>
-            </RouterLink>
+        <div class="space-y-1">
+          <div
+            v-if="sidebarOpen"
+            class="px-3 pb-1 text-[11px] font-medium uppercase tracking-[0.28em] text-slate-500"
+          >
+            Organize
+          </div>
+          <RouterLink
+            v-for="item in organizeNavItems"
+            :key="item.to"
+            :to="item.to"
+            :class="navLinkClasses(item.to, sidebarOpen)"
+            :title="sidebarOpen ? '' : item.label"
+            :aria-label="item.label"
+          >
+            <span
+              class="absolute inset-y-2 left-0 w-0.5 rounded-full bg-gradient-to-b from-fuchsia-300 via-violet-300 to-sky-300 transition-all duration-200"
+              :class="isActive(item.to) ? 'opacity-100' : 'opacity-0 group-hover:opacity-50'"
+            ></span>
+            <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/8 bg-white/5">
+              <SidebarIcon
+                :name="item.iconName"
+                class="h-5 w-5"
+                :class="iconClasses(isActive(item.to))"
+              />
+            </span>
+            <span v-if="sidebarOpen" class="truncate font-medium">{{ item.label }}</span>
+          </RouterLink>
+        </div>
+
+        <div class="mx-2 my-4 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+
+        <div class="space-y-2">
+          <button
+            type="button"
+            :class="groupButtonClasses({ key: 'advanced', children: filteredNavGroups }, sidebarOpen)"
+            :title="sidebarOpen ? '' : 'Advanced'"
+            @click="handleAdvancedToggle"
+          >
+            <span class="flex min-w-0 items-center gap-3">
+              <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/8 bg-white/5">
+                <SidebarIcon
+                  name="sparkles"
+                  class="h-5 w-5"
+                  :class="iconClasses(advancedSectionOpen)"
+                />
+              </span>
+              <span v-if="sidebarOpen" class="truncate font-medium">Advanced</span>
+            </span>
+            <SidebarIcon
+              v-if="sidebarOpen"
+              :name="advancedSectionOpen ? 'chevron-down' : 'chevron-right'"
+              class="h-4 w-4 shrink-0 text-slate-500"
+            />
+          </button>
+
+          <div v-show="sidebarOpen && advancedSectionOpen" class="space-y-2">
+            <div v-for="group in filteredNavGroups" :key="group.key" class="space-y-1">
+              <button
+                v-if="group.collapsible"
+                type="button"
+                :class="groupButtonClasses(group, true)"
+                @click="handleGroupToggle(group.key)"
+              >
+                <span class="flex min-w-0 items-center gap-3">
+                  <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/8 bg-white/5">
+                    <SidebarIcon
+                      :name="group.iconName"
+                      class="h-5 w-5"
+                      :class="iconClasses(isGroupActive(group) || openGroups[group.key])"
+                    />
+                  </span>
+                  <span class="min-w-0 flex-1 text-left">
+                    <span class="flex items-center gap-2 font-medium">
+                      <span class="truncate">{{ group.title }}</span>
+                      <span v-if="group.beta" class="beta-pill">Beta</span>
+                    </span>
+                  </span>
+                </span>
+                <SidebarIcon
+                  :name="openGroups[group.key] ? 'chevron-down' : 'chevron-right'"
+                  class="h-4 w-4 shrink-0 text-slate-500"
+                />
+              </button>
+              <div
+                v-show="openGroups[group.key]"
+                class="ml-5 space-y-1 border-l border-white/8 pl-4"
+              >
+                <RouterLink
+                  v-for="item in group.children"
+                  :key="item.to"
+                  :to="item.to"
+                  :class="childLinkClasses(item.to)"
+                >
+                  <span class="h-1.5 w-1.5 rounded-full bg-current opacity-70"></span>
+                  <span class="truncate">{{ item.label }}</span>
+                </RouterLink>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="pt-2 border-t border-gray-800/60 mt-4">
+        <div class="mx-2 my-4 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+
+        <div class="space-y-1">
           <RouterLink
             v-for="item in systemLinks"
             :key="item.to"
             :to="item.to"
-            class="flex items-center gap-3 w-full rounded transition hover:bg-gray-800 text-sm text-slate-200"
-            :class="[
-              sidebarOpen ? 'justify-start px-3 py-2' : 'justify-center px-0 py-2',
-              { 'bg-indigo-600': isActive(item.to) },
-            ]"
+            :class="navLinkClasses(item.to, sidebarOpen)"
             :title="sidebarOpen ? '' : item.label"
             :aria-label="item.label"
           >
-            <span>{{ item.icon }}</span>
-            <span v-if="sidebarOpen">{{ item.label }}</span>
+            <span
+              class="absolute inset-y-2 left-0 w-0.5 rounded-full bg-gradient-to-b from-fuchsia-300 via-violet-300 to-sky-300 transition-all duration-200"
+              :class="isActive(item.to) ? 'opacity-100' : 'opacity-0 group-hover:opacity-50'"
+            ></span>
+            <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/8 bg-white/5">
+              <SidebarIcon
+                :name="item.iconName"
+                class="h-5 w-5"
+                :class="iconClasses(isActive(item.to))"
+              />
+            </span>
+            <span v-if="sidebarOpen" class="truncate font-medium">{{ item.label }}</span>
           </RouterLink>
         </div>
       </nav>
 
-      <!-- Sidebar Footer: segmented actions -->
-      <div class="flex-shrink-0 mt-auto pb-4 px-3">
+      <div class="mt-auto flex-shrink-0 px-3 pb-4">
         <template v-if="sidebarOpen">
-          <div
-            class="grid gap-1 bg-gray-900/60 border border-gray-800 rounded-lg p-1"
-            :class="[authStore.user?.role === 'admin' ? 'grid-cols-6' : 'grid-cols-5']"
-          >
-            <RouterLink
-              to="/settings"
-              class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
-              title="Settings"
-              >⚙️</RouterLink
-            >
-            <RouterLink
-              to="/subscription"
-              class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
-              title="Billing"
-              >💳</RouterLink
-            >
-            <RouterLink
-              v-if="authStore.user?.role === 'admin'"
-              to="/admin"
-              class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
-              title="Admin Panel"
-              >🛠</RouterLink
-            >
-            <RouterLink
-              to="/help"
-              class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
-              title="Help"
-              >💬</RouterLink
-            >
-            <button
-              v-if="!isGuest"
-              @click="handleLogout"
-              class="inline-flex items-center justify-center py-2 rounded-md text-red-400 hover:bg-red-500/15 hover:text-red-300 transition"
-              title="Logout"
-              aria-label="Logout"
-            >
-              <svg
-                class="h-5 w-5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.8"
-                aria-hidden="true"
+          <div class="rounded-2xl border border-white/10 bg-white/5 p-1.5 backdrop-blur">
+            <div class="grid gap-1" :style="{ gridTemplateColumns: footerUtilityColumns }">
+              <RouterLink
+                v-for="item in footerUtilityLinks"
+                :key="item.to"
+                :to="item.to"
+                :class="utilityLinkClasses(item.to)"
+                :title="item.label"
               >
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4.75 3.75h9.5a1.5 1.5 0 011.5 1.5v13.5a1.5 1.5 0 01-1.5 1.5h-9.5a1.5 1.5 0 01-1.5-1.5V5.25a1.5 1.5 0 011.5-1.5z" />
-                <path stroke-linecap="round" stroke-linejoin="round" d="M10 12h10m0 0-3-3m3 3-3 3" />
-              </svg>
-            </button>
-            
+                <SidebarIcon
+                  :name="item.iconName"
+                  class="h-5 w-5"
+                  :class="iconClasses(isActive(item.to))"
+                />
+              </RouterLink>
+              <button
+                v-if="!isGuest"
+                type="button"
+                class="inline-flex items-center justify-center rounded-xl border border-transparent px-3 py-2 text-red-400 transition-all duration-200 hover:border-red-400/20 hover:bg-red-500/10 hover:text-red-300"
+                title="Logout"
+                aria-label="Logout"
+                @click="handleLogout"
+              >
+                <SidebarIcon name="logout" class="h-5 w-5" />
+              </button>
+            </div>
           </div>
         </template>
         <template v-else>
           <div class="flex items-center justify-center">
             <button
               v-if="!isGuest"
-              @click="handleLogout"
-              class="p-2 rounded-md text-red-400 hover:bg-red-500/15 hover:text-red-300 transition"
+              type="button"
+              class="inline-flex items-center justify-center rounded-xl border border-transparent p-2.5 text-red-400 transition-all duration-200 hover:border-red-400/20 hover:bg-red-500/10 hover:text-red-300"
               title="Logout"
               aria-label="Logout"
+              @click="handleLogout"
             >
-              <svg
-                class="h-5 w-5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.8"
-                aria-hidden="true"
-              >
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4.75 3.75h9.5a1.5 1.5 0 011.5 1.5v13.5a1.5 1.5 0 01-1.5 1.5h-9.5a1.5 1.5 0 01-1.5-1.5V5.25a1.5 1.5 0 011.5-1.5z" />
-                <path stroke-linecap="round" stroke-linejoin="round" d="M10 12h10m0 0-3-3m3 3-3 3" />
-              </svg>
+              <SidebarIcon name="logout" class="h-5 w-5" />
             </button>
           </div>
         </template>
@@ -293,148 +313,204 @@
     <transition name="slide">
       <aside
         v-if="mobileMenu"
-        class="fixed inset-0 bg-black/50 z-40 md:hidden"
+        class="fixed inset-0 z-40 bg-black/50 md:hidden"
         @click.self="mobileMenu = false"
       >
-        <div class="app-mobile-drawer absolute left-0 top-0 bottom-0 w-64 bg-gray-900 p-4 flex flex-col">
-          <!-- Header -->
-          <div class="flex justify-between items-center mb-6">
-            <div class="flex items-center gap-2 min-w-0">
-              <img src="/logo-bg-remove.png" alt="PlanCraftAI" class="w-8 h-8" />
-              <span class="text-lg font-semibold truncate">PlanCraftAI</span>
+        <div class="app-mobile-drawer absolute bottom-0 left-0 top-0 flex w-72 flex-col border-r border-white/10 bg-gray-950/92 p-4 backdrop-blur-2xl">
+          <div class="mb-6 flex items-center justify-between">
+            <div class="flex min-w-0 items-center gap-3">
+              <img src="/logo-bg-remove.png" alt="PlanCraftAI" class="h-9 w-9" />
+              <div class="min-w-0">
+                <div class="truncate text-lg font-semibold text-white">PlanCraftAI</div>
+                <div class="text-[11px] uppercase tracking-[0.28em] text-slate-500">Workspace OS</div>
+              </div>
             </div>
-            <button @click="mobileMenu = false" class="p-2 rounded hover:bg-gray-800">✖️</button>
+            <button
+              type="button"
+              class="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 p-2 text-slate-300 transition hover:border-white/20 hover:bg-white/10 hover:text-white"
+              @click="mobileMenu = false"
+            >
+              <SidebarIcon name="x" class="h-5 w-5" />
+            </button>
           </div>
 
-          <!-- Navigation -->
-          <nav class="space-y-3 flex-1 overflow-y-auto scrollbar-plan">
+          <nav class="flex-1 space-y-3 overflow-y-auto scrollbar-plan">
             <div class="space-y-1">
               <RouterLink
                 v-for="item in coreNavItems"
                 :key="item.to"
                 :to="item.to"
-                class="flex items-center gap-3 px-4 py-2 rounded hover:bg-indigo-600"
+                :class="navLinkClasses(item.to, true)"
                 @click="mobileMenu = false"
               >
-                <span class="inline-flex h-5 w-5 items-center justify-center">
-                  <svg
-                    v-if="item.iconType === 'grid-4-outline'"
-                    class="h-4 w-4"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.8"
-                    aria-hidden="true"
-                  >
-                    <rect x="4" y="4" width="6" height="6" rx="1" />
-                    <rect x="14" y="4" width="6" height="6" rx="1" />
-                    <rect x="4" y="14" width="6" height="6" rx="1" />
-                    <rect x="14" y="14" width="6" height="6" rx="1" />
-                  </svg>
-                  <span v-else>{{ item.icon }}</span>
+                <span
+                  class="absolute inset-y-2 left-0 w-0.5 rounded-full bg-gradient-to-b from-fuchsia-300 via-violet-300 to-sky-300 transition-all duration-200"
+                  :class="isActive(item.to) ? 'opacity-100' : 'opacity-0 group-hover:opacity-50'"
+                ></span>
+                <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/8 bg-white/5">
+                  <SidebarIcon
+                    :name="item.iconName"
+                    class="h-5 w-5"
+                    :class="iconClasses(isActive(item.to))"
+                  />
                 </span>
-                <span>{{ item.label }}</span>
+                <span class="truncate font-medium">{{ item.label }}</span>
               </RouterLink>
             </div>
 
-            <div v-for="group in filteredNavGroups" :key="group.key" class="rounded-lg">
-              <div
-                class="flex items-center justify-between px-3 py-2 text-sm font-semibold text-slate-200"
-                @click="toggleGroup(group.key)"
-              >
-                <span class="flex items-center gap-2">
-                  <span>{{ group.icon }}</span>
-                  <span>{{ group.title }}</span>
-                </span>
-                <span class="text-xs text-slate-400">
-                  {{ openGroups[group.key] ? '▾' : '▸' }}
-                </span>
+            <div class="mx-2 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+
+            <div class="space-y-1">
+              <div class="px-3 pb-1 text-[11px] font-medium uppercase tracking-[0.28em] text-slate-500">
+                Organize
               </div>
-              <div v-show="openGroups[group.key]" class="mt-1 space-y-1">
-                <RouterLink
-                  v-for="item in group.children"
-                  :key="item.to"
-                  :to="item.to"
-                  class="block px-4 py-2 rounded hover:bg-indigo-600"
-                  @click="mobileMenu = false"
-                >
-                  {{ item.icon }} {{ item.label }}
-                </RouterLink>
+              <RouterLink
+                v-for="item in organizeNavItems"
+                :key="item.to"
+                :to="item.to"
+                :class="navLinkClasses(item.to, true)"
+                @click="mobileMenu = false"
+              >
+                <span
+                  class="absolute inset-y-2 left-0 w-0.5 rounded-full bg-gradient-to-b from-fuchsia-300 via-violet-300 to-sky-300 transition-all duration-200"
+                  :class="isActive(item.to) ? 'opacity-100' : 'opacity-0 group-hover:opacity-50'"
+                ></span>
+                <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/8 bg-white/5">
+                  <SidebarIcon
+                    :name="item.iconName"
+                    class="h-5 w-5"
+                    :class="iconClasses(isActive(item.to))"
+                  />
+                </span>
+                <span class="truncate font-medium">{{ item.label }}</span>
+              </RouterLink>
+            </div>
+
+            <div class="mx-2 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+
+            <div class="space-y-2">
+              <button
+                type="button"
+                :class="groupButtonClasses({ key: 'advanced-mobile', children: filteredNavGroups }, true)"
+                @click="advancedSectionOpen = !advancedSectionOpen"
+              >
+                <span class="flex min-w-0 items-center gap-3">
+                  <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/8 bg-white/5">
+                    <SidebarIcon
+                      name="sparkles"
+                      class="h-5 w-5"
+                      :class="iconClasses(advancedSectionOpen)"
+                    />
+                  </span>
+                  <span class="truncate font-medium">Advanced</span>
+                </span>
+                <SidebarIcon
+                  :name="advancedSectionOpen ? 'chevron-down' : 'chevron-right'"
+                  class="h-4 w-4 shrink-0 text-slate-500"
+                />
+              </button>
+
+              <div v-show="advancedSectionOpen" class="space-y-2">
+                <div v-for="group in filteredNavGroups" :key="group.key" class="space-y-1">
+                  <button
+                    v-if="group.collapsible"
+                    type="button"
+                    :class="groupButtonClasses(group, true)"
+                    @click="toggleGroup(group.key)"
+                  >
+                    <span class="flex min-w-0 items-center gap-3">
+                      <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/8 bg-white/5">
+                        <SidebarIcon
+                          :name="group.iconName"
+                          class="h-5 w-5"
+                          :class="iconClasses(isGroupActive(group) || openGroups[group.key])"
+                        />
+                      </span>
+                      <span class="min-w-0 flex-1 text-left">
+                        <span class="flex items-center gap-2 font-medium">
+                          <span class="truncate">{{ group.title }}</span>
+                          <span v-if="group.beta" class="beta-pill">Beta</span>
+                        </span>
+                      </span>
+                    </span>
+                    <SidebarIcon
+                      :name="openGroups[group.key] ? 'chevron-down' : 'chevron-right'"
+                      class="h-4 w-4 shrink-0 text-slate-500"
+                    />
+                  </button>
+                  <div
+                    v-show="openGroups[group.key]"
+                    class="ml-5 space-y-1 border-l border-white/8 pl-4"
+                  >
+                    <RouterLink
+                      v-for="item in group.children"
+                      :key="item.to"
+                      :to="item.to"
+                      :class="childLinkClasses(item.to)"
+                      @click="mobileMenu = false"
+                    >
+                      <span class="h-1.5 w-1.5 rounded-full bg-current opacity-70"></span>
+                      <span class="truncate">{{ item.label }}</span>
+                    </RouterLink>
+                  </div>
+                </div>
               </div>
             </div>
-            <div class="pt-2 border-t border-gray-800/60 mt-4">
+
+            <div class="mx-2 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+
+            <div class="space-y-1">
               <RouterLink
                 v-for="item in systemLinks"
                 :key="item.to"
                 :to="item.to"
-                class="block px-3 py-2 rounded hover:bg-indigo-600"
+                :class="navLinkClasses(item.to, true)"
                 @click="mobileMenu = false"
               >
-                {{ item.icon }} {{ item.label }}
+                <span
+                  class="absolute inset-y-2 left-0 w-0.5 rounded-full bg-gradient-to-b from-fuchsia-300 via-violet-300 to-sky-300 transition-all duration-200"
+                  :class="isActive(item.to) ? 'opacity-100' : 'opacity-0 group-hover:opacity-50'"
+                ></span>
+                <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/8 bg-white/5">
+                  <SidebarIcon
+                    :name="item.iconName"
+                    class="h-5 w-5"
+                    :class="iconClasses(isActive(item.to))"
+                  />
+                </span>
+                <span class="truncate font-medium">{{ item.label }}</span>
               </RouterLink>
             </div>
           </nav>
 
-          <!-- Logout -->
-          <!-- <button
-            v-if="authStore.isLoggedIn"
-            @click="handleLogout"
-            class="mt-6 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg w-full"
-          >
-            Logout
-          </button> -->
-          <div class="p-4 border-t border-gray-800">
-            <!-- Grouped card: Settings | Profile | Billing | Help | Logout -->
-            <div
-              class="grid grid-cols-5 gap-1 bg-gray-900/60 border border-gray-800 rounded-lg p-1"
-            >
-              <RouterLink
-                to="/settings"
-                @click="mobileMenu = false"
-                class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
-                title="Settings"
-                >⚙️</RouterLink
-              >
-              <RouterLink
-                to="/profile"
-                @click="mobileMenu = false"
-                class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
-                title="Profile"
-                >👤</RouterLink
-              >
-              <RouterLink
-                to="/subscription"
-                @click="mobileMenu = false"
-                class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
-                title="Billing"
-                >💳</RouterLink
-              >
-              <RouterLink
-                to="/help"
-                @click="mobileMenu = false"
-                class="text-xs py-2 rounded-md hover:bg-gray-800 text-center transition"
-                title="Help"
-                >💬</RouterLink
-              >
-              <button
-                v-if="!isGuest"
-                @click="handleLogout"
-                class="inline-flex items-center justify-center py-2 rounded-md text-red-400 hover:bg-red-500/15 hover:text-red-300 transition"
-                title="Logout"
-                aria-label="Logout"
-              >
-                <svg
-                  class="h-5 w-5"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.8"
-                  aria-hidden="true"
+          <div class="mt-4 border-t border-white/8 pt-4">
+            <div class="rounded-2xl border border-white/10 bg-white/5 p-1.5 backdrop-blur">
+              <div class="grid gap-1" :style="{ gridTemplateColumns: footerUtilityColumns }">
+                <RouterLink
+                  v-for="item in footerUtilityLinks"
+                  :key="item.to"
+                  :to="item.to"
+                  :class="utilityLinkClasses(item.to)"
+                  :title="item.label"
+                  @click="mobileMenu = false"
                 >
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M4.75 3.75h9.5a1.5 1.5 0 011.5 1.5v13.5a1.5 1.5 0 01-1.5 1.5h-9.5a1.5 1.5 0 01-1.5-1.5V5.25a1.5 1.5 0 011.5-1.5z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M10 12h10m0 0-3-3m3 3-3 3" />
-                </svg>
-              </button>
+                  <SidebarIcon
+                    :name="item.iconName"
+                    class="h-5 w-5"
+                    :class="iconClasses(isActive(item.to))"
+                  />
+                </RouterLink>
+                <button
+                  v-if="!isGuest"
+                  type="button"
+                  class="inline-flex items-center justify-center rounded-xl border border-transparent px-3 py-2 text-red-400 transition-all duration-200 hover:border-red-400/20 hover:bg-red-500/10 hover:text-red-300"
+                  title="Logout"
+                  aria-label="Logout"
+                  @click="mobileMenu = false; handleLogout()"
+                >
+                  <SidebarIcon name="logout" class="h-5 w-5" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -568,7 +644,14 @@
       </header>
 
       <!-- Dynamic content -->
-      <main class="app-content flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-plan p-6">
+      <main
+        class="app-content flex-1 min-h-0"
+        :class="
+          isOnTalkPlanner
+            ? 'overflow-hidden p-0'
+            : 'overflow-y-auto overflow-x-hidden scrollbar-plan p-6'
+        "
+      >
         <div
           v-if="showWorkspaceRecovery"
           class="mx-auto flex min-h-[55vh] w-full max-w-2xl items-center justify-center"
@@ -632,7 +715,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, onUnmounted, computed, reactive } from 'vue'
+import { ref, onMounted, watch, onUnmounted, computed, reactive, defineComponent, h } from 'vue'
 import { hasSubscription, registerPushSubscription } from '@/services/pushService'
 import FeedbackPrompt from '@/components/feedback/FeedbackPrompt.vue'
 import FeedbackDrawer from '@/components/feedback/FeedbackDrawer.vue'
@@ -654,6 +737,141 @@ import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { ElMessage } from 'element-plus'
 import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
 import { fetchUserProfile } from '@/services/authService'
+
+const SidebarIcon = defineComponent({
+  name: 'SidebarIcon',
+  inheritAttrs: false,
+  props: {
+    name: {
+      type: String,
+      required: true,
+    },
+  },
+  setup(props, { attrs }) {
+    const renderSvg = (children) =>
+      h(
+        'svg',
+        {
+          fill: 'none',
+          viewBox: '0 0 24 24',
+          stroke: 'currentColor',
+          'stroke-width': '1.8',
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round',
+          'aria-hidden': 'true',
+          ...attrs,
+        },
+        children,
+      )
+
+    return () => {
+      switch (props.name) {
+        case 'dashboard':
+          return renderSvg([
+            h('rect', { x: '4', y: '4', width: '6', height: '6', rx: '1.5' }),
+            h('rect', { x: '14', y: '4', width: '6', height: '6', rx: '1.5' }),
+            h('rect', { x: '4', y: '14', width: '6', height: '6', rx: '1.5' }),
+            h('rect', { x: '14', y: '14', width: '6', height: '6', rx: '1.5' }),
+          ])
+        case 'compass':
+          return renderSvg([
+            h('circle', { cx: '12', cy: '12', r: '8.5' }),
+            h('path', { d: 'M14.8 9.2l-1.9 5.6-5.7 1.9 1.9-5.6 5.7-1.9z' }),
+          ])
+        case 'book-open':
+          return renderSvg([
+            h('path', { d: 'M12 6.5c-1.8-1.3-4-2-6.5-2v14c2.5 0 4.7.7 6.5 2' }),
+            h('path', { d: 'M12 6.5c1.8-1.3 4-2 6.5-2v14c-2.5 0-4.7.7-6.5 2' }),
+            h('path', { d: 'M12 6.5v14' }),
+          ])
+        case 'calendar':
+          return renderSvg([
+            h('rect', { x: '3.75', y: '5.75', width: '16.5', height: '14.5', rx: '2.5' }),
+            h('path', { d: 'M7.5 3.75v4M16.5 3.75v4M3.75 9.25h16.5' }),
+          ])
+        case 'link':
+          return renderSvg([
+            h('path', { d: 'M10 14l-2 2a3 3 0 01-4.25-4.25l2.75-2.75A3 3 0 0110.5 9' }),
+            h('path', { d: 'M14 10l2-2a3 3 0 114.25 4.25l-2.75 2.75A3 3 0 0113.5 15' }),
+            h('path', { d: 'M9 15l6-6' }),
+          ])
+        case 'bell':
+          return renderSvg([
+            h('path', { d: 'M6.75 15.75h10.5l-1.1-1.2a2.75 2.75 0 01-.73-1.85V10a3.42 3.42 0 10-6.84 0v2.7c0 .7-.26 1.38-.73 1.9l-1.1 1.15z' }),
+            h('path', { d: 'M9.75 17.25a2.25 2.25 0 004.5 0' }),
+          ])
+        case 'file-text':
+          return renderSvg([
+            h('path', { d: 'M8.25 3.75h6l4.5 4.5v11.5A2.25 2.25 0 0116.5 22h-8A2.25 2.25 0 016.25 19.75v-13.75A2.25 2.25 0 018.5 3.75z' }),
+            h('path', { d: 'M14.25 3.75v4.5h4.5M9.5 12h5M9.5 15.5h5M9.5 19h3.5' }),
+          ])
+        case 'bar-chart':
+          return renderSvg([
+            h('path', { d: 'M4.5 19.5h15' }),
+            h('path', { d: 'M8 19.5v-7' }),
+            h('path', { d: 'M12 19.5v-10.5' }),
+            h('path', { d: 'M16 19.5v-4.5' }),
+          ])
+        case 'sparkles':
+          return renderSvg([
+            h('path', { d: 'M12 3.75l1.2 3.55L16.75 8.5l-3.55 1.2L12 13.25l-1.2-3.55L7.25 8.5l3.55-1.2L12 3.75z' }),
+            h('path', { d: 'M18.25 14.25l.7 2.05 2.05.7-2.05.7-.7 2.05-.7-2.05-2.05-.7 2.05-.7.7-2.05z' }),
+            h('path', { d: 'M6 14.5l.9 2.55L9.45 18 6.9 18.95 6 21.5l-.9-2.55L2.55 18l2.55-.95L6 14.5z' }),
+          ])
+        case 'settings':
+          return renderSvg([
+            h('circle', { cx: '12', cy: '12', r: '3.2' }),
+            h('path', { d: 'M12 3.75v2.5M12 17.75v2.5M20.25 12h-2.5M6.25 12h-2.5M17.84 6.16l-1.8 1.8M7.96 16.04l-1.8 1.8M17.84 17.84l-1.8-1.8M7.96 7.96l-1.8-1.8' }),
+          ])
+        case 'box':
+          return renderSvg([
+            h('path', { d: 'M4.5 7.5L12 3.75l7.5 3.75M4.5 7.5V16.5L12 20.25m0-16.5v16.5m0 0l7.5-3.75V7.5' }),
+            h('path', { d: 'M8.25 5.63l7.5 3.75' }),
+          ])
+        case 'palette':
+          return renderSvg([
+            h('path', { d: 'M12 4.25c-4.55 0-8.25 3.36-8.25 7.5S7.45 19.25 12 19.25h.75a2.25 2.25 0 002.25-2.25c0-1.1.9-2 2-2h.5a3.75 3.75 0 003.75-3.75c0-3.87-4.14-7-9.25-7z' }),
+            h('circle', { cx: '7.9', cy: '10.2', r: '0.7' }),
+            h('circle', { cx: '10.8', cy: '8.1', r: '0.7' }),
+            h('circle', { cx: '14.1', cy: '8.25', r: '0.7' }),
+            h('circle', { cx: '16.35', cy: '10.7', r: '0.7' }),
+          ])
+        case 'briefcase':
+          return renderSvg([
+            h('rect', { x: '4', y: '7', width: '16', height: '12', rx: '2.25' }),
+            h('path', { d: 'M9 7V5.75A1.75 1.75 0 0110.75 4h2.5A1.75 1.75 0 0115 5.75V7M4 11.25h16' }),
+          ])
+        case 'credit-card':
+          return renderSvg([
+            h('rect', { x: '3.5', y: '5.5', width: '17', height: '13', rx: '2.25' }),
+            h('path', { d: 'M3.5 10h17M7.25 14.5h3.5' }),
+          ])
+        case 'message-circle':
+          return renderSvg([
+            h('path', { d: 'M12 4.25c-4.42 0-8 3.13-8 7s3.58 7 8 7c.86 0 1.69-.12 2.47-.35L19.5 19l-1.14-3.63A6.45 6.45 0 0020 11.25c0-3.87-3.58-7-8-7z' }),
+          ])
+        case 'shield':
+          return renderSvg([
+            h('path', { d: 'M12 3.75l6 2.25v5.38c0 4.02-2.54 7.67-6 8.87-3.46-1.2-6-4.85-6-8.87V6l6-2.25z' }),
+            h('path', { d: 'M9.75 12l1.5 1.5 3-3.5' }),
+          ])
+        case 'logout':
+          return renderSvg([
+            h('path', { d: 'M4.75 3.75h9.5a1.5 1.5 0 011.5 1.5v13.5a1.5 1.5 0 01-1.5 1.5h-9.5a1.5 1.5 0 01-1.5-1.5V5.25a1.5 1.5 0 011.5-1.5z' }),
+            h('path', { d: 'M10 12h10m0 0-3-3m3 3-3 3' }),
+          ])
+        case 'chevron-right':
+          return renderSvg([h('path', { d: 'M9 6l6 6-6 6' })])
+        case 'chevron-down':
+          return renderSvg([h('path', { d: 'M6 9l6 6 6-6' })])
+        case 'x':
+          return renderSvg([h('path', { d: 'M6 6l12 12M18 6L6 18' })])
+        default:
+          return renderSvg([h('circle', { cx: '12', cy: '12', r: '8' })])
+      }
+    }
+  },
+})
 const currentUserId = ref(null)
 function deriveUidFromStorage() {
   try {
@@ -917,95 +1135,139 @@ function isActive(path) {
   }
 }
 
+function isGroupActive(group) {
+  return Array.isArray(group?.children) && group.children.some((child) => isActive(child.to))
+}
+
+function iconClasses(active = false) {
+  return active
+    ? 'text-indigo-100'
+    : 'text-slate-400 transition-colors duration-200 group-hover:text-indigo-200'
+}
+
+function navLinkClasses(path, expanded = true) {
+  const active = isActive(path)
+  return [
+    'group relative flex w-full items-center gap-3 overflow-hidden rounded-2xl border text-sm transition-all duration-200',
+    expanded ? 'justify-start px-3.5 py-2.5' : 'justify-center px-2 py-2.5',
+    active
+      ? 'border-indigo-400/30 bg-gradient-to-r from-fuchsia-500/16 via-indigo-500/18 to-transparent text-white shadow-[0_12px_34px_rgba(79,70,229,0.18)]'
+      : 'border-transparent text-slate-300 hover:border-white/10 hover:bg-white/5 hover:text-white',
+  ]
+}
+
+function childLinkClasses(path) {
+  const active = isActive(path)
+  return [
+    'group flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm transition-all duration-200',
+    active
+      ? 'bg-white/8 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
+      : 'text-slate-400 hover:bg-white/5 hover:text-slate-100',
+  ]
+}
+
+function groupButtonClasses(group, expanded = true) {
+  const active = isGroupActive(group)
+  const open = !!openGroups[group.key]
+  return [
+    'group relative flex w-full items-center gap-3 overflow-hidden rounded-2xl border text-sm transition-all duration-200',
+    expanded ? 'justify-between px-3 py-2.5' : 'justify-center px-2 py-2.5',
+    active || open
+      ? 'border-white/10 bg-white/5 text-white'
+      : 'border-transparent text-slate-300 hover:border-white/10 hover:bg-white/5 hover:text-white',
+  ]
+}
+
+function utilityLinkClasses(path) {
+  const active = isActive(path)
+  return [
+    'group inline-flex items-center justify-center rounded-xl border px-3 py-2 transition-all duration-200',
+    active
+      ? 'border-indigo-400/30 bg-indigo-500/16 text-white'
+      : 'border-transparent text-slate-400 hover:border-white/10 hover:bg-white/5 hover:text-white',
+  ]
+}
+
 const coreNavItems = computed(() => {
   const items = [
-    { label: 'Dashboard', iconType: 'grid-4-outline', to: '/dashboard' },
-    { label: 'Planner', icon: '🧭', to: '/planner' },
-    { label: 'Playbooks', icon: '📚', to: '/playbooks', enabled: playbooksEnabled.value },
-    { label: 'Meetings', icon: '📅', to: '/meetings' },
-    { label: 'Quick Links', icon: '🔗', to: '/links' },
-    { label: 'Reminders', icon: '🔔', to: '/reminders' },
-    { label: 'Napkin', icon: '🧾', to: '/napkin' },
+    { label: 'Dashboard', iconName: 'dashboard', to: '/dashboard' },
+    { label: 'Planner', iconName: 'compass', to: '/planner' },
+    { label: 'Playbooks', iconName: 'book-open', to: '/playbooks', enabled: playbooksEnabled.value },
   ]
   return items.filter((item) => item.enabled !== false)
 })
+
+const organizeNavItems = computed(() => [
+  { label: 'Meetings', iconName: 'calendar', to: '/meetings' },
+  { label: 'Links', iconName: 'link', to: '/links' },
+  { label: 'Reminders', iconName: 'bell', to: '/reminders' },
+  { label: 'Notes', iconName: 'file-text', to: '/napkin' },
+])
 
 const navGroups = [
   {
     key: 'planning',
     title: 'Planning',
-    icon: '🗓',
+    iconName: 'calendar',
     collapsible: true,
-    defaultOpen: true,
+    defaultOpen: false,
     children: [
-      { label: 'Daily', icon: '📆', to: '/daily' },
-      { label: 'Weekly', icon: '🗒', to: '/weekly' },
-      { label: 'Monthly', icon: '🗂', to: '/monthly' },
+      { label: 'Daily', to: '/daily' },
+      { label: 'Weekly', to: '/weekly' },
+      { label: 'Monthly', to: '/monthly' },
     ],
   },
   {
     key: 'review',
     title: 'Review',
-    icon: '📊',
+    iconName: 'bar-chart',
     collapsible: true,
     defaultOpen: false,
     children: [
-      { label: 'Journal', icon: '📔', to: '/journal' },
-      { label: 'Reports', icon: '📈', to: '/reports' },
-      { label: 'Habits', icon: '🏆', to: '/habits' },
-    ],
-  },
-  {
-    key: 'settings',
-    title: 'Settings',
-    icon: '⚙️',
-    collapsible: true,
-    defaultOpen: false,
-    children: [
-      { label: 'Quick Setup', icon: '✨', to: '/settings?tab=account-quick-setup' },
-      { label: 'Notifications', icon: '🔔', to: '/settings?tab=account-notifications' },
-      { label: 'Integrations', icon: '🔗', to: '/settings?tab=integrations' },
+      { label: 'Journal', to: '/journal' },
+      { label: 'Reports', to: '/reports' },
+      { label: 'Habits', to: '/habits' },
     ],
   },
   {
     key: 'creator',
     title: 'Creator Mode',
-    icon: '🎨',
+    iconName: 'palette',
     beta: true,
     collapsible: true,
     defaultOpen: false,
     children: [
-      { label: 'Content Board', icon: '🏠', to: '/creator' },
-      { label: 'Calendar', icon: '📅', to: '/creator/calendar' },
-      { label: 'Repurpose', icon: '🔁', to: '/creator/repurpose' },
-      { label: 'Editor', icon: '✏️', to: '/creator/editor' },
-      { label: 'Publish', icon: '📤', to: '/creator/publish' },
+      { label: 'Content Board', to: '/creator' },
+      { label: 'Calendar', to: '/creator/calendar' },
+      { label: 'Repurpose', to: '/creator/repurpose' },
+      { label: 'Editor', to: '/creator/editor' },
+      { label: 'Publish', to: '/creator/publish' },
     ],
   },
   {
     key: 'leader',
     title: 'Leader Mode',
-    icon: '🧑‍💼',
+    iconName: 'briefcase',
     beta: true,
     collapsible: true,
     defaultOpen: false,
     children: [
-      { label: 'Events', icon: '🎉', to: '/leader/events' },
-      { label: 'Occasions', icon: '🎂', to: '/leader/occasions' },
-      { label: 'Messages', icon: '✉️', to: '/leader/messages' },
-      { label: 'Issues', icon: '🚨', to: '/leader/issues' },
-      { label: 'Contacts', icon: '👥', to: '/leader/contacts' },
-      { label: 'Maps', icon: '🗺', to: '/leader/maps' },
+      { label: 'Events', to: '/leader/events' },
+      { label: 'Occasions', to: '/leader/occasions' },
+      { label: 'Messages', to: '/leader/messages' },
+      { label: 'Issues', to: '/leader/issues' },
+      { label: 'Contacts', to: '/leader/contacts' },
+      { label: 'Maps', to: '/leader/maps' },
     ],
   },
   {
     key: 'ai',
-    title: 'AI Quick Actions',
-    icon: '🤖',
+    title: 'AI Actions',
+    iconName: 'sparkles',
     collapsible: true,
     defaultOpen: false,
     children: [
-      { label: 'Talk to Planner', icon: '🎤', to: '/talk-to-planner' },
+      { label: 'Talk to Planner', to: '/talk-to-planner' },
     ],
   },
 ]
@@ -1028,11 +1290,58 @@ const filteredNavGroups = computed(() => {
     })
 })
 
-const systemLinks = [
-  { label: 'Workspaces', icon: '📦', to: '/workspaces' },
-]
+const systemLinks = computed(() => [
+  { label: 'Workspaces', iconName: 'box', to: '/workspaces' },
+  { label: 'Settings', iconName: 'settings', to: '/settings' },
+])
+
+const footerUtilityLinks = computed(() => {
+  const links = [
+    { label: 'Billing', iconName: 'credit-card', to: '/subscription' },
+    { label: 'Help', iconName: 'message-circle', to: '/help' },
+  ]
+
+  if (authStore.user?.role === 'admin') {
+    links.unshift({ label: 'Admin Panel', iconName: 'shield', to: '/admin' })
+  }
+
+  return links
+})
+
+const footerUtilityColumns = computed(() =>
+  `repeat(${footerUtilityLinks.value.length + (isGuest.value ? 0 : 1)}, minmax(0, 1fr))`,
+)
 
 const openGroups = reactive({})
+const advancedSectionOpen = ref(false)
+
+function handleAdvancedToggle() {
+  if (!sidebarOpen.value) {
+    sidebarOpen.value = true
+    advancedSectionOpen.value = true
+    return
+  }
+
+  advancedSectionOpen.value = !advancedSectionOpen.value
+}
+
+function handleGroupToggle(key) {
+  if (!sidebarOpen.value) {
+    sidebarOpen.value = true
+    advancedSectionOpen.value = true
+    openGroups[key] = true
+    return
+  }
+
+  toggleGroup(key)
+}
+
+function syncSidebarDisclosure() {
+  const activeGroup = filteredNavGroups.value.find((group) => isGroupActive(group))
+  if (!activeGroup) return
+  advancedSectionOpen.value = true
+  openGroups[activeGroup.key] = true
+}
 
 async function handleLogout() {
   await authStore.logout()
@@ -1088,6 +1397,19 @@ watch(
     ensureWorkspaceHydrated()
     subStore.fetchStatus(authStore.user.uid, { minIntervalMs: 30000 }).catch(() => {})
   },
+)
+
+watch(
+  () => [
+    route.fullPath,
+    filteredNavGroups.value
+      .map((group) => `${group.key}:${group.children.map((child) => child.to).join(',')}`)
+      .join('|'),
+  ],
+  () => {
+    syncSidebarDisclosure()
+  },
+  { immediate: true },
 )
 
 onUnmounted(() => {

@@ -52,27 +52,33 @@ export function isServerDrivenNativeAppleAuthEnabled() {
   }
 }
 
-export function buildNativeAuthCallbackUrl({ code, redirect } = {}) {
+export function buildNativeAuthCallbackUrl({ code, redirect, platform, provider } = {}) {
   const origin =
     (typeof window !== 'undefined' && window.location?.origin) ||
     'https://plancraftai.com'
   const params = new URLSearchParams()
   if (code) params.set('code', code)
   params.set('redirect', normalizeRedirectPath(redirect))
+  if (platform) params.set('platform', String(platform))
+  if (provider) params.set('provider', String(provider))
   return `${origin}${NATIVE_AUTH_CALLBACK_PATH}?${params.toString()}`
 }
 
-export function buildNativeAuthFallbackSchemeUrl({ code, redirect } = {}) {
+export function buildNativeAuthFallbackSchemeUrl({ code, redirect, platform, provider } = {}) {
   const params = new URLSearchParams()
   if (code) params.set('code', code)
   params.set('redirect', normalizeRedirectPath(redirect))
+  if (platform) params.set('platform', String(platform))
+  if (provider) params.set('provider', String(provider))
   return `plancraftai://localhost${NATIVE_AUTH_CALLBACK_PATH}?${params.toString()}`
 }
 
-export function buildNativeAuthAndroidIntentUrl({ code, redirect } = {}) {
+export function buildNativeAuthAndroidIntentUrl({ code, redirect, platform, provider } = {}) {
   const params = new URLSearchParams()
   if (code) params.set('code', code)
   params.set('redirect', normalizeRedirectPath(redirect))
+  if (platform) params.set('platform', String(platform))
+  if (provider) params.set('provider', String(provider))
   return `intent://localhost${NATIVE_AUTH_CALLBACK_PATH}?${params.toString()}#Intent;scheme=plancraftai;package=${ANDROID_APP_PACKAGE};end`
 }
 
