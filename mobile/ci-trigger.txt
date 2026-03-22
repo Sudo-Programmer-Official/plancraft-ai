@@ -1,0 +1,2 @@
+CI trigger marker for mobile workflows.
+Update this file to force Android/iOS pipeline runs when no functional code changed.
