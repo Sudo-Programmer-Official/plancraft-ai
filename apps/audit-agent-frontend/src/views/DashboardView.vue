@@ -2598,6 +2598,8 @@ watch(
 )
 
 const unsubscribe = ref(null)
+let activeTaskListenerKey = null
+let nativeTaskSeedPromise = null
 
 function tasksCollection() {
   return collection(db, 'tasks')
@@ -2619,9 +2621,12 @@ function handleTaskSnapshot(snapshot) {
 }
 
 async function attachTaskListener(user) {
-  if (unsubscribe.value) unsubscribe.value()
   const effectiveUser = user || auth.currentUser || authStore?.user || null
   if (!effectiveUser?.uid) {
+    if (unsubscribe.value) unsubscribe.value()
+    unsubscribe.value = null
+    activeTaskListenerKey = null
+    nativeTaskSeedPromise = null
     syncDashboardTaskBuckets([])
     dashboardTasksLoading.value = false
     return
@@ -2641,12 +2646,25 @@ async function attachTaskListener(user) {
       return
     }
   }
+  const packagedNative = isNativePackagedApp()
+  const nextKey = `${effectiveUser.uid}:${wsId}:${packagedNative ? 'native' : 'web'}`
+
+  if (activeTaskListenerKey === nextKey) {
+    if (!packagedNative && unsubscribe.value) return
+    if (packagedNative && (nativeTaskSeedPromise || !dashboardTasksLoading.value)) return
+  }
+
+  if (unsubscribe.value) unsubscribe.value()
+  unsubscribe.value = null
+  activeTaskListenerKey = nextKey
   dashboardTasksLoading.value = true
-  if (isIosPackagedApp()) {
-    const seeded = await refreshAllTasks(true).then(() => true).catch(() => false)
+
+  if (packagedNative) {
+    nativeTaskSeedPromise = refreshAllTasks(true)
+    const seeded = await nativeTaskSeedPromise.then(() => true).catch(() => false)
+    nativeTaskSeedPromise = null
     if (seeded) syncDashboardTaskBuckets(allTasks.value)
     dashboardTasksLoading.value = false
-    unsubscribe.value = null
     return
   }
   const tasksQuery = query(tasksCollection(), where('workspaceId', '==', wsId))
