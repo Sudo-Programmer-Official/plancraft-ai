@@ -1,5 +1,5 @@
 // src/composables/useIsPremium.js
-import { computed, onMounted, watch } from 'vue'
+import { computed } from 'vue'
 import { useAuthStore } from '@/stores/authStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { resolvePlanKey } from '@/services/planService'
@@ -30,14 +30,13 @@ export function useIsPremium() {
     return storePremium || userPremium
   })
 
-  async function refresh() {
+  async function refresh(options = {}) {
     try {
-      await authStore.refreshPlan?.()
+      const uid = authStore.user?.uid
+      if (!uid) return
+      await subStore.fetchStatus(uid, options)
     } catch {}
   }
-
-  onMounted(() => { refresh() })
-  watch(() => authStore.user?.uid, (uid) => { if (uid) refresh() })
 
   return { isPremium, isAdmin, refresh }
 }

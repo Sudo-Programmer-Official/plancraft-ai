@@ -26,7 +26,7 @@
     </div>
   </transition>
   <div
-    class="app-shell flex min-h-screen w-full max-w-full overflow-x-hidden bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 text-white"
+    class="app-shell flex w-full max-w-full overflow-hidden bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 text-white"
   >
     <template v-if="!isShellReady">
       <div class="flex flex-1" aria-hidden="true"></div>
@@ -78,7 +78,7 @@
     </div>
     <!-- Sidebar (desktop only) -->
     <aside
-      class="hidden md:flex flex-col h-screen transition-all duration-200 bg-gray-950/70 backdrop-blur-xl"
+      class="hidden md:flex flex-col h-full transition-all duration-200 bg-gray-950/70 backdrop-blur-xl"
       :class="sidebarOpen ? 'w-64' : 'w-16'"
     >
       <div
@@ -442,7 +442,7 @@
     </transition>
 
     <!-- Main Content -->
-    <div class="app-main-pane flex-1 flex flex-col w-full max-w-full overflow-x-hidden">
+    <div class="app-main-pane flex-1 flex min-w-0 min-h-0 flex-col w-full max-w-full overflow-hidden">
       <!-- Header -->
       <header
         class="app-header sticky top-0 z-10 bg-gray-950/60 backdrop-blur-xl border-b border-gray-800 p-4 flex justify-between items-center w-full"
@@ -568,7 +568,7 @@
       </header>
 
       <!-- Dynamic content -->
-      <main class="app-content p-6 flex-1 overflow-y-auto overflow-x-hidden scrollbar-plan">
+      <main class="app-content flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-plan p-6">
         <div
           v-if="showWorkspaceRecovery"
           class="mx-auto flex min-h-[55vh] w-full max-w-2xl items-center justify-center"
@@ -810,7 +810,7 @@ watch(
     if (uid && token) {
       maybePromptProfile()
       ensureWorkspaceHydrated()
-      subStore.fetchStatus(uid, { force: true, minIntervalMs: 0 }).catch(() => {})
+      subStore.fetchStatus(uid, { minIntervalMs: 30000 }).catch(() => {})
       scheduleWorkspaceHydrationRetry()
     } else {
       clearWorkspaceRetryTimer()
@@ -1059,7 +1059,7 @@ function openFeedback() {
 onMounted(() => {
   featureFlagsStore.ensureLoaded().catch(() => {})
   if (authStore.user?.uid && authStore.token) {
-    subStore.fetchStatus(authStore.user.uid, { force: true, minIntervalMs: 0 })
+    subStore.fetchStatus(authStore.user.uid, { minIntervalMs: 30000 }).catch(() => {})
   }
   feedbackStore.init()
   // Upgrade banner events
@@ -1076,7 +1076,7 @@ watch(
   () => {
     if (!authStore.user?.uid) return
     ensureWorkspaceHydrated()
-    subStore.fetchStatus(authStore.user.uid, { force: true, minIntervalMs: 0 }).catch(() => {})
+    subStore.fetchStatus(authStore.user.uid, { minIntervalMs: 30000 }).catch(() => {})
   },
 )
 
@@ -1107,6 +1107,7 @@ html {
 body,
 #app {
   width: 100%;
+  height: 100%;
   min-height: 100vh;
   min-height: 100dvh;
   min-height: -webkit-fill-available;
@@ -1124,21 +1125,21 @@ body {
 }
 
 .app-shell {
-  min-height: 100vh;
-  min-height: 100dvh;
-  min-height: -webkit-fill-available;
+  height: 100vh;
+  height: 100dvh;
+  height: -webkit-fill-available;
+  min-height: 0;
   width: 100%;
+  overflow: hidden;
   padding-left: var(--safe-area-left);
   padding-right: var(--safe-area-right);
 }
 
 .app-main-pane {
-  min-height: 100vh;
-  min-height: 100dvh;
-  min-height: -webkit-fill-available;
-  height: 100vh;
-  height: 100dvh;
-  height: -webkit-fill-available;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .app-upgrade-banner {
@@ -1157,6 +1158,7 @@ body {
 }
 
 .app-content {
+  min-height: 0;
   padding-bottom: calc(1.5rem + var(--safe-area-bottom));
 }
 
