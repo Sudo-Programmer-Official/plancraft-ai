@@ -9,8 +9,8 @@
         <div class="startup-overlay__panel">
           <img src="/logo-bg-remove.png" alt="PlanCraftAI" class="startup-overlay__logo" />
           <p class="startup-overlay__eyebrow">PlanCraftAI</p>
-          <h1 class="startup-overlay__title">Preparing your workspace...</h1>
-          <p class="startup-overlay__subtitle">Syncing your tasks and restoring your flow</p>
+          <h1 class="startup-overlay__title">{{ startupOverlayTitle }}</h1>
+          <p class="startup-overlay__subtitle">{{ startupOverlaySubtitle }}</p>
           <div class="startup-overlay__progress" aria-hidden="true">
             <div class="startup-overlay__progress-bar"></div>
           </div>
@@ -30,15 +30,38 @@ import { ElNotification } from 'element-plus'
 import InstallPrompt from '@/components/InstallPrompt.vue'
 import ConfettiOverlay from '@/components/ConfettiOverlay.vue'
 import { useAppReady } from '@/composables/useAppReady'
-import { useAuthStore } from '@/stores/authStore'
 
-const authStore = useAuthStore()
 const route = useRoute()
-const { isShellReady } = useAppReady()
+const { isShellReady, isLoggingOut, hasAuthenticatedSession, startupStage } = useAppReady()
 
 const showStartupOverlay = computed(() => {
-  if (authStore.bootstrapping) return true
-  return !!route.meta?.requiresAuth && !isShellReady.value
+  if (isLoggingOut.value) return false
+  if (startupStage.value === 'bootstrapping') return true
+  if (!route.meta?.requiresAuth) return false
+  if (!hasAuthenticatedSession.value) return false
+  return !isShellReady.value
+})
+
+const startupOverlayTitle = computed(() => {
+  switch (startupStage.value) {
+    case 'authenticating':
+      return 'Signing you in...'
+    case 'bootstrapping':
+    case 'preparing-workspace':
+    default:
+      return 'Preparing your workspace...'
+  }
+})
+
+const startupOverlaySubtitle = computed(() => {
+  switch (startupStage.value) {
+    case 'authenticating':
+      return 'Securing your session and loading your account'
+    case 'bootstrapping':
+    case 'preparing-workspace':
+    default:
+      return 'Syncing your tasks and restoring your flow'
+  }
 })
 
 const confettiVisible = ref(false)

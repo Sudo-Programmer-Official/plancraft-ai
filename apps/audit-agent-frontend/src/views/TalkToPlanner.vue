@@ -678,7 +678,7 @@ const sendDisabled = computed(
 function syncComposerHeight() {
   const composer = chatInputRef.value
   if (!(composer instanceof HTMLTextAreaElement)) return
-  const maxHeight = typeof window !== 'undefined' && window.innerWidth <= 768 ? 160 : 192
+  const maxHeight = typeof window !== 'undefined' && window.innerWidth <= 768 ? 120 : 144
   composer.style.height = 'auto'
   composer.style.height = `${Math.min(composer.scrollHeight, maxHeight)}px`
   composer.style.overflowY = composer.scrollHeight > maxHeight ? 'auto' : 'hidden'
@@ -1165,15 +1165,21 @@ onMounted(() => {
 
 <style scoped>
 .talk-planner-wrapper {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   height: 100%;
+  max-height: 100%;
+  min-height: 0;
   max-width: 900px;
   margin: 0 auto;
   padding: 1rem;
+  overflow: hidden;
   background: linear-gradient(180deg, rgba(25, 20, 40, 0.95), rgba(20, 18, 35, 0.98));
-  border-radius: 1rem;
-  box-shadow: 0 0 30px rgba(90, 60, 150, 0.2);
+  border: 1px solid rgba(138, 120, 210, 0.2);
+  border-radius: 1.25rem;
+  box-shadow:
+    0 0 30px rgba(90, 60, 150, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
   color: #f9f8ff;
 }
 
@@ -1276,17 +1282,28 @@ onMounted(() => {
 }
 
 .chat-body {
-  flex-grow: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding: 1rem 0;
+  overflow-x: hidden;
+  padding: 0.85rem 0 0.5rem;
   display: flex;
   flex-direction: column;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.chat-body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 .chat-stream {
   display: flex;
   flex-direction: column;
   gap: 0.8rem;
+  min-height: 100%;
 }
 
 .chat-bubble {
@@ -1564,16 +1581,17 @@ onMounted(() => {
 
 .chat-input-bar {
   display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-  background: rgba(40, 35, 70, 0.8);
-  border: 1px solid rgba(100, 100, 255, 0.15);
-  border-radius: 2rem;
-  padding: 0.5rem 0.8rem;
-  margin-top: 1rem;
-  box-shadow: 0 16px 32px rgba(20, 16, 40, 0.35);
-  backdrop-filter: blur(8px);
+  align-items: stretch;
+  gap: 0.75rem;
+  flex-wrap: nowrap;
+  flex: 0 0 auto;
+  background: rgba(34, 29, 58, 0.92);
+  border: 1px solid rgba(126, 109, 212, 0.28);
+  border-radius: 1.1rem;
+  padding: 0.8rem;
+  margin-top: 0.85rem;
+  box-shadow: 0 16px 32px rgba(20, 16, 40, 0.32);
+  backdrop-filter: blur(12px);
 }
 
 .chat-input-bar--recording {
@@ -1584,14 +1602,17 @@ onMounted(() => {
 .chat-input-row {
   display: flex;
   align-items: flex-end;
-  gap: 0.6rem;
+  gap: 0.65rem;
   flex: 1;
   min-width: 0;
-  padding: 0.35rem 0.6rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  min-height: 64px;
+  padding: 0.7rem 0.8rem;
+  border-radius: 0.95rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px rgba(82, 64, 146, 0.14);
 }
 
 .chat-input {
@@ -1601,7 +1622,7 @@ onMounted(() => {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 1.5rem;
-  max-height: 12rem;
+  max-height: 9rem;
   background: transparent;
   border: none;
   color: #ffffff;
@@ -1615,6 +1636,14 @@ onMounted(() => {
   word-break: break-word;
   overflow-wrap: anywhere;
   overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.chat-input::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 .chat-input::placeholder {
@@ -1626,14 +1655,15 @@ onMounted(() => {
   position: relative;
   border: none;
   color: #fff;
-  height: 42px;
-  min-width: 42px;
+  height: 46px;
+  min-width: 46px;
   font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  align-self: flex-end;
 }
 
 .mic-btn::after,
@@ -1660,7 +1690,7 @@ onMounted(() => {
   height: 46px;
   min-width: 46px;
   padding: 0;
-  border-radius: 999px;
+  border-radius: 0.9rem;
   border: 1px solid rgba(125, 211, 252, 0.38);
   background: radial-gradient(circle at 30% 30%, rgba(79, 70, 229, 0.38), rgba(14, 165, 233, 0.18));
   box-shadow: 0 10px 24px rgba(14, 165, 233, 0.28);
@@ -1686,7 +1716,7 @@ onMounted(() => {
   inset: 0;
   display: grid;
   place-items: center;
-  border-radius: 999px;
+  border-radius: inherit;
   pointer-events: none;
 }
 
@@ -1724,10 +1754,11 @@ onMounted(() => {
 }
 
 .send-btn {
-  padding: 0 1.3rem;
-  border-radius: 999px;
-  background: linear-gradient(120deg, rgba(124, 58, 237, 0.5), rgba(14, 165, 233, 0.5));
-  border-color: rgba(165, 180, 252, 0.6);
+  width: 46px;
+  padding: 0;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(165, 180, 252, 0.38);
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.55), rgba(14, 165, 233, 0.42));
   color: #fdf4ff;
   box-shadow: 0 12px 24px rgba(79, 70, 229, 0.4);
 }
@@ -1865,21 +1896,32 @@ onMounted(() => {
 
 @media (max-width: 768px) {
   .talk-planner-wrapper {
-    padding: 0.75rem;
+    padding: 0.85rem;
+    border-radius: 1rem;
   }
 
   .chat-bubble {
-    max-width: 88%;
+    max-width: 92%;
   }
 
   .chat-input {
     font-size: 0.95rem;
   }
+
+  .chat-input-bar {
+    padding: 0.75rem;
+  }
+
+  .chat-input-row {
+    min-height: 60px;
+    padding: 0.65rem 0.7rem;
+    border-radius: 0.85rem;
+  }
 }
 
 @media (max-width: 540px) {
   .chat-input-bar {
-    padding: 0.75rem;
+    padding: 0.7rem;
   }
 
   .mic-indicator {
@@ -1891,21 +1933,7 @@ onMounted(() => {
 }
 
 @media (max-width: 640px) {
-  .chat-input-bar--with-recorder {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.75rem;
-  }
-
-  .voice-recorder-wrapper {
-    min-width: 100%;
-  }
-
   .chat-input-row {
-    width: 100%;
-  }
-
-  .voice-controller {
     width: 100%;
   }
 }

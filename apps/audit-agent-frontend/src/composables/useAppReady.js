@@ -21,8 +21,15 @@ export function useAppReady() {
     }
   })
 
+  const isBootstrapping = computed(() => authStore.bootstrapping === true)
+  const isAuthenticating = computed(() => authStore.authenticating === true)
+  const isLoggingOut = computed(() => authStore.logoutPending === true)
+  const hasAuthenticatedSession = computed(
+    () => isGuestSession.value || !!authStore.user?.uid,
+  )
+
   const isAuthReady = computed(() => {
-    if (authStore.bootstrapping) return false
+    if (isBootstrapping.value || isLoggingOut.value) return false
     if (isGuestSession.value) return true
     return !!authStore.user?.uid && !!authStore.token
   })
@@ -44,15 +51,27 @@ export function useAppReady() {
 
   const isShellReady = computed(() => isAuthReady.value && isWorkspaceHydrated.value)
   const isReady = computed(() => isAuthReady.value && isWorkspaceReady.value)
+  const startupStage = computed(() => {
+    if (isLoggingOut.value) return 'logging-out'
+    if (isAuthenticating.value) return 'authenticating'
+    if (isBootstrapping.value) return 'bootstrapping'
+    if (hasAuthenticatedSession.value && !isShellReady.value) return 'preparing-workspace'
+    return 'ready'
+  })
 
   return {
     isReady,
     isShellReady,
     isAuthReady,
+    isBootstrapping,
+    isAuthenticating,
+    isLoggingOut,
     isWorkspaceHydrated,
     isWorkspaceReady,
     hasResolvedWorkspace,
+    hasAuthenticatedSession,
     isGuestSession,
     resolvedWorkspaceId,
+    startupStage,
   }
 }

@@ -750,6 +750,11 @@ function handleQuickSetupDone() {
 }
 
 async function ensureWorkspaceHydrated() {
+  if (authStore.logoutPending) {
+    clearWorkspaceRetryTimer()
+    workspaceRetryCount.value = 0
+    return
+  }
   const uid = authStore.user?.uid
   if (!uid) {
     workspaceRetryCount.value = 0
@@ -785,7 +790,7 @@ function clearWorkspaceRetryTimer() {
 
 function scheduleWorkspaceHydrationRetry() {
   clearWorkspaceRetryTimer()
-  if (!isAuthReady.value || hasResolvedWorkspace.value) {
+  if (authStore.logoutPending || !isAuthReady.value || hasResolvedWorkspace.value) {
     workspaceRetryCount.value = 0
     return
   }
@@ -805,8 +810,13 @@ function scheduleWorkspaceHydrationRetry() {
 
 // Prompt for profile setup if incomplete + hydrate workspace store
 watch(
-  () => [authStore.user?.uid, authStore.token],
-  ([uid, token]) => {
+  () => [authStore.user?.uid, authStore.token, authStore.logoutPending],
+  ([uid, token, logoutPending]) => {
+    if (logoutPending) {
+      clearWorkspaceRetryTimer()
+      workspaceRetryCount.value = 0
+      return
+    }
     if (uid && token) {
       maybePromptProfile()
       ensureWorkspaceHydrated()
@@ -822,9 +832,9 @@ watch(
 )
 
 watch(
-  () => [isAuthReady.value, isWorkspaceHydrated.value, hasResolvedWorkspace.value, workspaceStore.loading, workspaceStore.error],
-  ([authReadyNow, workspaceHydratedNow, workspaceResolvedNow, workspaceLoading]) => {
-    if (!authReadyNow) {
+  () => [isAuthReady.value, isWorkspaceHydrated.value, hasResolvedWorkspace.value, workspaceStore.loading, workspaceStore.error, authStore.logoutPending],
+  ([authReadyNow, workspaceHydratedNow, workspaceResolvedNow, workspaceLoading, _workspaceError, logoutPending]) => {
+    if (logoutPending || !authReadyNow) {
       clearWorkspaceRetryTimer()
       workspaceRetryCount.value = 0
       return

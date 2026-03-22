@@ -806,6 +806,7 @@ export const useAuthStore = defineStore('authStore', {
     token: null,
     loading: true,
     bootstrapping: true,
+    authenticating: false,
     logoutPending: false,
     guest: false,
     usage: { used: 0, limit: 0, plan: '' },
@@ -814,11 +815,17 @@ export const useAuthStore = defineStore('authStore', {
   }),
 
   actions: {
-    resetAuth() {
+    setAuthenticating(active) {
+      this.authenticating = active === true
+    },
+
+    resetAuth(options = {}) {
+      const preserveLogoutPending = options?.preserveLogoutPending === true
       this.user = null
       this.token = null
       this.bootstrapping = false
-      this.logoutPending = false
+      this.authenticating = false
+      this.logoutPending = preserveLogoutPending ? this.logoutPending === true : false
       this.guest = false
       this.loading = false
       try {
@@ -951,6 +958,7 @@ export const useAuthStore = defineStore('authStore', {
 
     async init() {
       this.bootstrapping = true
+      this.authenticating = false
       this.loading = true
       const bootstrapTimeoutMs = isNativePackagedApp() ? 4000 : 7000
       const allowCachedSessionFallback = !isIosCapacitorApp()
@@ -1070,7 +1078,7 @@ export const useAuthStore = defineStore('authStore', {
             nativeSnapshot?.localId === this.user.uid
 
           if (!keepNativeSnapshotSession) {
-            this.resetAuth()
+            this.resetAuth({ preserveLogoutPending: this.logoutPending === true })
           }
           settleBootstrap(keepNativeSnapshotSession ? 'auth-state:ios-snapshot' : 'auth-state:none')
           return
@@ -1235,6 +1243,7 @@ export const useAuthStore = defineStore('authStore', {
     },
 
     async loginAsGuest() {
+      this.setAuthenticating(true)
       this.loading = true
       try {
         const user = await signInAsGuest()
@@ -1264,6 +1273,7 @@ export const useAuthStore = defineStore('authStore', {
           offset: 80,
         })
       } finally {
+        this.setAuthenticating(false)
         this.loading = false
       }
     },
@@ -1281,6 +1291,7 @@ export const useAuthStore = defineStore('authStore', {
       const current = auth.currentUser
       const alreadyLinked = (current?.providerData || []).some((p) => p?.providerId === 'google.com')
 
+      this.setAuthenticating(true)
       this.loading = true
       try {
         const isNative = !!Capacitor?.isNativePlatform?.()
@@ -1447,12 +1458,14 @@ export const useAuthStore = defineStore('authStore', {
         localStorage.setItem('token', this.token)
         notifySignedIn(this.user)
       } finally {
+        this.setAuthenticating(false)
         this.loading = false
       }
     },
 
     // 🍎 Sign in with Apple (iOS-only button will call this)
     async loginWithApple() {
+      this.setAuthenticating(true)
       this.loading = true
       try {
         const { useFeatureFlagsStore } = await import('@/stores/featureFlagsStore')
@@ -1627,6 +1640,7 @@ export const useAuthStore = defineStore('authStore', {
         }
         return user
       } finally {
+        this.setAuthenticating(false)
         this.loading = false
       }
     },
@@ -1753,6 +1767,7 @@ export const useAuthStore = defineStore('authStore', {
     },
 
     async completeNativeAuthHandoff(code, redirectTarget = '/dashboard') {
+      this.setAuthenticating(true)
       this.loading = true
       try {
         console.info('[Auth] Native auth handoff consume:start', {
@@ -1815,6 +1830,7 @@ export const useAuthStore = defineStore('authStore', {
         })
         throw error
       } finally {
+        this.setAuthenticating(false)
         this.loading = false
       }
     },
@@ -1831,6 +1847,7 @@ export const useAuthStore = defineStore('authStore', {
     async confirmPhoneOtp(confirmationResult, otp) {
       if (!confirmationResult) throw new Error('Missing confirmation result')
       if (!otp) throw new Error('Missing OTP code')
+      this.setAuthenticating(true)
       this.loading = true
       try {
         const current = auth.currentUser
@@ -1954,11 +1971,13 @@ export const useAuthStore = defineStore('authStore', {
         notifySignedIn(this.user)
         return user
       } finally {
+        this.setAuthenticating(false)
         this.loading = false
       }
     },
 
     async loginWithEmail(email, password) {
+      this.setAuthenticating(true)
       this.loading = true
       const current = auth.currentUser
       const alreadyLinked = (current?.providerData || []).some((p) => p?.providerId === 'password')
@@ -2304,11 +2323,13 @@ export const useAuthStore = defineStore('authStore', {
       }))
       throw error
     } finally {
+      this.setAuthenticating(false)
       this.loading = false
     }
   },
 
     async registerEmail(email, password) {
+      this.setAuthenticating(true)
       this.loading = true
       try {
         const user = await registerWithEmail(email, password)
@@ -2341,6 +2362,7 @@ export const useAuthStore = defineStore('authStore', {
           offset: 80,
         })
       } finally {
+        this.setAuthenticating(false)
         this.loading = false
       }
     },
@@ -2350,6 +2372,7 @@ export const useAuthStore = defineStore('authStore', {
     },
 
     async logout() {
+      this.setAuthenticating(false)
       this.logoutPending = true
       try {
         await withTimeout(signOutUser(), isIosCapacitorApp() ? 5000 : 8000, 'logout sign-out')
@@ -2366,8 +2389,7 @@ export const useAuthStore = defineStore('authStore', {
         try {
           trackEvent('Logout')
         } catch {}
-        this.resetAuth()
-        this.logoutPending = true
+        this.resetAuth({ preserveLogoutPending: true })
         setTimeout(() => {
           try {
             window.location.replace('/login')
