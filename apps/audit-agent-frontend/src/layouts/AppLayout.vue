@@ -2,6 +2,7 @@
   <FeedbackPrompt />
   <FeedbackDrawer />
   <SetupPrompt
+    v-if="isReady"
     :open="quickSetupStore.quickSetupOpen"
     :launch-source="quickSetupStore.quickSetupLaunchSource"
     @close="handleQuickSetupClose"
@@ -11,6 +12,28 @@
   <div
     class="app-shell flex min-h-screen w-full max-w-full overflow-x-hidden bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 text-white"
   >
+    <template v-if="!isReady">
+      <div class="flex flex-1 items-center justify-center px-6">
+        <div class="max-w-md text-center space-y-4">
+          <div class="text-2xl font-semibold text-white">Preparing your workspace…</div>
+          <p class="text-sm text-indigo-200/80">
+            {{ appReadyMessage }}
+          </p>
+          <div class="h-2 w-56 mx-auto rounded-full bg-white/10 overflow-hidden">
+            <div class="h-full w-1/2 bg-gradient-to-r from-indigo-400 via-fuchsia-400 to-sky-400 animate-pulse" />
+          </div>
+          <button
+            v-if="workspaceStore.error && isAuthReady"
+            type="button"
+            class="px-4 py-2 rounded-lg border border-white/20 bg-white/5 text-sm text-indigo-100 hover:bg-white/10 transition"
+            @click="ensureWorkspaceHydrated"
+          >
+            Retry workspace load
+          </button>
+        </div>
+      </div>
+    </template>
+    <template v-else>
     <!-- Global upgrade banner -->
     <!-- Global Upgrade Banner -->
     <div v-if="showUpgrade" class="app-upgrade-banner fixed top-0 left-0 right-0 z-50 px-3 sm:px-6">
@@ -575,6 +598,7 @@
       <PlanSummaryModal :open="planOpen" @close="planOpen = false" />
       <ProfileSetup :open="profileSetupOpen" @close="profileSetupOpen=false" @saved="onProfileSaved" />
     </div>
+    </template>
   </div>
 </template>
 
@@ -589,6 +613,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useFeedbackStore } from '@/stores/feedbackStore'
 import { useQuickSetupStore } from '@/stores/quickSetupStore'
+import { useAppReady } from '@/composables/useAppReady'
 import { useAuthFlags } from '@/composables/useAuthFlags'
 import PlanSummaryModal from '@/components/PlanSummaryModal.vue'
 import ProfileSetup from '@/components/ProfileSetup.vue'
@@ -659,10 +684,16 @@ const quickSetupStore = useQuickSetupStore()
 const subStore = useSubscriptionStore()
 const feedbackStore = useFeedbackStore()
 const { isPremium, isGuest } = useAuthFlags()
+const { isReady, isAuthReady, isWorkspaceReady } = useAppReady()
 const authReady = computed(() => !authStore.loading)
 const activeWorkspace = computed(() => workspaceStore.activeWorkspace || {})
 const activeWorkspaceSettings = computed(() => activeWorkspace.value?.settings || {})
 let lastWorkspaceInitKickAt = 0
+const appReadyMessage = computed(() => {
+  if (!isAuthReady.value) return 'Restoring your secure session…'
+  if (!isWorkspaceReady.value) return 'Loading your workspace context and tasks…'
+  return 'Finishing setup…'
+})
 
 const isOnTalkPlanner = computed(() => route.path === '/talk-to-planner')
 let upgradeHandler = null
@@ -687,7 +718,9 @@ async function ensureWorkspaceHydrated() {
     workspaceStore.reset()
     return
   }
-  if (workspaceStore.activeWorkspaceId) return
+  if (!authStore.token && !isGuest.value) return
+  if (workspaceStore.loading) return
+  if (workspaceStore.hydrated && workspaceStore.activeWorkspaceId) return
   const now = Date.now()
   if (now - lastWorkspaceInitKickAt < 1500) return
   lastWorkspaceInitKickAt = now
@@ -701,10 +734,11 @@ async function ensureWorkspaceHydrated() {
 // Prompt for profile setup if incomplete + hydrate workspace store
 watch(
   () => [authStore.user?.uid, authStore.token],
-  ([uid]) => {
-    maybePromptProfile()
-    if (uid) {
+  ([uid, token]) => {
+    if (uid && token) {
+      maybePromptProfile()
       ensureWorkspaceHydrated()
+      subStore.fetchStatus(uid, { force: true, minIntervalMs: 0 }).catch(() => {})
     } else {
       workspaceStore.reset()
     }
@@ -917,7 +951,9 @@ function openFeedback() {
 }
 
 onMounted(() => {
-  if (authStore.user?.uid) subStore.fetchStatus(authStore.user.uid, { force: true, minIntervalMs: 0 })
+  if (authStore.user?.uid && authStore.token) {
+    subStore.fetchStatus(authStore.user.uid, { force: true, minIntervalMs: 0 })
+  }
   feedbackStore.init()
   // Upgrade banner events
   try {
@@ -927,15 +963,6 @@ onMounted(() => {
     window.addEventListener('upgrade-required', upgradeHandler)
   } catch {}
 })
-
-watch(
-  () => authStore.user?.uid,
-  (uid, prev) => {
-    if (!uid || uid === prev) return
-    subStore.fetchStatus(uid, { force: true, minIntervalMs: 0 }).catch(() => {})
-  },
-  { immediate: true },
-)
 
 watch(
   () => authStore.token,

@@ -15,6 +15,7 @@ import {
 } from '@/services/firebaseService'
 import { resolveCategory } from '@/constants/taskCategories'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
+import { useAppReady } from '@/composables/useAppReady'
 
 // 🔗 Shared singleton state
 const tasks = ref([])
@@ -53,6 +54,7 @@ function normalizeWorkspaceId(value) {
 export function useTasks() {
   const authStore = useAuthStore()
   const workspaceStore = useWorkspaceStore()
+  const { isReady } = useAppReady()
 
   /**
    * 🔄 Helpers
@@ -534,8 +536,8 @@ export function useTasks() {
     }
   }
 
-  // 🔹 Only load once when app starts
-  if (!initialized) {
+  // 🔹 Only load once when app starts, after auth + workspace are truly ready
+  if (!initialized && isReady.value) {
     loadTasks().catch((err) =>
       console.warn('[useTasks] initial load failed', err?.message || err),
     )
@@ -570,6 +572,7 @@ export function useTasks() {
       watch(
         () => workspaceStore.activeWorkspaceId,
         async () => {
+          if (!isReady.value) return
           allTasks.value = []
           tasks.value = []
           activeFilter.value = makeDefaultFilter()
@@ -587,9 +590,10 @@ export function useTasks() {
   if (!authWatchAttached) {
     try {
       watch(
-        () => [authStore.user?.uid, authStore.token],
-        async ([uid]) => {
-          if (!uid) {
+        () => isReady.value,
+        async (ready) => {
+          if (!ready) {
+            if (authStore.user?.uid) return
             allTasks.value = []
             tasks.value = []
             initialized = false
