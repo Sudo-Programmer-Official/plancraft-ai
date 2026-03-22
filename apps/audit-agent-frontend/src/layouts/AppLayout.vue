@@ -1100,6 +1100,7 @@ onUnmounted(() => {
 }
 
 html {
+  height: 100%;
   height: -webkit-fill-available;
   background: #050816;
 }
@@ -1159,6 +1160,7 @@ body {
 
 .app-content {
   min-height: 0;
+  -webkit-overflow-scrolling: touch;
   padding-bottom: calc(1.5rem + var(--safe-area-bottom));
 }
 
@@ -1174,6 +1176,25 @@ body {
 
   .app-footer {
     display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .app-shell {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    min-height: -webkit-fill-available;
+    overflow: visible;
+  }
+
+  .app-main-pane {
+    height: auto;
+    overflow: visible;
+  }
+
+  .app-content {
+    overflow: visible;
   }
 }
 
