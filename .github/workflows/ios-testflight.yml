@@ -80,11 +80,11 @@ jobs:
         run: npm run build
         working-directory: apps/audit-agent-frontend
 
-      - name: Install Fastlane gems
-        run: bundle install
+      - name: Install Fastlane
+        run: gem install fastlane -N -v 2.232.2
 
       - name: Run Fastlane beta
-        run: bundle exec fastlane ios beta
+        run: fastlane ios beta
 
       - name: Upload IPA artifact
         if: success()

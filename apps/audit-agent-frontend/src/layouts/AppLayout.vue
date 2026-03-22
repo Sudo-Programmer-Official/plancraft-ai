@@ -23,7 +23,7 @@
             <div class="h-full w-1/2 bg-gradient-to-r from-indigo-400 via-fuchsia-400 to-sky-400 animate-pulse" />
           </div>
           <button
-            v-if="workspaceStore.error && isAuthReady"
+            v-if="showWorkspaceRetry"
             type="button"
             class="px-4 py-2 rounded-lg border border-white/20 bg-white/5 text-sm text-indigo-100 hover:bg-white/10 transition"
             @click="ensureWorkspaceHydrated"
@@ -689,11 +689,20 @@ const authReady = computed(() => !authStore.loading)
 const activeWorkspace = computed(() => workspaceStore.activeWorkspace || {})
 const activeWorkspaceSettings = computed(() => activeWorkspace.value?.settings || {})
 let lastWorkspaceInitKickAt = 0
+const workspaceRetryCount = ref(0)
+let workspaceRetryTimer = null
 const appReadyMessage = computed(() => {
   if (!isAuthReady.value) return 'Restoring your secure session…'
   if (!isWorkspaceReady.value) return 'Loading your workspace context and tasks…'
   return 'Finishing setup…'
 })
+const showWorkspaceRetry = computed(
+  () =>
+    !!isAuthReady.value &&
+    !isWorkspaceReady.value &&
+    !workspaceStore.loading &&
+    (!!workspaceStore.error || workspaceRetryCount.value >= 2),
+)
 
 const isOnTalkPlanner = computed(() => route.path === '/talk-to-planner')
 let upgradeHandler = null
@@ -715,20 +724,55 @@ function handleQuickSetupDone() {
 async function ensureWorkspaceHydrated() {
   const uid = authStore.user?.uid
   if (!uid) {
+    workspaceRetryCount.value = 0
     workspaceStore.reset()
     return
   }
   if (!authStore.token && !isGuest.value) return
   if (workspaceStore.loading) return
-  if (workspaceStore.hydrated && workspaceStore.activeWorkspaceId) return
+  if (workspaceStore.hydrated && workspaceStore.activeWorkspaceId) {
+    workspaceRetryCount.value = 0
+    return
+  }
   const now = Date.now()
   if (now - lastWorkspaceInitKickAt < 1500) return
   lastWorkspaceInitKickAt = now
   try {
     await workspaceStore.init()
+    if (workspaceStore.activeWorkspaceId) {
+      workspaceRetryCount.value = 0
+    }
   } catch {
     /* noop */
   }
+}
+
+function clearWorkspaceRetryTimer() {
+  if (!workspaceRetryTimer) return
+  try {
+    clearTimeout(workspaceRetryTimer)
+  } catch {}
+  workspaceRetryTimer = null
+}
+
+function scheduleWorkspaceHydrationRetry() {
+  clearWorkspaceRetryTimer()
+  if (!isAuthReady.value || isWorkspaceReady.value) {
+    workspaceRetryCount.value = 0
+    return
+  }
+  if (workspaceStore.loading) return
+  if (workspaceRetryCount.value >= 6) return
+
+  const delay = Math.min(1500 * (workspaceRetryCount.value + 1), 6000)
+  workspaceRetryTimer = setTimeout(async () => {
+    workspaceRetryTimer = null
+    workspaceRetryCount.value += 1
+    await ensureWorkspaceHydrated()
+    if (!isWorkspaceReady.value) {
+      scheduleWorkspaceHydrationRetry()
+    }
+  }, delay)
 }
 
 // Prompt for profile setup if incomplete + hydrate workspace store
@@ -739,9 +783,31 @@ watch(
       maybePromptProfile()
       ensureWorkspaceHydrated()
       subStore.fetchStatus(uid, { force: true, minIntervalMs: 0 }).catch(() => {})
+      scheduleWorkspaceHydrationRetry()
     } else {
+      clearWorkspaceRetryTimer()
+      workspaceRetryCount.value = 0
       workspaceStore.reset()
     }
+  },
+  { immediate: true },
+)
+
+watch(
+  () => [isAuthReady.value, isWorkspaceReady.value, workspaceStore.loading, workspaceStore.error],
+  ([authReadyNow, workspaceReadyNow, workspaceLoading]) => {
+    if (!authReadyNow) {
+      clearWorkspaceRetryTimer()
+      workspaceRetryCount.value = 0
+      return
+    }
+    if (workspaceReadyNow) {
+      clearWorkspaceRetryTimer()
+      workspaceRetryCount.value = 0
+      return
+    }
+    if (workspaceLoading) return
+    scheduleWorkspaceHydrationRetry()
   },
   { immediate: true },
 )
@@ -974,6 +1040,7 @@ watch(
 )
 
 onUnmounted(() => {
+  clearWorkspaceRetryTimer()
   if (upgradeHandler) {
     try {
       window.removeEventListener('upgrade-required', upgradeHandler)
