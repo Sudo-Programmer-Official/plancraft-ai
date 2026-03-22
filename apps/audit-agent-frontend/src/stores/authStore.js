@@ -1,4 +1,5 @@
 // src/stores/authStore.js
+import { h } from 'vue'
 import { defineStore } from 'pinia'
 import {
   signInAsGuest,
@@ -178,6 +179,70 @@ function mapIdentityToolkitError(rawMessage) {
         message: code || 'Native sign-in failed.',
       }
   }
+}
+
+function getNotificationPrimaryLabel(user = {}) {
+  return (
+    String(user?.displayName || user?.name || '').trim() ||
+    String(user?.email || user?.phone || '').trim() ||
+    'PlanCraftAI member'
+  )
+}
+
+function getNotificationSecondaryLabel(user = {}) {
+  return (
+    String(user?.email || '').trim() ||
+    String(user?.phone || '').trim() ||
+    'Workspace synced and ready to go.'
+  )
+}
+
+function getNotificationInitials(user = {}) {
+  const source = getNotificationPrimaryLabel(user)
+  const parts = source
+    .replace(/@.*/, '')
+    .split(/[\s._-]+/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .slice(0, 2)
+
+  const initials = parts.map((part) => part[0]?.toUpperCase?.() || '').join('')
+  return initials || 'P'
+}
+
+function buildSignedInNotificationMessage(user = {}) {
+  const photoUrl = String(user?.photoURL || user?.avatarUrl || '').trim()
+  const avatarNode = photoUrl
+    ? h('img', {
+        src: photoUrl,
+        alt: getNotificationPrimaryLabel(user),
+        class: 'pcai-auth-toast__avatar-image',
+      })
+    : h(
+        'div',
+        { class: 'pcai-auth-toast__avatar-fallback', 'aria-hidden': 'true' },
+        getNotificationInitials(user),
+      )
+
+  return h('div', { class: 'pcai-auth-toast' }, [
+    h('div', { class: 'pcai-auth-toast__avatar' }, [avatarNode]),
+    h('div', { class: 'pcai-auth-toast__body' }, [
+      h('p', { class: 'pcai-auth-toast__eyebrow' }, 'Welcome back'),
+      h('p', { class: 'pcai-auth-toast__title' }, getNotificationPrimaryLabel(user)),
+      h('p', { class: 'pcai-auth-toast__subtitle' }, getNotificationSecondaryLabel(user)),
+    ]),
+  ])
+}
+
+function notifySignedIn(user = {}, options = {}) {
+  ElNotification({
+    title: String(options?.title || 'Signed in'),
+    message: buildSignedInNotificationMessage(user),
+    customClass: 'pcai-auth-notification',
+    duration: Number.isFinite(options?.duration) ? options.duration : 1500,
+    offset: Number.isFinite(options?.offset) ? options.offset : 28,
+    showClose: options?.showClose === true,
+  })
 }
 
 function buildNativeIosSnapshotFromIdentityToolkitSession(data, fallback = {}) {
@@ -740,6 +805,8 @@ export const useAuthStore = defineStore('authStore', {
     user: null,
     token: null,
     loading: true,
+    bootstrapping: true,
+    logoutPending: false,
     guest: false,
     usage: { used: 0, limit: 0, plan: '' },
     _refreshTimer: null,
@@ -750,6 +817,8 @@ export const useAuthStore = defineStore('authStore', {
     resetAuth() {
       this.user = null
       this.token = null
+      this.bootstrapping = false
+      this.logoutPending = false
       this.guest = false
       this.loading = false
       try {
@@ -881,6 +950,8 @@ export const useAuthStore = defineStore('authStore', {
     },
 
     async init() {
+      this.bootstrapping = true
+      this.loading = true
       const bootstrapTimeoutMs = isNativePackagedApp() ? 4000 : 7000
       const allowCachedSessionFallback = !isIosCapacitorApp()
       const allowNativeIosSnapshotRestore = isIosCapacitorApp()
@@ -890,6 +961,7 @@ export const useAuthStore = defineStore('authStore', {
       const settleBootstrap = (reason) => {
         if (bootstrapSettled) return
         bootstrapSettled = true
+        this.bootstrapping = false
         this.loading = false
         try {
           if (bootstrapTimer) {
@@ -1373,13 +1445,7 @@ export const useAuthStore = defineStore('authStore', {
         this.token = await user.getIdToken()
         localStorage.setItem('user', JSON.stringify(this.user))
         localStorage.setItem('token', this.token)
-        ElNotification({
-          title: 'Welcome back ✨',
-          message: `Signed in as ${this.user.displayName || this.user.email || 'User'}`,
-          type: 'success',
-          duration: 2500,
-          offset: 80,
-        })
+        notifySignedIn(this.user)
       } finally {
         this.loading = false
       }
@@ -1389,6 +1455,17 @@ export const useAuthStore = defineStore('authStore', {
     async loginWithApple() {
       this.loading = true
       try {
+        const { useFeatureFlagsStore } = await import('@/stores/featureFlagsStore')
+        const flagsStore = useFeatureFlagsStore()
+        try {
+          await flagsStore.ensureLoaded()
+        } catch {}
+        if (!flagsStore.isEnabled('APPLE_AUTH')) {
+          const error = new Error('Apple sign-in is temporarily disabled. Use OTP or email/password.')
+          error.code = 'feature-disabled/apple-auth'
+          throw error
+        }
+
         const provider = new OAuthProvider('apple.com')
         provider.addScope('email')
         provider.addScope('name')
@@ -1537,13 +1614,17 @@ export const useAuthStore = defineStore('authStore', {
           }
         } catch {}
         kickOffPostLoginHydration(this, { platform: 'apple', source: 'apple-sign-in' })
-        ElNotification({
-          title: current ? 'Apple linked' : 'Welcome back ✨',
-          message: current ? 'Apple has been added to your account.' : `Signed in as ${this.user.displayName || this.user.email || 'User'}`,
-          type: 'success',
-          duration: 2400,
-          offset: 80,
-        })
+        if (current) {
+          ElNotification({
+            title: 'Apple linked',
+            message: 'Apple has been added to your account.',
+            type: 'success',
+            duration: 2200,
+            offset: 80,
+          })
+        } else {
+          notifySignedIn(this.user)
+        }
         return user
       } finally {
         this.loading = false
@@ -1598,13 +1679,7 @@ export const useAuthStore = defineStore('authStore', {
               mod.refreshAppToken().catch(() => {})
             }
           } catch {}
-          ElNotification({
-            title: 'Welcome back ✨',
-            message: `Signed in as ${this.user.displayName || this.user.email || 'User'}`,
-            type: 'success',
-            duration: 2500,
-            offset: 80,
-          })
+          notifySignedIn(this.user)
 
           const params = new URLSearchParams(window.location.search)
           const nativeHandoff = readNativeAuthHandoffIntent()
@@ -1719,13 +1794,7 @@ export const useAuthStore = defineStore('authStore', {
           platform: handoff?.platform || Capacitor?.getPlatform?.() || 'web',
           source: 'native-handoff',
         })
-        ElNotification({
-          title: 'Welcome back ✨',
-          message: `Signed in as ${this.user.displayName || this.user.email || 'User'}`,
-          type: 'success',
-          duration: 2500,
-          offset: 80,
-        })
+        notifySignedIn(this.user)
         console.info('[Auth] Native auth success', {
           uid: user.uid,
           provider: handoff?.provider || 'unknown',
@@ -1882,13 +1951,7 @@ export const useAuthStore = defineStore('authStore', {
           platform: Capacitor?.getPlatform?.() || 'web',
           source: 'phone-otp',
         })
-        ElNotification({
-          title: 'Welcome ✨',
-          message: `Signed in with phone ${this.user.phone || ''}`,
-          type: 'success',
-          duration: 2400,
-          offset: 80,
-        })
+        notifySignedIn(this.user)
         return user
       } finally {
         this.loading = false
@@ -2027,13 +2090,7 @@ export const useAuthStore = defineStore('authStore', {
             platform,
             source: `native-${platform}-email`,
           })
-          ElNotification({
-            title: 'Signed in ✨',
-            message: `Welcome ${this.user.displayName || this.user.email || ''}`,
-            type: 'success',
-            duration: 2200,
-            offset: 80,
-          })
+          notifySignedIn(this.user)
           return user
         }
 
@@ -2214,13 +2271,7 @@ export const useAuthStore = defineStore('authStore', {
         platform: nativePlatform,
         source: 'email-password',
       })
-      ElNotification({
-        title: 'Signed in ✨',
-        message: `Welcome ${this.user.displayName || this.user.email || ''}`,
-        type: 'success',
-        duration: 2400,
-        offset: 80,
-      })
+      notifySignedIn(this.user)
       console.info('[Auth] Email login completed', {
         uid: this.user?.uid || null,
         email: this.user?.email || null,
@@ -2299,6 +2350,7 @@ export const useAuthStore = defineStore('authStore', {
     },
 
     async logout() {
+      this.logoutPending = true
       try {
         await withTimeout(signOutUser(), isIosCapacitorApp() ? 5000 : 8000, 'logout sign-out')
       } catch (e) {
@@ -2315,11 +2367,15 @@ export const useAuthStore = defineStore('authStore', {
           trackEvent('Logout')
         } catch {}
         this.resetAuth()
+        this.logoutPending = true
         setTimeout(() => {
           try {
             window.location.replace('/login')
           } catch {}
         }, 350)
+        setTimeout(() => {
+          this.logoutPending = false
+        }, 1200)
       }
     },
   },

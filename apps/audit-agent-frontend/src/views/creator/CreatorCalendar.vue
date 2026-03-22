@@ -9,8 +9,13 @@
         <button class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm" @click="loadSlots">
           Refresh
         </button>
-        <button class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold" @click="newSlot">
-          New slot
+        <button
+          class="px-4 py-2 rounded-lg text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
+          :class="autoDeployEnabled ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-slate-800 border border-slate-700 text-slate-300'"
+          :disabled="!autoDeployEnabled"
+          @click="newSlot"
+        >
+          {{ autoDeployEnabled ? 'New slot' : 'Publishing Disabled' }}
         </button>
       </div>
     </div>
@@ -35,6 +40,7 @@
             item-key="id"
             group="creator-slots"
             handle=".drag"
+            :disabled="!autoDeployEnabled"
             class="space-y-2 min-h-[40px]"
             @change="(e) => onDrop(bucket.key, e)"
           >
@@ -49,10 +55,18 @@
                   <button class="drag text-slate-500 hover:text-slate-200 text-sm" title="Drag to reschedule">☰</button>
                 </div>
                 <div class="flex gap-2 pt-2">
-                  <button class="text-xs px-2 py-1 rounded bg-slate-800 border border-slate-700" @click="promptReschedule(element)">
+                  <button
+                    class="text-xs px-2 py-1 rounded bg-slate-800 border border-slate-700 disabled:opacity-50"
+                    :disabled="!autoDeployEnabled"
+                    @click="promptReschedule(element)"
+                  >
                     Reschedule
                   </button>
-                  <button class="text-xs px-2 py-1 rounded bg-slate-800 border border-slate-700" @click="edit(element)">
+                  <button
+                    class="text-xs px-2 py-1 rounded bg-slate-800 border border-slate-700 disabled:opacity-50"
+                    :disabled="!autoDeployEnabled"
+                    @click="edit(element)"
+                  >
                     Edit
                   </button>
                 </div>
@@ -77,12 +91,19 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { fetchCreatorSlots, updateCreatorSlot } from '@/services/creatorApi'
 import { toLocalDateKey } from '@/utils/dateHelper'
+import { useFeatureFlagsStore } from '@/stores/featureFlagsStore'
 
 const router = useRouter()
+const featureFlagsStore = useFeatureFlagsStore()
 const slots = ref([])
 const loading = ref(false)
+const autoDeployEnabled = computed(() => featureFlagsStore.isEnabled('AUTO_DEPLOY'))
 
 function newSlot() {
+  if (!autoDeployEnabled.value) {
+    ElMessage.info('Auto deployment is temporarily disabled while we stabilize the publishing flow.')
+    return
+  }
   router.push('/creator/publish/new')
 }
 
@@ -159,6 +180,11 @@ const buckets = computed(() => {
 const totalCount = computed(() => slots.value?.length || 0)
 
 async function onDrop(targetKey, evt) {
+  if (!autoDeployEnabled.value) {
+    ElMessage.info('Scheduling is temporarily disabled right now.')
+    await loadSlots()
+    return
+  }
   const moved = evt?.added?.element || evt?.moved?.element
   if (!moved) return
   try {
@@ -183,6 +209,10 @@ async function onDrop(targetKey, evt) {
 }
 
 async function promptReschedule(item) {
+  if (!autoDeployEnabled.value) {
+    ElMessage.info('Scheduling is temporarily disabled right now.')
+    return
+  }
   try {
     const next = window.prompt('Enter new date/time (YYYY-MM-DD HH:MM, 24h) or leave blank to cancel:', '')
     if (!next) return
@@ -200,8 +230,15 @@ async function promptReschedule(item) {
 }
 
 function edit(item) {
+  if (!autoDeployEnabled.value) {
+    ElMessage.info('Publishing is temporarily disabled right now.')
+    return
+  }
   router.push({ path: '/creator/publish/new', query: { slotId: item.id } })
 }
 
-onMounted(loadSlots)
+onMounted(() => {
+  featureFlagsStore.ensureLoaded().catch(() => {})
+  loadSlots()
+})
 </script>

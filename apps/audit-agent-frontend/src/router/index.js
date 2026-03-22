@@ -8,6 +8,7 @@ import DeleteAccount from '@/views/DeleteAccount.vue'
 import Terms from '@/views/TermsOfService.vue'
 import Contact from '@/views/ContactForm.vue'
 import { useAuthStore } from '@/stores/authStore'
+import { useFeatureFlagsStore } from '@/stores/featureFlagsStore'
 import CreatorLayout from '@/layouts/CreatorLayout.vue'
 import PublicLeaderLayout from '@/layouts/PublicLeaderLayout.vue'
 import NotFoundView from '@/views/NotFoundView.vue'
@@ -159,6 +160,9 @@ const router = createRouter({
         { path: 'talk-to-planner', name: 'talk-to-planner', component: () => import('@/views/TalkToPlanner.vue') },
         { path: 'today', name: 'today', component: () => import('@/views/TodayView.vue') },
         { path: 'planner', name: 'planner', component: () => import('@/views/PlannerView.vue') },
+        { path: 'playbooks', name: 'playbooks', component: () => import('@/views/PlaybooksListView.vue'), meta: { featureFlag: 'PLAYBOOKS' } },
+        { path: 'playbooks/new', name: 'playbook-create', component: () => import('@/views/PlaybookCreateView.vue'), meta: { featureFlag: 'PLAYBOOKS' } },
+        { path: 'playbooks/:id', name: 'playbook-detail', component: () => import('@/views/PlaybookDetailView.vue'), meta: { featureFlag: 'PLAYBOOKS' } },
         { path: 'tasks', name: 'tasks', component: () => import('@/views/AllTasksView.vue') },
         { path: 'quick-add', name: 'quick-add', component: () => import('@/views/NapkinView.vue') },
         { path: 'napkin', name: 'napkin', component: () => import('@/views/NapkinView.vue') },
@@ -186,7 +190,7 @@ const router = createRouter({
         { path: 'editor/:id', name: 'creator-editor', component: () => import('@/views/creator/CreatorEditor.vue') },
         { path: 'repurpose', name: 'creator-repurpose', component: () => import('@/views/creator/CreatorRepurpose.vue') },
         { path: 'preview/:id', name: 'creator-preview', component: () => import('@/views/creator/CreatorPreview.vue') },
-        { path: 'publish/:id', name: 'creator-publish', component: () => import('@/views/creator/CreatorPublish.vue') },
+        { path: 'publish/:id', name: 'creator-publish', component: () => import('@/views/creator/CreatorPublish.vue'), meta: { featureFlag: 'AUTO_DEPLOY' } },
       ],
     },
 
@@ -222,6 +226,7 @@ const router = createRouter({
 
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
+  const featureFlagsStore = useFeatureFlagsStore()
   try {
     console.info('[Router] navigating', {
       to: to.fullPath,
@@ -283,6 +288,19 @@ router.beforeEach(async (to, from, next) => {
   }
 
   // Skip auth guard for public routes
+  const requiredFeature = typeof to.meta?.featureFlag === 'string' ? to.meta.featureFlag : null
+  if (requiredFeature) {
+    try {
+      await featureFlagsStore.ensureLoaded()
+    } catch {}
+    if (!featureFlagsStore.isEnabled(requiredFeature)) {
+      if (requiredFeature === 'AUTO_DEPLOY') {
+        return next({ path: '/creator/calendar' })
+      }
+      return next({ path: '/dashboard' })
+    }
+  }
+
   if (!to.meta.requiresAuth || import.meta.env.SSR) return next()
 
   const user = await getCurrentUser(authStore)

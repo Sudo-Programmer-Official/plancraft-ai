@@ -9,29 +9,27 @@
     @done="handleQuickSetupDone"
     @updated="handleQuickSetupUpdated"
   />
+  <transition name="fade">
+    <div
+      v-if="showLogoutOverlay"
+      class="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/75 px-6 backdrop-blur-xl"
+    >
+      <div class="w-full max-w-sm rounded-3xl border border-white/10 bg-slate-950/85 p-8 text-center shadow-2xl">
+        <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-fuchsia-400/30 bg-gradient-to-br from-fuchsia-500/20 to-indigo-500/20">
+          <div class="h-8 w-8 rounded-full border-2 border-white/20 border-t-fuchsia-300 animate-spin"></div>
+        </div>
+        <h2 class="mt-5 text-2xl font-semibold text-white">Logging you out…</h2>
+        <p class="mt-2 text-sm text-indigo-100/75">
+          Clearing your session and taking you back to sign in.
+        </p>
+      </div>
+    </div>
+  </transition>
   <div
     class="app-shell flex min-h-screen w-full max-w-full overflow-x-hidden bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 text-white"
   >
     <template v-if="!isShellReady">
-      <div class="flex flex-1 items-center justify-center px-6">
-        <div class="max-w-md text-center space-y-4">
-          <div class="text-2xl font-semibold text-white">Preparing your workspace…</div>
-          <p class="text-sm text-indigo-200/80">
-            {{ appReadyMessage }}
-          </p>
-          <div class="h-2 w-56 mx-auto rounded-full bg-white/10 overflow-hidden">
-            <div class="h-full w-1/2 bg-gradient-to-r from-indigo-400 via-fuchsia-400 to-sky-400 animate-pulse" />
-          </div>
-          <button
-            v-if="showWorkspaceRetry"
-            type="button"
-            class="px-4 py-2 rounded-lg border border-white/20 bg-white/5 text-sm text-indigo-100 hover:bg-white/10 transition"
-            @click="ensureWorkspaceHydrated"
-          >
-            Retry workspace load
-          </button>
-        </div>
-      </div>
+      <div class="flex flex-1" aria-hidden="true"></div>
     </template>
     <template v-else>
     <!-- Global upgrade banner -->
@@ -559,7 +557,7 @@
           <!-- User Avatar -->
           <img
             v-if="authStore.isLoggedIn"
-            :src="authStore.user?.photoURL || 'https://i.pravatar.cc/40'"
+            :src="authStore.user?.photoURL || authStore.user?.avatarUrl || 'https://i.pravatar.cc/40'"
             class="rounded-full w-10 h-10 cursor-pointer"
             alt="avatar"
             @click="router.push('/settings')"
@@ -646,6 +644,7 @@ import { useFeedbackStore } from '@/stores/feedbackStore'
 import { useQuickSetupStore } from '@/stores/quickSetupStore'
 import { useAppReady } from '@/composables/useAppReady'
 import { useAuthFlags } from '@/composables/useAuthFlags'
+import { useFeatureFlagsStore } from '@/stores/featureFlagsStore'
 import PlanSummaryModal from '@/components/PlanSummaryModal.vue'
 import ProfileSetup from '@/components/ProfileSetup.vue'
 import { db } from '@/firebase/init'
@@ -711,30 +710,21 @@ const route = useRoute()
 const authStore = useAuthStore()
 const workspaceStore = useWorkspaceStore()
 const quickSetupStore = useQuickSetupStore()
+const featureFlagsStore = useFeatureFlagsStore()
 // Subscription state via store
 const subStore = useSubscriptionStore()
 const feedbackStore = useFeedbackStore()
 const { isPremium, isGuest } = useAuthFlags()
-const { isReady, isShellReady, isAuthReady, isWorkspaceHydrated, isWorkspaceReady, hasResolvedWorkspace } = useAppReady()
-const authReady = computed(() => !authStore.loading)
+const { isReady, isShellReady, isAuthReady, isWorkspaceHydrated, hasResolvedWorkspace } = useAppReady()
+const authReady = computed(() => !authStore.bootstrapping)
 const activeWorkspace = computed(() => workspaceStore.activeWorkspace || {})
 const activeWorkspaceSettings = computed(() => activeWorkspace.value?.settings || {})
+const playbooksEnabled = computed(() => featureFlagsStore.isEnabled('PLAYBOOKS'))
+const autoDeployEnabled = computed(() => featureFlagsStore.isEnabled('AUTO_DEPLOY'))
+const showLogoutOverlay = computed(() => authStore.logoutPending === true)
 let lastWorkspaceInitKickAt = 0
 const workspaceRetryCount = ref(0)
 let workspaceRetryTimer = null
-const appReadyMessage = computed(() => {
-  if (!isAuthReady.value) return 'Restoring your secure session…'
-  if (!isWorkspaceHydrated.value) return 'Loading your workspace context and tasks…'
-  if (!hasResolvedWorkspace.value) return 'Looking for a workspace for this account…'
-  return 'Finishing setup…'
-})
-const showWorkspaceRetry = computed(
-  () =>
-    !!isAuthReady.value &&
-    !hasResolvedWorkspace.value &&
-    !workspaceStore.loading &&
-    (!!workspaceStore.error || workspaceRetryCount.value >= 2),
-)
 const showWorkspaceRecovery = computed(
   () =>
     !!isShellReady.value &&
@@ -917,14 +907,18 @@ function isActive(path) {
   }
 }
 
-const coreNavItems = [
-  { label: 'Dashboard', iconType: 'grid-4-outline', to: '/dashboard' },
-  { label: 'Planner', icon: '🧭', to: '/planner' },
-  { label: 'Meetings', icon: '📅', to: '/meetings' },
-  { label: 'Quick Links', icon: '🔗', to: '/links' },
-  { label: 'Reminders', icon: '🔔', to: '/reminders' },
-  { label: 'Napkin', icon: '🧾', to: '/napkin' },
-]
+const coreNavItems = computed(() => {
+  const items = [
+    { label: 'Dashboard', iconType: 'grid-4-outline', to: '/dashboard' },
+    { label: 'Planner', icon: '🧭', to: '/planner' },
+    { label: 'Playbooks', icon: '📚', to: '/playbooks', enabled: playbooksEnabled.value },
+    { label: 'Meetings', icon: '📅', to: '/meetings' },
+    { label: 'Quick Links', icon: '🔗', to: '/links' },
+    { label: 'Reminders', icon: '🔔', to: '/reminders' },
+    { label: 'Napkin', icon: '🧾', to: '/napkin' },
+  ]
+  return items.filter((item) => item.enabled !== false)
+})
 
 const navGroups = [
   {
@@ -1009,11 +1003,19 @@ const navGroups = [
 const filteredNavGroups = computed(() => {
   const creatorOn = !!activeWorkspaceSettings.value.creatorModeEnabled
   const leaderOn = !!activeWorkspaceSettings.value.leaderModeEnabled
-  return navGroups.filter((group) => {
-    if (group.key === 'creator') return creatorOn
-    if (group.key === 'leader') return leaderOn
-    return true
-  })
+  return navGroups
+    .filter((group) => {
+      if (group.key === 'creator') return creatorOn
+      if (group.key === 'leader') return leaderOn
+      return true
+    })
+    .map((group) => {
+      if (group.key !== 'creator') return group
+      return {
+        ...group,
+        children: group.children.filter((child) => autoDeployEnabled.value || child.to !== '/creator/publish'),
+      }
+    })
 })
 
 const systemLinks = [
@@ -1024,7 +1026,6 @@ const openGroups = reactive({})
 
 async function handleLogout() {
   await authStore.logout()
-  router.push('/login')
 }
 
 function goToLogin() {
@@ -1056,6 +1057,7 @@ function openFeedback() {
 }
 
 onMounted(() => {
+  featureFlagsStore.ensureLoaded().catch(() => {})
   if (authStore.user?.uid && authStore.token) {
     subStore.fetchStatus(authStore.user.uid, { force: true, minIntervalMs: 0 })
   }
@@ -1180,6 +1182,14 @@ body {
 .slide-enter-from,
 .slide-leave-to {
   transform: translateX(-100%);
+}
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.18s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 /* Subtle pulse for guest sign-in CTA */
 @keyframes pulseSlow {

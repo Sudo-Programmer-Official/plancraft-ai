@@ -22,7 +22,7 @@ export function useAppReady() {
   })
 
   const isAuthReady = computed(() => {
-    if (authStore.loading) return false
+    if (authStore.bootstrapping) return false
     if (isGuestSession.value) return true
     return !!authStore.user?.uid && !!authStore.token
   })

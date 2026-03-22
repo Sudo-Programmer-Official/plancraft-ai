@@ -118,6 +118,8 @@ import locationRoutes from "./routes/locationRoutes.js";
 import workspaceRoutes from "./routes/workspaceRoutes.js";
 import visionRoutes from "./routes/visionRoutes.js";
 import versionRoutes from "./routes/versionRoutes.js";
+import featureFlagRoutes from "./routes/featureFlagRoutes.js";
+import playbookRoutes from "./routes/playbookRoutes.js";
 
 dotenv.config();
 
@@ -308,6 +310,8 @@ app.use("/api", billingRoutes);
 app.use("/api", journalRoutes);
 app.use("/api", locationRoutes);
 app.use("/api", workspaceRoutes);
+app.use("/api", featureFlagRoutes);
+app.use("/api", playbookRoutes);
 app.use("/api", visionRoutes);
 app.use("/api", versionRoutes);
 app.use("/", seoRoutes);

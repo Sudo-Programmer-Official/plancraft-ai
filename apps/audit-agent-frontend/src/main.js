@@ -10,6 +10,7 @@ import router from './router'
 import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import { useAuthStore } from '@/stores/authStore'
+import { useFeatureFlagsStore } from '@/stores/featureFlagsStore'
 import VoiceRecorder from '@/components/VoiceRecorder.vue'
 import { createHead } from '@vueuse/head'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
@@ -149,6 +150,7 @@ app.use(pinia)
 
 // ✅ Auth store init
 const authStore = useAuthStore(pinia)
+const featureFlagsStore = useFeatureFlagsStore(pinia)
 
 // Global components
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
@@ -309,6 +311,12 @@ try {
 
 // Mount app
 async function bootstrapApp() {
+  try {
+    await featureFlagsStore.ensureLoaded()
+  } catch (err) {
+    console.warn('[FeatureFlags] Startup load failed; continuing with defaults', err?.message || err)
+  }
+
   console.info('[Startup] before auth init')
   try {
     await authStore.init()

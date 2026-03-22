@@ -5,9 +5,20 @@ import Capacitor
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
+    private let brandBackgroundColor = UIColor(
+        red: 29.0 / 255.0,
+        green: 22.0 / 255.0,
+        blue: 69.0 / 255.0,
+        alpha: 1
+    )
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        window?.backgroundColor = brandBackgroundColor
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.window?.backgroundColor = self.brandBackgroundColor
+            self.window?.rootViewController?.view.backgroundColor = self.brandBackgroundColor
+        }
         return true
     }
 

@@ -16,10 +16,12 @@
       </nav>
       <div class="p-3 border-t border-slate-800">
         <button
-          class="w-full text-sm px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 transition"
-          @click="$router.push('/creator/publish/new')"
+          class="w-full text-sm px-3 py-2 rounded-lg transition disabled:cursor-not-allowed disabled:opacity-60"
+          :class="autoDeployEnabled ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-slate-800 border border-slate-700 text-slate-300'"
+          :disabled="!autoDeployEnabled"
+          @click="openPublish"
         >
-          Publish
+          {{ autoDeployEnabled ? 'Publish' : 'Publish Disabled' }}
         </button>
       </div>
     </aside>
@@ -31,6 +33,25 @@
 </template>
 
 <script setup>
-import { RouterView, RouterLink } from 'vue-router'
+import { RouterView, RouterLink, useRouter } from 'vue-router'
+import { computed, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
 import CreatorNavButton from '@/components/creator/CreatorNavButton.vue'
+import { useFeatureFlagsStore } from '@/stores/featureFlagsStore'
+
+const featureFlagsStore = useFeatureFlagsStore()
+const router = useRouter()
+const autoDeployEnabled = computed(() => featureFlagsStore.isEnabled('AUTO_DEPLOY'))
+
+onMounted(() => {
+  featureFlagsStore.ensureLoaded().catch(() => {})
+})
+
+function openPublish() {
+  if (!autoDeployEnabled.value) {
+    ElMessage.info('Auto deployment is temporarily disabled while we stabilize the publishing flow.')
+    return
+  }
+  router.push('/creator/publish/new')
+}
 </script>

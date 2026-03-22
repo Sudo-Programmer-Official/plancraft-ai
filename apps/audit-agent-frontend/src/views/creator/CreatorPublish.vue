@@ -7,13 +7,22 @@
         <p class="text-slate-400 text-sm">Choose platforms, variants, and timing.</p>
       </div>
       <button
-        class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold disabled:opacity-60"
-        :disabled="submitting"
+        class="px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-60"
+        :class="autoDeployEnabled ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-slate-800 border border-slate-700 text-slate-300'"
+        :disabled="submitting || !autoDeployEnabled"
         @click="submit"
       >
-        {{ submitting ? 'Scheduling…' : 'Publish / Schedule' }}
+        {{ !autoDeployEnabled ? 'Publish Disabled' : submitting ? 'Scheduling…' : 'Publish / Schedule' }}
       </button>
     </header>
+
+    <section
+      v-if="!autoDeployEnabled"
+      class="rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100"
+    >
+      Auto deployment is temporarily disabled while we stabilize publishing on native devices.
+      Drafting stays available, but publishing and scheduling are blocked for now.
+    </section>
 
     <div class="grid lg:grid-cols-3 gap-4">
       <section class="lg:col-span-2 p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-3">
@@ -65,7 +74,7 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import MediaUploadCard from '@/components/creator/MediaUploadCard.vue'
@@ -74,9 +83,12 @@ import PlatformPreviewInstagram from '@/components/creator/PlatformPreviewInstag
 import PlatformPreviewLinkedIn from '@/components/creator/PlatformPreviewLinkedIn.vue'
 import PlatformPreviewTwitter from '@/components/creator/PlatformPreviewTwitter.vue'
 import { createCreatorSlot } from '@/services/creatorApi'
+import { useFeatureFlagsStore } from '@/stores/featureFlagsStore'
 
 const router = useRouter()
+const featureFlagsStore = useFeatureFlagsStore()
 const submitting = ref(false)
+const autoDeployEnabled = computed(() => featureFlagsStore.isEnabled('AUTO_DEPLOY'))
 const form = reactive({
   platform: 'instagram',
   variantKey: 'ig_feed',
@@ -90,6 +102,10 @@ function setFiles(list) {
 }
 
 async function submit() {
+  if (!autoDeployEnabled.value) {
+    ElMessage.info('Auto deployment is temporarily disabled while we stabilize the publishing flow.')
+    return
+  }
   submitting.value = true
   try {
     await createCreatorSlot({
@@ -108,4 +124,8 @@ async function submit() {
     submitting.value = false
   }
 }
+
+onMounted(() => {
+  featureFlagsStore.ensureLoaded().catch(() => {})
+})
 </script>

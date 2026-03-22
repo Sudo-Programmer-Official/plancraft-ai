@@ -33,7 +33,7 @@
                 Continue with Google
               </button>
               <button
-                v-if="isIosApp"
+                v-if="isIosApp && appleAuthEnabled"
                 @click="loginApple"
                 :disabled="authStore.loading"
                 class="w-full flex items-center justify-center gap-3 bg-white text-gray-900 px-6 py-4 rounded-xl font-semibold shadow-lg hover:-translate-y-0.5 hover:shadow-2xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 disabled:opacity-70"
@@ -59,11 +59,26 @@
               </button>
             </div>
 
-            <div v-if="showEmail" class="auth-panel">
+            <div v-if="showEmail" :class="['auth-panel', { 'auth-panel--shake': emailErrorShake } ]">
               <h2 class="text-lg font-semibold text-white mb-3">Email access</h2>
               <div class="space-y-3">
-                <input v-model="email" type="email" placeholder="Email" class="auth-input" />
-                <input v-model="password" type="password" placeholder="Password" class="auth-input" />
+                <input
+                  v-model="email"
+                  type="email"
+                  placeholder="Email"
+                  autocomplete="email"
+                  :class="['auth-input', { 'auth-input--error': emailErrorActive }]"
+                />
+                <input
+                  ref="passwordFieldRef"
+                  v-model="password"
+                  type="password"
+                  placeholder="Password"
+                  autocomplete="current-password"
+                  :class="['auth-input', { 'auth-input--error': passwordErrorActive }]"
+                  @keydown.enter.prevent="onLoginEmail"
+                />
+                <p v-if="loginErrorMessage" class="auth-error" role="alert">{{ loginErrorMessage }}</p>
                 <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 text-sm">
                   <button @click="onLoginEmail" :disabled="authStore.loading" class="auth-action primary">
                     Sign In
@@ -159,7 +174,9 @@
             Loved by students, founders, and busy professionals — trusted by 300+ planners.
           </p>
 
-          <p v-if="authStore.loading" class="text-sm text-gray-300 mt-6 text-center">✨ Preparing your space...</p>
+          <p v-if="authStore.loading && !authStore.bootstrapping" class="text-sm text-gray-300 mt-6 text-center">
+            ✨ Preparing your workspace...
+          </p>
           <GoogleAuthDiagnostic v-if="!isNativeApp" class="mt-6" />
         </div>
       </div>
@@ -171,6 +188,7 @@
 import { ref, onMounted, computed, nextTick, watch } from "vue"
 import { useRouter, useRoute } from "vue-router"
 import { useAuthStore } from "@/stores/authStore"
+import { useFeatureFlagsStore } from '@/stores/featureFlagsStore'
 import LoginFeatureSlider from '@/components/LoginFeatureSlider.vue'
 import { useSeoMeta } from '@/composables/useSeoMeta'
 import { Capacitor } from '@capacitor/core'
@@ -178,6 +196,7 @@ import { Capacitor } from '@capacitor/core'
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const featureFlagsStore = useFeatureFlagsStore()
 const starsCanvas = ref(null)
 const isIosApp = computed(() => {
   try {
@@ -223,6 +242,7 @@ import {
 import { normalizeRedirectPath } from '@/services/mobileAuthHandoffService'
 
 const isNativeApp = computed(() => isNativePackagedApp())
+const appleAuthEnabled = computed(() => featureFlagsStore.isEnabled('APPLE_AUTH'))
 const phoneAuthTestingEnabled =
   import.meta.env.DEV || import.meta.env.VITE_FIREBASE_PHONE_AUTH_TESTING === '1'
 
@@ -290,6 +310,11 @@ async function loginApple() {
     if (authStore.user) await redirectAfterLogin()
   } catch (err) {
     console.warn('Apple login failed', err)
+    if (err?.code === 'feature-disabled/apple-auth') {
+      try { ElMessage.info(err?.message || 'Apple sign-in is temporarily disabled. Use OTP or email/password.') } catch {}
+      showEmail.value = true
+      return
+    }
     if (err?.code === 'auth/native-apple-unsupported') {
       try { ElMessage.info(getNativeAuthRestriction('apple')) } catch {}
       showEmail.value = true
@@ -314,8 +339,50 @@ const showEmail = ref(false)
 const email = ref('')
 const password = ref('')
 const magicSent = ref(false)
+const passwordFieldRef = ref(null)
+const loginErrorMessage = ref('')
+const emailErrorActive = ref(false)
+const passwordErrorActive = ref(false)
+const emailErrorShake = ref(false)
+
+function clearEmailAuthErrorState() {
+  loginErrorMessage.value = ''
+  emailErrorActive.value = false
+  passwordErrorActive.value = false
+}
+
+function triggerEmailErrorFeedback(message, { highlightEmail = false, highlightPassword = true } = {}) {
+  loginErrorMessage.value = message
+  emailErrorActive.value = highlightEmail
+  passwordErrorActive.value = highlightPassword
+  emailErrorShake.value = false
+
+  window.setTimeout(() => {
+    emailErrorShake.value = true
+  }, 0)
+
+  window.setTimeout(() => {
+    emailErrorShake.value = false
+  }, 420)
+
+  nextTick(() => {
+    const field = highlightPassword ? passwordFieldRef.value : null
+    if (!field?.focus) return
+    try {
+      field.focus({ preventScroll: true })
+    } catch {
+      field.focus()
+    }
+  })
+}
+
+watch([email, password], () => {
+  if (!loginErrorMessage.value && !emailErrorActive.value && !passwordErrorActive.value) return
+  clearEmailAuthErrorState()
+})
 
 async function onLoginEmail() {
+  clearEmailAuthErrorState()
   try {
     try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_SIGNIN_CLICK) } catch {}
     await authStore.loginWithEmail(email.value, password.value)
@@ -327,18 +394,19 @@ async function onLoginEmail() {
       message: e?.message || String(e),
     }))
     if (code.includes('auth/invalid-credential') || code.includes('auth/wrong-password') || code.includes('auth/user-not-found')) {
-      alert('Login failed. Check your email and password.')
+      triggerEmailErrorFeedback('Incorrect email or password.')
       return
     }
     if (code.includes('timed out')) {
-      alert(`Login timed out: ${code}`)
+      ElMessage.error('Login timed out. Please try again.')
       return
     }
-    alert(`Login failed: ${code || 'unknown error'}`)
+    ElMessage.error(`Login failed: ${code || 'unknown error'}`)
   }
 }
 
 async function onRegister() {
+  clearEmailAuthErrorState()
   try {
     try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_SIGNIN_CLICK) } catch {}
     await authStore.registerEmail(email.value, password.value)
@@ -470,6 +538,7 @@ function togglePhone() {
 }
 
 function toggleEmail() {
+  clearEmailAuthErrorState()
   showEmail.value = !showEmail.value
 }
 
@@ -810,6 +879,29 @@ onMounted(async () => {
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
 }
 
+.auth-panel--shake {
+  animation: auth-shake 0.34s ease;
+}
+
+@keyframes auth-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-7px);
+  }
+  40% {
+    transform: translateX(6px);
+  }
+  60% {
+    transform: translateX(-4px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
+}
+
 .auth-input {
   width: 100%;
   padding: 0.75rem 1rem;
@@ -819,8 +911,20 @@ onMounted(async () => {
   color: #fff;
 }
 
+.auth-input--error {
+  border-color: rgba(248, 113, 113, 0.82);
+  box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.22);
+}
+
 .auth-input::placeholder {
   color: rgba(226, 232, 240, 0.65);
+}
+
+.auth-error {
+  margin: -0.2rem 0 0;
+  color: rgb(252, 165, 165);
+  font-size: 0.88rem;
+  line-height: 1.4;
 }
 
 .auth-action {
