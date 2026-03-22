@@ -7,6 +7,8 @@ import { normalizePhone } from '../utils/phone.js'
 const router = express.Router()
 const APPLE_AUTH_SERVICE_MODULE = '../services/appleAuthService.js'
 const MOBILE_HANDOFF_SERVICE_MODULE = '../services/mobileAuthHandoffService.js'
+const MOBILE_HANDOFF_CALLBACK_PATH = '/app-auth/complete'
+const ANDROID_APP_PACKAGE = 'com.sudoprogrammer.plancraftai'
 
 let appleAuthServicePromise = null
 let mobileAuthHandoffServicePromise = null
@@ -202,6 +204,21 @@ function redirectToNativeAuthFailure(res, errorCode = 'apple_auth_failed') {
   return res.redirect(302, `plancraftai://localhost/login?${params.toString()}`)
 }
 
+function buildMobileHandoffRedirectUrl({ code, redirect, platform = 'ios', provider = 'phone' } = {}) {
+  const normalizedPlatform = String(platform || 'ios').trim().toLowerCase()
+  const params = new URLSearchParams()
+  if (code) params.set('code', String(code))
+  params.set('redirect', normalizeMobileAuthRedirectPath(redirect))
+  if (normalizedPlatform) params.set('platform', normalizedPlatform)
+  if (provider) params.set('provider', String(provider).trim().toLowerCase())
+
+  if (normalizedPlatform === 'android') {
+    return `intent://localhost${MOBILE_HANDOFF_CALLBACK_PATH}?${params.toString()}#Intent;scheme=plancraftai;package=${ANDROID_APP_PACKAGE};end`
+  }
+
+  return `plancraftai://localhost${MOBILE_HANDOFF_CALLBACK_PATH}?${params.toString()}`
+}
+
 router.post('/refresh', async (req, res) => {
   try {
     const secret = process.env.APP_JWT_SECRET
@@ -326,6 +343,37 @@ router.post('/mobile-handoff/consume', async (req, res) => {
     const status = Number(err?.status || 500)
     console.error('[auth/mobile-handoff/consume] error:', err?.message || err)
     return res.status(status).json({ ok: false, error: err?.message || 'Failed to consume mobile handoff' })
+  }
+})
+
+router.get('/mobile-handoff/redirect', async (req, res) => {
+  try {
+    const code = String(readBodyOrQuery(req, 'code') || '').trim()
+    if (!code) {
+      return res.status(400).send('Missing handoff code')
+    }
+
+    const redirect = normalizeMobileAuthRedirectPath(readBodyOrQuery(req, 'redirect'))
+    const platform = String(readBodyOrQuery(req, 'platform') || 'ios').trim().toLowerCase() || 'ios'
+    const provider = String(readBodyOrQuery(req, 'provider') || 'phone').trim().toLowerCase() || 'phone'
+    const targetUrl = buildMobileHandoffRedirectUrl({
+      code,
+      redirect,
+      platform,
+      provider,
+    })
+
+    console.info('[auth/mobile-handoff/redirect] redirecting', {
+      code,
+      platform,
+      provider,
+      redirect,
+    })
+
+    return res.redirect(302, targetUrl)
+  } catch (err) {
+    console.error('[auth/mobile-handoff/redirect] error:', err?.message || err)
+    return res.status(500).send('Failed to redirect mobile handoff')
   }
 })
 

@@ -64,6 +64,15 @@ export function buildNativeAuthCallbackUrl({ code, redirect, platform, provider 
   return `${origin}${NATIVE_AUTH_CALLBACK_PATH}?${params.toString()}`
 }
 
+export function buildNativeAuthServerRedirectUrl({ code, redirect, platform, provider } = {}) {
+  const url = new URL(buildApiUrl('/auth/mobile-handoff/redirect'))
+  if (code) url.searchParams.set('code', String(code))
+  url.searchParams.set('redirect', normalizeRedirectPath(redirect))
+  if (platform) url.searchParams.set('platform', String(platform))
+  if (provider) url.searchParams.set('provider', String(provider))
+  return url.toString()
+}
+
 export function buildNativeAuthFallbackSchemeUrl({ code, redirect, platform, provider } = {}) {
   const params = new URLSearchParams()
   if (code) params.set('code', code)
