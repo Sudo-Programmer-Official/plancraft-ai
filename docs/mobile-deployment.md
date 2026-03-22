@@ -273,6 +273,14 @@ npm ci
 npm run ios:testflight
 ```
 
+If you're using the macOS system Ruby (`2.6`), install Bundler `2.4.22` into your user gem path first:
+
+```bash
+export GEM_HOME="$HOME/.gem/ruby/2.6.0"
+export PATH="$GEM_HOME/bin:$PATH"
+gem install --user-install bundler -v 2.4.22
+```
+
 Required Fastlane/App Store Connect env vars:
 
 ```bash
