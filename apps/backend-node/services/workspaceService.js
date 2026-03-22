@@ -406,6 +406,53 @@ export async function listUserWorkspaces(userId) {
     }
   }
 
+  // Ownership fallback: some older workspaces exist in the top-level collection
+  // without the membership rows that the API now depends on.
+  if (!memberships.length) {
+    const ownedSnap = await db
+      .collection(WORKSPACE_COLLECTION)
+      .where("ownerId", "==", String(userId))
+      .limit(100)
+      .get();
+
+    if (!ownedSnap.empty) {
+      const batch = db.batch();
+      const now = new Date();
+      ownedSnap.forEach((doc) => {
+        const data = doc.data() || {};
+        const joinedAt = data.created_at || data.createdAt || now;
+        batch.set(
+          memberRef(doc.id, userId),
+          {
+            workspaceId: doc.id,
+            userId,
+            role: "owner",
+            invitedBy: userId,
+            status: "active",
+            joined_at: joinedAt,
+            updated_at: now,
+          },
+          { merge: true },
+        );
+        batch.set(
+          userMembershipRef(userId, doc.id),
+          {
+            workspaceId: doc.id,
+            userId,
+            role: "owner",
+            invitedBy: userId,
+            status: "active",
+            joined_at: joinedAt,
+            updated_at: now,
+          },
+          { merge: true },
+        );
+      });
+      await batch.commit();
+      return await listUserWorkspaces(userId);
+    }
+  }
+
   // Legacy migration: if no memberships yet, seed from user-scoped workspaces
   if (!memberships.length) {
     const legacySnap = await db
