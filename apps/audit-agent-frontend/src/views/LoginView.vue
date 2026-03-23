@@ -346,7 +346,7 @@ import {
 } from '@/utils/nativeAuthSupport'
 import {
   buildNativeAuthCallbackUrl,
-  buildNativeAuthServerRedirectUrl,
+  buildNativeAuthFallbackSchemeUrl,
   createMobileAuthHandoff,
   launchNativeAuthRoute,
   normalizeRedirectPath,
@@ -1047,43 +1047,70 @@ function resolvePostLoginRedirectTarget() {
   return '/dashboard'
 }
 
+function readNativeBrowserHandoffIntent() {
+  try {
+    const url = new URL(window.location.href)
+    const rawMode = String(url.searchParams.get('native_handoff') || route.query.native_handoff || '').trim().toLowerCase()
+    const provider = String(url.searchParams.get('native_provider') || route.query.native_provider || '').trim().toLowerCase()
+    if (!rawMode || !provider) return null
+
+    const [platform = '', method = ''] = rawMode.split('-', 2)
+    if (!platform) return null
+
+    const redirect = normalizeRedirectPath(
+      url.searchParams.get('native_redirect') ||
+      url.searchParams.get('redirect') ||
+      route.query.native_redirect ||
+      route.query.redirect ||
+      localStorage.getItem('postLoginRedirect') ||
+      '/dashboard',
+    )
+
+    return {
+      mode: rawMode,
+      platform,
+      method: method || null,
+      provider,
+      redirect,
+    }
+  } catch {
+    return null
+  }
+}
+
 async function maybeReturnToNativeAppAfterLogin(target) {
   if (isNativeApp.value) return false
 
-  const rawMode = String(route.query.native_handoff || '').trim().toLowerCase()
-  const provider = String(route.query.native_provider || '').trim().toLowerCase()
-  if (!rawMode || !provider) return false
-
-  const [platform = ''] = rawMode.split('-', 2)
-  if (!platform) return false
+  const nativeHandoff = readNativeBrowserHandoffIntent()
+  if (!nativeHandoff?.platform || !nativeHandoff?.provider) return false
 
   try {
     console.info('[Auth] Native browser handoff create:start', {
-      platform,
-      provider,
+      platform: nativeHandoff.platform,
+      provider: nativeHandoff.provider,
       redirect: target,
     })
     const handoff = await createMobileAuthHandoff({
       redirect: target,
-      platform,
-      provider,
+      platform: nativeHandoff.platform,
+      provider: nativeHandoff.provider,
     })
-    const returnUrl = platform === 'ios'
-      ? buildNativeAuthServerRedirectUrl({
+    const returnUrl = nativeHandoff.platform === 'ios'
+      ? buildNativeAuthFallbackSchemeUrl({
           code: handoff?.code,
           redirect: handoff?.redirect || target,
-          platform,
-          provider,
+          platform: nativeHandoff.platform,
+          provider: nativeHandoff.provider,
         })
       : buildNativeAuthCallbackUrl({
           code: handoff?.code,
           redirect: handoff?.redirect || target,
-          platform,
-          provider,
+          platform: nativeHandoff.platform,
+          provider: nativeHandoff.provider,
         })
     console.info('[Auth] Native browser handoff create:success', {
-      platform,
-      provider,
+      platform: nativeHandoff.platform,
+      provider: nativeHandoff.provider,
       redirect: handoff?.redirect || target,
       hasCode: !!handoff?.code,
       returnUrl,
@@ -1092,8 +1119,8 @@ async function maybeReturnToNativeAppAfterLogin(target) {
     return true
   } catch (error) {
     console.error('[Auth] Native browser handoff create:failed', {
-      platform,
-      provider,
+      platform: nativeHandoff.platform,
+      provider: nativeHandoff.provider,
       redirect: target,
       message: error?.message || String(error),
     })
