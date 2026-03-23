@@ -83,14 +83,44 @@
               <div v-if="showEmail" key="email" :class="['auth-panel', { 'auth-panel--shake': emailErrorShake }]">
                 <div class="auth-panel__header">
                   <div>
-                    <p class="auth-panel__eyebrow">Secure email access</p>
-                    <h2 class="text-lg font-semibold text-white">Email access</h2>
-                    <p class="auth-panel__hint">
-                      Use your email and password to restore your workspace, reminders, and account settings.
-                    </p>
+                    <p class="auth-panel__eyebrow">{{ emailPanelEyebrow }}</p>
+                    <h2 class="text-lg font-semibold text-white">{{ emailPanelTitle }}</h2>
+                    <p class="auth-panel__hint">{{ emailPanelHint }}</p>
                   </div>
                 </div>
+                <div class="auth-panel-switch" role="tablist" aria-label="Email account flow">
+                  <button
+                    type="button"
+                    class="auth-panel-switch__item"
+                    :class="{ 'auth-panel-switch__item--active': !isRegisterMode }"
+                    :disabled="authUiBusy"
+                    :aria-selected="!isRegisterMode"
+                    @click="setEmailAuthMode('signin')"
+                  >
+                    Sign in
+                  </button>
+                  <button
+                    type="button"
+                    class="auth-panel-switch__item"
+                    :class="{ 'auth-panel-switch__item--active': isRegisterMode }"
+                    :disabled="authUiBusy"
+                    :aria-selected="isRegisterMode"
+                    @click="setEmailAuthMode('register')"
+                  >
+                    Create account
+                  </button>
+                </div>
                 <div class="space-y-3">
+                  <input
+                    v-if="isRegisterMode"
+                    ref="displayNameFieldRef"
+                    v-model="registerDisplayName"
+                    type="text"
+                    placeholder="Your name"
+                    autocomplete="name"
+                    :class="['auth-input', { 'auth-input--error': nameErrorActive }]"
+                    @keydown.enter.prevent="onSubmitEmailAuth"
+                  />
                   <input
                     ref="emailFieldRef"
                     v-model="email"
@@ -98,29 +128,47 @@
                     placeholder="Email"
                     autocomplete="email"
                     :class="['auth-input', { 'auth-input--error': emailErrorActive }]"
+                    @keydown.enter.prevent="onSubmitEmailAuth"
                   />
                   <input
                     ref="passwordFieldRef"
                     v-model="password"
                     type="password"
-                    placeholder="Password"
-                    autocomplete="current-password"
+                    :placeholder="isRegisterMode ? 'Create password' : 'Password'"
+                    :autocomplete="isRegisterMode ? 'new-password' : 'current-password'"
                     :class="['auth-input', { 'auth-input--error': passwordErrorActive }]"
-                    @keydown.enter.prevent="onLoginEmail"
+                    @keydown.enter.prevent="onSubmitEmailAuth"
                   />
+                  <input
+                    v-if="isRegisterMode"
+                    ref="confirmPasswordFieldRef"
+                    v-model="confirmPassword"
+                    type="password"
+                    placeholder="Confirm password"
+                    autocomplete="new-password"
+                    :class="['auth-input', { 'auth-input--error': confirmPasswordErrorActive }]"
+                    @keydown.enter.prevent="onSubmitEmailAuth"
+                  />
+                  <p v-if="isRegisterMode" class="auth-help-text">
+                    Use at least 8 characters. We will sign you in and take you straight to your workspace.
+                  </p>
                   <p v-if="loginErrorMessage" class="auth-error" role="alert">{{ loginErrorMessage }}</p>
                   <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 text-sm">
-                    <button @click="onLoginEmail" :disabled="authUiBusy" class="auth-action primary">
-                      {{ signInButtonLabel }}
+                    <button @click="onSubmitEmailAuth" :disabled="authUiBusy" class="auth-action primary">
+                      {{ emailPrimaryActionLabel }}
                     </button>
-                    <button @click="onRegister" :disabled="authUiBusy" class="auth-action ghost">
-                      Create account
+                    <button @click="toggleEmailAuthMode" :disabled="authUiBusy" class="auth-action ghost">
+                      {{ emailSecondaryActionLabel }}
                     </button>
                   </div>
-                  <button @click="onReset" class="text-xs text-indigo-300 hover:text-indigo-200 transition text-left">
+                  <button
+                    v-if="!isRegisterMode"
+                    @click="onReset"
+                    class="text-xs text-indigo-300 hover:text-indigo-200 transition text-left"
+                  >
                     Forgot password?
                   </button>
-                  <div v-if="!isNativeApp" class="pt-3 border-t border-white/10">
+                  <div v-if="!isRegisterMode && !isNativeApp" class="pt-3 border-t border-white/10">
                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between text-sm gap-2">
                       <span class="text-indigo-100">Or get a magic link</span>
                       <button @click="onSendMagic" class="auth-action ghost px-4 py-2">
@@ -403,36 +451,93 @@ watch(
 const activeAuthMode = ref(null)
 const showEmail = computed(() => activeAuthMode.value === 'email')
 const showPhone = computed(() => activeAuthMode.value === 'phone')
+const emailAuthMode = ref('signin')
+const isRegisterMode = computed(() => emailAuthMode.value === 'register')
 const email = ref('')
 const password = ref('')
+const registerDisplayName = ref('')
+const confirmPassword = ref('')
 const magicSent = ref(false)
+const displayNameFieldRef = ref(null)
 const emailFieldRef = ref(null)
 const passwordFieldRef = ref(null)
+const confirmPasswordFieldRef = ref(null)
 const loginErrorMessage = ref('')
+const nameErrorActive = ref(false)
 const emailErrorActive = ref(false)
 const passwordErrorActive = ref(false)
+const confirmPasswordErrorActive = ref(false)
 const emailErrorShake = ref(false)
 const emailSubmitting = ref(false)
 const authUiBusy = computed(
   () => emailSubmitting.value || authStore.bootstrapping || authStore.authenticating || authStore.logoutPending,
 )
-const signInButtonLabel = computed(() => (emailSubmitting.value ? 'Signing you in...' : 'Sign In'))
+const emailPanelEyebrow = computed(() => (isRegisterMode.value ? 'Create your account' : 'Secure email access'))
+const emailPanelTitle = computed(() => (isRegisterMode.value ? 'Create account' : 'Email access'))
+const emailPanelHint = computed(() => (
+  isRegisterMode.value
+    ? 'Create your account with email and password, then continue straight into your workspace.'
+    : 'Use your email and password to restore your workspace, reminders, and account settings.'
+))
+const emailPrimaryActionLabel = computed(() => {
+  if (!emailSubmitting.value) return isRegisterMode.value ? 'Create account' : 'Sign In'
+  return isRegisterMode.value ? 'Creating your account...' : 'Signing you in...'
+})
+const emailSecondaryActionLabel = computed(() => (
+  isRegisterMode.value ? 'Already have an account?' : 'Need an account?'
+))
 
 function clearEmailAuthErrorState() {
   loginErrorMessage.value = ''
+  nameErrorActive.value = false
   emailErrorActive.value = false
   passwordErrorActive.value = false
+  confirmPasswordErrorActive.value = false
   emailErrorShake.value = false
 }
 
-function focusEmailField() {
-  const node = emailFieldRef.value
+function focusNode(node) {
   if (!node?.focus) return
   try {
     node.focus({ preventScroll: true })
   } catch {
     node.focus()
   }
+}
+
+function focusPrimaryEmailAuthField() {
+  if (isRegisterMode.value) {
+    focusNode(displayNameFieldRef.value)
+    return
+  }
+  focusNode(emailFieldRef.value)
+}
+
+function focusEmailField() {
+  focusNode(emailFieldRef.value)
+}
+
+function setEmailAuthMode(mode, { focus = true } = {}) {
+  const nextMode = mode === 'register' ? 'register' : 'signin'
+  if (emailAuthMode.value === nextMode) {
+    if (focus && showEmail.value) {
+      nextTick(() => focusPrimaryEmailAuthField())
+    }
+    return
+  }
+  emailAuthMode.value = nextMode
+  clearEmailAuthErrorState()
+  magicSent.value = false
+  if (!isRegisterMode.value) {
+    confirmPassword.value = ''
+  }
+  if (focus && showEmail.value) {
+    nextTick(() => focusPrimaryEmailAuthField())
+  }
+}
+
+function toggleEmailAuthMode() {
+  setEmailAuthMode(isRegisterMode.value ? 'signin' : 'register')
 }
 
 function setActiveAuthMode(mode, { focus = true } = {}) {
@@ -449,7 +554,7 @@ function setActiveAuthMode(mode, { focus = true } = {}) {
   activeAuthMode.value = nextMode
 
   if (nextMode === 'email' && focus) {
-    nextTick(() => focusEmailField())
+    nextTick(() => focusPrimaryEmailAuthField())
     return
   }
 
@@ -470,10 +575,20 @@ function setActiveAuthMode(mode, { focus = true } = {}) {
   }
 }
 
-function triggerEmailErrorFeedback(message, { highlightEmail = false, highlightPassword = true } = {}) {
+function triggerEmailErrorFeedback(
+  message,
+  {
+    highlightName = false,
+    highlightEmail = false,
+    highlightPassword = true,
+    highlightConfirmPassword = false,
+  } = {},
+) {
   loginErrorMessage.value = message
+  nameErrorActive.value = highlightName
   emailErrorActive.value = highlightEmail
   passwordErrorActive.value = highlightPassword
+  confirmPasswordErrorActive.value = highlightConfirmPassword
   emailErrorShake.value = false
 
   window.setTimeout(() => {
@@ -485,24 +600,100 @@ function triggerEmailErrorFeedback(message, { highlightEmail = false, highlightP
   }, 420)
 
   nextTick(() => {
-    const field = highlightPassword ? passwordFieldRef.value : null
-    if (!field?.focus) return
-    try {
-      field.focus({ preventScroll: true })
-    } catch {
-      field.focus()
+    if (highlightName) {
+      focusNode(displayNameFieldRef.value)
+      return
+    }
+    if (highlightEmail) {
+      focusNode(emailFieldRef.value)
+      return
+    }
+    if (highlightConfirmPassword) {
+      focusNode(confirmPasswordFieldRef.value)
+      return
+    }
+    if (highlightPassword) {
+      focusNode(passwordFieldRef.value)
     }
   })
 }
 
-watch([email, password], () => {
-  if (!loginErrorMessage.value && !emailErrorActive.value && !passwordErrorActive.value) return
+watch([registerDisplayName, email, password, confirmPassword, emailAuthMode], () => {
+  if (
+    !loginErrorMessage.value &&
+    !nameErrorActive.value &&
+    !emailErrorActive.value &&
+    !passwordErrorActive.value &&
+    !confirmPasswordErrorActive.value
+  ) return
   clearEmailAuthErrorState()
 })
+
+function validateEmailAuthForm(mode = emailAuthMode.value) {
+  const normalizedEmail = String(email.value || '').trim()
+  const normalizedName = String(registerDisplayName.value || '').trim().replace(/\s+/g, ' ')
+  email.value = normalizedEmail
+  registerDisplayName.value = normalizedName
+
+  if (!normalizedEmail) {
+    triggerEmailErrorFeedback('Enter your email address to continue.', {
+      highlightEmail: true,
+      highlightPassword: false,
+    })
+    return false
+  }
+
+  if (mode === 'register') {
+    if (!normalizedName) {
+      triggerEmailErrorFeedback('Add your name so we can personalize your workspace.', {
+        highlightName: true,
+        highlightPassword: false,
+      })
+      return false
+    }
+    if (!password.value) {
+      triggerEmailErrorFeedback('Create a password to finish setting up your account.', {
+        highlightPassword: true,
+      })
+      return false
+    }
+    if (String(password.value).length < 8) {
+      triggerEmailErrorFeedback('Use a stronger password with at least 8 characters.', {
+        highlightPassword: true,
+      })
+      return false
+    }
+    if (!confirmPassword.value) {
+      triggerEmailErrorFeedback('Confirm your password to continue.', {
+        highlightPassword: false,
+        highlightConfirmPassword: true,
+      })
+      return false
+    }
+    if (password.value !== confirmPassword.value) {
+      triggerEmailErrorFeedback('Passwords do not match yet.', {
+        highlightPassword: true,
+        highlightConfirmPassword: true,
+      })
+      return false
+    }
+    return true
+  }
+
+  if (!password.value) {
+    triggerEmailErrorFeedback('Enter your password to sign in.', {
+      highlightPassword: true,
+    })
+    return false
+  }
+
+  return true
+}
 
 async function onLoginEmail() {
   if (emailSubmitting.value) return
   clearEmailAuthErrorState()
+  if (!validateEmailAuthForm('signin')) return
   emailSubmitting.value = true
   try {
     try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_SIGNIN_CLICK) } catch {}
@@ -529,14 +720,55 @@ async function onLoginEmail() {
 }
 
 async function onRegister() {
+  if (emailSubmitting.value) return
   clearEmailAuthErrorState()
+  if (!validateEmailAuthForm('register')) return
+  emailSubmitting.value = true
   try {
     try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_SIGNIN_CLICK) } catch {}
-    await authStore.registerEmail(email.value, password.value)
+    await authStore.registerEmail(email.value, password.value, { displayName: registerDisplayName.value })
     if (authStore.user) await redirectAfterLogin()
   } catch (e) {
-    alert('Sign up failed. Try a different email.')
+    const code = String(e?.code || e?.message || '')
+    console.error('[Auth] LoginView email registration failed', JSON.stringify({
+      code: e?.code || null,
+      message: e?.message || String(e),
+    }))
+    if (code.includes('auth/email-already-in-use')) {
+      setEmailAuthMode('signin', { focus: false })
+      triggerEmailErrorFeedback('That email already has an account. Sign in instead.', {
+        highlightEmail: true,
+      })
+      return
+    }
+    if (code.includes('auth/invalid-email')) {
+      triggerEmailErrorFeedback('Enter a valid email address.', {
+        highlightEmail: true,
+        highlightPassword: false,
+      })
+      return
+    }
+    if (code.includes('auth/weak-password')) {
+      triggerEmailErrorFeedback('Use a stronger password with at least 8 characters.', {
+        highlightPassword: true,
+      })
+      return
+    }
+    if (code.includes('timed out')) {
+      ElMessage.error('Account creation timed out. Please try again.')
+      return
+    }
+    ElMessage.error('Could not create your account right now. Please try again.')
+  } finally {
+    emailSubmitting.value = false
   }
+}
+
+function onSubmitEmailAuth() {
+  if (isRegisterMode.value) {
+    return onRegister()
+  }
+  return onLoginEmail()
 }
 
 async function onReset() {
@@ -1237,6 +1469,38 @@ onMounted(async () => {
   line-height: 1.55;
 }
 
+.auth-panel-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem;
+  padding: 0.35rem;
+  margin-bottom: 1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.auth-panel-switch__item {
+  border: none;
+  border-radius: 0.85rem;
+  padding: 0.7rem 0.9rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: rgba(199, 210, 254, 0.78);
+  background: transparent;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.auth-panel-switch__item:hover:not(:disabled) {
+  color: #fff;
+}
+
+.auth-panel-switch__item--active {
+  color: #fff;
+  background: linear-gradient(120deg, rgba(168, 85, 247, 0.28), rgba(99, 102, 241, 0.24));
+  box-shadow: inset 0 0 0 1px rgba(192, 132, 252, 0.28);
+}
+
 .auth-panel--shake {
   animation: auth-shake 0.34s ease;
 }
@@ -1300,6 +1564,13 @@ onMounted(async () => {
   color: rgb(252, 165, 165);
   font-size: 0.88rem;
   line-height: 1.4;
+}
+
+.auth-help-text {
+  margin: -0.1rem 0 0;
+  color: rgba(196, 181, 253, 0.82);
+  font-size: 0.82rem;
+  line-height: 1.5;
 }
 
 .auth-action {
@@ -1524,6 +1795,10 @@ onMounted(async () => {
 
   .auth-inline-action {
     width: 100%;
+  }
+
+  .auth-panel-switch {
+    padding: 0.3rem;
   }
 }
 </style>

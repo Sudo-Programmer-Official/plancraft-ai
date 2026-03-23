@@ -6,7 +6,6 @@ import {
   signInWithGoogle, // still used for popup flow
   signOutUser,
   signInWithEmail,
-  registerWithEmail,
   sendResetEmail,
   fetchUserProfile,
 } from '@/services/authService'
@@ -24,9 +23,11 @@ import {
   getRedirectResult,
   signInWithPhoneNumber,
   signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signInWithCustomToken,
   EmailAuthProvider,
   PhoneAuthProvider,
+  updateProfile,
 } from 'firebase/auth'
 import { auth, db } from '@/firebase/init'
 import { identifyUser, trackEvent, trackSignupCompleted } from '@/services/analytics'
@@ -156,12 +157,22 @@ function parseJwtPayload(token) {
 function mapIdentityToolkitError(rawMessage) {
   const code = String(rawMessage || '').trim()
   switch (code) {
+    case 'EMAIL_EXISTS':
+      return {
+        code: 'auth/email-already-in-use',
+        message: 'That email is already in use.',
+      }
     case 'EMAIL_NOT_FOUND':
     case 'INVALID_LOGIN_CREDENTIALS':
     case 'INVALID_PASSWORD':
       return {
         code: 'auth/invalid-credential',
         message: 'Invalid email or password.',
+      }
+    case 'INVALID_EMAIL':
+      return {
+        code: 'auth/invalid-email',
+        message: 'Enter a valid email address.',
       }
     case 'USER_DISABLED':
       return {
@@ -173,7 +184,18 @@ function mapIdentityToolkitError(rawMessage) {
         code: 'auth/too-many-requests',
         message: 'Too many login attempts. Please try again later.',
       }
+    case 'OPERATION_NOT_ALLOWED':
+      return {
+        code: 'auth/operation-not-allowed',
+        message: 'Email/password sign-in is not enabled for this project.',
+      }
     default:
+      if (code.startsWith('WEAK_PASSWORD')) {
+        return {
+          code: 'auth/weak-password',
+          message: 'Use a stronger password with at least 8 characters.',
+        }
+      }
       return {
         code: code ? `auth/${code.toLowerCase().replace(/_/g, '-')}` : null,
         message: code || 'Native sign-in failed.',
@@ -401,6 +423,36 @@ async function nativeIosPasswordSignIn(email, password, platform = 'ios') {
   }
 
   return data
+}
+
+async function nativeDirectEmailRegister(email, password, platform = 'ios') {
+  const apiKey = getFirebaseApiKey()
+  const response = await withTimeout(
+    CapacitorHttp.post({
+      url: `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${encodeURIComponent(apiKey)}`,
+      headers: { 'Content-Type': 'application/json' },
+      data: {
+        email,
+        password,
+        returnSecureToken: true,
+      },
+      connectTimeout: 12000,
+      readTimeout: 12000,
+    }),
+    12000,
+    `native ${platform} account creation`,
+  )
+
+  const data = response?.data || {}
+  const errorMessage = data?.error?.message
+  if (errorMessage || !data?.idToken) {
+    const mapped = mapIdentityToolkitError(errorMessage)
+    const err = new Error(mapped.message)
+    err.code = mapped.code
+    throw err
+  }
+
+  return normalizeIdentityToolkitSession(data, email)
 }
 
 async function exchangeNativeSessionForCustomToken(idToken, provider = 'password', platform = 'ios') {
@@ -2328,39 +2380,265 @@ export const useAuthStore = defineStore('authStore', {
     }
   },
 
-    async registerEmail(email, password) {
+    async registerEmail(email, password, profile = {}) {
+      const profileInput =
+        typeof profile === 'string'
+          ? { displayName: profile }
+          : profile && typeof profile === 'object'
+            ? profile
+            : {}
+      const normalizedEmail = String(email || '').trim()
+      const preferredDisplayName = String(profileInput.displayName || '').trim()
+
       this.setAuthenticating(true)
       this.loading = true
-      try {
-        const user = await registerWithEmail(email, password)
-        const profile = await fetchUserProfile(user.uid)
+
+      const current = auth.currentUser
+      const alreadyLinked = (current?.providerData || []).some((p) => p?.providerId === 'password')
+      const nativePlatform = Capacitor?.getPlatform?.() || 'web'
+      const useNativeDirectRegister = isNativePackagedApp() && isIosCapacitorApp() && !current
+
+      const finalizeRegisteredUser = async (user, options = {}) => {
+        const source = String(options?.source || 'email-register')
+        const platform = String(options?.platform || nativePlatform)
+        const createdAt = Number.isFinite(options?.createdAt) ? options.createdAt : null
+        const notificationTitle = String(options?.notificationTitle || 'Account created')
+        const shouldTrackSignup = options?.trackSignup !== false
+
+        if (!user?.uid) {
+          throw new Error('Email registration did not return a Firebase user')
+        }
+
+        if (preferredDisplayName) {
+          try {
+            await withTimeout(
+              updateProfile(user, { displayName: preferredDisplayName }),
+              8000,
+              `${source} update profile`,
+            )
+            try { await user.reload?.() } catch {}
+            if (auth.currentUser?.uid === user.uid) {
+              user = auth.currentUser || user
+            }
+          } catch (error) {
+            console.warn('[Auth] Email registration profile update failed', {
+              source,
+              platform,
+              uid: user.uid,
+              message: error?.message || String(error),
+            })
+          }
+        }
+
+        const resolvedDisplayName = String(user?.displayName || preferredDisplayName || '').trim()
+        const resolvedEmail = String(user?.email || normalizedEmail || '').trim()
+
         this.user = {
           uid: user.uid,
-          displayName: user.displayName,
-          email: user.email,
+          displayName: resolvedDisplayName || null,
+          email: resolvedEmail || null,
           photoURL: user.photoURL,
-          role: profile?.role || 'user',
+          role: this.user?.role || 'user',
+          plan: this.user?.plan || '',
+          phone: this.user?.phone || user?.phoneNumber || undefined,
         }
         this.guest = false
-        this.token = await user.getIdToken()
+        this.token = await withFallback(user.getIdToken(), {
+          ms: 8000,
+          label: `${source} token`,
+          fallback: () => String(options?.tokenFallback || readStoredToken() || ''),
+        })
         localStorage.setItem('user', JSON.stringify(this.user))
-        localStorage.setItem('token', this.token)
+        if (this.token) localStorage.setItem('token', this.token)
+
+        if (platform === 'ios') {
+          persistNativeIosAuthSnapshot(
+            buildNativeIosSnapshotFromFirebaseUser(user, this.token),
+            {
+              email: resolvedEmail,
+              displayName: resolvedDisplayName,
+              photoUrl: user?.photoURL || '',
+              phoneNumber: user?.phoneNumber || '',
+            },
+          )
+        }
+
+        try {
+          setDoc(
+            doc(db, 'users', user.uid),
+            {
+              email: resolvedEmail || null,
+              name: resolvedDisplayName,
+              mode: 'email',
+              lastLoginAt: Date.now(),
+              ...(createdAt ? { createdAt } : {}),
+              ...(resolvedDisplayName ? { profileComplete: true } : {}),
+              authProviders: {
+                password: {
+                  providerLinked: true,
+                  ...(createdAt ? { linkedAt: new Date() } : {}),
+                  lastLoginAt: new Date(),
+                },
+              },
+            },
+            { merge: true },
+          ).catch((error) => {
+            console.warn('[Auth] Deferred email registration profile sync failed', {
+              source,
+              platform,
+              uid: user.uid,
+              message: error?.message || String(error),
+            })
+          })
+        } catch {}
+
+        withFallback(fetchUserProfile(user.uid), {
+          ms: 8000,
+          label: `${source} profile fetch`,
+          fallback: { role: this.user?.role || 'user' },
+        }).then((loadedProfile) => {
+          this.user = {
+            ...(this.user || {}),
+            ...loadedProfile,
+            displayName: this.user?.displayName || loadedProfile?.name || resolvedDisplayName || null,
+            email: this.user?.email || loadedProfile?.email || resolvedEmail || null,
+            photoURL: loadedProfile?.avatarUrl || this.user?.photoURL || null,
+            role: loadedProfile?.role || this.user?.role || 'user',
+            plan: loadedProfile?.plan || this.user?.plan || '',
+          }
+          try { localStorage.setItem('user', JSON.stringify(this.user)) } catch {}
+        }).catch(() => {})
+
         try {
           if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
             const mod = await import('@/services/appTokenService.js')
             mod.refreshAppToken().catch(() => {})
           }
         } catch {}
-        try {
-          trackSignupCompleted({ method: 'email' })
-        } catch (_) {}
+
+        kickOffPostLoginHydration(this, {
+          platform,
+          source,
+        })
+
+        if (shouldTrackSignup) {
+          try {
+            trackSignupCompleted({ method: 'email' })
+          } catch {}
+        }
+
         ElNotification({
-          title: 'Account created 🎉',
-          message: `Hi ${this.user.email || 'there'}!`,
+          title: notificationTitle,
+          message:
+            notificationTitle === 'Email added'
+              ? 'You can now use email and password to sign in.'
+              : `Welcome ${resolvedDisplayName || resolvedEmail || 'there'}!`,
           type: 'success',
-          duration: 2600,
+          duration: 2400,
           offset: 80,
         })
+
+        return user
+      }
+
+      const completeNativeDirectEmailRegister = async (platform = nativePlatform) => {
+        const session = await nativeDirectEmailRegister(normalizedEmail, password, platform)
+        const exchanged = await exchangeNativeSessionForCustomToken(session.idToken, 'password', platform)
+        const customToken = String(exchanged?.customToken || '')
+
+        let tokenSession
+        if (customToken) {
+          tokenSession = await nativeIosSignInWithCustomToken(customToken, platform)
+        } else {
+          tokenSession = normalizeIdentityToolkitSession(session, normalizedEmail)
+          if (!tokenSession?.idToken || !tokenSession?.refreshToken || !tokenSession?.localId) {
+            throw new Error(`Native ${platform} registration did not return a Firebase user`)
+          }
+          console.warn('[Auth] Native packaged app custom token exchange missing token during registration; using direct session', {
+            platform,
+            uid: tokenSession?.localId || null,
+          })
+        }
+
+        if (platform === 'ios') {
+          persistNativeIosAuthSnapshot(tokenSession, {
+            email: normalizedEmail,
+            displayName: preferredDisplayName,
+          })
+        }
+
+        const user = await hydrateNativeIosCustomTokenUser(tokenSession, normalizedEmail, 8000, platform)
+        return finalizeRegisteredUser(user, {
+          source: `native-${platform}-email-register`,
+          platform,
+          createdAt: Date.now(),
+          tokenFallback: tokenSession?.idToken || session?.idToken || '',
+          notificationTitle: 'Account created',
+          trackSignup: true,
+        })
+      }
+
+      try {
+        if (current && !alreadyLinked) {
+          const credential = EmailAuthProvider.credential(normalizedEmail, password)
+          const linkRes = await withTimeout(
+            linkWithCredential(current, credential),
+            12000,
+            'email registration link credential',
+          )
+          return await finalizeRegisteredUser(linkRes?.user || current, {
+            source: 'email-register-link',
+            platform: nativePlatform,
+            createdAt: current?.isAnonymous === true ? Date.now() : null,
+            notificationTitle: current?.isAnonymous === true ? 'Account created' : 'Email added',
+            trackSignup: current?.isAnonymous === true,
+          })
+        }
+
+        if (useNativeDirectRegister) {
+          return await completeNativeDirectEmailRegister('ios')
+        }
+
+        const cred = await withTimeout(
+          createUserWithEmailAndPassword(auth, normalizedEmail, password),
+          12000,
+          'email registration',
+        )
+        return await finalizeRegisteredUser(cred?.user, {
+          source: 'email-register',
+          platform: nativePlatform,
+          createdAt: Date.now(),
+          notificationTitle: 'Account created',
+          trackSignup: true,
+        })
+      } catch (error) {
+        const nativeAndroidTimeoutFallback =
+          isNativePackagedApp() &&
+          nativePlatform === 'android' &&
+          !current &&
+          /timed out/i.test(String(error?.message || ''))
+
+        if (nativeAndroidTimeoutFallback) {
+          console.warn('[Auth] Android email registration timed out in Firebase WebAuth; falling back to native direct flow', JSON.stringify({
+            code: error?.code || null,
+            message: error?.message || String(error),
+          }))
+          try {
+            return await completeNativeDirectEmailRegister('android')
+          } catch (nativeError) {
+            console.error('[Auth] Android native direct email registration fallback failed', JSON.stringify({
+              code: nativeError?.code || null,
+              message: nativeError?.message || String(nativeError),
+            }))
+            throw nativeError
+          }
+        }
+
+        console.error('[Auth] Email registration failed', JSON.stringify({
+          code: error?.code || null,
+          message: error?.message || String(error),
+        }))
+        throw error
       } finally {
         this.setAuthenticating(false)
         this.loading = false
