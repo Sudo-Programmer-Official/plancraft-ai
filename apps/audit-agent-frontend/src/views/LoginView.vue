@@ -25,9 +25,7 @@
             <div class="auth-methods">
               <div class="auth-methods__header">
                 <p class="auth-methods__eyebrow">Choose your sign-in method</p>
-                <p class="auth-methods__caption">
-                  Email is best for full account access. Phone is fastest when you want a quick code on mobile.
-                </p>
+                <p class="auth-methods__caption">{{ authMethodsCaption }}</p>
               </div>
               <div class="auth-methods__grid">
                 <button
@@ -63,6 +61,7 @@
                   <span class="auth-mode-card__badge">{{ showEmail ? 'Active' : 'Use' }}</span>
                 </button>
                 <button
+                  v-if="showPhoneOtpOption"
                   type="button"
                   :disabled="authUiBusy"
                   :class="['auth-mode-card', { 'auth-mode-card--active': showPhone }]"
@@ -450,7 +449,8 @@ watch(
 // Email auth
 const activeAuthMode = ref(null)
 const showEmail = computed(() => activeAuthMode.value === 'email')
-const showPhone = computed(() => activeAuthMode.value === 'phone')
+const showPhoneOtpOption = computed(() => !(isNativeApp.value && isIosApp.value))
+const showPhone = computed(() => showPhoneOtpOption.value && activeAuthMode.value === 'phone')
 const emailAuthMode = ref('signin')
 const isRegisterMode = computed(() => emailAuthMode.value === 'register')
 const email = ref('')
@@ -485,6 +485,11 @@ const emailPrimaryActionLabel = computed(() => {
 })
 const emailSecondaryActionLabel = computed(() => (
   isRegisterMode.value ? 'Already have an account?' : 'Need an account?'
+))
+const authMethodsCaption = computed(() => (
+  showPhoneOtpOption.value
+    ? 'Email is best for full account access. Phone is fastest when you want a quick code on mobile.'
+    : 'Use email or Apple sign-in in the iPhone app. Phone OTP is hidden here.'
 ))
 
 function clearEmailAuthErrorState() {
@@ -541,6 +546,9 @@ function toggleEmailAuthMode() {
 }
 
 function setActiveAuthMode(mode, { focus = true } = {}) {
+  if (mode === 'phone' && !showPhoneOtpOption.value) {
+    mode = 'email'
+  }
   const nextMode = mode === 'email' || mode === 'phone' ? mode : null
 
   if (activeAuthMode.value === 'phone' && nextMode !== 'phone') {
@@ -882,8 +890,8 @@ async function ensureRecaptcha(force = false) {
 }
 
 async function togglePhone() {
-  if (isNativeApp.value && isIosApp.value && !phoneAuthTestingEnabled) {
-    await launchPhoneAuthInBrowser()
+  if (!showPhoneOtpOption.value) {
+    setActiveAuthMode('email')
     return
   }
   setActiveAuthMode('phone')
@@ -1282,7 +1290,7 @@ onMounted(() => {
     return
   }
 
-  if (String(route.query.phone || '').trim() === '1') {
+  if (showPhoneOtpOption.value && String(route.query.phone || '').trim() === '1') {
     setActiveAuthMode('phone', { focus: false })
     return
   }
