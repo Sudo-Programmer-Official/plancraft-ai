@@ -234,6 +234,8 @@ import {
   addLink,
   addLinkCategory,
   deleteLink,
+  getDefaultLinkCategories,
+  getLinks,
   getLinkCategories,
   touchLink as touchLinkService,
   updateLink,
@@ -243,10 +245,11 @@ import {
 } from '@/services/firebaseService'
 import { useAuthStore } from '@/stores/authStore'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
+import { isIosPackagedApp } from '@/utils/nativeAuthSupport'
 
 const authStore = useAuthStore()
 const links = ref([])
-const categories = ref([])
+const categories = ref(getDefaultLinkCategories())
 const loading = ref(true)
 const modalOpen = ref(false)
 const editingLink = ref(null)
@@ -357,7 +360,7 @@ async function hydrateData(options = {}) {
   clearRealtimeFeeds()
 
   let linksReady = false
-  let categoriesReady = false
+  let categoriesReady = categories.value.length > 0
   const resolveLoading = () => {
     if (linksReady && categoriesReady) loading.value = false
   }
@@ -368,11 +371,29 @@ async function hydrateData(options = {}) {
     resolveLoading()
   })
 
+  if (isIosPackagedApp()) {
+    Promise.allSettled([getLinks(), getLinkCategories()]).then((results) => {
+      if (activeFeedKey.value !== nextFeedKey) return
+      const [linksResult, categoriesResult] = results
+      if (linksResult?.status === 'fulfilled' && Array.isArray(linksResult.value)) {
+        if (!links.value.length) {
+          links.value = linksResult.value
+        }
+        linksReady = true
+      }
+      if (categoriesResult?.status === 'fulfilled' && Array.isArray(categoriesResult.value) && categoriesResult.value.length) {
+        categories.value = categoriesResult.value
+      }
+      categoriesReady = true
+      resolveLoading()
+    })
+  }
+
   try {
     categories.value = await getLinkCategories()
   } catch (error) {
     console.warn('[Links] category bootstrap failed', error?.message || error)
-    categories.value = []
+    categories.value = getDefaultLinkCategories()
   } finally {
     categoriesReady = true
     resolveLoading()

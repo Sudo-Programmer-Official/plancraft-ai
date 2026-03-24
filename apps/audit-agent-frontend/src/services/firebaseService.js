@@ -921,6 +921,9 @@ const defaultLinkCategories = [
   { id: 'finance', name: 'Finance', icon: '💳', color: 'pink' },
 ]
 
+const linkMigrationQueue = new Map()
+const linkCategorySeedQueue = new Map()
+
 function coerceTimestamp(value) {
   if (!value) return 0
   if (typeof value === 'number') return value
@@ -1008,9 +1011,26 @@ async function seedDefaultCategories(userId) {
   return seeded
 }
 
+export function getDefaultLinkCategories() {
+  return defaultLinkCategories.map((category) => ({ ...category }))
+}
+
+function queueLinkCategorySeed(userId) {
+  const wsId = currentWorkspaceId() || 'personal'
+  const key = `${userId}:${wsId}`
+  if (linkCategorySeedQueue.has(key)) return linkCategorySeedQueue.get(key)
+  const task = seedDefaultCategories(userId)
+    .catch(() => [])
+    .finally(() => {
+      linkCategorySeedQueue.delete(key)
+    })
+  linkCategorySeedQueue.set(key, task)
+  return task
+}
+
 async function fetchLegacyLinks(userId) {
   const qy = query(collection(db, 'links'), where('userId', '==', userId))
-  const snap = await safeAction(getDocs(qy))
+  const snap = await safeAction(withTimeout(getDocs(qy), 4000, 'links legacy'))
   return snap.docs.map(mapLinkDoc)
 }
 
@@ -1041,6 +1061,19 @@ async function migrateLegacyLinks(userId) {
     }),
   )
   return migrated
+}
+
+function queueLegacyLinkMigration(userId) {
+  const wsId = currentWorkspaceId() || 'personal'
+  const key = `${userId}:${wsId}`
+  if (linkMigrationQueue.has(key)) return linkMigrationQueue.get(key)
+  const task = migrateLegacyLinks(userId)
+    .catch(() => [])
+    .finally(() => {
+      linkMigrationQueue.delete(key)
+    })
+  linkMigrationQueue.set(key, task)
+  return task
 }
 
 function sortLinks(list = []) {
@@ -1093,14 +1126,12 @@ export async function getLinks() {
   const session = currentSessionContext()
   if (!session?.uid) return []
   const col = linksCollectionForUser(session.uid)
-  const snap = await safeAction(getDocs(col))
+  const snap = await safeAction(withTimeout(getDocs(col), 4000, 'links read'))
   let list = snap.docs.map(mapLinkDoc)
   if (!list.length && currentWorkspaceId()) {
-    const migrated = await migrateLegacyLinks(session.uid)
-    if (migrated.length) {
-      list = migrated
-    } else {
-      list = await fetchLegacyLinks(session.uid)
+    list = await fetchLegacyLinks(session.uid)
+    if (list.length) {
+      queueLegacyLinkMigration(session.uid)
     }
   }
   return sortLinks(list)
@@ -1111,21 +1142,19 @@ export function watchLinks(cb) {
   if (!session?.uid) return () => {}
   try {
     let hydratedLegacy = false
+    let released = false
     const unsub = onSnapshot(
       linksCollectionForUser(session.uid),
       async (snap) => {
         let list = snap.docs.map(mapLinkDoc)
         if (!list.length && currentWorkspaceId() && !hydratedLegacy) {
           hydratedLegacy = true
+          cb([])
           try {
-            const migrated = await migrateLegacyLinks(session.uid)
-            if (migrated.length) {
-              cb(sortLinks(migrated))
-              return
-            }
             const legacy = await fetchLegacyLinks(session.uid)
-            if (legacy.length) {
+            if (!released && legacy.length) {
               cb(sortLinks(legacy))
+              queueLegacyLinkMigration(session.uid)
               return
             }
           } catch (err) {
@@ -1136,7 +1165,10 @@ export function watchLinks(cb) {
       },
       (err) => handleAuthError(err),
     )
-    return unsub
+    return () => {
+      released = true
+      unsub()
+    }
   } catch (err) {
     console.warn('watchLinks failed', err)
     return () => {}
@@ -1195,22 +1227,23 @@ export async function deleteLink(id) {
 
 async function fetchLegacyLinkCategories(userId) {
   const qy = query(collection(db, 'linksCategories'), where('userId', '==', userId))
-  const snap = await safeAction(getDocs(qy))
+  const snap = await safeAction(withTimeout(getDocs(qy), 4000, 'link categories legacy'))
   return snap.docs.map(mapCategoryDoc).sort((a, b) => (a.order || 0) - (b.order || 0))
 }
 
 export async function getLinkCategories() {
   const session = currentSessionContext()
-  if (!session?.uid) return defaultLinkCategories
+  if (!session?.uid) return getDefaultLinkCategories()
   const col = linkCategoriesCollection(session.uid)
-  const snap = await safeAction(getDocs(col))
+  const snap = await safeAction(withTimeout(getDocs(col), 4000, 'link categories read'))
   let categories = snap.docs.map(mapCategoryDoc)
   if (!categories.length) {
     if (currentWorkspaceId()) {
       const legacy = await fetchLegacyLinkCategories(session.uid)
       if (legacy.length) return legacy
     }
-    categories = await seedDefaultCategories(session.uid)
+    queueLinkCategorySeed(session.uid)
+    categories = getDefaultLinkCategories()
   } else {
     categories = categories.sort((a, b) => (a.order || 0) - (b.order || 0))
     if (currentWorkspaceId()) {
@@ -1241,6 +1274,13 @@ export function watchLinkCategories(cb) {
           } catch (err) {
             console.warn('watchLinkCategories legacy hydration failed', err?.message || err)
           }
+          queueLinkCategorySeed(session.uid)
+          cb(getDefaultLinkCategories())
+          return
+        } else if (!cats.length) {
+          queueLinkCategorySeed(session.uid)
+          cb(getDefaultLinkCategories())
+          return
         } else if (cats.length && currentWorkspaceId()) {
           try {
             const legacy = await fetchLegacyLinkCategories(session.uid)
