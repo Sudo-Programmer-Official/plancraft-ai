@@ -218,10 +218,8 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { doc, setDoc } from 'firebase/firestore'
-import { db } from '@/firebase/init'
 import { hasSubscription, registerPushSubscription } from '@/services/pushService'
-import { getIntegrations, getPreferences, getProfile, updateIntegrations, updatePreferences } from '@/services/settingsService'
+import { getIntegrations, getPreferences, getProfile, updateIntegrations, updatePreferences, updateProfile } from '@/services/settingsService'
 import { useAuthFlags } from '@/composables/useAuthFlags'
 import { useAuthStore } from '@/stores/authStore'
 import { guessCountryFromLocale, normalizePhone } from '@/utils/phoneUtils'
@@ -539,6 +537,7 @@ async function persistQuickSetup() {
 
     if (userId) {
       const channels = selectedChannels.value
+      let deferredProfileSync = false
       await withTimeout(updatePreferences(userId, {
         notifications: {
           email: channels.includes('email'),
@@ -555,7 +554,7 @@ async function persistQuickSetup() {
           enabled: channels.length > 0,
           channels,
         },
-      }), 10000, 'quick setup preferences save')
+      }), 15000, 'quick setup preferences save')
 
       const mergedIntegrations = {
         ...existingIntegrations.value,
@@ -569,28 +568,28 @@ async function persistQuickSetup() {
         },
       }
 
-      await withTimeout(updateIntegrations(userId, mergedIntegrations), 10000, 'quick setup integrations save')
+      await withTimeout(updateIntegrations(userId, mergedIntegrations), 15000, 'quick setup integrations save')
       const profilePatch = {
-        updatedAt: new Date(),
+        updatedAt: new Date().toISOString(),
       }
       if (normalizedPhone) {
         profilePatch.phone = normalizedPhone
       }
-      await withTimeout(
-        setDoc(
-          doc(db, 'users', userId),
-          profilePatch,
-          { merge: true }
-        ),
-        10000,
-        'quick setup profile save'
-      )
+      try {
+        await withTimeout(updateProfile(userId, profilePatch), 15000, 'quick setup profile sync')
+      } catch (error) {
+        deferredProfileSync = true
+        console.warn('[QuickSetup] profile sync deferred', error?.message || error)
+      }
 
       authStore.user = {
         ...(authStore.user || {}),
         phone: normalizedPhone || null,
       }
       existingIntegrations.value = mergedIntegrations
+      if (deferredProfileSync) {
+        saveSuccess.value = 'Quick setup saved. Profile details will finish syncing shortly.'
+      }
     }
 
     clearQuickSetupSnooze()
@@ -603,12 +602,17 @@ async function persistQuickSetup() {
     })
     emitSetupState(nextState)
     dirty.value = false
-    saveSuccess.value = nextState.requiredComplete
-      ? 'Quick setup complete.'
-      : 'Progress saved. You can finish the remaining items later.'
+    if (!saveSuccess.value) {
+      saveSuccess.value = nextState.requiredComplete
+        ? 'Quick setup complete.'
+        : 'Progress saved. You can finish the remaining items later.'
+    }
     return nextState
   } catch (error) {
-    saveError.value = error?.response?.data?.error || error?.message || 'Failed to save quick setup.'
+    const rawMessage = error?.response?.data?.error || error?.message || ''
+    saveError.value = /timed out/i.test(String(rawMessage))
+      ? 'Saving took longer than expected. Check your connection and try again.'
+      : rawMessage || 'Failed to save quick setup.'
     return null
   } finally {
     saving.value = false
@@ -868,12 +872,15 @@ watch(
 
 @media (max-width: 639px) {
   .setup-prompt :deep(.el-dialog) {
-    margin-top: 3vh !important;
+    margin-top: calc(env(safe-area-inset-top, 0px) + 12px) !important;
+    margin-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px) !important;
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px);
   }
 
   .setup-prompt :deep(.el-dialog__body) {
     padding-left: 1rem;
     padding-right: 1rem;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
   }
 
   .setup-prompt :deep(.el-dialog__footer) {

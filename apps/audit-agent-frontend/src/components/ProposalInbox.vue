@@ -18,7 +18,14 @@
       </div>
     </header>
 
-    <div class="grid md:grid-cols-3 gap-4">
+    <div
+      v-if="!canModerate"
+      class="rounded-xl border border-white/10 bg-slate-900/50 p-4 text-sm text-slate-300"
+    >
+      Editor or admin access is required to review workspace proposals.
+    </div>
+
+    <div v-else class="grid md:grid-cols-3 gap-4">
       <div class="md:col-span-1 space-y-2 max-h-[360px] overflow-y-auto pr-1">
         <div
           v-for="p in proposals"
@@ -206,7 +213,11 @@ function switchTab(key) {
 }
 
 async function loadProposals() {
-  if (!activeWorkspaceId.value) return
+  if (!activeWorkspaceId.value || !canModerate.value) {
+    proposals.value = []
+    loadingList.value = false
+    return
+  }
   loadingList.value = true
   try {
     proposals.value = await listProposals({ workspaceId: activeWorkspaceId.value, status: activeTab.value })

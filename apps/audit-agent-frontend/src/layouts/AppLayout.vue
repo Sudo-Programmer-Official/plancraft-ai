@@ -577,13 +577,15 @@
               </el-tooltip>
             </template>
             <template v-else>
-              <span
+              <RouterLink
                 v-if="showFreePlanHeaderBadge"
+                :to="{ path: billingRoutePath, query: { source: 'header-free-plan' } }"
                 :class="freePlanBadgeClasses"
                 :title="upgradePillTitle"
+                aria-label="Learn about upgrading your Free plan"
               >
                 Free Plan
-              </span>
+              </RouterLink>
               <RouterLink
                 v-else-if="!isGuest"
                 :to="billingRoutePath"
@@ -1358,7 +1360,7 @@ const upgradePillTitle = computed(() => (
 const showFreePlanHeaderBadge = computed(() => (
   isAppleBillingSafeMode.value && !isPremium.value && !isGuest.value
 ))
-const freePlanBadgeClasses = 'rounded-full border border-white/12 bg-white/8 px-3 py-1 text-sm font-semibold text-slate-100 shadow-sm'
+const freePlanBadgeClasses = 'rounded-full border border-white/12 bg-white/8 px-3 py-1 text-sm font-semibold text-slate-100 shadow-sm transition hover:bg-white/12 hover:text-white'
 const upgradePillClasses = computed(() => (
   isAppleBillingSafeMode.value
     ? 'rounded-full border border-white/12 bg-white/8 px-3 py-1 text-sm font-semibold text-slate-100 shadow-sm transition hover:bg-white/12'

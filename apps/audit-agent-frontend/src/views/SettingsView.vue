@@ -38,16 +38,16 @@
         </div>
       </nav>
 
-      <div v-show="activeTab === 'workspace-knowledge'">
+      <div v-if="activeTab === 'workspace-knowledge'">
         <KnowledgePanel />
       </div>
 
-      <div v-show="activeTab === 'workspace-proposals'">
+      <div v-if="activeTab === 'workspace-proposals'">
         <ProposalInbox />
       </div>
 
       <section
-        v-show="activeTab === 'workspace-policies'"
+        v-if="activeTab === 'workspace-policies'"
         class="settings-panel"
       >
         <h2 class="text-lg sm:text-xl font-semibold mb-2">🛡️ Policies</h2>
@@ -61,7 +61,7 @@
 
       <!-- Plan status and usage -->
       <section
-        v-show="activeTab === 'billing-subscription'"
+        v-if="activeTab === 'billing-subscription'"
         class="settings-panel space-y-4"
       >
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -237,7 +237,7 @@
       </section>
 
       <section
-        v-show="activeTab === 'account-profile'"
+        v-if="activeTab === 'account-profile'"
         class="settings-panel"
       >
         <h2 class="text-lg sm:text-xl font-semibold mb-2">🙋 Profile</h2>
@@ -246,7 +246,7 @@
       </section>
 
       <section
-        v-show="activeTab === 'account-preferences'"
+        v-if="activeTab === 'account-preferences'"
         class="settings-panel"
       >
         <h2 class="text-lg sm:text-xl font-semibold mb-2">⚙️ Preferences</h2>
@@ -254,7 +254,7 @@
       </section>
 
       <section
-        v-show="activeTab === 'account-quick-setup'"
+        v-if="activeTab === 'account-quick-setup'"
         class="settings-panel space-y-5"
       >
         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -321,7 +321,7 @@
 
       <!-- Notification Preferences -->
       <section
-        v-show="activeTab === 'account-notifications'"
+        v-if="activeTab === 'account-notifications'"
         ref="notificationsSection"
         :class="['settings-panel',
                  highlightNotifications ? 'ring-2 ring-indigo-400 ring-offset-2 ring-offset-transparent' : '']"
@@ -387,7 +387,7 @@
       </section>
 
       <section
-        v-show="activeTab === 'account-social'"
+        v-if="activeTab === 'account-social'"
         class="settings-panel"
       >
         <h2 class="text-lg sm:text-xl font-semibold mb-2">🌐 Social Accounts</h2>
@@ -396,7 +396,7 @@
 
       <!-- Integrations -->
       <section
-        v-show="activeTab === 'workspace-integrations'"
+        v-if="activeTab === 'workspace-integrations'"
         class="settings-panel"
       >
         <h2 class="text-lg sm:text-xl font-semibold mb-4">🔗 Integrations</h2>
@@ -825,19 +825,20 @@ const tabGroups = [
   },
 ]
 
-const activeTab = ref(normalizeTab(route.query?.tab) || 'workspace-knowledge')
+const DEFAULT_SETTINGS_TAB = 'account-profile'
+const activeTab = ref(normalizeTab(route.query?.tab) || DEFAULT_SETTINGS_TAB)
 
 watch(
   () => route.query?.tab,
   (tab) => {
-    const target = normalizeTab(tab) || 'workspace-knowledge'
+    const target = normalizeTab(tab) || DEFAULT_SETTINGS_TAB
     if (activeTab.value !== target) activeTab.value = target
     if (target === 'account-notifications') focusNotifications()
   },
 )
 
 function setActiveTab(id) {
-  const target = normalizeTab(id) || 'workspace-knowledge'
+  const target = normalizeTab(id) || DEFAULT_SETTINGS_TAB
   if (activeTab.value !== target) activeTab.value = target
   router.replace({ query: { ...route.query, tab: target } }).catch(() => {})
   if (target === 'account-notifications') focusNotifications()

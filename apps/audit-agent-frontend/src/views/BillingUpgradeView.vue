@@ -3,23 +3,41 @@
     <div class="max-w-3xl mx-auto px-4 sm:px-6 py-12 space-y-6">
       <template v-if="isAppleBillingSafeMode">
         <header class="space-y-2">
-          <p class="text-xs uppercase tracking-[0.35em] text-indigo-300">Billing</p>
-          <h1 class="text-3xl sm:text-4xl font-bold">Premium features available via your account</h1>
+          <p class="text-xs uppercase tracking-[0.35em] text-indigo-300">{{ appleBillingEyebrow }}</p>
+          <h1 class="text-3xl sm:text-4xl font-bold">{{ appleBillingTitle }}</h1>
           <p class="text-indigo-200">
-            Upgrade your experience on our website. Your account stays in sync with the app.
+            {{ appleBillingSubtitle }}
           </p>
         </header>
 
         <div class="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 space-y-5 shadow-xl">
           <div class="rounded-2xl border border-indigo-400/30 bg-indigo-500/10 p-5 space-y-3">
-            <p class="text-xs uppercase tracking-[0.24em] text-indigo-200">What to do next</p>
-            <p class="text-lg font-semibold text-white">Open {{ billingWebHost }} in Safari to upgrade or manage billing.</p>
+            <p class="text-xs uppercase tracking-[0.24em] text-indigo-200">{{ appleBillingGuideLabel }}</p>
+            <p class="text-lg font-semibold text-white">{{ appleBillingGuideTitle }}</p>
             <p class="text-sm text-indigo-100/85">
-              Your data is safe and will sync automatically after you upgrade. Once you come back here, refresh and your premium access will be ready.
+              {{ appleBillingGuideCopy }}
             </p>
           </div>
 
-          <div class="grid gap-3 sm:grid-cols-2">
+          <div
+            v-if="showHeaderFreePlanFlow"
+            class="grid gap-3 sm:grid-cols-3"
+          >
+            <div
+              v-for="step in headerFreePlanSteps"
+              :key="step.step"
+              class="rounded-xl border border-white/10 bg-slate-900/70 p-4"
+            >
+              <p class="text-xs uppercase tracking-[0.2em] text-indigo-200/80">{{ step.step }}</p>
+              <p class="mt-2 text-base font-semibold text-white">{{ step.title }}</p>
+              <p class="mt-2 text-sm text-indigo-100/80">{{ step.copy }}</p>
+            </div>
+          </div>
+
+          <div
+            v-else
+            class="grid gap-3 sm:grid-cols-2"
+          >
             <div class="rounded-xl border border-white/10 bg-slate-900/70 p-4">
               <p class="text-xs uppercase tracking-[0.2em] text-indigo-200/80">Requested plan</p>
               <p class="mt-2 text-lg font-semibold text-white">{{ planLabel }}</p>
@@ -44,6 +62,13 @@
               @click="refreshAccess"
             >
               I've upgraded · Refresh
+            </button>
+            <button
+              type="button"
+              class="px-5 py-3 rounded-xl border border-transparent bg-white/5 text-indigo-100 font-medium hover:bg-white/10 transition"
+              @click="goBack"
+            >
+              Maybe later
             </button>
           </div>
         </div>
@@ -140,6 +165,12 @@ const error = ref('')
 const billingWebHost = BILLING_WEB_HOST
 const billingWebUrl = BILLING_WEB_URL
 const isAppleBillingSafeMode = computed(() => detectAppleBillingSafeMode())
+const billingSource = computed(() => (
+  typeof route.query.source === 'string'
+    ? route.query.source.trim().toLowerCase()
+    : ''
+))
+const showHeaderFreePlanFlow = computed(() => billingSource.value === 'header-free-plan')
 const selectedWorkspace = computed(() => {
   return (
     workspaceStore.workspaces.find((w) => w.id === workspaceId.value) ||
@@ -157,6 +188,49 @@ const isOwner = computed(() => {
   const uid = authStore?.user?.uid
   return !!uid && !!selectedWorkspace.value && selectedWorkspace.value.ownerId === uid
 })
+const appleBillingEyebrow = computed(() => (
+  showHeaderFreePlanFlow.value ? 'Free plan' : 'Billing'
+))
+const appleBillingTitle = computed(() => (
+  showHeaderFreePlanFlow.value
+    ? 'You are on the Free Plan'
+    : 'Premium features available via your account'
+))
+const appleBillingSubtitle = computed(() => (
+  showHeaderFreePlanFlow.value
+    ? 'When you are ready, upgrade on our website. Your app data stays safe and your access will sync back here.'
+    : 'Upgrade your experience on our website. Your account stays in sync with the app.'
+))
+const appleBillingGuideLabel = computed(() => (
+  showHeaderFreePlanFlow.value ? 'How web upgrade works' : 'What to do next'
+))
+const appleBillingGuideTitle = computed(() => (
+  showHeaderFreePlanFlow.value
+    ? `Open ${billingWebHost} in Safari when you want to upgrade.`
+    : `Open ${billingWebHost} in Safari to upgrade or manage billing.`
+))
+const appleBillingGuideCopy = computed(() => (
+  showHeaderFreePlanFlow.value
+    ? 'Billing happens on the web, not inside the iPhone app. Once you upgrade there, come back here and refresh to unlock premium access.'
+    : 'Your data is safe and will sync automatically after you upgrade. Once you come back here, refresh and your premium access will be ready.'
+))
+const headerFreePlanSteps = [
+  {
+    step: 'Step 1',
+    title: 'Open the website',
+    copy: 'We will take you to the PlanCraftAI website in Safari when you are ready.',
+  },
+  {
+    step: 'Step 2',
+    title: 'Upgrade there',
+    copy: 'Sign in with the same account and manage premium access securely on the web.',
+  },
+  {
+    step: 'Step 3',
+    title: 'Come back here',
+    copy: 'Tap refresh in the app and your upgraded access will sync automatically.',
+  },
+]
 
 onMounted(async () => {
   try {
