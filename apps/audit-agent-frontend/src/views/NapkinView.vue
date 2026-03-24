@@ -1,45 +1,45 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-100 p-6">
-    <div class="max-w-6xl mx-auto space-y-6">
-      <header class="rounded-2xl bg-slate-900/80 border border-slate-800 p-5 flex flex-col lg:flex-row gap-4 items-start">
+  <div class="app-page-shell">
+    <div class="app-page-frame">
+      <header class="app-page-hero flex flex-col lg:flex-row gap-4 items-start">
         <div class="space-y-2">
-          <p class="uppercase text-[11px] tracking-[0.35em] text-indigo-300/80">AI Quick Actions</p>
-          <h1 class="text-3xl font-bold">Napkin</h1>
-          <p class="text-slate-300 text-sm max-w-2xl">
+          <p class="app-page-eyebrow">AI Quick Actions</p>
+          <h1 class="app-page-title !text-[clamp(2rem,3vw,2.85rem)]">Napkin</h1>
+          <p class="app-page-description max-w-2xl text-sm">
             Drop raw ideas, voice notes, and half-formed tasks. PlanCraft will classify, tag, and route them into Planner,
             Creator, or Leader mode when you’re ready.
           </p>
-          <div class="flex flex-wrap gap-2 text-xs text-slate-400">
-            <span class="px-3 py-1 rounded-full bg-slate-800 border border-slate-700">⚡ Quick add</span>
-            <span class="px-3 py-1 rounded-full bg-slate-800 border border-slate-700">🎙 Voice-ready</span>
-            <span class="px-3 py-1 rounded-full bg-slate-800 border border-slate-700">🧠 Auto-tagged</span>
+          <div class="flex flex-wrap gap-2 text-xs text-slate-300/80">
+            <span class="px-3 py-1 rounded-full bg-slate-950/30 border border-white/10">⚡ Quick add</span>
+            <span class="px-3 py-1 rounded-full bg-slate-950/30 border border-white/10">🎙 Voice-ready</span>
+            <span class="px-3 py-1 rounded-full bg-slate-950/30 border border-white/10">🧠 Auto-tagged</span>
           </div>
         </div>
-        <div class="ml-auto grid grid-cols-2 sm:grid-cols-3 gap-3 text-center w-full lg:w-auto">
-          <div class="stat-tile">
+        <div class="ml-auto app-page-kpis grid grid-cols-2 sm:grid-cols-3 text-center w-full lg:w-auto">
+          <div class="app-page-kpi stat-tile">
             <p class="stat-label">Captured</p>
             <p class="stat-value">{{ items.length }}</p>
           </div>
-          <div class="stat-tile">
+          <div class="app-page-kpi stat-tile">
             <p class="stat-label">Converted</p>
             <p class="stat-value">{{ convertedCount }}</p>
           </div>
-          <div class="stat-tile col-span-2 sm:col-span-1">
+          <div class="app-page-kpi stat-tile col-span-2 sm:col-span-1">
             <p class="stat-label">Voice notes</p>
             <p class="stat-value">{{ voiceCount }}</p>
           </div>
         </div>
       </header>
 
-      <section class="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl space-y-3">
+      <section class="app-page-section space-y-3">
         <div class="flex flex-col md:flex-row md:items-center gap-3 justify-between">
           <div>
-            <p class="text-xs uppercase tracking-[0.25em] text-indigo-200/70">Workspace pulse</p>
+            <p class="app-page-eyebrow !tracking-[0.25em]">Workspace pulse</p>
             <h2 class="text-xl font-semibold">What should I focus on?</h2>
             <p class="text-xs text-slate-400">Pulls tasks, napkin notes, drafts, and events for this workspace.</p>
           </div>
           <button
-            class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold transition disabled:opacity-50"
+            class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-fuchsia-500 to-indigo-500 hover:from-fuchsia-400 hover:to-indigo-400 text-sm font-semibold transition disabled:opacity-50"
             :disabled="summaryLoading"
             @click="askWorkspaceFocus"
           >
@@ -47,7 +47,7 @@
             <span>{{ summaryLoading ? 'Thinking…' : 'Ask AI about this workspace' }}</span>
           </button>
         </div>
-        <div class="text-sm text-slate-200 bg-slate-950/70 border border-slate-800 rounded-xl px-4 py-3 space-y-2">
+        <div class="text-sm text-slate-200 bg-slate-950/30 border border-white/10 rounded-2xl px-4 py-3 space-y-2">
           <p v-if="summaryLoading" class="text-slate-400">Gathering workspace context…</p>
           <div v-else-if="summaryLines.length" class="space-y-2">
             <p v-for="(line, idx) in summaryLines" :key="idx" class="leading-relaxed">
@@ -58,16 +58,16 @@
           <p v-if="summaryError" class="text-rose-300 text-xs">{{ summaryError }}</p>
         </div>
 
-        <div class="pt-3 border-t border-slate-800 space-y-2">
+        <div class="pt-3 border-t border-white/10 space-y-2">
           <div class="flex items-center gap-2">
             <input
               v-model="memoryQuery"
               type="text"
-              class="flex-1 rounded-lg bg-slate-950/60 border border-slate-800 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/40"
+              class="flex-1 rounded-xl bg-slate-950/30 border border-white/10 px-3 py-2 text-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30"
               placeholder="Search your brain (semantic) — e.g., “stripe billing”, “deep work routines”"
             />
             <button
-              class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm hover:border-indigo-500 transition disabled:opacity-60"
+              class="px-3 py-2 rounded-xl bg-slate-950/30 border border-white/10 text-sm hover:border-indigo-400 transition disabled:opacity-60"
               :disabled="memoryLoading || !memoryQuery.trim()"
               @click="runMemorySearch"
             >
@@ -82,7 +82,7 @@
             <div
               v-for="item in memoryResults"
               :key="item.id"
-              class="p-3 rounded-lg bg-slate-900/70 border border-slate-800"
+              class="p-3 rounded-xl bg-slate-950/25 border border-white/10"
             >
               <div class="flex items-center justify-between text-xs text-slate-400">
                 <span class="uppercase tracking-wide">{{ item.type }}</span>
@@ -98,10 +98,10 @@
         </div>
       </section>
 
-      <section class="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl space-y-4">
+      <section class="app-page-section space-y-4">
         <div class="flex flex-col md:flex-row md:items-center gap-3 justify-between">
           <div>
-            <p class="text-xs uppercase tracking-[0.25em] text-indigo-200/70">Quick Add</p>
+            <p class="app-page-eyebrow !tracking-[0.25em]">Quick Add</p>
             <h2 class="text-xl font-semibold">Fast capture with AI routing</h2>
           </div>
           <div class="flex gap-2 flex-wrap">
@@ -117,13 +117,13 @@
             <textarea
               v-model="input"
               rows="4"
-              class="w-full rounded-xl bg-slate-950/70 border border-slate-800 px-4 py-3 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/40 transition"
+              class="w-full rounded-2xl bg-slate-950/30 border border-white/10 px-4 py-3 text-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30 transition"
               placeholder="Type or paste anything — ideas, reminders, voice transcripts, screenshots (link), or messy notes…"
             ></textarea>
 
             <div class="flex flex-col sm:flex-row gap-3">
               <button
-                class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold transition disabled:opacity-50"
+                class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-fuchsia-500 to-indigo-500 hover:from-fuchsia-400 hover:to-indigo-400 text-sm font-semibold transition disabled:opacity-50"
                 :disabled="saving || (!input.trim() && !voiceTranscript)"
                 @click="saveNapkin"
               >
@@ -131,7 +131,7 @@
                 <span>{{ saving ? 'Saving…' : 'Drop to Napkin' }}</span>
               </button>
               <button
-                class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-700 hover:border-indigo-500 text-sm transition"
+                class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-950/30 border border-white/10 hover:border-indigo-400 text-sm transition"
                 :class="{ 'animate-pulse-soft': recordingState === 'recording' }"
                 @click="toggleRecording"
               >
@@ -143,7 +143,7 @@
               </button>
               <button
                 v-if="audioPreviewUrl || voiceTranscript"
-                class="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm hover:border-rose-500"
+                class="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-slate-950/30 border border-white/10 text-sm hover:border-rose-400"
                 @click="resetVoice"
               >
                 ✕ Clear voice
@@ -156,7 +156,7 @@
               </div>
               <div class="space-y-2">
                 <audio v-if="audioPreviewUrl" :src="audioPreviewUrl" controls class="w-full" />
-                <p v-if="voiceTranscript" class="text-sm text-slate-300 bg-slate-800/70 border border-slate-700 rounded-lg px-3 py-2">
+                <p v-if="voiceTranscript" class="text-sm text-slate-300 bg-slate-950/30 border border-white/10 rounded-xl px-3 py-2">
                   {{ voiceTranscript }}
                 </p>
               </div>
@@ -169,10 +169,10 @@
             </div>
           </div>
 
-          <div class="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3">
+          <div class="p-4 rounded-2xl bg-slate-950/30 border border-white/10 space-y-3">
             <div class="flex items-center justify-between">
               <p class="text-sm font-semibold text-slate-200">AI quick actions</p>
-              <span class="text-[11px] px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400">
+              <span class="text-[11px] px-2 py-0.5 rounded-full bg-slate-950/35 border border-white/10 text-slate-300/80">
                 {{ latestSaved ? 'Ready' : 'Waiting for input' }}
               </span>
             </div>
@@ -203,7 +203,7 @@
       <section class="space-y-3">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <p class="text-xs uppercase tracking-[0.25em] text-indigo-200/70">Stream</p>
+            <p class="app-page-eyebrow !tracking-[0.25em]">Stream</p>
             <h3 class="text-lg font-semibold">Your Napkin</h3>
           </div>
           <div class="flex flex-wrap gap-2">
@@ -214,8 +214,8 @@
               :class="[
                 'px-3 py-1.5 rounded-full text-sm border transition',
                 filter === f.value
-                  ? 'bg-indigo-600 text-white border-indigo-500'
-                  : 'bg-slate-900/70 text-slate-300 border-slate-800 hover:border-indigo-500/60',
+                  ? 'bg-indigo-500/90 text-white border-indigo-300/70'
+                  : 'bg-slate-950/30 text-slate-300 border-white/10 hover:border-indigo-400/60',
               ]"
             >
               {{ f.label }}
@@ -233,14 +233,14 @@
         <div v-if="loading" class="space-y-2">
           <div v-for="n in 4" :key="n" class="h-20 bg-slate-900/60 border border-slate-800 rounded-xl animate-pulse" />
         </div>
-        <div v-else-if="filteredItems.length === 0" class="text-sm text-slate-400 p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+        <div v-else-if="filteredItems.length === 0" class="app-page-empty text-sm">
           Nothing on the Napkin yet. Capture a note or voice memo to get started.
         </div>
         <div v-else class="space-y-3">
           <article
             v-for="item in filteredItems"
             :key="item.id"
-            class="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-indigo-500/50 transition space-y-3"
+            class="p-4 rounded-3xl bg-slate-950/30 border border-white/10 hover:border-indigo-300/50 transition space-y-3 shadow-lg shadow-slate-950/10"
           >
             <div class="flex items-start justify-between gap-3">
               <div class="space-y-1 flex-1">

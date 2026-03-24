@@ -46,11 +46,11 @@
         <div class="flex flex-wrap items-center justify-center gap-2">
           <RouterLink
             v-if="!isGuest"
-            to="/subscription"
+            :to="billingRoutePath"
             @click="trackUpgradeClick"
             class="bg-gradient-to-r from-fuchsia-500 via-purple-500 to-indigo-500 text-white font-semibold text-sm px-3 py-1.5 rounded-lg hover:scale-105 transition-transform shadow-md"
           >
-            Upgrade
+            {{ upgradeBannerLabel }}
           </RouterLink>
           <RouterLink
             v-else
@@ -77,43 +77,22 @@
       </div>
     </div>
     <!-- Sidebar (desktop only) -->
-    <aside
-      class="hidden md:flex h-full flex-col border-r border-white/5 bg-gray-950/72 backdrop-blur-xl transition-all duration-200"
-      :class="sidebarOpen ? 'w-72' : 'w-20'"
-    >
-      <div
-        class="flex-shrink-0 border-b border-white/6"
-        :class="sidebarOpen ? 'flex items-center justify-between p-4' : 'flex h-16 items-center justify-center p-2'"
-      >
-        <div v-if="sidebarOpen" class="flex min-w-0 items-center gap-3">
-          <img src="/logo-bg-remove.png" alt="PlanCraftAI" class="h-9 w-9" />
-          <div class="min-w-0">
-            <div class="truncate text-lg font-semibold text-white">PlanCraftAI</div>
-            <div class="text-[11px] uppercase tracking-[0.28em] text-slate-500">Workspace OS</div>
-          </div>
+    <aside class="app-desktop-sidebar hidden md:flex h-full w-72 flex-col border-r border-white/10 bg-gray-950/92 p-4 backdrop-blur-2xl">
+      <div class="mb-6 flex items-center gap-3">
+        <img src="/logo-bg-remove.png" alt="PlanCraftAI" class="h-9 w-9" />
+        <div class="min-w-0">
+          <div class="truncate text-lg font-semibold text-white">PlanCraftAI</div>
+          <div class="text-[11px] uppercase tracking-[0.28em] text-slate-500">Workspace OS</div>
         </div>
-        <button
-          @click="sidebarOpen = !sidebarOpen"
-          class="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 p-2 text-slate-300 transition hover:border-indigo-400/30 hover:bg-indigo-500/10 hover:text-white"
-          aria-label="Toggle sidebar"
-          :title="sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'"
-        >
-          <SidebarIcon
-            name="chevron-right"
-            class="h-4 w-4"
-            :class="sidebarOpen ? 'rotate-180 text-indigo-200' : 'text-slate-300'"
-          />
-        </button>
       </div>
 
-      <nav class="flex-1 overflow-y-auto scrollbar-plan px-3 pb-4 pt-4">
+      <nav class="flex-1 space-y-3 overflow-y-auto scrollbar-plan">
         <div class="space-y-1">
           <RouterLink
             v-for="item in coreNavItems"
             :key="item.to"
             :to="item.to"
-            :class="navLinkClasses(item.to, sidebarOpen)"
-            :title="sidebarOpen ? '' : item.label"
+            :class="navLinkClasses(item.to, true)"
             :aria-label="item.label"
           >
             <span
@@ -127,25 +106,21 @@
                 :class="iconClasses(isActive(item.to))"
               />
             </span>
-            <span v-if="sidebarOpen" class="truncate font-medium">{{ item.label }}</span>
+            <span class="truncate font-medium">{{ item.label }}</span>
           </RouterLink>
         </div>
 
-        <div class="mx-2 my-4 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+        <div class="mx-2 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
 
         <div class="space-y-1">
-          <div
-            v-if="sidebarOpen"
-            class="px-3 pb-1 text-[11px] font-medium uppercase tracking-[0.28em] text-slate-500"
-          >
+          <div class="px-3 pb-1 text-[11px] font-medium uppercase tracking-[0.28em] text-slate-500">
             Organize
           </div>
           <RouterLink
             v-for="item in organizeNavItems"
             :key="item.to"
             :to="item.to"
-            :class="navLinkClasses(item.to, sidebarOpen)"
-            :title="sidebarOpen ? '' : item.label"
+            :class="navLinkClasses(item.to, true)"
             :aria-label="item.label"
           >
             <span
@@ -159,17 +134,16 @@
                 :class="iconClasses(isActive(item.to))"
               />
             </span>
-            <span v-if="sidebarOpen" class="truncate font-medium">{{ item.label }}</span>
+            <span class="truncate font-medium">{{ item.label }}</span>
           </RouterLink>
         </div>
 
-        <div class="mx-2 my-4 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+        <div class="mx-2 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
 
         <div class="space-y-2">
           <button
             type="button"
-            :class="groupButtonClasses({ key: 'advanced', children: filteredNavGroups }, sidebarOpen)"
-            :title="sidebarOpen ? '' : 'Advanced'"
+            :class="groupButtonClasses({ key: 'advanced', children: filteredNavGroups }, true)"
             @click="handleAdvancedToggle"
           >
             <span class="flex min-w-0 items-center gap-3">
@@ -180,16 +154,15 @@
                   :class="iconClasses(advancedSectionOpen)"
                 />
               </span>
-              <span v-if="sidebarOpen" class="truncate font-medium">Advanced</span>
+              <span class="truncate font-medium">Advanced</span>
             </span>
             <SidebarIcon
-              v-if="sidebarOpen"
               :name="advancedSectionOpen ? 'chevron-down' : 'chevron-right'"
               class="h-4 w-4 shrink-0 text-slate-500"
             />
           </button>
 
-          <div v-show="sidebarOpen && advancedSectionOpen" class="space-y-2">
+          <div v-show="advancedSectionOpen" class="space-y-2">
             <div v-for="group in filteredNavGroups" :key="group.key" class="space-y-1">
               <button
                 v-if="group.collapsible"
@@ -235,15 +208,14 @@
           </div>
         </div>
 
-        <div class="mx-2 my-4 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+        <div class="mx-2 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
 
         <div class="space-y-1">
           <RouterLink
             v-for="item in systemLinks"
             :key="item.to"
             :to="item.to"
-            :class="navLinkClasses(item.to, sidebarOpen)"
-            :title="sidebarOpen ? '' : item.label"
+            :class="navLinkClasses(item.to, true)"
             :aria-label="item.label"
           >
             <span
@@ -257,47 +229,31 @@
                 :class="iconClasses(isActive(item.to))"
               />
             </span>
-            <span v-if="sidebarOpen" class="truncate font-medium">{{ item.label }}</span>
+            <span class="truncate font-medium">{{ item.label }}</span>
           </RouterLink>
         </div>
       </nav>
 
-      <div class="mt-auto flex-shrink-0 px-3 pb-4">
-        <template v-if="sidebarOpen">
-          <div class="rounded-2xl border border-white/10 bg-white/5 p-1.5 backdrop-blur">
-            <div class="grid gap-1" :style="{ gridTemplateColumns: footerUtilityColumns }">
-              <RouterLink
-                v-for="item in footerUtilityLinks"
-                :key="item.to"
-                :to="item.to"
-                :class="utilityLinkClasses(item.to)"
-                :title="item.label"
-              >
-                <SidebarIcon
-                  :name="item.iconName"
-                  class="h-5 w-5"
-                  :class="iconClasses(isActive(item.to))"
-                />
-              </RouterLink>
-              <button
-                v-if="!isGuest"
-                type="button"
-                class="inline-flex items-center justify-center rounded-xl border border-transparent px-3 py-2 text-red-400 transition-all duration-200 hover:border-red-400/20 hover:bg-red-500/10 hover:text-red-300"
-                title="Logout"
-                aria-label="Logout"
-                @click="handleLogout"
-              >
-                <SidebarIcon name="logout" class="h-5 w-5" />
-              </button>
-            </div>
-          </div>
-        </template>
-        <template v-else>
-          <div class="flex items-center justify-center">
+      <div class="mt-4 border-t border-white/8 pt-4">
+        <div class="rounded-2xl border border-white/10 bg-white/5 p-1.5 backdrop-blur">
+          <div class="grid gap-1" :style="{ gridTemplateColumns: footerUtilityColumns }">
+            <RouterLink
+              v-for="item in footerUtilityLinks"
+              :key="item.to"
+              :to="item.to"
+              :class="utilityLinkClasses(item.to)"
+              :title="item.label"
+            >
+              <SidebarIcon
+                :name="item.iconName"
+                class="h-5 w-5"
+                :class="iconClasses(isActive(item.to))"
+              />
+            </RouterLink>
             <button
               v-if="!isGuest"
               type="button"
-              class="inline-flex items-center justify-center rounded-xl border border-transparent p-2.5 text-red-400 transition-all duration-200 hover:border-red-400/20 hover:bg-red-500/10 hover:text-red-300"
+              class="inline-flex items-center justify-center rounded-xl border border-transparent px-3 py-2 text-red-400 transition-all duration-200 hover:border-red-400/20 hover:bg-red-500/10 hover:text-red-300"
               title="Logout"
               aria-label="Logout"
               @click="handleLogout"
@@ -305,7 +261,7 @@
               <SidebarIcon name="logout" class="h-5 w-5" />
             </button>
           </div>
-        </template>
+        </div>
       </div>
     </aside>
 
@@ -599,7 +555,7 @@
             <template v-if="isPremium">
               <el-tooltip content="You're on the Premium Plan!" placement="bottom">
                 <RouterLink
-                  to="/subscription"
+                  :to="billingRoutePath"
                   class="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-sm hover:from-purple-600 hover:to-pink-700 transition"
                 >
                   🧠 Pro
@@ -610,10 +566,10 @@
             <template v-else>
               <RouterLink
                 v-if="!isGuest"
-                to="/subscription"
+                :to="billingRoutePath"
                 class="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-sm hover:from-purple-600 hover:to-pink-700 transition"
               >
-                🚀 Upgrade
+                {{ upgradePillLabel }}
               </RouterLink>
               <button
                 v-else
@@ -736,6 +692,7 @@ import { trackLinkedInConversion } from '@/utils/ads'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { ElMessage } from 'element-plus'
 import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
+import { isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
 import { fetchUserProfile } from '@/services/authService'
 
 const SidebarIcon = defineComponent({
@@ -911,13 +868,6 @@ onMounted(() => {
   try { maybePromptProfile() } catch {}
 })
 
-const isSidebarCollapsed = ref(false)
-const sidebarOpen = computed({
-  get: () => !isSidebarCollapsed.value,
-  set: (val) => {
-    isSidebarCollapsed.value = !val
-  },
-}) // desktop toggle (open = !collapsed)
 const mobileMenu = ref(false) // mobile drawer toggle
 const showUpgrade = ref(false)
 const planOpen = ref(false)
@@ -952,6 +902,7 @@ const showWorkspaceRecovery = computed(
 
 const isOnTalkPlanner = computed(() => route.path === '/talk-to-planner')
 let upgradeHandler = null
+const SUBSCRIPTION_REFRESH_INTERVAL_MS = 5 * 60 * 1000
 
 function handleQuickSetupUpdated(nextState = null) {
   quickSetupStore.refreshQuickSetupState(nextState)
@@ -1029,7 +980,8 @@ function scheduleWorkspaceHydrationRetry() {
 // Prompt for profile setup if incomplete + hydrate workspace store
 watch(
   () => [authStore.user?.uid, authStore.token, authStore.logoutPending],
-  ([uid, token, logoutPending]) => {
+  ([uid, token, logoutPending], previous = []) => {
+    const [prevUid, prevToken, prevLogoutPending] = previous
     if (logoutPending) {
       clearWorkspaceRetryTimer()
       workspaceRetryCount.value = 0
@@ -1038,7 +990,10 @@ watch(
     if (uid && token) {
       maybePromptProfile()
       ensureWorkspaceHydrated()
-      subStore.fetchStatus(uid, { minIntervalMs: 30000 }).catch(() => {})
+      const gainedSession = uid !== prevUid || (!!token && !prevToken) || prevLogoutPending
+      if (gainedSession) {
+        subStore.fetchStatus(uid, { minIntervalMs: SUBSCRIPTION_REFRESH_INTERVAL_MS }).catch(() => {})
+      }
       scheduleWorkspaceHydrationRetry()
     } else {
       clearWorkspaceRetryTimer()
@@ -1294,10 +1249,14 @@ const systemLinks = computed(() => [
   { label: 'Workspaces', iconName: 'box', to: '/workspaces' },
   { label: 'Settings', iconName: 'settings', to: '/settings' },
 ])
+const isAppleBillingSafeMode = computed(() => detectAppleBillingSafeMode())
+const billingRoutePath = computed(() => (isAppleBillingSafeMode.value ? '/billing/upgrade' : '/subscription'))
+const upgradeBannerLabel = computed(() => (isAppleBillingSafeMode.value ? 'How to upgrade' : 'Upgrade'))
+const upgradePillLabel = computed(() => (isAppleBillingSafeMode.value ? 'Premium on web' : '🚀 Upgrade'))
 
 const footerUtilityLinks = computed(() => {
   const links = [
-    { label: 'Billing', iconName: 'credit-card', to: '/subscription' },
+    { label: 'Billing', iconName: 'credit-card', to: billingRoutePath.value },
     { label: 'Help', iconName: 'message-circle', to: '/help' },
   ]
 
@@ -1316,23 +1275,10 @@ const openGroups = reactive({})
 const advancedSectionOpen = ref(false)
 
 function handleAdvancedToggle() {
-  if (!sidebarOpen.value) {
-    sidebarOpen.value = true
-    advancedSectionOpen.value = true
-    return
-  }
-
   advancedSectionOpen.value = !advancedSectionOpen.value
 }
 
 function handleGroupToggle(key) {
-  if (!sidebarOpen.value) {
-    sidebarOpen.value = true
-    advancedSectionOpen.value = true
-    openGroups[key] = true
-    return
-  }
-
   toggleGroup(key)
 }
 
@@ -1377,9 +1323,6 @@ function openFeedback() {
 
 onMounted(() => {
   featureFlagsStore.ensureLoaded().catch(() => {})
-  if (authStore.user?.uid && authStore.token) {
-    subStore.fetchStatus(authStore.user.uid, { minIntervalMs: 30000 }).catch(() => {})
-  }
   feedbackStore.init()
   // Upgrade banner events
   try {
@@ -1395,7 +1338,6 @@ watch(
   () => {
     if (!authStore.user?.uid) return
     ensureWorkspaceHydrated()
-    subStore.fetchStatus(authStore.user.uid, { minIntervalMs: 30000 }).catch(() => {})
   },
 )
 
@@ -1458,6 +1400,7 @@ body {
 }
 
 .app-shell {
+  --desktop-sidebar-width: 18rem;
   height: 100vh;
   height: 100dvh;
   height: -webkit-fill-available;
@@ -1475,6 +1418,29 @@ body {
   overflow: hidden;
 }
 
+@media (min-width: 768px) {
+  .app-shell {
+    position: relative;
+  }
+
+  .app-desktop-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: var(--safe-area-left);
+    z-index: 15;
+    width: var(--desktop-sidebar-width);
+    height: 100vh;
+    height: 100dvh;
+    height: -webkit-fill-available;
+  }
+
+  .app-main-pane {
+    width: calc(100% - var(--desktop-sidebar-width));
+    margin-left: var(--desktop-sidebar-width);
+  }
+}
+
 .app-upgrade-banner {
   left: var(--safe-area-left);
   right: var(--safe-area-right);
@@ -1482,6 +1448,11 @@ body {
 }
 
 .app-mobile-drawer {
+  padding-top: calc(var(--safe-area-top) + 1rem);
+  padding-bottom: calc(var(--safe-area-bottom) + 1rem);
+}
+
+.app-desktop-sidebar {
   padding-top: calc(var(--safe-area-top) + 1rem);
   padding-bottom: calc(var(--safe-area-bottom) + 1rem);
 }

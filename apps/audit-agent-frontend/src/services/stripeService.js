@@ -4,9 +4,13 @@ import api from '@/services/api'
 const DEFAULT_STATUS = Object.freeze({ plan: 'free', status: 'free', remainingDays: 0, cancelAt: null })
 const CACHE_KEY = 'subscription_status_cache'
 const CACHE_TTL_MS = 1000 * 60 * 5 // 5 minutes
-const TIMEOUT_BACKOFF_MS = 1000 * 30
+const TIMEOUT_BACKOFF_MS = 1000 * 60 * 5
+const FALLBACK_LOG_COOLDOWN_MS = 1000 * 60 * 5
 const inFlightStatusRequests = new Map()
 const timeoutBackoffUntil = new Map()
+const fallbackLogUntil = new Map()
+const SHOULD_LOG_SUBSCRIPTION_FALLBACKS =
+  typeof import.meta !== 'undefined' && import.meta.env?.DEV
 
 function loadCacheMap() {
   if (typeof window === 'undefined' || !window.localStorage) return {}
@@ -87,6 +91,26 @@ function readStoredUserFallbackStatus() {
   }
 }
 
+function scheduleTimeoutBackoff(userId) {
+  if (!userId) return
+  timeoutBackoffUntil.set(userId, Date.now() + TIMEOUT_BACKOFF_MS)
+}
+
+function logFallbackOnce(userId, message, detail) {
+  if (!SHOULD_LOG_SUBSCRIPTION_FALLBACKS) return
+  if (!userId) return
+  const nextAllowedAt = fallbackLogUntil.get(userId) || 0
+  if (nextAllowedAt > Date.now()) return
+  fallbackLogUntil.set(userId, Date.now() + FALLBACK_LOG_COOLDOWN_MS)
+  console.debug(message, detail)
+}
+
+function isCanceledSubscriptionRequest(err) {
+  const code = String(err?.code || '')
+  const message = String(err?.message || '')
+  return code === 'ERR_CANCELED' || /canceled|aborted|aborterror/i.test(message)
+}
+
 export async function createCheckoutSession(plan, userId) {
   try {
     const successUrl = window.location.origin + '/subscription?status=success'
@@ -146,18 +170,20 @@ export async function getSubscriptionStatus(userId, options = {}) {
       return normalized
     } catch (err) {
       const cached = readCachedStatus(userId)
+      const requestCanceled = isCanceledSubscriptionRequest(err)
       if (cached) {
-        console.info('Subscription status fallback to cache:', err?.message || err)
-        if (err?.code === 'ERR_CANCELED') {
-          timeoutBackoffUntil.set(userId, Date.now() + TIMEOUT_BACKOFF_MS)
+        if (requestCanceled) {
+          scheduleTimeoutBackoff(userId)
+          return normalizeStatus(cached)
         }
+        logFallbackOnce(userId, '[Subscription] Using cached status', err?.message || err)
         return normalizeStatus(cached)
       }
       const message = err?.response?.data || err?.message || err
       const storedFallback = readStoredUserFallbackStatus()
-      if (err?.code === 'ERR_CANCELED') {
-        timeoutBackoffUntil.set(userId, Date.now() + TIMEOUT_BACKOFF_MS)
-        console.warn('Subscription status request timed out, using defaults')
+      if (requestCanceled) {
+        scheduleTimeoutBackoff(userId)
+        return storedFallback || { ...DEFAULT_STATUS }
       } else {
         console.error('Subscription status error:', message)
       }

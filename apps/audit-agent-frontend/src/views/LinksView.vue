@@ -1,20 +1,21 @@
 <template>
-  <main class="min-h-screen px-3 sm:px-6 py-6 bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 text-white">
-    <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+  <main class="app-page-shell">
+    <div class="app-page-frame">
+    <header class="app-page-hero flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
       <div>
-        <p class="text-[11px] uppercase tracking-[0.35em] text-indigo-300/80">Quick Links Hub</p>
-        <h1 class="text-2xl sm:text-3xl font-semibold">Organize and open faster</h1>
-        <p class="text-sm text-slate-300 mt-1">Categories, search, and rich cards designed for scale.</p>
+        <p class="app-page-eyebrow">Quick Links Hub</p>
+        <h1 class="app-page-title !text-[clamp(2rem,3vw,2.7rem)]">Organize and open faster</h1>
+        <p class="app-page-description">Faster first paint, cleaner surfaces, and the same visual rhythm as the dashboard.</p>
       </div>
-      <div class="flex flex-wrap gap-2">
+      <div class="app-page-toolbar">
         <button
-          class="px-3 py-2 rounded-lg border border-slate-700 text-sm font-semibold bg-slate-900 hover:border-indigo-400 transition"
+          class="px-3 py-2 rounded-xl border border-white/10 text-sm font-semibold bg-slate-950/35 hover:border-indigo-300/60 transition"
           @click="openEditor()"
         >
           + New Link
         </button>
         <button
-          class="px-3 py-2 rounded-lg border border-slate-700 text-sm font-semibold bg-slate-900 hover:border-indigo-400 transition"
+          class="px-3 py-2 rounded-xl border border-white/10 text-sm font-semibold bg-slate-950/35 hover:border-indigo-300/60 transition"
           @click="startAddCategory"
         >
           + New Category
@@ -24,14 +25,14 @@
 
     <section class="grid grid-cols-1 lg:grid-cols-5 gap-4">
       <!-- Sidebar -->
-      <aside class="lg:col-span-1 bg-slate-900/70 border border-slate-800 rounded-2xl p-4 space-y-3">
-        <p class="text-xs uppercase tracking-[0.3em] text-indigo-200/70">Categories</p>
+      <aside class="app-page-section app-page-section--compact lg:col-span-1 space-y-3">
+        <p class="app-page-eyebrow !tracking-[0.28em]">Categories</p>
         <div class="space-y-1">
           <button
             v-for="cat in sidebarCategories"
             :key="cat.key"
             class="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-left text-sm transition"
-            :class="activeCategory === cat.name ? 'bg-indigo-700 text-white border border-indigo-500/60' : 'bg-slate-800/70 text-slate-200 border border-slate-800 hover:border-indigo-400/40'"
+            :class="activeCategory === cat.name ? 'bg-indigo-500/90 text-white border border-indigo-300/70 shadow-lg shadow-indigo-950/25' : 'bg-slate-950/30 text-slate-100 border border-white/10 hover:border-indigo-300/40'"
             @click="setCategory(cat.name)"
           >
             <span class="flex items-center gap-2 truncate">
@@ -42,19 +43,19 @@
           </button>
         </div>
 
-        <div class="pt-3 border-t border-slate-800 space-y-2">
-          <p class="text-[11px] uppercase tracking-[0.25em] text-slate-400">Custom</p>
+        <div class="pt-3 border-t border-white/10 space-y-2">
+          <p class="text-[11px] uppercase tracking-[0.25em] text-slate-300/60">Custom</p>
           <div v-if="customCategories.length" class="space-y-1">
             <div
               v-for="cat in customCategories"
               :key="cat.id"
-              class="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800/60 border border-slate-800 hover:border-indigo-400/40 transition"
+              class="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-950/20 border border-white/10 hover:border-indigo-300/40 transition"
             >
               <div class="flex-1 min-w-0">
                 <div v-if="editingCategoryId === cat.id" class="flex items-center gap-2">
                   <input
                     v-model="editingCategoryName"
-                    class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-indigo-500/50 text-sm focus:outline-none"
+                    class="w-full px-3 py-2 rounded-lg bg-slate-950/35 border border-indigo-400/50 text-sm text-white focus:outline-none"
                   />
                   <button
                     class="text-xs text-emerald-300 hover:text-emerald-200"
@@ -91,19 +92,19 @@
           <div v-if="addingCategory" class="space-y-2">
             <input
               v-model="newCategoryName"
-              class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-indigo-500/50 text-sm focus:outline-none"
+              class="w-full px-3 py-2 rounded-lg bg-slate-950/35 border border-indigo-400/50 text-sm text-white focus:outline-none"
               placeholder="Category name"
               @keyup.enter="createCategory"
             />
             <div class="flex gap-2">
               <button
-                class="flex-1 px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-500 transition"
+                class="flex-1 px-3 py-2 rounded-xl bg-gradient-to-r from-fuchsia-500 to-indigo-500 text-white text-sm font-semibold hover:from-fuchsia-400 hover:to-indigo-400 transition"
                 @click="createCategory"
               >
                 Save
               </button>
               <button
-                class="px-3 py-2 rounded-lg bg-slate-800 text-slate-200 text-sm border border-slate-700"
+                class="px-3 py-2 rounded-xl bg-slate-950/30 text-slate-200 text-sm border border-white/10"
                 @click="cancelAddCategory"
               >
                 Cancel
@@ -115,13 +116,13 @@
 
       <!-- Main content -->
       <section class="lg:col-span-4 space-y-4">
-        <div class="flex flex-col md:flex-row md:items-center gap-3 bg-slate-900/70 border border-slate-800 rounded-2xl p-4">
+        <div class="app-page-section app-page-section--compact flex flex-col md:flex-row md:items-center gap-3">
           <div class="flex-1 flex items-center gap-3">
             <input
               v-model="search"
               type="search"
               placeholder="Search links by title or URL"
-              class="w-full px-4 py-2 rounded-lg bg-slate-950 border border-slate-800 text-sm focus:border-indigo-500 outline-none"
+              class="w-full px-4 py-2 rounded-xl bg-slate-950/35 border border-white/10 text-sm text-white focus:border-indigo-400 outline-none"
             />
           </div>
           <div class="flex items-center gap-2 flex-wrap">
@@ -129,21 +130,23 @@
               v-for="mode in filterModes"
               :key="mode.value"
               class="px-3 py-1.5 rounded-full text-xs font-semibold transition border"
-              :class="filterMode === mode.value ? 'bg-indigo-700 text-white border-indigo-500' : 'bg-slate-800 text-slate-200 border-slate-700 hover:border-indigo-400'"
+              :class="filterMode === mode.value ? 'bg-indigo-500/90 text-white border-indigo-300/70' : 'bg-slate-950/30 text-slate-200 border-white/10 hover:border-indigo-300/50'"
               @click="setFilter(mode.value)"
             >
               {{ mode.label }}
             </button>
           </div>
           <button
-            class="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 shadow-md transition"
+            class="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-400 hover:to-indigo-400 shadow-md transition"
             @click="openEditor()"
           >
             + Add Link
           </button>
         </div>
 
-        <div v-if="loading" class="text-slate-400 text-sm">Loading links…</div>
+        <div v-if="loading" class="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
+          <div v-for="n in 6" :key="n" class="app-page-skeleton h-44" />
+        </div>
 
         <div
           v-else-if="displayedLinks.length"
@@ -152,7 +155,7 @@
           <article
             v-for="link in displayedLinks"
             :key="link.id"
-            class="group rounded-2xl border border-white/10 bg-slate-900/70 hover:border-indigo-500/60 transition p-4 flex flex-col gap-3"
+            class="group rounded-3xl border border-white/10 bg-slate-950/30 hover:border-indigo-300/60 transition p-4 flex flex-col gap-3 shadow-lg shadow-slate-950/10"
           >
             <div class="flex items-center justify-between gap-3">
               <div class="flex items-center gap-3 truncate">
@@ -198,7 +201,7 @@
               {{ link.description }}
             </p>
             <div class="flex items-center justify-between text-xs text-slate-400">
-              <span class="px-2 py-0.5 rounded-full bg-slate-800/80 border border-slate-700">
+              <span class="px-2 py-0.5 rounded-full bg-slate-950/35 border border-white/10">
                 {{ link.category || 'General' }}
               </span>
               <span v-if="link.lastUsedAt" class="text-slate-500">Last opened · {{ formatRelative(link.lastUsedAt) }}</span>
@@ -206,7 +209,7 @@
           </article>
         </div>
 
-        <div v-else class="text-slate-400 text-sm bg-slate-900/60 border border-slate-800 rounded-2xl p-6 text-center">
+        <div v-else class="app-page-empty text-sm text-center">
           No links match this view. Try another filter or add a new link.
         </div>
       </section>
@@ -219,11 +222,12 @@
       @close="closeEditor"
       @save="handleSave"
     />
+    </div>
   </main>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import LinkEditorModal from '@/components/LinkEditorModal.vue'
 import {
@@ -231,15 +235,16 @@ import {
   addLinkCategory,
   deleteLink,
   getLinkCategories,
-  getLinks,
   touchLink as touchLinkService,
   updateLink,
   updateLinkCategory,
   watchLinkCategories,
   watchLinks,
 } from '@/services/firebaseService'
+import { useAuthStore } from '@/stores/authStore'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 
+const authStore = useAuthStore()
 const links = ref([])
 const categories = ref([])
 const loading = ref(true)
@@ -256,6 +261,7 @@ const editingCategoryId = ref(null)
 const editingCategoryName = ref('')
 const workspaceStore = useWorkspaceStore()
 const activeWorkspaceId = computed(() => workspaceStore.activeWorkspaceId)
+const activeFeedKey = ref('')
 
 const filterModes = [
   { label: 'All', value: 'all' },
@@ -320,37 +326,70 @@ const displayedLinks = computed(() => {
     })
 })
 
-async function hydrateData() {
-  loading.value = true
+function clearRealtimeFeeds() {
   try {
     stopLinks.value?.()
     stopCategories.value?.()
   } catch {}
-  try {
-    const [initialLinks, initialCats] = await Promise.all([getLinks(), getLinkCategories()])
-    links.value = initialLinks
-    categories.value = initialCats
-  } finally {
+  stopLinks.value = null
+  stopCategories.value = null
+}
+
+async function hydrateData(options = {}) {
+  const uid = authStore.user?.uid
+  if (!uid) {
+    clearRealtimeFeeds()
+    activeFeedKey.value = ''
+    links.value = []
+    categories.value = []
     loading.value = false
+    return
   }
+
+  const workspaceKey = activeWorkspaceId.value || 'personal'
+  const nextFeedKey = `${uid}:${workspaceKey}`
+  if (!options.force && activeFeedKey.value === nextFeedKey && stopLinks.value && stopCategories.value) {
+    return
+  }
+
+  activeFeedKey.value = nextFeedKey
+  loading.value = true
+  clearRealtimeFeeds()
+
+  let linksReady = false
+  let categoriesReady = false
+  const resolveLoading = () => {
+    if (linksReady && categoriesReady) loading.value = false
+  }
+
   stopLinks.value = watchLinks((list) => {
     links.value = list
+    linksReady = true
+    resolveLoading()
   })
+
+  try {
+    categories.value = await getLinkCategories()
+  } catch (error) {
+    console.warn('[Links] category bootstrap failed', error?.message || error)
+    categories.value = []
+  } finally {
+    categoriesReady = true
+    resolveLoading()
+  }
+
   stopCategories.value = watchLinkCategories((cats) => {
-    categories.value = cats
+    if (Array.isArray(cats) && cats.length) {
+      categories.value = cats
+    }
   })
 }
 
 watch(
-  () => authStore.user?.uid,
-  (uid) => {
+  () => [authStore.user?.uid, activeWorkspaceId.value],
+  ([uid]) => {
     if (!uid) {
-      links.value = []
-      categories.value = []
-      try {
-        stopLinks.value?.()
-        stopCategories.value?.()
-      } catch {}
+      hydrateData({ force: true })
       return
     }
     hydrateData()
@@ -358,15 +397,8 @@ watch(
   { immediate: true },
 )
 
-watch(activeWorkspaceId, () => {
-  if (authStore.user?.uid) hydrateData()
-})
-
 onBeforeUnmount(() => {
-  try {
-    stopLinks.value?.()
-    stopCategories.value?.()
-  } catch {}
+  clearRealtimeFeeds()
 })
 
 function openEditor(link = null) {

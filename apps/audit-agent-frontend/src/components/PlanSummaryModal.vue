@@ -24,11 +24,11 @@
       <div class="pt-2">
         <router-link
           v-if="planKey !== 'PREMIUM'"
-          to="/subscription"
+          :to="upgradeRoute"
           @click="track"
           class="inline-block px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition font-medium"
         >
-          🚀 Upgrade to Pro
+          {{ upgradeLabel }}
         </router-link>
         <span
           v-else
@@ -46,6 +46,7 @@ import { ref, computed, watch } from 'vue'
 import { trackLinkedInConversion } from '@/utils/ads'
 import { useAuthStore } from '@/stores/authStore'
 import { PLANS, resolvePlanKey } from '@/services/planService'
+import { isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
 
 const props = defineProps({ open: { type: Boolean, default: false } })
 const emit = defineEmits(['close'])
@@ -77,6 +78,8 @@ const planLabel = computed(() => {
     .join(' ')
 })
 const dialogWidth = ref(window.innerWidth < 640 ? '90%' : '420px')
+const upgradeRoute = computed(() => (detectAppleBillingSafeMode() ? '/billing/upgrade' : '/subscription'))
+const upgradeLabel = computed(() => (detectAppleBillingSafeMode() ? 'Upgrade to Premium on web' : 'Upgrade to Premium'))
 
 
 const limits = computed(() => ({

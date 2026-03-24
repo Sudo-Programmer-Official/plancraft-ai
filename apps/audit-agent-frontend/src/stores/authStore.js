@@ -1068,7 +1068,7 @@ export const useAuthStore = defineStore('authStore', {
                   try { mod.useWorkspaceStore().init() } catch {}
                 })
               } catch {}
-              this.refreshPlan({ minIntervalMs: 15000 }).catch(() => {})
+              this.refreshPlan({ minIntervalMs: 5 * 60 * 1000 }).catch(() => {})
               settleBootstrap('ios-snapshot')
             }
           } catch (error) {
@@ -1206,7 +1206,7 @@ export const useAuthStore = defineStore('authStore', {
                 mod.refreshAppToken().catch(() => {})
               }
             } catch {}
-            this.refreshPlan().catch(() => {})
+            this.refreshPlan({ minIntervalMs: 5 * 60 * 1000 }).catch(() => {})
           } else {
             this.resetAuth()
           }

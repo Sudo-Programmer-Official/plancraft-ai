@@ -1,6 +1,6 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-b from-slate-950 via-indigo-950 to-slate-950 text-white">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-10 space-y-8">
+  <div class="app-page-shell">
+    <div class="app-page-frame">
       <div v-if="guardError" class="rounded-2xl border border-rose-500/40 bg-rose-500/10 p-6 space-y-3">
         <h1 class="text-2xl font-semibold">No access to this workspace</h1>
         <p class="text-rose-100/80 text-sm">
@@ -15,7 +15,7 @@
       </div>
 
       <template v-else>
-        <section class="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 shadow-xl space-y-3">
+        <section class="app-page-hero space-y-3">
           <div v-if="bootingWorkspace" class="animate-pulse space-y-3">
             <div class="h-5 w-48 rounded bg-white/10"></div>
             <div class="h-8 w-64 rounded bg-white/10"></div>
@@ -23,9 +23,9 @@
           </div>
           <div v-else class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div class="space-y-1">
-              <p class="text-xs uppercase tracking-[0.35em] text-indigo-300">Active workspace</p>
-              <h1 class="text-2xl sm:text-3xl font-bold">{{ activeWorkspace?.name }}</h1>
-              <p class="text-sm text-indigo-200/90">
+              <p class="app-page-eyebrow">Active workspace</p>
+              <h1 class="app-page-title !text-[clamp(2rem,3vw,2.75rem)]">{{ activeWorkspace?.name }}</h1>
+              <p class="text-sm text-indigo-100/80">
                 {{ activeWorkspace?.description || 'Shared tasks, roles, and Voice AI reminders in one place.' }}
               </p>
               <div class="flex flex-wrap items-center gap-2 text-[12px] text-indigo-200/90">
@@ -45,13 +45,13 @@
             </div>
             <div class="flex flex-wrap gap-2">
               <button
-                class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 font-semibold shadow-lg shadow-indigo-900/40"
+                class="px-4 py-2 rounded-xl bg-gradient-to-r from-fuchsia-500 to-indigo-500 hover:from-fuchsia-400 hover:to-indigo-400 font-semibold shadow-lg shadow-indigo-950/35"
                 @click="router.push('/workspaces')"
               >
                 Manage workspace
               </button>
               <button
-                class="px-4 py-2 rounded-lg border border-white/20 hover:border-white/60 text-sm"
+                class="px-4 py-2 rounded-xl border border-white/10 hover:border-indigo-300/50 text-sm transition"
                 @click="router.push('/workspaces')"
               >
                 Invite teammates
@@ -65,14 +65,14 @@
             <h2 class="text-xl font-semibold">Tasks</h2>
             <div class="flex items-center gap-2">
               <button
-                class="px-4 py-2 rounded-lg bg-white text-indigo-800 font-semibold hover:bg-slate-100 transition"
+                class="px-4 py-2 rounded-xl bg-gradient-to-r from-fuchsia-500 to-indigo-500 text-white font-semibold hover:from-fuchsia-400 hover:to-indigo-400 transition"
                 :disabled="tasksLoading"
                 @click="createQuickTask"
               >
                 Create task
               </button>
               <button
-                class="px-4 py-2 rounded-lg border border-white/15 hover:border-white/40 text-sm"
+                class="px-4 py-2 rounded-xl border border-white/10 hover:border-indigo-300/50 text-sm transition"
                 @click="showTemplates = true"
               >
                 Use a template
@@ -81,33 +81,33 @@
           </div>
 
           <div v-if="tasksLoading" class="grid gap-3 md:grid-cols-2">
-            <div v-for="n in 4" :key="n" class="rounded-xl border border-white/10 bg-white/5 p-4 animate-pulse space-y-3">
+            <div v-for="n in 4" :key="n" class="app-page-skeleton p-4 animate-pulse space-y-3">
               <div class="h-4 w-2/3 bg-white/10 rounded"></div>
               <div class="h-3 w-full bg-white/10 rounded"></div>
               <div class="h-3 w-1/2 bg-white/10 rounded"></div>
             </div>
           </div>
 
-          <div v-else-if="!tasks?.length" class="rounded-2xl border border-white/10 bg-white/5 p-6 space-y-3 text-indigo-100">
+          <div v-else-if="!tasks?.length" class="app-page-section space-y-3 text-indigo-100">
             <h3 class="text-xl font-semibold">Your workspace is ready ✅</h3>
             <p class="text-sm text-indigo-200/90">
               Add tasks, invite teammates, or drop in a template. No spinners, no blank screens.
             </p>
             <div class="flex flex-wrap gap-3">
               <button
-                class="px-4 py-2 rounded-lg bg-white text-indigo-800 font-semibold hover:bg-slate-100 transition"
+                class="px-4 py-2 rounded-xl bg-gradient-to-r from-fuchsia-500 to-indigo-500 text-white font-semibold hover:from-fuchsia-400 hover:to-indigo-400 transition"
                 @click="createQuickTask"
               >
                 Create task
               </button>
               <button
-                class="px-4 py-2 rounded-lg border border-white/15 hover:border-white/40"
+                class="px-4 py-2 rounded-xl border border-white/10 hover:border-indigo-300/50 transition"
                 @click="router.push('/workspaces')"
               >
                 Invite teammate
               </button>
               <button
-                class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 font-semibold shadow-lg shadow-indigo-900/40"
+                class="px-4 py-2 rounded-xl bg-gradient-to-r from-fuchsia-500 to-indigo-500 hover:from-fuchsia-400 hover:to-indigo-400 font-semibold shadow-lg shadow-indigo-950/35 text-white"
                 @click="showTemplates = true"
               >
                 Use a template
@@ -119,7 +119,7 @@
             <article
               v-for="task in tasks"
               :key="task.id"
-              class="task-card rounded-2xl border border-white/10 bg-white/5 p-4"
+              class="task-card rounded-3xl border border-white/10 bg-slate-950/30 p-4 shadow-lg shadow-slate-950/10"
             >
               <div class="flex items-start gap-3">
                 <input
@@ -161,7 +161,7 @@
 
         <section
           v-if="showTemplates"
-          class="rounded-2xl border border-white/10 bg-slate-900/80 p-6 space-y-4 shadow-2xl shadow-indigo-900/40"
+          class="app-page-section space-y-4 shadow-2xl shadow-indigo-900/20"
         >
           <div class="flex items-center justify-between gap-3">
             <div>
@@ -179,7 +179,7 @@
             <article
               v-for="tpl in templateOptions"
               :key="tpl.key"
-              class="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-2 hover:border-indigo-300/60 transition"
+              class="rounded-3xl border border-white/10 bg-slate-950/30 p-4 space-y-2 hover:border-indigo-300/60 transition"
               :class="tpl.recommended ? 'ring-2 ring-indigo-400/50' : ''"
             >
               <div class="flex items-center justify-between gap-2">
@@ -195,7 +195,7 @@
                 <li v-for="task in tpl.tasks.slice(0, 3)" :key="task.title">✅ {{ task.title }}</li>
               </ul>
               <button
-                class="px-3 py-2 rounded-lg bg-white/90 text-indigo-800 font-semibold hover:bg-white"
+                class="px-3 py-2 rounded-xl bg-gradient-to-r from-fuchsia-500 to-indigo-500 text-white font-semibold hover:from-fuchsia-400 hover:to-indigo-400"
                 @click="applyTemplate(tpl)"
                 :disabled="templateApplying === tpl.key"
               >

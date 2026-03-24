@@ -83,17 +83,15 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import LinkEditorModal from '@/components/LinkEditorModal.vue'
 import {
   addLink,
-  getLinks,
   updateLink,
   watchLinks,
   watchLinkCategories,
   touchLink as touchLinkService,
 } from '@/services/firebaseService'
-import { useWorkspaceStore } from '@/stores/workspaceStore'
 
 const links = ref([])
 const categories = ref([])
@@ -101,8 +99,6 @@ const modalOpen = ref(false)
 const editingLink = ref(null)
 const stopLinks = ref(null)
 const stopCategories = ref(null)
-const workspaceStore = useWorkspaceStore()
-const activeWorkspaceId = computed(() => workspaceStore.activeWorkspaceId)
 
 const featuredLinks = computed(() => {
   const starred = links.value.filter((l) => l.starred).slice(0, 3)
@@ -115,7 +111,6 @@ async function hydrateLinks() {
     stopLinks.value?.()
     stopCategories.value?.()
   } catch {}
-  links.value = await getLinks()
   stopLinks.value = watchLinks((list) => {
     links.value = list
   })
@@ -125,10 +120,6 @@ async function hydrateLinks() {
 }
 
 onMounted(() => {
-  hydrateLinks()
-})
-
-watch(activeWorkspaceId, () => {
   hydrateLinks()
 })
 

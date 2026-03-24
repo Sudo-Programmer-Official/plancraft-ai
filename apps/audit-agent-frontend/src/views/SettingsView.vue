@@ -68,7 +68,7 @@
             <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Billing</p>
             <h2 class="text-lg sm:text-xl font-semibold mb-1">🌟 Subscription & Usage</h2>
             <p class="text-sm text-indigo-200">
-              Personal plan status plus the new teams pricing for shared workspaces.
+              {{ billingSectionIntro }}
             </p>
           </div>
           <div class="flex items-center gap-2 flex-wrap">
@@ -98,9 +98,10 @@
                   @click="upgradePlan"
                   class="bg-gradient-to-r from-purple-500 to-pink-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-white shadow-lg hover:from-purple-600 hover:to-pink-700 transition text-sm sm:text-base"
                 >
-                  🚀 Upgrade
+                  {{ personalPlanCtaLabel }}
                 </button>
-                <el-button size="small" plain @click="openSubscriptionPage">Manage in billing</el-button>
+                <el-button v-if="!isAppleBillingSafeMode" size="small" plain @click="openSubscriptionPage">Manage in billing</el-button>
+                <el-button v-else size="small" plain @click="copyBillingWebsite">Copy website</el-button>
               </div>
             </div>
 
@@ -126,10 +127,46 @@
               <p v-if="isPremium && subStore.subscription?.remainingDays > 0" class="text-xs text-indigo-300">
                 ⏳ Ends on {{ premiumEndsOn }}
               </p>
+              <p v-if="isAppleBillingSafeMode" class="text-xs text-indigo-200/80">
+                Billing changes are handled on {{ billingWebHost }}.
+              </p>
             </div>
           </div>
 
-          <div class="rounded-2xl border border-indigo-400/30 bg-indigo-900/60 p-4 sm:p-5 space-y-3 shadow-lg">
+          <div v-if="isAppleBillingSafeMode" class="rounded-2xl border border-indigo-400/30 bg-indigo-900/60 p-4 sm:p-5 space-y-4 shadow-lg">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <p class="text-xs uppercase tracking-[0.25em] text-indigo-200">Workspace upgrades</p>
+                <h3 class="text-xl font-semibold text-white">Paid workspaces are managed on the web</h3>
+                <p class="text-sm text-indigo-100/90">
+                  Create, upgrade, or manage shared workspaces on {{ billingWebHost }}. The app will reflect those changes after your next refresh.
+                </p>
+              </div>
+            </div>
+            <div class="rounded-xl border border-white/10 bg-slate-950/50 p-4 space-y-2">
+              <p class="text-sm font-semibold text-white">Included in paid workspaces</p>
+              <ul class="text-sm text-indigo-100/90 space-y-1">
+                <li>Shared workspace access and invites</li>
+                <li>Role-based collaboration</li>
+                <li>Voice AI reminders and team workflows</li>
+              </ul>
+            </div>
+            <div class="flex flex-wrap gap-3">
+              <button
+                class="px-3 py-2 rounded-lg bg-white text-indigo-800 font-semibold text-sm hover:bg-slate-100 transition"
+                @click="openSubscriptionPage"
+              >
+                Upgrade on web
+              </button>
+              <button
+                class="px-3 py-2 rounded-lg border border-white/15 bg-slate-900/60 text-white font-semibold text-sm hover:border-indigo-300/40 transition"
+                @click="copyBillingWebsite"
+              >
+                Copy website
+              </button>
+            </div>
+          </div>
+          <div v-else class="rounded-2xl border border-indigo-400/30 bg-indigo-900/60 p-4 sm:p-5 space-y-3 shadow-lg">
             <div class="flex items-start justify-between gap-3">
               <div>
                 <p class="text-xs uppercase tracking-[0.25em] text-indigo-200">Teams pricing</p>
@@ -682,8 +719,15 @@ import AvatarUploader from '@/components/AvatarUploader.vue'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { useQuickSetupStore } from '@/stores/quickSetupStore'
 import { getNativeAuthRestriction, isNativePackagedApp } from '@/utils/nativeAuthSupport'
+import { BILLING_WEB_HOST, isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
 import { copyText, openExternalUrl } from '@/utils/nativeUi'
-import { getIncompleteQuickSetupLabels } from '@/utils/quickSetup'
+import {
+  buildQuickSetupState,
+  dispatchQuickSetupUpdated,
+  getIncompleteQuickSetupLabels,
+  normalizeQuickSetupChannels,
+  writeQuickSetupState,
+} from '@/utils/quickSetup'
 import dayjs from 'dayjs'
 
 const authStore = useAuthStore()
@@ -694,6 +738,8 @@ const { refresh: refreshPremium } = useIsPremium()
 const workspaceStore = useWorkspaceStore()
 const quickSetupStore = useQuickSetupStore()
 const canUseBrowserPush = computed(() => !isNativePackagedApp())
+const billingWebHost = BILLING_WEB_HOST
+const isAppleBillingSafeMode = computed(() => detectAppleBillingSafeMode())
 const quickSetupState = computed(() => quickSetupStore.setupState)
 const quickSetupMissingLabels = computed(() => getIncompleteQuickSetupLabels(quickSetupState.value))
 const teamWorkspaces = computed(() =>
@@ -939,6 +985,58 @@ function applyProfileFields(user, data = {}) {
   profileComplete.value = !!(data?.name || user?.displayName)
 }
 
+function currentQuickSetupTimezone() {
+  try {
+    return (
+      localStorage.getItem('user_timezone') ||
+      Intl.DateTimeFormat().resolvedOptions().timeZone ||
+      'UTC'
+    )
+  } catch {
+    return 'UTC'
+  }
+}
+
+function deriveQuickSetupPhone() {
+  const candidates = [
+    notifPhones.value?.sms,
+    notifPhones.value?.voice,
+    integrationEndpoints.value?.sms?.phone,
+    integrationEndpoints.value?.whatsapp?.phone,
+    profileForm.phone,
+    authStore.user?.phone,
+  ]
+  return (
+    candidates
+      .map((value) => String(value || '').trim())
+      .find(Boolean) || ''
+  )
+}
+
+function deriveQuickSetupChannels() {
+  return normalizeQuickSetupChannels([
+    prefs.email && 'email',
+    canUseBrowserPush.value && prefs.pwa && 'pwa',
+    prefs.whatsapp && 'whatsapp',
+    prefs.sms && 'sms',
+    prefs.voice_call && 'voice_call',
+  ])
+}
+
+function syncQuickSetupFromSettings() {
+  const nextState = buildQuickSetupState({
+    timezone: currentQuickSetupTimezone(),
+    channels: deriveQuickSetupChannels(),
+    phone: deriveQuickSetupPhone(),
+    pushGranted: canUseBrowserPush.value ? !!prefs.pwa : false,
+    isNative: isNativePackagedApp(),
+  })
+  writeQuickSetupState(nextState)
+  quickSetupStore.refreshQuickSetupState(nextState)
+  dispatchQuickSetupUpdated(nextState)
+  return nextState
+}
+
 async function loadSettingsProfile(uid) {
   const user = auth.currentUser || authStore.user || null
   if (!uid) {
@@ -977,6 +1075,7 @@ async function hydrateSettingsForUser(uid) {
 
     await loadSettingsProfile(uid)
     await loadGoogle({ suppressLoader: false })
+    syncQuickSetupFromSettings()
     loadedSettingsUid.value = uid
   } finally {
     settingsLoadInFlight.value = false
@@ -1363,6 +1462,10 @@ function handleLogout() {
 }
 
 function openSubscriptionPage(hash = '') {
+  if (isAppleBillingSafeMode.value) {
+    router.push({ path: '/billing/upgrade', query: { source: 'settings-billing' } })
+    return
+  }
   const targetHash = hash ? `#${hash}` : ''
   router.push({ path: '/subscription', hash: targetHash })
 }
@@ -1372,6 +1475,11 @@ function goToTeamsPricing() {
 }
 
 function handleTeamCta(plan = 'starter') {
+  if (isAppleBillingSafeMode.value) {
+    const workspace = activeTeamWorkspace.value
+    router.push({ path: '/billing/upgrade', query: { source: 'settings-team', plan, workspaceId: workspace?.id || '' } })
+    return
+  }
   const isGuest = authStore.isGuest === true || authStore.guest === true || authStore.user?.mode === 'guest'
   const target = plan === 'pro' ? '/workspaces/new?plan=pro' : '/workspaces/new'
   const workspace = activeTeamWorkspace.value
@@ -1402,6 +1510,15 @@ function handleTeamCta(plan = 'starter') {
 function upgradePlan() {
   try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_UPGRADE_CLICK) } catch {}
   openSubscriptionPage() // redirect to subscription/pricing
+}
+
+async function copyBillingWebsite() {
+  const copied = await copyText(billingWebHost)
+  if (copied) {
+    ElMessage.success(`${billingWebHost} copied`)
+    return
+  }
+  ElMessage.info(`Visit ${billingWebHost}`)
 }
 
 // Updated saveSettings function with user feedback
@@ -1462,6 +1579,7 @@ async function saveSettings() {
       integrationToggles: toggles,
       integrationEndpoints: integrationEndpoints.value,
     })
+    syncQuickSetupFromSettings()
     ElMessage.success("✅ Settings saved successfully!")
     dirty.value = false // reset dirty flag
   } catch (error) {
@@ -1506,6 +1624,15 @@ async function saveProfile() {
       }
     }
     profileComplete.value = !!(profileForm.name && profileForm.name.trim().length)
+    authStore.user = {
+      ...(authStore.user || {}),
+      displayName: profileForm.name || authStore.user?.displayName || '',
+      email: profileForm.email || authStore.user?.email || '',
+      phone: phoneE164 || '',
+    }
+    integrationEndpoints.value.email = profileForm.email || authStore.user?.email || ''
+    try { localStorage.setItem('user', JSON.stringify(authStore.user)) } catch {}
+    syncQuickSetupFromSettings()
     ElMessage.success('Profile updated successfully!')
   } catch (e) {
     console.error('Failed to update profile', e)
@@ -1727,6 +1854,14 @@ const remindersUsed = computed(() => Number(usageToday.value.reminders || 0))
 const aiLimitLabel = computed(() => (isPremium.value ? '∞' : PLANS.FREE.limits.aiGenerations))
 const remindersLimitLabel = computed(() => (isPremium.value ? '∞' : PLANS.FREE.limits.remindersPerDay))
 const planOpen = ref(false)
+const billingSectionIntro = computed(() =>
+  isAppleBillingSafeMode.value
+    ? 'Plan upgrades and workspace billing are managed on the web for the iPhone app.'
+    : 'Personal plan status plus the new teams pricing for shared workspaces.',
+)
+const personalPlanCtaLabel = computed(() =>
+  isAppleBillingSafeMode.value ? 'Upgrade on web' : '🚀 Upgrade',
+)
 
 const normalizedPlanLabel = computed(() => {
   const raw =

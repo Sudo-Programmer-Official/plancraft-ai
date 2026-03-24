@@ -1,31 +1,31 @@
 <template>
-  <div class="min-h-screen w-full max-w-full min-w-0 overflow-x-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-50 box-border">
-    <div class="w-full max-w-6xl min-w-0 mx-auto px-4 sm:px-6 py-8 space-y-8">
-      <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 w-full max-w-full min-w-0">
+  <div class="app-page-shell w-full max-w-full min-w-0 overflow-x-hidden box-border">
+    <div class="app-page-frame w-full max-w-full min-w-0">
+      <header class="app-page-hero flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 w-full max-w-full min-w-0">
         <div class="space-y-2 min-w-0">
-          <p class="text-xs uppercase tracking-[0.3em] text-indigo-300/80">Workspaces</p>
-          <h1 class="text-3xl font-bold">Your universes inside PlanCraft</h1>
-          <p class="text-slate-300 max-w-3xl text-sm sm:text-base">
+          <p class="app-page-eyebrow">Workspaces</p>
+          <h1 class="app-page-title !text-[clamp(2rem,3vw,2.9rem)]">Your universes inside PlanCraft</h1>
+          <p class="app-page-description max-w-3xl text-sm sm:text-base">
             Switch contexts without losing focus. Every workspace keeps its own tasks, drafts, events, and AI memory.
           </p>
         </div>
-        <div class="flex flex-wrap items-center gap-2 min-w-0 w-full sm:w-auto">
+        <div class="app-page-toolbar min-w-0 w-full sm:w-auto">
           <button
-            class="px-4 py-2 rounded-lg border border-slate-700 bg-slate-900/70 hover:bg-slate-800 text-sm font-semibold w-full sm:w-auto"
+            class="px-4 py-2 rounded-xl border border-white/10 bg-slate-950/35 hover:border-indigo-300/60 text-sm font-semibold w-full sm:w-auto transition"
             @click="refresh"
           >
             Refresh
           </button>
           <button
             v-if="canManageMembers && activeWorkspaceId"
-            class="px-4 py-2 rounded-lg border border-indigo-400/60 bg-indigo-500/10 hover:bg-indigo-500/20 text-sm font-semibold text-indigo-100 w-full sm:w-auto"
+            class="px-4 py-2 rounded-xl border border-indigo-300/50 bg-indigo-500/10 hover:bg-indigo-500/20 text-sm font-semibold text-indigo-100 w-full sm:w-auto"
             :disabled="!canInvite"
             @click="openInviteModal()"
           >
             Share workspace
           </button>
           <button
-            class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold shadow-lg shadow-indigo-900/40 w-full sm:w-auto"
+            class="px-4 py-2 rounded-xl bg-gradient-to-r from-fuchsia-500 to-indigo-500 hover:from-fuchsia-400 hover:to-indigo-400 text-sm font-semibold shadow-lg shadow-indigo-950/35 w-full sm:w-auto transition"
             @click="openCreate"
           >
             + Create workspace
@@ -37,21 +37,21 @@
         <div class="lg:col-span-2 space-y-4 w-full max-w-full min-w-0">
           <div
             v-if="!workspaces.length && workspaceStore.loading"
-            class="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 text-slate-400"
+            class="app-page-section text-slate-300"
           >
             Loading your workspaces…
           </div>
 
           <div
             v-else-if="!workspaces.length"
-            class="rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 p-6 space-y-3 text-slate-300"
+            class="app-page-empty space-y-3 text-slate-200"
           >
             <h3 class="text-lg font-semibold text-slate-100">No workspaces yet</h3>
             <p class="text-sm text-slate-400">
               Create your first workspace to keep tasks, drafts, and reminders grouped by a theme.
             </p>
             <button
-              class="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold"
+              class="px-3 py-2 rounded-xl bg-gradient-to-r from-fuchsia-500 to-indigo-500 hover:from-fuchsia-400 hover:to-indigo-400 text-sm font-semibold text-white"
               @click="openCreate"
             >
               Start with “Personal”
@@ -62,7 +62,7 @@
             <article
               v-for="ws in workspaces"
               :key="ws.id"
-              class="w-full max-w-full min-w-0 rounded-2xl border bg-slate-900/70 p-4 space-y-3 transition hover:-translate-y-0.5 overflow-hidden box-border"
+              class="w-full max-w-full min-w-0 rounded-3xl border bg-slate-950/30 p-4 space-y-3 transition hover:-translate-y-0.5 overflow-hidden box-border shadow-lg shadow-slate-950/10"
               :class="workspaceCardClass(ws)"
             >
               <div class="flex items-start justify-between gap-2 min-w-0">
@@ -120,7 +120,7 @@
           </div>
         </div>
 
-        <aside class="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 space-y-4 h-fit w-full max-w-full min-w-0">
+        <aside class="app-page-section app-page-section--compact space-y-4 h-fit w-full max-w-full min-w-0">
           <div class="flex items-center gap-3 min-w-0">
             <div class="w-12 h-12 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-2xl">
               {{ activeWorkspace?.icon || '📦' }}
@@ -145,7 +145,7 @@
               <span>Leader/Creator boards respect the active workspace context.</span>
             </li>
           </ul>
-          <div class="border border-slate-800 rounded-xl p-3 bg-slate-900/70 space-y-3">
+          <div class="border border-white/10 rounded-2xl p-3 bg-slate-950/25 space-y-3">
             <div class="flex items-center justify-between gap-2">
               <div>
                 <p class="text-xs uppercase tracking-[0.2em] text-indigo-300/80">Creator mode</p>
@@ -184,7 +184,7 @@
             </div>
           </div>
           <button
-            class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm hover:border-indigo-400"
+            class="w-full px-3 py-2 rounded-xl bg-slate-950/30 border border-white/10 text-sm hover:border-indigo-300/50 transition"
             @click="openCreate"
           >
             + New workspace
@@ -193,7 +193,7 @@
       </section>
 
       <section id="workspace-members" class="pb-8 w-full max-w-full min-w-0">
-        <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 space-y-4 w-full max-w-full min-w-0">
+        <div class="app-page-section space-y-4 w-full max-w-full min-w-0">
           <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 min-w-0">
             <div>
               <p class="text-xs uppercase tracking-[0.3em] text-indigo-300/80">Members</p>
@@ -206,7 +206,7 @@
             </div>
             <div class="flex flex-wrap gap-2">
               <button
-                class="px-3 py-2 rounded-lg border border-slate-700 text-sm hover:border-indigo-300/60 disabled:opacity-50"
+                class="px-3 py-2 rounded-xl border border-white/10 text-sm hover:border-indigo-300/60 disabled:opacity-50 transition"
                 :disabled="membersLoading || !activeWorkspaceId"
                 @click="loadMembers()"
               >
@@ -214,7 +214,7 @@
               </button>
               <button
                 v-if="canManageMembers"
-                class="px-3 py-2 rounded-lg bg-indigo-600 text-sm font-semibold hover:bg-indigo-500 disabled:opacity-60"
+                class="px-3 py-2 rounded-xl bg-gradient-to-r from-fuchsia-500 to-indigo-500 text-sm font-semibold hover:from-fuchsia-400 hover:to-indigo-400 text-white disabled:opacity-60"
                 :disabled="!activeWorkspaceId || !canInvite"
                 @click="openInviteModal()"
               >
@@ -223,21 +223,21 @@
             </div>
           </div>
 
-          <div v-if="!activeWorkspaceId" class="text-slate-400 text-sm border border-dashed border-slate-700 rounded-xl p-4">
+          <div v-if="!activeWorkspaceId" class="app-page-empty text-sm">
             Select a workspace to manage its members.
           </div>
           <div v-else>
             <div v-if="membersError" class="text-rose-200 text-sm bg-rose-500/10 border border-rose-500/30 rounded-xl p-3">
               {{ membersError }}
             </div>
-            <div v-else-if="membersLoading" class="text-slate-300 text-sm border border-slate-800 rounded-xl p-3 bg-slate-900/60">
+            <div v-else-if="membersLoading" class="text-slate-200 text-sm border border-white/10 rounded-2xl p-3 bg-slate-950/25">
               Loading members…
             </div>
             <div v-else class="space-y-3">
               <div
                 v-for="member in members"
                 :key="member.userId"
-                class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-slate-800 rounded-xl p-3 bg-slate-900/60 min-w-0"
+                class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-white/10 rounded-2xl p-3 bg-slate-950/25 min-w-0"
               >
                 <div class="flex items-center gap-3 min-w-0">
                   <div class="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-sm font-semibold uppercase text-indigo-100">

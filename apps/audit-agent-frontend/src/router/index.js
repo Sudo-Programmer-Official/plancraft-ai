@@ -257,6 +257,26 @@ router.beforeEach(async (to, from, next) => {
     return next({ path: '/login', query: { mode: 'team', next: nextTarget } })
   }
 
+  if (
+    isIosPackagedApp() &&
+    (
+      to.path === '/subscription' ||
+      to.path === '/pricing' ||
+      to.path === '/billing' ||
+      to.path === '/checkout' ||
+      to.path === '/billing/checkout'
+    )
+  ) {
+    return next({
+      path: '/billing/upgrade',
+      query: {
+        ...to.query,
+        source: typeof to.query?.source === 'string' ? to.query.source : 'ios-billing',
+      },
+      hash: to.hash,
+    })
+  }
+
   // If navigating to login or signup: only redirect away when fully signed-in (not guest)
   if (to.path === '/login' || to.path === '/signup') {
     try {

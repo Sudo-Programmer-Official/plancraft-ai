@@ -1,14 +1,15 @@
 <template>
-  <div class="min-h-screen p-6 bg-gradient-to-b from-slate-900 to-slate-800 text-white relative">
+  <div class="app-page-shell relative">
+    <div class="app-page-frame">
     <!-- Header -->
-    <div class="flex flex-col gap-3 mb-4">
+    <div class="app-page-hero flex flex-col gap-3">
       <div class="flex items-center justify-between gap-3">
-        <h2 class="text-3xl font-semibold flex items-center gap-2">
+        <h2 class="app-page-title !text-[clamp(2rem,3vw,2.8rem)] flex items-center gap-2">
           🔔 Reminders
           <span v-if="loading" class="text-gray-400 text-base animate-pulse">Loading...</span>
         </h2>
         <button
-          class="px-3 py-2 text-sm rounded-lg bg-indigo-600 hover:bg-indigo-500 transition shadow shadow-indigo-500/20 add-reminder-btn"
+          class="px-3 py-2 text-sm rounded-xl bg-gradient-to-r from-fuchsia-500 to-indigo-500 hover:from-fuchsia-400 hover:to-indigo-400 transition shadow shadow-indigo-950/30 add-reminder-btn"
           @click="goToPlanner"
         >
           <span class="add-reminder-icon">＋</span> Add reminder
@@ -64,19 +65,19 @@
     </div>
 
     <!-- Usage meter: Sign in for guests, Upgrade for signed-in free users -->
-    <div v-if="usage.plan === 'free' && !isPremium" class="mb-6 flex items-center justify-between bg-slate-800/60 border border-slate-700 rounded-lg p-3">
+    <div v-if="usage.plan === 'free' && !isPremium" class="app-page-section app-page-section--compact mb-2 flex items-center justify-between">
       <span class="text-sm text-gray-300">You’ve used {{ usage.used }}/{{ usage.limit }} reminders today.</span>
       <button
         v-if="!isGuest"
         @click="goToUpgrade"
-        class="px-3 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 rounded-md text-white"
+        class="px-3 py-1 text-xs bg-gradient-to-r from-fuchsia-500 to-indigo-500 hover:from-fuchsia-400 hover:to-indigo-400 rounded-lg text-white"
       >
         Upgrade for unlimited 🚀
       </button>
       <RouterLink
         v-else
         to="/login"
-        class="px-3 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 rounded-md text-white"
+        class="px-3 py-1 text-xs bg-gradient-to-r from-fuchsia-500 to-indigo-500 hover:from-fuchsia-400 hover:to-indigo-400 rounded-lg text-white"
       >
         🔑 Sign in
       </RouterLink>
@@ -109,7 +110,7 @@
         :ref="setGroupRef(date)"
         class="scroll-mt-20"
       >
-        <h3 class="text-xl font-semibold mt-8 mb-3 border-b border-slate-700 pb-1">
+        <h3 class="text-xl font-semibold mt-8 mb-3 border-b border-white/10 pb-1">
           {{ date }}
         </h3>
 
@@ -117,7 +118,7 @@
           <div
             v-for="r in group"
             :key="r.id"
-            class="max-w-4xl mx-auto p-4 rounded-2xl bg-slate-800/70 border border-slate-700 shadow-md hover:shadow-indigo-500/20 transition-all flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3"
+            class="max-w-4xl mx-auto p-4 rounded-3xl bg-slate-950/30 border border-white/10 shadow-md hover:shadow-indigo-500/20 transition-all flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3"
           >
             <div class="flex flex-col flex-1 gap-1">
               <div class="font-semibold text-lg">{{ r.task || r.text || 'Reminder' }}</div>
@@ -136,7 +137,7 @@
             </div>
 
             <div class="flex gap-2 justify-end sm:justify-center shrink-0">
-              <button @click="goToPlannerWithReminder(r)" class="px-3 py-1 text-xs bg-slate-700/60 hover:bg-slate-700 border border-slate-500 rounded-lg text-slate-200 w-[100px] text-center">
+              <button @click="goToPlannerWithReminder(r)" class="px-3 py-1 text-xs bg-slate-950/30 hover:border-indigo-300/50 border border-white/10 rounded-xl text-slate-200 w-[100px] text-center transition">
                 Change time
               </button>
               <button @click="onSnooze(r)" class="px-3 py-1 text-xs bg-yellow-500/20 hover:bg-yellow-500/40 border border-yellow-500 rounded-lg text-yellow-300 w-[90px] text-center">
@@ -149,6 +150,7 @@
           </div>
         </TransitionGroup>
       </div>
+    </div>
     </div>
   </div>
 </template>

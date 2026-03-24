@@ -129,7 +129,7 @@
             class="text-indigo-200 hover:text-white underline decoration-indigo-300/70"
             @click="scrollToTeamPricing"
           >
-            See team pricing & features
+            {{ teamFeaturesCtaLabel }}
           </button>
         </div>
         <p class="mt-3 text-sm text-indigo-200/80 text-center">
@@ -370,12 +370,50 @@
       class="py-24 bg-gradient-to-b from-indigo-950/70 via-purple-950/60 to-slate-950/80 text-center"
     >
       <div class="max-w-6xl mx-auto px-6">
-        <h2 class="text-4xl md:text-5xl font-bold text-white mb-4">✨ Choose Your Flow</h2>
+        <h2 class="text-4xl md:text-5xl font-bold text-white mb-4">
+          {{ isAppleBillingSafeMode ? '✨ Premium Access' : '✨ Choose Your Flow' }}
+        </h2>
         <p class="text-indigo-200 mb-12 text-lg">
-          Simple plans designed to help you stay mindful and productive.
+          {{ isAppleBillingSafeMode ? `Premium features are available via your account. Visit ${billingWebHost} to manage upgrades on the web.` : 'Simple plans designed to help you stay mindful and productive.' }}
         </p>
 
-        <div class="space-y-6 max-w-5xl mx-auto">
+        <template v-if="isAppleBillingSafeMode">
+          <div class="max-w-5xl mx-auto rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl p-8 md:p-10 text-left shadow-2xl">
+            <div class="grid gap-6 md:grid-cols-2">
+              <div class="space-y-4">
+                <p class="text-sm uppercase tracking-[0.35em] text-indigo-300">Premium features</p>
+                <ul class="space-y-3 text-sm text-indigo-100/90">
+                  <li>Unlimited reminders and AI summaries</li>
+                  <li>Voice journaling and richer insights</li>
+                  <li>Calendar, WhatsApp, and shared workspace features</li>
+                </ul>
+              </div>
+              <div class="space-y-4">
+                <p class="text-sm uppercase tracking-[0.35em] text-indigo-300">Upgrade on web</p>
+                <p class="text-indigo-100/85">
+                  Use the website to manage upgrades or billing changes. The app will reflect those changes after sign-in.
+                </p>
+                <div class="flex flex-wrap gap-3">
+                  <RouterLink
+                    :to="billingRoutePath"
+                    class="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 font-semibold text-indigo-700 hover:bg-slate-100 transition shadow-md"
+                  >
+                    Learn how to upgrade
+                  </RouterLink>
+                  <button
+                    type="button"
+                    class="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/5 px-5 py-3 font-semibold text-white hover:border-indigo-300/40 transition"
+                    @click="startSoloFlow"
+                  >
+                    Continue with your account
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <div v-else class="space-y-6 max-w-5xl mx-auto">
           <p class="text-sm uppercase tracking-[0.35em] text-indigo-300">Solo plans</p>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-8 justify-center items-stretch">
             <!-- Free Plan -->
@@ -437,7 +475,7 @@
                   $2<span class="text-sm text-indigo-100">/month</span>
                 </div>
                 <RouterLink
-                  to="/subscription"
+                  :to="billingRoutePath"
                   class="inline-block w-full px-6 py-3 rounded-xl bg-white text-indigo-700 font-semibold hover:bg-slate-100 transition shadow-md"
                 >
                   💎 Explore Premium
@@ -448,62 +486,93 @@
         </div>
 
         <section id="team-pricing" class="mt-14 max-w-6xl mx-auto space-y-4 text-left">
-          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <div>
-              <p class="text-sm uppercase tracking-[0.35em] text-indigo-300">Teams pricing</p>
-              <h3 class="text-3xl font-semibold text-white">Workspaces for Teams</h3>
-              <p class="text-indigo-200 max-w-2xl">
-                Seat-based plans built for small teams that need shared tasks, team roles, and Voice
-                AI reminders that keep projects moving.
+          <template v-if="isAppleBillingSafeMode">
+            <div class="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl p-8 shadow-xl">
+              <p class="text-sm uppercase tracking-[0.35em] text-indigo-300">Team workspace features</p>
+              <h3 class="mt-3 text-3xl font-semibold text-white">Workspaces for Teams</h3>
+              <p class="mt-3 text-indigo-200 max-w-2xl">
+                Shared workspaces, teammate roles, and Voice AI follow-ups are available from your account on the web.
               </p>
-            </div>
-            <button
-              class="px-5 py-3 rounded-xl bg-white text-indigo-700 font-semibold hover:bg-slate-100 transition shadow-md"
-              @click="startTeamWorkspace"
-            >
-              Create Workspace
-            </button>
-          </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <article
-              v-for="plan in teamPlans"
-              :key="plan.name"
-              class="rounded-2xl border border-indigo-500/25 bg-slate-900/70 backdrop-blur-xl p-6 shadow-lg hover:-translate-y-1 transition"
-              :class="plan.featured ? 'ring-2 ring-indigo-400/50 bg-gradient-to-br from-indigo-900/80 via-slate-900 to-indigo-950' : ''"
-            >
-              <div class="flex items-center justify-between mb-3">
-                <h4 class="text-2xl font-semibold text-white">{{ plan.name }}</h4>
-                <span
-                  class="text-[11px] px-2 py-1 rounded-full bg-indigo-500/20 text-indigo-100 border border-indigo-400/40"
-                >
-                  Team
-                </span>
-              </div>
-              <div class="flex items-baseline gap-2">
-                <span class="text-3xl font-bold text-white">{{ plan.price }}</span>
-                <span class="text-sm text-indigo-200">/seat/month</span>
-              </div>
-              <p class="text-sm text-indigo-200 mt-1">{{ plan.minSeats }}</p>
-              <ul class="mt-4 space-y-2 text-sm text-indigo-100/90">
-                <li v-for="item in plan.features" :key="item">✅ {{ item }}</li>
+              <ul class="mt-6 grid gap-3 md:grid-cols-2 text-sm text-indigo-100/90">
+                <li>Shared tasks and workspace context</li>
+                <li>Role-based access for owners, admins, editors, and viewers</li>
+                <li>Voice AI reminders and follow-ups</li>
+                <li>Workspace creation and team setup</li>
               </ul>
-              <div v-if="plan.note" class="mt-3 text-xs text-amber-200 flex items-center gap-1">
-                <span>⚠️</span>
-                <span>{{ plan.note }}</span>
+              <div class="mt-6 flex flex-wrap gap-3">
+                <button
+                  class="px-5 py-3 rounded-xl bg-white text-indigo-700 font-semibold hover:bg-slate-100 transition shadow-md"
+                  @click="startTeamWorkspace"
+                >
+                  Create Workspace
+                </button>
+                <RouterLink
+                  :to="billingRoutePath"
+                  class="px-5 py-3 rounded-xl border border-white/15 bg-white/5 text-white font-semibold hover:border-indigo-300/40 transition"
+                >
+                  Learn how upgrades work
+                </RouterLink>
+              </div>
+            </div>
+          </template>
+          <template v-else>
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div>
+                <p class="text-sm uppercase tracking-[0.35em] text-indigo-300">Teams pricing</p>
+                <h3 class="text-3xl font-semibold text-white">Workspaces for Teams</h3>
+                <p class="text-indigo-200 max-w-2xl">
+                  Seat-based plans built for small teams that need shared tasks, team roles, and Voice
+                  AI reminders that keep projects moving.
+                </p>
               </div>
               <button
-                class="mt-6 w-full px-4 py-3 rounded-xl font-semibold shadow-lg transition"
-                :class="plan.featured ? 'bg-white text-indigo-800 hover:bg-slate-100' : 'bg-indigo-600 text-white hover:bg-indigo-500'"
+                class="px-5 py-3 rounded-xl bg-white text-indigo-700 font-semibold hover:bg-slate-100 transition shadow-md"
                 @click="startTeamWorkspace"
               >
                 Create Workspace
               </button>
-            </article>
-          </div>
-          <p class="text-sm text-indigo-200">
-            Seats = people you invite to collaborate in a workspace. You only pay for active teammates, not viewers or guests.
-          </p>
-          <p class="text-sm text-indigo-200">Change seats anytime. Billing adjusts automatically.</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <article
+                v-for="plan in teamPlans"
+                :key="plan.name"
+                class="rounded-2xl border border-indigo-500/25 bg-slate-900/70 backdrop-blur-xl p-6 shadow-lg hover:-translate-y-1 transition"
+                :class="plan.featured ? 'ring-2 ring-indigo-400/50 bg-gradient-to-br from-indigo-900/80 via-slate-900 to-indigo-950' : ''"
+              >
+                <div class="flex items-center justify-between mb-3">
+                  <h4 class="text-2xl font-semibold text-white">{{ plan.name }}</h4>
+                  <span
+                    class="text-[11px] px-2 py-1 rounded-full bg-indigo-500/20 text-indigo-100 border border-indigo-400/40"
+                  >
+                    Team
+                  </span>
+                </div>
+                <div class="flex items-baseline gap-2">
+                  <span class="text-3xl font-bold text-white">{{ plan.price }}</span>
+                  <span class="text-sm text-indigo-200">/seat/month</span>
+                </div>
+                <p class="text-sm text-indigo-200 mt-1">{{ plan.minSeats }}</p>
+                <ul class="mt-4 space-y-2 text-sm text-indigo-100/90">
+                  <li v-for="item in plan.features" :key="item">✅ {{ item }}</li>
+                </ul>
+                <div v-if="plan.note" class="mt-3 text-xs text-amber-200 flex items-center gap-1">
+                  <span>⚠️</span>
+                  <span>{{ plan.note }}</span>
+                </div>
+                <button
+                  class="mt-6 w-full px-4 py-3 rounded-xl font-semibold shadow-lg transition"
+                  :class="plan.featured ? 'bg-white text-indigo-800 hover:bg-slate-100' : 'bg-indigo-600 text-white hover:bg-indigo-500'"
+                  @click="startTeamWorkspace"
+                >
+                  Create Workspace
+                </button>
+              </article>
+            </div>
+            <p class="text-sm text-indigo-200">
+              Seats = people you invite to collaborate in a workspace. You only pay for active teammates, not viewers or guests.
+            </p>
+            <p class="text-sm text-indigo-200">Change seats anytime. Billing adjusts automatically.</p>
+          </template>
         </section>
 
         <div
@@ -567,16 +636,21 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
 import SeoLongForm from '@/components/SeoLongForm.vue'
 import TestimonialsSection from '@/components/TestimonialsSection.vue'
 import { useSeoMeta } from '@/composables/useSeoMeta'
 import { trackGuestStartFromLanding } from '@/services/analytics'
 import { useAuthStore } from '@/stores/authStore'
+import { BILLING_WEB_HOST, isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const isAppleBillingSafeMode = computed(() => detectAppleBillingSafeMode())
+const billingWebHost = BILLING_WEB_HOST
+const billingRoutePath = computed(() => (isAppleBillingSafeMode.value ? '/billing/upgrade' : '/subscription'))
+const teamFeaturesCtaLabel = computed(() => (isAppleBillingSafeMode.value ? 'See team workspace features' : 'See team pricing & features'))
 
 const teamHighlights = [
   {
@@ -905,7 +979,7 @@ function scrollToTeamPricing() {
       return
     }
   }
-  router.push('/pricing')
+  router.push(billingRoutePath.value)
 }
 
 function startTeamWorkspace(plan = 'starter') {

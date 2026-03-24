@@ -185,186 +185,171 @@ Return only the improved text.
 // }
 // services/openaiService.js
 
+function normalizeSummaryTask(task = {}) {
+  const title = String(task?.title || "").trim().slice(0, 160)
+  const normalizedDate = task?.date ? dayjs(task.date) : null
+  const date = normalizedDate?.isValid?.() ? normalizedDate.format("YYYY-MM-DD") : null
+  return {
+    title,
+    completed: !!task?.completed,
+    date,
+  }
+}
+
+function titleWordCount(title = "") {
+  return title.trim().split(/\s+/).filter(Boolean).length
+}
+
+const SUMMARY_HEAVY_KEYWORDS = [
+  "plan",
+  "review",
+  "prepare",
+  "build",
+  "draft",
+  "research",
+  "submit",
+  "complete",
+  "finalize",
+  "application",
+  "billing",
+  "tax",
+  "report",
+  "proposal",
+  "meeting",
+  "portal",
+]
+
+const SUMMARY_QUICK_KEYWORDS = [
+  "call",
+  "email",
+  "text",
+  "reply",
+  "send",
+  "check",
+  "book",
+  "pay",
+  "share",
+  "update",
+  "confirm",
+  "follow up",
+]
+
+function isHeavyLift(title = "") {
+  const normalized = title.toLowerCase()
+  const wordCount = titleWordCount(normalized)
+  return wordCount >= 6 || SUMMARY_HEAVY_KEYWORDS.some((keyword) => normalized.includes(keyword))
+}
+
+function isQuickWin(title = "") {
+  const normalized = title.toLowerCase()
+  const wordCount = titleWordCount(normalized)
+  return wordCount <= 4 || SUMMARY_QUICK_KEYWORDS.some((keyword) => normalized.includes(keyword))
+}
+
+function summaryUrgency(task, todayKey, weekEndKey) {
+  if (!task?.date) return 4
+  if (task.date < todayKey) return 0
+  if (task.date === todayKey) return 1
+  if (task.date <= weekEndKey) return 2
+  return 3
+}
+
+function dedupeSummaryTitles(tasks = [], limit = 3) {
+  const seen = new Set()
+  const picked = []
+  for (const task of tasks) {
+    const title = String(task?.title || "").trim()
+    if (!title) continue
+    const key = title.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    picked.push(title)
+    if (picked.length >= limit) break
+  }
+  return picked
+}
+
 export async function summarizeTasks(tasks) {
-  if (!tasks || !tasks.length) {
+  const normalized = Array.isArray(tasks) ? tasks.map(normalizeSummaryTask).filter((task) => task.title) : []
+  if (!normalized.length) {
     return {
       "Completed %": 0,
       "Pending items": 0,
       "Suggested focus for today": "No tasks found",
       "Quick wins": [],
       "Heavy lifts": [],
-      "Weekly warning": ""
+      "Weekly warning": "",
     }
   }
 
-  // 🔹 Compact tasks to avoid huge prompts (drop large fields; truncate)
-  const MAX_TITLE = 160
-  const MAX_DETAILS = 240
-  const compact = (t) => ({
-    title: String(t.title || "").slice(0, MAX_TITLE),
-    details: String(t.details || "").slice(0, MAX_DETAILS),
-    completed: !!t.completed,
-    date: t.date || undefined,
-  })
-
-  const compacted = tasks.map(compact)
-
-  // 🔹 Compute simple metrics locally (no need to query LLM)
-  const total = compacted.length
-  const completedCount = compacted.filter((t) => t.completed).length
-  const pendingCount = total - completedCount
+  const total = normalized.length
+  const completedCount = normalized.filter((task) => task.completed).length
+  const pendingTasks = normalized.filter((task) => !task.completed)
+  const pendingCount = pendingTasks.length
   const completedPct = total ? Math.round((completedCount / total) * 100) : 0
 
-  // 🔹 Prepare only pending tasks for focus suggestions
-  const pendingTasks = compacted.filter((t) => !t.completed)
-  // Further reduce payload to only essentials: a short string per task
-  const modelItems = pendingTasks.map((t) => {
-    const title = t.title || ""
-    const details = t.details || ""
-    const combined = details ? `${title} — ${details}` : title
-    // Keep strings compact; downstream prompt expects short strings
-    return combined.slice(0, 280)
-  })
-
-  // 🔹 Chunk by character budget instead of count
-  const BUDGET = Number(process.env.SUMMARY_PROMPT_CHAR_BUDGET || 9000) // chars
-  const serialize = (arr) => JSON.stringify(arr) // compact (no pretty print)
-  const chunks = []
-  let current = []
-  let currentLen = 2 // for surrounding []
-  for (const item of modelItems) {
-    const itemStr = (current.length ? "," : "") + JSON.stringify(item)
-    if (currentLen + itemStr.length > BUDGET && current.length) {
-      chunks.push(current)
-      current = [item]
-      currentLen = 2 + JSON.stringify(item).length
-    } else {
-      current.push(item)
-      currentLen += itemStr.length
-    }
-  }
-  if (current.length) chunks.push(current)
-
-  // Fallback if no pending tasks; still return stats
-  if (!chunks.length) {
+  if (!pendingCount) {
     return {
       "Completed %": completedPct,
-      "Pending items": pendingCount,
-      "Suggested focus for today": completedPct === 100 ? "Great job — plan tomorrow’s top 3." : "Pick one high-impact task and 2 quick wins.",
+      "Pending items": 0,
+      "Suggested focus for today": "Great job — plan tomorrow’s top 3.",
       "Quick wins": [],
       "Heavy lifts": [],
       "Weekly warning": "",
     }
   }
 
-  // 🔹 Summarize each chunk safely with automatic backoff if still too large
-  async function summarizeChunkSafe(list) {
-    let slice = list
-    while (slice.length) {
-      const prompt = `You are an AI productivity coach. From the following pending tasks, provide a concise suggestion.\n\nTasks (JSON array of short strings):\n${serialize(slice)}\n\nReturn ONLY valid JSON:\n{\n  "Suggested focus": "<string>",\n  "Quick wins": ["<string>", "<string>"],\n  "Heavy lifts": ["<string>", "<string>"]\n}`
-      try {
-        const res = await chatWithFallback({
-          modelList: ["gpt-3.5-turbo", "gpt-4.1-mini"],
-          messages: [{ role: "user", content: prompt }],
-          temperature: 0.3,
-        })
-        const cleaned = res.replace(/^```json\s*/i, "").replace(/```$/i, "").trim()
-        return JSON.parse(cleaned)
-      } catch (err) {
-        const msg = err?.error?.message || err?.message || ""
-        const code = err?.code || err?.error?.code
-        const tooLong = /context length|maximum context length|too many tokens/i.test(msg)
-        if (tooLong || code === "context_length_exceeded") {
-          // Reduce slice size and try again
-          if (slice.length <= 5) throw err
-          slice = slice.slice(0, Math.ceil(slice.length / 2))
-          continue
-        }
-        throw err
-      }
-    }
-    // Should not reach here
-    return { "Suggested focus": "", "Quick wins": [], "Heavy lifts": [] }
-  }
-
-  const partials = []
-  for (const c of chunks) {
-    try {
-      const part = await summarizeChunkSafe(c)
-      partials.push(part)
-    } catch (e) {
-      console.warn("⚠️ Failed to summarize a chunk:", e?.message || e)
-    }
-  }
-
-  // 🔹 Merge partials into final using the model (keep payload small)
-  const MERGE_MAX_PARTS = Number(process.env.SUMMARY_MERGE_MAX_PARTS || 24)
-  const MERGE_BUDGET = Number(process.env.SUMMARY_MERGE_CHAR_BUDGET || 6000)
-
-  const compactPart = (p) => ({
-    "Suggested focus": String(p["Suggested focus"] || "").slice(0, 200),
-    "Quick wins": (p["Quick wins"] || []).map((s) => String(s).slice(0, 120)).slice(0, 3),
-    "Heavy lifts": (p["Heavy lifts"] || []).map((s) => String(s).slice(0, 120)).slice(0, 3),
+  const today = dayjs().format("YYYY-MM-DD")
+  const weekEnd = dayjs().endOf("week").format("YYYY-MM-DD")
+  const pendingByUrgency = [...pendingTasks].sort((a, b) => {
+    const urgencyDelta = summaryUrgency(a, today, weekEnd) - summaryUrgency(b, today, weekEnd)
+    if (urgencyDelta !== 0) return urgencyDelta
+    if ((a.date || "") !== (b.date || "")) return (a.date || "").localeCompare(b.date || "")
+    return titleWordCount(b.title) - titleWordCount(a.title)
   })
 
-  let selected = partials.slice(0, MERGE_MAX_PARTS).map(compactPart)
-  let mergePayloadObj = { stats: { total, completedCount, pendingCount, completedPct }, parts: selected }
-  let mergePayload = JSON.stringify(mergePayloadObj)
-  while (mergePayload.length > MERGE_BUDGET && selected.length > 1) {
-    // Trim parts until under budget
-    selected = selected.slice(0, Math.ceil(selected.length / 2))
-    mergePayloadObj = { stats: mergePayloadObj.stats, parts: selected }
-    mergePayload = JSON.stringify(mergePayloadObj)
+  const overdueTasks = pendingByUrgency.filter((task) => task.date && task.date < today)
+  const dueTodayTasks = pendingByUrgency.filter((task) => task.date === today)
+  const dueThisWeekTasks = pendingByUrgency.filter((task) => task.date && task.date <= weekEnd)
+
+  const heavyLiftTasks = pendingByUrgency.filter((task) => isHeavyLift(task.title))
+  const quickWinTasks = pendingByUrgency.filter((task) => {
+    if (isHeavyLift(task.title)) return false
+    return isQuickWin(task.title) || !task.date || task.date <= weekEnd
+  })
+
+  const heavyLifts = dedupeSummaryTitles(heavyLiftTasks.length ? heavyLiftTasks : pendingByUrgency, 3)
+  const quickWins = dedupeSummaryTitles(quickWinTasks.length ? quickWinTasks : pendingByUrgency, 3)
+
+  let focus = ""
+  if (overdueTasks.length) {
+    focus = `Clear overdue work: ${overdueTasks[0].title}`
+  } else if (heavyLifts.length) {
+    focus = `Make progress on ${heavyLifts[0]}`
+  } else if (dueTodayTasks.length) {
+    focus = `Close today: ${dueTodayTasks[0].title}`
+  } else {
+    focus = `Build momentum with ${quickWins[0] || pendingByUrgency[0].title}`
   }
 
-  // If still over budget or no parts, fallback locally
-  if (!selected.length || mergePayload.length > MERGE_BUDGET) {
-    return {
-      "Completed %": completedPct,
-      "Pending items": pendingCount,
-      "Suggested focus for today": pendingCount ? "Pick one high-impact task and 2 quick wins." : "Great job — plan tomorrow’s top 3.",
-      "Quick wins": partials.flatMap(p => p["Quick wins"] || []).slice(0, 3),
-      "Heavy lifts": partials.flatMap(p => p["Heavy lifts"] || []).slice(0, 3),
-      "Weekly warning": "",
-    }
+  let weeklyWarning = ""
+  if (overdueTasks.length >= 3) {
+    weeklyWarning = `${overdueTasks.length} tasks are overdue — clear the oldest ones before adding new work.`
+  } else if (pendingCount >= 12 && completedPct < 45) {
+    weeklyWarning = "Your backlog is getting heavy — narrow this week to one heavy lift and a few quick wins."
+  } else if (dueTodayTasks.length >= 5) {
+    weeklyWarning = "Today looks packed — cut it down to the top three must-do tasks."
+  } else if (dueThisWeekTasks.length >= 8) {
+    weeklyWarning = "This week is crowded — protect time for your biggest commitment early."
   }
 
-  const mergePrompt = `You are an AI productivity coach. Merge these partial suggestions and stats into a single concise dashboard.\n\nData (JSON):\n${mergePayload}\n\nReturn ONLY valid JSON with fields:\n{\n  "Completed %": <number>,\n  "Pending items": <number>,\n  "Suggested focus for today": "<string>",\n  "Quick wins": ["<string>", "<string>"],\n  "Heavy lifts": ["<string>", "<string>"],\n  "Weekly warning": "<string>"\n}`
-
-  try {
-    const final = await chatWithFallback({
-      modelList: ["gpt-3.5-turbo", "gpt-4.1-mini"],
-      messages: [{ role: "user", content: mergePrompt }],
-      temperature: 0.3,
-    })
-    const cleaned = final.replace(/^```json\s*/i, "").replace(/```$/i, "").trim()
-    const parsed = JSON.parse(cleaned)
-    parsed["Completed %"] = Number(parsed["Completed %"]) || completedPct
-    parsed["Pending items"] = Number(parsed["Pending items"]) || pendingCount
-    return parsed
-  } catch (e) {
-    const msg = e?.error?.message || e?.message || ""
-    const tooLong = /context length|maximum context length|too many tokens/i.test(msg)
-    if (tooLong) {
-      // Final local fallback if merge still too long
-      return {
-        "Completed %": completedPct,
-        "Pending items": pendingCount,
-        "Suggested focus for today": pendingCount ? "Pick one high-impact task and 2 quick wins." : "Great job — plan tomorrow’s top 3.",
-        "Quick wins": partials.flatMap(p => p["Quick wins"] || []).slice(0, 3),
-        "Heavy lifts": partials.flatMap(p => p["Heavy lifts"] || []).slice(0, 3),
-        "Weekly warning": "",
-      }
-    }
-    console.warn("⚠️ Merge step failed, falling back to local stats:", e?.message || e)
-    return {
-      "Completed %": completedPct,
-      "Pending items": pendingCount,
-      "Suggested focus for today": pendingCount ? "Pick one high-impact task and 2 quick wins." : "Great job — plan tomorrow’s top 3.",
-      "Quick wins": partials.flatMap(p => p["Quick wins"] || []).slice(0, 3),
-      "Heavy lifts": partials.flatMap(p => p["Heavy lifts"] || []).slice(0, 3),
-      "Weekly warning": "",
-    }
+  return {
+    "Completed %": completedPct,
+    "Pending items": pendingCount,
+    "Suggested focus for today": focus,
+    "Quick wins": quickWins,
+    "Heavy lifts": heavyLifts,
+    "Weekly warning": weeklyWarning,
   }
 }
 // ✨ Quote Generator

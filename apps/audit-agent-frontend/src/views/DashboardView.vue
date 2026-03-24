@@ -1247,7 +1247,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, nextTick, watchEffect, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { collection, onSnapshot, updateDoc, doc, query, where, serverTimestamp, getDocs } from 'firebase/firestore'
 import { db, auth } from '@/firebase/init'
@@ -1684,6 +1684,43 @@ const onboardingStatus = ref({
   completedAt: null,
 })
 const onboardingSessionPlayed = ref(false)
+const AI_SUMMARY_DEBOUNCE_MS = 220
+let aiSummaryDebounceTimer = null
+let aiSummaryRequestId = 0
+let aiSummaryPendingKey = ''
+let aiSummaryResolvedKey = ''
+
+const summaryTasksPayload = computed(() => {
+  const merged = [...dailyTasks.value, ...weeklyTasks.value, ...monthlyTasks.value]
+  const uniqueTasks = new Map()
+  merged.forEach((task, index) => {
+    const normalized = {
+      id: task?.id || '',
+      title: String(task?.title || '').trim(),
+      completed: !!task?.completed,
+      date: typeof task?.date === 'string' ? task.date : (task?.date ? toYMD(task.date?.toDate?.() || task.date) : ''),
+    }
+    if (!normalized.title) return
+    const fallbackKey = `${normalized.title}:${normalized.date}:${normalized.completed ? 1 : 0}:${index}`
+    const key = normalized.id || fallbackKey
+    if (!uniqueTasks.has(key)) uniqueTasks.set(key, normalized)
+  })
+
+  return Array.from(uniqueTasks.values()).sort((a, b) => {
+    const dateDelta = String(a.date || '').localeCompare(String(b.date || ''))
+    if (dateDelta !== 0) return dateDelta
+    const titleDelta = a.title.localeCompare(b.title)
+    if (titleDelta !== 0) return titleDelta
+    if (a.completed !== b.completed) return Number(a.completed) - Number(b.completed)
+    return String(a.id || '').localeCompare(String(b.id || ''))
+  })
+})
+
+const summarySignature = computed(() =>
+  summaryTasksPayload.value
+    .map((task) => `${task.id || 'task'}:${task.date || ''}:${task.completed ? 1 : 0}:${task.title}`)
+    .join('|'),
+)
 
 const onboardingSteps = computed(() => [
   {
@@ -2177,7 +2214,11 @@ async function triggerSummary() {
   if (isRefreshingSummary.value) return
   try {
     isRefreshingSummary.value = true
-    await fetchAISummary()
+    const summary = await fetchAISummary({ force: true })
+    if (!summary) {
+      ElMessage({ type: 'info', message: 'No tasks to summarize yet', duration: 1500 })
+      return
+    }
     ElMessage({ type: 'success', message: 'Summary refreshed', duration: 1500 })
   } catch (error) {
     console.warn('Summary refresh failed:', error)
@@ -2213,8 +2254,7 @@ watch(
 )
 
 onMounted(async () => {
-  const seeded = await refreshAllTasks().then(() => true).catch(() => false)
-  if (seeded && (allTasks.value.length || activeWorkspaceId.value)) {
+  if (allTasks.value.length) {
     syncDashboardTaskBuckets(allTasks.value)
     dashboardTasksLoading.value = false
   }
@@ -2600,6 +2640,7 @@ watch(
 const unsubscribe = ref(null)
 let activeTaskListenerKey = null
 let nativeTaskSeedPromise = null
+let authStateStop = null
 
 function tasksCollection() {
   return collection(db, 'tasks')
@@ -2685,29 +2726,23 @@ async function attachTaskListener(user) {
   }
 }
 
-onMounted(() => {
-  onAuthStateChanged(auth, (user) => {
-    checkingAuth.value = false
-    attachTaskListener(user)
-  })
-})
-
 watch(activeWorkspaceId, () => {
   attachTaskListener(auth.currentUser || authStore.user || null)
 })
 
-watch(
-  () => [authStore.user?.uid, authStore.token],
-  () => {
-    attachTaskListener(auth.currentUser || authStore.user || null)
-  },
-  { immediate: true },
-)
-
 onUnmounted(() => {
   if (unsubscribe.value) unsubscribe.value()
+  if (authStateStop) {
+    try {
+      authStateStop()
+    } catch {
+      /* noop */
+    }
+    authStateStop = null
+  }
   detachNapkinListener()
   if (insightIntervalId.value) clearInterval(insightIntervalId.value)
+  if (aiSummaryDebounceTimer) clearTimeout(aiSummaryDebounceTimer)
   if (onboardingTimer) {
     clearTimeout(onboardingTimer)
     onboardingTimer = null
@@ -2799,27 +2834,59 @@ async function ignoreCarryover() {
   }
 }
 
-async function fetchAISummary() {
+function clearAISummaryTracking() {
+  if (aiSummaryDebounceTimer) {
+    clearTimeout(aiSummaryDebounceTimer)
+    aiSummaryDebounceTimer = null
+  }
+  aiSummaryRequestId += 1
+  aiSummaryPendingKey = ''
+  aiSummaryResolvedKey = ''
+}
+
+async function fetchAISummary(options = {}) {
+  const { force = false, signature = summarySignature.value } = options
   try {
-    const all = [...dailyTasks.value, ...weeklyTasks.value, ...monthlyTasks.value]
-    const unique = Array.from(new Map(all.map((t) => [t.id, t])).values())
-    const compacted = unique.map((t) => ({
-      id: t.id,
-      title: t.title,
-      completed: !!t.completed,
-      date: t.date,
-    }))
-    aiSummary.value = await summarizeTasks(compacted)
+    const compacted = summaryTasksPayload.value
+    if (!compacted.length || !signature) {
+      clearAISummaryTracking()
+      aiSummary.value = null
+      return null
+    }
+    if (!force && (signature === aiSummaryPendingKey || signature === aiSummaryResolvedKey)) {
+      return aiSummary.value
+    }
+
+    const requestId = ++aiSummaryRequestId
+    aiSummaryPendingKey = signature
+    const summary = await summarizeTasks(compacted)
+    if (requestId !== aiSummaryRequestId) return aiSummary.value
+    aiSummary.value = summary
+    aiSummaryResolvedKey = signature
+    return summary
   } catch (error) {
     console.error('❌ Task summary failed:', error.message || error)
+    return null
+  } finally {
+    if (signature === aiSummaryPendingKey) aiSummaryPendingKey = ''
   }
 }
 
-watchEffect(() => {
-  if (dailyTasks.value.length || weeklyTasks.value.length || monthlyTasks.value.length) {
-    fetchAISummary()
+watch(
+  summarySignature,
+  (signature) => {
+    if (aiSummaryDebounceTimer) clearTimeout(aiSummaryDebounceTimer)
+    if (!signature) {
+      clearAISummaryTracking()
+      aiSummary.value = null
+      return
+    }
+    aiSummaryDebounceTimer = setTimeout(() => {
+      aiSummaryDebounceTimer = null
+      fetchAISummary({ signature })
+    }, AI_SUMMARY_DEBOUNCE_MS)
   }
-})
+)
 
 watch(
   [dailyTasks, weeklyTasks, monthlyTasks, aiSummary, usage],
@@ -3035,7 +3102,7 @@ onMounted(() => {
       checkingAuth.value = false
       attachTaskListener(restoredUser)
     }
-    onAuthStateChanged(auth, (user) => {
+    authStateStop = onAuthStateChanged(auth, (user) => {
       checkingAuth.value = false
       attachTaskListener(user || authStore?.user || null)
     })
@@ -3054,10 +3121,13 @@ watch(
     try {
       if (!uid) {
         userStreak.value = 0
+        usage.value = { used: 0, limit: 0, plan: '' }
+        googleStatus.value = { connected: false, accounts: [] }
         return
       }
       await ensureDailyStreakState(uid)
       userStreak.value = await getUserStreak(uid)
+      await fetchUsage()
       await loadGoogleStatus()
     } catch {
       /* noop */
@@ -3065,9 +3135,6 @@ watch(
   },
   { immediate: true }
 )
-
-onMounted(fetchUsage)
-onMounted(loadGoogleStatus)
 
 onMounted(() => {
   try {

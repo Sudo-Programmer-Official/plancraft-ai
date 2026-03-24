@@ -1,21 +1,21 @@
 <template>
-  <div class="min-h-screen bg-slate-950 text-slate-100 p-6">
-    <div class="max-w-6xl mx-auto space-y-6">
-      <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+  <div class="app-page-shell">
+    <div class="app-page-frame">
+      <header class="app-page-hero flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <p class="uppercase text-xs tracking-[0.35em] text-indigo-300/80">Planner</p>
-          <h1 class="text-3xl font-bold mt-1">Your Tasks</h1>
-          <p class="text-slate-400 text-sm">Today, this week, and upcoming—stay on top of it all.</p>
+          <p class="app-page-eyebrow">Planner</p>
+          <h1 class="app-page-title">Your Tasks</h1>
+          <p class="app-page-description">Today, this week, and upcoming. The same clear rhythm as your dashboard, without the extra visual weight.</p>
         </div>
-        <div class="flex gap-2">
+        <div class="app-page-toolbar">
           <button
-            class="px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm hover:border-indigo-500"
+            class="px-4 py-2 rounded-xl bg-slate-950/35 border border-white/10 text-sm text-indigo-50 hover:border-indigo-300/60 transition"
             @click="refresh"
           >
             Refresh
           </button>
           <button
-            class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold"
+            class="px-4 py-2 rounded-xl bg-gradient-to-r from-fuchsia-500 to-indigo-500 hover:from-fuchsia-400 hover:to-indigo-400 text-sm font-semibold text-white shadow-lg shadow-indigo-950/35 transition"
             @click="openPlanner"
           >
             + New Task
@@ -23,7 +23,7 @@
         </div>
       </header>
 
-      <div class="flex flex-wrap gap-2">
+      <div class="app-page-section app-page-section--compact flex flex-wrap gap-2">
         <button
           v-for="mode in modes"
           :key="mode.value"
@@ -31,31 +31,31 @@
           :class="[
             'px-3 py-1.5 rounded-full text-sm font-semibold transition border',
             viewMode === mode.value
-              ? 'bg-indigo-600 text-white border-indigo-500'
-              : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-indigo-500/60',
+              ? 'bg-indigo-500/90 text-white border-indigo-300/70 shadow-lg shadow-indigo-950/30'
+              : 'bg-slate-950/25 text-slate-200 border-white/10 hover:border-indigo-300/50',
           ]"
         >
           {{ mode.label }}
         </button>
       </div>
 
-      <section class="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 shadow space-y-4">
+      <section class="app-page-section space-y-4">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-xs uppercase tracking-wide text-slate-400">Tasks</p>
-            <p class="text-sm text-slate-300">
+            <p class="app-page-eyebrow !tracking-[0.24em]">Tasks</p>
+            <p class="text-sm text-slate-200/80">
               {{ viewSubtitle }}
             </p>
           </div>
-          <span class="text-[11px] px-2 py-1 rounded-full bg-slate-800 border border-slate-700">
+          <span class="text-[11px] px-2 py-1 rounded-full bg-slate-950/35 border border-white/10 text-indigo-100/85">
             {{ totalCount }} total
           </span>
         </div>
 
         <div v-if="loading" class="space-y-2">
-          <div v-for="n in 3" :key="n" class="h-12 bg-slate-800/60 rounded-lg animate-pulse" />
+          <div v-for="n in 3" :key="n" class="app-page-skeleton h-12" />
         </div>
-        <div v-else-if="groupedDates.length === 0" class="text-sm text-slate-400 space-y-2">
+        <div v-else-if="groupedDates.length === 0" class="app-page-empty text-sm space-y-2">
           <p>No tasks yet for this view.</p>
           <button class="text-indigo-300 hover:text-white text-sm underline" @click="openPlanner">
             Add your first task
@@ -72,7 +72,7 @@
               <article
                 v-for="task in day.tasks"
                 :key="task.id"
-                class="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-start justify-between gap-3"
+                class="p-3 rounded-2xl bg-slate-950/30 border border-white/10 flex items-start justify-between gap-3 shadow-lg shadow-slate-950/10"
               >
                 <div class="space-y-1">
                   <p class="font-semibold" :class="{ 'line-through text-slate-500': task.completed }">
@@ -82,17 +82,17 @@
                     {{ task.details }}
                   </p>
                   <div class="flex items-center gap-2 text-[11px] text-slate-500">
-                    <span class="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700">
+                    <span class="px-2 py-0.5 rounded-full bg-slate-950/35 border border-white/10 text-indigo-100/85">
                       {{ task.category || 'Uncategorized' }}
                     </span>
-                    <span v-if="task.time" class="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700">
+                    <span v-if="task.time" class="px-2 py-0.5 rounded-full bg-slate-950/35 border border-white/10 text-indigo-100/85">
                       {{ task.time }}
                     </span>
                   </div>
                 </div>
                 <div class="flex items-center gap-2">
                   <span class="text-[11px] text-slate-500 whitespace-nowrap">{{ task.date }}</span>
-                  <button class="text-xs px-2 py-1 rounded bg-slate-800 border border-slate-700" @click="editTask(task)">
+                  <button class="text-xs px-2 py-1 rounded-xl bg-slate-950/35 border border-white/10 text-slate-100 hover:border-indigo-300/50 transition" @click="editTask(task)">
                     Edit
                   </button>
                 </div>
