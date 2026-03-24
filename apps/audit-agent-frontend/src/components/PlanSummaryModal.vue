@@ -16,14 +16,14 @@
       <div>
         <p class="font-medium text-slate-50">Usage today</p>
         <ul class="text-sm text-slate-200 space-y-1">
-          <li>AI generations: {{ usage.today.aiGenerations }} / {{ planKey === 'PREMIUM' ? '∞' : limits.aiGenerations }}</li>
-          <li>Reminders: {{ usage.today.reminders }} / {{ planKey === 'PREMIUM' ? '∞' : limits.remindersPerDay }}</li>
+          <li>AI generations: {{ usage.aiGenerations }} / {{ limits.aiGenerations }}</li>
+          <li>Reminders: {{ usage.reminders }} / {{ limits.remindersPerDay }}</li>
         </ul>
       </div>
 
       <div class="pt-2">
         <router-link
-          v-if="planKey !== 'PREMIUM'"
+          v-if="!isPaidPlan"
           :to="upgradeRoute"
           @click="track"
           class="inline-block px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition font-medium"
@@ -34,7 +34,7 @@
           v-else
           class="inline-block px-4 py-2 rounded-full bg-gradient-to-r from-purple-600 to-pink-500 text-white font-semibold text-sm shadow-sm"
         >
-          🧠 You're on Pro
+          🧠 You're on {{ planLabel }}
         </span>
       </div>
     </div>
@@ -45,7 +45,7 @@
 import { ref, computed, watch } from 'vue'
 import { trackLinkedInConversion } from '@/utils/ads'
 import { useAuthStore } from '@/stores/authStore'
-import { PLANS, resolvePlanKey } from '@/services/planService'
+import { useAccessStore } from '@/stores/accessStore'
 import { isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
 
 const props = defineProps({ open: { type: Boolean, default: false } })
@@ -64,11 +64,18 @@ const internalOpen = ref(props.open)
 watch(() => props.open, v => internalOpen.value = v)
 
 const authStore = useAuthStore()
-const usage = computed(() => authStore.user?.usage || { today: { aiGenerations: 0, reminders: 0 } })
+const accessStore = useAccessStore()
+const access = computed(() => accessStore.access || {})
+const usage = computed(() => access.value?.today || authStore.user?.usage?.today || { aiGenerations: 0, reminders: 0, tasks: 0 })
 
-const planKey = computed(() => resolvePlanKey(authStore.user))
+const planKey = computed(() => {
+  const plan = String(access.value?.effectivePlan || authStore.user?.plan || 'free').toLowerCase()
+  if (plan === 'team') return 'TEAM'
+  return plan === 'premium' ? 'PREMIUM' : 'FREE'
+})
+const isPaidPlan = computed(() => planKey.value === 'PREMIUM' || planKey.value === 'TEAM')
 const planLabel = computed(() => {
-  const raw = authStore.user?.plan || planKey.value
+  const raw = access.value?.effectivePlanLabel || authStore.user?.plan || planKey.value
   const cleaned = String(raw || '').replace(/[_-]+/g, ' ').trim()
   if (!cleaned) return planKey.value
   return cleaned
@@ -79,12 +86,12 @@ const planLabel = computed(() => {
 })
 const dialogWidth = ref(window.innerWidth < 640 ? '90%' : '420px')
 const upgradeRoute = computed(() => (detectAppleBillingSafeMode() ? '/billing/upgrade' : '/subscription'))
-const upgradeLabel = computed(() => (detectAppleBillingSafeMode() ? 'Upgrade to Premium on web' : 'Upgrade to Premium'))
+const upgradeLabel = computed(() => (detectAppleBillingSafeMode() ? 'Learn about Premium' : 'Upgrade to Premium'))
 
 
 const limits = computed(() => ({
-  aiGenerations: PLANS[planKey.value].limits.aiGenerations,
-  remindersPerDay: PLANS[planKey.value].limits.remindersPerDay,
+  aiGenerations: access.value?.limits?.aiGenerations == null ? '∞' : access.value?.limits?.aiGenerations,
+  remindersPerDay: access.value?.limits?.remindersPerDay == null ? '∞' : access.value?.limits?.remindersPerDay,
 }))
 
 function onClose() {

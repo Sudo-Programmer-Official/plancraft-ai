@@ -195,7 +195,10 @@
             </div>
             <span class="text-xs text-indigo-200">({{ filteredLogs.length }})</span>
           </div>
-          <div class="space-y-3 max-h-[480px] overflow-y-auto pr-1 scrollbar-plan">
+          <div
+            v-if="filteredLogs.length"
+            class="space-y-3 max-h-[480px] overflow-y-auto pr-1 scrollbar-plan"
+          >
             <div
               v-for="log in filteredLogs"
               :key="log.id"
@@ -222,6 +225,12 @@
               </div>
             </div>
           </div>
+          <div
+            v-else
+            class="rounded-xl border border-dashed border-white/15 bg-slate-900/35 px-4 py-8 text-center text-sm text-indigo-100/75"
+          >
+            No journal entries yet. Save your first reflection to start your timeline.
+          </div>
         </div>
 
         <div class="space-y-4">
@@ -241,7 +250,7 @@
 
           <div class="rounded-2xl bg-white/6 border border-white/10 p-4 shadow-lg">
             <p class="text-xs uppercase tracking-[0.25em] text-indigo-300/80">Emotion trend</p>
-            <div class="mt-2">
+            <div v-if="trendValues.length" class="mt-2">
               <svg viewBox="0 0 240 80" class="w-full h-24">
                 <polyline
                   :points="sparkPoints"
@@ -259,6 +268,12 @@
                 </defs>
               </svg>
               <p class="text-xs text-indigo-200 mt-1">Higher means lighter moods. Based on your last {{ Math.min(trendValues.length, 10) }} entries.</p>
+            </div>
+            <div
+              v-else
+              class="mt-3 rounded-xl border border-dashed border-white/10 bg-slate-900/35 px-4 py-6 text-sm text-indigo-100/70"
+            >
+              No mood trend yet. Add a few reflections and we’ll chart the pattern here.
             </div>
           </div>
         </div>
@@ -285,7 +300,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/authStore'
 import { fetchEntries, saveEntryToFirebase } from '@/services/firebaseService'
 import { enhanceJournal } from '@/services/aiService'

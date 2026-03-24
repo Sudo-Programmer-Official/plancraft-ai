@@ -1,11 +1,13 @@
 // src/composables/useIsPremium.js
 import { computed } from 'vue'
 import { useAuthStore } from '@/stores/authStore'
+import { useAccessStore } from '@/stores/accessStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { resolvePlanKey } from '@/services/planService'
 
 export function useIsPremium() {
   const authStore = useAuthStore()
+  const accessStore = useAccessStore()
   const subStore = useSubscriptionStore()
 
   const planFromStore = computed(() => {
@@ -25,8 +27,13 @@ export function useIsPremium() {
 
   const isPremium = computed(() => {
     if (isAdmin.value) return true
-    const storePremium = resolvePlanKey(planFromStore.value) === 'PREMIUM'
-    const userPremium = resolvePlanKey(authStore?.user) === 'PREMIUM'
+    if (accessStore.isPremium === true || accessStore.isPremium?.value === true) return true
+    const accessPlan = accessStore.access?.effectivePlan || accessStore.access?.value?.effectivePlan
+    if (accessPlan) {
+      return resolvePlanKey(accessPlan) !== 'FREE'
+    }
+    const storePremium = resolvePlanKey(planFromStore.value) !== 'FREE'
+    const userPremium = resolvePlanKey(authStore?.user) !== 'FREE'
     return storePremium || userPremium
   })
 
@@ -34,6 +41,7 @@ export function useIsPremium() {
     try {
       const uid = authStore.user?.uid
       if (!uid) return
+      await accessStore.fetchAccess(uid, options)
       await subStore.fetchStatus(uid, options)
     } catch {}
   }

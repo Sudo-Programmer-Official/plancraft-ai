@@ -27,6 +27,10 @@
   </transition>
   <div
     class="app-shell flex w-full max-w-full overflow-hidden bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 text-white"
+    :class="{
+      'app-shell--document-scroll': usesDocumentScrollShell,
+      'app-shell--overlay-sidebar': usesOverlaySidebar,
+    }"
   >
     <template v-if="!isShellReady">
       <div class="flex flex-1" aria-hidden="true"></div>
@@ -39,8 +43,7 @@
         class="bg-gradient-to-r from-fuchsia-600/40 via-purple-600/40 to-indigo-600/40 backdrop-blur-xl border border-fuchsia-400/30 text-white rounded-b-xl shadow-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 py-2 sm:py-3 px-3 sm:px-5 animate-fade-in"
       >
         <span class="text-sm sm:text-base font-medium text-center sm:text-left">
-          🚀 You're on the <span class="text-fuchsia-300 font-semibold">Free Plan</span>. Upgrade to
-          unlock unlimited AI and reminders.
+          {{ upgradeBannerMessage }}
         </span>
 
         <div class="flex flex-wrap items-center justify-center gap-2">
@@ -77,7 +80,10 @@
       </div>
     </div>
     <!-- Sidebar (desktop only) -->
-    <aside class="app-desktop-sidebar hidden md:flex h-full w-72 flex-col border-r border-white/10 bg-gray-950/92 p-4 backdrop-blur-2xl">
+    <aside
+      v-if="showsDesktopSidebar"
+      class="app-desktop-sidebar flex h-full w-72 flex-col border-r border-white/10 bg-gray-950/92 p-4 backdrop-blur-2xl"
+    >
       <div class="mb-6 flex items-center gap-3">
         <img src="/logo-bg-remove.png" alt="PlanCraftAI" class="h-9 w-9" />
         <div class="min-w-0">
@@ -269,7 +275,7 @@
     <transition name="slide">
       <aside
         v-if="mobileMenu"
-        class="fixed inset-0 z-40 bg-black/50 md:hidden"
+        class="fixed inset-0 z-40 bg-black/50"
         @click.self="mobileMenu = false"
       >
         <div class="app-mobile-drawer absolute bottom-0 left-0 top-0 flex w-72 flex-col border-r border-white/10 bg-gray-950/92 p-4 backdrop-blur-2xl">
@@ -474,14 +480,21 @@
     </transition>
 
     <!-- Main Content -->
-    <div class="app-main-pane flex-1 flex min-w-0 min-h-0 flex-col w-full max-w-full overflow-hidden">
+    <div
+      class="app-main-pane flex-1 flex min-w-0 min-h-0 flex-col w-full max-w-full overflow-hidden"
+      :class="{ 'app-main-pane--document-scroll': usesDocumentScrollShell }"
+    >
       <!-- Header -->
       <header
         class="app-header sticky top-0 z-10 bg-gray-950/60 backdrop-blur-xl border-b border-gray-800 p-4 flex justify-between items-center w-full"
       >
         <div class="flex items-center gap-3 min-w-0 flex-1">
           <!-- Hamburger (mobile only) -->
-          <button class="md:hidden p-2 hover:bg-gray-800 rounded" @click="mobileMenu = !mobileMenu">
+          <button
+            v-if="showsOverlaySidebar"
+            class="p-2 hover:bg-gray-800 rounded"
+            @click="mobileMenu = !mobileMenu"
+          >
             <svg
               class="w-6 h-6"
               fill="none"
@@ -564,10 +577,18 @@
               </el-tooltip>
             </template>
             <template v-else>
+              <span
+                v-if="showFreePlanHeaderBadge"
+                :class="freePlanBadgeClasses"
+                :title="upgradePillTitle"
+              >
+                Free Plan
+              </span>
               <RouterLink
-                v-if="!isGuest"
+                v-else-if="!isGuest"
                 :to="billingRoutePath"
-                class="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-sm hover:from-purple-600 hover:to-pink-700 transition"
+                :class="upgradePillClasses"
+                :title="upgradePillTitle"
               >
                 {{ upgradePillLabel }}
               </RouterLink>
@@ -587,13 +608,22 @@
           ></div>
 
           <!-- User Avatar -->
-          <img
+          <button
             v-if="authStore.isLoggedIn"
-            :src="authStore.user?.photoURL || authStore.user?.avatarUrl || 'https://i.pravatar.cc/40'"
-            class="rounded-full w-10 h-10 cursor-pointer"
-            alt="avatar"
+            type="button"
+            class="rounded-full transition focus:outline-none focus:ring-2 focus:ring-fuchsia-400"
+            aria-label="Open profile settings"
             @click="router.push('/settings')"
-          />
+          >
+            <UserAvatar
+              :src="authStore.user?.photoURL || authStore.user?.avatarUrl"
+              :name="authStore.user?.displayName || authStore.user?.name"
+              :email="authStore.user?.email"
+              alt="Profile avatar"
+              size-class="h-10 w-10"
+              text-class="text-sm"
+            />
+          </button>
 
           <!-- Logout removed from header per guidelines -->
         </div>
@@ -602,11 +632,12 @@
       <!-- Dynamic content -->
       <main
         class="app-content flex-1 min-h-0"
-        :class="
+        :class="[
           isOnTalkPlanner
             ? 'overflow-hidden p-0'
-            : 'overflow-y-auto overflow-x-hidden scrollbar-plan p-6'
-        "
+            : 'overflow-y-auto overflow-x-hidden scrollbar-plan p-6',
+          { 'app-content--document-scroll': usesDocumentScrollShell },
+        ]"
       >
         <div
           v-if="showWorkspaceRecovery"
@@ -678,6 +709,7 @@ import FeedbackDrawer from '@/components/feedback/FeedbackDrawer.vue'
 import SetupPrompt from '@/components/SetupPrompt.vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
+import { useAccessStore } from '@/stores/accessStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useFeedbackStore } from '@/stores/feedbackStore'
 import { useQuickSetupStore } from '@/stores/quickSetupStore'
@@ -686,6 +718,7 @@ import { useAuthFlags } from '@/composables/useAuthFlags'
 import { useFeatureFlagsStore } from '@/stores/featureFlagsStore'
 import PlanSummaryModal from '@/components/PlanSummaryModal.vue'
 import ProfileSetup from '@/components/ProfileSetup.vue'
+import UserAvatar from '@/components/UserAvatar.vue'
 import { db } from '@/firebase/init'
 import { doc, setDoc } from 'firebase/firestore'
 import { trackLinkedInConversion } from '@/utils/ads'
@@ -830,6 +863,37 @@ const SidebarIcon = defineComponent({
   },
 })
 const currentUserId = ref(null)
+const viewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1440)
+const coarseTouchViewport = ref(false)
+const likelyIpadViewport = ref(false)
+let storageHandler = null
+let viewportChangeHandler = null
+
+function detectCoarseTouchViewport() {
+  if (typeof window === 'undefined') return false
+  try {
+    return !!window.matchMedia?.('(hover: none) and (pointer: coarse)').matches
+  } catch {}
+  return false
+}
+
+function detectLikelyIpadViewport() {
+  if (typeof window === 'undefined') return false
+  try {
+    const ua = navigator.userAgent || ''
+    if (/iPad/i.test(ua)) return true
+    return /Macintosh/i.test(ua) && navigator.maxTouchPoints > 1
+  } catch {}
+  return false
+}
+
+function updateViewportLayoutState() {
+  if (typeof window === 'undefined') return
+  viewportWidth.value = window.innerWidth
+  coarseTouchViewport.value = detectCoarseTouchViewport()
+  likelyIpadViewport.value = detectLikelyIpadViewport()
+}
+
 function deriveUidFromStorage() {
   try {
     const direct = localStorage.getItem('uid')
@@ -844,11 +908,18 @@ function deriveUidFromStorage() {
 }
 
 onMounted(() => {
+  updateViewportLayoutState()
   currentUserId.value = deriveUidFromStorage()
   quickSetupStore.refreshQuickSetupState()
-  window.addEventListener('storage', () => {
+  storageHandler = () => {
     currentUserId.value = deriveUidFromStorage()
-  })
+  }
+  viewportChangeHandler = () => {
+    updateViewportLayoutState()
+  }
+  window.addEventListener('storage', storageHandler)
+  window.addEventListener('resize', viewportChangeHandler)
+  window.addEventListener('orientationchange', viewportChangeHandler)
   navGroups.forEach((g) => {
     openGroups[g.key] = g.defaultOpen ?? true
   })
@@ -880,6 +951,7 @@ const workspaceStore = useWorkspaceStore()
 const quickSetupStore = useQuickSetupStore()
 const featureFlagsStore = useFeatureFlagsStore()
 // Subscription state via store
+const accessStore = useAccessStore()
 const subStore = useSubscriptionStore()
 const feedbackStore = useFeedbackStore()
 const { isPremium, isGuest } = useAuthFlags()
@@ -901,6 +973,24 @@ const showWorkspaceRecovery = computed(
 )
 
 const isOnTalkPlanner = computed(() => route.path === '/talk-to-planner')
+const usesOverlaySidebar = computed(
+  () =>
+    viewportWidth.value < 768 ||
+    likelyIpadViewport.value ||
+    (coarseTouchViewport.value && viewportWidth.value <= 1200),
+)
+const showsDesktopSidebar = computed(
+  () => viewportWidth.value >= 768 && !usesOverlaySidebar.value,
+)
+const showsOverlaySidebar = computed(() => usesOverlaySidebar.value)
+const usesDocumentScrollShell = computed(
+  () =>
+    !isOnTalkPlanner.value &&
+    (
+      (likelyIpadViewport.value && viewportWidth.value <= 1400) ||
+      (coarseTouchViewport.value && viewportWidth.value <= 1024)
+    ),
+)
 let upgradeHandler = null
 const SUBSCRIPTION_REFRESH_INTERVAL_MS = 5 * 60 * 1000
 
@@ -992,12 +1082,14 @@ watch(
       ensureWorkspaceHydrated()
       const gainedSession = uid !== prevUid || (!!token && !prevToken) || prevLogoutPending
       if (gainedSession) {
+        accessStore.fetchAccess(uid, { minIntervalMs: SUBSCRIPTION_REFRESH_INTERVAL_MS }).catch(() => {})
         subStore.fetchStatus(uid, { minIntervalMs: SUBSCRIPTION_REFRESH_INTERVAL_MS }).catch(() => {})
       }
       scheduleWorkspaceHydrationRetry()
     } else {
       clearWorkspaceRetryTimer()
       workspaceRetryCount.value = 0
+      accessStore.reset()
       workspaceStore.reset()
     }
   },
@@ -1251,8 +1343,27 @@ const systemLinks = computed(() => [
 ])
 const isAppleBillingSafeMode = computed(() => detectAppleBillingSafeMode())
 const billingRoutePath = computed(() => (isAppleBillingSafeMode.value ? '/billing/upgrade' : '/subscription'))
-const upgradeBannerLabel = computed(() => (isAppleBillingSafeMode.value ? 'How to upgrade' : 'Upgrade'))
-const upgradePillLabel = computed(() => (isAppleBillingSafeMode.value ? 'Premium on web' : '🚀 Upgrade'))
+const upgradeBannerLabel = computed(() => (isAppleBillingSafeMode.value ? 'Learn about Premium' : 'Upgrade'))
+const upgradeBannerMessage = computed(() => (
+  isAppleBillingSafeMode.value
+    ? 'You have reached a Free plan limit. Premium access is available on our website, and your data will sync after you upgrade.'
+    : '🚀 You\'re on the Free Plan. Upgrade to unlock unlimited AI and reminders.'
+))
+const upgradePillLabel = computed(() => '🚀 Upgrade')
+const upgradePillTitle = computed(() => (
+  isAppleBillingSafeMode.value
+    ? 'You are on the Free plan. Premium access can be enabled on the web.'
+    : 'Upgrade'
+))
+const showFreePlanHeaderBadge = computed(() => (
+  isAppleBillingSafeMode.value && !isPremium.value && !isGuest.value
+))
+const freePlanBadgeClasses = 'rounded-full border border-white/12 bg-white/8 px-3 py-1 text-sm font-semibold text-slate-100 shadow-sm'
+const upgradePillClasses = computed(() => (
+  isAppleBillingSafeMode.value
+    ? 'rounded-full border border-white/12 bg-white/8 px-3 py-1 text-sm font-semibold text-slate-100 shadow-sm transition hover:bg-white/12'
+    : 'bg-gradient-to-r from-purple-500 to-pink-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-sm hover:from-purple-600 hover:to-pink-700 transition'
+))
 
 const footerUtilityLinks = computed(() => {
   const links = [
@@ -1354,8 +1465,30 @@ watch(
   { immediate: true },
 )
 
+watch(
+  () => showsDesktopSidebar.value,
+  (isDesktopSidebarVisible) => {
+    if (isDesktopSidebarVisible) {
+      mobileMenu.value = false
+    }
+  },
+)
+
 onUnmounted(() => {
   clearWorkspaceRetryTimer()
+  if (storageHandler) {
+    try {
+      window.removeEventListener('storage', storageHandler)
+    } catch {}
+    storageHandler = null
+  }
+  if (viewportChangeHandler) {
+    try {
+      window.removeEventListener('resize', viewportChangeHandler)
+      window.removeEventListener('orientationchange', viewportChangeHandler)
+    } catch {}
+    viewportChangeHandler = null
+  }
   if (upgradeHandler) {
     try {
       window.removeEventListener('upgrade-required', upgradeHandler)
@@ -1418,6 +1551,26 @@ body {
   overflow: hidden;
 }
 
+.app-shell--document-scroll {
+  height: auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
+  overflow: visible;
+}
+
+.app-main-pane--document-scroll {
+  height: auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
+  overflow: visible;
+}
+
+.app-content--document-scroll {
+  overflow: visible !important;
+}
+
 @media (min-width: 768px) {
   .app-shell {
     position: relative;
@@ -1439,6 +1592,11 @@ body {
     width: calc(100% - var(--desktop-sidebar-width));
     margin-left: var(--desktop-sidebar-width);
   }
+
+  .app-shell--overlay-sidebar .app-main-pane {
+    width: 100%;
+    margin-left: 0;
+  }
 }
 
 .app-upgrade-banner {
@@ -1453,7 +1611,7 @@ body {
 }
 
 .app-desktop-sidebar {
-  padding-top: calc(var(--safe-area-top) + 1rem);
+  padding-top: 1rem;
   padding-bottom: calc(var(--safe-area-bottom) + 1rem);
 }
 

@@ -1051,14 +1051,29 @@ function sortLinks(list = []) {
   })
 }
 
-export async function addLink({ title, url, category = 'Personal', icon = '🔗', starred = false, description = '' }) {
-  const user = auth.currentUser
-  if (!user) {
+function mergeCategories(primary = [], fallback = []) {
+  const byKey = new Map()
+  ;[...fallback, ...primary].forEach((category) => {
+    const key = String(category?.name || category?.id || '').trim().toLowerCase()
+    if (!key) return
+    byKey.set(key, category)
+  })
+  return Array.from(byKey.values()).sort((a, b) => (a.order || 0) - (b.order || 0))
+}
+
+function requireLinkSession() {
+  const session = currentSessionContext()
+  if (!session?.uid) {
     handleAuthError({ code: 'unauthenticated', message: 'Not signed in' })
     throw new Error('Not signed in')
   }
+  return session
+}
+
+export async function addLink({ title, url, category = 'Personal', icon = '🔗', starred = false, description = '' }) {
+  const session = requireLinkSession()
   const payload = {
-    userId: user.uid,
+    userId: session.uid,
     workspaceId: currentWorkspaceId() || null,
     title: title?.trim() || url || 'New Link',
     url: url?.trim(),
@@ -1070,31 +1085,53 @@ export async function addLink({ title, url, category = 'Personal', icon = '🔗'
     createdAt: Date.now(),
     lastUsedAt: 0,
   }
-  const ref = await safeAction(addDoc(linksCollectionForUser(user.uid), payload))
+  const ref = await safeAction(addDoc(linksCollectionForUser(session.uid), payload))
   return { id: ref.id, ...payload }
 }
 
 export async function getLinks() {
-  const user = auth.currentUser
-  if (!user) return []
-  const col = linksCollectionForUser(user.uid)
+  const session = currentSessionContext()
+  if (!session?.uid) return []
+  const col = linksCollectionForUser(session.uid)
   const snap = await safeAction(getDocs(col))
   let list = snap.docs.map(mapLinkDoc)
   if (!list.length && currentWorkspaceId()) {
-    const migrated = await migrateLegacyLinks(user.uid)
-    if (migrated.length) list = migrated
+    const migrated = await migrateLegacyLinks(session.uid)
+    if (migrated.length) {
+      list = migrated
+    } else {
+      list = await fetchLegacyLinks(session.uid)
+    }
   }
   return sortLinks(list)
 }
 
 export function watchLinks(cb) {
-  const user = auth.currentUser
-  if (!user) return () => {}
+  const session = currentSessionContext()
+  if (!session?.uid) return () => {}
   try {
+    let hydratedLegacy = false
     const unsub = onSnapshot(
-      linksCollectionForUser(user.uid),
-      (snap) => {
-        const list = snap.docs.map(mapLinkDoc)
+      linksCollectionForUser(session.uid),
+      async (snap) => {
+        let list = snap.docs.map(mapLinkDoc)
+        if (!list.length && currentWorkspaceId() && !hydratedLegacy) {
+          hydratedLegacy = true
+          try {
+            const migrated = await migrateLegacyLinks(session.uid)
+            if (migrated.length) {
+              cb(sortLinks(migrated))
+              return
+            }
+            const legacy = await fetchLegacyLinks(session.uid)
+            if (legacy.length) {
+              cb(sortLinks(legacy))
+              return
+            }
+          } catch (err) {
+            console.warn('watchLinks legacy hydration failed', err?.message || err)
+          }
+        }
         cb(sortLinks(list))
       },
       (err) => handleAuthError(err),
@@ -1107,18 +1144,20 @@ export function watchLinks(cb) {
 }
 
 export async function updateLink(id, patch) {
-  const user = auth.currentUser
-  if (!user) {
-    handleAuthError({ code: 'unauthenticated', message: 'Not signed in' })
-    throw new Error('Not signed in')
-  }
+  const session = requireLinkSession()
   const normalized = { ...patch }
   if ('title' in normalized && normalized.title == null) delete normalized.title
-  await safeAction(updateDoc(linkDocRef(user.uid, id), normalized))
-  // Update legacy doc if it exists to keep parity
   try {
-    await updateDoc(doc(db, 'links', id), normalized)
-  } catch {}
+    await safeAction(updateDoc(linkDocRef(session.uid, id), normalized))
+  } catch (err) {
+    try {
+      await safeAction(updateDoc(doc(db, 'links', id), normalized))
+      return
+    } catch {
+      throw err
+    }
+  }
+  try { await updateDoc(doc(db, 'links', id), normalized) } catch {}
 }
 
 export async function touchLink(id) {
@@ -1128,9 +1167,9 @@ export async function touchLink(id) {
 }
 
 export async function reorderLinks(linkIdsInOrder = []) {
-  const user = auth.currentUser
-  if (!user || !linkIdsInOrder.length) return
-  const col = linksCollectionForUser(user.uid)
+  const session = currentSessionContext()
+  if (!session?.uid || !linkIdsInOrder.length) return
+  const col = linksCollectionForUser(session.uid)
   const now = Date.now()
   await Promise.all(
     linkIdsInOrder.map((linkId, idx) =>
@@ -1140,39 +1179,74 @@ export async function reorderLinks(linkIdsInOrder = []) {
 }
 
 export async function deleteLink(id) {
-  const user = auth.currentUser
-  if (!user) {
-    handleAuthError({ code: 'unauthenticated', message: 'Not signed in' })
-    throw new Error('Not signed in')
-  }
-  await safeAction(deleteDoc(linkDocRef(user.uid, id)))
+  const session = requireLinkSession()
   try {
-    await deleteDoc(doc(db, 'links', id))
-  } catch {}
+    await safeAction(deleteDoc(linkDocRef(session.uid, id)))
+  } catch (err) {
+    try {
+      await safeAction(deleteDoc(doc(db, 'links', id)))
+      return
+    } catch {
+      throw err
+    }
+  }
+  try { await deleteDoc(doc(db, 'links', id)) } catch {}
+}
+
+async function fetchLegacyLinkCategories(userId) {
+  const qy = query(collection(db, 'linksCategories'), where('userId', '==', userId))
+  const snap = await safeAction(getDocs(qy))
+  return snap.docs.map(mapCategoryDoc).sort((a, b) => (a.order || 0) - (b.order || 0))
 }
 
 export async function getLinkCategories() {
-  const user = auth.currentUser
-  if (!user) return defaultLinkCategories
-  const col = linkCategoriesCollection(user.uid)
+  const session = currentSessionContext()
+  if (!session?.uid) return defaultLinkCategories
+  const col = linkCategoriesCollection(session.uid)
   const snap = await safeAction(getDocs(col))
   let categories = snap.docs.map(mapCategoryDoc)
   if (!categories.length) {
-    categories = await seedDefaultCategories(user.uid)
+    if (currentWorkspaceId()) {
+      const legacy = await fetchLegacyLinkCategories(session.uid)
+      if (legacy.length) return legacy
+    }
+    categories = await seedDefaultCategories(session.uid)
   } else {
     categories = categories.sort((a, b) => (a.order || 0) - (b.order || 0))
+    if (currentWorkspaceId()) {
+      const legacy = await fetchLegacyLinkCategories(session.uid)
+      categories = mergeCategories(categories, legacy)
+    }
   }
   return categories
 }
 
 export function watchLinkCategories(cb) {
-  const user = auth.currentUser
-  if (!user) return () => {}
+  const session = currentSessionContext()
+  if (!session?.uid) return () => {}
   try {
+    let hydratedLegacy = false
     const unsub = onSnapshot(
-      linkCategoriesCollection(user.uid),
-      (snap) => {
-        const cats = snap.docs.map(mapCategoryDoc).sort((a, b) => (a.order || 0) - (b.order || 0))
+      linkCategoriesCollection(session.uid),
+      async (snap) => {
+        let cats = snap.docs.map(mapCategoryDoc).sort((a, b) => (a.order || 0) - (b.order || 0))
+        if (!cats.length && currentWorkspaceId() && !hydratedLegacy) {
+          hydratedLegacy = true
+          try {
+            const legacy = await fetchLegacyLinkCategories(session.uid)
+            if (legacy.length) {
+              cb(legacy)
+              return
+            }
+          } catch (err) {
+            console.warn('watchLinkCategories legacy hydration failed', err?.message || err)
+          }
+        } else if (cats.length && currentWorkspaceId()) {
+          try {
+            const legacy = await fetchLegacyLinkCategories(session.uid)
+            cats = mergeCategories(cats, legacy)
+          } catch {}
+        }
         cb(cats)
       },
       (err) => handleAuthError(err),
@@ -1185,11 +1259,7 @@ export function watchLinkCategories(cb) {
 }
 
 export async function addLinkCategory({ name, icon = '🏷️', color = 'slate' }) {
-  const user = auth.currentUser
-  if (!user) {
-    handleAuthError({ code: 'unauthenticated', message: 'Not signed in' })
-    throw new Error('Not signed in')
-  }
+  const session = requireLinkSession()
   const payload = {
     name: name?.trim() || 'New Category',
     icon: icon || '🏷️',
@@ -1197,28 +1267,38 @@ export async function addLinkCategory({ name, icon = '🏷️', color = 'slate' 
     order: Date.now(),
     createdAt: Date.now(),
     workspaceId: currentWorkspaceId() || null,
-    userId: user.uid,
+    userId: session.uid,
   }
-  const ref = await safeAction(addDoc(linkCategoriesCollection(user.uid), payload))
+  const ref = await safeAction(addDoc(linkCategoriesCollection(session.uid), payload))
   return { id: ref.id, ...payload }
 }
 
 export async function updateLinkCategory(id, patch) {
-  const user = auth.currentUser
-  if (!user) {
-    handleAuthError({ code: 'unauthenticated', message: 'Not signed in' })
-    throw new Error('Not signed in')
+  const session = requireLinkSession()
+  try {
+    await safeAction(updateDoc(linkCategoryDocRef(session.uid, id), patch))
+  } catch (err) {
+    try {
+      await safeAction(updateDoc(doc(db, 'linksCategories', id), patch))
+      return
+    } catch {
+      throw err
+    }
   }
-  await safeAction(updateDoc(linkCategoryDocRef(user.uid, id), patch))
 }
 
 export async function deleteLinkCategory(id) {
-  const user = auth.currentUser
-  if (!user) {
-    handleAuthError({ code: 'unauthenticated', message: 'Not signed in' })
-    throw new Error('Not signed in')
+  const session = requireLinkSession()
+  try {
+    await safeAction(deleteDoc(linkCategoryDocRef(session.uid, id)))
+  } catch (err) {
+    try {
+      await safeAction(deleteDoc(doc(db, 'linksCategories', id)))
+      return
+    } catch {
+      throw err
+    }
   }
-  await safeAction(deleteDoc(linkCategoryDocRef(user.uid, id)))
 }
 
 // export async function savePreferences(userId, prefs) {

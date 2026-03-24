@@ -355,6 +355,7 @@ import { ElNotification, ElMessage } from 'element-plus'
 import VoiceRecorder from '@/components/VoiceRecorder.vue'
 import NotificationPrompt from '@/components/NotificationPrompt.vue'
 import { useAuthStore } from '@/stores/authStore'
+import { useAccessStore } from '@/stores/accessStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useTasks } from '@/composables/useTasks'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
@@ -634,9 +635,14 @@ function getInputText() {
 }
 
 const hasAttachmentsComputed = computed(() => imageTasksEnabled && attachments.value.length > 0)
-const featureAllowed = computed(() =>
-  isFeatureAllowed({ plan: subStore.subscription.plan, role: authStore?.user?.role }, 'aiSplit'),
-)
+const accessStore = useAccessStore()
+const featureAllowed = computed(() => {
+  const access = accessStore.access
+  if (access?.entitlements) {
+    return isFeatureAllowed(access, 'aiSplit')
+  }
+  return isFeatureAllowed({ plan: subStore.subscription.plan, role: authStore?.user?.role }, 'aiSplit')
+})
 const generateDisabled = computed(() => {
   // Keep image-only flow valid: allow submit when attachments exist even if text is empty
   if (!featureAllowed.value) return true

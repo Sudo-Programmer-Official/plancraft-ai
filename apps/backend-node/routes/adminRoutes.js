@@ -4,6 +4,14 @@ import { dataStore } from './dataStore.js'
 import { db } from '../services/firebaseAdmin.js'
 import dayjs from 'dayjs'
 import { WORKSPACE_COLLECTION } from '../services/workspaceService.js'
+import {
+  DEFAULT_ACCESS_CONTROL,
+  DEFAULT_PLAN_LIMITS,
+  invalidateAccessControlCache,
+  sanitizeAccessControl,
+  sanitizePlanLimits,
+  sanitizeUserAccessOverride,
+} from '../services/planService.js'
 
 const router = express.Router()
 
@@ -114,12 +122,14 @@ router.get('/users', requireAdmin, async (req, res) => {
     const snap = await ref.limit(limit).get()
     const users = snap.docs.map((doc) => {
       const data = doc.data() || {}
+      const accessOverride = sanitizeUserAccessOverride(data?.accessOverride || null)
       return {
         id: doc.id,
         name: data.name || data.displayName || '',
         email: data.email || '',
         role: data.role || 'user',
         plan: (data.plan || 'free'),
+        accessOverride,
         guest: !!data.guest,
         createdAt: data.createdAt || null,
       }
@@ -154,7 +164,7 @@ router.post('/users/updatePlan', requireAdmin, async (req, res) => {
     const userId = String(id || '')
     const p = String(plan || '').toLowerCase()
     if (!userId) return res.status(400).json({ error: 'Missing id' })
-    if (!['free', 'premium'].includes(p)) return res.status(400).json({ error: 'Invalid plan' })
+    if (!['free', 'premium', 'team'].includes(p)) return res.status(400).json({ error: 'Invalid plan' })
 
     await db.collection('users').doc(userId).set({ plan: p, updatedAt: new Date() }, { merge: true })
     const snap = await db.collection('users').doc(userId).get()
@@ -162,6 +172,32 @@ router.post('/users/updatePlan', requireAdmin, async (req, res) => {
     return res.json({ id: userId, name: data.name || '', email: data.email || '', role: data.role || 'user', plan: data.plan || p })
   } catch (e) {
     return res.status(500).json({ error: 'Failed to update plan' })
+  }
+})
+
+router.post('/users/:id/access-override', requireAdmin, async (req, res) => {
+  try {
+    const userId = String(req.params.id || '')
+    if (!userId) return res.status(400).json({ error: 'Missing id' })
+
+    const body = req.body || {}
+    const clear = body?.clear === true || body?.enabled === false
+    const accessOverride = clear ? null : sanitizeUserAccessOverride(body, {
+      gracePeriodDays: DEFAULT_ACCESS_CONTROL.gracePeriodDays,
+    })
+
+    await db.collection('users').doc(userId).set(
+      {
+        accessOverride,
+        updatedAt: new Date(),
+      },
+      { merge: true },
+    )
+
+    return res.json({ success: true, accessOverride })
+  } catch (error) {
+    console.error('Admin access override update failed', error)
+    return res.status(500).json({ error: 'Failed to update access override' })
   }
 })
 
@@ -278,15 +314,27 @@ router.get('/billing/workspaces/:workspaceId/timeline', requireAdmin, async (req
 router.get('/settings', requireAdmin, async (req, res) => {
   try {
     const snap = await db.collection('settings').doc('global').get()
+    const accessControlDefaults = sanitizeAccessControl(DEFAULT_ACCESS_CONTROL)
     const defaults = {
       blogPrompt: 'Generate engaging AI productivity content for PlanCraftAI.',
       aiModel: 'gpt-4o-mini',
       // Default to disabled to avoid noisy pushes
       enableNotifications: false,
       whatsappTemplate: 'blog_update_v1',
+      planLimits: sanitizePlanLimits(DEFAULT_PLAN_LIMITS),
+      accessControl: accessControlDefaults,
     }
     const doc = snap.exists ? (snap.data() || {}) : {}
-    const settings = { ...defaults, ...doc }
+    const accessControl = sanitizeAccessControl({
+      ...(doc?.accessControl || {}),
+      ...(doc?.planLimits ? { planLimits: doc.planLimits } : {}),
+    })
+    const settings = {
+      ...defaults,
+      ...doc,
+      planLimits: sanitizePlanLimits(accessControl.plans),
+      accessControl,
+    }
     // Attach a non-persistent version hint if present via env
     const version = process.env.APP_VERSION || process.env.npm_package_version || undefined
     return res.json({ settings: version ? { ...settings, version } : settings })
@@ -307,14 +355,21 @@ router.post('/settings', requireAdmin, async (req, res) => {
       return !!v
     }
 
+    const sanitizedAccessControl = sanitizeAccessControl({
+      ...(body?.accessControl || {}),
+      ...(body?.planLimits ? { planLimits: body.planLimits } : {}),
+    })
     const payload = {
       blogPrompt: toStr(body.blogPrompt).trim() || undefined,
       aiModel: toStr(body.aiModel).trim() || undefined,
       enableNotifications: toBool(body.enableNotifications),
       whatsappTemplate: toStr(body.whatsappTemplate).trim() || undefined,
+      planLimits: sanitizePlanLimits(sanitizedAccessControl.plans),
+      accessControl: sanitizedAccessControl,
       updatedAt: new Date(),
     }
     await db.collection('settings').doc('global').set(payload, { merge: true })
+    invalidateAccessControlCache()
     return res.json({ success: true })
   } catch (e) {
     console.error('Admin settings update failed', e)

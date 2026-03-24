@@ -347,7 +347,11 @@ router.post('/split-tasks', async (req, res) => {
       if (userId) {
         const ok = await checkUserPlanUsage(String(userId), 'ai')
         if (!ok?.ok) {
-          return res.status(403).json({ error: 'Daily AI limit reached. Upgrade to Pro to continue.' })
+          return res.status(403).json({
+            error: 'Daily AI limit reached. Upgrade to Premium to continue.',
+            code: 'ai_limit_reached',
+            details: ok?.details || null,
+          })
         }
       }
     } catch {}

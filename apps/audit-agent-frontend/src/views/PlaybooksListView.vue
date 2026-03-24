@@ -9,12 +9,24 @@
             Create repeatable multi-step workflows and track them like a calm checklist.
           </p>
         </div>
-        <RouterLink
-          to="/playbooks/new"
-          class="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-fuchsia-500 via-purple-500 to-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:scale-[1.02]"
-        >
-          + New Playbook
-        </RouterLink>
+        <div class="flex flex-col items-start gap-3 sm:items-end">
+          <div
+            v-if="showUsageIndicator"
+            class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-indigo-100/85"
+          >
+            <p class="text-[11px] uppercase tracking-[0.24em] text-indigo-200/70">Usage</p>
+            <p class="mt-1 font-semibold text-white">{{ usageHeadline }}</p>
+            <p v-if="usageHint" class="mt-1 text-xs text-indigo-100/70">{{ usageHint }}</p>
+          </div>
+          <button
+            type="button"
+            class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-lg transition"
+            :class="createButtonClasses"
+            @click="handleCreateClick"
+          >
+            {{ createButtonLabel }}
+          </button>
+        </div>
       </div>
     </section>
 
@@ -33,12 +45,13 @@
       <div class="text-4xl">📚</div>
       <h2 class="mt-4 text-2xl font-semibold text-white">No playbooks yet</h2>
       <p class="mt-2 text-sm">Start with a morning checklist, launch workflow, or meeting prep routine.</p>
-      <RouterLink
-        to="/playbooks/new"
+      <button
+        type="button"
         class="mt-6 inline-flex rounded-xl bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/15"
+        @click="handleCreateClick"
       >
-        Create your first playbook
-      </RouterLink>
+        {{ isAtLimit ? 'Upgrade to continue' : 'Create your first playbook' }}
+      </button>
     </section>
 
     <div v-else class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -75,17 +88,58 @@
         </div>
       </RouterLink>
     </div>
+
+    <FeatureLimitDialog
+      :open="showLimitDialog"
+      feature-label="playbooks"
+      :used="playbookUsage.used"
+      :limit="playbookUsage.limit || 0"
+      plan-label="Free plan"
+      @close="showLimitDialog = false"
+      @refreshed="handleUsageRefresh"
+    />
   </div>
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { RouterLink } from 'vue-router'
+import { useRouter } from 'vue-router'
+import FeatureLimitDialog from '@/components/FeatureLimitDialog.vue'
 import { fetchPlaybooks } from '@/services/playbookService'
 
+const router = useRouter()
 const loading = ref(true)
 const playbooks = ref([])
+const playbookUsage = ref({
+  used: 0,
+  limit: null,
+  isUnlimited: true,
+  atLimit: false,
+  nearLimit: false,
+})
+const showLimitDialog = ref(false)
+
+const isAtLimit = computed(() => playbookUsage.value?.atLimit === true)
+const isNearLimit = computed(() => playbookUsage.value?.nearLimit === true && !isAtLimit.value)
+const showUsageIndicator = computed(() => !playbookUsage.value?.isUnlimited && Number(playbookUsage.value?.limit || 0) > 0)
+const usageHeadline = computed(() => {
+  const used = Number(playbookUsage.value?.used || 0)
+  const limit = Number(playbookUsage.value?.limit || 0)
+  if (!showUsageIndicator.value) return `${used} used`
+  return `${used} / ${limit} used (Free plan)`
+})
+const usageHint = computed(() => {
+  if (isAtLimit.value) return 'You have reached your free playbook limit.'
+  if (isNearLimit.value) return 'You are close to your limit.'
+  return ''
+})
+const createButtonLabel = computed(() => (isAtLimit.value ? 'Upgrade to continue' : '+ New Playbook'))
+const createButtonClasses = computed(() => (
+  isAtLimit.value
+    ? 'bg-white/10 border border-white/15 hover:bg-white/15'
+    : 'bg-gradient-to-r from-fuchsia-500 via-purple-500 to-indigo-500 hover:scale-[1.02]'
+))
 
 function progressPercent(progress = {}) {
   const total = Number(progress?.total || 0)
@@ -109,12 +163,27 @@ function formatDate(value) {
 async function loadPlaybooks() {
   loading.value = true
   try {
-    playbooks.value = await fetchPlaybooks()
+    const payload = await fetchPlaybooks()
+    playbooks.value = payload?.playbooks || []
+    playbookUsage.value = payload?.usage || playbookUsage.value
   } catch (err) {
     ElMessage.error(err?.response?.data?.error || err?.message || 'Failed to load playbooks')
   } finally {
     loading.value = false
   }
+}
+
+function handleCreateClick() {
+  if (isAtLimit.value) {
+    showLimitDialog.value = true
+    return
+  }
+  router.push('/playbooks/new')
+}
+
+async function handleUsageRefresh() {
+  showLimitDialog.value = false
+  await loadPlaybooks()
 }
 
 onMounted(loadPlaybooks)

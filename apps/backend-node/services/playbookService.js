@@ -1,4 +1,5 @@
 import { db } from './firebaseAdmin.js'
+import { getFeatureUsageStatus } from './planService.js'
 
 export const PLAYBOOK_COLLECTION = 'playbooks'
 export const PLAYBOOK_STEP_COLLECTION = 'steps'
@@ -116,6 +117,16 @@ export async function createPlaybook(userId, payload = {}) {
   if (!name) {
     const error = new Error('Playbook name is required')
     error.statusCode = 400
+    throw error
+  }
+
+  const usageStatus = await getFeatureUsageStatus(userId, 'playbooks')
+  if (usageStatus.atLimit) {
+    const limit = usageStatus.limit ?? 0
+    const error = new Error(`You’ve reached your free limit (${limit} playbooks). Upgrade your account on our website to continue.`)
+    error.statusCode = 403
+    error.code = 'playbook_limit_reached'
+    error.details = usageStatus
     throw error
   }
 

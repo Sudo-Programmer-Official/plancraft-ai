@@ -15,7 +15,7 @@
             <p class="text-xs uppercase tracking-[0.24em] text-indigo-200">What to do next</p>
             <p class="text-lg font-semibold text-white">Open {{ billingWebHost }} in Safari to upgrade or manage billing.</p>
             <p class="text-sm text-indigo-100/85">
-              Once you upgrade on the website, come back here and refresh. Your premium access will be ready.
+              Your data is safe and will sync automatically after you upgrade. Once you come back here, refresh and your premium access will be ready.
             </p>
           </div>
 
@@ -43,7 +43,7 @@
               class="px-5 py-3 rounded-xl border border-white/15 bg-slate-900/70 text-white font-semibold hover:border-indigo-300/40 hover:bg-slate-900 transition"
               @click="refreshAccess"
             >
-              I've upgraded -> Refresh
+              I've upgraded · Refresh
             </button>
           </div>
         </div>
@@ -120,6 +120,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import api from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
+import { useAccessStore } from '@/stores/accessStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { copyText, openExternalUrl } from '@/utils/nativeUi'
@@ -129,6 +130,7 @@ const route = useRoute()
 const router = useRouter()
 const workspaceStore = useWorkspaceStore()
 const authStore = useAuthStore()
+const accessStore = useAccessStore()
 const subStore = useSubscriptionStore()
 const plan = ref('pro')
 const seats = ref(3)
@@ -207,6 +209,7 @@ async function refreshAccess() {
   try {
     const uid = authStore?.user?.uid
     if (uid) {
+      await accessStore.fetchAccess(uid, { force: true, minIntervalMs: 0 })
       await subStore.fetchStatus(uid, { force: true, minIntervalMs: 0 })
     }
   } catch {}

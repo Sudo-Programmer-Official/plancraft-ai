@@ -2,6 +2,7 @@ import express from "express";
 import { requireAuth, ensureUserMatches } from "../middleware/auth.js";
 import { requireWorkspaceRole } from "../middleware/workspace.js";
 import { canUseFeature, FEATURE_KEYS } from "../services/entitlements.js";
+import { checkUserPlanUsage } from "../services/planService.js";
 import { createTask, scheduleTaskReminder } from "../services/taskService.js";
 import { notifyTaskCreated } from "../services/notificationService.js";
 import { db } from "../services/firebaseAdmin.js";
@@ -173,6 +174,15 @@ router.post("/create", requireWorkspaceEditor, async (req, res) => {
     if (!userId) return res.status(400).json({ error: "Missing userId" });
     const workspaceId = selectWorkspaceId(req);
     if (!workspaceId) return res.status(400).json({ error: "workspaceId is required" });
+
+    const taskUsage = await checkUserPlanUsage(userId, "tasks");
+    if (!taskUsage?.ok) {
+      return res.status(403).json({
+        error: "Daily task limit reached. Upgrade to Premium to continue.",
+        code: "task_limit_reached",
+        details: taskUsage?.details || null,
+      });
+    }
 
     const task = await createTask(userId, { ...payload, workspaceId }, { ...options, workspaceId });
     return res.json({ success: true, task });

@@ -1,10 +1,11 @@
 <template>
-  <div class="min-h-screen p-4 sm:p-6 text-white bg-gradient-to-b from-slate-900 via-slate-900/90 to-slate-950">
-    <header class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-6">
+  <main class="app-page-shell">
+    <div class="app-page-frame">
+    <header class="app-page-hero flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <p class="text-xs uppercase tracking-[0.35em] text-indigo-300/80">Calendar</p>
-        <h1 class="text-2xl sm:text-3xl font-semibold">Meetings</h1>
-        <p class="text-sm text-slate-300/90">Read-only view of synced events.</p>
+        <p class="app-page-eyebrow">Calendar</p>
+        <h1 class="app-page-title !text-[clamp(2rem,3vw,2.7rem)]">Meetings</h1>
+        <p class="app-page-description">Read-only view of synced events.</p>
       </div>
       <div class="flex items-center gap-2 flex-wrap justify-end">
         <span v-if="googleConnected" class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-700/40 text-emerald-100 text-xs">
@@ -21,29 +22,31 @@
       </div>
     </header>
 
-    <EmptyState
-      v-if="!(meetings?.length)"
-      title="No meetings scheduled"
-      subtitle="Once your calendar syncs, your upcoming meetings will appear here."
-      icon="📅"
-    />
+    <section v-if="!(meetings?.length)" class="app-page-section">
+      <EmptyState
+        title="No meetings scheduled"
+        subtitle="Once your calendar syncs, your upcoming meetings will appear here."
+        icon="📅"
+      />
+    </section>
 
     <div v-else class="space-y-6">
-      <div v-if="groupedMeetings.today?.length" class="space-y-3">
+      <section v-if="groupedMeetings.today?.length" class="app-page-section app-page-section--compact space-y-3">
         <div class="text-lg font-semibold text-indigo-100">Today</div>
         <div class="grid gap-3">
           <MeetingCard v-for="m in groupedMeetings.today" :key="m.id" :meeting="m" />
         </div>
-      </div>
+      </section>
 
-      <div v-if="groupedMeetings.upcoming?.length" class="space-y-3">
+      <section v-if="groupedMeetings.upcoming?.length" class="app-page-section app-page-section--compact space-y-3">
         <div class="text-lg font-semibold text-indigo-100">Upcoming</div>
         <div class="grid gap-3">
           <MeetingCard v-for="m in groupedMeetings.upcoming" :key="m.id" :meeting="m" />
         </div>
-      </div>
+      </section>
     </div>
-  </div>
+    </div>
+  </main>
 </template>
 
 <script setup>

@@ -905,6 +905,13 @@ export const useAuthStore = defineStore('authStore', {
         })
       } catch {}
       try {
+        import('@/stores/accessStore').then((mod) => {
+          try {
+            mod.useAccessStore().reset()
+          } catch {}
+        })
+      } catch {}
+      try {
         import('@/stores/workspaceStore').then((mod) => {
           try {
             mod.useWorkspaceStore().reset()
@@ -953,18 +960,24 @@ export const useAuthStore = defineStore('authStore', {
         this._refreshPlanUid = uid
         this._refreshPlanPromise = (async () => {
           let status = null
-          let usage = null
+          let access = null
           const previousPlan = String(this.user?.plan || '').toLowerCase()
           try {
-            const [subStoreModule, usageResult] = await Promise.all([
+            const [subStoreModule, accessStoreModule, accessResult] = await Promise.all([
               import('@/stores/subscriptionStore'),
+              import('@/stores/accessStore'),
               withFallback(getUsageStatus(uid), {
                 ms: 5000,
-                label: 'usage status',
+                label: 'effective access',
                 fallback: null,
               }),
             ])
-            usage = usageResult
+            access = accessResult
+            try {
+              if (access) {
+                accessStoreModule.useAccessStore().applyAccess(access)
+              }
+            } catch {}
             try {
               status = await withFallback(
                 subStoreModule.useSubscriptionStore().fetchStatus(uid, {
@@ -980,11 +993,12 @@ export const useAuthStore = defineStore('authStore', {
             } catch {}
           } catch {}
 
-          const resolvedPlan = String(status?.plan || previousPlan || '').toLowerCase()
+          const resolvedPlan = String(access?.effectivePlan || status?.plan || previousPlan || '').toLowerCase()
           this.user = {
             ...(this.user || {}),
             ...(resolvedPlan ? { plan: resolvedPlan } : {}),
-            usage: usage || this.user?.usage,
+            ...(access ? { access } : {}),
+            usage: access ? { today: access.today || {}, ...access.usage } : this.user?.usage,
           }
           try { localStorage.setItem('user', JSON.stringify(this.user)) } catch {}
           try {
@@ -992,7 +1006,7 @@ export const useAuthStore = defineStore('authStore', {
               await updateDoc(doc(db, 'users', uid), { plan: resolvedPlan })
             }
           } catch {}
-          return { user: this.user, refreshed: !!(status || usage) }
+          return { user: this.user, refreshed: !!(status || access) }
         })()
 
         const result = await this._refreshPlanPromise

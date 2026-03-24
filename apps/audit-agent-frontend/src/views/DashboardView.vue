@@ -91,7 +91,7 @@
     </section>
 
     <div
-      v-if="showCarryoverBanner || (usage.plan === 'free' && !isPremium.value) || reactivateEligible"
+      v-if="showCarryoverBanner || showReminderPlanBanner || reactivateEligible"
       class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-4"
     >
       <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
@@ -134,21 +134,29 @@
         </div>
 
         <div
-          v-if="usage.plan === 'free' && !isPremium.value"
+          v-if="showReminderPlanBanner"
           class="dashboard-banner bg-indigo-600/10 border-indigo-500/40 text-indigo-100 flex items-center justify-between gap-3"
         >
           <div class="flex items-center gap-2">
             <span class="text-xl">🚀</span>
-            <p class="text-sm sm:text-base">
-              You’ve used {{ usage.used }}/{{ usage.limit }} reminders today.
-            </p>
+            <div class="space-y-1">
+              <p class="text-sm sm:text-base">
+                {{ reminderPlanBannerText }}
+              </p>
+              <p
+                v-if="isAppleBillingSafeMode && isReminderLimitReached"
+                class="text-xs text-indigo-100/75"
+              >
+                Your data stays safe and will sync after you upgrade on the website.
+              </p>
+            </div>
           </div>
           <button
             v-if="!isGuest.value"
             @click="goToUpgrade"
             class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold"
           >
-            Upgrade
+            {{ reminderPlanBannerCta }}
           </button>
           <RouterLink
             v-else
@@ -1256,6 +1264,7 @@ import { toLocalDateKey, parseLocalDateKey } from '@/utils/dateHelper'
 import { summarizeTasks } from '@/services/aiService'
 import GuestBanner from '@/components/GuestBanner.vue'
 import { useAuthStore } from '@/stores/authStore'
+import { useAccessStore } from '@/stores/accessStore'
 import TaskPlannerDialog from '@/components/TaskPlannerDialog.vue'
 import { useTasks } from '@/composables/useTasks'
 import { addTaskToFirebase, updateTaskInFirebase, fetchEntries } from '@/services/firebaseService'
@@ -1285,6 +1294,7 @@ import { subscribeToNapkinItems } from '@/services/napkinService'
 import { fetchDashboardPreferences, saveDashboardPreferences } from '@/services/dashboardPreferencesService'
 import { getGoogleStatus, triggerGoogleSyncNow } from '@/stores/integrationsStore'
 import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
+import { isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
 import {
   getIncompleteQuickSetupLabels,
   isQuickSetupSnoozed,
@@ -1295,6 +1305,7 @@ dayjs.extend(utc)
 dayjs.extend(timezone)
 
 const authStore = useAuthStore()
+const accessStore = useAccessStore()
 const { isPremium, isGuest } = useAuthFlags()
 const workspaceStore = useWorkspaceStore()
 const activeWorkspaceId = computed(() => {
@@ -1494,6 +1505,7 @@ const showNapkin = computed(() => cardVisibility.value.has('napkin'))
 
 // Usage meter (free plan)
 const usage = ref({ used: 0, limit: 0, plan: '' })
+const isAppleBillingSafeMode = detectAppleBillingSafeMode()
 const googleStatus = ref({ connected: false, accounts: [] })
 const googleLoading = ref(false)
 const googleSyncing = ref(false)
@@ -1509,12 +1521,46 @@ async function fetchUsage() {
   try {
     const uid = auth?.currentUser?.uid || localStorage.getItem('uid')
     if (!uid) return
-    const { data } = await api.get('/reminders/usage', { params: { userId: uid } })
-    if (data?.success) usage.value = { used: data.used || 0, limit: data.limit || 0, plan: data.plan || '' }
+    const access = await accessStore.fetchAccess(uid, { minIntervalMs: 0 })
+    usage.value = {
+      used: Number(access?.today?.reminders || 0),
+      limit: access?.limits?.remindersPerDay == null ? 0 : Number(access.limits.remindersPerDay || 0),
+      plan: access?.effectivePlan || '',
+    }
   } catch {
     /* noop */
   }
 }
+
+const isFreeReminderPlan = computed(() => usage.value.plan === 'free' && !isPremium.value)
+const reminderNearLimitThreshold = computed(() => {
+  const limit = Number(usage.value.limit || 0)
+  if (!Number.isFinite(limit) || limit <= 0) return Infinity
+  return Math.max(limit - 1, Math.ceil(limit * 0.8))
+})
+const isReminderLimitReached = computed(() => {
+  const limit = Number(usage.value.limit || 0)
+  if (!Number.isFinite(limit) || limit <= 0) return false
+  return Number(usage.value.used || 0) >= limit
+})
+const isReminderNearLimit = computed(() => {
+  const limit = Number(usage.value.limit || 0)
+  if (!Number.isFinite(limit) || limit <= 0) return false
+  return Number(usage.value.used || 0) >= reminderNearLimitThreshold.value
+})
+const showReminderPlanBanner = computed(() => isFreeReminderPlan.value && isReminderNearLimit.value)
+const reminderPlanBannerText = computed(() => {
+  if (!showReminderPlanBanner.value) return ''
+  const used = Number(usage.value.used || 0)
+  const limit = Number(usage.value.limit || 0)
+  if (isReminderLimitReached.value) {
+    return `You’ve reached your free reminder limit for today (${limit}).`
+  }
+  return `You’ve used ${used}/${limit} reminders on the Free plan.`
+})
+const reminderPlanBannerCta = computed(() => (
+  isAppleBillingSafeMode ? 'Learn about Premium' : 'Upgrade'
+))
 
 async function loadGoogleStatus() {
   if (!authStore?.user?.uid) return
@@ -1567,7 +1613,7 @@ function goToUpgrade() {
   }
   try {
     if (isGuest.value) return routerNav.push('/login')
-    routerNav.push('/pricing')
+    routerNav.push(isAppleBillingSafeMode ? '/billing/upgrade' : '/pricing')
   } catch {
     /* noop */
   }

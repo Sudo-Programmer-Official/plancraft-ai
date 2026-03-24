@@ -236,6 +236,7 @@ import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElNotification } from 'element-plus'
 import { useAuthStore } from '@/stores/authStore'
+import { useAccessStore } from '@/stores/accessStore'
 import { createCheckoutSession, cancelSubscription } from '@/services/stripeService'
 import { trackEvent } from '@/services/analytics'
 import ErrorDialog from '@/components/ErrorDialog.vue'
@@ -248,6 +249,7 @@ import { copyText, openExternalUrl } from '@/utils/nativeUi'
 import { BILLING_WEB_HOST, BILLING_WEB_URL, isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
 
 const authStore = useAuthStore()
+const accessStore = useAccessStore()
 const workspaceStore = useWorkspaceStore()
 const router = useRouter()
 const billingWebHost = BILLING_WEB_HOST
@@ -599,6 +601,7 @@ async function refreshPremiumAccess() {
   try {
     const uid = authStore?.user?.uid
     if (uid) {
+      await accessStore.fetchAccess(uid, { force: true, minIntervalMs: 0 })
       await subStore.fetchStatus(uid, { force: true, minIntervalMs: 0 })
     }
   } catch {}

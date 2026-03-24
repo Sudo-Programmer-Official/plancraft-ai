@@ -80,6 +80,7 @@ import { fileURLToPath } from "url";
 
 import aiRoutes from "./routes/aiRoutes.js";
 import usageRoutes from "./routes/usageRoutes.js";
+import accessRoutes from "./routes/accessRoutes.js";
 import transcribeRoutes from "./routes/transcribeRoutes.js";
 import ttsRoutes from "./routes/ttsRoutes.js";
 import subscriptionRoutes from "./routes/subscriptionRoutes.js";
@@ -282,6 +283,7 @@ app.use("/api/ai", aiRoutes);
 // Back-compat: allow calling AI endpoints under /api as well
 app.use("/api", aiRoutes);
 app.use("/api/usage", usageRoutes);
+app.use("/api/access", accessRoutes);
 app.use("/api", transcribeRoutes);
 app.use("/api/tts", ttsRoutes);
 app.use("/api", subscriptionRoutes);

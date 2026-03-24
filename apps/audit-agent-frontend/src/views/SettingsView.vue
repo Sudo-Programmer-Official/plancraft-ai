@@ -1,12 +1,13 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-900 text-white px-3 sm:px-6 lg:px-10 py-10">
+  <div class="app-page-shell text-white">
     <!-- Header -->
-    <header class="mb-10 text-center">
-      <h1 class="text-3xl sm:text-4xl font-bold mb-2">⚙️ Settings</h1>
-      <p class="text-indigo-300">Manage your notifications, integrations, and account preferences.</p>
+    <main class="settings-shell app-page-frame space-y-8 sm:space-y-10">
+    <header class="app-page-hero mb-0 text-center">
+      <h1 class="text-3xl sm:text-4xl font-bold mb-2 text-white">⚙️ Settings</h1>
+      <p class="app-page-description mx-auto">Manage your notifications, integrations, and account preferences.</p>
     </header>
 
-    <main class="settings-shell space-y-8 sm:space-y-10 px-1">
+    <div class="space-y-8 sm:space-y-10">
       <!-- Settings navigation -->
       <nav class="settings-panel nav-panel">
         <div class="nav-scroll">
@@ -606,9 +607,15 @@
       <!-- Account -->
       <section class="settings-panel">
         <h2 class="text-lg sm:text-xl font-semibold mb-4">👤 Account</h2>
-        <div class="flex items-center gap-4 mb-4">
-          <AvatarUploader :url="authStore.user?.photoURL || authStore.user?.avatarUrl" @updated="onAvatarUpdated" />
-          <div>
+        <div class="profile-identity mb-4">
+          <AvatarUploader
+            :url="authStore.user?.photoURL || authStore.user?.avatarUrl"
+            :name="profileForm.name || authStore.user?.displayName || authStore.user?.name"
+            :email="profileForm.email || authStore.user?.email"
+            class="profile-identity-uploader"
+            @updated="onAvatarUpdated"
+          />
+          <div class="profile-identity-copy">
             <p class="font-medium">{{ profileForm.name || authStore.user?.displayName || 'Guest User' }}</p>
             <p class="text-sm text-indigo-300">{{ profileForm.email || authStore.user?.email }}</p>
           </div>
@@ -638,6 +645,7 @@
           <button class="px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base rounded-lg bg-red-600 hover:bg-red-700 transition" @click="handleLogout">Logout</button>
         </div>
       </section>
+    </div>
     </main>
   </div>
   <PlanSummaryModal :open="planOpen" @close="planOpen=false" />
@@ -707,8 +715,9 @@ import { getPreferences as apiGetPrefs, updatePreferences as apiUpdatePrefs, get
 import { createGptLinkCode } from '@/services/gptService'
 import SocialIntegrationPanel from '@/components/settings/SocialIntegrationPanel.vue'
 import { subscribeUserToPush } from "@/services/pwaService"
+import { useAccessStore } from '@/stores/accessStore'
 import { useSubscriptionStore } from "@/stores/subscriptionStore"
-import { PLANS, resolvePlanKey } from "@/services/planService"
+import { resolvePlanKey } from "@/services/planService"
 import PlanSummaryModal from "@/components/PlanSummaryModal.vue"
 import KnowledgePanel from "@/components/KnowledgePanel.vue"
 import ProposalInbox from "@/components/ProposalInbox.vue"
@@ -733,6 +742,7 @@ import dayjs from 'dayjs'
 const authStore = useAuthStore()
 const router = useRouter()
 const route = useRoute()
+const accessStore = useAccessStore()
 const subStore = useSubscriptionStore()
 const { refresh: refreshPremium } = useIsPremium()
 const workspaceStore = useWorkspaceStore()
@@ -1084,6 +1094,9 @@ async function hydrateSettingsForUser(uid) {
 
 const isPremium = computed(() => {
   try {
+    if (accessStore.access?.effectivePlan) {
+      return ['premium', 'team'].includes(String(accessStore.access.effectivePlan).toLowerCase())
+    }
     const planCandidates = [
       subStore?.subscription?.value?.plan ?? subStore?.subscription?.plan,
       authStore?.user?.plan,
@@ -1091,7 +1104,7 @@ const isPremium = computed(() => {
     ]
     const role = String(authStore?.user?.role || '').toLowerCase()
     const isAdminRole = role === 'admin' || role === 'superadmin'
-    const hasPremiumPlan = planCandidates.some((plan) => resolvePlanKey(plan) === 'PREMIUM')
+    const hasPremiumPlan = planCandidates.some((plan) => resolvePlanKey(plan) !== 'FREE')
     return hasPremiumPlan || isAdminRole
   } catch { return false }
 })
@@ -1848,11 +1861,11 @@ async function enablePush() {
 
 // Plan gates
 // Use unified premium flag to control gates for a consistent UX
-const usageToday = computed(() => authStore.user?.usage?.today || { aiGenerations: 0, reminders: 0 })
+const usageToday = computed(() => accessStore.access?.today || authStore.user?.usage?.today || { aiGenerations: 0, reminders: 0 })
 const aiUsed = computed(() => Number(usageToday.value.aiGenerations || 0))
 const remindersUsed = computed(() => Number(usageToday.value.reminders || 0))
-const aiLimitLabel = computed(() => (isPremium.value ? '∞' : PLANS.FREE.limits.aiGenerations))
-const remindersLimitLabel = computed(() => (isPremium.value ? '∞' : PLANS.FREE.limits.remindersPerDay))
+const aiLimitLabel = computed(() => (accessStore.access?.limits?.aiGenerations == null ? '∞' : accessStore.access?.limits?.aiGenerations ?? 10))
+const remindersLimitLabel = computed(() => (accessStore.access?.limits?.remindersPerDay == null ? '∞' : accessStore.access?.limits?.remindersPerDay ?? 10))
 const planOpen = ref(false)
 const billingSectionIntro = computed(() =>
   isAppleBillingSafeMode.value
@@ -1860,11 +1873,12 @@ const billingSectionIntro = computed(() =>
     : 'Personal plan status plus the new teams pricing for shared workspaces.',
 )
 const personalPlanCtaLabel = computed(() =>
-  isAppleBillingSafeMode.value ? 'Upgrade on web' : '🚀 Upgrade',
+  isAppleBillingSafeMode.value ? 'Learn about Premium' : '🚀 Upgrade',
 )
 
 const normalizedPlanLabel = computed(() => {
   const raw =
+    accessStore.access?.effectivePlanLabel ||
     authStore.user?.plan ||
     subStore.subscription?.value?.plan ||
     subStore.subscription?.plan ||
@@ -1943,6 +1957,35 @@ const premiumEndsOn = computed(() => {
 
 .integration-card {
   height: 100%;
+}
+
+.profile-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.32);
+  border-radius: 1rem;
+  padding: 1rem;
+}
+
+.profile-identity-copy {
+  min-width: 0;
+}
+
+.profile-identity-copy p {
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 640px) {
+  .profile-identity {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .profile-identity-uploader {
+    flex-shrink: 0;
+  }
 }
 
 @media (max-width: 640px) {

@@ -7,13 +7,15 @@ import {
   listPlaybooks,
   updatePlaybookStep,
 } from '../services/playbookService.js'
+import { getFeatureUsageStatus } from '../services/planService.js'
 
 const router = express.Router()
 
 router.get('/playbooks', requireAuth, async (req, res) => {
   try {
     const playbooks = await listPlaybooks(req.user.uid)
-    return res.json({ playbooks })
+    const usage = await getFeatureUsageStatus(req.user.uid, 'playbooks', { used: playbooks.length })
+    return res.json({ playbooks, usage })
   } catch (error) {
     console.error('[Playbooks] list failed', error?.message || error)
     return res.status(error?.statusCode || 500).json({ error: error?.message || 'Failed to load playbooks' })
@@ -26,7 +28,11 @@ router.post('/playbooks', requireAuth, async (req, res) => {
     return res.status(201).json(payload)
   } catch (error) {
     console.error('[Playbooks] create failed', error?.message || error)
-    return res.status(error?.statusCode || 500).json({ error: error?.message || 'Failed to create playbook' })
+    return res.status(error?.statusCode || 500).json({
+      error: error?.message || 'Failed to create playbook',
+      code: error?.code || null,
+      details: error?.details || null,
+    })
   }
 })
 

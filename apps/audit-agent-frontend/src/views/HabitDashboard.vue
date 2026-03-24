@@ -40,7 +40,7 @@
       <p class="text-rose-200 text-sm">{{ error }}</p>
     </section>
 
-    <section v-else-if="!summary" class="rounded-2xl bg-slate-900/60 border border-slate-700/60 p-8">
+    <section v-else-if="!hasHabitData" class="rounded-2xl bg-slate-900/60 border border-slate-700/60 p-8">
       <h3 class="text-xl font-semibold text-slate-100 mb-3">Keep completing tasks ✨</h3>
       <p class="text-slate-300 text-sm leading-relaxed">
         Start marking tasks as done and your AI coach will build streaks, consistency scores, and personalized voice insights for you.
@@ -152,7 +152,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onBeforeUnmount, watch } from 'vue'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { useRouter } from 'vue-router'
@@ -222,6 +222,20 @@ function setLastPlayed(value) {
 const consistencyPercent = computed(() =>
   summary.value ? Math.round(Math.max(0, Math.min(1, summary.value.consistency_score || 0)) * 100) : 0,
 )
+const hasHabitData = computed(() => {
+  const value = summary.value
+  if (!value || typeof value !== 'object') return false
+  return [
+    value.current_streak,
+    value.best_streak,
+    value.consistency_score,
+    value.habit_strength,
+    value.avg_completion_time,
+    value.last_coach_at,
+    value.last_coach_message,
+    value.last_coach_audio_url,
+  ].some((entry) => entry !== null && entry !== undefined && entry !== '')
+})
 const strengthPercent = computed(() =>
   summary.value ? Math.round(Math.max(0, Math.min(1, summary.value.habit_strength || 0)) * 100) : 0,
 )

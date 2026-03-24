@@ -51,7 +51,14 @@
         <h1 class="text-xl font-semibold">{{ $route.name || 'Admin' }}</h1>
         <div class="flex items-center gap-3">
           <span class="text-sm text-gray-300">{{ authStore.user?.displayName || 'Admin' }}</span>
-          <img :src="authStore.user?.photoURL || 'https://i.pravatar.cc/40'" class="w-9 h-9 rounded-full" />
+          <UserAvatar
+            :src="authStore.user?.photoURL || authStore.user?.avatarUrl"
+            :name="authStore.user?.displayName || authStore.user?.name"
+            :email="authStore.user?.email"
+            alt="Admin avatar"
+            size-class="h-9 w-9"
+            text-class="text-xs"
+          />
           <button @click="logout" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm">Logout</button>
         </div>
       </header>
@@ -71,6 +78,7 @@
 import { ref } from 'vue'
 import { useAuthStore } from '@/stores/authStore'
 import { useRouter } from 'vue-router'
+import UserAvatar from '@/components/UserAvatar.vue'
 
 const authStore = useAuthStore()
 const router = useRouter()

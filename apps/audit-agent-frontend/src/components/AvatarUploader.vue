@@ -1,13 +1,21 @@
 <template>
-  <div class="flex items-center gap-4">
+  <div class="flex w-full min-w-0 flex-col items-start gap-3 sm:w-auto sm:flex-row sm:items-center sm:gap-4">
     <div class="relative">
-      <img :src="previewUrl || currentUrl || fallback" alt="avatar" class="w-16 h-16 rounded-full object-cover border border-white/20" />
+      <UserAvatar
+        :src="previewUrl || currentUrl"
+        :name="name"
+        :email="email"
+        alt="Profile photo"
+        size-class="h-16 w-16"
+        text-class="text-base"
+        class="border-white/20"
+      />
       <label class="absolute bottom-0 right-0 bg-indigo-600 hover:bg-indigo-700 text-white w-7 h-7 rounded-full flex items-center justify-center text-xs cursor-pointer shadow">
         <input type="file" accept="image/*" class="hidden" @change="onFile" />
         ⬆︎
       </label>
     </div>
-    <div class="text-sm text-slate-300">
+    <div class="min-w-0 text-sm text-slate-300">
       <div class="font-medium">Profile Photo</div>
       <div class="opacity-80">JPG/PNG, up to 3 MB</div>
       <div v-if="uploading" class="text-indigo-300 mt-1">Uploading…</div>
@@ -22,9 +30,12 @@ import { getStorage, ref as sref, uploadBytes, getDownloadURL } from 'firebase/s
 import firebaseApp, { db } from '@/firebase/init'
 import { doc, setDoc } from 'firebase/firestore'
 import { ElMessage } from 'element-plus'
+import UserAvatar from '@/components/UserAvatar.vue'
 
 const props = defineProps({
   url: { type: String, default: '' },
+  name: { type: String, default: '' },
+  email: { type: String, default: '' },
 })
 const emit = defineEmits(['updated'])
 
@@ -33,7 +44,6 @@ const storage = getStorage(firebaseApp)
 
 const previewUrl = ref('')
 const uploading = ref(false)
-const fallback = 'https://i.pravatar.cc/80'
 const currentUrl = computed(() => props.url)
 
 function readFileAsURL(file) {
