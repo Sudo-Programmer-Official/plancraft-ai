@@ -1548,6 +1548,8 @@ body {
   min-width: 0;
   min-height: 0;
   height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
 }
 
@@ -1564,6 +1566,8 @@ body {
   min-height: 100vh;
   min-height: 100dvh;
   min-height: -webkit-fill-available;
+  display: flex;
+  flex-direction: column;
   overflow: visible;
 }
 
@@ -1651,6 +1655,8 @@ body {
 
   .app-main-pane {
     height: auto;
+    display: flex;
+    flex-direction: column;
     overflow: visible;
   }
 

@@ -31,73 +31,6 @@
         </div>
       </header>
 
-      <section class="app-page-section space-y-3">
-        <div class="flex flex-col md:flex-row md:items-center gap-3 justify-between">
-          <div>
-            <p class="app-page-eyebrow !tracking-[0.25em]">Workspace pulse</p>
-            <h2 class="text-xl font-semibold">What should I focus on?</h2>
-            <p class="text-xs text-slate-400">Pulls tasks, napkin notes, drafts, and events for this workspace.</p>
-          </div>
-          <button
-            class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-fuchsia-500 to-indigo-500 hover:from-fuchsia-400 hover:to-indigo-400 text-sm font-semibold transition disabled:opacity-50"
-            :disabled="summaryLoading"
-            @click="askWorkspaceFocus"
-          >
-            <span v-if="summaryLoading" class="loader-dot" aria-hidden="true"></span>
-            <span>{{ summaryLoading ? 'Thinking…' : 'Ask AI about this workspace' }}</span>
-          </button>
-        </div>
-        <div class="text-sm text-slate-200 bg-slate-950/30 border border-white/10 rounded-2xl px-4 py-3 space-y-2">
-          <p v-if="summaryLoading" class="text-slate-400">Gathering workspace context…</p>
-          <div v-else-if="summaryLines.length" class="space-y-2">
-            <p v-for="(line, idx) in summaryLines" :key="idx" class="leading-relaxed">
-              {{ line }}
-            </p>
-          </div>
-          <p v-else class="text-slate-400">No summary yet. Ask the workspace AI to get a quick focus plan.</p>
-          <p v-if="summaryError" class="text-rose-300 text-xs">{{ summaryError }}</p>
-        </div>
-
-        <div class="pt-3 border-t border-white/10 space-y-2">
-          <div class="flex items-center gap-2">
-            <input
-              v-model="memoryQuery"
-              type="text"
-              class="flex-1 rounded-xl bg-slate-950/30 border border-white/10 px-3 py-2 text-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30"
-              placeholder="Search your brain (semantic) — e.g., “stripe billing”, “deep work routines”"
-            />
-            <button
-              class="px-3 py-2 rounded-xl bg-slate-950/30 border border-white/10 text-sm hover:border-indigo-400 transition disabled:opacity-60"
-              :disabled="memoryLoading || !memoryQuery.trim()"
-              @click="runMemorySearch"
-            >
-              <span v-if="memoryLoading" class="loader-dot" aria-hidden="true"></span>
-              <span>{{ memoryLoading ? 'Searching…' : 'Search' }}</span>
-            </button>
-          </div>
-          <div class="text-xs text-slate-400">Powered by semantic search for this workspace.</div>
-          <div v-if="memoryError" class="text-rose-300 text-xs">{{ memoryError }}</div>
-          <div v-if="memoryLoading && !memoryResults.length" class="text-sm text-slate-400">Retrieving matches…</div>
-          <div v-else-if="memoryResults.length" class="space-y-2">
-            <div
-              v-for="item in memoryResults"
-              :key="item.id"
-              class="p-3 rounded-xl bg-slate-950/25 border border-white/10"
-            >
-              <div class="flex items-center justify-between text-xs text-slate-400">
-                <span class="uppercase tracking-wide">{{ item.type }}</span>
-                <span v-if="item.createdAt">{{ item.createdAt }}</span>
-              </div>
-              <p class="text-sm text-slate-100 mt-1">{{ item.title || item.preview }}</p>
-              <p v-if="item.tags?.length" class="text-[11px] text-slate-400 mt-1">
-                #{{ item.tags.slice(0, 4).join(' #') }}
-              </p>
-            </div>
-          </div>
-          <div v-else class="text-sm text-slate-500">No results yet.</div>
-        </div>
-      </section>
-
       <section class="app-page-section space-y-4">
         <div class="flex flex-col md:flex-row md:items-center gap-3 justify-between">
           <div>
@@ -317,21 +250,12 @@ import {
 } from '@/services/napkinService'
 import { toLocalDateKey } from '@/utils/dateHelper'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
-import { askWorkspaceSummary } from '@/services/workspaceAiService'
-import { searchWorkspaceMemory } from '@/services/workspaceAiService'
 
 type RecorderState = 'idle' | 'recording' | 'processing'
 
 const router = useRouter()
 const workspaceStore = useWorkspaceStore()
 
-const workspaceSummary = ref<string>('')
-const summaryLoading = ref(false)
-const summaryError = ref('')
-const memoryQuery = ref('')
-const memoryLoading = ref(false)
-const memoryResults = ref<any[]>([])
-const memoryError = ref('')
 const input = ref('')
 const voiceTranscript = ref('')
 const recordingState = ref<RecorderState>('idle')
@@ -373,14 +297,6 @@ const filteredItems = computed(() => {
 const latestSaved = computed(() => items.value.find((i) => i.id === latestSavedId.value))
 const convertedCount = computed(() => items.value.filter((i) => i.status === 'converted').length)
 const voiceCount = computed(() => items.value.filter((i) => i.audioUrl || i.source === 'voice').length)
-const summaryLines = computed(() =>
-  workspaceSummary.value
-    ? workspaceSummary.value
-        .split(/\n+/)
-        .map((line) => line.trim())
-        .filter(Boolean)
-    : [],
-)
 
 const formattedTimer = computed(() => {
   const mins = Math.floor(recordingSeconds.value / 60)
@@ -398,57 +314,6 @@ function formatDate(ms: number) {
     }).format(new Date(ms))
   } catch {
     return new Date(ms).toLocaleString()
-  }
-}
-
-async function askWorkspaceFocus() {
-  summaryLoading.value = true
-  summaryError.value = ''
-  try {
-    const workspaceId = workspaceStore?.activeWorkspaceId || null
-    if (!workspaceId) {
-      summaryError.value = 'Select a workspace to get a focused summary.'
-      workspaceSummary.value = ''
-      summaryLoading.value = false
-      return
-    }
-    const { answer } = await askWorkspaceSummary({
-      workspaceId,
-      question: 'What should I focus on today?',
-    })
-    workspaceSummary.value = answer || ''
-  } catch (err: any) {
-    summaryError.value = err?.response?.data?.error || err?.message || 'Failed to fetch workspace summary'
-  } finally {
-    summaryLoading.value = false
-  }
-}
-
-async function runMemorySearch() {
-  memoryLoading.value = true
-  memoryError.value = ''
-  try {
-    const workspaceId = workspaceStore?.activeWorkspaceId || null
-    if (!workspaceId) {
-      memoryError.value = 'Select a workspace first.'
-      return
-    }
-    const matches = await searchWorkspaceMemory({
-      workspaceId,
-      query: memoryQuery.value,
-      topK: 8,
-    })
-    memoryResults.value = matches.map((m) => ({
-      ...m,
-      title: m.metadata?.title || m.metadata?.text || '',
-      preview: m.metadata?.text || '',
-      tags: m.metadata?.tags || [],
-      createdAt: m.metadata?.createdAt || '',
-    }))
-  } catch (err: any) {
-    memoryError.value = err?.response?.data?.error || err?.message || 'Search failed'
-  } finally {
-    memoryLoading.value = false
   }
 }
 
@@ -723,10 +588,6 @@ onMounted(() => {
     workspaceUnsub = workspaceStore.$subscribe(() => {
       if (unsubscribe) unsubscribe()
       subscribe()
-      workspaceSummary.value = ''
-      summaryError.value = ''
-      memoryResults.value = []
-      memoryError.value = ''
     })
   } catch {
     /* noop */
