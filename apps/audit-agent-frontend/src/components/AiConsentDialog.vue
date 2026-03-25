@@ -7,39 +7,39 @@
     :close-on-press-escape="false"
     :show-close="false"
   >
-    <div class="space-y-5 text-slate-100">
-      <div class="space-y-2">
-        <p class="text-xs uppercase tracking-[0.32em] text-indigo-300/80">AI disclosure</p>
-        <h2 class="text-2xl font-semibold text-white">Allow secure AI processing?</h2>
-        <p class="text-sm text-indigo-100/85">
+    <div class="space-y-6 text-[#1A1A1A]">
+      <div class="space-y-3">
+        <p class="text-xs font-semibold uppercase tracking-[0.32em] text-[#5B6FD8]">AI disclosure</p>
+        <h2 class="text-2xl font-bold leading-tight text-[#111111]">Allow secure AI processing?</h2>
+        <p class="text-base leading-7 text-[#1A1A1A]">
           When you use AI features, the text, voice recordings, images, or workspace content you
           choose to send may be processed by secure third-party AI providers, including OpenAI, to
           generate plans, summaries, and suggestions.
         </p>
-        <p class="text-sm text-indigo-100/75">
+        <p class="text-base leading-7 text-[#1A1A1A]">
           We only send the content needed to fulfill your request. You can choose not to allow this,
           but AI-powered features will stay off in the app until you do.
         </p>
       </div>
 
-      <div class="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-indigo-100/85">
+      <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-[#1A1A1A]">
         Review the full details in our
-        <RouterLink to="/privacy" class="font-semibold text-white underline underline-offset-4">
+        <RouterLink to="/privacy" class="font-semibold text-[#111111] underline underline-offset-4">
           Privacy Policy
         </RouterLink>.
       </div>
 
-      <div class="flex flex-wrap gap-3">
+      <div class="flex flex-col gap-3 sm:flex-row">
         <button
           type="button"
-          class="rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
+          class="inline-flex w-full items-center justify-center rounded-xl bg-[#111111] px-5 py-3 text-base font-semibold text-white shadow-lg shadow-slate-900/20 transition hover:bg-[#000000] sm:w-auto sm:min-w-[140px]"
           @click="handleDecision(true)"
         >
           Allow
         </button>
         <button
           type="button"
-          class="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
+          class="inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 text-base font-semibold text-slate-700 transition hover:bg-slate-50 sm:w-auto sm:min-w-[140px]"
           @click="handleDecision(false)"
         >
           Not now
@@ -77,11 +77,9 @@ onBeforeUnmount(() => {
 <style scoped>
 .ai-consent-dialog :deep(.el-dialog) {
   border-radius: 1.25rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background:
-    linear-gradient(155deg, rgba(15, 23, 42, 0.96), rgba(49, 46, 129, 0.94), rgba(30, 41, 59, 0.96));
-  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.48);
-  backdrop-filter: blur(18px);
+  border: 1px solid rgba(226, 232, 240, 0.96);
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.22);
 }
 
 .ai-consent-dialog :deep(.el-dialog__header) {
@@ -89,6 +87,6 @@ onBeforeUnmount(() => {
 }
 
 .ai-consent-dialog :deep(.el-dialog__body) {
-  padding: 1.5rem;
+  padding: 1.75rem;
 }
 </style>
