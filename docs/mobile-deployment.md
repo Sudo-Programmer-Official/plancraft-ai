@@ -74,19 +74,21 @@ Required production pieces:
 
 1. Deploy `/.well-known/assetlinks.json`
 2. Keep the Android package name as `com.sudoprogrammer.plancraftai`
-3. Keep the SHA-256 fingerprint in `assetlinks.json` in sync with the release keystore
+3. Keep every required SHA-256 fingerprint in `assetlinks.json` in sync with Play App Signing and any release/upload keys in use
 4. Re-run `cap sync android` after any manifest or web change
 
-Current release SHA-256 in the repo:
+Current SHA-256 fingerprints in the repo:
 
 ```text
 EE:3F:BD:BF:2E:2F:A6:73:20:92:FC:33:88:2C:2B:72:2D:BA:D6:A9:8C:26:25:3C:21:81:94:6D:0B:75:FB:03
+FF:8E:E9:27:DA:06:67:BD:F4:48:DA:FE:2A:F9:9C:CD:B1:1B:D9:FF:E4:F3:8F:69:B4:53:37:53:3E:BC:84:6F
+2C:86:54:4F:1A:AC:A6:CE:01:F4:C7:FC:B1:FE:EA:C7:1A:B4:91:E9:39:66:F9:06:92:00:02:99:89:B8:40:A9
 ```
 
 Quick verification after deploy:
 
 1. Open `https://plancraftai.com/.well-known/assetlinks.json`
-2. Confirm the JSON contains the package name and SHA-256 above
+2. Confirm the JSON contains the package name and all three SHA-256 fingerprints above
 3. Reinstall the Android app if app links were previously cached incorrectly
 4. Test email/password sign-in from the Android app
 

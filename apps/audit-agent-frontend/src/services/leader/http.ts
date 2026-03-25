@@ -3,6 +3,7 @@ import { ElMessage } from 'element-plus'
 import { auth } from '@/firebase/init'
 import { getAppToken } from '@/services/appTokenService'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
+import { ensureAiConsentOrThrow } from '@/services/aiConsentService'
 
 type Service = 'growth' | 'goals' | 'posting' | 'creator' | 'nlp'
 
@@ -139,6 +140,9 @@ function makeClient(baseURL: string, opts: { timeout?: number; silent?: boolean 
   })
 
   client.interceptors.request.use(async (config) => {
+    if (baseURL === resolveBase('nlp')) {
+      await ensureAiConsentOrThrow({ source: 'nlp-request' })
+    }
     const headers = await buildAuthHeaders()
     config.headers = { ...(config.headers || {}), ...headers }
     return config

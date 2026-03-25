@@ -1,4 +1,5 @@
 import api from '@/services/api'
+import { ensureAiConsentOrThrow } from '@/services/aiConsentService'
 
 type UploadResponse = {
   imageUrl: string
@@ -7,6 +8,7 @@ type UploadResponse = {
 }
 
 export async function uploadImageForVision(file: File | Blob): Promise<UploadResponse> {
+  await ensureAiConsentOrThrow({ source: 'vision-upload' })
   if (!file) throw new Error('File is required')
   const form = new FormData()
   form.append('file', file)

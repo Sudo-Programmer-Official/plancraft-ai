@@ -250,6 +250,7 @@ import {
 } from '@/services/napkinService'
 import { toLocalDateKey } from '@/utils/dateHelper'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
+import { ensureAiConsentOrThrow } from '@/services/aiConsentService'
 
 type RecorderState = 'idle' | 'recording' | 'processing'
 
@@ -384,6 +385,7 @@ function stopStream() {
 
 async function transcribeBlob(blob: Blob) {
   try {
+    await ensureAiConsentOrThrow({ source: 'napkin-transcribe' })
     const fd = new FormData()
     fd.append('file', blob, 'napkin-voice.webm')
     const { data } = await api.post('/transcribe', fd, {
@@ -396,7 +398,7 @@ async function transcribeBlob(blob: Blob) {
     }
   } catch (err: any) {
     console.warn('[napkin] voice transcription failed', err?.message || err)
-    ElMessage.error('Voice transcription failed')
+    ElMessage.error(err?.message || 'Voice transcription failed')
   }
 }
 

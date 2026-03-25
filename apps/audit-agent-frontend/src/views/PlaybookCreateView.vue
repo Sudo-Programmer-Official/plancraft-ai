@@ -28,8 +28,8 @@
         <p class="text-xs uppercase tracking-[0.35em] text-amber-200/80">Free plan limit reached</p>
         <h2 class="text-2xl font-semibold text-white">You’ve reached your playbook limit</h2>
         <p class="max-w-2xl text-sm leading-7 text-indigo-100/75">
-          Upgrade your account on our website to continue creating playbooks. Your data is safe and
-          will sync automatically after you upgrade.
+          This mobile app does not offer purchases. If this account already has premium access
+          created outside the app, refresh access and your playbook limit will sync automatically.
         </p>
         <div class="flex flex-wrap gap-3">
           <button

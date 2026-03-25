@@ -8,14 +8,23 @@
     <div class="space-y-5 text-slate-100">
       <div class="space-y-2">
         <p class="text-xs uppercase tracking-[0.32em] text-indigo-300/80">{{ planLabel }}</p>
-        <h2 class="text-2xl font-semibold text-white">Upgrade to continue</h2>
-        <p class="text-sm text-indigo-100/85">
-          You’ve reached your free limit ({{ limitText }} {{ featureLabel }}).
-          Upgrade your account on {{ billingWebHost }} to continue.
+        <h2 class="text-2xl font-semibold text-white">
+          {{ isAppleBillingSafeMode ? 'Premium access required' : 'Upgrade to continue' }}
+        </h2>
+        <p v-if="isAppleBillingSafeMode" class="text-sm text-indigo-100/85">
+          You’ve reached your free limit ({{ limitText }} {{ featureLabel }}). This mobile app does
+          not offer purchases. If this account already has premium access from outside the app,
+          refresh to sync it here.
         </p>
-        <p class="text-sm text-indigo-100/75">
-          Your data is safe and will sync after you upgrade.
-        </p>
+        <template v-else>
+          <p class="text-sm text-indigo-100/85">
+            You’ve reached your free limit ({{ limitText }} {{ featureLabel }}).
+            Upgrade your account on {{ billingWebHost }} to continue.
+          </p>
+          <p class="text-sm text-indigo-100/75">
+            Your data is safe and will sync after you upgrade.
+          </p>
+        </template>
       </div>
 
       <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -25,6 +34,7 @@
 
       <div class="flex flex-wrap gap-3">
         <button
+          v-if="!isAppleBillingSafeMode"
           type="button"
           class="rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
           @click="handlePrimaryAction"
@@ -79,7 +89,7 @@ const refreshing = ref(false)
 const isAppleBillingSafeMode = detectAppleBillingSafeMode()
 const billingWebHost = BILLING_WEB_HOST
 const limitText = computed(() => (props.limit > 0 ? String(props.limit) : '0'))
-const primaryActionLabel = computed(() => (isAppleBillingSafeMode ? 'Upgrade to Premium' : 'Learn about Premium'))
+const primaryActionLabel = computed(() => 'Learn about Premium')
 
 async function handlePrimaryAction() {
   if (!isAppleBillingSafeMode) {

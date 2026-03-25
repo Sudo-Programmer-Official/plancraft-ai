@@ -38,7 +38,7 @@
     <template v-else>
     <!-- Global upgrade banner -->
     <!-- Global Upgrade Banner -->
-    <div v-if="showUpgrade" class="app-upgrade-banner fixed top-0 left-0 right-0 z-50 px-3 sm:px-6">
+    <div v-if="showUpgrade && !isAppleBillingSafeMode" class="app-upgrade-banner fixed top-0 left-0 right-0 z-50 px-3 sm:px-6">
       <div
         class="bg-gradient-to-r from-fuchsia-600/40 via-purple-600/40 to-indigo-600/40 backdrop-blur-xl border border-fuchsia-400/30 text-white rounded-b-xl shadow-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 py-2 sm:py-3 px-3 sm:px-5 animate-fade-in"
       >
@@ -566,28 +566,37 @@
           <!-- Upgrade Button / Pro Badge -->
           <div v-if="authReady" class="flex items-center gap-2 whitespace-nowrap">
             <template v-if="isPremium">
-              <el-tooltip content="You're on the Premium Plan!" placement="bottom">
+              <span
+                v-if="isAppleBillingSafeMode"
+                :class="premiumStatusBadgeClasses"
+                aria-label="Pro plan status"
+              >
+                Pro
+              </span>
+              <el-tooltip
+                v-else
+                content="You're on the Premium Plan!"
+                placement="bottom"
+              >
                 <RouterLink
                   :to="billingRoutePath"
                   class="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-sm hover:from-purple-600 hover:to-pink-700 transition"
                 >
                   🧠 Pro
                 </RouterLink>
-                <!-- <span class="bg-gradient-to-r from-purple-700 to-pink-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-sm">🧠 Pro</span> -->
               </el-tooltip>
             </template>
             <template v-else>
-              <RouterLink
+              <span
                 v-if="showFreePlanHeaderBadge"
-                :to="{ path: billingRoutePath, query: { source: 'header-free-plan' } }"
                 :class="freePlanBadgeClasses"
                 :title="upgradePillTitle"
-                aria-label="Learn about upgrading your Free plan"
+                aria-label="Free plan status"
               >
                 Free Plan
-              </RouterLink>
+              </span>
               <RouterLink
-                v-else-if="!isGuest"
+                v-else-if="!isGuest && !isAppleBillingSafeMode"
                 :to="billingRoutePath"
                 :class="upgradePillClasses"
                 :title="upgradePillTitle"
@@ -709,7 +718,7 @@ import { hasSubscription, registerPushSubscription } from '@/services/pushServic
 import FeedbackPrompt from '@/components/feedback/FeedbackPrompt.vue'
 import FeedbackDrawer from '@/components/feedback/FeedbackDrawer.vue'
 import SetupPrompt from '@/components/SetupPrompt.vue'
-import { useRouter, useRoute } from 'vue-router'
+import { RouterLink, useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { useAccessStore } from '@/stores/accessStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
@@ -1345,22 +1354,23 @@ const systemLinks = computed(() => [
 ])
 const isAppleBillingSafeMode = computed(() => detectAppleBillingSafeMode())
 const billingRoutePath = computed(() => (isAppleBillingSafeMode.value ? '/billing/upgrade' : '/subscription'))
-const upgradeBannerLabel = computed(() => (isAppleBillingSafeMode.value ? 'Upgrade to Premium' : 'Upgrade'))
+const upgradeBannerLabel = computed(() => (isAppleBillingSafeMode.value ? 'Refresh access' : 'Upgrade'))
 const upgradeBannerMessage = computed(() => (
   isAppleBillingSafeMode.value
-    ? 'You have reached a Free plan limit. Premium access is available on our website, and your data will sync after you upgrade.'
+    ? 'You have reached a Free plan limit. Existing premium access syncs automatically if this account already has it outside the app.'
     : '🚀 You\'re on the Free Plan. Upgrade to unlock unlimited AI and reminders.'
 ))
 const upgradePillLabel = computed(() => '🚀 Upgrade')
 const upgradePillTitle = computed(() => (
   isAppleBillingSafeMode.value
-    ? 'You are on the Free plan. Premium access is managed on the web.'
+    ? 'You are on the Free plan. Existing premium access syncs automatically to this account.'
     : 'Upgrade'
 ))
 const showFreePlanHeaderBadge = computed(() => (
   isAppleBillingSafeMode.value && !isPremium.value && !isGuest.value
 ))
-const freePlanBadgeClasses = 'rounded-full border border-white/12 bg-white/8 px-3 py-1 text-sm font-semibold text-slate-100 shadow-sm transition hover:bg-white/12 hover:text-white'
+const premiumStatusBadgeClasses = 'rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm font-semibold text-slate-100'
+const freePlanBadgeClasses = 'rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm font-semibold text-slate-100'
 const upgradePillClasses = computed(() => (
   isAppleBillingSafeMode.value
     ? 'rounded-full border border-white/12 bg-white/8 px-3 py-1 text-sm font-semibold text-slate-100 shadow-sm transition hover:bg-white/12'
@@ -1368,10 +1378,11 @@ const upgradePillClasses = computed(() => (
 ))
 
 const footerUtilityLinks = computed(() => {
-  const links = [
-    { label: 'Billing', iconName: 'credit-card', to: billingRoutePath.value },
-    { label: 'Help', iconName: 'message-circle', to: '/help' },
-  ]
+  const links = [{ label: 'Help', iconName: 'message-circle', to: '/help' }]
+
+  if (!isAppleBillingSafeMode.value) {
+    links.unshift({ label: 'Billing', iconName: 'credit-card', to: billingRoutePath.value })
+  }
 
   if (authStore.user?.role === 'admin') {
     links.unshift({ label: 'Admin Panel', iconName: 'shield', to: '/admin' })
@@ -1440,6 +1451,7 @@ onMounted(() => {
   // Upgrade banner events
   try {
     upgradeHandler = () => {
+      if (isAppleBillingSafeMode.value) return
       showUpgrade.value = true
     }
     window.addEventListener('upgrade-required', upgradeHandler)

@@ -1,6 +1,8 @@
 import api from '@/services/api'
+import { ensureAiConsentOrThrow } from '@/services/aiConsentService'
 
 export async function requestSpeechUrl(text, options = {}) {
+  await ensureAiConsentOrThrow({ source: 'tts-generate' })
   const payload = {
     text: typeof text === 'string' ? text : String(text || ''),
   }

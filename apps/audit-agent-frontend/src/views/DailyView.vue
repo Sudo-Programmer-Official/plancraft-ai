@@ -99,22 +99,26 @@ function handleMorningTranscript(text) {
 
 async function generateTasks() {
   if (!planningInput.value.trim()) return
-  const planDate = toLocalDateKey(new Date())
-  const { tasks: generated } = await generateTasksFromText(planningInput.value, {
-    planDate,
-    debugLabel: 'DailyView',
-  })
-  for (const [i, t] of generated.entries()) {
-    const newTask = {
-      title: t,
-      details: '',
-      completed: false,
-      date: toLocalDateKey(new Date()),
-      logs: [],
+  try {
+    const planDate = toLocalDateKey(new Date())
+    const { tasks: generated } = await generateTasksFromText(planningInput.value, {
+      planDate,
+      debugLabel: 'DailyView',
+    })
+    for (const [i, t] of generated.entries()) {
+      const newTask = {
+        title: t,
+        details: '',
+        completed: false,
+        date: toLocalDateKey(new Date()),
+        logs: [],
+      }
+      await addTask(newTask)
     }
-    await addTask(newTask)
+    planningInput.value = ''
+  } catch (err) {
+    console.error('Daily task generation failed:', err)
   }
-  planningInput.value = ''
 }
 
 function handleEveningTranscript(raw) {

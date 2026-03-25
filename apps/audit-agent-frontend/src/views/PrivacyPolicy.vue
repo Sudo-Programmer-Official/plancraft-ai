@@ -7,7 +7,7 @@
 
     <div class="max-w-4xl mx-auto py-16 px-6 text-gray-200">
       <h1 class="text-3xl font-bold mb-6">Privacy Policy</h1>
-      <p class="mb-4 text-sm text-gray-400">Last updated: March 20, 2026</p>
+      <p class="mb-4 text-sm text-gray-400">Last updated: March 25, 2026</p>
 
       <p class="mb-6">
         At <strong>PlanCraftAI</strong>, operated by <strong>Sudo Programmer Inc.</strong>, your privacy
@@ -20,6 +20,7 @@
         <li>Account information (name, email, profile photo).</li>
         <li>Notification preferences and integration tokens (Google, Slack, Discord, WhatsApp).</li>
         <li>Usage data (app interactions, analytics events).</li>
+        <li>Text, voice, image, and workspace content you choose to submit for AI-powered features.</li>
         <li>Audio and call data (processed via Twilio, OpenAI, ElevenLabs, Google STT).</li>
         <li>Payment information (processed via Stripe, never stored by us).</li>
       </ul>
@@ -28,6 +29,7 @@
       <ul class="list-disc pl-6 mb-6 space-y-2">
         <li>Deliver reminders via Email, Push, WhatsApp, Slack, or other integrations.</li>
         <li>Enable AI-based productivity and call features.</li>
+        <li>Process the text, audio, images, and workspace context you submit for AI-powered planning, summaries, transcription, and suggestions after you give in-app consent.</li>
         <li>We request microphone (audio) access to enable voice-based features such as AI calls, transcription, and voice interactions.</li>
         <li>Process subscriptions and payments through Stripe.</li>
         <li>Maintain account security and prevent misuse.</li>
@@ -43,7 +45,7 @@
       <p class="mb-6">
         Data is stored on <strong>Firebase</strong> and <strong>Render</strong> with encryption in transit (HTTPS).
         Sensitive information such as payment details are processed directly by <strong>Stripe</strong>.
-        Call data and integrations are secured and can be revoked at any time.
+        Call data, AI inputs, and integrations are secured and can be revoked at any time.
       </p>
       <p class="mb-6">
         We do not sell or rent your personal data to third parties.
@@ -54,13 +56,47 @@
         <li><strong>Firebase</strong> – authentication, database, analytics</li>
         <li><strong>Stripe</strong> – payments & subscriptions</li>
         <li><strong>Twilio</strong> – calls, SMS, WhatsApp messaging</li>
-        <li><strong>OpenAI</strong> – AI transcription and insights</li>
+        <li><strong>OpenAI</strong> – AI transcription, planning, summaries, and insights</li>
         <li><strong>Google</strong> – Calendar, Speech-to-Text</li>
         <li><strong>Slack & Discord</strong> – notifications</li>
         <li><strong>Mixpanel</strong> – usage analytics</li>
       </ul>
 
-      <h2 class="text-xl font-semibold mt-8 mb-4">6. Google Calendar Data Usage</h2>
+      <h2 class="text-xl font-semibold mt-8 mb-4">6. AI Data Processing Disclosure</h2>
+      <div class="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-5 text-slate-100/90">
+        <div>
+          <p class="font-semibold text-lg mb-2 text-white">What data may be shared</p>
+          <ul class="list-disc pl-6 space-y-1">
+            <li>Text you type into AI features, such as planning prompts, journal entries, and workspace questions.</li>
+            <li>Voice recordings or transcripts you submit for transcription or AI responses.</li>
+            <li>Images you upload for AI-powered extraction or task generation.</li>
+            <li>Relevant workspace context needed to answer the specific AI request you make.</li>
+          </ul>
+        </div>
+        <div>
+          <p class="font-semibold text-lg mb-2 text-white">Where it is sent</p>
+          <ul class="list-disc pl-6 space-y-1">
+            <li>Secure third-party AI providers, including <strong>OpenAI</strong>, and related speech providers used by PlanCraftAI.</li>
+            <li>Only the minimum content needed to fulfill the AI request is sent.</li>
+          </ul>
+        </div>
+        <div>
+          <p class="font-semibold text-lg mb-2 text-white">Why it is sent</p>
+          <ul class="list-disc pl-6 space-y-1">
+            <li>To generate plans, summaries, suggestions, transcriptions, and AI-assisted outputs you explicitly request.</li>
+            <li>To return those results to your account or workspace inside PlanCraftAI.</li>
+          </ul>
+        </div>
+        <div>
+          <p class="font-semibold text-lg mb-2 text-white">User control</p>
+          <ul class="list-disc pl-6 space-y-1">
+            <li>In the mobile app, we present an in-app disclosure before sending AI data to third-party AI providers.</li>
+            <li>If you do not allow this processing, AI-powered features remain disabled until you opt in.</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 class="text-xl font-semibold mt-8 mb-4">7. Google Calendar Data Usage</h2>
       <div class="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-5 text-slate-100/90">
         <div>
           <p class="font-semibold text-lg mb-2 text-white">Description of Data Access</p>
@@ -97,14 +133,14 @@
         </div>
       </div>
 
-      <h2 class="text-xl font-semibold mt-8 mb-4">7. Your Rights</h2>
+      <h2 class="text-xl font-semibold mt-8 mb-4">8. Your Rights</h2>
       <p class="mb-6">
         You may request to <strong>access, update, or delete</strong> your data at any time.
         For account deletion, visit our <a href="/delete-account" class="text-blue-400 underline">Delete Account page</a>
         or email us at <a href="mailto:help@sudoprogrammer.com" class="text-blue-400 underline">help@sudoprogrammer.com</a>.
       </p>
 
-      <h2 class="text-xl font-semibold mt-8 mb-4">8. Contact Us</h2>
+      <h2 class="text-xl font-semibold mt-8 mb-4">9. Contact Us</h2>
       <ul class="list-disc pl-6 mt-2 space-y-1">
         <li>Email: <a href="mailto:support@plancraftai.com" class="text-blue-400 underline">support@plancraftai.com</a></li>
         <li>Support: <a href="mailto:help@sudoprogrammer.com" class="text-blue-400 underline">help@sudoprogrammer.com</a></li>

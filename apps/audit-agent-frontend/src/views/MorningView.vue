@@ -67,7 +67,12 @@ async function generateTasks() {
       try { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('upgrade-required', { detail: { source: 'morning-view' } })) } catch {}
     } else {
       console.error('AI generation failed:', err)
-      ElNotification({ title: 'Error', message: 'Failed to generate tasks. Please try again later.', type: 'error', duration: 3000 })
+      ElNotification({
+        title: 'Error',
+        message: err?.message || 'Failed to generate tasks. Please try again later.',
+        type: 'error',
+        duration: 3000,
+      })
     }
   }
 }

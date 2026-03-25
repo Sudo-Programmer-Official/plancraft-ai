@@ -95,14 +95,14 @@
               </div>
               <div class="flex items-center gap-2 flex-wrap">
                 <button
-                  v-if="!isPremium"
+                  v-if="!isPremium && !isAppleBillingSafeMode"
                   @click="upgradePlan"
                   class="bg-gradient-to-r from-purple-500 to-pink-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-white shadow-lg hover:from-purple-600 hover:to-pink-700 transition text-sm sm:text-base"
                 >
                   {{ personalPlanCtaLabel }}
                 </button>
                 <el-button v-if="!isAppleBillingSafeMode" size="small" plain @click="openSubscriptionPage">Manage in billing</el-button>
-                <el-button v-else size="small" plain @click="copyBillingWebsite">Copy website</el-button>
+                <el-button v-else size="small" plain @click="refreshBillingAccess">Refresh access</el-button>
               </div>
             </div>
 
@@ -129,7 +129,7 @@
                 ⏳ Ends on {{ premiumEndsOn }}
               </p>
               <p v-if="isAppleBillingSafeMode" class="text-xs text-indigo-200/80">
-                Billing changes are handled on {{ billingWebHost }}.
+                This mobile app does not offer purchases. Existing premium access syncs here automatically.
               </p>
             </div>
           </div>
@@ -138,9 +138,10 @@
             <div class="flex items-start justify-between gap-3">
               <div>
                 <p class="text-xs uppercase tracking-[0.25em] text-indigo-200">Workspace upgrades</p>
-                <h3 class="text-xl font-semibold text-white">Paid workspaces are managed on the web</h3>
+                <h3 class="text-xl font-semibold text-white">Paid workspaces sync into the app</h3>
                 <p class="text-sm text-indigo-100/90">
-                  Create, upgrade, or manage shared workspaces on {{ billingWebHost }}. The app will reflect those changes after your next refresh.
+                  This mobile app does not offer purchases or upgrades. If this account already belongs to
+                  a paid workspace created outside the app, refresh and the access will appear here.
                 </p>
               </div>
             </div>
@@ -155,15 +156,9 @@
             <div class="flex flex-wrap gap-3">
               <button
                 class="px-3 py-2 rounded-lg bg-white text-indigo-800 font-semibold text-sm hover:bg-slate-100 transition"
-                @click="openSubscriptionPage"
+                @click="refreshBillingAccess"
               >
-                Upgrade on web
-              </button>
-              <button
-                class="px-3 py-2 rounded-lg border border-white/15 bg-slate-900/60 text-white font-semibold text-sm hover:border-indigo-300/40 transition"
-                @click="copyBillingWebsite"
-              >
-                Copy website
+                Refresh access
               </button>
             </div>
           </div>
@@ -1535,6 +1530,23 @@ async function copyBillingWebsite() {
   ElMessage.info(`Visit ${billingWebHost}`)
 }
 
+async function refreshBillingAccess() {
+  try {
+    const uid = authStore?.user?.uid
+    if (uid) {
+      await accessStore.fetchAccess(uid, { force: true, minIntervalMs: 0 })
+      await subStore.fetchStatus(uid, { force: true, minIntervalMs: 0 })
+      await refreshPremium?.()
+    }
+  } catch {}
+
+  try {
+    await workspaceStore.init()
+  } catch {}
+
+  ElMessage.success('Account access refreshed')
+}
+
 // Updated saveSettings function with user feedback
 async function saveSettings() {
   try {
@@ -1870,11 +1882,11 @@ const remindersLimitLabel = computed(() => (accessStore.access?.limits?.reminder
 const planOpen = ref(false)
 const billingSectionIntro = computed(() =>
   isAppleBillingSafeMode.value
-    ? 'Plan upgrades and workspace billing are managed on the web for the mobile app.'
+    ? 'This mobile app does not offer purchases. Existing premium and paid workspace access sync automatically to your account.'
     : 'Personal plan status plus the new teams pricing for shared workspaces.',
 )
 const personalPlanCtaLabel = computed(() =>
-  isAppleBillingSafeMode.value ? 'Upgrade to Premium' : '🚀 Upgrade',
+  isAppleBillingSafeMode.value ? 'Refresh access' : '🚀 Upgrade',
 )
 
 const normalizedPlanLabel = computed(() => {

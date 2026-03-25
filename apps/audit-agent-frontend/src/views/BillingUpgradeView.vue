@@ -49,19 +49,19 @@
           </div>
 
           <div class="flex flex-wrap gap-3">
-            <button
-              type="button"
+            <RouterLink
+              v-if="!authStore.user?.uid"
+              to="/login"
               class="px-5 py-3 rounded-xl bg-white text-slate-950 font-semibold hover:bg-slate-100 transition"
-              @click="openBillingWebsite"
             >
-              Upgrade to Premium
-            </button>
+              Sign in
+            </RouterLink>
             <button
               type="button"
               class="px-5 py-3 rounded-xl border border-white/15 bg-slate-900/70 text-white font-semibold hover:border-indigo-300/40 hover:bg-slate-900 transition"
               @click="refreshAccess"
             >
-              I've upgraded · Refresh
+              Refresh access
             </button>
             <button
               type="button"
@@ -73,7 +73,7 @@
           </div>
 
           <p class="text-sm text-indigo-100/70">
-            Opens secure web checkout in your browser. After you upgrade, come back here and refresh.
+            No purchase or external payment flow is shown in the mobile app.
           </p>
         </div>
       </template>
@@ -145,15 +145,14 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import api from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
 import { useAccessStore } from '@/stores/accessStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
-import { copyText, openExternalUrl } from '@/utils/nativeUi'
-import { BILLING_WEB_HOST, BILLING_WEB_URL, isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
+import { isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
 
 const route = useRoute()
 const router = useRouter()
@@ -166,8 +165,6 @@ const seats = ref(3)
 const workspaceId = ref('')
 const submitting = ref(false)
 const error = ref('')
-const billingWebHost = BILLING_WEB_HOST
-const billingWebUrl = BILLING_WEB_URL
 const isAppleBillingSafeMode = computed(() => detectAppleBillingSafeMode())
 const billingSource = computed(() => (
   typeof route.query.source === 'string'
@@ -202,37 +199,37 @@ const appleBillingTitle = computed(() => (
 ))
 const appleBillingSubtitle = computed(() => (
   showHeaderFreePlanFlow.value
-    ? 'When you are ready, upgrade on our website. Your app data stays safe and your access will sync back here.'
-    : 'Upgrade your experience on our website. Your account stays in sync with the app.'
+    ? 'This mobile app does not offer plan upgrades. Existing premium access appears automatically for accounts that already subscribe outside the app.'
+    : 'This mobile app does not offer purchases. Existing premium or paid workspace access syncs automatically to your account.'
 ))
 const appleBillingGuideLabel = computed(() => (
-  showHeaderFreePlanFlow.value ? 'How web upgrade works' : 'What to do next'
+  showHeaderFreePlanFlow.value ? 'How access works' : 'What to do next'
 ))
 const appleBillingGuideTitle = computed(() => (
   showHeaderFreePlanFlow.value
-    ? `Open ${billingWebHost} in Safari when you want to upgrade.`
-    : `Open ${billingWebHost} in Safari to upgrade or manage billing.`
+    ? 'Use the same account that already has premium access.'
+    : 'Paid access syncs automatically when linked to this account.'
 ))
 const appleBillingGuideCopy = computed(() => (
   showHeaderFreePlanFlow.value
-    ? 'Billing happens on the web, not inside the mobile app. Once you upgrade there, come back here and refresh to unlock premium access.'
-    : 'Your data is safe and will sync automatically after you upgrade. Once you come back here, refresh and your premium access will be ready.'
+    ? 'If you already subscribe outside the app, sign in here with that same account and refresh access.'
+    : 'If this account already has premium or paid workspace access from outside the app, refresh here to sync it.'
 ))
 const headerFreePlanSteps = [
   {
     step: 'Step 1',
-    title: 'Open the website',
-    copy: 'We will take you to the PlanCraftAI website in Safari when you are ready.',
+    title: 'Use the same account',
+    copy: 'Sign in to this mobile app with the account that already has paid access outside the app.',
   },
   {
     step: 'Step 2',
-    title: 'Upgrade there',
-    copy: 'Sign in with the same account and manage premium access securely on the web.',
+    title: 'Return to the app',
+    copy: 'Keep this screen open or come back after your account session is ready.',
   },
   {
     step: 'Step 3',
-    title: 'Come back here',
-    copy: 'Tap refresh in the app and your upgraded access will sync automatically.',
+    title: 'Refresh access',
+    copy: 'Tap refresh and your premium access will sync automatically if it already exists on your account.',
   },
 ]
 
@@ -261,17 +258,6 @@ watch(
     else if (selectedWorkspace.value?.seatsUsed) seats.value = selectedWorkspace.value.seatsUsed
   },
 )
-
-async function openBillingWebsite() {
-  const opened = openExternalUrl(billingWebUrl)
-  if (opened) return
-  const copied = await copyText(billingWebUrl)
-  if (copied) {
-    ElMessage.success(`${billingWebUrl} copied`)
-    return
-  }
-  ElMessage.info(`Visit ${billingWebHost}`)
-}
 
 function goBack() {
   try {

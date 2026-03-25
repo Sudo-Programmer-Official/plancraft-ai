@@ -68,7 +68,7 @@
     <div v-if="usage.plan === 'free' && !isPremium" class="app-page-section app-page-section--compact mb-2 flex items-center justify-between">
       <span class="text-sm text-gray-300">You’ve used {{ usage.used }}/{{ usage.limit }} reminders today.</span>
       <button
-        v-if="!isGuest"
+        v-if="!isGuest && !isAppleBillingSafeMode"
         @click="goToUpgrade"
         class="px-3 py-1 text-xs bg-gradient-to-r from-fuchsia-500 to-indigo-500 hover:from-fuchsia-400 hover:to-indigo-400 rounded-lg text-white"
       >
@@ -175,6 +175,7 @@ import { resolveTaskMeetingLink } from '@/utils/taskLinks'
 import { toUtcIso } from '@/utils/time'
 import { useTasks } from '@/composables/useTasks'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
+import { isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
 
 // Time setup
 dayjs.extend(utc)
@@ -191,6 +192,7 @@ let refreshTimer = null
 
 const usage = ref({ used: 0, limit: 0, plan: '' })
 const { isPremium, isGuest, isFreeUser } = useAuthFlags()
+const isAppleBillingSafeMode = computed(() => detectAppleBillingSafeMode())
 const customDate = ref(dayjs().format('YYYY-MM-DD'))
 const filterMode = ref('Today') // Today | Next7 | Custom
 const authStore = useAuthStore()
@@ -245,7 +247,7 @@ async function fetchUsage() {
 
 function goToUpgrade() {
   try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_UPGRADE_CLICK) } catch {}
-  try { router.push('/pricing') } catch {}
+  try { router.push(isAppleBillingSafeMode.value ? '/billing/upgrade' : '/pricing') } catch {}
 }
 
 function setGroupRef(date) {

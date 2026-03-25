@@ -37,5 +37,12 @@ Help people form a sustainable daily rhythm: plan clearly, capture progress effo
 
 ---
 
-See `docs/architecture.md` for system design, `docs/setup.md` for local run/deploy, and `docs/api.md` for backend routes.
+### Core Product Docs
+- `docs/build-launch-handbook.md` — founder playbook for product decisions, platform learnings, release process, and launch preparation.
+- `docs/product-roadmap-2026-2027.md` — dated 12-month roadmap for product, retention, reliability, collaboration, and monetization priorities.
+- `docs/deployment-playbook.md` — repeatable deployment order, release checks, versioning discipline, and store-delivery workflow.
+- `docs/mobile-deployment.md` — repeatable mobile build, sync, signing, and store-delivery workflow.
+- `docs/app-store-listing.md` — store metadata and reviewer note reference.
+- `docs/app-store-screenshot-brief.md` — screenshot copy and positioning guidance.
 
+See `docs/architecture.md` for system design, `docs/setup.md` for local run/deploy, and `docs/api.md` for backend routes.

@@ -66,10 +66,10 @@
             Sign in
           </RouterLink>
           <RouterLink
-            to="/pricing"
+            :to="secondaryCtaRoute"
             class="px-6 py-3 rounded-xl border border-white/30 font-semibold hover:border-white transition"
           >
-            Pricing
+            {{ secondaryCtaLabel }}
           </RouterLink>
         </div>
       </div>
@@ -78,9 +78,15 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import SeoLongForm from '@/components/SeoLongForm.vue'
 import { useSeoMeta } from '@/composables/useSeoMeta'
+import { isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
+
+const isAppleBillingSafeMode = computed(() => detectAppleBillingSafeMode())
+const secondaryCtaRoute = computed(() => (isAppleBillingSafeMode.value ? '/billing/upgrade' : '/pricing'))
+const secondaryCtaLabel = computed(() => (isAppleBillingSafeMode.value ? 'Account access' : 'Pricing'))
 
 const channels = [
   {

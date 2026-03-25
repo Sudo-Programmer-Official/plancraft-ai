@@ -374,7 +374,7 @@
           {{ isAppleBillingSafeMode ? '✨ Premium Access' : '✨ Choose Your Flow' }}
         </h2>
         <p class="text-indigo-200 mb-12 text-lg">
-          {{ isAppleBillingSafeMode ? `Premium features are available via your account. Visit ${billingWebHost} to manage upgrades on the web.` : 'Simple plans designed to help you stay mindful and productive.' }}
+          {{ isAppleBillingSafeMode ? 'This mobile app does not offer purchases. Premium access appears automatically when your account already has it outside the app.' : 'Simple plans designed to help you stay mindful and productive.' }}
         </p>
 
         <template v-if="isAppleBillingSafeMode">
@@ -389,16 +389,17 @@
                 </ul>
               </div>
               <div class="space-y-4">
-                <p class="text-sm uppercase tracking-[0.35em] text-indigo-300">Upgrade on web</p>
+                <p class="text-sm uppercase tracking-[0.35em] text-indigo-300">Account access</p>
                 <p class="text-indigo-100/85">
-                  Use the website to manage upgrades or billing changes. The app will reflect those changes after sign-in.
+                  Sign in with the same account that already has premium access outside the app and
+                  it will appear here automatically.
                 </p>
                 <div class="flex flex-wrap gap-3">
                   <RouterLink
                     :to="billingRoutePath"
                     class="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 font-semibold text-indigo-700 hover:bg-slate-100 transition shadow-md"
                   >
-                    Learn how to upgrade
+                    Learn how access works
                   </RouterLink>
                   <button
                     type="button"
@@ -510,7 +511,7 @@
                   :to="billingRoutePath"
                   class="px-5 py-3 rounded-xl border border-white/15 bg-white/5 text-white font-semibold hover:border-indigo-300/40 transition"
                 >
-                  Learn how upgrades work
+                  Learn how paid access works
                 </RouterLink>
               </div>
             </div>
@@ -643,12 +644,11 @@ import TestimonialsSection from '@/components/TestimonialsSection.vue'
 import { useSeoMeta } from '@/composables/useSeoMeta'
 import { trackGuestStartFromLanding } from '@/services/analytics'
 import { useAuthStore } from '@/stores/authStore'
-import { BILLING_WEB_HOST, isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
+import { isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const isAppleBillingSafeMode = computed(() => detectAppleBillingSafeMode())
-const billingWebHost = BILLING_WEB_HOST
 const billingRoutePath = computed(() => (isAppleBillingSafeMode.value ? '/billing/upgrade' : '/subscription'))
 const teamFeaturesCtaLabel = computed(() => (isAppleBillingSafeMode.value ? 'See team workspace features' : 'See team pricing & features'))
 

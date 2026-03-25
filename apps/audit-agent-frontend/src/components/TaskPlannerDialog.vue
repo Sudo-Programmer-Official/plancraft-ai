@@ -371,6 +371,7 @@ import { scheduleReminder, getReminderStatus } from '@/services/reminderService'
 import { createNapkinItem } from '@/services/napkinService'
 import { isFeatureAllowed } from '@/services/planService'
 import { hasNotificationSetup } from '@/utils/notificationCheck'
+import { areImageTasksEnabled } from '@/utils/imageTasksAccess'
 
 /* ---------------- Utilities ---------------- */
 import { toLocalDateKey, parseLocalDateKey } from '@/utils/dateHelper'
@@ -383,15 +384,6 @@ dayjs.extend(utc)
 dayjs.extend(timezone)
 
 /* ---------------- Constants ---------------- */
-function parseEnvFlag(value) {
-  return (
-    String(value || '')
-      .split('#')[0]
-      .trim()
-      .toLowerCase() === 'true'
-  )
-}
-
 const DURATION_HINTS = {
   class: 75,
   lecture: 60,
@@ -585,7 +577,7 @@ const activeWorkspaceId = computed(() => {
   }
 })
 
-const imageTasksEnabled = parseEnvFlag(import.meta.env.VITE_ENABLE_IMAGE_TASKS)
+const imageTasksEnabled = areImageTasksEnabled()
 const attachments = ref([])
 const attachmentUploading = ref(false)
 const attachmentInput = ref(null)

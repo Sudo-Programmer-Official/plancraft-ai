@@ -3,51 +3,52 @@
     <div class="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
       <div class="rounded-3xl border border-white/10 bg-gradient-to-br from-slate-900/85 via-indigo-950/80 to-slate-900/85 p-8 sm:p-10 shadow-2xl space-y-8">
         <div class="space-y-3">
-          <p class="text-sm uppercase tracking-[0.35em] text-indigo-300">Premium access</p>
-          <h1 class="text-3xl sm:text-4xl font-semibold text-white">Premium features are available via your account</h1>
+          <p class="text-sm uppercase tracking-[0.35em] text-indigo-300">Account access</p>
+          <h1 class="text-3xl sm:text-4xl font-semibold text-white">This app does not offer purchases</h1>
           <p class="max-w-3xl text-indigo-100/85 text-base sm:text-lg">
-            Upgrade your experience on our website. Your account stays in sync, so premium access is ready when you come back.
+            Premium features appear here automatically when the signed-in account already has an
+            active subscription created outside the app.
           </p>
         </div>
 
         <div class="grid gap-4 md:grid-cols-2">
           <div class="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-3">
-            <p class="text-xs uppercase tracking-[0.24em] text-indigo-200">Included with premium</p>
+            <p class="text-xs uppercase tracking-[0.24em] text-indigo-200">Already subscribed?</p>
             <ul class="space-y-2 text-sm text-indigo-100/90">
-              <li>Unlimited AI insights and reminders</li>
-              <li>Calendar and WhatsApp integrations</li>
-              <li>Priority support and early access</li>
+              <li>Sign in here with the same account you use outside the app.</li>
+              <li>Refresh access after your session finishes loading.</li>
+              <li>Your premium features will unlock automatically when linked to this account.</li>
             </ul>
           </div>
           <div class="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-3">
-            <p class="text-xs uppercase tracking-[0.24em] text-indigo-200">For teams</p>
+            <p class="text-xs uppercase tracking-[0.24em] text-indigo-200">For paid workspaces</p>
             <ul class="space-y-2 text-sm text-indigo-100/90">
-              <li>Shared workspaces and teammate invites</li>
-              <li>Role-based collaboration</li>
-              <li>Voice AI reminders and follow-ups</li>
+              <li>Paid workspace memberships created outside the app sync to your account.</li>
+              <li>Role-based access and shared features appear after the next refresh.</li>
+              <li>No purchase or external payment flow is shown in the mobile app.</li>
             </ul>
           </div>
         </div>
 
         <div class="flex flex-wrap gap-3">
-          <button
-            type="button"
+          <RouterLink
+            v-if="!authStore.user?.uid"
+            to="/login"
             class="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
-            @click="openBillingWebsite"
           >
-            Upgrade to Premium
-          </button>
+            Sign in
+          </RouterLink>
           <button
             type="button"
             class="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:border-indigo-300/40"
             @click="refreshPremiumAccess"
           >
-            I've upgraded -> Refresh
+            Refresh access
           </button>
         </div>
 
         <p class="text-sm text-indigo-100/70">
-          Opens secure web checkout in your browser. When you return, refresh and your premium access will sync.
+          Existing subscriptions and paid workspace access sync automatically after sign-in.
         </p>
       </div>
     </div>
@@ -249,24 +250,21 @@ import { useIsPremium } from '@/composables/useIsPremium'
 import { trackLinkedInConversion } from '@/utils/ads'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { useSeoMeta } from '@/composables/useSeoMeta'
-import { copyText, openExternalUrl } from '@/utils/nativeUi'
-import { BILLING_WEB_HOST, BILLING_WEB_URL, isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
+import { isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
 
 const authStore = useAuthStore()
 const accessStore = useAccessStore()
 const workspaceStore = useWorkspaceStore()
 const router = useRouter()
-const billingWebHost = BILLING_WEB_HOST
-const billingWebUrl = BILLING_WEB_URL
 const isAppleBillingSafeMode = detectAppleBillingSafeMode()
 const billingSafeRoute = '/billing/upgrade'
 useSeoMeta({
   title: isAppleBillingSafeMode ? 'Premium Access | PlanCraft AI' : 'Pricing | PlanCraft AI – Solo & Team Plans with Voice AI',
   description: isAppleBillingSafeMode
-    ? 'Premium features for PlanCraft AI are available via your account on the web.'
+    ? 'This mobile app does not offer purchases. Existing premium access syncs automatically to your account.'
     : 'Compare solo and team plans for PlanCraft AI. Get AI planning, calendar sync, and Voice AI reminders with pricing built for individuals and shared workspaces.',
   keywords: isAppleBillingSafeMode
-    ? ['PlanCraft AI premium access', 'PlanCraft AI account upgrades']
+    ? ['PlanCraft AI premium access', 'PlanCraft AI account access']
     : [
         'PlanCraft AI pricing',
         'AI planner subscription',
@@ -584,21 +582,6 @@ async function confirmCancel() {
   } finally {
     cancelLoading.value = false
   }
-}
-
-async function copyBillingWebsite() {
-  const copied = await copyText(billingWebHost)
-  if (copied) {
-    ElMessage.success(`${billingWebHost} copied`)
-    return
-  }
-  ElMessage.info(`Visit ${billingWebHost}`)
-}
-
-async function openBillingWebsite() {
-  const opened = openExternalUrl(billingWebUrl)
-  if (opened) return
-  await copyBillingWebsite()
 }
 
 async function refreshPremiumAccess() {

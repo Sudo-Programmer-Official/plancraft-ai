@@ -130,7 +130,10 @@
           <button class="text-slate-400 hover:text-white" @click="closeModal">✕</button>
         </div>
         <div class="grid sm:grid-cols-2 gap-3">
-          <div class="sm:col-span-2 rounded-lg border border-indigo-500/30 bg-indigo-500/10 p-3 space-y-2">
+          <div
+            v-if="imageTasksEnabled"
+            class="sm:col-span-2 rounded-lg border border-indigo-500/30 bg-indigo-500/10 p-3 space-y-2"
+          >
             <div class="flex items-center justify-between gap-2">
               <div>
                 <p class="text-xs uppercase tracking-wide text-indigo-200">Scan invite / poster</p>
@@ -235,13 +238,7 @@ import {
   suggestEventCopy,
 } from '@/services/leader/events'
 import { nlpClient } from '@/services/leader/http'
-
-function parseEnvFlag(value) {
-  return String(value || '')
-    .split('#')[0]
-    .trim()
-    .toLowerCase() === 'true'
-}
+import { areImageTasksEnabled } from '@/utils/imageTasksAccess'
 
 const router = useRouter()
 const route = useRoute()
@@ -266,7 +263,7 @@ const form = reactive({
   tags: '',
 })
 
-const imageTasksEnabled = parseEnvFlag(import.meta.env.VITE_ENABLE_IMAGE_TASKS)
+const imageTasksEnabled = areImageTasksEnabled()
 let visionUploadLoader = null
 async function getVisionUploader() {
   if (!imageTasksEnabled) throw new Error('Image capture is disabled')

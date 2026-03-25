@@ -147,12 +147,12 @@
                 v-if="isAppleBillingSafeMode && isReminderLimitReached"
                 class="text-xs text-indigo-100/75"
               >
-                Your data stays safe and will sync after you upgrade on the website.
+                Premium access only appears here for accounts that already subscribe outside the app.
               </p>
             </div>
           </div>
           <button
-            v-if="!isGuest.value"
+            v-if="!isGuest.value && !isAppleBillingSafeMode"
             @click="goToUpgrade"
             class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold"
           >

@@ -7,6 +7,7 @@ import {
 } from '@capgo/capacitor-audio-recorder'
 import api from '@/services/api'
 import { recordAndSendToBackend } from '@/utils/backendRecorder'
+import { ensureAiConsentOrThrow } from '@/services/aiConsentService'
 
 const MAX_DURATION_MS = 60_000
 const STOP_FALLBACK_MS = 1_800
@@ -391,6 +392,7 @@ export function useAudioRecorder(options = {}) {
   }
 
   const transcribeBlob = async (blob, fileName = null) => {
+    await ensureAiConsentOrThrow({ source: 'voice-transcribe' })
     console.log(`${logPrefix} transcription request ${stringifyLogPayload({ size: blob?.size, type: blob?.type, fileName })}`)
     const fd = new FormData()
     const fallbackExt = inferFileExtFromUri(fileName || '')

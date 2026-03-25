@@ -7,6 +7,7 @@ import timezone from 'dayjs/plugin/timezone'
 import { ElMessage } from 'element-plus'
 import { buildTimeContext } from '@/services/time_context'
 import { normalizeTemporalTasks } from '@/services/time_parser'
+import { ensureAiConsentOrThrow } from '@/services/aiConsentService'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -57,10 +58,12 @@ function emitSummarizerTimeoutWarning() {
  * ✨ Journal Enhancer
  */
 export async function enhanceJournal(text) {
+  await ensureAiConsentOrThrow({ source: 'journal-enhance' })
   try {
     const res = await api.post("/journal/enhance", { text });
     return safeGet(res, "enhanced", "");
   } catch (err) {
+    if (err?.code === 'AI_CONSENT_REQUIRED') throw err
     console.error("❌ Journal Enhance API Error:", err?.response?.data || err.message);
     throw new Error("Failed to enhance journal entry. Please try again later.");
   }
@@ -70,6 +73,7 @@ export async function enhanceJournal(text) {
  * ✨ Task Summarizer
  */
 export async function summarizeTasks(tasks) {
+  await ensureAiConsentOrThrow({ source: 'tasks-summarize' })
   try {
     const res = await api.post("/tasks/summarize", { tasks });
 
@@ -85,6 +89,7 @@ export async function summarizeTasks(tasks) {
       weeklyWarning: summary["Weekly warning"] ?? summary.weeklyWarning ?? "",
     };
   } catch (err) {
+    if (err?.code === 'AI_CONSENT_REQUIRED') throw err
     const msg = err?.response?.data || err?.message
     console.error("❌ Task Summarize API Error:", msg);
     if (err?.code === 'ECONNABORTED' || /timeout/i.test(String(msg))) {
@@ -105,6 +110,7 @@ export async function summarizeTasks(tasks) {
  * ✨ Generate tasks from freeform text with temporal context
  */
 export async function generateTasksFromText(text, options = {}) {
+  await ensureAiConsentOrThrow({ source: 'tasks-generate' })
   const trimmed = String(text ?? '').trim()
   const {
     planDate,
@@ -187,6 +193,7 @@ export async function generateTasksFromText(text, options = {}) {
       raw: raw,
     }
   } catch (err) {
+    if (err?.code === 'AI_CONSENT_REQUIRED') throw err
     console.error("❌ Generate Tasks API Error:", err?.response?.data || err.message);
     throw new Error("Failed to generate tasks. Please try again later.");
   }
@@ -233,6 +240,7 @@ function resolveRelativeReminderIso(text, nowAnchor, timezoneGuess) {
 }
 
 export async function extractReminderTime(text, options = {}) {
+  await ensureAiConsentOrThrow({ source: 'reminder-extract' })
   const trimmed = String(text ?? '').trim()
   if (!trimmed) return null
 
@@ -299,6 +307,7 @@ export async function extractReminderTime(text, options = {}) {
     } catch {}
     return normalized
   } catch (err) {
+    if (err?.code === 'AI_CONSENT_REQUIRED') throw err
     console.error("❌ Extract Time API Error:", err?.response?.data || err.message);
     return null
   }

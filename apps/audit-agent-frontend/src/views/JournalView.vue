@@ -125,7 +125,10 @@
             </div>
           </div>
 
-          <div class="mt-4 rounded-xl bg-slate-900/50 border border-indigo-400/20 p-4 space-y-3">
+          <div
+            v-if="imageTasksEnabled"
+            class="mt-4 rounded-xl bg-slate-900/50 border border-indigo-400/20 p-4 space-y-3"
+          >
             <div class="flex items-center justify-between">
               <div>
                 <p class="text-xs uppercase tracking-[0.25em] text-indigo-300/80">Scan</p>
@@ -308,13 +311,7 @@ import VoiceRecorder from '@/components/VoiceRecorder.vue'
 import { ElNotification } from 'element-plus'
 import { nlpClient } from '@/services/leader/http'
 import { addTaskToFirebase } from '@/services/firebaseService'
-
-function parseEnvFlag(value) {
-  return String(value || '')
-    .split('#')[0]
-    .trim()
-    .toLowerCase() === 'true'
-}
+import { areImageTasksEnabled } from '@/utils/imageTasksAccess'
 
 const authStore = useAuthStore()
 const userName = computed(() => authStore?.user?.displayName || 'friend')
@@ -341,7 +338,7 @@ const captureLoading = ref(false)
 const captureError = ref('')
 const captureImageName = ref('')
 const fileInput = ref(null)
-const imageTasksEnabled = parseEnvFlag(import.meta.env.VITE_ENABLE_IMAGE_TASKS)
+const imageTasksEnabled = areImageTasksEnabled()
 let visionUploadLoader = null
 async function getVisionUploader() {
   if (!imageTasksEnabled) throw new Error('Image capture is disabled')
@@ -430,24 +427,32 @@ function appendTag(tag) {
 
 async function saveEntry() {
   if (!entryText.value.trim()) return
-  const enhanced = await enhanceJournal(entryText.value)
-  enhancedText.value = enhanced
-  const timestamp = Date.now()
-  const entry = {
-    id: crypto.randomUUID?.() || timestamp,
-    text: enhanced || entryText.value,
-    mood: selectedMood.value,
-    timestamp,
-    createdAt: timestamp,
-    tags: tagSuggestions.slice(0, 2),
-    summary: (enhanced || entryText.value).slice(0, 100) + '…',
+  try {
+    const enhanced = await enhanceJournal(entryText.value)
+    enhancedText.value = enhanced
+    const timestamp = Date.now()
+    const entry = {
+      id: crypto.randomUUID?.() || timestamp,
+      text: enhanced || entryText.value,
+      mood: selectedMood.value,
+      timestamp,
+      createdAt: timestamp,
+      tags: tagSuggestions.slice(0, 2),
+      summary: (enhanced || entryText.value).slice(0, 100) + '…',
+    }
+    await saveEntryToFirebase(entry)
+    logs.value = [entry, ...logs.value]
+    entryText.value = ''
+    voiceTranscript.value = ''
+    selectedMood.value = null
+    ElNotification({ title: 'Saved', message: 'Your reflection was saved 💫', type: 'success' })
+  } catch (err) {
+    ElNotification({
+      title: 'Unable to save',
+      message: err?.message || 'We could not process that reflection right now.',
+      type: 'error',
+    })
   }
-  await saveEntryToFirebase(entry)
-  logs.value = [entry, ...logs.value]
-  entryText.value = ''
-  voiceTranscript.value = ''
-  selectedMood.value = null
-  ElNotification({ title: 'Saved', message: 'Your reflection was saved 💫', type: 'success' })
 }
 
 function formatDate(ms) {

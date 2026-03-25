@@ -18,18 +18,25 @@
       </div>
     </transition>
 
+    <AiConsentDialog />
     <InstallPrompt />
     <ConfettiOverlay v-if="confettiVisible" @done="confettiVisible = false" />
   </div>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElNotification } from 'element-plus'
+import AiConsentDialog from '@/components/AiConsentDialog.vue'
 import InstallPrompt from '@/components/InstallPrompt.vue'
 import ConfettiOverlay from '@/components/ConfettiOverlay.vue'
 import { useAppReady } from '@/composables/useAppReady'
+import {
+  getAiConsentStatus,
+  openAiConsentPrompt,
+  requiresAiConsent,
+} from '@/services/aiConsentService'
 
 const route = useRoute()
 const { isShellReady, isLoggingOut, hasAuthenticatedSession, startupStage } = useAppReady()
@@ -65,6 +72,7 @@ const startupOverlaySubtitle = computed(() => {
 })
 
 const confettiVisible = ref(false)
+const aiConsentAutoPrompted = ref(false)
 
 function triggerConfetti(count) {
   confettiVisible.value = true
@@ -90,6 +98,27 @@ onMounted(() => {
   }
   window.addEventListener('streak-increased', streakHandler)
 })
+
+watch(
+  () => ({
+    showStartupOverlay: showStartupOverlay.value,
+    hasAuthenticatedSession: hasAuthenticatedSession.value,
+    requiresAuth: !!route.meta?.requiresAuth,
+  }),
+  ({ showStartupOverlay, hasAuthenticatedSession, requiresAuth }) => {
+    if (aiConsentAutoPrompted.value) return
+    if (!requiresAiConsent()) return
+    if (!requiresAuth || !hasAuthenticatedSession) return
+    if (showStartupOverlay) return
+    if (getAiConsentStatus() !== 'unknown') return
+
+    aiConsentAutoPrompted.value = true
+    window.setTimeout(() => {
+      openAiConsentPrompt('app-launch')
+    }, 250)
+  },
+  { immediate: true, deep: true },
+)
 
 onBeforeUnmount(() => {
   try {

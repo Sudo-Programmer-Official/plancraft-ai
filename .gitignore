@@ -66,6 +66,8 @@ dev-toolkit/**/node_modules/
 *.p12
 *.key
 *.crt
+*.jks
+*.keystore
 
 # -----------------------------
 # Build / output artifacts
