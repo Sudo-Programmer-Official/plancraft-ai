@@ -86,7 +86,7 @@ const planLabel = computed(() => {
 })
 const dialogWidth = ref(window.innerWidth < 640 ? '90%' : '420px')
 const upgradeRoute = computed(() => (detectAppleBillingSafeMode() ? '/billing/upgrade' : '/subscription'))
-const upgradeLabel = computed(() => (detectAppleBillingSafeMode() ? 'Learn about Premium' : 'Upgrade to Premium'))
+const upgradeLabel = computed(() => (detectAppleBillingSafeMode() ? 'Upgrade to Premium' : 'Upgrade to Premium'))
 
 
 const limits = computed(() => ({

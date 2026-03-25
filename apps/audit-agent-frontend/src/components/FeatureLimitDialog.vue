@@ -79,7 +79,7 @@ const refreshing = ref(false)
 const isAppleBillingSafeMode = detectAppleBillingSafeMode()
 const billingWebHost = BILLING_WEB_HOST
 const limitText = computed(() => (props.limit > 0 ? String(props.limit) : '0'))
-const primaryActionLabel = computed(() => (isAppleBillingSafeMode ? 'Open Website' : 'Learn about Premium'))
+const primaryActionLabel = computed(() => (isAppleBillingSafeMode ? 'Upgrade to Premium' : 'Learn about Premium'))
 
 async function handlePrimaryAction() {
   if (!isAppleBillingSafeMode) {

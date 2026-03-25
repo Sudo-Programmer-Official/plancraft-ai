@@ -1559,7 +1559,7 @@ const reminderPlanBannerText = computed(() => {
   return `You’ve used ${used}/${limit} reminders on the Free plan.`
 })
 const reminderPlanBannerCta = computed(() => (
-  isAppleBillingSafeMode ? 'Learn about Premium' : 'Upgrade'
+  isAppleBillingSafeMode ? 'Upgrade to Premium' : 'Upgrade'
 ))
 
 async function loadGoogleStatus() {

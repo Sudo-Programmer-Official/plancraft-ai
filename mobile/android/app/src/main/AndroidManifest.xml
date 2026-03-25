@@ -58,6 +58,37 @@
                     android:host="www.plancraftai.com"
                     android:pathPrefix="/app-auth/complete" />
             </intent-filter>
+
+            <!-- Verified app links for web-managed billing return flows -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="plancraftai.com"
+                    android:pathPrefix="/subscription" />
+                <data
+                    android:scheme="https"
+                    android:host="www.plancraftai.com"
+                    android:pathPrefix="/subscription" />
+                <data
+                    android:scheme="https"
+                    android:host="plancraftai.com"
+                    android:pathPrefix="/billing/upgrade" />
+                <data
+                    android:scheme="https"
+                    android:host="www.plancraftai.com"
+                    android:pathPrefix="/billing/upgrade" />
+                <data
+                    android:scheme="https"
+                    android:host="plancraftai.com"
+                    android:pathPrefix="/app" />
+                <data
+                    android:scheme="https"
+                    android:host="www.plancraftai.com"
+                    android:pathPrefix="/app" />
+            </intent-filter>
           
         </activity>
 

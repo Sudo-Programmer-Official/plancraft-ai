@@ -54,7 +54,7 @@
               class="px-5 py-3 rounded-xl bg-white text-slate-950 font-semibold hover:bg-slate-100 transition"
               @click="openBillingWebsite"
             >
-              Open Website
+              Upgrade to Premium
             </button>
             <button
               type="button"
@@ -71,6 +71,10 @@
               Maybe later
             </button>
           </div>
+
+          <p class="text-sm text-indigo-100/70">
+            Opens secure web checkout in your browser. After you upgrade, come back here and refresh.
+          </p>
         </div>
       </template>
 
@@ -211,7 +215,7 @@ const appleBillingGuideTitle = computed(() => (
 ))
 const appleBillingGuideCopy = computed(() => (
   showHeaderFreePlanFlow.value
-    ? 'Billing happens on the web, not inside the iPhone app. Once you upgrade there, come back here and refresh to unlock premium access.'
+    ? 'Billing happens on the web, not inside the mobile app. Once you upgrade there, come back here and refresh to unlock premium access.'
     : 'Your data is safe and will sync automatically after you upgrade. Once you come back here, refresh and your premium access will be ready.'
 ))
 const headerFreePlanSteps = [

@@ -35,7 +35,7 @@
             class="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
             @click="openBillingWebsite"
           >
-            Open Website
+            Upgrade to Premium
           </button>
           <button
             type="button"
@@ -45,6 +45,10 @@
             I've upgraded -> Refresh
           </button>
         </div>
+
+        <p class="text-sm text-indigo-100/70">
+          Opens secure web checkout in your browser. When you return, refresh and your premium access will sync.
+        </p>
       </div>
     </div>
   </template>

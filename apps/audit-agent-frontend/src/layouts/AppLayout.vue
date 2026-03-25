@@ -1345,7 +1345,7 @@ const systemLinks = computed(() => [
 ])
 const isAppleBillingSafeMode = computed(() => detectAppleBillingSafeMode())
 const billingRoutePath = computed(() => (isAppleBillingSafeMode.value ? '/billing/upgrade' : '/subscription'))
-const upgradeBannerLabel = computed(() => (isAppleBillingSafeMode.value ? 'Learn about Premium' : 'Upgrade'))
+const upgradeBannerLabel = computed(() => (isAppleBillingSafeMode.value ? 'Upgrade to Premium' : 'Upgrade'))
 const upgradeBannerMessage = computed(() => (
   isAppleBillingSafeMode.value
     ? 'You have reached a Free plan limit. Premium access is available on our website, and your data will sync after you upgrade.'
@@ -1354,7 +1354,7 @@ const upgradeBannerMessage = computed(() => (
 const upgradePillLabel = computed(() => '🚀 Upgrade')
 const upgradePillTitle = computed(() => (
   isAppleBillingSafeMode.value
-    ? 'You are on the Free plan. Premium access can be enabled on the web.'
+    ? 'You are on the Free plan. Premium access is managed on the web.'
     : 'Upgrade'
 ))
 const showFreePlanHeaderBadge = computed(() => (

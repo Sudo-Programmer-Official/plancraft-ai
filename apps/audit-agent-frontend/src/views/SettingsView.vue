@@ -1870,11 +1870,11 @@ const remindersLimitLabel = computed(() => (accessStore.access?.limits?.reminder
 const planOpen = ref(false)
 const billingSectionIntro = computed(() =>
   isAppleBillingSafeMode.value
-    ? 'Plan upgrades and workspace billing are managed on the web for the iPhone app.'
+    ? 'Plan upgrades and workspace billing are managed on the web for the mobile app.'
     : 'Personal plan status plus the new teams pricing for shared workspaces.',
 )
 const personalPlanCtaLabel = computed(() =>
-  isAppleBillingSafeMode.value ? 'Learn about Premium' : '🚀 Upgrade',
+  isAppleBillingSafeMode.value ? 'Upgrade to Premium' : '🚀 Upgrade',
 )
 
 const normalizedPlanLabel = computed(() => {

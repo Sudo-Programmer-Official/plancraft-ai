@@ -258,7 +258,7 @@ router.beforeEach(async (to, from, next) => {
   }
 
   if (
-    isIosPackagedApp() &&
+    isNativePackagedApp() &&
     (
       to.path === '/subscription' ||
       to.path === '/pricing' ||
@@ -271,7 +271,7 @@ router.beforeEach(async (to, from, next) => {
       path: '/billing/upgrade',
       query: {
         ...to.query,
-        source: typeof to.query?.source === 'string' ? to.query.source : 'ios-billing',
+        source: typeof to.query?.source === 'string' ? to.query.source : 'native-billing',
       },
       hash: to.hash,
     })

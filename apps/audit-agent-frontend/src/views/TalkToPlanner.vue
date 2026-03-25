@@ -618,8 +618,8 @@ const userDisplayName = computed(() => {
 
 const userId = computed(() => authStore?.user?.uid || localStorage.getItem('uid') || null)
 const userInitial = computed(() => (userDisplayName.value || 'You').charAt(0).toUpperCase())
-
 const messages = ref([createWelcomeMessage(userDisplayName.value)])
+let chatScrollFrame = null
 
 watch(userDisplayName, (name) => {
   if (!messages.value.length) {
@@ -636,12 +636,7 @@ watch(
   () => messages.value.length,
   () => {
     nextTick(() => {
-      try {
-        const el = chatContainer.value
-        if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
-      } catch {
-        /* noop */
-      }
+      scrollChatToBottom(messages.value.length > 2 ? 'smooth' : 'auto')
     })
   },
 )
@@ -690,10 +685,29 @@ const sendDisabled = computed(
 function syncComposerHeight() {
   const composer = chatInputRef.value
   if (!(composer instanceof HTMLTextAreaElement)) return
-  const maxHeight = typeof window !== 'undefined' && window.innerWidth <= 768 ? 120 : 144
+  const maxHeight = typeof window !== 'undefined' && window.innerWidth <= 768 ? 112 : 136
   composer.style.height = 'auto'
   composer.style.height = `${Math.min(composer.scrollHeight, maxHeight)}px`
   composer.style.overflowY = composer.scrollHeight > maxHeight ? 'auto' : 'hidden'
+}
+
+function scrollChatToBottom(behavior = 'smooth') {
+  if (typeof window === 'undefined') return
+  if (chatScrollFrame) {
+    window.cancelAnimationFrame(chatScrollFrame)
+    chatScrollFrame = null
+  }
+  chatScrollFrame = window.requestAnimationFrame(() => {
+    chatScrollFrame = null
+    try {
+      const el = chatContainer.value
+      if (el) {
+        el.scrollTo({ top: el.scrollHeight, behavior })
+      }
+    } catch {
+      /* noop */
+    }
+  })
 }
 
 function handleComposerKeydown(event) {
@@ -1139,6 +1153,10 @@ onBeforeUnmount(() => {
   resetPlannerRecording()
   if (typeof window !== 'undefined') {
     window.removeEventListener('resize', syncComposerHeight)
+    if (chatScrollFrame) {
+      window.cancelAnimationFrame(chatScrollFrame)
+      chatScrollFrame = null
+    }
   }
 })
 
@@ -1180,6 +1198,7 @@ watch(
 onMounted(() => {
   nextTick(() => {
     syncComposerHeight()
+    scrollChatToBottom('auto')
   })
   if (typeof window !== 'undefined') {
     window.addEventListener('resize', syncComposerHeight, { passive: true })
@@ -1191,44 +1210,56 @@ onMounted(() => {
 .talk-planner-wrapper {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
+  height: 100%;
   min-height: 0;
   overflow: hidden;
-  max-width: 900px;
+  max-width: 940px;
   width: 100%;
   margin: 0 auto;
-  padding: 1rem;
-  background: linear-gradient(180deg, rgba(25, 20, 40, 0.95), rgba(20, 18, 35, 0.98));
-  border: 1px solid rgba(138, 120, 210, 0.2);
-  border-radius: 1.25rem;
+  padding: 1.05rem;
+  background:
+    linear-gradient(160deg, rgba(37, 26, 82, 0.94), rgba(68, 39, 138, 0.88)),
+    radial-gradient(circle at top right, rgba(236, 72, 153, 0.14), transparent 34%);
+  border: 1px solid rgba(148, 128, 236, 0.26);
+  border-radius: 1.4rem;
   box-shadow:
-    0 0 30px rgba(90, 60, 150, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    0 24px 48px rgba(19, 13, 42, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
   color: #f9f8ff;
 }
 
 .talk-planner-page {
+  --talk-safe-bottom: var(--safe-area-bottom, env(safe-area-inset-bottom, 0px));
+  --talk-page-padding-x: 1rem;
+  --talk-page-padding-top: 0.95rem;
+  --talk-page-padding-bottom: max(calc(var(--talk-safe-bottom) + 0.8rem), 0.95rem);
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
+  min-height: 100%;
   height: 100%;
-  min-height: 0;
+  max-height: 100%;
+  min-width: 0;
   overflow: hidden;
-  padding: 1rem;
-  gap: 0.9rem;
+  padding: var(--talk-page-padding-top) var(--talk-page-padding-x) var(--talk-page-padding-bottom);
+  gap: 1rem;
+  box-sizing: border-box;
 }
 
 .talk-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.75rem;
+  gap: 0.9rem;
+  margin-bottom: 0.85rem;
 }
 
 .talk-title {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 1.6rem;
-  font-weight: 600;
+  font-size: clamp(1.65rem, 2vw, 2rem);
+  font-weight: 700;
+  line-height: 1.1;
   color: #f3e8ff;
 }
 
@@ -1236,13 +1267,15 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 0.6rem;
+  flex-shrink: 0;
 }
 
-.voice-toggle {
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+.voice-toggle,
+.clear-btn {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.95rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.8);
   display: inline-flex;
@@ -1252,16 +1285,23 @@ onMounted(() => {
   transition:
     background 0.2s ease,
     color 0.2s ease,
-    border-color 0.2s ease;
+    border-color 0.2s ease,
+    transform 0.2s ease;
+  touch-action: manipulation;
 }
 
-.voice-toggle:hover {
+.voice-toggle:hover,
+.clear-btn:hover {
   background: rgba(255, 255, 255, 0.16);
   color: #ffffff;
+  transform: translateY(-1px);
 }
 
 .voice-toggle:focus-visible,
-.voice-replay-btn:focus-visible {
+.voice-replay-btn:focus-visible,
+.clear-btn:focus-visible,
+.mic-btn:focus-visible,
+.send-btn:focus-visible {
   outline: 2px solid rgba(196, 181, 253, 0.8);
   outline-offset: 2px;
 }
@@ -1285,17 +1325,13 @@ onMounted(() => {
 }
 
 .clear-btn {
-  background: transparent;
-  border: none;
-  color: rgba(255, 255, 255, 0.65);
-  font-size: 1.3rem;
-  transition: color 0.2s ease;
-  cursor: pointer;
+  font-size: 1.05rem;
 }
 
 .clear-btn:disabled {
-  opacity: 0.3;
+  opacity: 0.42;
   cursor: not-allowed;
+  transform: none;
 }
 
 .clear-btn:not(:disabled):hover {
@@ -1318,10 +1354,12 @@ onMounted(() => {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 0.85rem 0 0;
+  padding: 0.85rem 0.1rem 0;
   display: flex;
   flex-direction: column;
-  overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
@@ -1344,10 +1382,10 @@ onMounted(() => {
   display: flex;
   align-items: flex-start;
   gap: 0.75rem;
-  max-width: 78%;
+  max-width: min(82%, 680px);
   min-width: 0;
-  padding: 0.78rem 1rem;
-  border-radius: 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 1.05rem;
   line-height: 1.45;
   word-break: break-word;
   box-shadow: 0 10px 25px rgba(34, 20, 70, 0.2);
@@ -1619,20 +1657,17 @@ onMounted(() => {
 }
 
 .chat-input-dock {
-  position: sticky;
-  bottom: 0;
-  z-index: 5;
-  max-width: 900px;
+  position: relative;
+  z-index: 3;
+  max-width: 940px;
   width: 100%;
   margin: 0 auto;
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.2rem);
-  background:
-    linear-gradient(180deg, rgba(79, 42, 160, 0), rgba(44, 23, 90, 0.3) 25%, rgba(23, 18, 40, 0.88));
+  padding-bottom: 0;
+  align-self: end;
 }
 
 .chat-input-dock--recording {
-  background:
-    linear-gradient(180deg, rgba(111, 61, 187, 0), rgba(82, 39, 150, 0.38) 25%, rgba(23, 18, 40, 0.94));
+  filter: saturate(1.05);
 }
 
 .chat-input-bar {
@@ -1643,9 +1678,9 @@ onMounted(() => {
   flex: 0 0 auto;
   background: rgba(34, 29, 58, 0.92);
   border: 1px solid rgba(126, 109, 212, 0.28);
-  border-radius: 1.1rem;
+  border-radius: 1.15rem;
   padding: 0.8rem;
-  box-shadow: 0 16px 32px rgba(20, 16, 40, 0.32);
+  box-shadow: 0 16px 28px rgba(20, 16, 40, 0.26);
   backdrop-filter: blur(12px);
 }
 
@@ -1719,6 +1754,7 @@ onMounted(() => {
   cursor: pointer;
   transition: opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
   align-self: flex-end;
+  touch-action: manipulation;
 }
 
 .mic-btn::after,
@@ -1827,6 +1863,14 @@ onMounted(() => {
   background: rgba(140, 100, 255, 0.4);
   color: #ffffff;
   transform: translateY(-1px);
+}
+
+.send-btn:disabled,
+.mic-btn:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 @keyframes mic-processing {
@@ -1951,17 +1995,28 @@ onMounted(() => {
 
 @media (max-width: 768px) {
   .talk-planner-page {
-    padding: 0.75rem;
-    gap: 0.75rem;
+    --talk-page-padding-x: 0.75rem;
+    --talk-page-padding-top: 0.75rem;
+    --talk-page-padding-bottom: max(calc(var(--talk-safe-bottom) + 0.75rem), 0.8rem);
+    gap: 0.8rem;
   }
 
   .talk-planner-wrapper {
-    padding: 0.85rem;
-    border-radius: 1rem;
+    padding: 0.92rem;
+    border-radius: 1.12rem;
+  }
+
+  .talk-header {
+    align-items: flex-start;
+    margin-bottom: 0.7rem;
+  }
+
+  .talk-title {
+    font-size: clamp(1.45rem, 5vw, 1.8rem);
   }
 
   .chat-bubble {
-    max-width: 92%;
+    max-width: 94%;
   }
 
   .chat-input {
@@ -1969,30 +2024,40 @@ onMounted(() => {
   }
 
   .chat-input-bar {
-    padding: 0.75rem;
+    padding: 0.72rem;
   }
 
   .chat-input-row {
     min-height: 60px;
-    padding: 0.65rem 0.7rem;
+    padding: 0.6rem 0.68rem;
     border-radius: 0.85rem;
+  }
+
+  .voice-toggle,
+  .clear-btn {
+    width: 2.6rem;
+    height: 2.6rem;
+    border-radius: 0.9rem;
   }
 }
 
 @media (max-width: 540px) {
   .talk-planner-page {
-    padding: 0.55rem;
+    --talk-page-padding-x: 0.6rem;
+    --talk-page-padding-top: 0.6rem;
+    --talk-page-padding-bottom: max(calc(var(--talk-safe-bottom) + 0.65rem), 0.72rem);
+  }
+
+  .talk-header {
+    gap: 0.7rem;
+  }
+
+  .talk-title {
+    font-size: 1.35rem;
   }
 
   .chat-input-bar {
     padding: 0.7rem;
-  }
-
-  .mic-indicator {
-    order: 4;
-    width: 100%;
-    justify-content: center;
-    margin: 0.35rem 0 0;
   }
 }
 
