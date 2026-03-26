@@ -7,6 +7,17 @@ function parseEnvFlag(value) {
     .toLowerCase() === 'true'
 }
 
+function isNativeImageTasksDebugEnabled() {
+  return (
+    parseEnvFlag(import.meta.env.VITE_ENABLE_NATIVE_IMAGE_TASKS) ||
+    parseEnvFlag(import.meta.env.VITE_ENABLE_NATIVE_IMAGE_TASKS_DEBUG) ||
+    String(import.meta.env.MODE || '').trim().toLowerCase() === 'development'
+  )
+}
+
 export function areImageTasksEnabled() {
-  return parseEnvFlag(import.meta.env.VITE_ENABLE_IMAGE_TASKS) && !isNativePackagedApp()
+  const globallyEnabled = parseEnvFlag(import.meta.env.VITE_ENABLE_IMAGE_TASKS)
+  if (!globallyEnabled) return false
+  if (!isNativePackagedApp()) return true
+  return isNativeImageTasksDebugEnabled()
 }
