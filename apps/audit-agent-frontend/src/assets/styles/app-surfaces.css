@@ -1,5 +1,9 @@
 .app-page-shell {
   min-height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
   padding: 1rem 0.875rem 2rem;
   color: #eef2ff;
 }
@@ -7,6 +11,9 @@
 .app-page-frame {
   width: min(1200px, 100%);
   margin: 0 auto;
+  flex: 1 0 auto;
+  min-width: 0;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
