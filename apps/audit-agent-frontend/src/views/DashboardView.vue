@@ -1325,6 +1325,23 @@ const activeWorkspaceId = computed(() => {
     return workspaceStore.activeWorkspaceId || null
   }
 })
+const activeWorkspace = computed(() => {
+  try {
+    return (
+      workspaceStore.activeWorkspace ||
+      workspaceStore.workspaces?.find?.((workspace) => workspace?.id === activeWorkspaceId.value) ||
+      null
+    )
+  } catch {
+    return null
+  }
+})
+const isPersonalActiveWorkspace = computed(() => {
+  const workspace = activeWorkspace.value
+  if (!workspace) return false
+  if (String(workspace?.workspaceType || '').trim().toLowerCase() === 'personal') return true
+  return String(workspace?.name || '').trim().toLowerCase() === 'personal'
+})
 const routerNav = useRouter()
 const subStore = useSubscriptionStore()
 const isFirstVisit = computed(() => isGuest.value && authStore?.user?.firstVisitInitialized !== true)
@@ -1838,9 +1855,15 @@ const onboardingSteps = computed(() => [
 const todayKeyRef = computed(() => toLocalDateKey(new Date()))
 const carryoverCandidates = computed(() => {
   const todayKey = todayKeyRef.value
+  const currentWorkspaceId = activeWorkspaceId.value ? String(activeWorkspaceId.value) : null
+  if (!currentWorkspaceId) return []
+  const allowLegacyPersonalTasks = isPersonalActiveWorkspace.value
   return (allTasks.value || [])
     .filter((t) => {
       if (!t || t.completed) return false
+      const taskWorkspaceId = t?.workspaceId ? String(t.workspaceId) : null
+      if (!taskWorkspaceId) return allowLegacyPersonalTasks
+      if (taskWorkspaceId !== currentWorkspaceId) return false
       const fromPreviousDay = t.date < todayKey
       const flagged = t.is_carryover === true && t.date < todayKey
       return fromPreviousDay || flagged

@@ -541,10 +541,12 @@ export function useTasks() {
     if (!normalized.length) return []
 
     const normalizedDate = typeof targetDate === 'string' ? targetDate : toLocalDateKey(new Date(targetDate))
-    const prevById = new Map(allTasks.value.map((t) => [t.id, t.date]))
+    const existingById = new Map(allTasks.value.map((t) => [t.id, t]))
     const payload = normalized.map((entry) => ({
       id: entry.id,
-      previousDate: entry.previousDate || prevById.get(entry.id) || entry.date || null,
+      workspaceId: entry.workspaceId || existingById.get(entry.id)?.workspaceId || null,
+      previousDate:
+        entry.previousDate || existingById.get(entry.id)?.previousDate || existingById.get(entry.id)?.date || entry.date || null,
       completed: options.completed ?? false,
     }))
     const ids = payload.map((p) => p.id)

@@ -963,7 +963,6 @@ export async function moveTasksToDate(taskPayloads = [], targetDate, extra = {})
       date: normalizedDate,
       updatedAt: serverTimestamp(),
     }
-    if (!task.workspaceId) updates.workspaceId = wsId
     if (extra.status) updates.status = extra.status
     if ('completed' in extra) updates.completed = !!extra.completed
     else if (task.completed !== undefined) updates.completed = !!task.completed
