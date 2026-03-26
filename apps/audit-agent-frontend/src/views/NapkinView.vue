@@ -226,6 +226,17 @@
                 <span class="truncate text-right">{{ item.suggestion || routeSuggestion(item.intent) }}</span>
               </div>
             </button>
+
+            <div v-if="hasMoreItems || loadingMore" class="napkin-list-footer">
+              <button
+                type="button"
+                class="napkin-load-more-btn"
+                :disabled="loadingMore"
+                @click="loadMoreNapkin"
+              >
+                {{ loadingMore ? 'Loading older notes…' : 'Load older notes' }}
+              </button>
+            </div>
           </div>
 
           <aside
@@ -419,11 +430,13 @@ import {
   classifyNapkinText,
   createNapkinItem,
   deleteNapkinItem,
+  fetchNapkinItemsPage,
   subscribeToNapkinItems,
   updateNapkinItem,
   type NapkinClassification,
   type NapkinIntent,
   type NapkinItem,
+  type NapkinPageInfo,
 } from '@/services/napkinService'
 import { toLocalDateKey } from '@/utils/dateHelper'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
@@ -435,6 +448,7 @@ const router = useRouter()
 const workspaceStore = useWorkspaceStore()
 
 const input = ref('')
+const NAPKIN_PAGE_SIZE = 40
 const voiceTranscript = ref('')
 const recordingState = ref<RecorderState>('idle')
 const recordingSeconds = ref(0)
@@ -445,8 +459,11 @@ const saving = ref(false)
 const loading = ref(true)
 const savingEdit = ref(false)
 const deleting = ref(false)
+const loadingMore = ref(false)
 const napkinError = ref('')
 const items = ref<NapkinItem[]>([])
+const liveItems = ref<NapkinItem[]>([])
+const olderItems = ref<NapkinItem[]>([])
 const filter = ref('all')
 const plannerOpen = ref(false)
 const plannerTask = ref<any>(null)
@@ -473,6 +490,10 @@ let mediaRecorder: MediaRecorder | null = null
 let timerId: number | null = null
 let stream: MediaStream | null = null
 let workspaceUnsub: (() => void) | null = null
+const nextWorkspaceCursor = ref<NapkinPageInfo['workspaceCursor']>(null)
+const nextLegacyCursor = ref<NapkinPageInfo['legacyCursor']>(null)
+const hasMoreWorkspace = ref(false)
+const hasMoreLegacy = ref(false)
 
 const filteredItems = computed(() => {
   if (filter.value === 'all') return items.value
@@ -491,6 +512,7 @@ const deleteDialogOpen = computed({
 const latestSaved = computed(() => items.value.find((i) => i.id === latestSavedId.value))
 const convertedCount = computed(() => items.value.filter((i) => i.status === 'converted').length)
 const voiceCount = computed(() => items.value.filter((i) => i.audioUrl || i.source === 'voice').length)
+const hasMoreItems = computed(() => hasMoreWorkspace.value || hasMoreLegacy.value)
 
 const formattedTimer = computed(() => {
   const mins = Math.floor(recordingSeconds.value / 60)
@@ -529,6 +551,53 @@ function detailHeading(item: NapkinItem) {
 function formatDetailMeta(item: NapkinItem) {
   const sourceLabel = item.audioUrl || item.source === 'voice' ? 'Voice note' : 'Typed note'
   return `${sourceLabel} · ${formatDate(item.createdAt)}`
+}
+
+function mergeLocalNapkinLists(...lists: NapkinItem[][]) {
+  const merged = new Map<string, NapkinItem>()
+  for (const list of lists) {
+    for (const item of list || []) {
+      const key = `${item.workspaceId || 'legacy'}:${item.id}`
+      if (!merged.has(key)) merged.set(key, item)
+      else merged.set(key, { ...merged.get(key), ...item })
+    }
+  }
+  return Array.from(merged.values()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+}
+
+function syncMergedItems() {
+  items.value = mergeLocalNapkinLists(liveItems.value, olderItems.value)
+}
+
+function resetPaginationState() {
+  liveItems.value = []
+  olderItems.value = []
+  items.value = []
+  nextWorkspaceCursor.value = null
+  nextLegacyCursor.value = null
+  hasMoreWorkspace.value = false
+  hasMoreLegacy.value = false
+  loadingMore.value = false
+}
+
+function applyPageInfo(pageInfo?: NapkinPageInfo | null) {
+  if (!pageInfo) return
+  nextWorkspaceCursor.value = pageInfo.workspaceCursor
+  nextLegacyCursor.value = pageInfo.legacyCursor
+  hasMoreWorkspace.value = pageInfo.hasMoreWorkspace
+  hasMoreLegacy.value = pageInfo.hasMoreLegacy
+}
+
+function patchLocalItem(itemId: string, updater: (item: NapkinItem) => NapkinItem) {
+  liveItems.value = liveItems.value.map((entry) => (entry.id === itemId ? updater(entry) : entry))
+  olderItems.value = olderItems.value.map((entry) => (entry.id === itemId ? updater(entry) : entry))
+  syncMergedItems()
+}
+
+function removeLocalItem(itemId: string) {
+  liveItems.value = liveItems.value.filter((entry) => entry.id !== itemId)
+  olderItems.value = olderItems.value.filter((entry) => entry.id !== itemId)
+  syncMergedItems()
 }
 
 function syncLayoutMode() {
@@ -709,15 +778,11 @@ async function saveEdit() {
       },
       item.workspaceId,
     )
-    items.value = items.value.map((entry) =>
-      entry.id === item.id
-        ? {
-            ...entry,
-            text: nextText,
-            metadata: nextMetadata,
-          }
-        : entry,
-    )
+    patchLocalItem(item.id, (entry) => ({
+      ...entry,
+      text: nextText,
+      metadata: nextMetadata,
+    }))
     cancelEdit()
     ElMessage.success('Note updated')
   } catch (err: any) {
@@ -832,7 +897,7 @@ async function confirmDelete() {
   deleting.value = true
   try {
     await deleteNapkinItem(item.id, item.workspaceId)
-    items.value = items.value.filter((entry) => entry.id !== item.id)
+    removeLocalItem(item.id)
     if (!isTwoPane.value) detailOpen.value = false
     if (selectedItemId.value === item.id) {
       selectedItemId.value = null
@@ -850,14 +915,20 @@ async function confirmDelete() {
 function subscribe() {
   loading.value = true
   napkinError.value = ''
+  resetPaginationState()
   try {
     unsubscribe = subscribeToNapkinItems(
-      (list) => {
-        items.value = list
+      (list, pageInfo) => {
+        liveItems.value = list
+        if (!olderItems.value.length) {
+          applyPageInfo(pageInfo)
+        }
+        syncMergedItems()
         loading.value = false
         napkinError.value = ''
       },
       {
+        pageSize: NAPKIN_PAGE_SIZE,
         onError: () => {
           if (!items.value.length) {
             napkinError.value = 'Napkin feed is unavailable right now. Showing the last saved items if possible.'
@@ -870,6 +941,27 @@ function subscribe() {
     console.warn('[napkin] subscribe failed', err?.message || err)
     napkinError.value = 'Unable to load napkin stream.'
     loading.value = false
+  }
+}
+
+async function loadMoreNapkin() {
+  if (loadingMore.value || !hasMoreItems.value) return
+  loadingMore.value = true
+  try {
+    const page = await fetchNapkinItemsPage({
+      workspaceId: workspaceStore.activeWorkspaceId,
+      pageSize: NAPKIN_PAGE_SIZE,
+      workspaceCursor: nextWorkspaceCursor.value,
+      legacyCursor: nextLegacyCursor.value,
+    })
+    olderItems.value = mergeLocalNapkinLists(olderItems.value, page.items)
+    applyPageInfo(page.pageInfo)
+    syncMergedItems()
+  } catch (err: any) {
+    console.warn('[napkin] load more failed', err?.message || err)
+    ElMessage.error(err?.message || 'Unable to load older notes')
+  } finally {
+    loadingMore.value = false
   }
 }
 
@@ -922,6 +1014,38 @@ onBeforeUnmount(() => {
 <style scoped>
 .napkin-page {
   overflow-x: hidden;
+}
+
+.napkin-list-footer {
+  display: flex;
+  justify-content: center;
+  padding-top: 0.75rem;
+}
+
+.napkin-load-more-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 13rem;
+  padding: 0.8rem 1.15rem;
+  border-radius: 999px;
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  background: rgba(15, 23, 42, 0.72);
+  color: #e2e8f0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  transition: border-color 0.2s ease, transform 0.2s ease, background 0.2s ease;
+}
+
+.napkin-load-more-btn:hover:not(:disabled) {
+  border-color: rgba(129, 140, 248, 0.6);
+  background: rgba(49, 46, 129, 0.55);
+  transform: translateY(-1px);
+}
+
+.napkin-load-more-btn:disabled {
+  cursor: wait;
+  opacity: 0.7;
 }
 
 .chip {

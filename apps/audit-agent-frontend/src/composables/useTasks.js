@@ -8,6 +8,8 @@ import {
   addTaskToFirebase,
   deleteTaskFromFirebase,
   fetchAllTasksForWorkspace,
+  fetchTasksBetween,
+  fetchTasksByDate,
   fetchTasksForToday,
   fetchUnfinishedTasksBefore,
   moveTasksToDate,
@@ -26,6 +28,7 @@ let refreshListenerAttached = false
 let workspaceWatchAttached = false
 let authWatchAttached = false
 let refreshPromise = null
+const scopedLoadPromises = new Map()
 let lastRolloverKey = null
 
 function makeTodayKey() {
@@ -127,6 +130,10 @@ export function useTasks() {
     return base.map((task) => normalizeTask(task)).filter(Boolean)
   }
 
+  function normalizeAndSort(raw) {
+    return sortTasks(normalizeList(uniqueById(raw)))
+  }
+
   function isCurrentWorkspaceTask(taskOrWorkspaceId) {
     const activeWorkspaceId = normalizeWorkspaceId(workspaceStore?.activeWorkspaceId)
     if (!activeWorkspaceId) return true
@@ -223,8 +230,38 @@ export function useTasks() {
     tasks.value = applyFilters(allTasks.value, activeFilter.value)
   }
 
+  function matchesScopedFilter(task, filter) {
+    const opts = { ...makeDefaultFilter(), ...(filter || {}) }
+    const planned = getTaskPlannedDate(task)
+    if (!planned) return false
+
+    if (opts.dateFilter === 'today' || opts.dateFilter === 'tomorrow') {
+      return planned === (opts.startDate || makeTodayKey())
+    }
+
+    if (opts.dateFilter === 'range' || opts.dateFilter === 'custom') {
+      const start = opts.startDate || makeTodayKey()
+      const end = opts.endDate || start
+      return planned >= start && planned <= end
+    }
+
+    if (opts.dateFilter === 'overdue') {
+      const cutoff = opts.endDate || opts.startDate || makeTodayKey()
+      return planned < cutoff && !task?.completed
+    }
+
+    return false
+  }
+
+  function replaceScopedTasksInCache(rawTasks, filter) {
+    const nextScopedTasks = normalizeAndSort(rawTasks)
+    const retained = allTasks.value.filter((task) => !matchesScopedFilter(task, filter))
+    allTasks.value = sortTasks(uniqueById([...retained, ...nextScopedTasks]))
+    return nextScopedTasks
+  }
+
   async function refreshAllTasks(force = false) {
-    if (refreshPromise && !force) return refreshPromise
+    if (refreshPromise) return refreshPromise
     refreshPromise = (async () => {
       // Prefer a single fetch of all tasks for the workspace; fall back to today if needed.
       // If both reads fail on mobile, keep the current in-memory task cache instead of
@@ -243,11 +280,11 @@ export function useTasks() {
       }
 
       if (Array.isArray(raw)) {
-        allTasks.value = sortTasks(normalizeList(uniqueById(raw)))
+        allTasks.value = normalizeAndSort(raw)
       } else if (!previousTasks.length) {
         allTasks.value = []
       } else {
-        allTasks.value = sortTasks(normalizeList(uniqueById(previousTasks)))
+        allTasks.value = normalizeAndSort(previousTasks)
       }
 
       syncFiltered()
@@ -266,15 +303,55 @@ export function useTasks() {
    */
   async function loadTasks(filterOverrides = {}) {
     const today = makeTodayKey()
+    const tomorrowDate = new Date()
+    tomorrowDate.setDate(tomorrowDate.getDate() + 1)
+    const tomorrow = toLocalDateKey(tomorrowDate)
+    const requestedDateFilter = filterOverrides?.dateFilter || 'today'
     const baseFilter = {
       ...makeDefaultFilter(),
       ...filterOverrides,
-      dateFilter: filterOverrides?.dateFilter || 'today',
-      startDate: filterOverrides?.startDate || today,
-      endDate: filterOverrides?.endDate || filterOverrides?.startDate || today,
+      dateFilter: requestedDateFilter,
+      startDate: filterOverrides?.startDate || (requestedDateFilter === 'tomorrow' ? tomorrow : today),
+      endDate:
+        filterOverrides?.endDate ||
+        filterOverrides?.startDate ||
+        (requestedDateFilter === 'tomorrow' ? tomorrow : today),
     }
-    await refreshAllTasks(true)
-    syncFiltered(baseFilter)
+    const loadKey = JSON.stringify({
+      workspaceId: normalizeWorkspaceId(workspaceStore?.activeWorkspaceId),
+      ...baseFilter,
+    })
+    if (scopedLoadPromises.has(loadKey)) return scopedLoadPromises.get(loadKey)
+
+    const loadPromise = (async () => {
+      let raw = null
+      if (baseFilter.dateFilter === 'today') {
+        raw = await fetchTasksForToday()
+      } else if (baseFilter.dateFilter === 'tomorrow') {
+        raw = await fetchTasksByDate(baseFilter.startDate)
+      } else if (baseFilter.dateFilter === 'overdue') {
+        raw = await fetchUnfinishedTasksBefore(baseFilter.endDate || baseFilter.startDate || today)
+      } else if (baseFilter.dateFilter === 'range' || baseFilter.dateFilter === 'custom') {
+        raw = await fetchTasksBetween(baseFilter.startDate, baseFilter.endDate)
+      } else {
+        await refreshAllTasks()
+        syncFiltered(baseFilter)
+        return tasks.value
+      }
+
+      const scopedTasks = replaceScopedTasksInCache(raw, baseFilter)
+      activeFilter.value = { ...baseFilter }
+      tasks.value = applyFilters(scopedTasks, baseFilter)
+      initialized = true
+      return tasks.value
+    })()
+
+    scopedLoadPromises.set(loadKey, loadPromise)
+    try {
+      return await loadPromise
+    } finally {
+      scopedLoadPromises.delete(loadKey)
+    }
   }
 
   function mergeTasksLocally(taskEntries = []) {
@@ -489,10 +566,10 @@ export function useTasks() {
         completed: options.completed ?? false,
         previousDate: options.previousDate,
       })
-      await refreshAllTasks(true)
+      await refreshAllTasks()
     } catch (err) {
       console.warn('[useTasks] moveTasks failed', err?.message || err)
-      await refreshAllTasks(true)
+      await refreshAllTasks()
       throw err
     }
   }
@@ -558,7 +635,7 @@ export function useTasks() {
 
         if (incomingTasks.length && mergeTasksLocally(incomingTasks)) return
 
-        refreshAllTasks(true)
+        refreshAllTasks()
           .then(() => syncFiltered())
           .catch((err) => console.warn('[useTasks] refresh failed', err?.message || err))
       })
@@ -599,11 +676,13 @@ export function useTasks() {
             initialized = false
             return
           }
-          initialized = false
-          await refreshAllTasks(true).catch((err) =>
+          if (initialized) {
+            syncFiltered()
+            return
+          }
+          await loadTasks(activeFilter.value).catch((err) =>
             console.warn('[useTasks] auth refresh failed', err?.message || err),
           )
-          syncFiltered()
         },
         { immediate: true },
       )

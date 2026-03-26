@@ -173,9 +173,9 @@ import EmptyState from '@/components/EmptyState.vue'
 import { resolveReminderLink } from '@/utils/taskLinks'
 import { resolveTaskMeetingLink } from '@/utils/taskLinks'
 import { toUtcIso } from '@/utils/time'
-import { useTasks } from '@/composables/useTasks'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
+import { fetchTasksBetween, fetchTasksByDate } from '@/services/firebaseService'
 
 // Time setup
 dayjs.extend(utc)
@@ -198,9 +198,12 @@ const filterMode = ref('Today') // Today | Next7 | Custom
 const authStore = useAuthStore()
 const workspaceStore = useWorkspaceStore()
 const activeWorkspaceId = computed(() => workspaceStore.activeWorkspaceId)
-const { allTasks, refreshAllTasks, getTaskPlannedDate } = useTasks()
 const showPast = ref(false)
 const visibleCount = computed(() => visibleReminders.value.length)
+const reminderTasks = ref([])
+let reminderTaskWindowKey = ''
+let reminderTaskWindowPromise = null
+let reminderTaskWindowToken = 0
 const chipDates = computed(() =>
   Object.keys(groupedReminders.value || {}).filter(
     (d) => d !== 'Today' && d !== 'Next 7 Days' && d !== 'Tomorrow',
@@ -319,6 +322,73 @@ function normalizeReminder(row) {
   }
 }
 
+function resolveReminderTaskWindow() {
+  const today = dayjs().format('YYYY-MM-DD')
+  if (filterMode.value === 'Today') {
+    return { start: today, end: today, key: `today:${today}` }
+  }
+  if (filterMode.value === 'Custom') {
+    const selected = dayjs(customDate.value || today).format('YYYY-MM-DD')
+    return { start: selected, end: selected, key: `custom:${selected}` }
+  }
+  if (filterMode.value === 'Next7') {
+    return {
+      start: today,
+      end: dayjs(today).add(7, 'day').format('YYYY-MM-DD'),
+      key: `next7:${today}`,
+    }
+  }
+  return {
+    start: today,
+    end: dayjs(today).add(7, 'day').format('YYYY-MM-DD'),
+    key: `default:${today}`,
+  }
+}
+
+async function loadReminderTasksWindow({ force = false } = {}) {
+  if (!activeWorkspaceId.value) {
+    reminderTasks.value = []
+    reminderTaskWindowKey = ''
+    return []
+  }
+
+  const windowRange = resolveReminderTaskWindow()
+  const requestKey = windowRange.key
+
+  if (!force && requestKey === reminderTaskWindowKey && reminderTaskWindowPromise) {
+    return reminderTaskWindowPromise
+  }
+
+  reminderTaskWindowKey = requestKey
+  const requestId = ++reminderTaskWindowToken
+  const request =
+    windowRange.start === windowRange.end
+      ? fetchTasksByDate(windowRange.start)
+      : fetchTasksBetween(windowRange.start, windowRange.end)
+
+  const trackedRequest = Promise.resolve(request)
+    .then((rows) => {
+      if (requestId === reminderTaskWindowToken) {
+        reminderTasks.value = Array.isArray(rows) ? rows : []
+      }
+      return Array.isArray(rows) ? rows : []
+    })
+    .catch((error) => {
+      if (requestId === reminderTaskWindowToken) {
+        reminderTasks.value = []
+      }
+      throw error
+    })
+    .finally(() => {
+      if (reminderTaskWindowPromise === trackedRequest) {
+        reminderTaskWindowPromise = null
+      }
+    })
+
+  reminderTaskWindowPromise = trackedRequest
+  return trackedRequest
+}
+
 function formatDualTime(iso) {
   const d = toJsDate(iso)
   if (!d) return ''
@@ -394,7 +464,7 @@ function deriveReminderIsoFromTask(task, tz) {
 
 const fallbackTaskReminders = computed(() => {
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
-  const tasks = Array.isArray(allTasks.value) ? allTasks.value : []
+  const tasks = Array.isArray(reminderTasks.value) ? reminderTasks.value : []
   return tasks
     .map((t) => {
       const iso = deriveReminderIsoFromTask(t, zone)
@@ -428,7 +498,7 @@ function mergeReminders(primary = [], fallback = []) {
   return Array.from(map.values())
 }
 
-async function loadReminders() {
+async function loadReminders({ reloadTasks = false, forceTaskWindow = false } = {}) {
   const uid = authStore?.user?.uid || auth?.currentUser?.uid || localStorage.getItem('uid')
   if (!uid) {
     reminders.value = []
@@ -438,6 +508,9 @@ async function loadReminders() {
   }
   loading.value = true
   try {
+    if (reloadTasks || !reminderTaskWindowKey) {
+      await loadReminderTasksWindow({ force: forceTaskWindow })
+    }
     const { data } = await api.get('/reminders', {
       params: { userId: uid, workspaceId: activeWorkspaceId.value || undefined },
     })
@@ -504,13 +577,12 @@ async function onSnooze(r) {
 }
 
 onMounted(() => {
-  (async () => {
+  ;(async () => {
     await Promise.allSettled([
-      refreshAllTasks(true),
-      loadReminders(),
+      loadReminders({ reloadTasks: true, forceTaskWindow: true }),
       fetchUsage(),
     ])
-    refreshTimer = setInterval(loadReminders, 60 * 1000)
+    refreshTimer = setInterval(() => loadReminders(), 60 * 1000)
   })()
 })
 onUnmounted(() => {
@@ -524,31 +596,47 @@ onUnmounted(() => {
 onMounted(() => {
   try {
     window.addEventListener('usage-refresh', fetchUsage)
-    window.addEventListener('usage-refresh', loadReminders)
+    window.addEventListener('usage-refresh', handleReminderUsageRefresh)
   } catch {}
 })
 onUnmounted(() => {
   try {
     window.removeEventListener('usage-refresh', fetchUsage)
-    window.removeEventListener('usage-refresh', loadReminders)
+    window.removeEventListener('usage-refresh', handleReminderUsageRefresh)
   } catch {}
 })
+
+async function handleReminderUsageRefresh() {
+  await loadReminders({ reloadTasks: true, forceTaskWindow: true })
+}
 
 watch(
   () => authStore?.user?.uid,
   (uid) => {
-    if (uid) loadReminders()
+    if (uid) loadReminders({ reloadTasks: true, forceTaskWindow: true })
+    else reminders.value = []
   }
 )
 
 watch(
   activeWorkspaceId,
   async (workspaceId) => {
-    if (!workspaceId) return
-    await Promise.allSettled([
-      refreshAllTasks(true),
-      loadReminders(),
-    ])
+    if (!workspaceId) {
+      reminderTasks.value = []
+      reminders.value = []
+      reminderTaskWindowKey = ''
+      return
+    }
+    await loadReminders({ reloadTasks: true, forceTaskWindow: true })
+  },
+)
+
+watch(
+  [filterMode, customDate],
+  async ([mode, date], [previousMode, previousDate]) => {
+    if (!activeWorkspaceId.value) return
+    if (mode === previousMode && date === previousDate) return
+    await loadReminders({ reloadTasks: true, forceTaskWindow: true })
   },
 )
 

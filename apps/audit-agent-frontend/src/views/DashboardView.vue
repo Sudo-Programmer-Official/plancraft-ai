@@ -1257,8 +1257,8 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { collection, onSnapshot, updateDoc, doc, query, where, serverTimestamp, getDocs } from 'firebase/firestore'
-import { db, auth } from '@/firebase/init'
+import { updateDoc, doc, serverTimestamp } from 'firebase/firestore'
+import { auth } from '@/firebase/init'
 import { onAuthStateChanged } from 'firebase/auth'
 import { toLocalDateKey, parseLocalDateKey } from '@/utils/dateHelper'
 import { summarizeTasks } from '@/services/aiService'
@@ -1282,7 +1282,6 @@ import { getReminderStatus, scheduleReminder } from '@/services/reminderService'
 import { listReports, generateReport } from '@/services/reportsService'
 import api from '@/services/api'
 import { getPreferences as getUserPreferences, updateOnboardingStatus } from '@/services/settingsService'
-import { isIosPackagedApp } from '@/utils/nativeAuthSupport'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { ElMessage, ElNotification } from 'element-plus'
 import { TASK_CATEGORY_FILTERS, getCategoryIcon, getCategoryColor, resolveCategory } from '@/constants/taskCategories'
@@ -2683,37 +2682,15 @@ watch(
   },
 )
 
-const unsubscribe = ref(null)
 let activeTaskListenerKey = null
-let nativeTaskSeedPromise = null
+let dashboardTaskSeedPromise = null
 let authStateStop = null
-
-function tasksCollection() {
-  return collection(db, 'tasks')
-}
-
-function handleTaskSnapshot(snapshot) {
-  const userTasks = snapshot.docs.map((docSnap) => {
-    const data = docSnap.data()
-    return {
-      id: docSnap.id,
-      ...data,
-      category: resolveCategory(data?.category),
-      date: typeof data.date === 'string' ? data.date : toYMD(data.date?.toDate?.() || data.date),
-      createdAt: data.createdAt?.toMillis?.() || data.createdAt || 0,
-    }
-  })
-  syncDashboardTaskBuckets(userTasks)
-  dashboardTasksLoading.value = false
-}
 
 async function attachTaskListener(user) {
   const effectiveUser = user || auth.currentUser || authStore?.user || null
   if (!effectiveUser?.uid) {
-    if (unsubscribe.value) unsubscribe.value()
-    unsubscribe.value = null
     activeTaskListenerKey = null
-    nativeTaskSeedPromise = null
+    dashboardTaskSeedPromise = null
     syncDashboardTaskBuckets([])
     dashboardTasksLoading.value = false
     return
@@ -2737,39 +2714,19 @@ async function attachTaskListener(user) {
   const nextKey = `${effectiveUser.uid}:${wsId}:${packagedNative ? 'native' : 'web'}`
 
   if (activeTaskListenerKey === nextKey) {
-    if (!packagedNative && unsubscribe.value) return
-    if (packagedNative && (nativeTaskSeedPromise || !dashboardTasksLoading.value)) return
+    if (dashboardTaskSeedPromise || !dashboardTasksLoading.value) return
   }
 
-  if (unsubscribe.value) unsubscribe.value()
-  unsubscribe.value = null
   activeTaskListenerKey = nextKey
   dashboardTasksLoading.value = true
-
-  if (packagedNative) {
-    nativeTaskSeedPromise = refreshAllTasks(true)
-    const seeded = await nativeTaskSeedPromise.then(() => true).catch(() => false)
-    nativeTaskSeedPromise = null
-    if (seeded) syncDashboardTaskBuckets(allTasks.value)
-    dashboardTasksLoading.value = false
-    return
-  }
-  const tasksQuery = query(tasksCollection(), where('workspaceId', '==', wsId))
-  try {
-    unsubscribe.value = onSnapshot(tasksQuery, async (snapshot) => {
-      handleTaskSnapshot(snapshot)
-    }, async (error) => {
-      console.warn('Live tasks listener failed; falling back to one-time load', error?.message || error)
-      const seeded = await refreshAllTasks(true).then(() => true).catch(() => false)
-      if (seeded) syncDashboardTaskBuckets(allTasks.value)
-      dashboardTasksLoading.value = false
-    })
-  } catch (error) {
-    console.warn('Live tasks listener failed; falling back to one-time load', error?.message || error)
-    const seeded = await refreshAllTasks(true).then(() => true).catch(() => false)
-    if (seeded) syncDashboardTaskBuckets(allTasks.value)
-    dashboardTasksLoading.value = false
-  }
+  dashboardTaskSeedPromise = refreshAllTasks()
+  const seeded = await dashboardTaskSeedPromise.then(() => true).catch((error) => {
+    console.warn('Dashboard task refresh failed', error?.message || error)
+    return false
+  })
+  dashboardTaskSeedPromise = null
+  if (seeded) syncDashboardTaskBuckets(allTasks.value)
+  dashboardTasksLoading.value = false
 }
 
 watch(activeWorkspaceId, () => {
@@ -2777,7 +2734,6 @@ watch(activeWorkspaceId, () => {
 })
 
 onUnmounted(() => {
-  if (unsubscribe.value) unsubscribe.value()
   if (authStateStop) {
     try {
       authStateStop()

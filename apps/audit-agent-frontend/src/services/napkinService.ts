@@ -4,10 +4,12 @@ import {
   deleteDoc,
   getDocs,
   doc,
+  limit,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
+  startAfter,
   updateDoc,
   type DocumentData,
   type FirestoreError,
@@ -55,12 +57,30 @@ export type NapkinItem = {
 type NapkinSubscribeOptions = {
   onError?: (error: Error | FirestoreError) => void
   workspaceId?: string | null
+  pageSize?: number
   /**
    * Fallback to a one-time fetch if the live listener fails.
    * Defaults to true so the UI still has something to render.
    */
   fallback?: boolean
 }
+
+export type NapkinPageInfo = {
+  workspaceCursor: QueryDocumentSnapshot<DocumentData> | null
+  legacyCursor: QueryDocumentSnapshot<DocumentData> | null
+  hasMoreWorkspace: boolean
+  hasMoreLegacy: boolean
+  pageSize: number
+}
+
+type NapkinPageRequest = {
+  workspaceId?: string | null
+  pageSize?: number
+  workspaceCursor?: QueryDocumentSnapshot<DocumentData> | null
+  legacyCursor?: QueryDocumentSnapshot<DocumentData> | null
+}
+
+const DEFAULT_NAPKIN_PAGE_SIZE = 40
 
 type CreateNapkinPayload = {
   text: string
@@ -150,6 +170,24 @@ function parseJson(text: string) {
   } catch {
     return null
   }
+}
+
+function normalizePageSize(value?: number) {
+  const raw = Number(value)
+  if (!Number.isFinite(raw)) return DEFAULT_NAPKIN_PAGE_SIZE
+  return Math.max(10, Math.min(Math.trunc(raw), 100))
+}
+
+function buildNapkinQuery(
+  uid: string,
+  workspaceId: string | null | undefined,
+  pageSize: number,
+  cursor?: QueryDocumentSnapshot<DocumentData> | null,
+) {
+  const clauses: any[] = [orderBy('createdAt', 'desc')]
+  if (cursor) clauses.push(startAfter(cursor))
+  clauses.push(limit(pageSize))
+  return query(napkinCollection(uid, workspaceId), ...clauses)
 }
 
 function heuristicClassification(text: string): NapkinClassification {
@@ -313,19 +351,33 @@ export async function deleteNapkinItem(id: string, workspaceId?: string | null) 
   await deleteDoc(ref)
 }
 
-export function subscribeToNapkinItems(onChange: (items: NapkinItem[]) => void, options: NapkinSubscribeOptions = {}) {
+export function subscribeToNapkinItems(
+  onChange: (items: NapkinItem[], pageInfo?: NapkinPageInfo) => void,
+  options: NapkinSubscribeOptions = {},
+) {
   const uid = userIdOrThrow()
   const wsId = options.workspaceId !== undefined ? options.workspaceId : currentWorkspaceId()
   const allowFallback = options.fallback !== false
+  const pageSize = normalizePageSize(options.pageSize)
   let workspaceItems: NapkinItem[] = []
   let legacyItems: NapkinItem[] = []
+  let workspaceCursor: QueryDocumentSnapshot<DocumentData> | null = null
+  let legacyCursor: QueryDocumentSnapshot<DocumentData> | null = null
+  let hasMoreWorkspace = false
+  let hasMoreLegacy = false
   const unsubs: Array<() => void> = []
   let closed = false
   let errored = false
 
   const emitCombined = () => {
     if (closed) return
-    onChange(mergeNapkinItems([workspaceItems, legacyItems]))
+    onChange(mergeNapkinItems([workspaceItems, legacyItems]), {
+      workspaceCursor,
+      legacyCursor,
+      hasMoreWorkspace,
+      hasMoreLegacy,
+      pageSize,
+    })
   }
 
   const stopListeners = () => {
@@ -353,8 +405,8 @@ export function subscribeToNapkinItems(onChange: (items: NapkinItem[]) => void, 
     stopListeners()
     if (allowFallback) {
       try {
-        const fallbackItems = await fetchNapkinItemsOnce(wsId)
-        if (!closed) onChange(fallbackItems)
+        const fallbackPage = await fetchNapkinItemsPage({ workspaceId: wsId, pageSize })
+        if (!closed) onChange(fallbackPage.items, fallbackPage.pageInfo)
       } catch (err) {
         options.onError?.(err as Error)
       }
@@ -363,11 +415,13 @@ export function subscribeToNapkinItems(onChange: (items: NapkinItem[]) => void, 
 
   // Active workspace feed
   if (wsId) {
-    const q = query(napkinCollection(uid, wsId), orderBy('createdAt', 'desc'))
+    const q = buildNapkinQuery(uid, wsId, pageSize)
     const unsubWs = onSnapshot(
       q,
       (snapshot) => {
         workspaceItems = snapshot.docs.map(mapNapkinDoc)
+        workspaceCursor = snapshot.docs[snapshot.docs.length - 1] || null
+        hasMoreWorkspace = snapshot.size === pageSize
         emitCombined()
       },
       handleSnapshotError,
@@ -376,11 +430,13 @@ export function subscribeToNapkinItems(onChange: (items: NapkinItem[]) => void, 
   }
 
   // Legacy/global feed for backwards compatibility
-  const legacyQuery = query(napkinCollection(uid, null), orderBy('createdAt', 'desc'))
+  const legacyQuery = buildNapkinQuery(uid, null, pageSize)
   const unsubLegacy = onSnapshot(
     legacyQuery,
     (snapshot) => {
       legacyItems = snapshot.docs.map(mapNapkinDoc)
+      legacyCursor = snapshot.docs[snapshot.docs.length - 1] || null
+      hasMoreLegacy = snapshot.size === pageSize
       emitCombined()
     },
     (error: FirestoreError) => {
@@ -388,6 +444,8 @@ export function subscribeToNapkinItems(onChange: (items: NapkinItem[]) => void, 
       if (error?.code === 'permission-denied') {
         console.warn('[napkin] legacy subscription permission denied; skipping legacy feed')
         legacyItems = []
+        legacyCursor = null
+        hasMoreLegacy = false
         emitCombined()
         return
       }
@@ -432,29 +490,37 @@ function mergeNapkinItems(lists: NapkinItem[][]) {
   return Array.from(merged.values()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
 }
 
-export async function fetchNapkinItemsOnce(workspaceId?: string | null): Promise<NapkinItem[]> {
+export async function fetchNapkinItemsPage(request: NapkinPageRequest = {}): Promise<{ items: NapkinItem[]; pageInfo: NapkinPageInfo }> {
   const uid = userIdOrThrow()
-  const wsId = workspaceId !== undefined ? workspaceId : currentWorkspaceId()
+  const wsId = request.workspaceId !== undefined ? request.workspaceId : currentWorkspaceId()
+  const pageSize = normalizePageSize(request.pageSize)
   const lists: NapkinItem[][] = []
   let workspaceError: Error | null = null
   let legacyError: FirestoreError | null = null
+  let workspaceCursor = request.workspaceCursor || null
+  let legacyCursor = request.legacyCursor || null
+  let hasMoreWorkspace = false
+  let hasMoreLegacy = false
 
   if (wsId) {
     try {
-      const snapshot = await getDocs(query(napkinCollection(uid, wsId), orderBy('createdAt', 'desc')))
+      const snapshot = await getDocs(buildNapkinQuery(uid, wsId, pageSize, request.workspaceCursor))
       lists.push(snapshot.docs.map(mapNapkinDoc))
+      workspaceCursor = snapshot.docs[snapshot.docs.length - 1] || request.workspaceCursor || null
+      hasMoreWorkspace = snapshot.size === pageSize
     } catch (err) {
       workspaceError = err as Error
     }
   }
 
   try {
-    const legacySnap = await getDocs(query(napkinCollection(uid, null), orderBy('createdAt', 'desc')))
+    const legacySnap = await getDocs(buildNapkinQuery(uid, null, pageSize, request.legacyCursor))
     lists.push(legacySnap.docs.map(mapNapkinDoc))
+    legacyCursor = legacySnap.docs[legacySnap.docs.length - 1] || request.legacyCursor || null
+    hasMoreLegacy = legacySnap.size === pageSize
   } catch (err) {
     const error = err as FirestoreError
     legacyError = error
-    // Many users no longer have access to the legacy path; ignore permission errors there.
     if (error?.code !== 'permission-denied') {
       if (!lists.length) throw error
     }
@@ -463,5 +529,19 @@ export async function fetchNapkinItemsOnce(workspaceId?: string | null): Promise
   if (!lists.length && workspaceError) throw workspaceError
   if (!lists.length && legacyError) throw legacyError
 
-  return mergeNapkinItems(lists)
+  return {
+    items: mergeNapkinItems(lists),
+    pageInfo: {
+      workspaceCursor,
+      legacyCursor,
+      hasMoreWorkspace,
+      hasMoreLegacy,
+      pageSize,
+    },
+  }
+}
+
+export async function fetchNapkinItemsOnce(workspaceId?: string | null): Promise<NapkinItem[]> {
+  const page = await fetchNapkinItemsPage({ workspaceId })
+  return page.items
 }
