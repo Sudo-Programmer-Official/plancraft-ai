@@ -1522,13 +1522,21 @@ body {
 #app {
   display: flex;
   flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
 }
 
 .app-shell {
   --desktop-sidebar-width: 18rem;
+  flex: 1 1 auto;
+  height: 100%;
   height: 100vh;
   height: 100dvh;
   height: -webkit-fill-available;
+  min-height: 100vh;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
   min-height: 0;
   width: 100%;
   overflow: hidden;
@@ -1537,11 +1545,12 @@ body {
 }
 
 .app-main-pane {
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
   height: 100%;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
 }
 
@@ -1616,6 +1625,7 @@ body {
 }
 
 .app-content {
+  flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
