@@ -7,6 +7,7 @@ import { toLocalDateKey } from '@/utils/dateHelper'
 import {
   addTaskToFirebase,
   deleteTaskFromFirebase,
+  ensureRecurringNextTask,
   fetchAllTasksForWorkspace,
   fetchTasksBetween,
   fetchTasksByDate,
@@ -461,6 +462,7 @@ export function useTasks() {
    * ✅ Toggle completion
    */
   async function toggleComplete(task) {
+    const wasCompleted = !!task?.completed
     try {
       task.completed = !task.completed
       await updateTaskInFirebase(task)
@@ -468,13 +470,21 @@ export function useTasks() {
         uniqueById(allTasks.value.map((t) => (t.id === task.id ? normalizeTask(task) : t))),
       )
       syncFiltered()
-      if (task.completed) {
+      if (!wasCompleted && task.completed) {
         try {
           const hour = new Date().getHours()
           const completion_time = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
           trackEvent('Task Completed', { taskId: task.id, completion_time })
         } catch (e) {
           console.warn('analytics: Task Completed track failed', e)
+        }
+        try {
+          await ensureRecurringNextTask(task)
+        } catch (recurrenceError) {
+          console.warn('Recurring task advance failed:', recurrenceError?.message || recurrenceError)
+          try {
+            ElMessage.warning('Task completed, but the next recurring task could not be created.')
+          } catch {}
         }
       }
     } catch (err) {

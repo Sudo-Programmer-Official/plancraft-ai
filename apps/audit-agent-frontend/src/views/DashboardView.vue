@@ -5,7 +5,7 @@
   </div>
   <main
     v-else
-    class="min-h-screen px-2 py-6 sm:px-4 md:px-6 pb-12 transition-colors max-w-7xl mx-auto flex flex-col gap-6 lg:gap-8"
+    class="min-h-screen w-full min-w-0 max-w-7xl mx-auto overflow-x-hidden px-2 py-6 pb-12 transition-colors sm:px-4 md:px-6 flex flex-col gap-6 lg:gap-8"
   >
     <GuestBanner :isGuest="authStore.guest" class="order-1" @login="redirectToLogin" />
 
@@ -37,7 +37,7 @@
     <!-- Tier 1 · Overview -->
     <section class="space-y-4 order-3">
       <div class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4">
-        <div class="dashboard-card greeting-card space-y-4">
+        <div class="dashboard-card greeting-card max-w-full min-w-0 space-y-4">
           <div>
             <p class="text-xs sm:text-sm uppercase tracking-widest text-indigo-300/80">
               Your companion workspace
@@ -75,13 +75,13 @@
           </div>
 
           <div
-            class="now-bar rounded-xl bg-indigo-900/40 border border-indigo-700/40 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+            class="now-bar max-w-full min-w-0 rounded-xl bg-indigo-900/40 border border-indigo-700/40 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
           >
-            <div class="flex items-center gap-2 text-slate-200">
+            <div class="flex min-w-0 items-center gap-2 text-slate-200">
               <span class="text-xl">🕐</span>
               <span class="font-medium text-sm sm:text-base">Current Focus</span>
             </div>
-            <div class="text-indigo-200 text-sm sm:text-base font-medium">
+            <div class="min-w-0 break-words text-indigo-200 text-sm sm:text-base font-medium">
               {{ currentFocusTask?.title || "All caught up — take a mindful pause." }}
             </div>
           </div>
@@ -230,7 +230,7 @@
       v-if="showDaily"
       class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-3"
     >
-        <div class="dashboard-card daily-card space-y-5" :class="{ 'daily-card--fullscreen': isTodayFullscreen }">
+        <div class="dashboard-card daily-card max-w-full min-w-0 space-y-5" :class="{ 'daily-card--fullscreen': isTodayFullscreen }">
           <div class="daily-card__header">
             <div class="daily-card__heading">
               <div class="focus-date-row flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap w-full">
@@ -242,25 +242,37 @@
                 >
                   <span class="text-lg leading-none" aria-hidden="true">📅</span>
                 </button>
-                <div class="focus-date-pill flex w-full sm:w-auto flex-1 sm:flex-none items-center gap-1 rounded-xl bg-slate-800/60 border border-slate-700/50 px-1 py-0.5 min-w-0">
+                <div class="focus-date-main">
+                  <div class="focus-date-pill flex w-full sm:w-auto flex-1 sm:flex-none items-center gap-1 rounded-xl bg-slate-800/60 border border-slate-700/50 px-1 py-0.5 min-w-0">
+                    <button
+                      type="button"
+                      class="p-1.5 rounded-md text-slate-300 hover:bg-slate-700/60 hover:text-slate-100 transition"
+                      aria-label="Previous day"
+                      @click="prevFocusDay"
+                    >
+                      <span class="text-sm font-medium">&lt;</span>
+                    </button>
+                    <span class="px-2 py-1 text-sm font-medium text-slate-100 min-w-0 flex-1 text-center truncate max-w-[180px] sm:max-w-none">
+                      {{ focusDateLabel }}
+                    </span>
+                    <button
+                      type="button"
+                      class="p-1.5 rounded-md text-slate-300 hover:bg-slate-700/60 hover:text-slate-100 transition"
+                      aria-label="Next day"
+                      @click="nextFocusDay"
+                    >
+                      <span class="text-sm font-medium">&gt;</span>
+                    </button>
+                  </div>
                   <button
                     type="button"
-                    class="p-1.5 rounded-md text-slate-300 hover:bg-slate-700/60 hover:text-slate-100 transition"
-                    aria-label="Previous day"
-                    @click="prevFocusDay"
+                    class="today-fullscreen-btn today-fullscreen-btn--inline"
+                    :aria-pressed="isTodayFullscreen"
+                    :title="isTodayFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'"
+                    @click="toggleTodayFullscreen"
                   >
-                    <span class="text-sm font-medium">&lt;</span>
-                  </button>
-                  <span class="px-2 py-1 text-sm font-medium text-slate-100 min-w-0 flex-1 text-center truncate max-w-[180px] sm:max-w-none">
-                    {{ focusDateLabel }}
-                  </span>
-                  <button
-                    type="button"
-                    class="p-1.5 rounded-md text-slate-300 hover:bg-slate-700/60 hover:text-slate-100 transition"
-                    aria-label="Next day"
-                    @click="nextFocusDay"
-                  >
-                    <span class="text-sm font-medium">&gt;</span>
+                    <span v-if="!isTodayFullscreen">⤢</span>
+                    <span v-else>⤡</span>
                   </button>
                 </div>
                 <button
@@ -276,7 +288,7 @@
             <div class="daily-card__actions">
               <button
                 type="button"
-                class="today-fullscreen-btn"
+                class="today-fullscreen-btn today-fullscreen-btn--desktop"
                 :aria-pressed="isTodayFullscreen"
                 :title="isTodayFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'"
                 @click="toggleTodayFullscreen"
@@ -352,7 +364,7 @@
                 <div
                   v-if="dashboardTasksLoading"
                   :key="`daily-loading-${focusSelectedDate}`"
-                  class="dashboard-task-skeleton-list"
+                  class="dashboard-task-skeleton-list min-w-0"
                   aria-label="Loading tasks"
                 >
                   <div v-for="index in 3" :key="`daily-skeleton-${index}`" class="dashboard-task-skeleton-card">
@@ -372,23 +384,23 @@
                     v-for="task in filteredDaily"
                     :key="task.id"
                   :class="[
-                    'flex items-center justify-between gap-3 p-3 rounded-xl transition border',
+                    'flex max-w-full min-w-0 items-center justify-between gap-3 p-3 rounded-xl transition border',
                     activeTaskId === task.id
                       ? 'bg-indigo-900/60 border-indigo-400/70 shadow-[0_0_12px_rgba(99,102,241,0.35)]'
                       : 'bg-slate-900/70 border-slate-800/80 hover:border-indigo-500/40',
                   ]"
                 >
-                  <div class="flex flex-1 items-start gap-3">
+                  <div class="flex min-w-0 flex-1 items-start gap-3">
                     <input
                       type="checkbox"
                       :checked="task.completed"
                       @change="() => toggleComplete(task)"
                       class="mt-0.5 w-4 h-4 cursor-pointer accent-indigo-500"
                     />
-                    <div class="flex-1 space-y-1">
+                    <div class="min-w-0 flex-1 space-y-1">
                       <div class="flex flex-wrap items-center gap-2">
                         <span
-                          class="font-medium"
+                          class="min-w-0 break-words font-medium"
                           :class="{ 'line-through text-slate-500': task.completed, 'text-slate-100': !task.completed }"
                         >
                           {{ task.title }}
@@ -416,7 +428,7 @@
                       </div>
                     </div>
                   </div>
-                  <div class="flex items-center gap-2">
+                  <div class="flex shrink-0 items-center gap-2">
                     <button
                       v-if="!task.completed"
                       @click.stop="markTaskActive(task)"
@@ -466,7 +478,7 @@
       v-if="showAllTasks"
       class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-5"
     >
-        <div class="dashboard-card all-tasks-card space-y-5">
+        <div class="dashboard-card all-tasks-card max-w-full min-w-0 space-y-5">
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <h3 class="text-lg sm:text-xl font-semibold text-slate-100">
@@ -501,7 +513,7 @@
               </button>
             </div>
 
-            <div class="flex flex-wrap items-center gap-3 p-3 rounded-2xl bg-slate-900/70 border border-slate-800/70">
+            <div class="flex max-w-full min-w-0 flex-wrap items-center gap-3 p-3 rounded-2xl bg-slate-900/70 border border-slate-800/70">
               <label class="flex items-center gap-2 text-xs text-slate-300">
                 <span class="text-slate-400">From</span>
                 <input
@@ -520,7 +532,7 @@
                 />
               </label>
 
-              <div class="flex items-center gap-2 ml-auto flex-wrap sm:flex-nowrap">
+              <div class="ml-auto flex max-w-full min-w-0 flex-wrap items-center gap-2 sm:flex-nowrap">
                 <div class="flex gap-1 bg-slate-800/60 border border-slate-700 rounded-full p-1">
                   <button
                     v-for="status in allTasksStatusOptions"
@@ -545,13 +557,13 @@
                     {{ categoryIcon(cat) }} {{ cat }}
                   </option>
                 </select>
-                <div class="relative">
+                <div class="relative min-w-0 w-full sm:w-auto">
                   <span class="absolute left-2 top-2.5 text-slate-500">🔍</span>
                   <input
                     v-model="allTasksSearch"
                     type="text"
                     placeholder="Search title or notes"
-                    class="pl-7 pr-3 py-2 rounded-lg bg-slate-800/80 border border-slate-700 text-xs text-slate-100 focus:border-indigo-400 focus:outline-none"
+                    class="w-full min-w-0 pl-7 pr-3 py-2 rounded-lg bg-slate-800/80 border border-slate-700 text-xs text-slate-100 focus:border-indigo-400 focus:outline-none"
                   />
                 </div>
               </div>
@@ -603,23 +615,23 @@
                 v-for="task in filteredAllTasks"
                 :key="task.id"
                 :class="[
-                  'p-3 rounded-xl border transition flex justify-between gap-3',
+                  'flex max-w-full min-w-0 justify-between gap-3 rounded-xl border p-3 transition',
                   activeTaskId === task.id
                     ? 'bg-indigo-900/60 border-indigo-500/60 shadow-[0_0_12px_rgba(99,102,241,0.35)]'
                     : 'bg-slate-900/70 border-slate-800/80 hover:border-indigo-500/40',
                 ]"
               >
-                <div class="flex items-start gap-3 flex-1">
+                <div class="flex min-w-0 flex-1 items-start gap-3">
                   <input
                     type="checkbox"
                     :checked="task.completed"
                     @change="() => toggleComplete(task)"
                     class="mt-1 w-4 h-4 cursor-pointer accent-indigo-500"
                   />
-                  <div class="space-y-1">
+                  <div class="min-w-0 space-y-1">
                     <div class="flex flex-wrap items-center gap-2">
                       <span
-                        class="font-medium"
+                        class="min-w-0 break-words font-medium"
                         :class="{ 'line-through text-slate-500': task.completed, 'text-slate-100': !task.completed }"
                       >
                         {{ task.title }}
@@ -1257,7 +1269,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { updateDoc, doc, serverTimestamp } from 'firebase/firestore'
 import { auth } from '@/firebase/init'
 import { onAuthStateChanged } from 'firebase/auth'
 import { toLocalDateKey, parseLocalDateKey } from '@/utils/dateHelper'
@@ -1696,7 +1707,7 @@ watch(
 )
 
 /* -------------- Tasks + Journal state -------------- */
-const { allTasks, moveTasks, refreshAllTasks, mergeTasksLocally } = useTasks()
+const { allTasks, moveTasks, refreshAllTasks, mergeTasksLocally, toggleComplete: toggleTaskComplete } = useTasks()
 const aiSummary = ref(null)
 const dailyTasks = ref([])
 const weeklyTasks = ref([])
@@ -2128,16 +2139,9 @@ function formatNapkinDate(ms) {
 }
 
 async function toggleComplete(task) {
-  task.completed = !task.completed
-  if (task.completed && activeTaskId.value === task.id) activeTaskId.value = null
-  const patch = { completed: task.completed }
-  if (task.completed) patch.completedAt = serverTimestamp()
-  else patch.completedAt = null
-  try {
-    await updateDoc(doc(db, 'tasks', task.id), patch)
-  } catch (error) {
-    console.warn('Failed to toggle complete:', error)
-  }
+  const wasCompleted = !!task?.completed
+  await toggleTaskComplete(task)
+  if (!wasCompleted && task?.completed && activeTaskId.value === task.id) activeTaskId.value = null
 }
 
 function rotateInsightsOnce() {
@@ -3163,12 +3167,20 @@ onUnmounted(() => {
   border: 1px solid rgba(148, 163, 184, 0.18);
   box-shadow: 0 18px 38px rgba(11, 13, 26, 0.45);
   backdrop-filter: blur(10px);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .dashboard-banner {
   border-radius: 1.15rem;
   padding: 1rem 1.25rem;
   box-shadow: inset 0 1px 12px rgba(255, 255, 255, 0.06);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .quick-setup-banner {
@@ -3197,6 +3209,7 @@ onUnmounted(() => {
 .dashboard-section {
   width: 100%;
   max-width: 100%;
+  min-width: 0;
 }
 
 @media (max-width: 768px) {
@@ -3209,6 +3222,9 @@ onUnmounted(() => {
 
 .now-bar {
   box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.08);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .action-chip {
@@ -3284,6 +3300,8 @@ onUnmounted(() => {
   justify-content: flex-start;
   gap: 0.75rem;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .daily-card__plan-btn {
@@ -3296,9 +3314,22 @@ onUnmounted(() => {
 .focus-date-row {
   width: 100%;
   align-items: center;
+  min-width: 0;
+}
+
+.focus-date-main {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
 }
 
 .focus-date-pill {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
   justify-content: space-between;
 }
 
@@ -3348,6 +3379,8 @@ onUnmounted(() => {
   border: 1px solid rgba(99, 102, 241, 0.12);
   background: rgba(15, 23, 42, 0.62);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  max-width: 100%;
+  min-width: 0;
 }
 
 .dashboard-task-skeleton-check,
@@ -3431,12 +3464,19 @@ onUnmounted(() => {
   border: 1px solid rgba(255, 255, 255, 0.15);
   background: rgba(79, 70, 229, 0.15);
   color: #e0e7ff;
-  display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 16px;
   flex-shrink: 0;
   transition: all 0.2s ease;
+}
+
+.today-fullscreen-btn--inline {
+  display: inline-flex;
+}
+
+.today-fullscreen-btn--desktop {
+  display: none;
 }
 
 .jump-today-btn {
@@ -3482,6 +3522,19 @@ onUnmounted(() => {
 
   .focus-date-row {
     width: auto;
+  }
+
+  .focus-date-main {
+    width: auto;
+    flex: 0 0 auto;
+  }
+
+  .today-fullscreen-btn--inline {
+    display: none;
+  }
+
+  .today-fullscreen-btn--desktop {
+    display: inline-flex;
   }
 
   .focus-date-pill {
@@ -3567,8 +3620,17 @@ onUnmounted(() => {
 }
 
 @media (max-width: 640px) {
+  .dashboard-card {
+    padding: 1rem;
+  }
+
+  .dashboard-banner {
+    padding: 0.9rem 1rem;
+  }
+
   .daily-card__actions {
     width: 100%;
+    flex-wrap: wrap;
   }
 
   .focus-date-row {
@@ -3576,9 +3638,17 @@ onUnmounted(() => {
     gap: 0.75rem;
   }
 
-  .focus-date-pill {
+  .focus-date-main {
     width: 100%;
-    flex: 1 1 100%;
+  }
+
+  .focus-date-pill {
+    flex: 1 1 auto;
+    width: auto;
+  }
+
+  .daily-card__plan-btn {
+    white-space: normal;
   }
 
   .jump-today-btn {
@@ -3596,6 +3666,16 @@ onUnmounted(() => {
 
   .category-filter-chip {
     min-height: 2.35rem;
+  }
+
+  .action-chip {
+    width: 100%;
+    max-width: 100%;
+    justify-content: center;
+  }
+
+  .task-category-pill {
+    white-space: normal;
   }
 }
 

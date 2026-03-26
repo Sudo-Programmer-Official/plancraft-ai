@@ -35,8 +35,12 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>PlanCraftAI uses the camera to capture images for tasks, feedback, and profile photos.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>PlanCraftAI needs microphone access to record voice tasks and transcribe them into plans.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>PlanCraftAI uses your photo library so you can attach images for tasks, feedback, and profile photos.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

@@ -24,6 +24,12 @@ import { updateStreakOnEntry } from '@/services/streakService'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { clearStoredAuthArtifacts, readNativeIosAuthSnapshot } from '@/utils/authStorage'
 import { isIosPackagedApp } from '@/utils/nativeAuthSupport'
+import {
+  computeNextRecurringDate,
+  computeReminderScheduleIso,
+  normalizeReminderOffsetDays,
+  normalizeTaskRepeat,
+} from '@/utils/taskRecurrence'
 
 const tasksRef = collection(db, "tasks");
 const journalRef = collection(db, "journalEntries");
@@ -120,6 +126,106 @@ function normalizeTaskDate(value) {
     /* fall back below */
   }
   return toLocalDateKey(new Date())
+}
+
+function cloneTaskMetadata(metadata = {}, additions = {}) {
+  const base = metadata && typeof metadata === 'object' ? { ...metadata } : {}
+  const extra = additions && typeof additions === 'object' ? additions : {}
+  return { ...base, ...extra }
+}
+
+function normalizeReminderConfig(value, fallbackOffsetDays = null) {
+  if (!value || typeof value !== 'object') {
+    const fallback = normalizeReminderOffsetDays(fallbackOffsetDays, { fallback: null })
+    if (fallback && fallback > 0) {
+      return { offsetDays: fallback, includeOnDue: true }
+    }
+    return null
+  }
+
+  const includeOnDue = value.includeOnDue !== false
+  const offsetDays = normalizeReminderOffsetDays(value.offsetDays, { fallback: fallbackOffsetDays })
+  const next = { includeOnDue }
+  if (offsetDays && offsetDays > 0) next.offsetDays = offsetDays
+  return next
+}
+
+export async function ensureRecurringNextTask(task) {
+  const repeat = normalizeTaskRepeat(task?.repeat)
+  if (!repeat || !task?.completed) return null
+
+  const sourceDate = normalizeTaskDate(task?.date || task?.dueDate || task?.plannedDate)
+  const nextDate = computeNextRecurringDate(sourceDate, repeat)
+  if (!nextDate) return null
+
+  const repeatMeta = task?.repeatMeta && typeof task.repeatMeta === 'object' ? task.repeatMeta : {}
+  if (repeatMeta?.lastSpawnedDate === nextDate) return null
+
+  const timezoneHint =
+    (typeof task?.timezone === 'string' && task.timezone.trim()) ||
+    (typeof task?.metadata?.timezone === 'string' && task.metadata.timezone.trim()) ||
+    Intl.DateTimeFormat().resolvedOptions().timeZone ||
+    'UTC'
+  const reminderOffsetDays = normalizeReminderOffsetDays(task?.reminderOffsetDays, { fallback: 0 }) || 0
+  const reminderTime = typeof task?.reminderTime === 'string' && task.reminderTime.trim()
+    ? task.reminderTime.trim()
+    : null
+  const scheduledTime = reminderTime
+    ? computeReminderScheduleIso({
+        date: nextDate,
+        reminderTime,
+        timezone: timezoneHint,
+        reminderOffsetDays,
+      })
+    : null
+
+  const nextTask = {
+    title: task?.title || 'Recurring task',
+    details: task?.details || '',
+    category: task?.category || 'Uncategorized',
+    date: nextDate,
+    completed: false,
+    attachments: Array.isArray(task?.attachments) ? task.attachments : [],
+    link: task?.link || null,
+    priority: task?.priority ?? null,
+    duration: Number.isFinite(task?.duration) ? task.duration : null,
+    estimate_minutes: Number.isFinite(task?.estimate_minutes) ? task.estimate_minutes : null,
+    scheduledTime,
+    reminderTime,
+    reminderChannels: Array.isArray(task?.reminderChannels) ? task.reminderChannels : null,
+    channels: Array.isArray(task?.channels)
+      ? task.channels
+      : Array.isArray(task?.reminderChannels)
+        ? task.reminderChannels
+        : null,
+    timezone: timezoneHint,
+    source: task?.source || 'recurring',
+    timeHint: task?.timeHint || null,
+    relation: task?.timeRelation || task?.relation || null,
+    gapMinutes: Number.isFinite(task?.gapMinutes) ? task.gapMinutes : null,
+    confidence: Number.isFinite(task?.timeConfidence) ? task.timeConfidence : Number.isFinite(task?.confidence) ? task.confidence : null,
+    meta: task?.timeMeta && typeof task.timeMeta === 'object' ? task.timeMeta : null,
+    repeat,
+    reminderOffsetDays: reminderOffsetDays || 0,
+    reminder: normalizeReminderConfig(task?.reminder, reminderOffsetDays || 0),
+    metadata: cloneTaskMetadata(task?.metadata, {
+      recurringOriginTaskId: task?.id || null,
+      recurringGeneratedAt: new Date().toISOString(),
+      recurringPreviousDate: sourceDate,
+    }),
+    order: Number.isFinite(task?.order) ? task.order : 0,
+  }
+
+  const saved = await addTaskToFirebase(nextTask)
+  const nextRepeatMeta = {
+    ...repeatMeta,
+    lastSpawnedDate: nextDate,
+    lastSpawnedTaskId: saved?.id || null,
+    advancedAt: new Date().toISOString(),
+  }
+  await updateTaskInFirebase({ id: task.id, repeatMeta: nextRepeatMeta })
+  task.repeatMeta = nextRepeatMeta
+  return saved
 }
 
 function taskDocRef(taskId) {
@@ -645,6 +751,17 @@ export async function addTaskToFirebase(task, options = {}) {
   if ('source' in task) payload.source = task.source || 'manual'
   if ('duration' in task) payload.duration = task.duration
   if ('metadata' in task) payload.metadata = task.metadata
+  const repeatRule = normalizeTaskRepeat(task?.repeat)
+  if ('repeat' in task && repeatRule) payload.repeat = repeatRule
+  if ('repeatMeta' in task) {
+    payload.repeatMeta = task?.repeatMeta && typeof task.repeatMeta === 'object' ? task.repeatMeta : null
+  }
+  if ('reminderOffsetDays' in task) {
+    payload.reminderOffsetDays = normalizeReminderOffsetDays(task?.reminderOffsetDays, { fallback: 0 })
+  }
+  if ('reminder' in task) {
+    payload.reminder = normalizeReminderConfig(task?.reminder, task?.reminderOffsetDays)
+  }
 
   if ('estimate_minutes' in task) {
     const est = Number(task.estimate_minutes)

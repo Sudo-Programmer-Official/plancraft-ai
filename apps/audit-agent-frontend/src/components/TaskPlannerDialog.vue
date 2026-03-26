@@ -271,6 +271,77 @@
               <p v-if="setReminder && !(props.readonly || props.disableReminder)" class="hint">
                 We’ll match your notification preferences. Calls only ring when it’s reminder time.
               </p>
+              <div v-if="voiceReminderSummaryLines.length" class="reminder-auto-summary">
+                <p class="reminder-auto-summary__title">{{ voiceReminderSummaryTitle }}</p>
+                <div class="reminder-auto-summary__items">
+                  <span
+                    v-for="line in voiceReminderSummaryLines"
+                    :key="line"
+                    class="reminder-auto-summary__item"
+                  >
+                    ✓ {{ line }}
+                  </span>
+                </div>
+              </div>
+
+              <div v-if="setReminder" class="field-grid repeat-grid repeat-grid--offset">
+                <div class="field">
+                  <label class="field-label">Notify me before due date</label>
+                  <el-input-number
+                    v-model="reminderOffsetDays"
+                    :min="0"
+                    :max="365"
+                    :disabled="props.readonly || props.disableReminder || !setReminder"
+                    class="w-full planner-dark-number"
+                  />
+                  <p class="field-help">
+                    0 means the same day. 2 means two days before the task is due.
+                  </p>
+                </div>
+              </div>
+
+              <div class="repeat-block">
+                <label class="reminder-toggle" :class="{ 'reminder-toggle--disabled': props.readonly }">
+                  <el-switch
+                    v-model="repeatEnabled"
+                    :disabled="props.readonly"
+                  />
+                  <span class="reminder-toggle__label">Repeat this task</span>
+                </label>
+
+                <div v-if="repeatEnabled" class="field-grid repeat-grid">
+                  <div class="field">
+                    <label class="field-label">Repeat</label>
+                    <el-select
+                      v-model="repeatType"
+                      :disabled="props.readonly"
+                      class="w-full planner-dark-select"
+                    >
+                      <el-option
+                        v-for="option in repeatOptions"
+                        :key="option.value"
+                        :label="option.label"
+                        :value="option.value"
+                      />
+                    </el-select>
+                  </div>
+                  <div v-if="repeatType === 'custom'" class="field">
+                    <label class="field-label">Every</label>
+                    <el-input-number
+                      v-model="repeatIntervalDays"
+                      :min="1"
+                      :max="365"
+                      :disabled="props.readonly"
+                      class="w-full planner-dark-number"
+                    />
+                    <p class="field-help">Set a custom repeat interval in days.</p>
+                  </div>
+                </div>
+
+                <p v-if="repeatEnabled" class="hint repeat-hint">
+                  When you complete this task, PlanCraft will create the next occurrence automatically.
+                </p>
+              </div>
             </div>
           </transition>
         </section>
@@ -376,6 +447,12 @@ import { areImageTasksEnabled } from '@/utils/imageTasksAccess'
 /* ---------------- Utilities ---------------- */
 import { toLocalDateKey, parseLocalDateKey } from '@/utils/dateHelper'
 import { toUtcIso, getUserTimezone } from '@/utils/time'
+import {
+  computeReminderScheduleIso,
+  normalizeReminderOffsetDays,
+  normalizeTaskRepeat,
+} from '@/utils/taskRecurrence'
+import { parseVoiceTaskIntent } from '@/utils/taskVoiceParser'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
@@ -414,6 +491,12 @@ const channelOptions = [
 ]
 const DEFAULT_REMINDER_CHANNELS = ['email', 'pwa', 'whatsapp']
 const MAX_INSTANT_ALERTS = 2
+const repeatOptions = [
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'custom', label: 'Custom (X days)' },
+]
 
 function coerceText(value, fallback = '') {
   if (typeof value === 'string') return value
@@ -562,6 +645,22 @@ function computeReminderChannels() {
   return merged.length ? merged : ['pwa']
 }
 
+function normalizeReminderConfig(value, fallback = {}) {
+  if (!value || typeof value !== 'object') return fallback || null
+  const includeOnDue = value.includeOnDue !== false
+  const offsetDays = normalizeReminderOffsetDays(value.offsetDays, { fallback: null })
+  const next = { includeOnDue }
+  if (offsetDays && offsetDays > 0) next.offsetDays = offsetDays
+  return next
+}
+
+function buildReminderConfig({ includeOnDue = true, offsetDays = null } = {}) {
+  const next = { includeOnDue: includeOnDue !== false }
+  const normalizedOffset = normalizeReminderOffsetDays(offsetDays, { fallback: null })
+  if (normalizedOffset && normalizedOffset > 0) next.offsetDays = normalizedOffset
+  return next
+}
+
 /* ---------------- Refs ---------------- */
 const { tasks: taskStore } = useTasks()
 const tasks = computed(() => {
@@ -608,7 +707,13 @@ const reminderTime = ref('')
 const reminderManuallyEdited = ref(false)
 const reminderAbsoluteIso = ref(null)
 const setReminder = ref(false)
+const reminderOffsetDays = ref(0)
+const includeOnDue = ref(true)
 const reminderOptionsVisible = ref(false)
+const repeatEnabled = ref(false)
+const repeatType = ref('daily')
+const repeatIntervalDays = ref(30)
+const voiceParsedIntent = ref(null)
 const plannerVoiceReset = ref(0)
 const plannerVoiceState = ref('idle')
 const detailsVoiceReset = ref(0)
@@ -663,6 +768,24 @@ const plannerVoiceButtonLabel = computed(() => {
   if (plannerVoiceState.value === 'transcribing') return 'Transcribing audio'
   if (plannerVoiceState.value === 'recording') return 'Stop recording'
   return 'Start voice input'
+})
+
+const voiceReminderSummaryTitle = computed(() => {
+  if (!voiceParsedIntent.value?.reminder) return ''
+  return voiceParsedIntent.value?.meta?.appliedDefaultReminder ? 'Reminders (auto)' : 'Reminders from voice'
+})
+
+const voiceReminderSummaryLines = computed(() => {
+  if (!setReminder.value || !voiceParsedIntent.value?.reminder) return []
+  const lines = []
+  const offsetDays = normalizeReminderOffsetDays(reminderOffsetDays.value, { fallback: null })
+  if (offsetDays && offsetDays > 0) {
+    lines.push(`${offsetDays} day${offsetDays === 1 ? '' : 's'} before`)
+  }
+  if (includeOnDue.value) {
+    lines.push('On due date')
+  }
+  return lines
 })
 
 function onReminderTimeChange() {
@@ -909,9 +1032,15 @@ function resetNewTaskState() {
   reminderTime.value = ''
   reminderAbsoluteIso.value = null
   reminderManuallyEdited.value = false
+  reminderOffsetDays.value = 0
+  includeOnDue.value = true
   if (!props.lockDate) selectedDate.value = normalizeDateInput(props.date)
   setReminder.value = !!reminderPrefs.value.enabled
   reminderOptionsVisible.value = false
+  repeatEnabled.value = false
+  repeatType.value = 'daily'
+  repeatIntervalDays.value = 30
+  voiceParsedIntent.value = null
   plannerVoiceReset.value += 1
   plannerVoiceState.value = 'idle'
   if (!allowedReminderChannels.value.length && reminderPrefs.value.channels.length) {
@@ -936,6 +1065,17 @@ function hydrateFromTask(current) {
   detailsVoiceReset.value += 1
 
   if (current.date) selectedDate.value = normalizeDateInput(current.date)
+  const repeatRule = normalizeTaskRepeat(current.repeat)
+  repeatEnabled.value = !!repeatRule
+  repeatType.value = repeatRule?.type || 'daily'
+  repeatIntervalDays.value = repeatRule?.intervalDays || 30
+  reminderOffsetDays.value = normalizeReminderOffsetDays(current.reminderOffsetDays, { fallback: 0 }) || 0
+  const reminderConfig = normalizeReminderConfig(current.reminder, null)
+  includeOnDue.value = reminderConfig?.includeOnDue !== false
+  if (reminderConfig && reminderConfig.offsetDays && reminderOffsetDays.value <= 0) {
+    reminderOffsetDays.value = reminderConfig.offsetDays
+  }
+  voiceParsedIntent.value = null
   let reminderHydrated = false
   if (current.scheduledTime) {
     reminderHydrated = applyReminderIso(current.scheduledTime, {
@@ -1553,15 +1693,45 @@ async function save() {
   }
 
   const dateToSave = props.lockDate && props.task?.date ? props.task.date : selectedDate.value
+  const repeatToSave = repeatEnabled.value
+    ? normalizeTaskRepeat({ type: repeatType.value, intervalDays: repeatIntervalDays.value })
+    : null
+  if (repeatEnabled.value && !repeatToSave) {
+    ElMessage({
+      type: 'warning',
+      message: 'Choose a valid repeat schedule before saving.',
+      duration: 3500,
+    })
+    return
+  }
   let reminderToSave = null
+  let reminderOffsetToSave = null
+  let reminderConfigToSave = null
   if (props.disableReminder) {
     reminderToSave = props.task?.reminderTime ?? null
+    reminderOffsetToSave = normalizeReminderOffsetDays(props.task?.reminderOffsetDays, { fallback: null })
+    reminderConfigToSave = normalizeReminderConfig(props.task?.reminder, null)
   } else if (setReminder.value) {
     reminderToSave = reminderTime.value || null
+    reminderOffsetToSave = normalizeReminderOffsetDays(reminderOffsetDays.value, { fallback: 0 })
+    reminderConfigToSave = buildReminderConfig({
+      includeOnDue: includeOnDue.value,
+      offsetDays: reminderOffsetToSave,
+    })
   }
 
+  const tzCandidate = getUserTimezone()
+  const reminderTimezone =
+    typeof tzCandidate === 'string' && tzCandidate.includes('/')
+      ? tzCandidate
+      : Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
   const baseIso = reminderToSave
-    ? reminderAbsoluteIso.value || buildLocalIso(dateToSave, reminderToSave)
+    ? computeReminderScheduleIso({
+        date: dateToSave,
+        reminderTime: reminderToSave,
+        timezone: reminderTimezone,
+        reminderOffsetDays: reminderOffsetToSave || 0,
+      }) || buildLocalIso(dateToSave, reminderToSave)
     : null
   const scheduledIso = baseIso
     ? enforceFutureReminder(baseIso, { allowDateChange: !props.lockDate })
@@ -1577,9 +1747,14 @@ async function save() {
     details: details.value,
     date: dateToSave,
     reminderTime: reminderToSave,
+    reminderOffsetDays: reminderOffsetToSave,
+    ...(reminderConfigToSave !== null || (props.task && 'reminder' in props.task)
+      ? { reminder: reminderConfigToSave }
+      : {}),
     scheduledTime: scheduledIso,
     reminderChannels: channelsToSave,
     channels: channelsToSave,
+    repeat: repeatToSave,
     attachments: attachments.value.length ? attachments.value : props.task?.attachments,
   })
   ElNotification({ title: 'Success', message: 'Task saved', type: 'success' })
@@ -1658,18 +1833,102 @@ function toggleChannel(id) {
   allowedReminderChannels.value = Array.from(current)
 }
 
-function handleTranscript(result = {}) {
+function extractTranscriptText(result = {}) {
   const rawValue =
     typeof result === 'string'
       ? result.trim()
       : typeof result?.text === 'string'
         ? result.text.trim()
         : ''
-  const value = rawValue.replace(/[^\p{L}\p{N}\s]+/gu, '').trim() ? rawValue : ''
-  if (!value) return
-  assignText(input, value)
-  if (!setReminder.value && reminderPrefs.value.enabled) setReminder.value = true
-  logTimeBrainDialog('transcription:title', { length: value.length })
+  return rawValue.replace(/[^\p{L}\p{N}\s]+/gu, '').trim() ? rawValue : ''
+}
+
+async function resolveVoiceTaskIntent(rawValue) {
+  const parsed = parseVoiceTaskIntent(rawValue, { now: new Date() })
+  const needsAiFallback = !parsed?.repeat && !parsed?.meta?.hasClearTitle
+  if (!needsAiFallback) return parsed
+
+  try {
+    const tzCandidate = getUserTimezone()
+    const tz =
+      typeof tzCandidate === 'string' && tzCandidate.includes('/')
+        ? tzCandidate
+        : Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+    const result = await generateTasksFromText(rawValue, {
+      planDate: selectedDate.value,
+      timezone: tz,
+      maxItems: 1,
+      debugLabel: 'TaskPlannerDialog:voice-parser-fallback',
+      reminderTime: reminderTime.value || null,
+    })
+    const first = Array.isArray(result?.items) ? result.items[0] : null
+    const aiTitle = coerceText(first?.displayTitle || first?.title, '').trim()
+    if (!aiTitle) return parsed
+    return {
+      ...parsed,
+      title: enrichTitle({
+        title: aiTitle,
+        rawPhrase: rawValue,
+        displayTitle: coerceText(first?.displayTitle, aiTitle),
+      }),
+      confidence: 'low',
+      meta: {
+        ...parsed.meta,
+        hasClearTitle: true,
+        usedAiFallback: true,
+      },
+    }
+  } catch (err) {
+    console.warn('[TaskPlannerDialog] voice parser fallback failed', err?.message || err)
+    return parsed
+  }
+}
+
+function applyParsedTask(parsed, rawValue) {
+  const safeParsed = parsed && typeof parsed === 'object' ? parsed : null
+  const nextTitle = safeParsed?.meta?.hasClearTitle ? safeParsed.title : rawValue
+  assignText(input, nextTitle)
+
+  if (safeParsed?.dueDate && !props.lockDate) {
+    selectedDate.value = normalizeDateInput(safeParsed.dueDate)
+  }
+
+  if (safeParsed?.repeat) {
+    repeatEnabled.value = true
+    repeatType.value = safeParsed.repeat.type || 'daily'
+    repeatIntervalDays.value = safeParsed.repeat.intervalDays || 30
+  }
+
+  if (!props.disableReminder && safeParsed?.reminder) {
+    setReminder.value = true
+    reminderOptionsVisible.value = true
+    includeOnDue.value = safeParsed.reminder.includeOnDue !== false
+    if (Number.isFinite(safeParsed.reminder.offsetDays)) {
+      reminderOffsetDays.value =
+        normalizeReminderOffsetDays(safeParsed.reminder.offsetDays, { fallback: 0 }) || 0
+    } else if (safeParsed?.meta?.explicitDueDayOnly) {
+      reminderOffsetDays.value = 0
+    }
+  } else if (!safeParsed?.reminder) {
+    includeOnDue.value = true
+  }
+
+  voiceParsedIntent.value = safeParsed?.reminder ? safeParsed : null
+}
+
+async function handleTranscript(result = {}) {
+  const rawValue = extractTranscriptText(result)
+  if (!rawValue) return
+  const parsed = await resolveVoiceTaskIntent(rawValue)
+  applyParsedTask(parsed, rawValue)
+  console.log('Parsed task intent:', parsed)
+  logTimeBrainDialog('transcription:title', {
+    length: rawValue.length,
+    repeat: parsed?.repeat?.type || null,
+    hasReminder: !!parsed?.reminder,
+    confidence: parsed?.confidence || 'low',
+    usedAiFallback: !!parsed?.meta?.usedAiFallback,
+  })
   plannerVoiceReset.value += 1
 }
 
@@ -1678,8 +1937,7 @@ function onPlannerVoiceStateChange(nextState) {
 }
 
 function appendDetails(result = {}) {
-  const rawValue = typeof result?.text === 'string' ? result.text.trim() : ''
-  const value = rawValue.replace(/[^\p{L}\p{N}\s]+/gu, '').trim() ? rawValue : ''
+  const value = extractTranscriptText(result)
   if (!value) return
   details.value = details.value ? `${details.value}\n${value}` : value
   logTimeBrainDialog('transcription:details', { length: value.length })
@@ -1799,6 +2057,12 @@ function appendDetails(result = {}) {
   font-size: 0.9rem;
   margin-bottom: 0.35rem;
   color: rgba(226, 232, 240, 0.8);
+}
+
+.field-help {
+  margin: 0.45rem 0 0;
+  font-size: 0.8rem;
+  color: rgba(148, 163, 184, 0.78);
 }
 
 /* assistive bar */
@@ -2100,6 +2364,20 @@ function appendDetails(result = {}) {
   color: rgba(226, 232, 240, 0.9);
 }
 
+.repeat-block {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.repeat-grid {
+  margin-top: 0.9rem;
+}
+
+.repeat-grid--offset {
+  margin-top: 0.9rem;
+}
+
 .channel-icons {
   display: flex;
   align-items: center;
@@ -2142,6 +2420,43 @@ function appendDetails(result = {}) {
   margin: 0;
   font-size: 0.78rem;
   color: rgba(148, 163, 184, 0.85);
+}
+
+.reminder-auto-summary {
+  margin-top: 0.85rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(129, 140, 248, 0.28);
+  background: rgba(49, 46, 129, 0.28);
+}
+
+.reminder-auto-summary__title {
+  margin: 0 0 0.45rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #c7d2fe;
+}
+
+.reminder-auto-summary__items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.reminder-auto-summary__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.3rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.35);
+  color: #e0e7ff;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.repeat-hint {
+  margin-top: 0.8rem;
 }
 
 .reminder-collapse-enter-active,
@@ -2435,6 +2750,58 @@ function appendDetails(result = {}) {
 .task-planner-dialog .el-input__inner::placeholder,
 .task-planner-dialog .el-textarea__inner::placeholder {
   color: #cbd5e1; /* light slate */
+}
+
+:deep(.task-planner-dialog .el-input__wrapper),
+:deep(.task-planner-dialog .el-select__wrapper) {
+  background: rgba(15, 23, 42, 0.42) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03) !important;
+  border-radius: 0.85rem !important;
+  min-height: 44px;
+}
+
+:deep(.task-planner-dialog .el-input__wrapper:hover),
+:deep(.task-planner-dialog .el-select__wrapper:hover) {
+  border-color: rgba(129, 140, 248, 0.4) !important;
+}
+
+:deep(.task-planner-dialog .el-input__wrapper.is-focus),
+:deep(.task-planner-dialog .el-select__wrapper.is-focused) {
+  border-color: rgba(129, 140, 248, 0.68) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(129, 140, 248, 0.2),
+    0 0 0 3px rgba(99, 102, 241, 0.14) !important;
+}
+
+:deep(.task-planner-dialog .el-select__selected-item),
+:deep(.task-planner-dialog .el-select__placeholder),
+:deep(.task-planner-dialog .el-select__caret),
+:deep(.task-planner-dialog .el-input-number .el-input__inner) {
+  color: #f8fafc !important;
+}
+
+:deep(.task-planner-dialog .el-input-number) {
+  width: 100%;
+}
+
+:deep(.task-planner-dialog .el-input-number .el-input__wrapper) {
+  background: rgba(79, 70, 229, 0.16) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03) !important;
+}
+
+:deep(.task-planner-dialog .el-input-number__decrease),
+:deep(.task-planner-dialog .el-input-number__increase) {
+  background: rgba(15, 23, 42, 0.42) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  color: #cbd5e1 !important;
+}
+
+:deep(.task-planner-dialog .el-input-number__decrease:hover),
+:deep(.task-planner-dialog .el-input-number__increase:hover) {
+  background: rgba(79, 70, 229, 0.28) !important;
+  color: #f8fafc !important;
 }
 
 /* Voice + Generate buttons aligned */
@@ -2806,6 +3173,62 @@ function appendDetails(result = {}) {
 .task-planner-dialog .el-input__wrapper:hover {
   background-color: rgba(255, 255, 255, 0.15) !important; /* slightly brighter */
   border-color: #6366f1 !important; /* indigo highlight */
+}
+
+:deep(.task-planner-dialog .planner-dark-select),
+:deep(.task-planner-dialog .planner-dark-number) {
+  --el-bg-color: rgba(15, 23, 42, 0.42);
+  --el-fill-color-blank: rgba(15, 23, 42, 0.42);
+  --el-fill-color-light: rgba(15, 23, 42, 0.42);
+  --el-fill-color: rgba(15, 23, 42, 0.42);
+  --el-border-color: rgba(255, 255, 255, 0.14);
+  --el-border-color-hover: rgba(129, 140, 248, 0.45);
+  --el-color-primary: #818cf8;
+  --el-text-color-regular: #f8fafc;
+  --el-text-color-placeholder: rgba(203, 213, 225, 0.72);
+}
+
+:deep(.task-planner-dialog .planner-dark-select .el-select__wrapper),
+:deep(.task-planner-dialog .planner-dark-number .el-input__wrapper) {
+  background: rgba(15, 23, 42, 0.42) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03) !important;
+  border-radius: 0.85rem !important;
+}
+
+:deep(.task-planner-dialog .planner-dark-select .el-select__wrapper:hover),
+:deep(.task-planner-dialog .planner-dark-number .el-input__wrapper:hover),
+:deep(.task-planner-dialog .planner-dark-number .el-input__wrapper.is-focus),
+:deep(.task-planner-dialog .planner-dark-select .el-select__wrapper.is-focused) {
+  background: rgba(30, 41, 59, 0.62) !important;
+  border-color: rgba(129, 140, 248, 0.55) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(129, 140, 248, 0.16),
+    0 0 0 3px rgba(99, 102, 241, 0.12) !important;
+}
+
+:deep(.task-planner-dialog .planner-dark-select .el-select__selected-item),
+:deep(.task-planner-dialog .planner-dark-select .el-select__placeholder),
+:deep(.task-planner-dialog .planner-dark-select .el-select__caret),
+:deep(.task-planner-dialog .planner-dark-number .el-input__inner) {
+  color: #f8fafc !important;
+}
+
+:deep(.task-planner-dialog .planner-dark-number) {
+  width: 100%;
+}
+
+:deep(.task-planner-dialog .planner-dark-number .el-input-number__decrease),
+:deep(.task-planner-dialog .planner-dark-number .el-input-number__increase) {
+  background: rgba(30, 41, 59, 0.92) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: rgba(226, 232, 240, 0.82) !important;
+}
+
+:deep(.task-planner-dialog .planner-dark-number .el-input-number__decrease:hover),
+:deep(.task-planner-dialog .planner-dark-number .el-input-number__increase:hover) {
+  background: rgba(79, 70, 229, 0.34) !important;
+  color: #f8fafc !important;
 }
 
 .attachment-block {

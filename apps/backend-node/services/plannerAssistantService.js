@@ -3,7 +3,7 @@ import utc from "dayjs/plugin/utc.js";
 import timezone from "dayjs/plugin/timezone.js";
 import { db } from "./firebaseAdmin.js";
 import { handleTextReminder } from "./textHandler.js";
-import { createTask } from "./taskService.js";
+import { advanceRecurringTask, createTask } from "./taskService.js";
 import { recordCompletion } from "./habitService.js";
 import { extractReminderTime as extractReminderTimeAI } from "./openaiService.js";
 import { formatLocalTime } from "../utils/timezone.js";
@@ -718,6 +718,11 @@ async function completeTaskForUser(uid, payload = {}, context = {}) {
     } catch (habitErr) {
       console.warn("[PlannerAssistant] habit logging skipped", habitErr?.message || habitErr);
     }
+    try {
+      await advanceRecurringTask(uid, { ...task, completed: true }, { workspaceId: task?.workspaceId || null });
+    } catch (recurrenceErr) {
+      console.warn("[PlannerAssistant] recurrence advance skipped", recurrenceErr?.message || recurrenceErr);
+    }
     return {
       status: "completed",
       type: "complete_task",
@@ -865,6 +870,15 @@ async function updateTaskForUser(uid, payload = {}, context = {}) {
       });
     } catch (habitErr) {
       console.warn("[PlannerAssistant] habit logging (update) skipped", habitErr?.message || habitErr);
+    }
+    try {
+      await advanceRecurringTask(
+        uid,
+        { ...task, ...updates, completed: true },
+        { workspaceId: task?.workspaceId || null },
+      );
+    } catch (recurrenceErr) {
+      console.warn("[PlannerAssistant] recurrence advance (update) skipped", recurrenceErr?.message || recurrenceErr);
     }
   }
   return {

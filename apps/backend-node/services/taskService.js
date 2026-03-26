@@ -16,6 +16,7 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 
 const REMINDER_CHANNEL_ALLOW_LIST = ["pwa", "whatsapp", "email", "sms", "voice_call"];
+const TASK_REPEAT_TYPE_VALUES = new Set(["daily", "weekly", "monthly", "custom"]);
 
 function toYMD(value) {
   try {
@@ -33,10 +34,66 @@ function toYMD(value) {
   return dayjs().format("YYYY-MM-DD");
 }
 
+function computeNextRecurringDate(dateYmd, repeat) {
+  if (!repeat || !dateYmd) return null;
+  const base = dayjs(String(dateYmd).trim());
+  if (!base.isValid()) return null;
+  if (repeat.type === "daily") return base.add(1, "day").format("YYYY-MM-DD");
+  if (repeat.type === "weekly") return base.add(1, "week").format("YYYY-MM-DD");
+  if (repeat.type === "monthly") return base.add(1, "month").format("YYYY-MM-DD");
+  return base.add(repeat.intervalDays || 1, "day").format("YYYY-MM-DD");
+}
+
 function sanitizeString(value, fallback = "") {
   if (typeof value !== "string") return fallback;
   const trimmed = value.trim();
   return trimmed.length ? trimmed : fallback;
+}
+
+function normalizeTaskRepeat(value) {
+  if (!value || typeof value !== "object") return null;
+  const type = sanitizeString(value.type, "").toLowerCase();
+  if (!TASK_REPEAT_TYPE_VALUES.has(type)) return null;
+  if (type === "custom") {
+    const intervalDays = Math.max(1, Math.min(365, Math.trunc(Number(value.intervalDays) || 0)));
+    if (!intervalDays) return null;
+    return { type: "custom", intervalDays };
+  }
+  return { type, intervalDays: null };
+}
+
+function normalizeReminderOffsetDays(value, fallback = null) {
+  if (value === null || value === undefined || value === "") return fallback;
+  const next = Math.trunc(Number(value));
+  if (!Number.isFinite(next)) return fallback;
+  return Math.max(0, Math.min(next, 365));
+}
+
+function sanitizeReminderConfig(value, fallbackOffsetDays = null) {
+  if (!value || typeof value !== "object") {
+    const fallback = normalizeReminderOffsetDays(fallbackOffsetDays, null);
+    if (fallback && fallback > 0) {
+      return { offsetDays: fallback, includeOnDue: true };
+    }
+    return null;
+  }
+  const includeOnDue = value.includeOnDue !== false;
+  const offsetDays = normalizeReminderOffsetDays(value.offsetDays, fallbackOffsetDays);
+  const next = { includeOnDue };
+  if (offsetDays && offsetDays > 0) next.offsetDays = offsetDays;
+  return next;
+}
+
+function sanitizeRepeatMeta(value) {
+  if (!value || typeof value !== "object") return null;
+  const lastSpawnedDate = toYMD(value.lastSpawnedDate || value.nextDate || null);
+  const lastSpawnedTaskId = sanitizeString(value.lastSpawnedTaskId || "", "");
+  const advancedAt = toUtcIso(value.advancedAt || value.lastSpawnedAt || null, "UTC");
+  const next = {};
+  if (lastSpawnedDate) next.lastSpawnedDate = lastSpawnedDate;
+  if (lastSpawnedTaskId) next.lastSpawnedTaskId = lastSpawnedTaskId;
+  if (advancedAt) next.advancedAt = advancedAt;
+  return Object.keys(next).length ? next : null;
 }
 
 function normalizeReminderChannels(...sources) {
@@ -244,6 +301,74 @@ export async function scheduleTaskReminder(userId, task, payload = {}, options =
   }
 }
 
+export async function advanceRecurringTask(userId, task = {}, options = {}) {
+  const repeat = normalizeTaskRepeat(task?.repeat);
+  if (!repeat || !task?.completed) return null;
+
+  const sourceDate = toYMD(task?.date || task?.dueDate || null);
+  const nextDate = computeNextRecurringDate(sourceDate, repeat);
+  if (!nextDate) return null;
+
+  const repeatMeta = sanitizeRepeatMeta(task?.repeatMeta) || {};
+  if (repeatMeta?.lastSpawnedDate === nextDate) return null;
+
+  const timezone = resolveReminderTimezone(task, task, options);
+  const reminderOffsetDays = normalizeReminderOffsetDays(task?.reminderOffsetDays, 0) || 0;
+  const reminderTime = sanitizeString(task?.reminderTime || task?.time || "", "") || null;
+  const reminderDate = reminderOffsetDays > 0 ? dayjs(nextDate).subtract(reminderOffsetDays, "day").format("YYYY-MM-DD") : nextDate;
+  const scheduledTime = reminderTime ? buildIsoFromDateTime(reminderDate, reminderTime, timezone) : null;
+
+  const nextPayload = {
+    title: task?.title || "Recurring task",
+    details: task?.details || "",
+    category: task?.category || "Uncategorized",
+    date: nextDate,
+    reminderTime,
+    scheduledTime,
+    reminderChannels: Array.isArray(task?.reminderChannels) ? task.reminderChannels : null,
+    channels: Array.isArray(task?.channels) ? task.channels : Array.isArray(task?.reminderChannels) ? task.reminderChannels : null,
+    timezone,
+    attachments: Array.isArray(task?.attachments) ? task.attachments : [],
+    link: task?.link || null,
+    priority: task?.priority ?? null,
+    duration: Number.isFinite(task?.duration) ? task.duration : null,
+    estimate_minutes: Number.isFinite(task?.estimate_minutes) ? task.estimate_minutes : null,
+    source: task?.source || "recurring",
+    repeat,
+    reminderOffsetDays,
+    reminder: sanitizeReminderConfig(task?.reminder, reminderOffsetDays),
+    metadata: {
+      ...(task?.metadata && typeof task.metadata === "object" ? task.metadata : {}),
+      recurringOriginTaskId: task?.id || null,
+      recurringGeneratedAt: new Date().toISOString(),
+      recurringPreviousDate: sourceDate,
+    },
+    workspaceId: task?.workspaceId || options.workspaceId || null,
+  };
+
+  const saved = await createTask(userId, nextPayload, {
+    workspaceId: task?.workspaceId || options.workspaceId || null,
+    origin: "recurring_task",
+  });
+
+  const nextRepeatMeta = {
+    ...repeatMeta,
+    lastSpawnedDate: nextDate,
+    lastSpawnedTaskId: saved?.id || null,
+    advancedAt: new Date().toISOString(),
+  };
+
+  await db.collection("tasks").doc(String(task.id)).set(
+    {
+      repeatMeta: nextRepeatMeta,
+      updatedAt: new Date(),
+    },
+    { merge: true },
+  );
+
+  return saved;
+}
+
 export async function createTask(userId, payload = {}, options = {}) {
   const uid = sanitizeString(String(userId || ""), "").trim();
   if (!uid) throw new Error("Missing userId for task creation");
@@ -270,6 +395,10 @@ export async function createTask(userId, payload = {}, options = {}) {
     payload.metadata && typeof payload.metadata === "object"
       ? payload.metadata
       : { origin: options.origin || "planner-assistant" };
+  const repeat = normalizeTaskRepeat(payload.repeat);
+  const reminderOffsetDays = normalizeReminderOffsetDays(payload.reminderOffsetDays, null);
+  const repeatMeta = sanitizeRepeatMeta(payload.repeatMeta);
+  const reminder = sanitizeReminderConfig(payload.reminder, reminderOffsetDays);
 
   const doc = {
     title: title.slice(0, 160),
@@ -295,6 +424,10 @@ export async function createTask(userId, payload = {}, options = {}) {
     metadata,
     timezone: payload.timezone || options.timezone || null,
     source: sanitizeString(payload.source || options.origin || "planner-assistant", "planner-assistant"),
+    repeat,
+    reminderOffsetDays,
+    reminder,
+    repeatMeta,
     timeHint: sanitizeString(payload.timeHint || payload.time_hint || "", "") || null,
     timeRelation:
       sanitizeString(payload.timeRelation || payload.relation || payload.time_relation || "", "") || null,
@@ -331,6 +464,10 @@ export async function createTask(userId, payload = {}, options = {}) {
   if (!doc.duration) delete doc.duration;
   if (!doc.estimate_minutes) delete doc.estimate_minutes;
   if (!doc.timezone) delete doc.timezone;
+  if (!doc.repeat) delete doc.repeat;
+  if (doc.reminderOffsetDays === null || doc.reminderOffsetDays === undefined || doc.reminderOffsetDays <= 0) delete doc.reminderOffsetDays;
+  if (!doc.reminder) delete doc.reminder;
+  if (!doc.repeatMeta) delete doc.repeatMeta;
   if (!doc.timeHint) delete doc.timeHint;
   if (!doc.timeRelation) delete doc.timeRelation;
   if (!doc.gapMinutes && doc.gapMinutes !== 0) delete doc.gapMinutes;
