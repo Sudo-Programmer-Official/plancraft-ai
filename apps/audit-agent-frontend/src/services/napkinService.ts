@@ -81,6 +81,8 @@ type NapkinPageRequest = {
 }
 
 const DEFAULT_NAPKIN_PAGE_SIZE = 40
+const STORAGE_BUCKET = import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'audit-agent-66451.firebasestorage.app'
+const napkinAudioUrlCache = new Map<string, Promise<string | null>>()
 
 type CreateNapkinPayload = {
   text: string
@@ -188,6 +190,69 @@ function buildNapkinQuery(
   if (cursor) clauses.push(startAfter(cursor))
   clauses.push(limit(pageSize))
   return query(napkinCollection(uid, workspaceId), ...clauses)
+}
+
+function extractStoragePath(rawUrl?: string | null) {
+  if (!rawUrl || typeof rawUrl !== 'string') return null
+  try {
+    const url = new URL(rawUrl)
+    const byName = url.searchParams.get('name')
+    if (byName) return decodeURIComponent(byName)
+
+    const marker = '/o/'
+    const index = url.pathname.indexOf(marker)
+    if (index === -1) return null
+    return decodeURIComponent(url.pathname.slice(index + marker.length))
+  } catch {
+    return null
+  }
+}
+
+function shouldRepairAudioUrl(rawUrl?: string | null) {
+  if (!rawUrl || typeof rawUrl !== 'string') return false
+  try {
+    const url = new URL(rawUrl)
+    if (!url.hostname.includes('firebasestorage.googleapis.com')) return false
+    const bucketMatch = url.pathname.match(/\/v0\/b\/([^/]+)\/o(?:\/|$)/)
+    const bucket = bucketMatch?.[1] ? decodeURIComponent(bucketMatch[1]) : null
+    if (url.searchParams.has('name')) return true
+    if (!url.searchParams.has('token')) return true
+    if (bucket && bucket !== STORAGE_BUCKET) return true
+    return false
+  } catch {
+    return false
+  }
+}
+
+async function resolveNapkinAudioUrl(uid: string, itemId: string, rawUrl?: string | null) {
+  if (rawUrl && !shouldRepairAudioUrl(rawUrl)) return rawUrl
+
+  const cacheKey = `${uid}:${itemId}:${rawUrl || ''}`
+  if (napkinAudioUrlCache.has(cacheKey)) {
+    return napkinAudioUrlCache.get(cacheKey) as Promise<string | null>
+  }
+
+  const resolver = (async () => {
+    const storage = getStorage()
+    const candidates = new Set<string>()
+    const derivedPath = extractStoragePath(rawUrl)
+    if (derivedPath) candidates.add(derivedPath)
+    candidates.add(`napkin/${uid}/${itemId}.webm`)
+    candidates.add(`napkin/${uid}/${itemId}.mp3`)
+
+    for (const candidate of candidates) {
+      try {
+        return await getDownloadURL(storageRef(storage, candidate))
+      } catch {
+        /* try next candidate */
+      }
+    }
+
+    return rawUrl || null
+  })()
+
+  napkinAudioUrlCache.set(cacheKey, resolver)
+  return resolver
 }
 
 function heuristicClassification(text: string): NapkinClassification {
@@ -418,8 +483,8 @@ export function subscribeToNapkinItems(
     const q = buildNapkinQuery(uid, wsId, pageSize)
     const unsubWs = onSnapshot(
       q,
-      (snapshot) => {
-        workspaceItems = snapshot.docs.map(mapNapkinDoc)
+      async (snapshot) => {
+        workspaceItems = await Promise.all(snapshot.docs.map((doc) => mapNapkinDoc(doc, uid)))
         workspaceCursor = snapshot.docs[snapshot.docs.length - 1] || null
         hasMoreWorkspace = snapshot.size === pageSize
         emitCombined()
@@ -433,8 +498,8 @@ export function subscribeToNapkinItems(
   const legacyQuery = buildNapkinQuery(uid, null, pageSize)
   const unsubLegacy = onSnapshot(
     legacyQuery,
-    (snapshot) => {
-      legacyItems = snapshot.docs.map(mapNapkinDoc)
+    async (snapshot) => {
+      legacyItems = await Promise.all(snapshot.docs.map((doc) => mapNapkinDoc(doc, uid)))
       legacyCursor = snapshot.docs[snapshot.docs.length - 1] || null
       hasMoreLegacy = snapshot.size === pageSize
       emitCombined()
@@ -457,14 +522,15 @@ export function subscribeToNapkinItems(
   return () => teardown()
 }
 
-function mapNapkinDoc(docSnap: QueryDocumentSnapshot<DocumentData>): NapkinItem {
+async function mapNapkinDoc(docSnap: QueryDocumentSnapshot<DocumentData>, uid: string): Promise<NapkinItem> {
   const data = docSnap.data() || {}
+  const audioUrl = await resolveNapkinAudioUrl(uid, docSnap.id, data.audioUrl || null)
   return {
     id: docSnap.id,
     text: data.text || '',
     source: data.source || 'typed',
     transcript: data.transcript || '',
-    audioUrl: data.audioUrl || null,
+    audioUrl,
     createdAt: dateFromDoc(data),
     status: (data.status || 'unsorted') as NapkinStatus,
     type: (data.type || 'note') as NapkinKind,
@@ -505,7 +571,7 @@ export async function fetchNapkinItemsPage(request: NapkinPageRequest = {}): Pro
   if (wsId) {
     try {
       const snapshot = await getDocs(buildNapkinQuery(uid, wsId, pageSize, request.workspaceCursor))
-      lists.push(snapshot.docs.map(mapNapkinDoc))
+      lists.push(await Promise.all(snapshot.docs.map((doc) => mapNapkinDoc(doc, uid))))
       workspaceCursor = snapshot.docs[snapshot.docs.length - 1] || request.workspaceCursor || null
       hasMoreWorkspace = snapshot.size === pageSize
     } catch (err) {
@@ -515,7 +581,7 @@ export async function fetchNapkinItemsPage(request: NapkinPageRequest = {}): Pro
 
   try {
     const legacySnap = await getDocs(buildNapkinQuery(uid, null, pageSize, request.legacyCursor))
-    lists.push(legacySnap.docs.map(mapNapkinDoc))
+    lists.push(await Promise.all(legacySnap.docs.map((doc) => mapNapkinDoc(doc, uid))))
     legacyCursor = legacySnap.docs[legacySnap.docs.length - 1] || request.legacyCursor || null
     hasMoreLegacy = legacySnap.size === pageSize
   } catch (err) {

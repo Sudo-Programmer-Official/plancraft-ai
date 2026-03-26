@@ -30,8 +30,8 @@ const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDI0qFImSxQFYkT5CRu2K1yEZuPX1W2xEY",
   authDomain: safeAuthDomain,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "audit-agent-66451",
-  // Storage bucket should be the appspot.com domain
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "audit-agent-66451.appspot.com",
+  // Keep frontend aligned with the backend/admin bucket to avoid broken media URLs.
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "audit-agent-66451.firebasestorage.app",
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "488930745261",
   appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:488930745261:web:5fe03c2568c323ec091f24",
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-681FBRFSNY",

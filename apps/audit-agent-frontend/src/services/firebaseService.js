@@ -1234,23 +1234,42 @@ export async function addLink({ title, url, category = 'Personal', icon = '🔗'
     createdAt: Date.now(),
     lastUsedAt: 0,
   }
-  const ref = await safeAction(addDoc(linksCollectionForUser(session.uid), payload))
-  return { id: ref.id, ...payload }
+  try {
+    const ref = await safeAction(addDoc(linksCollectionForUser(session.uid), payload))
+    return { id: ref.id, ...payload }
+  } catch (err) {
+    if (currentWorkspaceId()) {
+      const ref = await safeAction(addDoc(collection(db, 'links'), payload))
+      return { id: ref.id, ...payload }
+    }
+    throw err
+  }
 }
 
 export async function getLinks() {
   const session = currentSessionContext()
   if (!session?.uid) return []
-  const col = linksCollectionForUser(session.uid)
-  const snap = await safeAction(withTimeout(getDocs(col), 4000, 'links read'))
-  let list = snap.docs.map(mapLinkDoc)
-  if (!list.length && currentWorkspaceId()) {
-    list = await fetchLegacyLinks(session.uid)
-    if (list.length) {
-      queueLegacyLinkMigration(session.uid)
+  try {
+    const col = linksCollectionForUser(session.uid)
+    const snap = await safeAction(withTimeout(getDocs(col), 4000, 'links read'))
+    let list = snap.docs.map(mapLinkDoc)
+    if (!list.length && currentWorkspaceId()) {
+      list = await fetchLegacyLinks(session.uid)
+      if (list.length) {
+        queueLegacyLinkMigration(session.uid)
+      }
     }
+    return sortLinks(list)
+  } catch (err) {
+    if (currentWorkspaceId() || isIosPackagedApp()) {
+      try {
+        return sortLinks(await fetchLegacyLinks(session.uid))
+      } catch {
+        return []
+      }
+    }
+    throw err
   }
-  return sortLinks(list)
 }
 
 export function watchLinks(cb) {
@@ -1279,7 +1298,19 @@ export function watchLinks(cb) {
         }
         cb(sortLinks(list))
       },
-      (err) => handleAuthError(err),
+      async (err) => {
+        handleAuthError(err)
+        if (currentWorkspaceId() || isIosPackagedApp()) {
+          try {
+            const legacy = await fetchLegacyLinks(session.uid)
+            cb(sortLinks(legacy))
+            return
+          } catch {
+            cb([])
+            return
+          }
+        }
+      },
     )
     return () => {
       released = true
@@ -1350,24 +1381,37 @@ async function fetchLegacyLinkCategories(userId) {
 export async function getLinkCategories() {
   const session = currentSessionContext()
   if (!session?.uid) return getDefaultLinkCategories()
-  const col = linkCategoriesCollection(session.uid)
-  const snap = await safeAction(withTimeout(getDocs(col), 4000, 'link categories read'))
-  let categories = snap.docs.map(mapCategoryDoc)
-  if (!categories.length) {
-    if (currentWorkspaceId()) {
-      const legacy = await fetchLegacyLinkCategories(session.uid)
-      if (legacy.length) return legacy
+  try {
+    const col = linkCategoriesCollection(session.uid)
+    const snap = await safeAction(withTimeout(getDocs(col), 4000, 'link categories read'))
+    let categories = snap.docs.map(mapCategoryDoc)
+    if (!categories.length) {
+      if (currentWorkspaceId()) {
+        const legacy = await fetchLegacyLinkCategories(session.uid)
+        if (legacy.length) return legacy
+      }
+      queueLinkCategorySeed(session.uid)
+      categories = getDefaultLinkCategories()
+    } else {
+      categories = categories.sort((a, b) => (a.order || 0) - (b.order || 0))
+      if (currentWorkspaceId()) {
+        const legacy = await fetchLegacyLinkCategories(session.uid)
+        categories = mergeCategories(categories, legacy)
+      }
     }
-    queueLinkCategorySeed(session.uid)
-    categories = getDefaultLinkCategories()
-  } else {
-    categories = categories.sort((a, b) => (a.order || 0) - (b.order || 0))
-    if (currentWorkspaceId()) {
-      const legacy = await fetchLegacyLinkCategories(session.uid)
-      categories = mergeCategories(categories, legacy)
+    return categories
+  } catch (err) {
+    if (currentWorkspaceId() || isIosPackagedApp()) {
+      try {
+        const legacy = await fetchLegacyLinkCategories(session.uid)
+        if (legacy.length) return legacy
+      } catch {
+        /* noop */
+      }
+      return getDefaultLinkCategories()
     }
+    throw err
   }
-  return categories
 }
 
 export function watchLinkCategories(cb) {
@@ -1405,7 +1449,21 @@ export function watchLinkCategories(cb) {
         }
         cb(cats)
       },
-      (err) => handleAuthError(err),
+      async (err) => {
+        handleAuthError(err)
+        if (currentWorkspaceId() || isIosPackagedApp()) {
+          try {
+            const legacy = await fetchLegacyLinkCategories(session.uid)
+            if (legacy.length) {
+              cb(legacy)
+              return
+            }
+          } catch {
+            /* noop */
+          }
+          cb(getDefaultLinkCategories())
+        }
+      },
     )
     return unsub
   } catch (err) {

@@ -379,8 +379,10 @@ async function hydrateData(options = {}) {
         if (!links.value.length) {
           links.value = linksResult.value
         }
-        linksReady = true
+      } else if (!links.value.length) {
+        links.value = []
       }
+      linksReady = true
       if (categoriesResult?.status === 'fulfilled' && Array.isArray(categoriesResult.value) && categoriesResult.value.length) {
         categories.value = categoriesResult.value
       }
