@@ -32,11 +32,41 @@
         🌐 Website
       </a>
     </div>
+
+    <div class="mt-8 rounded-2xl border border-white/10 bg-slate-900/60 p-5">
+      <p class="text-xs font-semibold uppercase tracking-[0.28em] text-indigo-200/80">Legal & account</p>
+      <div class="mt-4 grid gap-3 sm:grid-cols-2">
+        <RouterLink
+          to="/privacy"
+          class="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/10"
+        >
+          Privacy Policy
+        </RouterLink>
+        <RouterLink
+          to="/terms"
+          class="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/10"
+        >
+          Terms of Service
+        </RouterLink>
+        <RouterLink
+          to="/contact"
+          class="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/10"
+        >
+          Contact
+        </RouterLink>
+        <a
+          href="mailto:support@plancraftai.com"
+          class="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/10"
+        >
+          Email support
+        </a>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { useRoute } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { useFeedbackStore } from '@/stores/feedbackStore'
 import { useSeoMeta } from '@/composables/useSeoMeta'
 

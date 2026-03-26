@@ -1,21 +1,21 @@
 <template>
-  <div class="app-page-shell">
+  <div class="app-page-shell napkin-page">
     <div class="app-page-frame">
-      <header class="app-page-hero flex flex-col lg:flex-row gap-4 items-start">
-        <div class="space-y-2">
+      <header class="app-page-hero flex flex-col items-start gap-4 lg:flex-row">
+        <div class="min-w-0 space-y-2">
           <p class="app-page-eyebrow">AI Quick Actions</p>
           <h1 class="app-page-title !text-[clamp(2rem,3vw,2.85rem)]">Napkin</h1>
           <p class="app-page-description max-w-2xl text-sm">
             Drop raw ideas, voice notes, and half-formed tasks. PlanCraft will classify, tag, and route them into Planner,
-            Creator, or Leader mode when you’re ready.
+            Creator, or Leader mode when you are ready.
           </p>
           <div class="flex flex-wrap gap-2 text-xs text-slate-300/80">
-            <span class="px-3 py-1 rounded-full bg-slate-950/30 border border-white/10">⚡ Quick add</span>
-            <span class="px-3 py-1 rounded-full bg-slate-950/30 border border-white/10">🎙 Voice-ready</span>
-            <span class="px-3 py-1 rounded-full bg-slate-950/30 border border-white/10">🧠 Auto-tagged</span>
+            <span class="rounded-full border border-white/10 bg-slate-950/30 px-3 py-1">Quick add</span>
+            <span class="rounded-full border border-white/10 bg-slate-950/30 px-3 py-1">Voice-ready</span>
+            <span class="rounded-full border border-white/10 bg-slate-950/30 px-3 py-1">Auto-tagged</span>
           </div>
         </div>
-        <div class="ml-auto app-page-kpis grid grid-cols-2 sm:grid-cols-3 text-center w-full lg:w-auto">
+        <div class="app-page-kpis ml-auto grid w-full grid-cols-2 text-center sm:grid-cols-3 lg:w-auto">
           <div class="app-page-kpi stat-tile">
             <p class="stat-label">Captured</p>
             <p class="stat-value">{{ items.length }}</p>
@@ -32,54 +32,62 @@
       </header>
 
       <section class="app-page-section space-y-4">
-        <div class="flex flex-col md:flex-row md:items-center gap-3 justify-between">
+        <div class="flex flex-col justify-between gap-3 md:flex-row md:items-center">
           <div>
             <p class="app-page-eyebrow !tracking-[0.25em]">Quick Add</p>
             <h2 class="text-xl font-semibold">Fast capture with AI routing</h2>
           </div>
-          <div class="flex gap-2 flex-wrap">
-            <span class="chip" v-if="classification">
-              {{ classification.intent === 'planner' ? 'Planner suggested' : classification.intent === 'creator' ? 'Creator suggested' : classification.intent === 'leader' ? 'Leader suggested' : 'Stay on Napkin' }}
+          <div class="flex flex-wrap gap-2">
+            <span v-if="classification" class="chip">
+              {{
+                classification.intent === 'planner'
+                  ? 'Planner suggested'
+                  : classification.intent === 'creator'
+                  ? 'Creator suggested'
+                  : classification.intent === 'leader'
+                  ? 'Leader suggested'
+                  : 'Stay on Napkin'
+              }}
             </span>
-            <span class="chip" v-if="classification">Tag: {{ classification.category }}</span>
+            <span v-if="classification" class="chip">Tag: {{ classification.category }}</span>
           </div>
         </div>
 
-        <div class="grid lg:grid-cols-[1.2fr_0.9fr] gap-4">
-          <div class="space-y-3">
+        <div class="grid gap-4 lg:grid-cols-[1.2fr_0.9fr]">
+          <div class="min-w-0 space-y-3">
             <textarea
               v-model="input"
               rows="4"
-              class="w-full rounded-2xl bg-slate-950/30 border border-white/10 px-4 py-3 text-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30 transition"
-              placeholder="Type or paste anything — ideas, reminders, voice transcripts, screenshots (link), or messy notes…"
+              class="w-full rounded-2xl border border-white/10 bg-slate-950/30 px-4 py-3 text-sm transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30"
+              placeholder="Type or paste anything: ideas, reminders, voice transcripts, screenshots (link), or messy notes..."
             ></textarea>
 
-            <div class="flex flex-col sm:flex-row gap-3">
+            <div class="flex flex-col gap-3 sm:flex-row">
               <button
-                class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-fuchsia-500 to-indigo-500 hover:from-fuchsia-400 hover:to-indigo-400 text-sm font-semibold transition disabled:opacity-50"
+                class="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-fuchsia-500 to-indigo-500 px-4 py-2.5 text-sm font-semibold transition hover:from-fuchsia-400 hover:to-indigo-400 disabled:opacity-50"
                 :disabled="saving || (!input.trim() && !voiceTranscript)"
                 @click="saveNapkin"
               >
                 <span v-if="saving" class="loader-dot" aria-hidden="true"></span>
-                <span>{{ saving ? 'Saving…' : 'Drop to Napkin' }}</span>
+                <span>{{ saving ? 'Saving...' : 'Drop to Napkin' }}</span>
               </button>
               <button
-                class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-950/30 border border-white/10 hover:border-indigo-400 text-sm transition"
+                class="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-slate-950/30 px-4 py-2.5 text-sm transition hover:border-indigo-400"
                 :class="{ 'animate-pulse-soft': recordingState === 'recording' }"
                 @click="toggleRecording"
               >
-                <span v-if="recordingState === 'recording'">⏹ Stop</span>
-                <span v-else-if="recordingState === 'processing'">⏳ Processing</span>
-                <span v-else>🎙 Voice capture</span>
+                <span v-if="recordingState === 'recording'">Stop</span>
+                <span v-else-if="recordingState === 'processing'">Processing</span>
+                <span v-else>Voice capture</span>
                 <span v-if="recordingState === 'recording'" class="recording-dot" aria-hidden="true"></span>
                 <span v-if="recordingState !== 'idle'" class="text-xs text-slate-400">{{ formattedTimer }}</span>
               </button>
               <button
                 v-if="audioPreviewUrl || voiceTranscript"
-                class="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-slate-950/30 border border-white/10 text-sm hover:border-rose-400"
+                class="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2 text-sm hover:border-rose-400"
                 @click="resetVoice"
               >
-                ✕ Clear voice
+                Clear voice
               </button>
             </div>
 
@@ -89,7 +97,10 @@
               </div>
               <div class="space-y-2">
                 <audio v-if="audioPreviewUrl" :src="audioPreviewUrl" controls class="w-full" />
-                <p v-if="voiceTranscript" class="text-sm text-slate-300 bg-slate-950/30 border border-white/10 rounded-xl px-3 py-2">
+                <p
+                  v-if="voiceTranscript"
+                  class="rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2 text-sm text-slate-300"
+                >
                   {{ voiceTranscript }}
                 </p>
               </div>
@@ -102,31 +113,31 @@
             </div>
           </div>
 
-          <div class="p-4 rounded-2xl bg-slate-950/30 border border-white/10 space-y-3">
+          <div class="space-y-3 rounded-2xl border border-white/10 bg-slate-950/30 p-4">
             <div class="flex items-center justify-between">
               <p class="text-sm font-semibold text-slate-200">AI quick actions</p>
-              <span class="text-[11px] px-2 py-0.5 rounded-full bg-slate-950/35 border border-white/10 text-slate-300/80">
+              <span class="rounded-full border border-white/10 bg-slate-950/35 px-2 py-0.5 text-[11px] text-slate-300/80">
                 {{ latestSaved ? 'Ready' : 'Waiting for input' }}
               </span>
             </div>
             <p class="text-xs text-slate-400">PlanCraft recommends where this note should land.</p>
 
-            <div class="grid sm:grid-cols-2 gap-2">
+            <div class="grid gap-2 sm:grid-cols-2">
               <button class="action-btn" :disabled="!latestSaved" @click="latestSaved && openPlanner(latestSaved)">
-                <span>🗓 Add to Planner</span>
+                <span>Add to Planner</span>
               </button>
               <button class="action-btn" :disabled="!latestSaved" @click="latestSaved && convertToCreator(latestSaved)">
-                <span>🎨 Send to Creator</span>
+                <span>Send to Creator</span>
               </button>
               <button class="action-btn" :disabled="!latestSaved" @click="latestSaved && convertToLeader(latestSaved)">
-                <span>🧭 Add Leader Event</span>
+                <span>Add Leader Event</span>
               </button>
               <button class="action-btn" :disabled="!latestSaved" @click="latestSaved && keepNapkin(latestSaved)">
-                <span>📌 Keep in Napkin</span>
+                <span>Keep in Napkin</span>
               </button>
             </div>
 
-            <div v-if="latestSaved" class="text-xs text-slate-400 mt-2">
+            <div v-if="latestSaved" class="mt-2 text-xs text-slate-400">
               {{ latestSaved.suggestion || 'Ready for routing.' }}
             </div>
           </div>
@@ -134,7 +145,7 @@
       </section>
 
       <section class="space-y-3">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p class="app-page-eyebrow !tracking-[0.25em]">Stream</p>
             <h3 class="text-lg font-semibold">Your Napkin</h3>
@@ -143,12 +154,13 @@
             <button
               v-for="f in filters"
               :key="f.value"
+              type="button"
               @click="filter = f.value"
               :class="[
-                'px-3 py-1.5 rounded-full text-sm border transition',
+                'rounded-full border px-3 py-1.5 text-sm transition',
                 filter === f.value
-                  ? 'bg-indigo-500/90 text-white border-indigo-300/70'
-                  : 'bg-slate-950/30 text-slate-300 border-white/10 hover:border-indigo-400/60',
+                  ? 'border-indigo-300/70 bg-indigo-500/90 text-white'
+                  : 'border-white/10 bg-slate-950/30 text-slate-300 hover:border-indigo-400/60',
               ]"
             >
               {{ f.label }}
@@ -158,65 +170,192 @@
 
         <div
           v-if="napkinError"
-          class="text-sm text-rose-200 bg-rose-900/40 border border-rose-700/40 rounded-xl px-3 py-2"
+          class="rounded-xl border border-rose-700/40 bg-rose-900/40 px-3 py-2 text-sm text-rose-200"
         >
           {{ napkinError }}
         </div>
 
         <div v-if="loading" class="space-y-2">
-          <div v-for="n in 4" :key="n" class="h-20 bg-slate-900/60 border border-slate-800 rounded-xl animate-pulse" />
+          <div
+            v-for="n in 4"
+            :key="n"
+            class="h-32 rounded-2xl border border-slate-800 bg-slate-900/60 animate-pulse"
+          />
         </div>
         <div v-else-if="filteredItems.length === 0" class="app-page-empty text-sm">
           Nothing on the Napkin yet. Capture a note or voice memo to get started.
         </div>
-        <div v-else class="space-y-3">
-          <article
-            v-for="item in filteredItems"
-            :key="item.id"
-            class="p-4 rounded-3xl bg-slate-950/30 border border-white/10 hover:border-indigo-300/50 transition space-y-3 shadow-lg shadow-slate-950/10"
-          >
-            <div class="flex items-start justify-between gap-3">
-              <div class="space-y-1 flex-1">
-                <div class="flex flex-wrap items-center gap-2 text-[11px]">
-                  <span class="pill">{{ item.type }}</span>
-                  <span class="pill pill-ghost">{{ item.category }}</span>
-                  <span v-if="item.status !== 'unsorted'" class="pill pill-ghost uppercase tracking-wide">
-                    {{ item.status }}
-                  </span>
-                  <span class="text-slate-500">{{ formatDate(item.createdAt) }}</span>
+        <div v-else class="napkin-stream-layout">
+          <div class="napkin-list-pane">
+            <button
+              v-for="item in filteredItems"
+              :key="item.id"
+              type="button"
+              class="napkin-list-card"
+              :class="{ 'napkin-list-card--active': selectedItem?.id === item.id }"
+              @click="openDetail(item)"
+            >
+              <div class="flex min-w-0 items-start justify-between gap-3">
+                <div class="min-w-0 flex-1 space-y-3">
+                  <div class="flex min-w-0 flex-wrap items-center gap-2 text-[11px]">
+                    <span class="pill">{{ item.type }}</span>
+                    <span class="pill pill-ghost">{{ item.category }}</span>
+                    <span v-if="item.status !== 'unsorted'" class="pill pill-ghost uppercase tracking-wide">
+                      {{ item.status }}
+                    </span>
+                    <span v-if="item.audioUrl || item.source === 'voice'" class="pill pill-ghost">Voice</span>
+                    <span class="text-slate-500">{{ formatDate(item.createdAt) }}</span>
+                  </div>
+                  <p class="napkin-card-preview">
+                    {{ item.text }}
+                  </p>
                 </div>
-                <p class="text-sm text-slate-100 whitespace-pre-line leading-relaxed">
-                  {{ item.text }}
-                </p>
-                <p v-if="item.transcript && item.transcript !== item.text" class="text-xs text-slate-400">
-                  Transcript: {{ item.transcript }}
-                </p>
-                <audio
-                  v-if="item.audioUrl"
-                  :src="item.audioUrl"
-                  controls
-                  class="w-full mt-2 rounded-lg border border-slate-800 bg-slate-950/60"
-                />
+                <span class="napkin-card-chevron" aria-hidden="true">Open</span>
               </div>
-              <div class="flex flex-col gap-2 items-end">
-                <button class="icon-btn" @click="archiveItem(item)" :title="item.status === 'archived' ? 'Unarchive' : 'Archive'">
-                  {{ item.status === 'archived' ? '⬆️' : '📦' }}
-                </button>
-                <button class="icon-btn" @click="deleteItem(item)" title="Delete">🗑</button>
+
+              <div class="flex items-center justify-between gap-3 text-xs text-slate-400">
+                <div class="flex min-w-0 flex-wrap gap-2 overflow-hidden">
+                  <span
+                    v-for="tag in item.tags.slice(0, 2)"
+                    :key="tag"
+                    class="pill pill-ghost max-w-full"
+                  >
+                    #{{ tag }}
+                  </span>
+                </div>
+                <span class="truncate text-right">{{ item.suggestion || routeSuggestion(item.intent) }}</span>
+              </div>
+            </button>
+          </div>
+
+          <aside
+            v-if="selectedItem || isTwoPane"
+            class="napkin-detail-pane"
+            :class="{
+              'napkin-detail-pane--open': detailOpen || isTwoPane,
+              'napkin-detail-pane--two-pane': isTwoPane,
+            }"
+            @click.self="closeDetail"
+          >
+            <div class="napkin-detail-card">
+              <div class="napkin-detail-toolbar">
+                <div class="min-w-0">
+                  <p class="text-xs font-semibold uppercase tracking-[0.28em] text-indigo-200/80">Full note</p>
+                  <h4 class="truncate text-xl font-semibold text-white">
+                    {{ selectedItem ? detailHeading(selectedItem) : 'Napkin detail' }}
+                  </h4>
+                  <p v-if="selectedItem" class="mt-1 text-sm text-slate-400">
+                    {{ formatDetailMeta(selectedItem) }}
+                  </p>
+                </div>
+                <div class="flex shrink-0 items-center gap-2">
+                  <button
+                    v-if="selectedItem && !isEditingSelected"
+                    type="button"
+                    class="detail-action-btn"
+                    @click="beginEdit(selectedItem)"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    v-if="selectedItem && isEditingSelected"
+                    type="button"
+                    class="detail-action-btn"
+                    @click="cancelEdit"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    v-if="selectedItem"
+                    type="button"
+                    class="detail-action-btn detail-action-btn--danger"
+                    @click="requestDelete(selectedItem)"
+                  >
+                    Delete
+                  </button>
+                  <button v-if="!isTwoPane" type="button" class="detail-close-btn" @click="closeDetail">
+                    Close
+                  </button>
+                </div>
+              </div>
+
+              <div v-if="selectedItem" class="napkin-detail-scroll">
+                <div class="space-y-5">
+                  <div class="flex flex-wrap gap-2 text-xs text-slate-300">
+                    <span class="pill">{{ selectedItem.type }}</span>
+                    <span class="pill pill-ghost">{{ selectedItem.category }}</span>
+                    <span class="pill pill-ghost">{{ routeSuggestion(selectedItem.intent) }}</span>
+                    <span v-for="tag in selectedItem.tags" :key="tag" class="pill pill-ghost">#{{ tag }}</span>
+                  </div>
+
+                  <div v-if="isEditingSelected" class="space-y-3">
+                    <label class="block space-y-2">
+                      <span class="text-sm font-medium text-slate-200">Edit note</span>
+                      <textarea
+                        v-model="editDraft"
+                        rows="10"
+                        class="detail-textarea"
+                        placeholder="Update your note..."
+                      ></textarea>
+                    </label>
+                    <div class="flex flex-col gap-2 sm:flex-row">
+                      <button type="button" class="detail-primary-btn" @click="saveEdit">
+                        {{ savingEdit ? 'Saving...' : 'Save changes' }}
+                      </button>
+                      <button type="button" class="detail-secondary-btn" @click="cancelEdit">Cancel</button>
+                    </div>
+                  </div>
+
+                  <div v-else class="space-y-4">
+                    <p class="napkin-detail-body">
+                      {{ selectedItem.text }}
+                    </p>
+
+                    <div
+                      v-if="selectedItem.transcript && selectedItem.transcript !== selectedItem.text"
+                      class="rounded-2xl border border-white/10 bg-slate-950/35 p-4"
+                    >
+                      <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Transcript</p>
+                      <p class="napkin-detail-body mt-3 text-sm text-slate-300">
+                        {{ selectedItem.transcript }}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div
+                    v-if="selectedItem.audioUrl"
+                    class="rounded-2xl border border-white/10 bg-slate-950/35 p-4"
+                  >
+                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Voice attachment</p>
+                    <audio
+                      :src="selectedItem.audioUrl"
+                      controls
+                      class="mt-3 w-full rounded-lg border border-slate-800 bg-slate-950/60"
+                    />
+                  </div>
+
+                  <div class="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p class="text-sm font-semibold text-white">Move this note</p>
+                        <p class="text-xs text-slate-400">Send it where you want to work on it next.</p>
+                      </div>
+                    </div>
+                    <div class="mt-4 flex flex-wrap gap-2">
+                      <button type="button" class="action-chip" @click="openPlanner(selectedItem)">Add to Planner</button>
+                      <button type="button" class="action-chip" @click="convertToCreator(selectedItem)">Send to Creator</button>
+                      <button type="button" class="action-chip" @click="convertToLeader(selectedItem)">Add Leader Event</button>
+                      <button type="button" class="action-chip" @click="keepNapkin(selectedItem)">Keep here</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div v-else class="napkin-detail-empty">
+                Select a note to review the full content and move it where it belongs.
               </div>
             </div>
-
-            <div v-if="item.tags?.length" class="flex flex-wrap gap-2 text-[11px] text-slate-400">
-              <span v-for="tag in item.tags" :key="tag" class="pill pill-ghost">#{{ tag }}</span>
-            </div>
-
-            <div class="flex flex-wrap gap-2">
-              <button class="action-chip" @click="openPlanner(item)">Add to Planner</button>
-              <button class="action-chip" @click="convertToCreator(item)">Send to Creator</button>
-              <button class="action-chip" @click="convertToLeader(item)">Add Leader Event</button>
-              <button class="action-chip" @click="keepNapkin(item)">Keep here</button>
-            </div>
-          </article>
+          </aside>
         </div>
       </section>
     </div>
@@ -229,13 +368,50 @@
       @close="closePlanner"
       @saved="handleTaskSaved"
     />
+
+    <el-dialog
+      v-model="deleteDialogOpen"
+      width="min(420px, calc(100vw - 2rem))"
+      class="napkin-delete-dialog"
+      :close-on-click-modal="!deleting"
+      :close-on-press-escape="!deleting"
+      :show-close="!deleting"
+    >
+      <template #header>
+        <div class="space-y-1">
+          <p class="text-xs font-semibold uppercase tracking-[0.28em] text-rose-300/80">Delete note</p>
+          <h3 class="text-lg font-semibold text-white">Remove this Napkin entry?</h3>
+        </div>
+      </template>
+
+      <div class="space-y-4 text-sm text-slate-200">
+        <p>This permanently deletes the note and its attachments from this workspace.</p>
+        <p
+          v-if="deleteCandidate"
+          class="max-h-28 overflow-hidden rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-slate-300"
+        >
+          {{ deleteCandidate.text }}
+        </p>
+      </div>
+
+      <template #footer>
+        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button type="button" class="detail-secondary-btn" :disabled="deleting" @click="closeDeleteDialog">
+            Cancel
+          </button>
+          <button type="button" class="detail-danger-btn" :disabled="deleting" @click="confirmDelete">
+            {{ deleting ? 'Deleting...' : 'Delete' }}
+          </button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import TaskPlannerDialog from '@/components/TaskPlannerDialog.vue'
 import api from '@/services/api'
 import { addTaskToFirebase, updateTaskInFirebase } from '@/services/firebaseService'
@@ -246,6 +422,7 @@ import {
   subscribeToNapkinItems,
   updateNapkinItem,
   type NapkinClassification,
+  type NapkinIntent,
   type NapkinItem,
 } from '@/services/napkinService'
 import { toLocalDateKey } from '@/utils/dateHelper'
@@ -266,6 +443,8 @@ const recordedBlob = ref<Blob | null>(null)
 const classification = ref<NapkinClassification | null>(null)
 const saving = ref(false)
 const loading = ref(true)
+const savingEdit = ref(false)
+const deleting = ref(false)
 const napkinError = ref('')
 const items = ref<NapkinItem[]>([])
 const filter = ref('all')
@@ -273,6 +452,12 @@ const plannerOpen = ref(false)
 const plannerTask = ref<any>(null)
 const convertingFrom = ref<NapkinItem | null>(null)
 const latestSavedId = ref<string | null>(null)
+const selectedItemId = ref<string | null>(null)
+const detailOpen = ref(false)
+const isTwoPane = ref(false)
+const editingItemId = ref<string | null>(null)
+const editDraft = ref('')
+const deleteCandidate = ref<NapkinItem | null>(null)
 
 const filters = [
   { label: 'All', value: 'all' },
@@ -295,6 +480,14 @@ const filteredItems = computed(() => {
   return items.value.filter((i) => i.type === filter.value)
 })
 
+const selectedItem = computed(() => filteredItems.value.find((item) => item.id === selectedItemId.value) || null)
+const isEditingSelected = computed(() => !!selectedItem.value && editingItemId.value === selectedItem.value.id)
+const deleteDialogOpen = computed({
+  get: () => !!deleteCandidate.value,
+  set: (next) => {
+    if (!next) closeDeleteDialog()
+  },
+})
 const latestSaved = computed(() => items.value.find((i) => i.id === latestSavedId.value))
 const convertedCount = computed(() => items.value.filter((i) => i.status === 'converted').length)
 const voiceCount = computed(() => items.value.filter((i) => i.audioUrl || i.source === 'voice').length)
@@ -316,6 +509,32 @@ function formatDate(ms: number) {
   } catch {
     return new Date(ms).toLocaleString()
   }
+}
+
+function routeSuggestion(intent: NapkinIntent) {
+  if (intent === 'planner') return 'Planner suggested'
+  if (intent === 'creator') return 'Creator suggested'
+  if (intent === 'leader') return 'Leader suggested'
+  return 'Stay on Napkin'
+}
+
+function detailHeading(item: NapkinItem) {
+  if (item.type === 'task') return 'Task draft'
+  if (item.type === 'idea') return 'Idea note'
+  if (item.type === 'content') return 'Content note'
+  if (item.type === 'reminder') return 'Reminder note'
+  return 'Captured note'
+}
+
+function formatDetailMeta(item: NapkinItem) {
+  const sourceLabel = item.audioUrl || item.source === 'voice' ? 'Voice note' : 'Typed note'
+  return `${sourceLabel} · ${formatDate(item.createdAt)}`
+}
+
+function syncLayoutMode() {
+  if (typeof window === 'undefined') return
+  isTwoPane.value = window.innerWidth >= 768
+  if (isTwoPane.value) detailOpen.value = false
 }
 
 async function toggleRecording() {
@@ -435,6 +654,7 @@ async function saveNapkin() {
       metadata: { length: text.length },
     })
     latestSavedId.value = saved.id
+    selectedItemId.value = saved.id
     input.value = ''
     voiceTranscript.value = ''
     resetVoice()
@@ -447,7 +667,68 @@ async function saveNapkin() {
   }
 }
 
+function openDetail(item: NapkinItem) {
+  selectedItemId.value = item.id
+  if (!isTwoPane.value) detailOpen.value = true
+}
+
+function closeDetail() {
+  if (isTwoPane.value) return
+  detailOpen.value = false
+  cancelEdit()
+}
+
+function beginEdit(item: NapkinItem) {
+  selectedItemId.value = item.id
+  editDraft.value = item.text
+  editingItemId.value = item.id
+  if (!isTwoPane.value) detailOpen.value = true
+}
+
+function cancelEdit() {
+  editingItemId.value = null
+  editDraft.value = ''
+}
+
+async function saveEdit() {
+  const item = selectedItem.value
+  const nextText = editDraft.value.trim()
+  if (!item || editingItemId.value !== item.id) return
+  if (!nextText) {
+    ElMessage.warning('Note cannot be empty')
+    return
+  }
+  savingEdit.value = true
+  try {
+    const nextMetadata = { ...(item.metadata || {}), length: nextText.length }
+    await updateNapkinItem(
+      item.id,
+      {
+        text: nextText,
+        metadata: nextMetadata,
+      },
+      item.workspaceId,
+    )
+    items.value = items.value.map((entry) =>
+      entry.id === item.id
+        ? {
+            ...entry,
+            text: nextText,
+            metadata: nextMetadata,
+          }
+        : entry,
+    )
+    cancelEdit()
+    ElMessage.success('Note updated')
+  } catch (err: any) {
+    ElMessage.error(err?.message || 'Failed to save changes')
+  } finally {
+    savingEdit.value = false
+  }
+}
+
 function openPlanner(item: NapkinItem) {
+  if (!isTwoPane.value) detailOpen.value = false
   convertingFrom.value = item
   plannerTask.value = {
     title: item.text.slice(0, 120),
@@ -479,11 +760,15 @@ async function handleTaskSaved(payload: any) {
       }
     }
     if (convertingFrom.value?.id) {
-      await updateNapkinItem(convertingFrom.value.id, {
-        status: 'converted',
-        intent: 'planner',
-        linkedTaskId: linkedId,
-      }, convertingFrom.value.workspaceId)
+      await updateNapkinItem(
+        convertingFrom.value.id,
+        {
+          status: 'converted',
+          intent: 'planner',
+          linkedTaskId: linkedId,
+        },
+        convertingFrom.value.workspaceId,
+      )
     }
     ElMessage.success('Routed to Planner')
   } catch (err: any) {
@@ -531,29 +816,34 @@ async function keepNapkin(item: NapkinItem) {
   }
 }
 
-async function archiveItem(item: NapkinItem) {
-  try {
-    const nextStatus = item.status === 'archived' ? 'unsorted' : 'archived'
-    await updateNapkinItem(item.id, { status: nextStatus }, item.workspaceId)
-  } catch (err: any) {
-    ElMessage.error(err?.message || 'Failed to archive')
-  }
+function requestDelete(item: NapkinItem | null) {
+  if (!item) return
+  deleteCandidate.value = item
 }
 
-async function deleteItem(item: NapkinItem) {
-  try {
-    await ElMessageBox.confirm('Delete this Napkin entry?', 'Delete', {
-      confirmButtonText: 'Delete',
-      cancelButtonText: 'Cancel',
-      type: 'warning',
-    })
-  } catch {
-    return
-  }
+function closeDeleteDialog() {
+  if (deleting.value) return
+  deleteCandidate.value = null
+}
+
+async function confirmDelete() {
+  const item = deleteCandidate.value
+  if (!item) return
+  deleting.value = true
   try {
     await deleteNapkinItem(item.id, item.workspaceId)
+    items.value = items.value.filter((entry) => entry.id !== item.id)
+    if (!isTwoPane.value) detailOpen.value = false
+    if (selectedItemId.value === item.id) {
+      selectedItemId.value = null
+    }
+    cancelEdit()
+    deleteCandidate.value = null
+    ElMessage.success('Deleted from Napkin')
   } catch (err: any) {
     ElMessage.error(err?.message || 'Delete failed')
+  } finally {
+    deleting.value = false
   }
 }
 
@@ -568,10 +858,9 @@ function subscribe() {
         napkinError.value = ''
       },
       {
-        onError: (error) => {
+        onError: () => {
           if (!items.value.length) {
-            napkinError.value =
-              'Napkin feed is unavailable right now. Showing the last saved items if possible.'
+            napkinError.value = 'Napkin feed is unavailable right now. Showing the last saved items if possible.'
           }
           loading.value = false
         },
@@ -584,7 +873,33 @@ function subscribe() {
   }
 }
 
+watch(
+  filteredItems,
+  (list) => {
+    if (!list.length) {
+      selectedItemId.value = null
+      detailOpen.value = false
+      cancelEdit()
+      return
+    }
+
+    const hasSelected = !!selectedItemId.value && list.some((item) => item.id === selectedItemId.value)
+    if (!hasSelected) {
+      selectedItemId.value = list[0].id
+      cancelEdit()
+      if (!isTwoPane.value) detailOpen.value = false
+    }
+  },
+  { immediate: true },
+)
+
+watch(isTwoPane, (enabled) => {
+  if (enabled) detailOpen.value = false
+})
+
 onMounted(() => {
+  syncLayoutMode()
+  window.addEventListener('resize', syncLayoutMode)
   subscribe()
   try {
     workspaceUnsub = workspaceStore.$subscribe(() => {
@@ -599,11 +914,16 @@ onMounted(() => {
 onBeforeUnmount(() => {
   if (unsubscribe) unsubscribe()
   if (workspaceUnsub) workspaceUnsub()
+  window.removeEventListener('resize', syncLayoutMode)
   resetVoice()
 })
 </script>
 
 <style scoped>
+.napkin-page {
+  overflow-x: hidden;
+}
+
 .chip {
   display: inline-flex;
   align-items: center;
@@ -630,8 +950,8 @@ onBeforeUnmount(() => {
 
 .stat-value {
   margin: 0.15rem 0 0;
-  font-weight: 700;
   font-size: 1.4rem;
+  font-weight: 700;
 }
 
 .loader-dot {
@@ -660,10 +980,10 @@ onBeforeUnmount(() => {
 
 .action-btn {
   display: inline-flex;
+  width: 100%;
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  width: 100%;
   padding: 0.8rem 0.75rem;
   border-radius: 0.9rem;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -684,13 +1004,17 @@ onBeforeUnmount(() => {
 
 .pill {
   display: inline-flex;
+  max-width: 100%;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.15rem 0.6rem;
+  padding: 0.2rem 0.65rem;
   border-radius: 999px;
   background: rgba(99, 102, 241, 0.15);
   border: 1px solid rgba(129, 140, 248, 0.4);
   text-transform: capitalize;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pill-ghost {
@@ -699,7 +1023,7 @@ onBeforeUnmount(() => {
 }
 
 .action-chip {
-  padding: 0.55rem 0.9rem;
+  padding: 0.6rem 0.95rem;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.04);
@@ -713,16 +1037,268 @@ onBeforeUnmount(() => {
   background: rgba(129, 140, 248, 0.12);
 }
 
-.icon-btn {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.05);
+.napkin-stream-layout {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.napkin-list-pane {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.napkin-list-card {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 140px;
+  max-height: 140px;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.75rem;
+  overflow: hidden;
+  border-radius: 1.4rem;
   border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(2, 6, 23, 0.44);
+  padding: 1rem;
+  text-align: left;
+  box-shadow: 0 18px 32px rgba(15, 23, 42, 0.18);
+  transition: border-color 0.2s ease, transform 0.18s ease, background 0.18s ease;
+}
+
+.napkin-list-card:hover {
+  border-color: rgba(129, 140, 248, 0.55);
+  background: rgba(15, 23, 42, 0.6);
+  transform: translateY(-1px);
+}
+
+.napkin-list-card--active {
+  border-color: rgba(129, 140, 248, 0.8);
+  background: linear-gradient(180deg, rgba(49, 46, 129, 0.3), rgba(15, 23, 42, 0.72));
+}
+
+.napkin-card-preview {
+  overflow: hidden;
+  color: #f8fafc;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  text-wrap: pretty;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.napkin-card-chevron {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.35rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #cbd5f5;
+}
+
+.napkin-detail-pane {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  background: rgba(2, 6, 23, 0.82);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.napkin-detail-pane--open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.napkin-detail-pane--two-pane {
+  position: sticky;
+  top: calc(var(--safe-area-top) + 1rem);
+  inset: auto;
+  z-index: 0;
+  background: transparent;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.napkin-detail-card {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  background: rgba(2, 6, 23, 0.96);
+  box-shadow: 0 24px 60px rgba(2, 6, 23, 0.42);
+}
+
+.napkin-detail-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 1rem;
+}
+
+.napkin-detail-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.napkin-detail-empty {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  color: #94a3b8;
+}
+
+.napkin-detail-body {
+  color: #f8fafc;
+  font-size: 0.98rem;
+  line-height: 1.72;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.detail-textarea {
+  width: 100%;
+  min-height: 240px;
+  resize: vertical;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(15, 23, 42, 0.82);
+  padding: 1rem;
+  color: #f8fafc;
+  line-height: 1.65;
+  outline: none;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.detail-textarea:focus {
+  border-color: rgba(129, 140, 248, 0.72);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.16);
+}
+
+.detail-action-btn,
+.detail-primary-btn,
+.detail-secondary-btn,
+.detail-danger-btn,
+.detail-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.95rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 0.7rem 0.95rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.detail-action-btn,
+.detail-secondary-btn,
+.detail-close-btn {
+  background: rgba(255, 255, 255, 0.04);
+  color: #e2e8f0;
+}
+
+.detail-action-btn:hover,
+.detail-secondary-btn:hover,
+.detail-close-btn:hover {
+  border-color: rgba(129, 140, 248, 0.55);
+  background: rgba(129, 140, 248, 0.12);
+}
+
+.detail-action-btn--danger,
+.detail-danger-btn {
+  border-color: rgba(251, 113, 133, 0.4);
+  background: rgba(159, 18, 57, 0.18);
+  color: #fecdd3;
+}
+
+.detail-action-btn--danger:hover,
+.detail-danger-btn:hover {
+  border-color: rgba(251, 113, 133, 0.7);
+  background: rgba(190, 24, 93, 0.24);
+}
+
+.detail-primary-btn {
+  background: linear-gradient(135deg, #ec4899, #6366f1);
+  color: white;
+  border-color: transparent;
+}
+
+.detail-primary-btn:hover {
+  filter: brightness(1.06);
+}
+
+.napkin-delete-dialog :deep(.el-dialog) {
+  border-radius: 1.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #0f172a;
+  box-shadow: 0 24px 60px rgba(2, 6, 23, 0.42);
+}
+
+.napkin-delete-dialog :deep(.el-dialog__body) {
+  padding-top: 0.5rem;
+}
+
+@media (min-width: 768px) {
+  .napkin-stream-layout {
+    grid-template-columns: minmax(0, 0.92fr) minmax(320px, 0.88fr);
+    align-items: start;
+  }
+
+  .napkin-detail-card {
+    min-height: 580px;
+    max-height: calc(100dvh - 8rem);
+    border-radius: 1.6rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+}
+
+@media (max-width: 767px) {
+  .napkin-list-card {
+    border-radius: 1.15rem;
+  }
+
+  .napkin-detail-card {
+    border-radius: 0;
+  }
+
+  .napkin-detail-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .napkin-detail-toolbar > div:last-child {
+    width: 100%;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
 }
 
 @keyframes spin {

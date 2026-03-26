@@ -683,28 +683,6 @@
         </div>
         <RouterView v-else />
       </main>
-      <!-- Compact sticky footer -->
-      <footer
-        class="app-footer py-3 text-center text-xs sm:text-sm text-indigo-300 bg-slate-950/95 border-t border-gray-800"
-      >
-        <div
-          class="max-w-7xl mx-auto px-4 flex items-center justify-center sm:justify-between gap-3"
-        >
-          <div class="hidden sm:flex items-center gap-2">
-            <img src="/logo-bg-remove.png" alt="PlanCraftAI" class="w-6 h-6" />
-            <span class="opacity-80">PlanCraftAI</span>
-          </div>
-          <div class="flex items-center gap-4">
-            <RouterLink to="/blog" class="hover:underline">Blog</RouterLink>
-            <RouterLink to="/privacy" class="hover:underline">Privacy</RouterLink>
-            <RouterLink to="/terms" class="hover:underline">Terms</RouterLink>
-            <RouterLink to="/contact" class="hover:underline">Contact</RouterLink>
-            <a href="mailto:careers@plancraftai.com" class="hover:underline hidden sm:inline"
-              >Careers</a
-            >
-          </div>
-        </div>
-      </footer>
       <PlanSummaryModal :open="planOpen" @close="planOpen = false" />
       <ProfileSetup :open="profileSetupOpen" @close="profileSetupOpen=false" @saved="onProfileSaved" />
     </div>
@@ -1643,18 +1621,9 @@ body {
   padding-bottom: calc(1.5rem + var(--safe-area-bottom));
 }
 
-.app-footer {
-  margin-top: auto;
-  padding-bottom: calc(0.75rem + var(--safe-area-bottom));
-}
-
 @media (max-width: 1024px) {
   .app-content {
     padding-bottom: calc(1rem + var(--safe-area-bottom));
-  }
-
-  .app-footer {
-    display: none;
   }
 }
 
