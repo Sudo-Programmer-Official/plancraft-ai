@@ -1530,6 +1530,7 @@ body {
 .app-shell {
   --desktop-sidebar-width: 18rem;
   flex: 1 1 auto;
+  display: flex;
   height: 100%;
   height: 100vh;
   height: 100dvh;
@@ -1537,7 +1538,6 @@ body {
   min-height: 100vh;
   min-height: 100dvh;
   min-height: -webkit-fill-available;
-  min-height: 0;
   width: 100%;
   overflow: hidden;
   padding-left: var(--safe-area-left);
@@ -1638,10 +1638,12 @@ body {
   padding-bottom: calc(1.5rem + var(--safe-area-bottom));
 }
 
-.app-content > :first-child {
+.app-content > * {
   flex: 1 0 auto;
   min-width: 0;
   min-height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 @media (max-width: 1024px) {

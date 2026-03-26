@@ -1,4 +1,5 @@
 .app-page-shell {
+  flex: 1 1 auto;
   min-height: 100%;
   width: 100%;
   display: flex;
@@ -11,7 +12,7 @@
 .app-page-frame {
   width: min(1200px, 100%);
   margin: 0 auto;
-  flex: 1 0 auto;
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 100%;
   display: flex;
