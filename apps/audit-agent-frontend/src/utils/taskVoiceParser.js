@@ -35,11 +35,43 @@ const NUMBER_WORDS = {
 const SIMPLE_NUMBER_WORDS = Object.keys(NUMBER_WORDS)
   .filter((key) => key !== 'hundred')
   .join('|')
+const MONTH_NAME_PATTERN =
+  'jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?'
+const MONTH_INDEX_BY_NAME = {
+  jan: 0,
+  january: 0,
+  feb: 1,
+  february: 1,
+  mar: 2,
+  march: 2,
+  apr: 3,
+  april: 3,
+  may: 4,
+  jun: 5,
+  june: 5,
+  jul: 6,
+  july: 6,
+  aug: 7,
+  august: 7,
+  sep: 8,
+  sept: 8,
+  september: 8,
+  oct: 9,
+  october: 9,
+  nov: 10,
+  november: 10,
+  dec: 11,
+  december: 11,
+}
 
 const SAME_DAY_PATTERN = /\b(on that day|on the due date|same day)\b/i
 const ISO_DATE_PATTERN = /\b(\d{4}-\d{2}-\d{2})\b/
-const MONTH_DATE_PATTERN =
-  /\b(?:on\s+)?((?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:,\s*\d{4})?)\b/i
+const MONTH_DATE_PATTERN = new RegExp(
+  `\\b(?:on\\s+)?((${MONTH_NAME_PATTERN})\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,\\s*(\\d{4}))?)\\b`,
+  'i',
+)
+const STANDALONE_DAY_OF_MONTH_PATTERN = /^\s*(\d{1,2})(?:st|nd|rd|th)?\s*$/i
+const ON_DAY_OF_MONTH_PATTERN = /\bon\s+(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)?\b/i
 const OFFSET_PATTERN = new RegExp(
   `\\b((?:\\d+|(?:${SIMPLE_NUMBER_WORDS})(?:[-\\s](?:${SIMPLE_NUMBER_WORDS}))?))\\s+days?\\s+before\\b`,
   'i',
@@ -65,6 +97,72 @@ function parseNumberToken(token) {
     const value = Number(NUMBER_WORDS[parts[0]]) + Number(NUMBER_WORDS[parts[1]])
     return clampDays(value)
   }
+  return null
+}
+
+function normalizeDayOfMonth(value) {
+  const day = Number.parseInt(value, 10)
+  if (!Number.isInteger(day) || day < 1 || day > 31) return null
+  return day
+}
+
+function resolveNextDayOfMonthOccurrence(day, now = new Date()) {
+  const normalizedDay = normalizeDayOfMonth(day)
+  if (!normalizedDay) return null
+
+  const base = dayjs(now).startOf('day')
+  for (let monthOffset = 0; monthOffset < 24; monthOffset += 1) {
+    const monthBase = base.add(monthOffset, 'month').startOf('month')
+    const candidate = monthBase.date(normalizedDay).startOf('day')
+    const monthOverflowed = candidate.month() !== monthBase.month()
+    if (monthOverflowed) continue
+    if (candidate.isBefore(base, 'day')) continue
+    return candidate.toDate()
+  }
+
+  return null
+}
+
+function resolveMonthDate(match, now = new Date()) {
+  const monthName = String(match?.[2] || '').toLowerCase()
+  const monthIndex = MONTH_INDEX_BY_NAME[monthName]
+  const day = normalizeDayOfMonth(match?.[3])
+  const explicitYear = match?.[4] ? Number.parseInt(match[4], 10) : null
+  if (!Number.isInteger(monthIndex) || !day) return null
+
+  const base = dayjs(now).startOf('day')
+  const startingYear = explicitYear || base.year()
+
+  for (let yearOffset = 0; yearOffset < 8; yearOffset += 1) {
+    const year = explicitYear || startingYear + yearOffset
+    const candidate = dayjs(new Date(year, monthIndex, day)).startOf('day')
+    const overflowed =
+      candidate.year() !== year ||
+      candidate.month() !== monthIndex ||
+      candidate.date() !== day
+    if (overflowed) {
+      if (explicitYear) return null
+      continue
+    }
+    if (explicitYear || !candidate.isBefore(base, 'day')) {
+      return candidate.toDate()
+    }
+  }
+
+  return null
+}
+
+function parsePartialDayOfMonth(raw, now = new Date()) {
+  const standaloneMatch = raw.match(STANDALONE_DAY_OF_MONTH_PATTERN)
+  if (standaloneMatch?.[1]) {
+    return resolveNextDayOfMonthOccurrence(standaloneMatch[1], now)
+  }
+
+  const explicitMatch = raw.match(ON_DAY_OF_MONTH_PATTERN)
+  if (explicitMatch?.[1]) {
+    return resolveNextDayOfMonthOccurrence(explicitMatch[1], now)
+  }
+
   return null
 }
 
@@ -146,9 +244,11 @@ function parseDueDate(text, { now = new Date() } = {}) {
 
   const monthMatch = raw.match(MONTH_DATE_PATTERN)
   if (monthMatch?.[1]) {
-    const parsed = dayjs(monthMatch[1])
-    return parsed.isValid() ? parsed.startOf('day').toDate() : null
+    return resolveMonthDate(monthMatch, now)
   }
+
+  const partialDay = parsePartialDayOfMonth(raw, now)
+  if (partialDay) return partialDay
 
   if (/\btomorrow\b/i.test(raw)) return base.add(1, 'day').startOf('day').toDate()
   if (/\btoday\b/i.test(raw)) return base.startOf('day').toDate()
@@ -171,6 +271,8 @@ function extractTitle(text) {
     /\b(today|tomorrow|next week)\b/gi,
     /\b(?:on\s+)?\d{4}-\d{2}-\d{2}\b/g,
     MONTH_DATE_PATTERN,
+    STANDALONE_DAY_OF_MONTH_PATTERN,
+    ON_DAY_OF_MONTH_PATTERN,
   ]
 
   patterns.forEach((pattern) => {
