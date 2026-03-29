@@ -2,7 +2,6 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAnalytics, isSupported as analyticsIsSupported } from "firebase/analytics";
-import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check'
 import {
   getAuth,
   initializeAuth,
@@ -18,6 +17,7 @@ import { Capacitor } from '@capacitor/core';
 // For native (Capacitor) builds, prefer a dedicated mobile auth domain if provided.
 const isNative = !!Capacitor?.isNativePlatform?.()
 const nativePlatform = Capacitor?.getPlatform?.() || 'web'
+const isServer = typeof window === 'undefined' || import.meta.env.SSR
 const baseAuthDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "audit-agent-66451.firebaseapp.com"
 const mobileAuthDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN_MOBILE || baseAuthDomain
 // iOS uses email/password only right now; keep it aligned with the app's public host.
@@ -56,22 +56,26 @@ function describePersistenceOrder(order) {
 
 let auth
 try {
-  const persistenceOrder = buildAuthPersistenceOrder()
-  const authOptions = {
-    persistence: persistenceOrder,
-    popupRedirectResolver: browserPopupRedirectResolver,
+  if (isServer) {
+    auth = getAuth(firebaseApp)
+  } else {
+    const persistenceOrder = buildAuthPersistenceOrder()
+    const authOptions = {
+      persistence: persistenceOrder,
+      popupRedirectResolver: browserPopupRedirectResolver,
+    }
+    auth = initializeAuth(firebaseApp, authOptions)
+    console.info('[Auth] Firebase Auth initialized with persistence fallbacks', {
+      native: isNative,
+      platform: nativePlatform,
+      origin: typeof window !== 'undefined' ? window.location.origin : 'server',
+      authDomain: firebaseConfig.authDomain,
+      baseAuthDomain,
+      mobileAuthDomain,
+      persistence: describePersistenceOrder(persistenceOrder),
+      popupRedirectResolver: true,
+    })
   }
-  auth = initializeAuth(firebaseApp, authOptions)
-  console.info('[Auth] Firebase Auth initialized with persistence fallbacks', {
-    native: isNative,
-    platform: nativePlatform,
-    origin: typeof window !== 'undefined' ? window.location.origin : 'server',
-    authDomain: firebaseConfig.authDomain,
-    baseAuthDomain,
-    mobileAuthDomain,
-    persistence: describePersistenceOrder(persistenceOrder),
-    popupRedirectResolver: true,
-  })
 } catch (error) {
   auth = getAuth(firebaseApp)
   console.warn('[Auth] initializeAuth fallback to getAuth()', error)
@@ -87,9 +91,13 @@ try {
       if (ok) {
         analytics = getAnalytics(firebaseApp);
       }
-    }).catch(() => {});
+    }).catch(() => {
+      /* noop */
+    });
   }
-} catch {}
+} catch {
+  /* noop */
+}
 export { analytics };
 
 // Initialize App Check (required if enforcement is enabled for Auth/Firestore/Storage)

@@ -1,5 +1,5 @@
 import { db } from '@/firebase/init'
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, orderBy, serverTimestamp, Timestamp } from 'firebase/firestore'
+import { collection, doc, getDocs, setDoc, updateDoc, deleteDoc, query, where, orderBy, serverTimestamp, Timestamp } from 'firebase/firestore'
 
 function slugify(text) {
   return String(text || '')
@@ -58,8 +58,13 @@ export async function publishBlog(id, flag = true) {
   await updateBlog(id, { published: !!flag })
 }
 
-export async function getBlogBySlug(slug) {
-  const q = query(collection(db, 'blogs'), where('slug', '==', String(slug)))
+export async function getBlogBySlug(slug, options = {}) {
+  const { publishedOnly = true } = options
+  const constraints = [where('slug', '==', String(slug))]
+  if (publishedOnly) {
+    constraints.push(where('published', '==', true))
+  }
+  const q = query(collection(db, 'blogs'), ...constraints)
   const snap = await getDocs(q)
   if (snap.empty) return null
   const d = snap.docs[0]

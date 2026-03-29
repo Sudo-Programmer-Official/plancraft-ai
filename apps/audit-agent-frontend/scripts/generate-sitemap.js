@@ -6,7 +6,6 @@
  * Includes static + blog routes from Firestore.
  * Works with Firebase Hosting / Vite / Netlify.
  */
-/* eslint-env node */
 import { writeFileSync, mkdirSync, existsSync, readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -80,16 +79,39 @@ async function getBlogSlugs() {
     return [];
   }
   try {
-    const snap = await db.collection("blogs").get();
+    const snap = await db.collection("blogs").where("published", "==", true).get();
+    const seen = new Set();
     const slugs = snap.docs
       .map((d) => {
         const data = d.data() || {}
-        const slug = data.slug || d.id
-        if (!slug) return null
+        const slug = String(data.slug || "").trim().toLowerCase()
+        const title = String(data.title || "").trim()
+        const summary = String(data.summary || "").trim()
+        const content = String(data.content || "").trim()
+        const slugLooksIndexable = /^[a-z0-9]+(?:-[a-z0-9]+)+$/.test(slug) && slug.length >= 8
+        const contentLooksIndexable =
+          title.length >= 16 && (summary.length >= 60 || content.replace(/<[^>]+>/g, " ").length >= 250)
+        if (!slugLooksIndexable || !contentLooksIndexable) return null
+
+        const dedupeKey = slug.replace(/-\d+$/, "")
+        if (seen.has(dedupeKey)) return null
+        seen.add(dedupeKey)
+
+        const updatedAt = data.updated_at?.toDate ? data.updated_at.toDate() : data.updated_at || data.created_at
+        const lastmod = (() => {
+          try {
+            const value = updatedAt?.toDate ? updatedAt.toDate() : new Date(updatedAt)
+            return Number.isNaN(value?.getTime?.()) ? undefined : value.toISOString().slice(0, 10)
+          } catch {
+            return undefined
+          }
+        })()
+
         return {
           path: `/blog/${slug}`,
           changefreq: 'weekly',
           priority: 0.82,
+          lastmod,
         }
       })
       .filter(Boolean);

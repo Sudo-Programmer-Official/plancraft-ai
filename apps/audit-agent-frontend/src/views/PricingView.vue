@@ -292,12 +292,12 @@ useSeoMeta({
       ],
 })
 const loading = ref(false)
-const monthlyPriceId = import.meta.env.VITE_STRIPE_MONTHLY_PRICE_ID || 'price_monthly_default'
 const errorVisible = ref(false)
 const cancelLoading = ref(false)
 const countdown = ref('03:00:00')
 const offerActive = ref(false)
 let promoTimer = null
+let statusPollTimer = null
 const TEAM_REDIRECT = '/workspaces/new'
 const teamWorkspaces = computed(() =>
   (workspaceStore.workspaces || []).filter((w) => (w.workspaceType || w.type) === 'team'),
@@ -316,7 +316,6 @@ const proCtaLabel = computed(() => {
 })
 
 const subStore = useSubscriptionStore()
-const sub = subStore.subscription
 const { isPremium } = useIsPremium()
 
 const dialogVisible = ref(false)
@@ -347,7 +346,11 @@ function startPromoTimer() {
       if (left <= 0) {
         countdown.value = '00:00:00'
         stopPromoTimer()
-        try { sessionStorage.removeItem(key) } catch {}
+        try {
+          sessionStorage.removeItem(key)
+        } catch {
+          /* noop */
+        }
         return
       }
       const s = Math.floor(left / 1000)
@@ -391,12 +394,18 @@ async function onUpgrade() {
     const isGuest = authStore.isGuest === true || authStore.guest === true || authStore.user?.mode === 'guest'
 
     if (!authStore.user?.uid || isGuest) {
-      try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_UPGRADE_CLICK) } catch {}
+      try {
+        trackLinkedInConversion(import.meta.env.VITE_LI_CONV_UPGRADE_CLICK)
+      } catch {
+        /* noop */
+      }
       // Store post-login redirect intent
       try {
         localStorage.setItem('postLoginRedirect', '/subscription?upgrade=1')
         localStorage.setItem('upgradeAfterLogin', '1')
-      } catch {}
+      } catch {
+        /* noop */
+      }
 
       // Themed info message (aligned with PlanCraftAI UI tone)
       ElNotification({
@@ -416,7 +425,11 @@ async function onUpgrade() {
     // Proceed with checkout
     loading.value = true
     trackEvent('upgrade_started')
-    try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_UPGRADE_CLICK) } catch {}
+    try {
+      trackLinkedInConversion(import.meta.env.VITE_LI_CONV_UPGRADE_CLICK)
+    } catch {
+      /* noop */
+    }
     const url = await createCheckoutSession('monthly', authStore.user?.uid)
     window.location.href = url
 
@@ -436,7 +449,11 @@ function handleTeamCta(plan = 'starter') {
   const workspace = activeWorkspace.value
 
   if (!authStore.user?.uid || isGuest) {
-    try { localStorage.setItem('postLoginRedirect', target) } catch {}
+    try {
+      localStorage.setItem('postLoginRedirect', target)
+    } catch {
+      /* noop */
+    }
     return router.push({ path: '/signup', query: { mode: 'team', next: target } })
   }
 
@@ -463,13 +480,21 @@ onMounted(() => {
   }
   if (isPremium.value) {
     stopPromoTimer()
-    try { sessionStorage.removeItem('promoExpiresAt') } catch {}
+    try {
+      sessionStorage.removeItem('promoExpiresAt')
+    } catch {
+      /* noop */
+    }
   } else {
     startPromoTimer()
   }
 
   if (authStore?.user?.uid) {
-    try { workspaceStore.init() } catch {}
+    try {
+      workspaceStore.init()
+    } catch {
+      /* noop */
+    }
   }
 
   const qs = window?.location?.search || ''
@@ -479,19 +504,35 @@ onMounted(() => {
   const wantsUpgrade = (new URLSearchParams(qs).get('upgrade') === '1') || localStorage.getItem('upgradeAfterLogin') === '1'
   if (isSuccess) {
     trackEvent('upgrade_success')
-    try { ElNotification({ title: '🎉 Payment successful', message: 'Premium is now active!', type: 'success', duration: 2600, offset: 80 }) } catch {}
+    try {
+      ElNotification({ title: '🎉 Payment successful', message: 'Premium is now active!', type: 'success', duration: 2600, offset: 80 })
+    } catch {
+      /* noop */
+    }
     // Refresh plan + usage after redirect (webhook may take a moment)
-    try { authStore.refreshUser?.() } catch {}
-    try { authStore.refreshPlan?.() } catch {}
+    try {
+      authStore.refreshUser?.()
+    } catch {
+      /* noop */
+    }
+    try {
+      authStore.refreshPlan?.()
+    } catch {
+      /* noop */
+    }
     // Poll subscription status briefly to reflect changes
     const uid = authStore?.user?.uid
     if (uid) {
       let attempts = 0
-      const timer = setInterval(async () => {
+      if (statusPollTimer) {
+        clearInterval(statusPollTimer)
+      }
+      statusPollTimer = setInterval(async () => {
         attempts++
         await subStore.fetchStatus(uid)
         if (subStore.subscription.plan === 'premium' || attempts >= 6) {
-          clearInterval(timer)
+          clearInterval(statusPollTimer)
+          statusPollTimer = null
         }
       }, 2000)
     }
@@ -499,10 +540,18 @@ onMounted(() => {
     subStore.fetchStatus(authStore.user.uid)
   }
   if (isReactivated) {
-    try { ElNotification({ title: '🎉 Reactivated', message: 'Welcome back to Premium!', type: 'success', duration: 2400, offset: 80 }) } catch {}
+    try {
+      ElNotification({ title: '🎉 Reactivated', message: 'Welcome back to Premium!', type: 'success', duration: 2400, offset: 80 })
+    } catch {
+      /* noop */
+    }
   }
   if (isCancel) {
-    try { ElNotification({ title: 'Checkout canceled', message: 'You can try again anytime.', type: 'info', duration: 2200, offset: 80 }) } catch {}
+    try {
+      ElNotification({ title: 'Checkout canceled', message: 'You can try again anytime.', type: 'info', duration: 2200, offset: 80 })
+    } catch {
+      /* noop */
+    }
   }
   // Auto-continue to checkout after login if user intended to upgrade
   try {
@@ -510,19 +559,30 @@ onMounted(() => {
       localStorage.removeItem('upgradeAfterLogin')
       onUpgrade()
     }
-  } catch {}
+  } catch {
+    /* noop */
+  }
 })
 watch(isPremium, (val) => {
   if (isAppleBillingSafeMode) return
   if (val) {
     stopPromoTimer()
-    try { sessionStorage.removeItem('promoExpiresAt') } catch {}
+    try {
+      sessionStorage.removeItem('promoExpiresAt')
+    } catch {
+      /* noop */
+    }
   } else {
     startPromoTimer()
   }
 })
 
-onUnmounted(() => { try { if (typeof timer !== 'undefined') clearInterval(timer) } catch {} })
+onUnmounted(() => {
+  if (statusPollTimer) {
+    clearInterval(statusPollTimer)
+    statusPollTimer = null
+  }
+})
 onUnmounted(() => stopPromoTimer())
 
 // async function onCancel() {
@@ -591,11 +651,15 @@ async function refreshPremiumAccess() {
       await accessStore.fetchAccess(uid, { force: true, minIntervalMs: 0 })
       await subStore.fetchStatus(uid, { force: true, minIntervalMs: 0 })
     }
-  } catch {}
+  } catch {
+    /* noop */
+  }
 
   try {
     await workspaceStore.init()
-  } catch {}
+  } catch {
+    /* noop */
+  }
 
   ElMessage.success('Account access refreshed')
   router.push('/dashboard')

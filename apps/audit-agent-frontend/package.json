@@ -6,9 +6,9 @@
   "scripts": {
     "dev": "vite --mode development",
     "generate:release": "RELEASE_PLATFORM=web RELEASE_BUILD=${GITHUB_RUN_NUMBER:-} RELEASE_COMMIT=${GITHUB_SHA:-} RELEASE_OUTPUT=public/release.json node ../../scripts/generate-release-metadata.mjs",
-    "build": "npm run generate:release && vite build --mode production && node scripts/generate-sitemap.js",
-    "build:dev": "npm run generate:release && vite build --mode development && node -r dotenv/config scripts/generate-sitemap.js",
-    "build:ssg": "vite-ssg build src/main-ssg.js",
+    "build": "npm run generate:release && npm run build:ssg && node scripts/generate-sitemap.js",
+    "build:dev": "npm run generate:release && SKIP_SSG_PWA_REGENERATE=1 vite-ssg build --mode development && node -r dotenv/config scripts/generate-sitemap.js",
+    "build:ssg": "SKIP_SSG_PWA_REGENERATE=1 vite-ssg build",
     "preview": "vite preview",
     "deploy": "npm run build && firebase deploy",
     "lint": "eslint . --fix",

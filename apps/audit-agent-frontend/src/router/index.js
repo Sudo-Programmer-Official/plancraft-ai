@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createMemoryHistory, createRouter, createWebHistory } from 'vue-router'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import LandingPage from '../views/LandingPage.vue'
 import AppLayout from '@/layouts/AppLayout.vue'
@@ -42,10 +42,14 @@ const getCurrentUser = (authStore = null) =>
       settled = true
       try {
         if (timeoutId) clearTimeout(timeoutId)
-      } catch {}
+      } catch {
+        /* noop */
+      }
       try {
         if (removeListener) removeListener()
-      } catch {}
+      } catch {
+        /* noop */
+      }
       resolve(user)
     }
 
@@ -54,7 +58,9 @@ const getCurrentUser = (authStore = null) =>
         console.warn('[Router] Timed out waiting for Firebase auth state; continuing with fallback checks')
         finish(getAuth().currentUser || null)
       }, isNativePackagedApp() ? 4000 : 7000)
-    } catch {}
+    } catch {
+      /* noop */
+    }
 
     removeListener = onAuthStateChanged(
       getAuth(),
@@ -67,9 +73,7 @@ const getCurrentUser = (authStore = null) =>
     )
   })
 
-const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
-  routes: [
+export const routes = [
     // ✅ Public routes
     { path: '/', name: 'landing', component: LandingPage },
     { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue') },
@@ -80,7 +84,13 @@ const router = createRouter({
     { path: '/delete-account', component: DeleteAccount },
     { path: '/terms', component: Terms },
     { path: '/contact', component: Contact },
+    { path: '/pricing', name: 'pricing', component: () => import('@/views/PricingView.vue') },
+    { path: '/help', name: 'help', component: () => import('@/views/HelpView.vue') },
     { path: '/features', name: 'features', component: () => import('@/views/FeaturesView.vue') },
+    { path: '/ai-task-planner', name: 'ai-task-planner', component: () => import('@/views/AiTaskPlannerView.vue') },
+    { path: '/ai-daily-planner', name: 'ai-daily-planner', component: () => import('@/views/AiDailyPlannerView.vue') },
+    { path: '/voice-reminder-app', name: 'voice-reminder-app', component: () => import('@/views/VoiceReminderAppView.vue') },
+    { path: '/recurring-reminder-app', name: 'recurring-reminder-app', component: () => import('@/views/RecurringReminderAppView.vue') },
     { path: '/voice-planning', name: 'voice-planning', component: () => import('@/views/VoicePlanningView.vue') },
     { path: '/ai-reminders', name: 'ai-reminders', component: () => import('@/views/AiRemindersView.vue') },
     { path: '/invite/:token', name: 'workspace-invite', component: () => import('@/views/WorkspaceInviteView.vue') },
@@ -170,12 +180,10 @@ const router = createRouter({
         { path: 'goals', name: 'goals', component: () => import('@/views/GoalsView.vue') },
         { path: 'links', name: 'links', component: () => import('@/views/LinksView.vue') },
         { path: 'settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },
-        { path: 'pricing', name: 'pricing', component: () => import('@/views/PricingView.vue') },
         { path: 'subscription', name: 'subscription', component: () => import('@/views/PricingView.vue') },
         { path: 'workspaces', name: 'workspaces', component: () => import('@/views/WorkspacesView.vue') },
         { path: 'workspaces/new', name: 'workspace-new', component: () => import('@/views/WorkspaceOnboarding.vue') },
         { path: 'app', name: 'workspace-app', component: () => import('@/views/WorkspaceAppView.vue') },
-        { path: 'help', name: 'help', component: () => import('@/views/HelpView.vue') },
       ],
     },
 
@@ -221,7 +229,13 @@ const router = createRouter({
       name: 'NotFound',
       component: NotFoundView,
     },
-  ],
+]
+
+const router = createRouter({
+  history: import.meta.env.SSR
+    ? createMemoryHistory(import.meta.env.BASE_URL)
+    : createWebHistory(import.meta.env.BASE_URL),
+  routes,
 })
 
 router.beforeEach(async (to, from, next) => {
@@ -239,7 +253,9 @@ router.beforeEach(async (to, from, next) => {
           ? readNativeIosAuthSnapshot().localId
           : null,
     })
-  } catch {}
+  } catch {
+    /* noop */
+  }
 
   const wantsTeamSignup = to.path === '/signup' && to.query?.mode === 'team'
   if (wantsTeamSignup) {
@@ -248,7 +264,9 @@ router.beforeEach(async (to, from, next) => {
       '/workspaces/new'
     try {
       localStorage.setItem('postLoginRedirect', nextTarget)
-    } catch {}
+    } catch {
+      /* noop */
+    }
     const isGuest =
       authStore?.isGuest === true || authStore?.guest === true || authStore?.user?.mode === 'guest'
     if (authStore?.user && !isGuest) {
@@ -290,7 +308,9 @@ router.beforeEach(async (to, from, next) => {
         readNativeIosAuthSnapshot()?.localId === authStore.user.uid
       const hasStrictSession = !isIosPackagedApp() || !!getAuth().currentUser || hasNativeSnapshotSession
       if (authStore?.user && !isGuest && hasStrictSession) return next(nextTarget)
-    } catch {}
+    } catch {
+      /* noop */
+    }
     return next()
   }
 
@@ -304,7 +324,9 @@ router.beforeEach(async (to, from, next) => {
       if (authStore?.user && !isGuest && (getAuth().currentUser || hasNativeSnapshotSession)) {
         return next('/dashboard')
       }
-    } catch {}
+    } catch {
+      /* noop */
+    }
   }
 
   // Skip auth guard for public routes
@@ -312,7 +334,9 @@ router.beforeEach(async (to, from, next) => {
   if (requiredFeature) {
     try {
       await featureFlagsStore.ensureLoaded()
-    } catch {}
+    } catch {
+      /* noop */
+    }
     if (!featureFlagsStore.isEnabled(requiredFeature)) {
       if (requiredFeature === 'AUTO_DEPLOY') {
         return next({ path: '/creator/calendar' })
@@ -333,7 +357,9 @@ router.beforeEach(async (to, from, next) => {
         if (authStore?.user || (cachedUser && cachedToken)) {
           return next()
         }
-      } catch {}
+      } catch {
+        /* noop */
+      }
     }
     if (to.path === '/workspaces/new') {
       return next({ path: '/signup', query: { mode: 'team', next: '/workspaces/new' } })
@@ -346,7 +372,9 @@ router.beforeEach(async (to, from, next) => {
   if (isGuest && (to.path === '/workspaces/new' || to.path === '/app')) {
     try {
       localStorage.setItem('postLoginRedirect', to.fullPath || '/workspaces/new')
-    } catch {}
+    } catch {
+      /* noop */
+    }
     return next({ path: '/login', query: { mode: 'team', next: to.fullPath || '/workspaces/new' } })
   }
 

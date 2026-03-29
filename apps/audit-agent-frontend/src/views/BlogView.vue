@@ -174,16 +174,20 @@ function onContentClick(e) {
         try {
           contentBox.value?.focus()
           contentBox.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        } catch {}
+        } catch {
+          /* noop */
+        }
       })
     }
-  } catch {}
+  } catch {
+    /* noop */
+  }
 }
 
 onMounted(async () => {
   try {
     loading.value = true
-    post.value = await getBlogBySlug(route.params.slug)
+    post.value = await getBlogBySlug(route.params.slug, { publishedOnly: true })
   } finally {
     loading.value = false
   }
@@ -207,6 +211,17 @@ watchEffect(() => {
 })
 
 // 🧠 SEO & OG metadata
+watchEffect(() => {
+  if (!loading.value && !post.value) {
+    useHead({
+      title: 'Post Not Found | PlanCraftAI Blog',
+      meta: [
+        { name: 'robots', content: 'noindex, nofollow' },
+      ],
+    })
+  }
+})
+
 watchEffect(() => {
   if (post.value) {
     const canonicalUrl = `https://plancraftai.com/blog/${post.value.slug}`

@@ -3,11 +3,11 @@
     <section class="px-6 py-20 md:py-28 text-center">
       <p class="uppercase text-xs tracking-[0.35em] text-indigo-300 mb-4">Product Tour</p>
       <h1 class="text-4xl md:text-5xl font-extrabold leading-tight max-w-4xl mx-auto">
-        AI-powered task manager with voice journaling, calendar sync, and mindful reminders
+        AI task planner with voice reminders, daily planning, and calendar-aware execution
       </h1>
       <p class="mt-5 text-lg md:text-xl text-indigo-100 max-w-3xl mx-auto leading-relaxed">
-        PlanCraft AI is a focused productivity app that pairs AI coaching with peaceful design.
-        Speak tasks, sync Google Calendar, and let smart reminders keep every promise on track.
+        PlanCraftAI helps you speak tasks, sort priorities, and keep work moving with smart
+        reminders. It is built for people who want less remembering and more follow-through.
       </p>
       <div class="mt-8 flex flex-col md:flex-row gap-4 justify-center">
         <RouterLink
@@ -77,10 +77,10 @@
 
     <section class="px-6 py-16 bg-indigo-950/70">
       <div class="max-w-4xl mx-auto text-center">
-        <h2 class="text-3xl font-bold mb-4">Ready to make peaceful productivity your default?</h2>
+        <h2 class="text-3xl font-bold mb-4">Ready to stop losing tasks and start planning with confidence?</h2>
         <p class="text-indigo-100 mb-8">
-          Sign in to sync with Google Calendar, set smart reminders, and use the voice journaling
-          assistant every day.
+          Sign in to sync Google Calendar, capture tasks by voice, and keep follow-through moving
+          with reminders that stay tied to real work.
         </p>
         <div class="flex flex-col md:flex-row gap-4 justify-center">
           <RouterLink
@@ -117,9 +117,9 @@ const useCaseCards = [
     emoji: '🧠',
     title: 'AI Daily Planning',
     description:
-      'Answer a few mindful prompts and receive a suggested agenda balanced across goals, meetings, and personal care.',
-    href: '/voice-planning',
-    ctaLabel: 'Plan your morning',
+      'Start with a realistic agenda that balances priorities, meetings, and the work that actually needs to happen today.',
+    href: '/ai-daily-planner',
+    ctaLabel: 'See daily planning',
   },
   {
     emoji: '🎤',
@@ -139,11 +139,11 @@ const useCaseCards = [
   },
   {
     emoji: '⏰',
-    title: 'Smart Reminders & Recaps',
+    title: 'Voice Reminders & Follow-ups',
     description:
-      'Send reminders over push, WhatsApp, or email. Evening recaps highlight what to celebrate next.',
-    href: '/ai-reminders',
-    ctaLabel: 'See reminder flows',
+      'Turn spoken tasks into reminders over push, WhatsApp, or recap-style nudges that stay tied to real work.',
+    href: '/voice-reminder-app',
+    ctaLabel: 'See voice reminders',
   },
 ]
 
@@ -171,7 +171,7 @@ const featureBullets = [
 ]
 
 const longformIntro =
-  'PlanCraft AI replaces scattered tools with a calm surface that still feels powerful. Here is how teams and solo builders use it end to end.'
+  'PlanCraftAI replaces scattered notes, reminder apps, and overloaded calendars with one workflow for capture, planning, and follow-through.'
 
 const longformSections = [
   {
@@ -228,13 +228,13 @@ const structuredData = [
 ]
 
 useSeoMeta({
-  title: 'AI-Powered Task Manager | Smart Planning, Voice Reminders, and Calendar Sync',
+  title: 'AI Task Planner Features | Voice Reminders, AI Daily Planning, and Calendar Sync',
   description:
-    'Review every PlanCraft AI feature: AI daily planning, voice task creation, Google Calendar sync, and compassionate reminders.',
+    'Review PlanCraftAI features for AI daily planning, voice task creation, voice reminders, recurring reminders, and Google Calendar sync.',
   keywords: [
-    'AI task manager features',
-    'AI productivity app',
-    'voice planning features',
+    'AI task planner features',
+    'AI daily planner features',
+    'voice reminder app features',
     'Google Calendar sync planner',
   ],
   structuredData,

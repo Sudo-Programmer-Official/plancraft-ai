@@ -43,7 +43,6 @@
 
 <script setup>
 import { ref, watch } from 'vue'
-import { CircleCloseFilled } from '@element-plus/icons-vue'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -57,7 +56,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'retry'])
 const visible = ref(props.modelValue)
 
-const dialogWidth = ref(window.innerWidth < 640 ? '90%' : '420px')
+const dialogWidth = ref(typeof window !== 'undefined' && window.innerWidth < 640 ? '90%' : '420px')
 
 watch(() => props.modelValue, val => visible.value = val)
 watch(visible, val => emit('update:modelValue', val))

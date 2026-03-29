@@ -2,15 +2,19 @@ User-agent: *
 
 Allow: /
 Allow: /features
+Allow: /ai-task-planner
+Allow: /ai-daily-planner
 Allow: /voice-planning
+Allow: /voice-reminder-app
 Allow: /ai-reminders
+Allow: /recurring-reminder-app
 Allow: /google-calendar-integration
 Allow: /blog
 Allow: /pricing
 Allow: /contact
 Allow: /privacy
 Allow: /terms
-Allow: /data-deletion
+Allow: /delete-account
 Allow: /help
 
 Disallow: /login

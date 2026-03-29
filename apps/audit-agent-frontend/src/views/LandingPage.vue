@@ -29,21 +29,38 @@
       <div
         class="relative z-10 max-w-5xl mx-auto px-6 text-center flex flex-col items-center gap-7 md:gap-9"
       >
+        <div class="flex flex-wrap justify-center gap-2 md:gap-3">
+          <span
+            v-for="chip in heroSearchChips"
+            :key="chip"
+            class="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs md:text-sm font-semibold uppercase tracking-[0.18em] text-indigo-100 backdrop-blur-xl"
+          >
+            {{ chip }}
+          </span>
+        </div>
         <div class="flex flex-col gap-4 md:gap-5">
           <h1
             id="hero-title"
             class="text-5xl md:text-7xl font-extrabold tracking-tight text-white drop-shadow-lg leading-[1.05]"
             data-aos="fade-up"
           >
-            Peaceful Productivity
+            AI Task Planner with Voice Reminders
           </h1>
+          <p
+            class="text-xl md:text-3xl font-semibold text-white/90 max-w-4xl mx-auto leading-snug"
+            data-aos="fade-up"
+            data-aos-delay="120"
+          >
+            Plan your day, speak tasks, and never forget anything again.
+          </p>
           <p
             class="text-lg md:text-2xl text-indigo-100 max-w-3xl mx-auto leading-relaxed md:leading-[1.7]"
             data-aos="fade-up"
             data-aos-delay="150"
           >
-            PlanCraft AI is a peaceful AI workspace for individuals and teams — plan together, speak
-            your tasks, sync calendars, and let Voice AI keep everyone on track.
+            Turn voice notes into tasks, sync your calendar, and get smart reminders powered by AI.
+            PlanCraftAI works as an AI daily planner for solo users and a shared planning workspace
+            for teams.
           </p>
         </div>
         <div
@@ -55,41 +72,112 @@
             type="primary"
             size="large"
             class="primary-team-cta hero-cta w-full sm:w-auto !px-8 !py-3.5 !rounded-2xl font-semibold"
-            @click="startTeamsFlow"
+            @click="startSoloFlow"
             >
-            <span class="cta-icon" aria-hidden="true">↗</span>
-            <span>Try for Teams</span>
+            <span>Start Planning Free</span>
             </el-button
           >
           <el-button
             size="large"
             plain
             class="solo-cta hero-cta w-full sm:w-auto !px-6 !py-3 !rounded-xl font-semibold"
-            @click="startSoloFlow"
+            @click="startTeamWorkspace"
             >
-            <span>Try Solo</span>
+            <span>Create Team Workspace</span>
             </el-button
           >
         </div>
         <div class="flex flex-col gap-2 text-indigo-100/90 leading-relaxed max-w-2xl mx-auto">
           <p
-            class="text-sm md:text-base"
+            class="text-sm md:text-base font-semibold uppercase tracking-[0.24em] text-indigo-200"
             data-aos="fade-up"
             data-aos-delay="300"
           >
-            Use it solo, or create a workspace for your team.
+            No credit card needed
           </p>
           <p
             class="text-base md:text-lg text-indigo-100"
             data-aos="fade-up"
             data-aos-delay="320"
           >
-            Built for workspaces with seats, billing, and roles — with Voice AI reminders that keep
-            everyone calmly aligned.
+            Built for founders, operators, creators, and small teams who are tired of losing tasks
+            after meetings, voice notes, and busy days.
           </p>
         </div>
       </div>
     </section>
+
+    <section class="py-16 md:py-20 bg-slate-950 text-white">
+      <div class="max-w-6xl mx-auto px-6 grid gap-6 lg:grid-cols-2">
+        <article class="rounded-3xl border border-rose-300/20 bg-rose-500/10 p-8 backdrop-blur-xl shadow-xl">
+          <p class="uppercase text-xs tracking-[0.35em] text-rose-200">The problem</p>
+          <h2 class="mt-3 text-3xl md:text-4xl font-bold">Stop juggling tasks in your head</h2>
+          <ul class="mt-6 space-y-4 text-base text-rose-50/90 leading-relaxed">
+            <li v-for="problem in problemBullets" :key="problem">• {{ problem }}</li>
+          </ul>
+        </article>
+        <article class="rounded-3xl border border-emerald-300/20 bg-emerald-500/10 p-8 backdrop-blur-xl shadow-xl">
+          <p class="uppercase text-xs tracking-[0.35em] text-emerald-200">The fix</p>
+          <h2 class="mt-3 text-3xl md:text-4xl font-bold">PlanCraftAI fixes this</h2>
+          <ul class="mt-6 space-y-4 text-base text-emerald-50/90 leading-relaxed">
+            <li v-for="solution in solutionBullets" :key="solution">• {{ solution }}</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="py-16 md:py-20 bg-gradient-to-b from-slate-950 to-indigo-950/70 text-white">
+      <div class="max-w-6xl mx-auto px-6">
+        <div class="text-center max-w-3xl mx-auto">
+          <p class="uppercase text-xs tracking-[0.35em] text-indigo-300">How it feels</p>
+          <h2 class="mt-3 text-3xl md:text-4xl font-bold">A voice command becomes a real plan</h2>
+          <p class="mt-4 text-indigo-100 text-lg leading-relaxed">
+            People do not switch because a planner looks calm. They switch when it stops things
+            from slipping through the cracks.
+          </p>
+        </div>
+        <div class="mt-10 grid gap-6 lg:grid-cols-[1.2fr_1fr] items-start">
+          <div class="rounded-3xl border border-white/10 bg-white/5 p-7 md:p-8 shadow-2xl backdrop-blur-xl">
+            <p class="uppercase text-xs tracking-[0.35em] text-indigo-300">Example input</p>
+            <div class="mt-5 rounded-2xl border border-indigo-300/20 bg-slate-950/70 p-6">
+              <p class="text-sm text-indigo-200 mb-3">Voice note</p>
+              <p class="text-2xl md:text-3xl font-semibold text-white leading-snug">
+                “Remind me to call John tomorrow at 5.”
+              </p>
+            </div>
+            <div class="mt-6 grid gap-4 md:grid-cols-3">
+              <div
+                v-for="demo in voiceDemoSteps"
+                :key="demo.title"
+                class="rounded-2xl border border-white/10 bg-white/5 p-5 text-left"
+              >
+                <p class="text-2xl">{{ demo.emoji }}</p>
+                <h3 class="mt-3 font-semibold text-lg">{{ demo.title }}</h3>
+                <p class="mt-2 text-sm text-indigo-100/90 leading-relaxed">{{ demo.desc }}</p>
+              </div>
+            </div>
+          </div>
+          <div class="rounded-3xl border border-white/10 bg-gradient-to-br from-indigo-600/20 via-purple-600/10 to-slate-950 p-7 shadow-xl">
+            <p class="uppercase text-xs tracking-[0.35em] text-indigo-300">Why people convert</p>
+            <div class="mt-5 space-y-4">
+              <div
+                v-for="hook in conversionHooks"
+                :key="hook.title"
+                class="rounded-2xl border border-white/10 bg-white/5 p-5"
+              >
+                <h3 class="font-semibold text-lg text-white">{{ hook.title }}</h3>
+                <p class="mt-2 text-sm text-indigo-100/90 leading-relaxed">{{ hook.desc }}</p>
+              </div>
+            </div>
+            <p class="mt-6 text-sm text-indigo-200">
+              Join early users building calmer productivity systems without relying on memory alone.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <TestimonialsSection :testimonials="testimonialCards" />
 
     <!-- Workspaces for Teams -->
     <section
@@ -140,7 +228,7 @@
 
     <SeoLongForm
       eyebrow="Guides"
-      title="How AI Helps Plan Your Day"
+      title="How PlanCraftAI helps you capture tasks, plan the day, and follow through"
       :intro="longformIntro"
       :sections="longformSections"
     >
@@ -221,14 +309,14 @@
     >
       <div class="max-w-7xl mx-auto px-6">
         <h2 class="text-4xl md:text-5xl font-extrabold text-white drop-shadow mb-4">
-          Why Use PlanCraftAI?
+          Why people switch to PlanCraftAI
         </h2>
         <p class="text-indigo-200 mb-16 text-lg">
-          Designed to be mindful and supportive — not overwhelming.
+          Forget less, capture faster, and follow through more often.
         </p>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div
-            v-for="(f, idx) in features"
+            v-for="f in features"
             :key="f.title"
             class="group relative rounded-2xl bg-white/5 backdrop-blur-xl p-8 border border-white/10 shadow-lg hover:-translate-y-2 transition-all hover:shadow-indigo-500/40"
           >
@@ -253,11 +341,11 @@
         <div class="text-center max-w-3xl mx-auto mb-14">
           <p class="uppercase text-xs tracking-[0.35em] text-indigo-300">Use cases</p>
           <h2 class="mt-3 text-3xl md:text-4xl font-bold">
-            AI planner for goals, journaling, and mindful momentum
+            Search-intent pages for the workflows people actually want
           </h2>
           <p class="mt-4 text-indigo-200">
             Target the workflows people search for most: AI daily planning, voice task creation,
-            Google Calendar integration, and gentle reminders powered by PlanCraft AI.
+            Google Calendar integration, and reminders that stay connected to real tasks.
           </p>
         </div>
         <div class="grid gap-8 md:grid-cols-2">
@@ -284,11 +372,11 @@
     <!-- Daily Flow -->
     <section id="flow" class="py-20 bg-slate-900/60 text-center">
       <div class="max-w-7xl mx-auto px-6">
-        <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">A Gentle Daily Flow</h2>
-        <p class="text-indigo-200 mb-12">Small, steady steps toward a calmer you.</p>
+        <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">From capture to follow-through</h2>
+        <p class="text-indigo-200 mb-12">A simple sequence that keeps work moving instead of slipping.</p>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
           <div
-            v-for="(s, idx) in steps"
+            v-for="s in steps"
             :key="s.title"
             class="rounded-xl bg-white/10 backdrop-blur-md shadow p-6 border border-white/10 hover:scale-105 transition"
           >
@@ -299,8 +387,6 @@
         </div>
       </div>
     </section>
-
-    <TestimonialsSection :testimonials="testimonialCards" />
 
     <!-- Blog Preview -->
     <section
@@ -358,9 +444,9 @@
       <div class="max-w-3xl mx-auto px-6">
         <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">Why We Built PlanCraftAI</h2>
         <p class="text-indigo-200 leading-relaxed text-lg">
-          Modern work is chaotic. Notifications never stop. Plans scatter. We built PlanCraftAI to
-          bring mindfulness back to productivity — a planner that listens, adapts, and keeps you
-          peacefully focused.
+          Modern work breaks down when people keep tasks in their head and reminders across too many
+          tools. We built PlanCraftAI to capture work quickly, make daily priorities obvious, and
+          keep follow-ups from getting lost.
         </p>
       </div>
     </section>
@@ -374,7 +460,7 @@
           {{ isAppleBillingSafeMode ? '✨ Premium Access' : '✨ Choose Your Flow' }}
         </h2>
         <p class="text-indigo-200 mb-12 text-lg">
-          {{ isAppleBillingSafeMode ? 'This mobile app does not offer purchases. Premium access appears automatically when your account already has it outside the app.' : 'Simple plans designed to help you stay mindful and productive.' }}
+          {{ isAppleBillingSafeMode ? 'This mobile app does not offer purchases. Premium access appears automatically when your account already has it outside the app.' : 'Simple plans for people who want to stop forgetting tasks and keep work moving.' }}
         </p>
 
         <template v-if="isAppleBillingSafeMode">
@@ -429,7 +515,7 @@
               <div>
                 <h3 class="text-2xl font-semibold text-white mb-3">🌿 Solo Free</h3>
                 <p class="text-indigo-200 text-sm mb-6">
-                  Perfect for those starting their mindful journey.
+                  Start capturing tasks, planning the day, and building follow-through for free.
                 </p>
                 <ul class="space-y-3 text-left text-sm text-indigo-100 mb-6">
                   <li>✅ Create & manage tasks</li>
@@ -462,7 +548,7 @@
               <div>
                 <h3 class="text-2xl font-semibold text-white mb-3">🚀 Solo Premium</h3>
                 <p class="text-indigo-100 text-sm mb-6">
-                  Unlock the full mindful productivity experience.
+                  Unlock smarter reminders, richer planning, and faster follow-through.
                 </p>
                 <ul class="space-y-3 text-left text-sm mb-6 text-white/95">
                   <li>💎 Unlimited reminders & AI summaries</li>
@@ -595,10 +681,10 @@
     <!-- CTA -->
     <section id="cta" class="py-20 bg-gradient-to-b from-slate-900/60 to-slate-950/80 text-center">
       <div class="max-w-3xl mx-auto px-6" data-aos="zoom-in">
-        <h2 class="text-3xl md:text-4xl font-bold text-white">Ready to build together — calmly?</h2>
+        <h2 class="text-3xl md:text-4xl font-bold text-white">Ready to stop losing tasks?</h2>
         <p class="mt-3 text-indigo-200 leading-relaxed">
-          Create a workspace for your team, or start solo and invite teammates anytime.
-          No setup friction. No pressure.
+          Start free as an AI daily planner for yourself, or create a workspace and bring your team
+          into the same reminder and planning flow.
         </p>
         <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
           <el-button type="primary" size="large" class="!px-7 !py-3 !rounded-xl" @click="startTeamWorkspace">
@@ -617,7 +703,7 @@
       class="landing-footer py-8 text-center text-sm text-indigo-300 bg-slate-950 border-t border-indigo-500/10"
     >
       <div class="max-w-7xl mx-auto px-6">
-        <p class="text-indigo-200 mb-2">Built for calm execution — solo or with a team.</p>
+        <p class="text-indigo-200 mb-2">Built to help solo users and teams capture work and follow through.</p>
         <p class="flex flex-col sm:flex-row justify-center items-center gap-2">
           <span
             >© {{ new Date().getFullYear() }} <strong>Sudo Programmer Inc.</strong> — Crafted with
@@ -649,8 +735,55 @@ import { isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/bi
 const router = useRouter()
 const authStore = useAuthStore()
 const isAppleBillingSafeMode = computed(() => detectAppleBillingSafeMode())
-const billingRoutePath = computed(() => (isAppleBillingSafeMode.value ? '/billing/upgrade' : '/subscription'))
+const billingRoutePath = computed(() => (isAppleBillingSafeMode.value ? '/billing/upgrade' : '/pricing'))
 const teamFeaturesCtaLabel = computed(() => (isAppleBillingSafeMode.value ? 'See team workspace features' : 'See team pricing & features'))
+
+const heroSearchChips = ['AI daily planner', 'Voice task manager', 'Smart reminders']
+
+const problemBullets = [
+  'Forgetting tasks after meetings, walks, and voice notes?',
+  'Too many tools, but no clear picture of what matters today?',
+  'Typing and organizing tasks feels like another job?',
+]
+
+const solutionBullets = [
+  'Speak once and get clean tasks created instantly.',
+  'Let AI prioritize your day around meetings, deadlines, and real energy.',
+  'Use smart reminders and recaps so important work does not disappear.',
+]
+
+const voiceDemoSteps = [
+  {
+    emoji: '✅',
+    title: 'Task created',
+    desc: 'PlanCraftAI turns the request into a clean task instead of leaving it as a loose note.',
+  },
+  {
+    emoji: '⏰',
+    title: 'Reminder scheduled',
+    desc: 'The reminder is placed for tomorrow at 5 so you do not need a second app or follow-up step.',
+  },
+  {
+    emoji: '📅',
+    title: 'Calendar-aware',
+    desc: 'The planner can fit the task into your day and keep the timing visible alongside meetings.',
+  },
+]
+
+const conversionHooks = [
+  {
+    title: 'Capture before you forget',
+    desc: 'Voice-first input is faster than opening three apps and hoping you remember later.',
+  },
+  {
+    title: 'See what today actually needs',
+    desc: 'The AI daily planner helps you focus on the next few important tasks, not an endless list.',
+  },
+  {
+    title: 'Follow-through without nagging',
+    desc: 'Reminders, recaps, and gentle nudges keep work moving without creating more noise.',
+  },
+]
 
 const teamHighlights = [
   {
@@ -673,18 +806,18 @@ const teamHighlights = [
 const features = [
   {
     emoji: '🎙️',
-    title: 'Voice Journaling',
-    desc: 'Use the AI journaling assistant to turn spoken reflections into structured entries and action items.',
+    title: 'Speak tasks naturally',
+    desc: 'Use PlanCraftAI as a voice task manager that turns spoken notes into clean tasks, dates, and follow-ups.',
   },
   {
     emoji: '📅',
-    title: 'Smart Planner',
-    desc: 'Auto-carry tasks forward, schedule with intention blocks, and let AI highlight your next best step.',
+    title: 'Let AI plan your day',
+    desc: 'Build a realistic agenda with calendar-aware priorities instead of sorting through a flat backlog.',
   },
   {
-    emoji: '💓',
-    title: 'Mood Reflection',
-    desc: 'Track energy and emotions so your planning rhythm stays compassionate and realistic.',
+    emoji: '⏰',
+    title: 'Get reminders that follow through',
+    desc: 'Smart reminders, recaps, and recurring nudges keep promises visible without turning into notification spam.',
   },
 ]
 
@@ -719,16 +852,16 @@ const useCases = [
   {
     emoji: '🧠',
     title: 'AI Daily Planning',
-    desc: 'Start each morning with AI prompts that align goals, energy, and calendar realities.',
-    href: '/voice-planning',
-    ctaLabel: 'Plan an AI-powered day',
+    desc: 'Start with a clear schedule built around priorities, meetings, and realistic time blocks.',
+    href: '/ai-daily-planner',
+    ctaLabel: 'See the AI daily planner',
   },
   {
     emoji: '🎤',
     title: 'Voice Task Creation',
-    desc: 'Capture tasks by speaking naturally; PlanCraft AI structures them with due dates and tags.',
-    href: '/voice-planning#voice-capture',
-    ctaLabel: 'See voice planner flow',
+    desc: 'Speak naturally, then let PlanCraftAI turn the input into structured tasks, due dates, and reminders.',
+    href: '/ai-task-planner',
+    ctaLabel: 'See voice task capture',
   },
   {
     emoji: '📆',
@@ -739,83 +872,87 @@ const useCases = [
   },
   {
     emoji: '⏰',
-    title: 'Smart Reminders & Recaps',
-    desc: 'Let AI send reminders, nudges, and evening summaries over push, WhatsApp, or email.',
-    href: '/ai-reminders',
-    ctaLabel: 'Automate reminders',
+    title: 'Voice Reminder App',
+    desc: 'Create reminders from spoken input and follow up across push, WhatsApp, or recap-style nudges.',
+    href: '/voice-reminder-app',
+    ctaLabel: 'Explore voice reminders',
   },
 ]
 
 const faqs = [
   {
-    question: 'What makes PlanCraft AI different from other AI task managers?',
+    question: 'What is the best AI task manager for people who think out loud?',
     answer:
-      'PlanCraft AI blends voice journaling, Google Calendar sync, habit insights, and compassionate reminders so planning feels calm—perfect for founders, creators, and neurodiverse minds.',
+      'PlanCraftAI is built for people who capture work in fragments. It combines voice task capture, AI daily planning, calendar sync, and smart reminders so spoken thoughts become real follow-through.',
   },
   {
-    question: 'Can I really plan my day using only my voice?',
+    question: 'How does an AI daily planner work?',
     answer:
-      'Yes. Speak your routine or brain-dump ideas, and the AI daily planner will generate actionable tasks, priorities, and follow-up reminders.',
+      'An AI daily planner takes your tasks, timing, and calendar context, then helps you decide what deserves attention first. PlanCraftAI adds voice input, due-date parsing, and reminders so the plan stays useful after the morning.',
   },
   {
-    question: 'Does PlanCraft AI integrate with Google Calendar?',
+    question: 'Is there an AI app for reminders and follow-ups?',
     answer:
-      'Absolutely. Import meetings, create prep tasks, and receive AI summaries that link right back to your Google Calendar events.',
+      'Yes. PlanCraftAI works as a voice reminder app and recurring reminder system, sending smart nudges, follow-ups, and recap-style reminders tied to real tasks.',
   },
   {
-    question: 'Is there an AI journaling assistant for evening reflections?',
+    question: 'Does PlanCraftAI integrate with Google Calendar?',
     answer:
-      'Every night you can dictate a short reflection; PlanCraft AI summarizes emotions, progress, and goals so you always know what to improve tomorrow.',
+      'Yes. You can sync Google Calendar, place tasks around meetings, and keep prep reminders tied to the schedule you already work from.',
   },
 ]
 
 const longformIntro =
-  'Searchers often ask how an AI productivity app can guide an entire day. Here is the playbook PlanCraft AI follows to turn intention into steady progress.'
+  'People searching for an AI task planner or AI daily planner are not looking for vague calm. They want a system that captures tasks fast, helps prioritize the day, and makes sure nothing important gets missed.'
 const longformSections = [
   {
-    eyebrow: 'Morning focus',
-    heading: 'Start with AI daily agenda suggestions',
+    eyebrow: 'Capture',
+    heading: 'Speak tasks before they disappear',
     description:
-      'Speak goals, appointments, or hurdles aloud. PlanCraft AI structures them into a purpose-built schedule that still leaves room for rest.',
+      'PlanCraftAI is strongest when work starts as a thought, a meeting note, or a fast voice memo. Spoken input becomes structured tasks without a cleanup session afterward.',
     bullets: [
-      'Map priorities to energy highs and lows',
-      'Convert journaling prompts into ready-made tasks',
-      'Publish a lightweight daily contract with yourself',
+      'Turn rough speech into clear task names',
+      'Pull dates and reminders out of natural language',
+      'Keep capture friction low when the day is moving fast',
     ],
-    ctaText: 'Plan your morning with AI',
-    ctaHref: '/voice-planning',
+    ctaText: 'See the AI task planner',
+    ctaHref: '/ai-task-planner',
   },
   {
-    eyebrow: 'During the day',
-    heading: 'Voice task creation keeps momentum high',
+    eyebrow: 'Prioritize',
+    heading: 'Use AI to build a day you can actually finish',
     description:
-      'Skip typing. Drop quick voice notes and watch PlanCraft AI summarize, categorize, and remind you before deadlines slip.',
+      'A planner is only useful when it helps you choose. PlanCraftAI looks at your tasks and schedule so today feels realistic instead of overloaded.',
     bullets: [
-      'Capture tasks straight from meetings or walks',
-      'Automatically add context like tags, due dates, and urgency',
-      'Trigger AI reminders via push or WhatsApp',
+      'Balance priorities against meetings and time blocks',
+      'Highlight the next few actions that matter most',
+      'Create a calmer daily plan without losing urgency',
     ],
-    ctaText: 'Capture tasks hands-free',
-    ctaHref: '/ai-reminders',
+    ctaText: 'Explore AI daily planning',
+    ctaHref: '/ai-daily-planner',
   },
   {
-    eyebrow: 'Evening reset',
-    heading: 'Journaling assistant closes the loop',
+    eyebrow: 'Follow through',
+    heading: 'Let smart reminders keep promises visible',
     description:
-      'A quick reflection trains PlanCraft AI on what energized you, what drained you, and which goals deserve attention tomorrow.',
+      'The missing piece in most planners is follow-through. PlanCraftAI pairs tasks with reminders, recaps, and repeat schedules so work does not vanish after capture.',
     bullets: [
-      'Summaries designed for “People also ask” queries on AI journaling',
-      'Automatic recap emails or push cards',
-      'Goal tracking that celebrates streaks and rest days',
+      'Voice reminders for tasks you capture on the go',
+      'Recurring reminders for routines and repeat commitments',
+      'Recaps that help you reset instead of re-open every app',
     ],
-    ctaText: 'See AI journaling assistant',
-    ctaHref: '/voice-planning#evening',
+    ctaText: 'See the voice reminder app',
+    ctaHref: '/voice-reminder-app',
   },
 ]
 
 const seoLinks = [
   { label: 'All PlanCraft AI features', to: '/features' },
+  { label: 'AI task planner for voice capture', to: '/ai-task-planner' },
+  { label: 'AI daily planner for realistic schedules', to: '/ai-daily-planner' },
   { label: 'Voice planning and journaling', to: '/voice-planning' },
+  { label: 'Voice reminder app for spoken follow-ups', to: '/voice-reminder-app' },
+  { label: 'Recurring reminder app for habits and routines', to: '/recurring-reminder-app' },
   { label: 'AI reminders that feel human', to: '/ai-reminders' },
   { label: 'Google Calendar sync walkthrough', to: '/google-calendar-integration' },
   { label: 'Guides on AI productivity & goals', to: '/blog' },
@@ -836,21 +973,21 @@ const testimonialCards = [
   {
     name: 'Ananya M.',
     role: 'Founder, health tech',
-    quote: 'PlanCraftAI helped me stay grounded during my startup chaos.',
+    quote: 'I stopped losing follow-ups after calls because I can just speak them and move on.',
     avatar: 'https://i.pravatar.cc/150?img=47',
     status: 'approved',
   },
   {
     name: 'Michael L.',
     role: 'Ops lead, 12-person team',
-    quote: 'The calm design makes planning feel like meditation.',
+    quote: 'The team workspace finally gives us one place for tasks, reminders, and who owns what.',
     avatar: 'https://i.pravatar.cc/150?img=48',
     status: 'approved',
   },
   {
     name: 'Ravi K.',
     role: 'Product, creator tools',
-    quote: 'I love the voice journaling — it feels personal and effortless.',
+    quote: 'It feels like an AI daily planner that understands real life instead of demanding perfect input.',
     avatar: 'https://i.pravatar.cc/150?img=49',
     status: 'approved',
     audio: null,
@@ -863,6 +1000,8 @@ const featureList = Array.from(
   new Set([
     ...features.map((f) => f.title),
     ...useCases.map((c) => c.title),
+    'AI daily planner',
+    'Voice reminder app',
     'Workspaces for Teams',
     'Voice AI reminders for teams',
     'Role-based collaboration',
@@ -882,17 +1021,12 @@ const structuredData = [
     installUrl: `${BASE_URL}/#install`,
     screenshot: `${BASE_URL}/plancraftai-post-one.png`,
     description:
-      'PlanCraft AI is the peaceful AI task manager with Workspaces for teams, role-based access, and Voice AI reminders for calm productivity.',
+      'PlanCraftAI is an AI task planner and voice reminder app with AI daily planning, calendar sync, recurring reminders, and shared workspaces for teams.',
     offers: {
       '@type': 'Offer',
       price: '0.00',
       priceCurrency: 'USD',
       availability: 'https://schema.org/OnlineOnly',
-    },
-    aggregateRating: {
-      '@type': 'AggregateRating',
-      ratingValue: '5.0',
-      ratingCount: '42',
     },
   },
   {
@@ -922,17 +1056,17 @@ const structuredData = [
 ]
 
 useSeoMeta({
-  title: 'PlanCraft AI – Workspaces for Teams with Voice AI reminders',
+  title: 'PlanCraftAI | AI Task Planner, AI Daily Planner, and Voice Reminder App',
   description:
-    'PlanCraft AI now includes Workspaces for teams — invite teammates, assign roles, share tasks, and let Voice AI reminders keep everyone aligned while staying solo-friendly.',
+    'Use PlanCraftAI as an AI task planner and voice reminder app. Speak tasks, plan your day, sync your calendar, and get smart reminders that keep work from slipping.',
   keywords: [
     'PlanCraft AI',
-    'AI task manager',
+    'AI task planner',
     'AI daily planner',
+    'voice reminder app',
+    'voice task manager',
+    'recurring reminder app',
     'AI productivity app',
-    'AI journaling assistant',
-    'AI planner for goals',
-    'voice planning for teams',
     'AI reminders',
     'Workspaces for teams',
     'voice AI reminders for teams',
@@ -943,25 +1077,13 @@ useSeoMeta({
   pageLabel: 'Landing',
 })
 
-function startTeamsFlow() {
-  if (typeof localStorage !== 'undefined') {
-    try {
-      localStorage.setItem('postLoginRedirect', '/workspaces/new')
-    } catch {}
-  }
-
-  const isGuest = authStore?.isGuest === true || authStore?.guest === true || authStore?.user?.mode === 'guest'
-  if (authStore?.user?.uid && !isGuest) {
-    return router.push('/workspaces/new')
-  }
-  router.push({ path: '/signup', query: { mode: 'team', next: '/workspaces/new' } })
-}
-
 function startSoloFlow() {
   if (typeof localStorage !== 'undefined') {
     try {
       localStorage.setItem('postLoginRedirect', '/dashboard')
-    } catch {}
+    } catch {
+      /* noop */
+    }
   }
 
   const isGuest = authStore?.isGuest === true || authStore?.guest === true || authStore?.user?.mode === 'guest'
@@ -986,7 +1108,9 @@ function startTeamWorkspace(plan = 'starter') {
   if (typeof localStorage !== 'undefined') {
     try {
       localStorage.setItem('postLoginRedirect', `/workspaces/new?plan=${plan}`)
-    } catch {}
+    } catch {
+      /* noop */
+    }
   }
 
   const isGuest = authStore?.isGuest === true || authStore?.guest === true || authStore?.user?.mode === 'guest'

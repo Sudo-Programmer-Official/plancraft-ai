@@ -1,5 +1,6 @@
 import { fileURLToPath, URL } from 'node:url'
 import path from 'path'
+import process from 'node:process'
 
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
@@ -9,6 +10,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+const skipSsgPwaRegenerate = process.env.SKIP_SSG_PWA_REGENERATE === '1'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -65,6 +67,17 @@ export default defineConfig({
         ],
       },
     }),
+    {
+      name: 'skip-ssg-pwa-regenerate',
+      apply: 'build',
+      configResolved(config) {
+        if (!skipSsgPwaRegenerate) return
+        const pwaPlugin = config.plugins.find((plugin) => plugin.name === 'vite-plugin-pwa')
+        if (pwaPlugin?.api?.generateSW) {
+          pwaPlugin.api.generateSW = async () => undefined
+        }
+      },
+    },
   ],
   resolve: {
     alias: {
@@ -85,5 +98,8 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     copyPublicDir: true, // ✅ this ensures /public contents (logo.png, sitemap.xml, etc.) are included
-  }
+  },
+  ssgOptions: {
+    entry: 'src/main-ssg.js',
+  },
 })
