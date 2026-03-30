@@ -348,9 +348,12 @@ function shouldFallbackTaskReadToApi(error) {
 }
 
 function normalizeApiTaskRecord(task = {}) {
+  const storedWorkspaceId =
+    typeof task?.workspaceId === 'string' && task.workspaceId.trim() ? task.workspaceId.trim() : null
   return {
     ...task,
-    workspaceId: task?.workspaceId || currentWorkspaceId() || null,
+    workspaceId: storedWorkspaceId,
+    orphanedWorkspace: !storedWorkspaceId,
     date: normalizeTaskDate(task?.date || task?.dueDate),
   }
 }
@@ -532,18 +535,7 @@ export async function fetchTasksForToday() {
       orderBy("order", "asc")
     );
 
-    let snapshot = await safeAction(withTimeout(getDocs(q), 8000, 'task read today'))
-    if (!snapshot.size) {
-      // Legacy personal tasks without workspaceId
-      const legacy = query(
-        scopedTasks,
-        where('workspaceId', '==', null),
-        where('userId', '==', session.uid),
-        where('date', '==', today),
-        orderBy('order', 'asc'),
-      )
-      snapshot = await safeAction(withTimeout(getDocs(legacy), 8000, 'task read today legacy'))
-    }
+    const snapshot = await safeAction(withTimeout(getDocs(q), 8000, 'task read today'))
     return snapshot.docs.map(mapTaskDoc)
   }, { date: today }, 'today')
 }
@@ -564,17 +556,7 @@ export async function fetchTasksByDate(dateStr) {
       where('date', '==', dateStr),
       orderBy('order', 'asc'),
     )
-    let snap = await safeAction(withTimeout(getDocs(qy), 8000, 'task read date'))
-    if (!snap.size) {
-      const legacy = query(
-        scopedTasks,
-        where('workspaceId', '==', null),
-        where('userId', '==', session.uid),
-        where('date', '==', dateStr),
-        orderBy('order', 'asc'),
-      )
-      snap = await safeAction(withTimeout(getDocs(legacy), 8000, 'task read date legacy'))
-    }
+    const snap = await safeAction(withTimeout(getDocs(qy), 8000, 'task read date'))
     return snap.docs.map(mapTaskDoc)
   }, { date: dateStr }, 'date')
 }
@@ -597,19 +579,7 @@ export async function fetchTasksBetween(startYMD, endYMD) {
       orderBy('date', 'asc'),
       orderBy('order', 'asc'),
     )
-    let snap = await safeAction(withTimeout(getDocs(qy), 8000, 'task read range'))
-    if (!snap.size) {
-      const legacy = query(
-        scopedTasks,
-        where('workspaceId', '==', null),
-        where('userId', '==', session.uid),
-        where('date', '>=', startYMD),
-        where('date', '<=', endYMD),
-        orderBy('date', 'asc'),
-        orderBy('order', 'asc'),
-      )
-      snap = await safeAction(withTimeout(getDocs(legacy), 8000, 'task read range legacy'))
-    }
+    const snap = await safeAction(withTimeout(getDocs(qy), 8000, 'task read range'))
     return snap.docs.map(mapTaskDoc)
   }, { startDate: startYMD, endDate: endYMD }, 'range')
 }
@@ -625,18 +595,8 @@ export async function fetchAllTasksForWorkspace() {
   return fetchTasksWithApiFallback(async () => {
     const scopedTasks = resolveTasksRef()
     const primaryQuery = query(scopedTasks, where('workspaceId', '==', wsId))
-    const orphanQuery = query(scopedTasks, where('workspaceId', '==', null), where('userId', '==', session.uid))
-
-    const [primarySnap, orphanSnap] = await Promise.all([
-      safeAction(withTimeout(getDocs(primaryQuery), 8000, 'task read workspace')),
-      safeAction(withTimeout(getDocs(orphanQuery), 8000, 'task read workspace legacy')),
-    ])
-    const combined = [...(primarySnap?.docs || []), ...(orphanSnap?.docs || [])]
-
-    // De-duplicate by id in case of overlap
-    const byId = new Map()
-    combined.forEach((doc) => byId.set(doc.id, doc))
-    return Array.from(byId.values()).map(mapTaskDoc)
+    const primarySnap = await safeAction(withTimeout(getDocs(primaryQuery), 8000, 'task read workspace'))
+    return primarySnap.docs.map(mapTaskDoc)
   }, {}, 'workspace')
 }
 
@@ -653,31 +613,22 @@ export async function fetchUnfinishedTasksBefore(ymd) {
     ? ymd
     : toLocalDateKey(new Date(ymd || Date.now()))
 
-  async function runQuery(includeCompletedFilter = true, useLegacy = false) {
-    const clauses = [where('workspaceId', '==', useLegacy ? null : wsId)]
-    if (useLegacy) clauses.push(where('userId', '==', session.uid))
+  async function runQuery(includeCompletedFilter = true) {
+    const clauses = [where('workspaceId', '==', wsId)]
     clauses.push(where('date', '<', target))
     if (includeCompletedFilter) clauses.push(where('completed', '==', false))
     const qy = query(scopedTasks, ...clauses, orderBy('date', 'asc'))
-    return safeAction(getDocs(qy))
+    return safeAction(withTimeout(getDocs(qy), 8000, 'task read unfinished'))
   }
 
   let snap = null
   try {
-    snap = await runQuery(true, false)
+    snap = await runQuery(true)
   } catch {
     try {
-      snap = await runQuery(false, false)
+      snap = await runQuery(false)
     } catch (err) {
-      console.warn('[fetchUnfinishedTasksBefore] primary query failed, falling back', err?.message || err)
-    }
-  }
-
-  if (!snap || !snap.size) {
-    try {
-      snap = await runQuery(true, true)
-    } catch {
-      snap = await runQuery(false, true)
+      console.warn('[fetchUnfinishedTasksBefore] workspace query failed', err?.message || err)
     }
   }
 
@@ -851,13 +802,26 @@ export async function updateTaskInFirebase(task) {
     handleAuthError({ code: 'unauthenticated', message: 'User not logged in' })
     throw new Error('User not logged in')
   }
-  const { id, createdAt, workspaceId, ...updates } = task
+  const normalizedWsId = typeof task?.workspaceId === 'string' && task.workspaceId.trim() ? task.workspaceId.trim() : null
+  const activeWorkspaceId = currentWorkspaceId()
+  if (normalizedWsId && activeWorkspaceId && normalizedWsId !== activeWorkspaceId) {
+    throw new Error('Task belongs to a different workspace')
+  }
+
+  const {
+    id,
+    createdAt,
+    workspaceId: _workspaceId,
+    createdBy: _createdBy,
+    orphanedWorkspace: _orphanedWorkspace,
+    legacyWorkspace: _legacyWorkspace,
+    ...updates
+  } = task
   const justCompleted = updates.completed === true
 
-  // Avoid mutating workspace ownership; imported meeting tasks may not have workspaceId set.
-  const normalizedWsId = typeof workspaceId === 'string' && workspaceId.trim() ? workspaceId.trim() : null
-  if (normalizedWsId) updates.workspaceId = normalizedWsId
-  else delete updates.workspaceId
+  // Firestore rules keep workspaceId immutable. Client updates must not send it.
+  delete updates.workspaceId
+  delete updates.createdBy
   if ('date' in updates) updates.date = normalizeTaskDate(updates.date)
 
   const ref = taskDocRef(id)
@@ -868,10 +832,10 @@ export async function updateTaskInFirebase(task) {
   dispatchTaskRefresh({
     reason: 'task-updated',
     taskId: id,
-    workspaceId: normalizedWsId || currentWorkspaceId(),
+    workspaceId: normalizedWsId || activeWorkspaceId,
     task: {
       id,
-      workspaceId: normalizedWsId || currentWorkspaceId(),
+      workspaceId: normalizedWsId || activeWorkspaceId || null,
       ...updates,
     },
   })

@@ -55,7 +55,7 @@
         </div>
 
         <!-- Title -->
-        <div>
+        <div data-field="title">
           <label class="text-sm text-slate-300 mb-1 block">Title</label>
           <el-input
             v-model="form.title"
@@ -75,8 +75,40 @@
           <p v-if="lastModel" class="text-xs text-slate-400 mt-1">Model: {{ lastModel }}</p>
         </div>
 
+        <div data-field="focusKeyword">
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-sm text-slate-300">SEO Keyword</label>
+            <el-button
+              size="small"
+              text
+              class="!text-indigo-300 hover:!text-indigo-200"
+              @click="genIdea"
+            >
+              💡 Use for idea
+            </el-button>
+          </div>
+          <el-input
+            v-model="form.focusKeyword"
+            placeholder="Example: AI daily planner"
+            class="rounded-lg"
+          >
+            <template #append>
+              <el-button
+                text
+                @click="enhanceField('focusKeyword')"
+                class="text-indigo-400 hover:text-indigo-300"
+              >
+                ✨
+              </el-button>
+            </template>
+          </el-input>
+          <p class="mt-1 text-xs text-slate-400">
+            Start with the exact search phrase you want the post to rank for.
+          </p>
+        </div>
+
         <!-- Summary -->
-        <div>
+        <div data-field="summary">
           <div class="flex items-center justify-between mb-1">
             <label class="text-sm text-slate-300">Summary</label>
             <div class="flex items-center gap-2">
@@ -106,8 +138,53 @@
           </el-input>
         </div>
 
+        <div data-field="seoTitle">
+          <label class="text-sm text-slate-300 mb-1 block">SEO Title</label>
+          <el-input
+            v-model="form.seoTitle"
+            placeholder="Search result title"
+            class="rounded-lg"
+          >
+            <template #append>
+              <el-button
+                text
+                @click="enhanceField('seoTitle')"
+                class="text-indigo-400 hover:text-indigo-300"
+              >
+                ✨
+              </el-button>
+            </template>
+          </el-input>
+          <p class="mt-1 text-xs text-slate-400">
+            Keep this around 55-60 characters for cleaner search snippets.
+          </p>
+        </div>
+
+        <div data-field="metaDescription">
+          <label class="text-sm text-slate-300 mb-1 block">Meta Description</label>
+          <el-input
+            v-model="form.metaDescription"
+            type="textarea"
+            :rows="2"
+            placeholder="Short search description"
+          >
+            <template #append>
+              <el-button
+                text
+                @click="enhanceField('metaDescription')"
+                class="text-indigo-400 hover:text-indigo-300"
+              >
+                ✨
+              </el-button>
+            </template>
+          </el-input>
+          <p class="mt-1 text-xs text-slate-400">
+            Aim for one sentence under 155 characters.
+          </p>
+        </div>
+
         <!-- Tags -->
-        <div>
+        <div data-field="tags">
           <label class="text-sm text-slate-300 mb-1 block">Tags</label>
           <el-input
             v-model="tags"
@@ -144,6 +221,9 @@
             placeholder="Image URL"
             class="rounded-lg"
           />
+          <p class="mt-1 text-xs text-slate-400">
+            Best result: replace AI artwork with a real product screenshot or realistic stock-style cover when possible.
+          </p>
           <transition name="fade">
             <img
               v-if="form.coverImage"
@@ -155,7 +235,7 @@
         </div>
 
         <!-- Content -->
-        <div>
+        <div data-field="content">
           <div class="flex items-center justify-between mb-2">
             <label class="text-sm text-slate-300">Content</label>
             <div class="flex items-center gap-2">
@@ -190,6 +270,49 @@
           <p v-if="lastModel" class="text-xs text-slate-400 mt-1">Model: {{ lastModel }}</p>
         </div>
 
+        <div class="rounded-2xl border border-emerald-400/20 bg-emerald-500/5 p-4">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <p class="text-xs uppercase tracking-[0.28em] text-emerald-200/80">SEO score</p>
+              <div class="mt-2 flex items-center gap-3">
+                <span class="text-3xl font-semibold text-white">{{ form.qualityScore || 0 }}</span>
+                <span
+                  class="rounded-full px-3 py-1 text-xs font-medium"
+                  :class="form.qualityReady ? 'bg-emerald-500/20 text-emerald-200' : 'bg-amber-500/20 text-amber-100'"
+                >
+                  {{ form.qualityReady ? 'Ready to publish' : 'Needs work' }}
+                </span>
+              </div>
+              <p class="mt-2 text-xs text-slate-300">
+                Word count: {{ form.qualityWordCount || 0 }}
+                <span class="mx-2 text-slate-500">•</span>
+                Keyword density: {{ form.qualityKeywordDensity || 0 }}%
+              </p>
+            </div>
+            <el-button
+              size="small"
+              plain
+              class="!border-emerald-400/30 !text-emerald-200 hover:!bg-emerald-500/10"
+              @click="refreshQuality"
+            >
+              Check score
+            </el-button>
+          </div>
+
+          <div v-if="qualityChecks.length" class="mt-4 grid gap-2">
+            <div
+              v-for="check in qualityChecks"
+              :key="check.key"
+              class="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
+            >
+              <span class="text-slate-200">{{ check.label }}</span>
+              <span :class="check.passed ? 'text-emerald-300' : 'text-amber-200'">
+                {{ check.passed ? 'Pass' : 'Miss' }}
+              </span>
+            </div>
+          </div>
+        </div>
+
         <!-- Actions -->
         <div
           class="flex flex-wrap gap-3 justify-end border-t border-white/10 pt-4 mt-4"
@@ -206,6 +329,7 @@
             @click="publish"
             type="success"
             plain
+            :disabled="publishBlocked"
             class="!px-5 !py-2"
           >
             🚀 Publish
@@ -249,6 +373,20 @@
           v-else
           class="prose prose-invert max-w-none leading-relaxed space-y-3"
         >
+          <div
+            v-if="searchPreviewTitle || searchPreviewDescription"
+            class="mb-6 rounded-2xl border border-emerald-400/20 bg-emerald-500/5 p-4 not-prose"
+          >
+            <p class="text-[11px] tracking-wide uppercase text-emerald-200/80">Search snippet</p>
+            <p class="mt-2 text-xs text-emerald-300">{{ searchPreviewUrl }}</p>
+            <h3 class="mt-1 text-lg font-semibold text-white">
+              {{ searchPreviewTitle }}
+            </h3>
+            <p class="mt-2 text-sm leading-relaxed text-slate-300">
+              {{ searchPreviewDescription }}
+            </p>
+          </div>
+
           <img
             v-if="form.coverImage"
             :src="form.coverImage"
@@ -262,6 +400,26 @@
           <p class="text-indigo-100/90 mb-3 text-sm leading-relaxed">
             {{ form.summary }}
           </p>
+          <div v-if="form.focusKeyword || relatedLinks.length" class="mb-5 space-y-3 not-prose">
+            <div v-if="form.focusKeyword" class="flex flex-wrap items-center gap-2">
+              <span class="text-xs uppercase tracking-[0.28em] text-slate-400">Target keyword</span>
+              <span class="rounded-full border border-indigo-400/20 bg-indigo-500/10 px-3 py-1 text-xs text-indigo-200">
+                {{ form.focusKeyword }}
+              </span>
+            </div>
+            <div v-if="relatedLinks.length" class="space-y-2">
+              <p class="text-xs uppercase tracking-[0.28em] text-slate-400">Internal links</p>
+              <div class="flex flex-wrap gap-2">
+                <span
+                  v-for="link in relatedLinks"
+                  :key="link.href || link.path"
+                  class="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-200"
+                >
+                  {{ link.anchorText || link.label || link.path }}
+                </span>
+              </div>
+            </div>
+          </div>
           <div v-html="renderedMarkdown" class="text-slate-200"></div>
         </div>
       </aside>
@@ -273,13 +431,13 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import MarkdownIt from 'markdown-it'
 import { useBlogs } from '@/composables/useBlogs'
-import { createBlog, updateBlog, deleteBlog, publishBlog } from '@/services/blogService'
+import { createBlog, updateBlog, deleteBlog } from '@/services/blogService'
 import api from '@/services/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AdminBlogList from '@/components/admin/AdminBlogList.vue'
 
 const md = new MarkdownIt({ html: true, linkify: true })
-const { blogs, loading, fetchBlogs } = useBlogs(false)
+const { fetchBlogs } = useBlogs(false)
 const active = ref(null)
 const saving = ref(false)
 const aiLoading = ref(false)
@@ -290,33 +448,107 @@ const autoSaving = ref(false)
 let autoTimer = null
 const lastModel = ref('')
 
-const form = ref({
-  title: '',
-  summary: '',
-  content: '',
-  tags: [],
-  coverImage: '',
-  author: ''
-})
+function normalizeTags(value) {
+  if (Array.isArray(value)) return value.map((tag) => String(tag || '').trim()).filter(Boolean)
+  return String(value || '')
+    .split(/[,#]+/)
+    .map((tag) => tag.trim())
+    .filter(Boolean)
+}
+
+function normalizeFaqItems(value) {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((item) => ({
+      question: String(item?.question || item?.q || '').trim(),
+      answer: String(item?.answer || item?.a || '').trim(),
+    }))
+    .filter((item) => item.question && item.answer)
+}
+
+function normalizeInternalLinks(value) {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((item) => ({
+      path: String(item?.path || '').trim(),
+      href: String(item?.href || '').trim(),
+      anchorText: String(item?.anchorText || item?.label || '').trim(),
+      label: String(item?.label || item?.anchorText || '').trim(),
+    }))
+    .filter((item) => item.path || item.href)
+}
+
+function normalizeQualityChecks(value) {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((item) => ({
+      key: String(item?.key || ''),
+      label: String(item?.label || '').trim(),
+      passed: !!item?.passed,
+      points: Number(item?.points || 0),
+    }))
+    .filter((item) => item.key && item.label)
+}
+
+function buildEmptyForm() {
+  return {
+    title: '',
+    seoTitle: '',
+    metaDescription: '',
+    focusKeyword: '',
+    summary: '',
+    content: '',
+    tags: [],
+    faqItems: [],
+    internalLinks: [],
+    qualityScore: 0,
+    qualityReady: false,
+    qualityWordCount: 0,
+    qualityKeywordDensity: 0,
+    qualityChecks: [],
+    coverImage: '',
+    author: '',
+  }
+}
+
+const form = ref(buildEmptyForm())
 
 // Render markdown preview live
 const renderedMarkdown = computed(() => md.render(form.value.content || ''))
+const searchPreviewTitle = computed(() => form.value.seoTitle || form.value.title || 'SEO title preview')
+const searchPreviewDescription = computed(
+  () => form.value.metaDescription || form.value.summary || 'Meta description preview'
+)
+const searchPreviewUrl = computed(() => {
+  const slug = String(active.value?.slug || form.value.title || 'new-post')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+  return `plancraftai.com/blog/${slug || 'new-post'}`
+})
+const relatedLinks = computed(() => normalizeInternalLinks(form.value.internalLinks))
+const qualityChecks = computed(() => normalizeQualityChecks(form.value.qualityChecks))
+const publishBlocked = computed(() => (form.value.qualityScore || 0) > 0 && !form.value.qualityReady)
 
 const tags = computed({
   get: () => (Array.isArray(form.value.tags) ? form.value.tags.join(', ') : ''),
   set: (v) => {
-    form.value.tags = String(v || '').split(',').map(s => s.trim()).filter(Boolean)
+    form.value.tags = normalizeTags(v)
   }
 })
 
 function select(b) {
   active.value = b
-  form.value = { ...b }
-}
-
-function newDraft() {
-  active.value = { id: null }
-  form.value = { title: '', summary: '', content: '', tags: [], coverImage: '', author: '' }
+  form.value = {
+    ...buildEmptyForm(),
+    ...b,
+    tags: normalizeTags(b?.tags),
+    faqItems: normalizeFaqItems(b?.faqItems),
+    internalLinks: normalizeInternalLinks(b?.internalLinks),
+    qualityChecks: normalizeQualityChecks(b?.qualityChecks),
+  }
+  refreshQuality({ silent: true })
 }
 
 async function ensureId() {
@@ -349,9 +581,9 @@ async function enhanceField(field) {
     aiLoading.value = true
     const resp = await api.post(`/blogs/${id}/enhance`, { field, value: form.value[field] })
     if (resp?.data?.success && resp?.data?.enhanced) {
-      form.value[field] = resp.data.enhanced
-      // enhance endpoint currently uses gpt-3.5-turbo
-      lastModel.value = 'gpt-3.5-turbo'
+      if (field === 'tags') form.value.tags = normalizeTags(resp.data.enhanced)
+      else form.value[field] = resp.data.enhanced
+      lastModel.value = 'AI enhanced'
       ElMessage({
         message: `✨ ${field[0].toUpperCase() + field.slice(1)} enhanced!`,
         type: 'success',
@@ -375,13 +607,31 @@ async function writeContent() {
   try {
     const id = await ensureId()
     aiLoading.value = true
-    // Persist latest title/summary to guide generation
-    await updateBlog(id, { title: form.value.title, summary: form.value.summary })
+    await updateBlog(id, {
+      title: form.value.title,
+      summary: form.value.summary,
+      focusKeyword: form.value.focusKeyword,
+      seoTitle: form.value.seoTitle,
+      metaDescription: form.value.metaDescription,
+      tags: form.value.tags,
+    })
     const resp = await api.post(`/blogs/${id}/content`)
     if (resp?.data?.success && resp?.data?.content) {
       form.value.content = resp.data.content
+      form.value.summary = resp.data.summary || form.value.summary
+      form.value.seoTitle = resp.data.seoTitle || form.value.seoTitle
+      form.value.metaDescription = resp.data.metaDescription || form.value.metaDescription
+      form.value.focusKeyword = resp.data.focusKeyword || form.value.focusKeyword
+      form.value.tags = normalizeTags(resp.data.tags || form.value.tags)
+      form.value.faqItems = normalizeFaqItems(resp.data.faqItems || form.value.faqItems)
+      form.value.internalLinks = normalizeInternalLinks(resp.data.internalLinks || form.value.internalLinks)
+      form.value.qualityScore = Number(resp.data.qualityScore || 0)
+      form.value.qualityReady = !!resp.data.qualityReady
+      form.value.qualityWordCount = Number(resp.data.qualityWordCount || 0)
+      form.value.qualityKeywordDensity = Number(resp.data.qualityKeywordDensity || 0)
+      form.value.qualityChecks = normalizeQualityChecks(resp.data.qualityChecks)
       lastModel.value = resp?.data?.model || lastModel.value
-      ElMessage.success('Content generated')
+      ElMessage.success('SEO article generated')
     } else throw new Error(resp?.data?.error || 'Generation failed')
   } catch (e) {
     ElMessage.error(e?.message || 'AI write failed')
@@ -392,13 +642,21 @@ async function writeContent() {
 
 async function genIdea() {
   try {
-    const resp = await api.post('/blogs/idea')
+    const resp = await api.post('/blogs/idea', { keyword: form.value.focusKeyword })
     if (resp?.data?.success && resp?.data?.draft) {
       const d = resp.data.draft
       ElMessage.success('Idea created')
       await fetchBlogs()
       active.value = d
-      form.value = { ...d }
+      form.value = {
+        ...buildEmptyForm(),
+        ...d,
+        tags: normalizeTags(d?.tags),
+        faqItems: normalizeFaqItems(d?.faqItems),
+        internalLinks: normalizeInternalLinks(d?.internalLinks),
+        qualityChecks: normalizeQualityChecks(d?.qualityChecks),
+      }
+      await refreshQuality({ silent: true })
     } else throw new Error(resp?.data?.error || 'Failed')
   } catch (e) {
     ElMessage.error(e?.message || 'Idea generation failed')
@@ -454,6 +712,7 @@ async function saveDraft() {
     }
     autosaved.value = true
     await fetchBlogs()
+    await refreshQuality({ silent: true })
   } catch (e) {
     ElMessage.error(e?.message || 'Save failed')
   } finally {
@@ -467,11 +726,44 @@ async function publish() {
     const id = await ensureId()
     await updateBlog(id, { ...form.value, published: false })
     // Trigger publish + announcement hook on backend
-    await api.post(`/blogs/${id}/publish`)
+    const resp = await api.post(`/blogs/${id}/publish`)
+    if (resp?.data) {
+      form.value.qualityScore = Number(resp.data.qualityScore || form.value.qualityScore || 0)
+      form.value.qualityReady = !!resp.data.qualityReady
+      form.value.qualityWordCount = Number(resp.data.qualityWordCount || form.value.qualityWordCount || 0)
+      form.value.qualityKeywordDensity = Number(resp.data.qualityKeywordDensity || form.value.qualityKeywordDensity || 0)
+      form.value.qualityChecks = normalizeQualityChecks(resp.data.qualityChecks || form.value.qualityChecks)
+    }
     ElMessage.success('Published')
     await fetchBlogs()
   } catch (e) {
-    ElMessage.error(e?.message || 'Publish failed')
+    const data = e?.response?.data
+    if (data?.qualityChecks) {
+      form.value.qualityScore = Number(data.qualityScore || 0)
+      form.value.qualityReady = !!data.qualityReady
+      form.value.qualityWordCount = Number(data.qualityWordCount || 0)
+      form.value.qualityKeywordDensity = Number(data.qualityKeywordDensity || 0)
+      form.value.qualityChecks = normalizeQualityChecks(data.qualityChecks)
+    }
+    ElMessage.error(data?.error || e?.message || 'Publish failed')
+  }
+}
+
+async function refreshQuality(options = {}) {
+  const { silent = false } = options
+  try {
+    if (!active.value?.id) return
+    const resp = await api.post(`/blogs/${active.value.id}/score`)
+    if (resp?.data?.success) {
+      form.value.qualityScore = Number(resp.data.qualityScore || 0)
+      form.value.qualityReady = !!resp.data.qualityReady
+      form.value.qualityWordCount = Number(resp.data.qualityWordCount || 0)
+      form.value.qualityKeywordDensity = Number(resp.data.qualityKeywordDensity || 0)
+      form.value.qualityChecks = normalizeQualityChecks(resp.data.qualityChecks)
+      if (!silent) ElMessage.success('Blog score refreshed')
+    }
+  } catch (e) {
+    if (!silent) ElMessage.error(e?.response?.data?.error || e?.message || 'Failed to score blog')
   }
 }
 
@@ -481,16 +773,25 @@ async function remove() {
     await ElMessageBox.confirm('Delete this post?', 'Confirm', { type: 'warning' })
     await deleteBlog(active.value.id)
     active.value = null
+    form.value = buildEmptyForm()
     await fetchBlogs()
     ElMessage.success('Deleted')
-  } catch {}
+  } catch {
+    /* noop */
+  }
 }
 
 onMounted(fetchBlogs)
 
 // Debounced auto-save when title/summary change
 watch(
-  () => [form.value.title, form.value.summary],
+  () => [
+    form.value.title,
+    form.value.summary,
+    form.value.focusKeyword,
+    form.value.seoTitle,
+    form.value.metaDescription,
+  ],
   () => {
     if (autoTimer) clearTimeout(autoTimer)
     autoTimer = setTimeout(async () => {
@@ -498,9 +799,16 @@ watch(
         if (!form.value.title) return
         autoSaving.value = true
         const id = await ensureId()
-        await updateBlog(id, { title: form.value.title, summary: form.value.summary, published: false })
+        await updateBlog(id, {
+          title: form.value.title,
+          summary: form.value.summary,
+          focusKeyword: form.value.focusKeyword,
+          seoTitle: form.value.seoTitle,
+          metaDescription: form.value.metaDescription,
+          published: false,
+        })
         autosaved.value = true
-      } catch (e) {
+      } catch {
         // no-op
       } finally {
         autoSaving.value = false

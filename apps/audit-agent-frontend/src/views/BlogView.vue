@@ -99,6 +99,24 @@
             Show full article ↓
           </button>
         </div>
+
+        <section
+          v-if="relatedLinks.length"
+          class="mt-10 rounded-2xl border border-white/10 bg-white/5 p-5"
+        >
+          <p class="text-xs uppercase tracking-[0.28em] text-slate-400">Keep exploring</p>
+          <h2 class="mt-2 text-xl font-semibold text-white">Related PlanCraftAI pages</h2>
+          <div class="mt-4 flex flex-wrap gap-3">
+            <router-link
+              v-for="link in relatedLinks"
+              :key="link.href || link.path"
+              :to="link.path || '/'"
+              class="rounded-full border border-indigo-400/20 bg-indigo-500/10 px-4 py-2 text-sm text-indigo-200 transition hover:border-indigo-300/60 hover:text-white"
+            >
+              {{ link.anchorText || link.label || link.path }}
+            </router-link>
+          </div>
+        </section>
       </article>
     </main>
 
@@ -134,6 +152,13 @@ const post = ref(null)
 const loading = ref(true)
 const showFull = ref(false)
 const contentBox = ref(null)
+const articleTitle = computed(() => post.value?.seoTitle || post.value?.title || 'PlanCraftAI Blog')
+const articleDescription = computed(
+  () =>
+    post.value?.metaDescription ||
+    post.value?.summary ||
+    'Explore AI productivity insights and planning stories with PlanCraftAI.'
+)
 const displayTags = computed(() => {
   const raw = post.value?.tags
   if (Array.isArray(raw)) return raw
@@ -141,6 +166,18 @@ const displayTags = computed(() => {
     .split(/[,#]+/)
     .map((t) => t.trim())
     .filter(Boolean)
+})
+const relatedLinks = computed(() => {
+  const raw = post.value?.internalLinks
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((item) => ({
+      path: String(item?.path || '').trim(),
+      href: String(item?.href || '').trim(),
+      anchorText: String(item?.anchorText || item?.label || '').trim(),
+      label: String(item?.label || item?.anchorText || '').trim(),
+    }))
+    .filter((item) => item.path || item.href)
 })
 
 const limitedContent = computed(() => {
@@ -225,19 +262,57 @@ watchEffect(() => {
 watchEffect(() => {
   if (post.value) {
     const canonicalUrl = `https://plancraftai.com/blog/${post.value.slug}`
+    const keywords = [...new Set([...(displayTags.value || []), post.value.focusKeyword].filter(Boolean))]
+    const articleSchema = {
+      '@context': 'https://schema.org',
+      '@type': 'BlogPosting',
+      headline: post.value.title,
+      alternativeHeadline: articleTitle.value !== post.value.title ? articleTitle.value : undefined,
+      description: articleDescription.value,
+      image: post.value.coverImage || 'https://plancraftai.com/default-blog-cover.png',
+      datePublished: formatSchemaDate(post.value.created_at),
+      dateModified: formatSchemaDate(post.value.updated_at || post.value.created_at),
+      author: {
+        '@type': 'Organization',
+        name: post.value.author || 'PlanCraftAI',
+      },
+      publisher: {
+        '@type': 'Organization',
+        name: 'PlanCraftAI',
+        logo: {
+          '@type': 'ImageObject',
+          url: 'https://plancraftai.com/logo.png',
+        },
+      },
+      mainEntityOfPage: canonicalUrl,
+      keywords,
+    }
+    const faqSchema = Array.isArray(post.value.faqItems) && post.value.faqItems.length
+      ? {
+          '@context': 'https://schema.org',
+          '@type': 'FAQPage',
+          mainEntity: post.value.faqItems.map((item) => ({
+            '@type': 'Question',
+            name: item.question,
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: item.answer,
+            },
+          })),
+        }
+      : null
+
     useHead({
-      title: `${post.value.title} | PlanCraftAI Blog`,
+      title: `${articleTitle.value} | PlanCraftAI Blog`,
       meta: [
         {
           name: 'description',
-          content:
-            post.value.summary ||
-            'Explore AI productivity insights and planning stories with PlanCraftAI.',
+          content: articleDescription.value,
         },
-        { name: 'keywords', content: (post.value.tags || []).join(', ') },
+        { name: 'keywords', content: keywords.join(', ') },
         { property: 'og:type', content: 'article' },
-        { property: 'og:title', content: post.value.title },
-        { property: 'og:description', content: post.value.summary },
+        { property: 'og:title', content: articleTitle.value },
+        { property: 'og:description', content: articleDescription.value },
         {
           property: 'og:image',
           content: post.value.coverImage || '/default-blog-cover.png',
@@ -254,6 +329,22 @@ watchEffect(() => {
           href: canonicalUrl,
         },
       ],
+      script: [
+        {
+          key: 'blog-posting-schema',
+          type: 'application/ld+json',
+          children: JSON.stringify(articleSchema),
+        },
+        ...(faqSchema
+          ? [
+              {
+                key: 'blog-faq-schema',
+                type: 'application/ld+json',
+                children: JSON.stringify(faqSchema),
+              },
+            ]
+          : []),
+      ],
     })
   }
 })
@@ -264,6 +355,15 @@ function formatDate(val) {
     return new Date(val).toLocaleDateString()
   } catch {
     return ''
+  }
+}
+
+function formatSchemaDate(val) {
+  try {
+    if (val?.toDate) return val.toDate().toISOString()
+    return new Date(val).toISOString()
+  } catch {
+    return undefined
   }
 }
 </script>

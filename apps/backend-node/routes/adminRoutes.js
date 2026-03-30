@@ -316,7 +316,8 @@ router.get('/settings', requireAdmin, async (req, res) => {
     const snap = await db.collection('settings').doc('global').get()
     const accessControlDefaults = sanitizeAccessControl(DEFAULT_ACCESS_CONTROL)
     const defaults = {
-      blogPrompt: 'Generate engaging AI productivity content for PlanCraftAI.',
+      blogPrompt:
+        'Write keyword-first PlanCraftAI blog posts with practical examples, comparison sections, strong H2 structure, FAQ sections, and natural internal links to the homepage plus one SEO landing page. Include soft mid-article CTAs and a clear end CTA.',
       aiModel: 'gpt-4o-mini',
       // Default to disabled to avoid noisy pushes
       enableNotifications: false,

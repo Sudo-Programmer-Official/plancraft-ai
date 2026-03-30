@@ -251,7 +251,8 @@ function buildDefaultAccessControl() {
 function buildDefaultSettings() {
   const accessControl = buildDefaultAccessControl()
   return {
-    blogPrompt: 'Generate engaging AI productivity content for PlanCraftAI.',
+    blogPrompt:
+      'Write keyword-first PlanCraftAI blog posts with practical examples, comparison sections, strong H2 structure, FAQ sections, and natural internal links to the homepage plus one SEO landing page. Include soft mid-article CTAs and a clear end CTA.',
     aiModel: 'gpt-4o-mini',
     enableNotifications: false,
     whatsappTemplate: 'blog_update_v1',
@@ -329,7 +330,7 @@ async function saveSettings() {
       return
     }
     campaigns = parsed
-  } catch (error) {
+  } catch {
     ElMessage.error('Campaigns JSON is invalid')
     return
   }

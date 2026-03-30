@@ -54,31 +54,16 @@ function mapTaskDoc(docSnap, extra = {}) {
   };
 }
 
-async function listTasksForScope({ workspaceId, userId, date = null, startDate = null, endDate = null }) {
-  async function runQuery({ useLegacy = false } = {}) {
-    let ref = db.collection("tasks");
-    ref = ref.where("workspaceId", "==", useLegacy ? null : workspaceId);
-    if (useLegacy) ref = ref.where("userId", "==", userId);
-    if (date) {
-      ref = ref.where("date", "==", date);
-    } else {
-      if (startDate) ref = ref.where("date", ">=", startDate);
-      if (endDate) ref = ref.where("date", "<=", endDate);
-    }
-    const snap = await ref.get();
-    return snap.docs.map((docSnap) => mapTaskDoc(docSnap, useLegacy ? { legacyWorkspace: true } : {}));
+async function listTasksForScope({ workspaceId, date = null, startDate = null, endDate = null }) {
+  let ref = db.collection("tasks").where("workspaceId", "==", workspaceId);
+  if (date) {
+    ref = ref.where("date", "==", date);
+  } else {
+    if (startDate) ref = ref.where("date", ">=", startDate);
+    if (endDate) ref = ref.where("date", "<=", endDate);
   }
-
-  const [primary, legacy] = await Promise.all([
-    runQuery({ useLegacy: false }),
-    userId ? runQuery({ useLegacy: true }).catch(() => []) : Promise.resolve([]),
-  ]);
-
-  const deduped = new Map();
-  [...primary, ...legacy].forEach((task) => {
-    if (task?.id) deduped.set(task.id, task);
-  });
-  return Array.from(deduped.values());
+  const snap = await ref.get();
+  return snap.docs.map((docSnap) => mapTaskDoc(docSnap));
 }
 
 function stripVoiceChannels(channels, voiceAllowed) {
@@ -152,14 +137,12 @@ router.get("/", requireWorkspaceViewer, async (req, res) => {
     const workspaceId = selectWorkspaceId(req);
     if (!workspaceId) return res.status(400).json({ error: "workspaceId is required" });
 
-    const userId = String(req.query?.userId || req.user?.uid || "").trim();
     const date = normalizeYmd(req.query?.date || null);
     const startDate = normalizeYmd(req.query?.startDate || req.query?.start || null);
     const endDate = normalizeYmd(req.query?.endDate || req.query?.end || null);
 
     const items = await listTasksForScope({
       workspaceId,
-      userId,
       date,
       startDate,
       endDate,

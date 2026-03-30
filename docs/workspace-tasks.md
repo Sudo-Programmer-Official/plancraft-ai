@@ -26,6 +26,8 @@ Client write payloads must include:
 Fetching:
 
 - Always filter by `where('workspaceId', '==', activeWorkspaceId)`.
-- Legacy fallback (optional) can check `workspaceId == null` AND `userId == uid` to surface personal tasks for the owner.
+- Workspace views should not merge `workspaceId == null` legacy tasks into the active workspace cache.
+- Audit legacy data before cleanup with `node scripts/auditTaskWorkspaceConsistency.mjs --report tmp/task-workspace-audit.json`.
+- Only auto-fix the safe case with `node scripts/auditTaskWorkspaceConsistency.mjs --apply-resolved-missing`.
 
 Reminder: backend APIs that create tasks must also pass `workspaceId` and set `createdBy`, and callers must have editor/admin (or owner) membership in that workspace.***

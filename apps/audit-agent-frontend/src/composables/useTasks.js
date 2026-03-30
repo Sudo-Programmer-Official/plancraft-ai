@@ -132,7 +132,7 @@ export function useTasks() {
   }
 
   function normalizeAndSort(raw) {
-    return sortTasks(normalizeList(uniqueById(raw)))
+    return sortTasks(normalizeList(uniqueById(raw)).filter((task) => isCurrentWorkspaceTask(task)))
   }
 
   function isCurrentWorkspaceTask(taskOrWorkspaceId) {
@@ -140,10 +140,10 @@ export function useTasks() {
     if (!activeWorkspaceId) return true
     if (typeof taskOrWorkspaceId === 'string') {
       const workspaceId = normalizeWorkspaceId(taskOrWorkspaceId)
-      return !workspaceId || workspaceId === activeWorkspaceId
+      return workspaceId === activeWorkspaceId
     }
     const workspaceId = normalizeWorkspaceId(taskOrWorkspaceId?.workspaceId)
-    return !workspaceId || workspaceId === activeWorkspaceId
+    return workspaceId === activeWorkspaceId
   }
 
   function sortTasks(list, sortBy = 'default', sortDir = 'desc') {
@@ -177,7 +177,7 @@ export function useTasks() {
 
   function applyFilters(base, filter = null) {
     const opts = { ...makeDefaultFilter(), ...(filter || {}) }
-    let filtered = Array.isArray(base) ? [...base] : []
+    let filtered = (Array.isArray(base) ? [...base] : []).filter((task) => isCurrentWorkspaceTask(task))
 
     if (opts.status === 'pending') {
       filtered = filtered.filter((t) => !t.completed && t.status !== 'completed')
@@ -410,6 +410,7 @@ export function useTasks() {
    */
   async function addTask(newTask = null) {
     if (!newTask) throw new Error('Task data is required')
+    const activeWorkspaceId = normalizeWorkspaceId(newTask?.workspaceId || workspaceStore?.activeWorkspaceId)
     const baseTask = {
       title: 'New Task',
       details: '',
@@ -419,7 +420,11 @@ export function useTasks() {
       createdAt: Date.now(),
     }
 
-    const task = { ...baseTask, ...(newTask || {}) }
+    const task = {
+      ...baseTask,
+      ...(newTask || {}),
+      ...(activeWorkspaceId ? { workspaceId: activeWorkspaceId } : {}),
+    }
     const normalizedTask = normalizeTask(task)
     const optimisticId = `temp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
     const optimisticTask = {
