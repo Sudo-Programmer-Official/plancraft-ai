@@ -152,40 +152,255 @@ router.use('/push', pushRoutes)
 // Optional Stripe client (dev-friendly if missing)
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY
 const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2022-11-15' }) : null
+const APPLE_SOLO_PRODUCT_ID =
+  String(process.env.APPLE_SOLO_PREMIUM_PRODUCT_ID || 'solo_premium_monthly').trim() ||
+  'solo_premium_monthly'
+const PREMIUM_ACTIVE_STATUSES = new Set(['active', 'trialing', 'past_due', 'in_grace_period'])
+const PREMIUM_CANCELLED_STATUSES = new Set(['canceled', 'cancelled'])
+
+function normalizeProductId(value) {
+  const raw = String(value || '').trim()
+  return raw || null
+}
+
+function normalizeSubscriptionStatusValue(value, fallback = 'free') {
+  const raw = String(value || '').trim().toLowerCase()
+  if (!raw) return fallback
+  if (raw === 'subscribed') return 'active'
+  if (raw === 'billing_retry' || raw === 'in_billing_retry_period') return 'in_grace_period'
+  if (raw === 'grace' || raw === 'grace_period' || raw === 'in_grace' || raw === 'in_grace_period') {
+    return 'in_grace_period'
+  }
+  if (raw === 'revoked' || raw === 'cancelled') return 'cancelled'
+  return raw
+}
+
+function inferSubscriptionSource(sub = {}) {
+  const explicit = String(sub?.source || '').trim().toLowerCase()
+  if (explicit) return explicit
+  if (sub?.originalTransactionId || sub?.productId === APPLE_SOLO_PRODUCT_ID) return 'apple'
+  if (sub?.stripeSubId || sub?.customerId || sub?.id) return 'stripe'
+  return null
+}
+
+function calculateRemainingDays(expiresAt) {
+  if (!expiresAt) return 0
+  const diffMs = expiresAt.getTime() - Date.now()
+  if (diffMs <= 0) return 0
+  return Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)))
+}
+
+function resolveEffectiveSubscriptionStatus(sub = {}) {
+  const expiresAt = normalizeDate(sub?.expiresAt || sub?.currentPeriodEnd)
+  let status = normalizeSubscriptionStatusValue(
+    sub?.status,
+    expiresAt && expiresAt.getTime() > Date.now() ? 'active' : 'free',
+  )
+
+  if (status === 'free' && expiresAt && expiresAt.getTime() > Date.now()) {
+    status = 'active'
+  }
+
+  if (PREMIUM_ACTIVE_STATUSES.has(status) && expiresAt && expiresAt.getTime() <= Date.now()) {
+    status = 'expired'
+  }
+
+  if (PREMIUM_CANCELLED_STATUSES.has(status) && expiresAt && expiresAt.getTime() <= Date.now()) {
+    status = 'expired'
+  }
+
+  return {
+    status,
+    expiresAt,
+  }
+}
+
+function isPremiumSubscriptionStatus(status, expiresAt) {
+  if (PREMIUM_ACTIVE_STATUSES.has(status)) return true
+  if (PREMIUM_CANCELLED_STATUSES.has(status)) {
+    return !!expiresAt && expiresAt.getTime() > Date.now()
+  }
+  return false
+}
+
+function buildNormalizedSubscription(sub = {}) {
+  const source = inferSubscriptionSource(sub)
+  const { status, expiresAt } = resolveEffectiveSubscriptionStatus(sub)
+  let cancelAt = normalizeDate(sub?.cancelAt)
+  if (!cancelAt && sub?.cancelAtPeriodEnd && expiresAt) {
+    cancelAt = expiresAt
+  }
+
+  const plan = isPremiumSubscriptionStatus(status, expiresAt) ? 'premium' : 'free'
+
+  return {
+    plan,
+    status,
+    cancelAt: cancelAt ? cancelAt.toISOString() : null,
+    remainingDays: calculateRemainingDays(expiresAt),
+    expiresAt: expiresAt ? expiresAt.toISOString() : null,
+    source: source || (plan === 'premium' ? 'stripe' : null),
+    productId: normalizeProductId(sub?.productId),
+    originalTransactionId: sub?.originalTransactionId == null ? null : String(sub.originalTransactionId),
+  }
+}
+
+function buildAppleSubscriptionWrite(existingSubscription = {}, input = {}) {
+  const productId = normalizeProductId(input?.productId)
+  const expiresAt = normalizeDate(input?.expiresAt)
+  const purchaseDate = normalizeDate(input?.purchaseDate)
+  const revocationDate = normalizeDate(input?.revocationDate)
+  const originalTransactionId =
+    input?.originalTransactionId == null ? null : String(input.originalTransactionId)
+  const transactionId = input?.transactionId == null ? null : String(input.transactionId)
+  const rawStatus = String(input?.rawStatus || '').trim().toLowerCase() || null
+
+  let status = normalizeSubscriptionStatusValue(
+    input?.status,
+    expiresAt && expiresAt.getTime() > Date.now() ? 'active' : 'expired',
+  )
+  if (revocationDate) status = 'cancelled'
+
+  if (PREMIUM_ACTIVE_STATUSES.has(status) && expiresAt && expiresAt.getTime() <= Date.now()) {
+    status = 'expired'
+  }
+  if (PREMIUM_CANCELLED_STATUSES.has(status) && expiresAt && expiresAt.getTime() <= Date.now()) {
+    status = 'expired'
+  }
+
+  const cancelAtPeriodEnd = PREMIUM_CANCELLED_STATUSES.has(status)
+  const cancelAt = cancelAtPeriodEnd
+    ? normalizeDate(input?.cancelAt) || expiresAt || revocationDate || null
+    : null
+
+  const appleDetails = existingSubscription?.apple && typeof existingSubscription.apple === 'object'
+    ? existingSubscription.apple
+    : {}
+
+  const subscription = {
+    ...existingSubscription,
+    source: 'apple',
+    productId,
+    status,
+    expiresAt,
+    currentPeriodEnd: expiresAt,
+    cancelAt,
+    cancelAtPeriodEnd,
+    purchaseDate,
+    revocationDate,
+    originalTransactionId,
+    transactionId,
+    ownershipType: input?.ownershipType ? String(input.ownershipType) : null,
+    apple: {
+      ...appleDetails,
+      rawStatus,
+      origin: input?.origin ? String(input.origin) : null,
+      lastIngestedAt: new Date(),
+    },
+  }
+
+  const normalized = buildNormalizedSubscription(subscription)
+  return {
+    plan: normalized.plan,
+    subscription,
+    normalized,
+  }
+}
 
 // GET /api/subscription/status?userId=123
 router.get('/subscription/status', async (req, res) => {
   try {
     const userId = String(req.query.userId || req?.user?.uid || '')
-    if (!userId) return res.json({ plan: 'free', status: 'free', remainingDays: 0 })
+    if (!userId) {
+      return res.json({
+        plan: 'free',
+        status: 'free',
+        remainingDays: 0,
+        cancelAt: null,
+        expiresAt: null,
+        source: null,
+        productId: null,
+        originalTransactionId: null,
+      })
+    }
     const snap = await db.collection('users').doc(userId).get()
     const data = snap.exists ? snap.data() : {}
-    const sub = data?.subscription || {}
-    const rawStatus = String(sub.status || '').toLowerCase()
-    const status = rawStatus || 'free'
-    // Treat 'canceled' (scheduled at period end) as premium until end date
-    const plan = (status === 'active' || status === 'trialing' || status === 'past_due' || status === 'canceled') ? 'premium' : 'free'
-
-    let remainingDays = 0
-    let cancelAt = normalizeDate(sub?.cancelAt)
-    try {
-      const end = normalizeDate(sub?.currentPeriodEnd)
-      if (end) {
-        const diffMs = end.getTime() - Date.now()
-        remainingDays = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)))
-        // If cancelAt not explicitly set but a period end exists and cancel is scheduled, reflect it
-        if (sub?.cancelAtPeriodEnd && !cancelAt) cancelAt = end
-      }
-    } catch {}
-    return res.json({
-      plan,
-      status,
-      cancelAt: cancelAt ? cancelAt.toISOString() : null,
-      remainingDays,
-    })
+    return res.json(buildNormalizedSubscription(data?.subscription || {}))
   } catch (err) {
     console.error('subscription/status error', err)
-    res.status(200).json({ plan: 'free', status: 'free', remainingDays: 0 })
+    res.status(200).json({
+      plan: 'free',
+      status: 'free',
+      remainingDays: 0,
+      cancelAt: null,
+      expiresAt: null,
+      source: null,
+      productId: null,
+      originalTransactionId: null,
+    })
+  }
+})
+
+router.post('/subscription/apple/ingest', async (req, res) => {
+  try {
+    const userId = String(req.body?.userId || req?.user?.uid || '')
+    const productId = normalizeProductId(req.body?.productId)
+    if (!userId) return res.status(400).json({ error: 'Missing userId' })
+    if (!productId) return res.status(400).json({ error: 'Missing productId' })
+    if (productId !== APPLE_SOLO_PRODUCT_ID) {
+      return res.status(400).json({ error: 'Unexpected Apple product ID' })
+    }
+
+    const originalTransactionId = req.body?.originalTransactionId
+    if (originalTransactionId == null || String(originalTransactionId).trim() === '') {
+      return res.status(400).json({ error: 'Missing originalTransactionId' })
+    }
+
+    console.info('[AppleIAP] ingest request', {
+      userId,
+      productId,
+      status: req.body?.status || null,
+      expiresAt: req.body?.expiresAt || null,
+      originalTransactionId: String(originalTransactionId),
+      origin: req.body?.origin || null,
+    })
+
+    const userRef = db.collection('users').doc(userId)
+    const snap = await userRef.get()
+    const userData = snap.exists ? (snap.data() || {}) : {}
+    const existingSubscription = userData?.subscription || {}
+    const next = buildAppleSubscriptionWrite(existingSubscription, req.body || {})
+
+    await userRef.set(
+      {
+        plan: next.plan,
+        subscription: next.subscription,
+        updatedAt: new Date(),
+      },
+      { merge: true },
+    )
+
+    console.info('[AppleIAP] ingest stored', {
+      userId,
+      plan: next.plan,
+      status: next.normalized.status,
+      source: next.normalized.source,
+      productId: next.normalized.productId,
+      expiresAt: next.normalized.expiresAt,
+      originalTransactionId: next.normalized.originalTransactionId,
+    })
+
+    return res.json({
+      plan: next.plan,
+      subscription: next.normalized,
+    })
+  } catch (error) {
+    console.error('[AppleIAP] ingest failed', {
+      message: error?.message || String(error),
+      code: error?.code || null,
+      stack: error?.stack || null,
+    })
+    return res.status(500).json({ error: 'Failed to ingest Apple subscription' })
   }
 })
 

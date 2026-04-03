@@ -168,6 +168,29 @@
           </div>
         </div>
 
+        <div class="napkin-stream-toolbar">
+          <div class="napkin-search-box">
+            <input
+              v-model="searchTerm"
+              type="search"
+              class="napkin-search-input"
+              placeholder="Search note text, transcript, tags, or category"
+            />
+            <button
+              v-if="searchTerm"
+              type="button"
+              class="napkin-search-clear"
+              @click="searchTerm = ''"
+            >
+              Clear
+            </button>
+          </div>
+          <p class="napkin-stream-summary">
+            Showing {{ filteredItems.length }} of {{ items.length }} notes
+            <span v-if="searchTerm.trim()"> for "{{ searchTerm.trim() }}"</span>
+          </p>
+        </div>
+
         <div
           v-if="napkinError"
           class="rounded-xl border border-rose-700/40 bg-rose-900/40 px-3 py-2 text-sm text-rose-200"
@@ -183,7 +206,11 @@
           />
         </div>
         <div v-else-if="filteredItems.length === 0" class="app-page-empty text-sm">
-          Nothing on the Napkin yet. Capture a note or voice memo to get started.
+          {{
+            searchTerm.trim()
+              ? `No notes match "${searchTerm.trim()}". Try a different keyword.`
+              : 'Nothing on the Napkin yet. Capture a note or voice memo to get started.'
+          }}
         </div>
         <div v-else class="napkin-stream-layout">
           <div class="napkin-list-pane">
@@ -465,6 +492,7 @@ const items = ref<NapkinItem[]>([])
 const liveItems = ref<NapkinItem[]>([])
 const olderItems = ref<NapkinItem[]>([])
 const filter = ref('all')
+const searchTerm = ref('')
 const plannerOpen = ref(false)
 const plannerTask = ref<any>(null)
 const convertingFrom = ref<NapkinItem | null>(null)
@@ -496,9 +524,31 @@ const hasMoreWorkspace = ref(false)
 const hasMoreLegacy = ref(false)
 
 const filteredItems = computed(() => {
-  if (filter.value === 'all') return items.value
-  if (filter.value === 'voice') return items.value.filter((i) => i.audioUrl || i.source === 'voice')
-  return items.value.filter((i) => i.type === filter.value)
+  let base = items.value
+
+  if (filter.value === 'voice') {
+    base = base.filter((i) => i.audioUrl || i.source === 'voice')
+  } else if (filter.value !== 'all') {
+    base = base.filter((i) => i.type === filter.value)
+  }
+
+  const term = searchTerm.value.trim().toLowerCase()
+  if (!term) return base
+
+  return base.filter((item) => {
+    const searchable = [
+      item.text,
+      item.transcript,
+      item.category,
+      item.type,
+      item.status,
+      item.suggestion,
+      routeSuggestion(item.intent),
+      ...(Array.isArray(item.tags) ? item.tags : []),
+    ]
+
+    return searchable.some((value) => String(value || '').toLowerCase().includes(term))
+  })
 })
 
 const selectedItem = computed(() => filteredItems.value.find((item) => item.id === selectedItemId.value) || null)
@@ -1048,6 +1098,60 @@ onBeforeUnmount(() => {
   opacity: 0.7;
 }
 
+.napkin-stream-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.napkin-search-box {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.56);
+  padding: 0.45rem 0.55rem 0.45rem 0.9rem;
+}
+
+.napkin-search-input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: #f8fafc;
+  font-size: 0.95rem;
+  outline: none;
+}
+
+.napkin-search-input::placeholder {
+  color: rgba(148, 163, 184, 0.78);
+}
+
+.napkin-search-clear {
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  background: rgba(67, 56, 202, 0.2);
+  padding: 0.45rem 0.85rem;
+  color: #e0e7ff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.napkin-search-clear:hover {
+  border-color: rgba(129, 140, 248, 0.65);
+  background: rgba(79, 70, 229, 0.28);
+}
+
+.napkin-stream-summary {
+  margin: 0;
+  color: rgba(148, 163, 184, 0.9);
+  font-size: 0.84rem;
+}
+
 .chip {
   display: inline-flex;
   align-items: center;
@@ -1391,6 +1495,17 @@ onBeforeUnmount(() => {
 }
 
 @media (min-width: 768px) {
+  .napkin-stream-toolbar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .napkin-search-box {
+    flex: 1 1 auto;
+    max-width: 32rem;
+  }
+
   .napkin-stream-layout {
     grid-template-columns: minmax(0, 0.92fr) minmax(320px, 0.88fr);
     align-items: start;

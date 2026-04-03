@@ -2,54 +2,59 @@
   <template v-if="isAppleBillingSafeMode">
     <div class="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
       <div class="rounded-3xl border border-white/10 bg-gradient-to-br from-slate-900/85 via-indigo-950/80 to-slate-900/85 p-8 sm:p-10 shadow-2xl space-y-8">
-        <div class="space-y-3">
-          <p class="text-sm uppercase tracking-[0.35em] text-indigo-300">Account access</p>
-          <h1 class="text-3xl sm:text-4xl font-semibold text-white">This app does not offer purchases</h1>
-          <p class="max-w-3xl text-indigo-100/85 text-base sm:text-lg">
-            Premium features appear here automatically when the signed-in account already has an
-            active subscription created outside the app.
-          </p>
-        </div>
+        <div class="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+          <div class="space-y-6">
+            <div class="space-y-3">
+              <p class="text-sm uppercase tracking-[0.35em] text-indigo-300">Solo Premium</p>
+              <h1 class="text-3xl sm:text-4xl font-semibold text-white">Buy Solo Premium in the iOS app</h1>
+              <p class="max-w-3xl text-indigo-100/85 text-base sm:text-lg">
+                Apple handles Solo Premium billing here. Team workspace billing stays managed by the
+                workspace owner or admin outside the app.
+              </p>
+            </div>
 
-        <div class="grid gap-4 md:grid-cols-2">
-          <div class="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-3">
-            <p class="text-xs uppercase tracking-[0.24em] text-indigo-200">Already subscribed?</p>
-            <ul class="space-y-2 text-sm text-indigo-100/90">
-              <li>Sign in here with the same account you use outside the app.</li>
-              <li>Refresh access after your session finishes loading.</li>
-              <li>Your premium features will unlock automatically when linked to this account.</li>
-            </ul>
+            <AppleSoloPremiumCard />
           </div>
-          <div class="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-3">
-            <p class="text-xs uppercase tracking-[0.24em] text-indigo-200">For paid workspaces</p>
-            <ul class="space-y-2 text-sm text-indigo-100/90">
-              <li>Paid workspace memberships created outside the app sync to your account.</li>
-              <li>Role-based access and shared features appear after the next refresh.</li>
-              <li>No purchase or external payment flow is shown in the mobile app.</li>
-            </ul>
+          <div class="space-y-4">
+            <div class="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-3">
+              <p class="text-xs uppercase tracking-[0.24em] text-indigo-200">Already subscribed?</p>
+              <ul class="space-y-2 text-sm text-indigo-100/90">
+                <li>Sign in with the same account you use for Solo Premium or your paid workspace.</li>
+                <li>Use restore purchases for Apple subscriptions, or refresh access for existing synced billing.</li>
+                <li>Your premium features unlock automatically when the account entitlement is active.</li>
+              </ul>
+            </div>
+            <div class="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-3">
+              <p class="text-xs uppercase tracking-[0.24em] text-indigo-200">For team workspaces</p>
+              <ul class="space-y-2 text-sm text-indigo-100/90">
+                <li>Workspace billing is managed by the workspace owner or admin.</li>
+                <li>Paid workspace memberships sync to your account after the next refresh.</li>
+                <li>No team checkout or external payment flow is shown in the mobile app.</li>
+              </ul>
+            </div>
+
+            <div class="flex flex-wrap gap-3">
+              <RouterLink
+                v-if="!authStore.user?.uid"
+                to="/login"
+                class="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
+              >
+                Sign in
+              </RouterLink>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:border-indigo-300/40"
+                @click="refreshPremiumAccess"
+              >
+                Refresh access
+              </button>
+            </div>
+
+            <p class="text-sm text-indigo-100/70">
+              Existing Solo Premium access and paid workspace access sync automatically after sign-in.
+            </p>
           </div>
         </div>
-
-        <div class="flex flex-wrap gap-3">
-          <RouterLink
-            v-if="!authStore.user?.uid"
-            to="/login"
-            class="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
-          >
-            Sign in
-          </RouterLink>
-          <button
-            type="button"
-            class="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:border-indigo-300/40"
-            @click="refreshPremiumAccess"
-          >
-            Refresh access
-          </button>
-        </div>
-
-        <p class="text-sm text-indigo-100/70">
-          Existing subscriptions and paid workspace access sync automatically after sign-in.
-        </p>
       </div>
     </div>
   </template>
@@ -101,15 +106,22 @@
           </p>
           <p v-else class="text-2xl font-bold mb-4">$2 / month</p>
           <div v-if="isPremium" class="space-y-2">
-            <button
-              :disabled="cancelLoading"
-              @click="onCancel"
-              class="w-full py-2 rounded-lg bg-gradient-to-r from-rose-600 to-red-500 text-white font-semibold hover:from-rose-700 hover:to-red-600 transition disabled:opacity-60 text-sm sm:text-base"
-            >
-              <span v-if="cancelLoading">Canceling…</span>
-              <span v-else>Cancel Subscription</span>
-            </button>
-            <p class="text-sm text-white/80">You're currently on Premium.</p>
+            <template v-if="isAppleManagedPremium">
+              <div class="rounded-xl border border-white/10 bg-black/15 px-4 py-4 text-sm text-white/85">
+                This premium subscription is managed through Apple on your iPhone.
+              </div>
+            </template>
+            <template v-else>
+              <button
+                :disabled="cancelLoading"
+                @click="onCancel"
+                class="w-full py-2 rounded-lg bg-gradient-to-r from-rose-600 to-red-500 text-white font-semibold hover:from-rose-700 hover:to-red-600 transition disabled:opacity-60 text-sm sm:text-base"
+              >
+                <span v-if="cancelLoading">Canceling…</span>
+                <span v-else>Cancel Subscription</span>
+              </button>
+              <p class="text-sm text-white/80">You're currently on Premium.</p>
+            </template>
           </div>
           <button
             v-else
@@ -251,6 +263,7 @@ import { trackLinkedInConversion } from '@/utils/ads'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { useSeoMeta } from '@/composables/useSeoMeta'
 import { isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
+import AppleSoloPremiumCard from '@/components/AppleSoloPremiumCard.vue'
 
 const authStore = useAuthStore()
 const accessStore = useAccessStore()
@@ -261,10 +274,10 @@ const billingSafeRoute = '/billing/upgrade'
 useSeoMeta({
   title: isAppleBillingSafeMode ? 'Premium Access | PlanCraft AI' : 'Pricing | PlanCraft AI – Solo & Team Plans with Voice AI',
   description: isAppleBillingSafeMode
-    ? 'This mobile app does not offer purchases. Existing premium access syncs automatically to your account.'
+    ? 'Buy Solo Premium through Apple in the iOS app, or refresh synced premium and paid workspace access on your account.'
     : 'Compare solo and team plans for PlanCraft AI. Get AI planning, calendar sync, and Voice AI reminders with pricing built for individuals and shared workspaces.',
   keywords: isAppleBillingSafeMode
-    ? ['PlanCraft AI premium access', 'PlanCraft AI account access']
+    ? ['PlanCraft AI Solo Premium', 'PlanCraft AI Apple subscription', 'PlanCraft AI account access']
     : [
         'PlanCraft AI pricing',
         'AI planner subscription',
@@ -317,6 +330,10 @@ const proCtaLabel = computed(() => {
 
 const subStore = useSubscriptionStore()
 const { isPremium } = useIsPremium()
+const isAppleManagedPremium = computed(() => {
+  const source = String(subStore.subscription?.source || '').trim().toLowerCase()
+  return source === 'apple'
+})
 
 const dialogVisible = ref(false)
 
@@ -614,6 +631,10 @@ onUnmounted(() => stopPromoTimer())
 //   }
 // }
 async function onCancel() {
+  if (isAppleManagedPremium.value) {
+    ElMessage.info('This subscription is managed through Apple on your iPhone.')
+    return
+  }
   if (!authStore.user) {
     router.push('/login')
     return

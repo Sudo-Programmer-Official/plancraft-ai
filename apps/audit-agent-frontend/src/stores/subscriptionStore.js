@@ -5,7 +5,16 @@ import { getSubscriptionStatus } from '@/services/stripeService'
 import { useAuthStore } from '@/stores/authStore'
 
 export const useSubscriptionStore = defineStore('subscription', () => {
-  const subscription = ref({ plan: 'free', status: 'free', cancelAt: null, remainingDays: 0 })
+  const subscription = ref({
+    plan: 'free',
+    status: 'free',
+    cancelAt: null,
+    remainingDays: 0,
+    expiresAt: null,
+    source: null,
+    productId: null,
+    originalTransactionId: null,
+  })
   const loading = ref(false)
   const error = ref(null)
   const lastFetchedAt = ref(0)
@@ -45,6 +54,10 @@ export const useSubscriptionStore = defineStore('subscription', () => {
           status: data.status || (data.plan === 'premium' ? 'active' : 'free'),
           cancelAt: data.cancelAt ? new Date(data.cancelAt) : null,
           remainingDays: Number(data.remainingDays || 0),
+          expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
+          source: data.source || null,
+          productId: data.productId || null,
+          originalTransactionId: data.originalTransactionId || null,
         }
         refreshed = true
       } catch (e) {
@@ -67,7 +80,16 @@ export const useSubscriptionStore = defineStore('subscription', () => {
   }
 
   function reset() {
-    subscription.value = { plan: 'free', status: 'free', cancelAt: null, remainingDays: 0 }
+    subscription.value = {
+      plan: 'free',
+      status: 'free',
+      cancelAt: null,
+      remainingDays: 0,
+      expiresAt: null,
+      source: null,
+      productId: null,
+      originalTransactionId: null,
+    }
     loading.value = false
     error.value = null
     lastFetchedAt.value = 0

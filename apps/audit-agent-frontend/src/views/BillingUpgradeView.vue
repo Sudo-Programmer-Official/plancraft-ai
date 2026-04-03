@@ -11,6 +11,13 @@
         </header>
 
         <div class="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 space-y-5 shadow-xl">
+          <AppleSoloPremiumCard
+            v-if="showSoloApplePurchase"
+            eyebrow="Solo Premium"
+            title="Buy or restore Solo Premium on iPhone"
+            subtitle="Apple handles Solo Premium billing in this app. Team workspace upgrades remain admin-managed outside the app."
+          />
+
           <div class="rounded-2xl border border-indigo-400/30 bg-indigo-500/10 p-5 space-y-3">
             <p class="text-xs uppercase tracking-[0.24em] text-indigo-200">{{ appleBillingGuideLabel }}</p>
             <p class="text-lg font-semibold text-white">{{ appleBillingGuideTitle }}</p>
@@ -73,7 +80,7 @@
           </div>
 
           <p class="text-sm text-indigo-100/70">
-            No purchase or external payment flow is shown in the mobile app.
+            {{ appleBillingFootnote }}
           </p>
         </div>
       </template>
@@ -153,6 +160,7 @@ import { useAccessStore } from '@/stores/accessStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
+import AppleSoloPremiumCard from '@/components/AppleSoloPremiumCard.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -172,6 +180,11 @@ const billingSource = computed(() => (
     : ''
 ))
 const showHeaderFreePlanFlow = computed(() => billingSource.value === 'header-free-plan')
+const isTeamBillingContext = computed(() => (
+  billingSource.value === 'pricing-team' ||
+  billingSource.value === 'settings-team'
+))
+const showSoloApplePurchase = computed(() => isAppleBillingSafeMode.value && !isTeamBillingContext.value)
 const selectedWorkspace = computed(() => {
   return (
     workspaceStore.workspaces.find((w) => w.id === workspaceId.value) ||
@@ -190,46 +203,59 @@ const isOwner = computed(() => {
   return !!uid && !!selectedWorkspace.value && selectedWorkspace.value.ownerId === uid
 })
 const appleBillingEyebrow = computed(() => (
-  showHeaderFreePlanFlow.value ? 'Free plan' : 'Billing'
+  showHeaderFreePlanFlow.value ? 'Solo Premium' : isTeamBillingContext.value ? 'Team billing' : 'Billing'
 ))
 const appleBillingTitle = computed(() => (
   showHeaderFreePlanFlow.value
-    ? 'You are on the Free Plan'
-    : 'Premium features available via your account'
+    ? 'Upgrade to Solo Premium in the app'
+    : isTeamBillingContext.value
+      ? 'Team billing is managed by the workspace owner'
+      : 'Manage Solo Premium on iPhone'
 ))
 const appleBillingSubtitle = computed(() => (
   showHeaderFreePlanFlow.value
-    ? 'This mobile app does not offer plan upgrades. Existing premium access appears automatically for accounts that already subscribe outside the app.'
-    : 'This mobile app does not offer purchases. Existing premium or paid workspace access syncs automatically to your account.'
+    ? 'Solo Premium can be purchased or restored directly through Apple in this app. Paid workspace access still syncs automatically when the account already has it.'
+    : isTeamBillingContext.value
+      ? 'Team Starter and Team Pro remain admin-managed. This mobile app does not show team checkout or seat changes.'
+      : 'Solo Premium is sold through Apple in this app. Team workspace billing remains admin-managed outside the app.'
 ))
 const appleBillingGuideLabel = computed(() => (
-  showHeaderFreePlanFlow.value ? 'How access works' : 'What to do next'
+  showHeaderFreePlanFlow.value ? 'How access works' : isTeamBillingContext.value ? 'Team access' : 'What to do next'
 ))
 const appleBillingGuideTitle = computed(() => (
   showHeaderFreePlanFlow.value
-    ? 'Use the same account that already has premium access.'
-    : 'Paid access syncs automatically when linked to this account.'
+    ? 'Sign in, then buy or restore Solo Premium.'
+    : isTeamBillingContext.value
+      ? 'Ask the workspace owner or admin to manage billing.'
+      : 'Solo Premium and synced workspace access both resolve through this account.'
 ))
 const appleBillingGuideCopy = computed(() => (
   showHeaderFreePlanFlow.value
-    ? 'If you already subscribe outside the app, sign in here with that same account and refresh access.'
-    : 'If this account already has premium or paid workspace access from outside the app, refresh here to sync it.'
+    ? 'If you already subscribe through Apple, restore purchases. If your premium access exists elsewhere, sign in with that same account and refresh access.'
+    : isTeamBillingContext.value
+      ? 'Workspace owners manage seats and billing outside the mobile app. When your account already belongs to a paid workspace, refresh here to sync access.'
+      : 'Buy Solo Premium here with Apple, or refresh when this account already has premium or paid workspace access.'
+))
+const appleBillingFootnote = computed(() => (
+  showSoloApplePurchase.value
+    ? 'Solo Premium uses Apple in-app purchase. Team workspace billing remains outside the mobile app.'
+    : 'No purchase or external payment flow is shown in the mobile app.'
 ))
 const headerFreePlanSteps = [
   {
     step: 'Step 1',
-    title: 'Use the same account',
-    copy: 'Sign in to this mobile app with the account that already has paid access outside the app.',
+    title: 'Sign in to your account',
+    copy: 'Use the same account you want to unlock with Solo Premium or restore to from Apple.',
   },
   {
     step: 'Step 2',
-    title: 'Return to the app',
-    copy: 'Keep this screen open or come back after your account session is ready.',
+    title: 'Buy or restore',
+    copy: 'Purchase Solo Premium with Apple here, or restore an existing Apple subscription.',
   },
   {
     step: 'Step 3',
-    title: 'Refresh access',
-    copy: 'Tap refresh and your premium access will sync automatically if it already exists on your account.',
+    title: 'Refresh synced access',
+    copy: 'If this account already has paid workspace access, refresh and it will sync automatically.',
   },
 ]
 

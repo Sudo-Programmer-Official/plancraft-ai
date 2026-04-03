@@ -1,7 +1,16 @@
 // src/services/stripeService.js
 import api from '@/services/api'
 
-const DEFAULT_STATUS = Object.freeze({ plan: 'free', status: 'free', remainingDays: 0, cancelAt: null })
+const DEFAULT_STATUS = Object.freeze({
+  plan: 'free',
+  status: 'free',
+  remainingDays: 0,
+  cancelAt: null,
+  expiresAt: null,
+  source: null,
+  productId: null,
+  originalTransactionId: null,
+})
 const CACHE_KEY = 'subscription_status_cache'
 const CACHE_TTL_MS = 1000 * 60 * 5 // 5 minutes
 const TIMEOUT_BACKOFF_MS = 1000 * 60 * 5
@@ -56,11 +65,16 @@ function writeCachedStatus(userId, data) {
 function normalizeStatus(payload) {
   if (!payload || typeof payload !== 'object') return { ...DEFAULT_STATUS }
   const plan = payload.plan || (payload.status === 'active' ? 'premium' : 'free')
+  const source = payload.source || null
   return {
     plan,
     status: payload.status || (plan === 'premium' ? 'active' : 'free'),
     remainingDays: Number(payload.remainingDays || 0),
     cancelAt: payload.cancelAt || null,
+    expiresAt: payload.expiresAt || null,
+    source,
+    productId: payload.productId || null,
+    originalTransactionId: payload.originalTransactionId || null,
   }
 }
 
@@ -85,6 +99,10 @@ function readStoredUserFallbackStatus() {
       status: 'active',
       remainingDays: Number(user?.subscription?.remainingDays || 0),
       cancelAt: user?.subscription?.cancelAt || null,
+      expiresAt: user?.subscription?.expiresAt || user?.subscription?.currentPeriodEnd || null,
+      source: user?.subscription?.source || 'stripe',
+      productId: user?.subscription?.productId || null,
+      originalTransactionId: user?.subscription?.originalTransactionId || null,
     }
   } catch {
     return null
