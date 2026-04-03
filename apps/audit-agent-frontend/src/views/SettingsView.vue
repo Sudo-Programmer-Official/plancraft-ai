@@ -129,7 +129,7 @@
                 ⏳ Ends on {{ premiumEndsOn }}
               </p>
               <p v-if="isAppleBillingSafeMode" class="text-xs text-indigo-200/80">
-                This mobile app does not offer purchases. Existing premium access syncs here automatically.
+                Solo Premium is available in the iPhone app. Existing premium access also syncs here automatically.
               </p>
             </div>
           </div>
@@ -138,10 +138,10 @@
             <div class="flex items-start justify-between gap-3">
               <div>
                 <p class="text-xs uppercase tracking-[0.25em] text-indigo-200">Workspace upgrades</p>
-                <h3 class="text-xl font-semibold text-white">Paid workspaces sync into the app</h3>
+                <h3 class="text-xl font-semibold text-white">Team access syncs into the app</h3>
                 <p class="text-sm text-indigo-100/90">
-                  This mobile app does not offer purchases or upgrades. If this account already belongs to
-                  a paid workspace created outside the app, refresh and the access will appear here.
+                  Team plans are managed by workspace owners on web. If this account already belongs to
+                  a paid workspace, refresh and the access will appear here.
                 </p>
               </div>
             </div>
@@ -1882,7 +1882,7 @@ const remindersLimitLabel = computed(() => (accessStore.access?.limits?.reminder
 const planOpen = ref(false)
 const billingSectionIntro = computed(() =>
   isAppleBillingSafeMode.value
-    ? 'This mobile app does not offer purchases. Existing premium and paid workspace access sync automatically to your account.'
+    ? 'Solo Premium is available in the iPhone app, and existing paid workspace access syncs automatically to your account.'
     : 'Personal plan status plus the new teams pricing for shared workspaces.',
 )
 const personalPlanCtaLabel = computed(() =>

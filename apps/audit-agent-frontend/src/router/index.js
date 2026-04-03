@@ -276,7 +276,7 @@ router.beforeEach(async (to, from, next) => {
   }
 
   if (
-    isNativePackagedApp() &&
+    isIosPackagedApp() &&
     (
       to.path === '/subscription' ||
       to.path === '/pricing' ||

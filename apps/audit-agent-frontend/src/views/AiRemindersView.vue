@@ -86,7 +86,7 @@ import { isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/bi
 
 const isAppleBillingSafeMode = computed(() => detectAppleBillingSafeMode())
 const secondaryCtaRoute = computed(() => (isAppleBillingSafeMode.value ? '/billing/upgrade' : '/pricing'))
-const secondaryCtaLabel = computed(() => (isAppleBillingSafeMode.value ? 'Account access' : 'Pricing'))
+const secondaryCtaLabel = computed(() => (isAppleBillingSafeMode.value ? 'Upgrade to Solo Premium' : 'Pricing'))
 
 const channels = [
   {

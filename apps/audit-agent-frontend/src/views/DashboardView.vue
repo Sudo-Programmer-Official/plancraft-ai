@@ -147,12 +147,12 @@
                 v-if="isAppleBillingSafeMode && isReminderLimitReached"
                 class="text-xs text-indigo-100/75"
               >
-                Premium access only appears here for accounts that already subscribe outside the app.
+                Upgrade to Solo Premium here, or refresh access if this account already belongs to a paid workspace.
               </p>
             </div>
           </div>
           <button
-            v-if="!isGuest.value && !isAppleBillingSafeMode"
+            v-if="!isGuest.value"
             @click="goToUpgrade"
             class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold"
           >
@@ -1088,11 +1088,14 @@
           <div v-else-if="napkinLoading" class="space-y-2">
             <div v-for="n in 3" :key="n" class="h-16 bg-slate-900/40 border border-slate-800 rounded-xl animate-pulse" />
           </div>
-          <div v-else-if="napkinPreview.length" class="space-y-3">
+          <div
+            v-else-if="napkinPreview.length"
+            class="space-y-3 max-h-[32rem] overflow-y-auto pr-1 sm:max-h-[34rem]"
+          >
             <article
               v-for="item in napkinPreview"
               :key="item.id"
-              class="p-3 rounded-xl bg-slate-900/70 border border-slate-800/80 hover:border-indigo-500/60 transition space-y-2"
+              class="p-3 rounded-xl bg-slate-900/70 border border-slate-800/80 hover:border-indigo-500/60 transition space-y-2 overflow-hidden"
             >
               <div class="flex flex-wrap items-center gap-2 text-[11px]">
                 <span class="px-2 py-1 rounded-full bg-indigo-900/60 border border-indigo-700/60 text-indigo-100 uppercase tracking-wide">
@@ -1109,12 +1112,14 @@
                 </span>
                 <span class="text-slate-400">{{ formatNapkinDate(item.createdAt) }}</span>
               </div>
-              <p class="text-sm text-slate-50 whitespace-pre-line leading-relaxed">
-                {{ item.text }}
-              </p>
-              <p v-if="item.tags?.length" class="text-[11px] text-slate-400">
-                #{{ item.tags.slice(0, 4).join(' #') }}
-              </p>
+              <div class="max-h-64 overflow-y-auto pr-1 space-y-2">
+                <p class="text-sm text-slate-50 whitespace-pre-line leading-relaxed">
+                  {{ item.text }}
+                </p>
+                <p v-if="item.tags?.length" class="text-[11px] text-slate-400">
+                  #{{ item.tags.slice(0, 4).join(' #') }}
+                </p>
+              </div>
             </article>
           </div>
           <div v-else class="text-sm text-slate-300 bg-slate-900/60 border border-slate-800 rounded-xl px-3 py-2">

@@ -26,11 +26,11 @@
           v-if="!isPaidPlan && isAppleBillingSafeMode"
           class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-indigo-100/85"
         >
-          This mobile app does not offer purchases. Premium access appears automatically when this
-          account already has an active subscription created outside the app.
+          Solo Premium is available in the iPhone app with Apple In-App Purchase. Team plans are
+          managed by workspace owners on web, and existing paid workspace access still syncs here.
         </div>
         <router-link
-          v-else-if="!isPaidPlan"
+          v-if="!isPaidPlan"
           :to="upgradeRoute"
           @click="track"
           class="inline-block px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition font-medium"
@@ -94,7 +94,7 @@ const planLabel = computed(() => {
 const dialogWidth = ref(window.innerWidth < 640 ? '90%' : '420px')
 const isAppleBillingSafeMode = computed(() => detectAppleBillingSafeMode())
 const upgradeRoute = computed(() => (detectAppleBillingSafeMode() ? '/billing/upgrade' : '/subscription'))
-const upgradeLabel = computed(() => (detectAppleBillingSafeMode() ? 'Upgrade to Premium' : 'Upgrade to Premium'))
+const upgradeLabel = computed(() => (detectAppleBillingSafeMode() ? 'Upgrade to Solo Premium' : 'Upgrade to Premium'))
 
 
 const limits = computed(() => ({

@@ -83,7 +83,7 @@ defineProps({
   },
   subtitle: {
     type: String,
-    default: 'Apple handles billing in the iOS app. Team workspace billing stays admin-managed outside the app.',
+    default: 'Apple handles Solo Premium billing in the iOS app. Team plans are managed by workspace owners on web.',
   },
 })
 
@@ -138,9 +138,11 @@ const purchaseLabel = computed(() => (
     ? `Subscribe for ${product.value.displayPrice}`
     : 'Subscribe with Apple'
 ))
-const productPriceLabel = computed(() => product.value?.displayPrice || 'Available in the App Store')
+const productPriceLabel = computed(() => (
+  product.value?.displayPrice ? `${product.value.displayPrice} / month` : '$2.99 / month'
+))
 const priceCaption = computed(() => (
-  product.value?.displayPrice ? 'Auto-renewable monthly subscription' : 'Solo Premium monthly subscription'
+  product.value?.displayPrice ? 'Apple In-App Purchase · auto-renewable monthly subscription' : 'Apple In-App Purchase'
 ))
 const productTitle = computed(() => product.value?.title || 'Solo Premium')
 const productDescription = computed(() => (

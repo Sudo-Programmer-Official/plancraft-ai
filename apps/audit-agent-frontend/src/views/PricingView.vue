@@ -6,10 +6,10 @@
           <div class="space-y-6">
             <div class="space-y-3">
               <p class="text-sm uppercase tracking-[0.35em] text-indigo-300">Solo Premium</p>
-              <h1 class="text-3xl sm:text-4xl font-semibold text-white">Buy Solo Premium in the iOS app</h1>
+              <h1 class="text-3xl sm:text-4xl font-semibold text-white">Upgrade to Solo Premium on iPhone</h1>
               <p class="max-w-3xl text-indigo-100/85 text-base sm:text-lg">
-                Apple handles Solo Premium billing here. Team workspace billing stays managed by the
-                workspace owner or admin outside the app.
+                Solo Premium is available via Apple In-App Purchase at $2.99/month. Team plans are
+                managed by workspace owners on web.
               </p>
             </div>
 
@@ -19,7 +19,7 @@
             <div class="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-3">
               <p class="text-xs uppercase tracking-[0.24em] text-indigo-200">Already subscribed?</p>
               <ul class="space-y-2 text-sm text-indigo-100/90">
-                <li>Sign in with the same account you use for Solo Premium or your paid workspace.</li>
+                <li>Sign in with the same account you use for Solo Premium or your team workspace.</li>
                 <li>Use restore purchases for Apple subscriptions, or refresh access for existing synced billing.</li>
                 <li>Your premium features unlock automatically when the account entitlement is active.</li>
               </ul>
@@ -27,9 +27,9 @@
             <div class="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-3">
               <p class="text-xs uppercase tracking-[0.24em] text-indigo-200">For team workspaces</p>
               <ul class="space-y-2 text-sm text-indigo-100/90">
-                <li>Workspace billing is managed by the workspace owner or admin.</li>
+                <li>Team plans are managed by workspace owners on web.</li>
                 <li>Paid workspace memberships sync to your account after the next refresh.</li>
-                <li>No team checkout or external payment flow is shown in the mobile app.</li>
+                <li>No team pricing or external checkout is shown in the iPhone app.</li>
               </ul>
             </div>
 

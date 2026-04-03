@@ -587,19 +587,22 @@
               </el-tooltip>
             </template>
             <template v-else>
-              <span
+              <RouterLink
                 v-if="showFreePlanHeaderBadge"
+                :to="headerBillingRoute"
                 :class="freePlanBadgeClasses"
                 :title="upgradePillTitle"
+                @click="trackUpgradeClick"
                 aria-label="Free plan status"
               >
                 Free Plan
-              </span>
+              </RouterLink>
               <RouterLink
                 v-else-if="!isGuest && !isAppleBillingSafeMode"
-                :to="billingRoutePath"
+                :to="headerBillingRoute"
                 :class="upgradePillClasses"
                 :title="upgradePillTitle"
+                @click="trackUpgradeClick"
               >
                 {{ upgradePillLabel }}
               </RouterLink>
@@ -1332,6 +1335,12 @@ const systemLinks = computed(() => [
 ])
 const isAppleBillingSafeMode = computed(() => detectAppleBillingSafeMode())
 const billingRoutePath = computed(() => (isAppleBillingSafeMode.value ? '/billing/upgrade' : '/subscription'))
+const headerBillingRoute = computed(() => ({
+  path: billingRoutePath.value,
+  query: {
+    source: isAppleBillingSafeMode.value ? 'header-free-plan' : 'header-upgrade',
+  },
+}))
 const upgradeBannerLabel = computed(() => (isAppleBillingSafeMode.value ? 'Refresh access' : 'Upgrade'))
 const upgradeBannerMessage = computed(() => (
   isAppleBillingSafeMode.value
@@ -1341,14 +1350,14 @@ const upgradeBannerMessage = computed(() => (
 const upgradePillLabel = computed(() => '🚀 Upgrade')
 const upgradePillTitle = computed(() => (
   isAppleBillingSafeMode.value
-    ? 'You are on the Free plan. Existing premium access syncs automatically to this account.'
+    ? 'Open Solo Premium on iPhone or refresh access that already exists on this account.'
     : 'Upgrade'
 ))
 const showFreePlanHeaderBadge = computed(() => (
   isAppleBillingSafeMode.value && !isPremium.value && !isGuest.value
 ))
 const premiumStatusBadgeClasses = 'rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm font-semibold text-slate-100'
-const freePlanBadgeClasses = 'rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm font-semibold text-slate-100'
+const freePlanBadgeClasses = 'rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm font-semibold text-slate-100 transition hover:border-indigo-300/60 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-400/70'
 const upgradePillClasses = computed(() => (
   isAppleBillingSafeMode.value
     ? 'rounded-full border border-white/12 bg-white/8 px-3 py-1 text-sm font-semibold text-slate-100 shadow-sm transition hover:bg-white/12'

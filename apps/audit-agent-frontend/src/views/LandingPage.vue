@@ -460,7 +460,7 @@
           {{ isAppleBillingSafeMode ? '✨ Premium Access' : '✨ Choose Your Flow' }}
         </h2>
         <p class="text-indigo-200 mb-12 text-lg">
-          {{ isAppleBillingSafeMode ? 'This mobile app does not offer purchases. Premium access appears automatically when your account already has it outside the app.' : 'Simple plans for people who want to stop forgetting tasks and keep work moving.' }}
+          {{ isAppleBillingSafeMode ? 'Solo Premium is available via Apple In-App Purchase at $2.99/month. Team plans are managed by workspace owners on web.' : 'Simple plans for people who want to stop forgetting tasks and keep work moving.' }}
         </p>
 
         <template v-if="isAppleBillingSafeMode">
@@ -475,17 +475,17 @@
                 </ul>
               </div>
               <div class="space-y-4">
-                <p class="text-sm uppercase tracking-[0.35em] text-indigo-300">Account access</p>
+                <p class="text-sm uppercase tracking-[0.35em] text-indigo-300">Solo Premium</p>
                 <p class="text-indigo-100/85">
-                  Sign in with the same account that already has premium access outside the app and
-                  it will appear here automatically.
+                  Sign in with the account you want to upgrade to Solo Premium, or restore and
+                  refresh access if this account already belongs to a paid workspace.
                 </p>
                 <div class="flex flex-wrap gap-3">
                   <RouterLink
                     :to="billingRoutePath"
                     class="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 font-semibold text-indigo-700 hover:bg-slate-100 transition shadow-md"
                   >
-                    Learn how access works
+                    Upgrade to Solo Premium
                   </RouterLink>
                   <button
                     type="button"
@@ -578,7 +578,8 @@
               <p class="text-sm uppercase tracking-[0.35em] text-indigo-300">Team workspace features</p>
               <h3 class="mt-3 text-3xl font-semibold text-white">Workspaces for Teams</h3>
               <p class="mt-3 text-indigo-200 max-w-2xl">
-                Shared workspaces, teammate roles, and Voice AI follow-ups are available from your account on the web.
+                Team plans are managed by workspace owners on web. Paid workspace access still syncs
+                into the iPhone app after sign-in.
               </p>
               <ul class="mt-6 grid gap-3 md:grid-cols-2 text-sm text-indigo-100/90">
                 <li>Shared tasks and workspace context</li>
@@ -586,20 +587,6 @@
                 <li>Voice AI reminders and follow-ups</li>
                 <li>Workspace creation and team setup</li>
               </ul>
-              <div class="mt-6 flex flex-wrap gap-3">
-                <button
-                  class="px-5 py-3 rounded-xl bg-white text-indigo-700 font-semibold hover:bg-slate-100 transition shadow-md"
-                  @click="startTeamWorkspace"
-                >
-                  Create Workspace
-                </button>
-                <RouterLink
-                  :to="billingRoutePath"
-                  class="px-5 py-3 rounded-xl border border-white/15 bg-white/5 text-white font-semibold hover:border-indigo-300/40 transition"
-                >
-                  Learn how paid access works
-                </RouterLink>
-              </div>
             </div>
           </template>
           <template v-else>

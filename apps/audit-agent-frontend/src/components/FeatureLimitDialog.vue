@@ -9,12 +9,12 @@
       <div class="space-y-2">
         <p class="text-xs uppercase tracking-[0.32em] text-indigo-300/80">{{ planLabel }}</p>
         <h2 class="text-2xl font-semibold text-white">
-          {{ isAppleBillingSafeMode ? 'Premium access required' : 'Upgrade to continue' }}
+          {{ isAppleBillingSafeMode ? 'Upgrade to Solo Premium' : 'Upgrade to continue' }}
         </h2>
         <p v-if="isAppleBillingSafeMode" class="text-sm text-indigo-100/85">
-          You’ve reached your free limit ({{ limitText }} {{ featureLabel }}). This mobile app does
-          not offer purchases. If this account already has premium access from outside the app,
-          refresh to sync it here.
+          You’ve reached your free limit ({{ limitText }} {{ featureLabel }}). Solo Premium is
+          available in the iPhone app with Apple In-App Purchase. Team plans are managed by workspace
+          owners on web, and existing paid workspace access can be refreshed here.
         </p>
         <template v-else>
           <p class="text-sm text-indigo-100/85">
@@ -34,7 +34,6 @@
 
       <div class="flex flex-wrap gap-3">
         <button
-          v-if="!isAppleBillingSafeMode"
           type="button"
           class="rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
           @click="handlePrimaryAction"
@@ -65,8 +64,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { BILLING_WEB_HOST, BILLING_WEB_URL, isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
-import { copyText, openExternalUrl } from '@/utils/nativeUi'
+import { BILLING_WEB_HOST, isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
 import { useAuthStore } from '@/stores/authStore'
 import { useAccessStore } from '@/stores/accessStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
@@ -89,23 +87,13 @@ const refreshing = ref(false)
 const isAppleBillingSafeMode = detectAppleBillingSafeMode()
 const billingWebHost = BILLING_WEB_HOST
 const limitText = computed(() => (props.limit > 0 ? String(props.limit) : '0'))
-const primaryActionLabel = computed(() => 'Learn about Premium')
+const primaryActionLabel = computed(() => (
+  isAppleBillingSafeMode ? 'Upgrade to Solo Premium' : 'Learn about Premium'
+))
 
 async function handlePrimaryAction() {
-  if (!isAppleBillingSafeMode) {
-    emit('close')
-    await router.push('/subscription')
-    return
-  }
-
-  const opened = openExternalUrl(BILLING_WEB_URL)
-  if (opened) return
-  const copied = await copyText(BILLING_WEB_URL)
-  if (copied) {
-    ElMessage.success(`${BILLING_WEB_URL} copied`)
-    return
-  }
-  ElMessage.info(`Visit ${billingWebHost}`)
+  emit('close')
+  await router.push(isAppleBillingSafeMode ? '/billing/upgrade' : '/subscription')
 }
 
 async function handleRefresh() {

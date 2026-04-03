@@ -15,7 +15,7 @@
             v-if="showSoloApplePurchase"
             eyebrow="Solo Premium"
             title="Buy or restore Solo Premium on iPhone"
-            subtitle="Apple handles Solo Premium billing in this app. Team workspace upgrades remain admin-managed outside the app."
+            subtitle="Solo Premium is available via Apple In-App Purchase at $2.99/month. Team plans are managed by workspace owners on web."
           />
 
           <div class="rounded-2xl border border-indigo-400/30 bg-indigo-500/10 p-5 space-y-3">
@@ -42,7 +42,7 @@
           </div>
 
           <div
-            v-else
+            v-else-if="!isTeamBillingContext"
             class="grid gap-3 sm:grid-cols-2"
           >
             <div class="rounded-xl border border-white/10 bg-slate-900/70 p-4">
@@ -53,6 +53,14 @@
               <p class="text-xs uppercase tracking-[0.2em] text-indigo-200/80">Workspace</p>
               <p class="mt-2 text-sm font-medium text-white break-all">{{ workspaceId || 'Current workspace' }}</p>
             </div>
+          </div>
+
+          <div
+            v-else
+            class="rounded-xl border border-white/10 bg-slate-900/70 p-4"
+          >
+            <p class="text-xs uppercase tracking-[0.2em] text-indigo-200/80">Team billing</p>
+            <p class="mt-2 text-base font-semibold text-white">Team plans are managed by workspace owners on web.</p>
           </div>
 
           <div class="flex flex-wrap gap-3">
@@ -209,15 +217,15 @@ const appleBillingTitle = computed(() => (
   showHeaderFreePlanFlow.value
     ? 'Upgrade to Solo Premium in the app'
     : isTeamBillingContext.value
-      ? 'Team billing is managed by the workspace owner'
+      ? 'Team plans are managed on web'
       : 'Manage Solo Premium on iPhone'
 ))
 const appleBillingSubtitle = computed(() => (
   showHeaderFreePlanFlow.value
-    ? 'Solo Premium can be purchased or restored directly through Apple in this app. Paid workspace access still syncs automatically when the account already has it.'
+    ? 'Solo Premium is available via Apple In-App Purchase at $2.99/month. Paid workspace access still syncs automatically when the account already has it.'
     : isTeamBillingContext.value
-      ? 'Team Starter and Team Pro remain admin-managed. This mobile app does not show team checkout or seat changes.'
-      : 'Solo Premium is sold through Apple in this app. Team workspace billing remains admin-managed outside the app.'
+      ? 'Team plans are managed by workspace owners on web. This iPhone app does not show team pricing or external checkout.'
+      : 'Solo Premium is sold through Apple in this app. Team plans are managed by workspace owners on web.'
 ))
 const appleBillingGuideLabel = computed(() => (
   showHeaderFreePlanFlow.value ? 'How access works' : isTeamBillingContext.value ? 'Team access' : 'What to do next'
@@ -226,20 +234,20 @@ const appleBillingGuideTitle = computed(() => (
   showHeaderFreePlanFlow.value
     ? 'Sign in, then buy or restore Solo Premium.'
     : isTeamBillingContext.value
-      ? 'Ask the workspace owner or admin to manage billing.'
+      ? 'Ask the workspace owner to manage the team plan on web.'
       : 'Solo Premium and synced workspace access both resolve through this account.'
 ))
 const appleBillingGuideCopy = computed(() => (
   showHeaderFreePlanFlow.value
     ? 'If you already subscribe through Apple, restore purchases. If your premium access exists elsewhere, sign in with that same account and refresh access.'
     : isTeamBillingContext.value
-      ? 'Workspace owners manage seats and billing outside the mobile app. When your account already belongs to a paid workspace, refresh here to sync access.'
+      ? 'When your account already belongs to a paid workspace, refresh here to sync access. New team purchases and plan changes are handled by workspace owners on web.'
       : 'Buy Solo Premium here with Apple, or refresh when this account already has premium or paid workspace access.'
 ))
 const appleBillingFootnote = computed(() => (
   showSoloApplePurchase.value
-    ? 'Solo Premium uses Apple in-app purchase. Team workspace billing remains outside the mobile app.'
-    : 'No purchase or external payment flow is shown in the mobile app.'
+    ? 'Solo Premium uses Apple In-App Purchase at $2.99/month. Team plans are managed by workspace owners on web.'
+    : 'No team pricing or external payment flow is shown in the iPhone app.'
 ))
 const headerFreePlanSteps = [
   {
