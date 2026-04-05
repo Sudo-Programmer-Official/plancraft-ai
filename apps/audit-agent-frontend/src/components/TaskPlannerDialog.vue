@@ -1886,8 +1886,12 @@ async function resolveVoiceTaskIntent(rawValue) {
 
 function applyParsedTask(parsed, rawValue) {
   const safeParsed = parsed && typeof parsed === 'object' ? parsed : null
-  const nextTitle = safeParsed?.meta?.hasClearTitle ? safeParsed.title : rawValue
-  assignText(input, nextTitle)
+  const nextTranscript = coerceText(rawValue, '').trim()
+  const nextTitle = safeParsed?.meta?.hasClearTitle ? safeParsed.title : nextTranscript
+
+  // Keep the full spoken sentence visible in the planner field.
+  // Parsed intent still drives date/repeat/reminder autofill below.
+  assignText(input, nextTranscript || nextTitle)
 
   if (safeParsed?.dueDate && !props.lockDate) {
     selectedDate.value = normalizeDateInput(safeParsed.dueDate)
