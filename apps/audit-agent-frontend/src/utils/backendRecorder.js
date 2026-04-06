@@ -1,4 +1,3 @@
-import RecordRTC from "recordrtc"
 import api from '@/services/api'
 
 const MIME_CANDIDATES = [
@@ -12,6 +11,19 @@ const MIME_CANDIDATES = [
 ]
 const VOICE_STOP_DELAY_MS = 400
 const MINIMUM_AUDIO_BYTES = 1024
+let recordRtcLoader = null
+
+async function loadRecordRTC() {
+  if (typeof window === 'undefined') {
+    throw new Error('RecordRTC is only available in the browser')
+  }
+
+  if (!recordRtcLoader) {
+    recordRtcLoader = import('recordrtc').then((module) => module?.default || module)
+  }
+
+  return recordRtcLoader
+}
 
 function sanitizeTranscriptText(value) {
   const text = String(value || "").replace(/\s+/g, " ").trim()
@@ -33,7 +45,6 @@ function getExt(mime) {
 
 function resolveMimeType() {
   const canUse = (type) =>
-    (typeof RecordRTC.isTypeSupported === "function" && RecordRTC.isTypeSupported(type)) ||
     (typeof MediaRecorder !== "undefined" && typeof MediaRecorder.isTypeSupported === "function"
       ? MediaRecorder.isTypeSupported(type)
       : false)
@@ -73,6 +84,8 @@ export async function recordAndSendToBackend(
   onResult,
   { timeSliceMs = 4000, mode = "final", emitFinalResult = mode === "final" } = {}
 ) {
+  const RecordRTC = await loadRecordRTC()
+
   if (!navigator?.mediaDevices?.getUserMedia) {
     throw new Error("Browser microphone APIs unavailable")
   }
