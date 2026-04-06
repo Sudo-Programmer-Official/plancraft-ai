@@ -18,6 +18,28 @@ import { auth, db } from "@/firebase/init"; // Already initialized
 import api from '@/services/api'
 import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
 
+const PUBLIC_SITE_URL = ((import.meta.env.VITE_SITE_URL && String(import.meta.env.VITE_SITE_URL)) || 'https://plancraftai.com')
+  .replace(/\/+$/, '')
+
+function buildSafeContinueUrl(path = '/login') {
+  const rawPath = String(path || '/login')
+  const normalizedPath = rawPath.startsWith('/') ? rawPath : `/${rawPath.replace(/^\/+/, '')}`
+
+  if (typeof window !== 'undefined') {
+    try {
+      const protocol = String(window.location.protocol || '').toLowerCase()
+      const origin = String(window.location.origin || '').replace(/\/+$/, '')
+      if ((protocol === 'http:' || protocol === 'https:') && origin) {
+        return `${origin}${normalizedPath}`
+      }
+    } catch {
+      /* noop */
+    }
+  }
+
+  return `${PUBLIC_SITE_URL}${normalizedPath}`
+}
+
 export async function signInAsGuest() {
   const result = await signInAnonymously(auth);
   const user = result.user;
@@ -77,8 +99,8 @@ export async function registerWithEmail(email, password) {
 
 export async function sendResetEmail(email) {
   const actionCodeSettings = {
-    // After the user completes the reset flow, send them back to login
-    url: (typeof window !== 'undefined' ? window.location.origin : '') + '/login?reset=1',
+    // Firebase action links must redirect to http(s), not capacitor:// or ionic://.
+    url: buildSafeContinueUrl('/login?reset=1'),
     // Let Firebase host the reset UI (safer cross‑browser); we only provide a continue URL
     handleCodeInApp: false,
   }
@@ -113,11 +135,11 @@ export async function fetchUserProfile(uid) {
 // Passwordless: send magic link to email
 export async function sendMagicLink(email) {
   const actionCodeSettings = {
-    url: (typeof window !== 'undefined' ? window.location.origin : '') + '/login',
+    url: buildSafeContinueUrl('/login'),
     handleCodeInApp: true,
   }
   await sendSignInLinkToEmail(auth, email, actionCodeSettings)
-  try { localStorage.setItem('emailForSignIn', email) } catch {}
+  try { localStorage.setItem('emailForSignIn', email) } catch { /* noop */ }
 }
 
 // Passwordless: complete sign-in from magic link
@@ -126,7 +148,7 @@ export async function completeMagicLinkSignIn(currentUrl) {
   const email = emailStored || ''
   if (!isSignInWithEmailLink(auth, currentUrl)) return null
   const userCred = await signInWithEmailLink(auth, email || window.prompt('Confirm your email for sign-in'), currentUrl)
-  try { localStorage.removeItem('emailForSignIn') } catch {}
+  try { localStorage.removeItem('emailForSignIn') } catch { /* noop */ }
   const user = userCred.user
   await setDoc(doc(db, 'users', user.uid), {
     email: user.email,

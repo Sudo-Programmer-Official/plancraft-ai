@@ -163,6 +163,10 @@ function mapIdentityToolkitError(rawMessage) {
         message: 'That email is already in use.',
       }
     case 'EMAIL_NOT_FOUND':
+      return {
+        code: 'auth/user-not-found',
+        message: 'No account found for this email.',
+      }
     case 'INVALID_LOGIN_CREDENTIALS':
     case 'INVALID_PASSWORD':
       return {

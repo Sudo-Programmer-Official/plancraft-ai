@@ -713,7 +713,14 @@ async function onLoginEmail() {
       code: e?.code || null,
       message: e?.message || String(e),
     }))
-    if (code.includes('auth/invalid-credential') || code.includes('auth/wrong-password') || code.includes('auth/user-not-found')) {
+    if (code.includes('auth/user-not-found')) {
+      triggerEmailErrorFeedback('No account found for this email. Create an account first.', {
+        highlightEmail: true,
+        highlightPassword: false,
+      })
+      return
+    }
+    if (code.includes('auth/invalid-credential') || code.includes('auth/wrong-password')) {
       triggerEmailErrorFeedback('Incorrect email or password.')
       return
     }
@@ -783,7 +790,7 @@ async function onReset() {
   if (!email.value) return ElMessage.warning('Enter your email above to reset')
   try {
     await authStore.resetPassword(email.value)
-    ElMessage.success('Password reset email sent. Check inbox/spam.')
+    ElMessage.success('Password reset email sent. Check inbox/spam and continue in the browser.')
   } catch (e) {
     const code = String(e?.code || e?.message || '')
     if (code.includes('auth/invalid-email')) {

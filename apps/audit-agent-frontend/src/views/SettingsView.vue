@@ -772,10 +772,10 @@
     :close-on-press-escape="!deleteAccountLoading"
   >
     <div class="space-y-4">
-      <p class="text-sm text-slate-300">
+      <p class="text-sm text-slate-700">
         Are you sure? This permanently deletes your account and signs you out of PlanCraft AI.
       </p>
-      <div class="rounded-xl border border-red-300/20 bg-red-500/10 px-4 py-3 text-sm text-red-50/90 space-y-1">
+      <div class="rounded-xl border border-red-300/40 bg-red-50 px-4 py-3 text-sm text-red-900 space-y-1">
         <p>This will permanently delete:</p>
         <p>- Your account data</p>
         <p>- Your tasks, reminders, and journal entries</p>
@@ -797,10 +797,10 @@
     :close-on-press-escape="false"
   >
     <div class="space-y-4">
-      <p class="text-sm text-slate-300">
+      <p class="text-sm text-slate-700">
         Your account has been deleted.
       </p>
-      <p class="text-sm text-slate-400">
+      <p class="text-sm text-slate-500">
         You are being signed out now.
       </p>
       <div class="flex justify-end">
