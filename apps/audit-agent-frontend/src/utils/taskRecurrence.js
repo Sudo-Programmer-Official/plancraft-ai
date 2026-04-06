@@ -1,7 +1,7 @@
 import dayjs from 'dayjs'
 import { toUtcIso } from '@/utils/time'
 
-export const TASK_REPEAT_TYPE_VALUES = ['daily', 'weekly', 'monthly', 'custom']
+export const TASK_REPEAT_TYPE_VALUES = ['daily', 'weekly', 'weekend', 'monthly', 'custom']
 
 export function normalizeTaskRepeat(value) {
   if (!value || typeof value !== 'object') return null
@@ -37,6 +37,11 @@ export function computeNextRecurringDate(dateYmd, repeatInput) {
 
   if (repeat.type === 'daily') return base.add(1, 'day').format('YYYY-MM-DD')
   if (repeat.type === 'weekly') return base.add(1, 'week').format('YYYY-MM-DD')
+  if (repeat.type === 'weekend') {
+    const dayOfWeek = base.day()
+    if (dayOfWeek === 6 || dayOfWeek === 0) return base.add(7, 'day').format('YYYY-MM-DD')
+    return base.add(6 - dayOfWeek, 'day').format('YYYY-MM-DD')
+  }
   if (repeat.type === 'monthly') return base.add(1, 'month').format('YYYY-MM-DD')
   return base.add(repeat.intervalDays || 1, 'day').format('YYYY-MM-DD')
 }

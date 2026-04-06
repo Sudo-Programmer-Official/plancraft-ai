@@ -52,6 +52,38 @@
               />
             </div>
           </div>
+          <div class="quick-repeat-block">
+            <div class="field">
+              <label class="field-label">Repeat</label>
+              <div class="repeat-preset-row">
+                <button
+                  v-for="option in repeatPresetOptions"
+                  :key="option.value"
+                  type="button"
+                  class="repeat-preset"
+                  :class="{ 'repeat-preset--active': activeRepeatSelection === option.value }"
+                  :disabled="props.readonly"
+                  @click="setRepeatOption(option.value)"
+                >
+                  {{ option.label }}
+                </button>
+              </div>
+              <div v-if="repeatEnabled && repeatType === 'custom'" class="repeat-custom-inline">
+                <label class="field-label">Every</label>
+                <el-input-number
+                  v-model="repeatIntervalDays"
+                  :min="1"
+                  :max="365"
+                  :disabled="props.readonly"
+                  class="w-full planner-dark-number"
+                />
+                <span class="repeat-custom-inline__suffix">days</span>
+              </div>
+              <p class="field-help repeat-inline-help">
+                {{ repeatHelperText }}
+              </p>
+            </div>
+          </div>
         </section>
 
         <section class="planner-card section-task">
@@ -300,48 +332,6 @@
                 </div>
               </div>
 
-              <div class="repeat-block">
-                <label class="reminder-toggle" :class="{ 'reminder-toggle--disabled': props.readonly }">
-                  <el-switch
-                    v-model="repeatEnabled"
-                    :disabled="props.readonly"
-                  />
-                  <span class="reminder-toggle__label">Repeat this task</span>
-                </label>
-
-                <div v-if="repeatEnabled" class="field-grid repeat-grid">
-                  <div class="field">
-                    <label class="field-label">Repeat</label>
-                    <el-select
-                      v-model="repeatType"
-                      :disabled="props.readonly"
-                      class="w-full planner-dark-select"
-                    >
-                      <el-option
-                        v-for="option in repeatOptions"
-                        :key="option.value"
-                        :label="option.label"
-                        :value="option.value"
-                      />
-                    </el-select>
-                  </div>
-                  <div v-if="repeatType === 'custom'" class="field">
-                    <label class="field-label">Every</label>
-                    <el-input-number
-                      v-model="repeatIntervalDays"
-                      :min="1"
-                      :max="365"
-                      :disabled="props.readonly"
-                      class="w-full planner-dark-number"
-                    />
-                    <p class="field-help">Set a custom repeat interval in days.</p>
-                  </div>
-                </div>
-
-                <p v-if="repeatEnabled" class="hint repeat-hint">
-                  When you complete this task, PlanCraft will create the next occurrence automatically.
-                </p>
-              </div>
             </div>
           </transition>
         </section>
@@ -438,7 +428,7 @@ import {
   getPreferences as getUserPreferences,
   getReminderPreferences,
 } from '@/services/settingsService'
-import { scheduleReminder, getReminderStatus } from '@/services/reminderService'
+import { getReminderStatus } from '@/services/reminderService'
 import { createNapkinItem } from '@/services/napkinService'
 import { isFeatureAllowed } from '@/services/planService'
 import { hasNotificationSetup } from '@/utils/notificationCheck'
@@ -461,23 +451,6 @@ dayjs.extend(utc)
 dayjs.extend(timezone)
 
 /* ---------------- Constants ---------------- */
-const DURATION_HINTS = {
-  class: 75,
-  lecture: 60,
-  exam: 120,
-  study: 45,
-  homework: 40,
-  assignment: 40,
-  gym: 60,
-  workout: 60,
-  run: 45,
-  dinner: 45,
-  lunch: 40,
-  breakfast: 20,
-  meeting: 30,
-  call: 20,
-  sleep: 480,
-}
 const RELATIVE_HINT_PATTERN =
   /\b(in\s+\d+\s+\w+|after\s+\w+|before\s+\w+|later|then|next|from now|soon)\b/i
 const REMINDER_CHANNEL_ALLOW_LIST = ['pwa', 'whatsapp', 'email', 'sms', 'voice_call']
@@ -491,11 +464,13 @@ const channelOptions = [
 ]
 const DEFAULT_REMINDER_CHANNELS = ['email', 'pwa', 'whatsapp']
 const MAX_INSTANT_ALERTS = 2
-const repeatOptions = [
+const repeatPresetOptions = [
+  { value: 'off', label: 'Once' },
   { value: 'daily', label: 'Daily' },
   { value: 'weekly', label: 'Weekly' },
+  { value: 'weekend', label: 'Weekend' },
   { value: 'monthly', label: 'Monthly' },
-  { value: 'custom', label: 'Custom (X days)' },
+  { value: 'custom', label: 'Custom' },
 ]
 
 function coerceText(value, fallback = '') {
@@ -584,14 +559,6 @@ function normalizeDateInput(value) {
   return typeof value === 'string' ? value : toLocalDateKey(value)
 }
 
-function inferDuration(title, fallback = 30) {
-  const key = (title || '').toLowerCase()
-  for (const [k, mins] of Object.entries(DURATION_HINTS)) {
-    if (key.includes(k)) return mins
-  }
-  return fallback
-}
-
 function normalizeReminderPreferences(raw) {
   const channels = Array.isArray(raw?.channels)
     ? Array.from(
@@ -627,13 +594,6 @@ function applyReminderDefaults(source) {
   }
 }
 
-function computeCreationChannels() {
-  const selected = new Set(allowedReminderChannels.value.map((c) => c.toLowerCase()))
-  const defaults = reminderPrefs.value.channels.map((c) => c.toLowerCase())
-  const combined = CREATION_CHANNELS.filter((c) => selected.has(c) || defaults.includes(c))
-  return combined.slice(0, 2)
-}
-
 function computeReminderChannels() {
   const base = new Set(reminderPrefs.value.channels.map((c) => c.toLowerCase()))
   const toggled = new Set(allowedReminderChannels.value.map((c) => c.toLowerCase()))
@@ -659,6 +619,51 @@ function buildReminderConfig({ includeOnDue = true, offsetDays = null } = {}) {
   const normalizedOffset = normalizeReminderOffsetDays(offsetDays, { fallback: null })
   if (normalizedOffset && normalizedOffset > 0) next.offsetDays = normalizedOffset
   return next
+}
+
+function isWeekendDate(value) {
+  const parsed = parseLocalDateKey(normalizeDateInput(value))
+  const dayOfWeek = parsed.getDay()
+  return dayOfWeek === 0 || dayOfWeek === 6
+}
+
+function weekendDayLabel(value) {
+  const parsed = parseLocalDateKey(normalizeDateInput(value))
+  return parsed.getDay() === 0 ? 'Sunday' : 'Saturday'
+}
+
+function alignDateToWeekend(value) {
+  const parsed = parseLocalDateKey(normalizeDateInput(value))
+  const dayOfWeek = parsed.getDay()
+  if (dayOfWeek === 0 || dayOfWeek === 6) return toLocalDateKey(parsed)
+  parsed.setDate(parsed.getDate() + (6 - dayOfWeek))
+  return toLocalDateKey(parsed)
+}
+
+function syncSelectedDateToWeekend(value = selectedDate.value) {
+  if (props.lockDate) return
+  const normalized = normalizeDateInput(value)
+  const weekendDate = alignDateToWeekend(normalized)
+  if (weekendDate === normalized) return
+  repeatWeekendCoercionGuard = true
+  selectedDate.value = weekendDate
+  repeatWeekendCoercionGuard = false
+}
+
+function setRepeatOption(value) {
+  if (props.readonly) return
+  if (value === 'off') {
+    repeatEnabled.value = false
+    return
+  }
+  repeatEnabled.value = true
+  repeatType.value = value
+  if (value === 'custom' && (!Number.isFinite(Number(repeatIntervalDays.value)) || Number(repeatIntervalDays.value) < 1)) {
+    repeatIntervalDays.value = 30
+  }
+  if (value === 'weekend') {
+    syncSelectedDateToWeekend()
+  }
 }
 
 /* ---------------- Refs ---------------- */
@@ -721,6 +726,7 @@ const input = ref('')
 const details = ref('')
 const link = ref('')
 const selectedDate = ref(normalizeDateInput(props.date))
+let repeatWeekendCoercionGuard = false
 const loading = ref(false)
 const notifPromptOpen = ref(false)
 const suppressAutoClose = ref(false)
@@ -732,11 +738,26 @@ function getInputText() {
 }
 
 const hasAttachmentsComputed = computed(() => imageTasksEnabled && attachments.value.length > 0)
+const activeRepeatSelection = computed(() => (repeatEnabled.value ? repeatType.value : 'off'))
+const repeatHelperText = computed(() => {
+  if (!repeatEnabled.value) {
+    return 'Optional for routines like beard trimming, supplements, or hair care.'
+  }
+  if (repeatType.value === 'weekend') {
+    return isWeekendDate(selectedDate.value)
+      ? `Repeats every ${weekendDayLabel(selectedDate.value)} after you complete it.`
+      : 'Weekend tasks are scheduled for Saturday or Sunday. Weekday picks move to Saturday.'
+  }
+  if (repeatType.value === 'custom') {
+    return `Creates the next task ${Math.max(1, Number(repeatIntervalDays.value) || 1)} day(s) after completion.`
+  }
+  return 'When you complete this task, PlanCraft creates the next occurrence automatically.'
+})
 const accessStore = useAccessStore()
 const featureAllowed = computed(() => {
   const access = accessStore.access
   if (access?.entitlements) {
-    return isFeatureAllowed(access, 'aiSplit')
+  return isFeatureAllowed(access, 'aiSplit')
   }
   return isFeatureAllowed({ plan: subStore.subscription.plan, role: authStore?.user?.role }, 'aiSplit')
 })
@@ -949,10 +970,22 @@ watch(selectedDate, (val) => {
   logTimeBrainDialog('selected-date-change', { value: val })
   if (props.lockDate && props?.task?.date && val !== props.task.date)
     selectedDate.value = props.task.date
+  if (!repeatWeekendCoercionGuard && repeatEnabled.value && repeatType.value === 'weekend' && !props.lockDate) {
+    syncSelectedDateToWeekend(val)
+  }
   if (!reminderAutofillGuard) {
     reminderAbsoluteIso.value = null
   }
 })
+watch(
+  [repeatEnabled, repeatType],
+  ([enabled, type], [previousEnabled, previousType]) => {
+    if (!enabled || type !== 'weekend') return
+    if (!previousEnabled || previousType !== 'weekend' || !isWeekendDate(selectedDate.value)) {
+      syncSelectedDateToWeekend()
+    }
+  },
+)
 watch(reminderTime, (val) => {
   logTimeBrainDialog('reminder-time-change', { value: val, lock: props.disableReminder })
   if (props.disableReminder && props.task?.reminderTime && val !== props.task.reminderTime)
@@ -1232,7 +1265,9 @@ function resolveTaskLocalEnd(task, tz, fallbackDate) {
     try {
       const parsed = dayjs(task.ends_at).tz(zone)
       if (parsed.isValid()) return parsed.format('YYYY-MM-DDTHH:mm:ssZ')
-    } catch {}
+    } catch {
+      /* noop */
+    }
   }
 
   if (task?.reminderTime && dateKey) {
@@ -1244,7 +1279,9 @@ function resolveTaskLocalEnd(task, tz, fallbackDate) {
     try {
       const parsed = dayjs(task.scheduledTime).tz(zone)
       if (parsed.isValid()) return parsed.format('YYYY-MM-DDTHH:mm:ssZ')
-    } catch {}
+    } catch {
+      /* noop */
+    }
   }
 
   return null
@@ -1693,7 +1730,7 @@ async function save() {
     }
   }
 
-  const dateToSave = props.lockDate && props.task?.date ? props.task.date : selectedDate.value
+  let dateToSave = props.lockDate && props.task?.date ? props.task.date : selectedDate.value
   const repeatToSave = repeatEnabled.value
     ? normalizeTaskRepeat({ type: repeatType.value, intervalDays: repeatIntervalDays.value })
     : null
@@ -1704,6 +1741,18 @@ async function save() {
       duration: 3500,
     })
     return
+  }
+  if (repeatToSave?.type === 'weekend' && !isWeekendDate(dateToSave)) {
+    if (props.lockDate) {
+      ElMessage({
+        type: 'warning',
+        message: 'Weekend repeats need a Saturday or Sunday date.',
+        duration: 3500,
+      })
+      return
+    }
+    dateToSave = alignDateToWeekend(dateToSave)
+    selectedDate.value = dateToSave
   }
   let reminderToSave = null
   let reminderOffsetToSave = null
@@ -2092,6 +2141,74 @@ function appendDetails(result = {}) {
   color: rgba(148, 163, 184, 0.78);
 }
 
+.quick-repeat-block {
+  margin-top: 0.75rem;
+}
+
+.repeat-preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.repeat-preset {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 0.5rem 0.85rem;
+  background: rgba(15, 23, 42, 0.42);
+  color: rgba(226, 232, 240, 0.9);
+  font-size: 0.83rem;
+  font-weight: 600;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.repeat-preset:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(129, 140, 248, 0.55);
+  color: #f8fafc;
+}
+
+.repeat-preset--active {
+  border-color: rgba(129, 140, 248, 0.9);
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.35), rgba(14, 165, 233, 0.22));
+  color: #f8fafc;
+  box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.22);
+}
+
+.repeat-preset:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.repeat-custom-inline {
+  margin-top: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.repeat-custom-inline .field-label {
+  margin: 0;
+}
+
+.repeat-custom-inline :deep(.planner-dark-number) {
+  max-width: 180px;
+}
+
+.repeat-custom-inline__suffix {
+  font-size: 0.84rem;
+  color: rgba(226, 232, 240, 0.78);
+}
+
+.repeat-inline-help {
+  margin-top: 0.65rem;
+}
+
 /* assistive bar */
 .assistive-bar {
   display: flex;
@@ -2391,16 +2508,6 @@ function appendDetails(result = {}) {
   color: rgba(226, 232, 240, 0.9);
 }
 
-.repeat-block {
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.repeat-grid {
-  margin-top: 0.9rem;
-}
-
 .repeat-grid--offset {
   margin-top: 0.9rem;
 }
@@ -2480,10 +2587,6 @@ function appendDetails(result = {}) {
   color: #e0e7ff;
   font-size: 0.78rem;
   font-weight: 600;
-}
-
-.repeat-hint {
-  margin-top: 0.8rem;
 }
 
 .reminder-collapse-enter-active,

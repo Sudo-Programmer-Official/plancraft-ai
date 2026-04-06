@@ -16,7 +16,7 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 
 const REMINDER_CHANNEL_ALLOW_LIST = ["pwa", "whatsapp", "email", "sms", "voice_call"];
-const TASK_REPEAT_TYPE_VALUES = new Set(["daily", "weekly", "monthly", "custom"]);
+const TASK_REPEAT_TYPE_VALUES = new Set(["daily", "weekly", "weekend", "monthly", "custom"]);
 
 function toYMD(value) {
   try {
@@ -40,6 +40,11 @@ function computeNextRecurringDate(dateYmd, repeat) {
   if (!base.isValid()) return null;
   if (repeat.type === "daily") return base.add(1, "day").format("YYYY-MM-DD");
   if (repeat.type === "weekly") return base.add(1, "week").format("YYYY-MM-DD");
+  if (repeat.type === "weekend") {
+    const dayOfWeek = base.day();
+    if (dayOfWeek === 6 || dayOfWeek === 0) return base.add(7, "day").format("YYYY-MM-DD");
+    return base.add(6 - dayOfWeek, "day").format("YYYY-MM-DD");
+  }
   if (repeat.type === "monthly") return base.add(1, "month").format("YYYY-MM-DD");
   return base.add(repeat.intervalDays || 1, "day").format("YYYY-MM-DD");
 }

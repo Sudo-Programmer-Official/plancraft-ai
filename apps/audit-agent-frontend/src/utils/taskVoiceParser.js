@@ -66,6 +66,8 @@ const MONTH_INDEX_BY_NAME = {
 
 const SAME_DAY_PATTERN = /\b(on that day|on the due date|same day)\b/i
 const ISO_DATE_PATTERN = /\b(\d{4}-\d{2}-\d{2})\b/
+const WEEKEND_REPEAT_PATTERN = /\b(every weekend|each weekend|on weekends?)\b/i
+const THIS_WEEKEND_PATTERN = /\b(this weekend|next weekend)\b/i
 const MONTH_DATE_PATTERN = new RegExp(
   `\\b(?:on\\s+)?((${MONTH_NAME_PATTERN})\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,\\s*(\\d{4}))?)\\b`,
   'i',
@@ -171,6 +173,14 @@ function capitalizeFirst(text) {
   return text.charAt(0).toUpperCase() + text.slice(1)
 }
 
+function resolveWeekendDate(raw, now = new Date()) {
+  if (!THIS_WEEKEND_PATTERN.test(String(raw || ''))) return null
+  const base = dayjs(now).startOf('day')
+  const dayOfWeek = base.day()
+  if (dayOfWeek === 6 || dayOfWeek === 0) return base.toDate()
+  return base.add(6 - dayOfWeek, 'day').toDate()
+}
+
 function stripMatchedPattern(source, pattern) {
   return source.replace(pattern, ' ')
 }
@@ -191,6 +201,7 @@ function parseRepeat(text) {
 
   if (/\b(daily|every day|each day)\b/i.test(raw)) return { type: 'daily', intervalDays: null }
   if (/\b(weekly|every week|each week)\b/i.test(raw)) return { type: 'weekly', intervalDays: null }
+  if (WEEKEND_REPEAT_PATTERN.test(raw)) return { type: 'weekend', intervalDays: null }
   if (/\b(monthly|every month|each month)\b/i.test(raw)) return { type: 'monthly', intervalDays: null }
   return null
 }
@@ -250,6 +261,9 @@ function parseDueDate(text, { now = new Date() } = {}) {
   const partialDay = parsePartialDayOfMonth(raw, now)
   if (partialDay) return partialDay
 
+  const weekendDate = resolveWeekendDate(raw, now)
+  if (weekendDate) return weekendDate
+
   if (/\btomorrow\b/i.test(raw)) return base.add(1, 'day').startOf('day').toDate()
   if (/\btoday\b/i.test(raw)) return base.startOf('day').toDate()
   if (/\bnext week\b/i.test(raw)) return base.add(7, 'day').startOf('day').toDate()
@@ -266,8 +280,10 @@ function extractTitle(text) {
     /\bplease remind me\b/gi,
     EVERY_DAYS_PATTERN,
     /\b(daily|every day|each day|weekly|every week|each week|monthly|every month|each month)\b/gi,
+    WEEKEND_REPEAT_PATTERN,
     OFFSET_PATTERN,
     SAME_DAY_PATTERN,
+    THIS_WEEKEND_PATTERN,
     /\b(today|tomorrow|next week)\b/gi,
     /\b(?:on\s+)?\d{4}-\d{2}-\d{2}\b/g,
     MONTH_DATE_PATTERN,
@@ -294,7 +310,7 @@ function hasClearTitle(title, original) {
   if (cleaned.length < 3) return false
   const normalizedOriginal = normalizeWhitespace(original).toLowerCase()
   if (cleaned === normalizedOriginal) return false
-  if (/^(remind me|on that day|every \d+ days?|daily|weekly|monthly)$/i.test(cleaned)) return false
+  if (/^(remind me|on that day|every \d+ days?|daily|weekly|weekend|monthly|every weekend)$/i.test(cleaned)) return false
   return /[a-z0-9]/i.test(cleaned)
 }
 
