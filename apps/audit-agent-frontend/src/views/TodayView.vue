@@ -74,11 +74,13 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useTasks } from '@/composables/useTasks'
+import { useDayClock } from '@/composables/useDayClock'
 import { askWorkspaceSummary } from '@/services/workspaceAiService'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { trackAISuggestionAccepted } from '@/services/analytics'
 
-const todayDate = new Date().toLocaleDateString()
+const { now: dayClockNow } = useDayClock()
+const todayDate = computed(() => dayClockNow.value.toLocaleDateString())
 const { tasks, loadTasks, toggleComplete } = useTasks()
 const workspaceStore = useWorkspaceStore()
 const aiPlan = ref('')
@@ -121,7 +123,11 @@ async function planMyDay() {
     })
     aiPlan.value = answer || ''
     if (answer) {
-      try { trackAISuggestionAccepted({ suggestion_type: 'daily_plan' }) } catch (_) {}
+      try {
+        trackAISuggestionAccepted({ suggestion_type: 'daily_plan' })
+      } catch {
+        /* noop */
+      }
     }
   } catch (err) {
     planError.value =

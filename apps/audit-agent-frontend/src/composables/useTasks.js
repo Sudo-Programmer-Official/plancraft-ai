@@ -19,6 +19,7 @@ import {
 import { resolveCategory } from '@/constants/taskCategories'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { useAppReady } from '@/composables/useAppReady'
+import { useDayClock } from '@/composables/useDayClock'
 
 // 🔗 Shared singleton state
 const tasks = ref([])
@@ -28,6 +29,7 @@ let initialized = false
 let refreshListenerAttached = false
 let workspaceWatchAttached = false
 let authWatchAttached = false
+let dayClockWatchAttached = false
 let refreshPromise = null
 const scopedLoadPromises = new Map()
 let lastRolloverKey = null
@@ -59,6 +61,7 @@ export function useTasks() {
   const authStore = useAuthStore()
   const workspaceStore = useWorkspaceStore()
   const { isReady } = useAppReady()
+  const { todayKey } = useDayClock()
 
   /**
    * 🔄 Helpers
@@ -89,7 +92,9 @@ export function useTasks() {
       } else if (value?.toDate) {
         try {
           return toLocalDateKey(value.toDate())
-        } catch {}
+        } catch {
+          /* noop */
+        }
       } else if (value instanceof Date || typeof value === 'number') {
         const d = new Date(value)
         if (!Number.isNaN(d.getTime())) return toLocalDateKey(d)
@@ -99,7 +104,9 @@ export function useTasks() {
       try {
         const created = task.createdAt?.toDate ? task.createdAt.toDate() : new Date(task.createdAt)
         if (!Number.isNaN(created?.getTime?.())) return toLocalDateKey(created)
-      } catch {}
+      } catch {
+        /* noop */
+      }
     }
     return null
   }
@@ -231,6 +238,33 @@ export function useTasks() {
     tasks.value = applyFilters(allTasks.value, activeFilter.value)
   }
 
+  function normalizeRelativeFilter(filter = {}) {
+    const next = { ...makeDefaultFilter(), ...(filter || {}) }
+    const today = makeTodayKey()
+
+    if (next.dateFilter === 'today') {
+      next.startDate = today
+      next.endDate = today
+      return next
+    }
+
+    if (next.dateFilter === 'tomorrow') {
+      const tomorrowDate = new Date()
+      tomorrowDate.setDate(tomorrowDate.getDate() + 1)
+      const tomorrow = toLocalDateKey(tomorrowDate)
+      next.startDate = tomorrow
+      next.endDate = tomorrow
+      return next
+    }
+
+    if (next.dateFilter === 'overdue') {
+      next.endDate = today
+      if (!next.startDate) next.startDate = today
+    }
+
+    return next
+  }
+
   function matchesScopedFilter(task, filter) {
     const opts = { ...makeDefaultFilter(), ...(filter || {}) }
     const planned = getTaskPlannedDate(task)
@@ -261,7 +295,7 @@ export function useTasks() {
     return nextScopedTasks
   }
 
-  async function refreshAllTasks(force = false) {
+  async function refreshAllTasks() {
     if (refreshPromise) return refreshPromise
     refreshPromise = (async () => {
       // Prefer a single fetch of all tasks for the workspace; fall back to today if needed.
@@ -458,7 +492,9 @@ export function useTasks() {
       allTasks.value = allTasks.value.filter((t) => t.id !== optimisticId)
       try {
         ElMessage.error('Could not create task. Please try again.')
-      } catch {}
+      } catch {
+        /* noop */
+      }
       throw err
     }
   }
@@ -489,7 +525,9 @@ export function useTasks() {
           console.warn('Recurring task advance failed:', recurrenceError?.message || recurrenceError)
           try {
             ElMessage.warning('Task completed, but the next recurring task could not be created.')
-          } catch {}
+          } catch {
+            /* noop */
+          }
         }
       }
     } catch (err) {
@@ -706,6 +744,28 @@ export function useTasks() {
       authWatchAttached = true
     } catch (err) {
       console.warn('[useTasks] failed to attach auth watcher', err?.message || err)
+    }
+  }
+  if (!dayClockWatchAttached) {
+    try {
+      watch(todayKey, async (next, prev) => {
+        if (!prev || next === prev || !isReady.value) return
+        const refreshedFilter = normalizeRelativeFilter(activeFilter.value)
+        activeFilter.value = refreshedFilter
+        try {
+          await ensureDailyRollover()
+        } catch (err) {
+          console.warn('[useTasks] daily rollover refresh failed', err?.message || err)
+        }
+        try {
+          await loadTasks(refreshedFilter)
+        } catch (err) {
+          console.warn('[useTasks] day clock refresh failed', err?.message || err)
+        }
+      })
+      dayClockWatchAttached = true
+    } catch (err) {
+      console.warn('[useTasks] failed to attach day clock watcher', err?.message || err)
     }
   }
 

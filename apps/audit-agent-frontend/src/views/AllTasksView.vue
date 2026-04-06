@@ -203,11 +203,13 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { TASK_CATEGORY_FILTERS, resolveCategory } from '@/constants/taskCategories'
 import { toLocalDateKey } from '@/utils/dateHelper'
+import { useDayClock } from '@/composables/useDayClock'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { useTasks } from '@/composables/useTasks'
 
 const workspaceStore = useWorkspaceStore()
 const { allTasks, refreshAllTasks, getTaskPlannedDate } = useTasks()
+const { todayKey } = useDayClock()
 
 const loading = ref(true)
 const searchTerm = ref('')
@@ -219,8 +221,6 @@ const categoryFilter = ref('All')
 const sortField = ref('dueDate')
 const sortDir = ref('asc')
 const selectedWorkspace = ref(workspaceStore.activeWorkspaceId)
-
-const todayKey = computed(() => toLocalDateKey(new Date()))
 
 function normalizeRange() {
   if (!customStart.value && customEnd.value) customStart.value = customEnd.value

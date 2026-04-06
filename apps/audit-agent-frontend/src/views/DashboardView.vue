@@ -1292,12 +1292,13 @@ import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
 import { useAuthFlags } from '@/composables/useAuthFlags'
+import { useDayClock } from '@/composables/useDayClock'
 import { trackLinkedInConversion } from '@/utils/ads'
 import { trackGuestDashboardLoaded } from '@/services/analytics'
 import { getReminderStatus, scheduleReminder } from '@/services/reminderService'
 import { listReports, generateReport } from '@/services/reportsService'
 import api from '@/services/api'
-import { getPreferences as getUserPreferences, updateOnboardingStatus } from '@/services/settingsService'
+import { getPreferences as getUserPreferences } from '@/services/settingsService'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { ElMessage, ElNotification } from 'element-plus'
 import { TASK_CATEGORY_FILTERS, getCategoryIcon, getCategoryColor, resolveCategory } from '@/constants/taskCategories'
@@ -1319,6 +1320,7 @@ import {
 dayjs.extend(utc)
 dayjs.extend(timezone)
 
+const { now: dayClockNow, todayKey: todayKeyRef } = useDayClock()
 const authStore = useAuthStore()
 const accessStore = useAccessStore()
 const { isPremium, isGuest } = useAuthFlags()
@@ -1695,7 +1697,7 @@ function attachNapkinListener() {
         napkinError.value = ''
       },
       {
-        onError: (error) => {
+        onError: () => {
           // If we already have data, keep showing it instead of a scary banner.
           if (!napkinItems.value.length) {
             napkinError.value = 'Napkin feed is unavailable right now. Please refresh to try again.'
@@ -1704,7 +1706,7 @@ function attachNapkinListener() {
         },
       },
     )
-  } catch (error) {
+  } catch {
     napkinError.value = 'Unable to load napkin stream.'
     napkinLoading.value = false
   }
@@ -1800,64 +1802,6 @@ const summarySignature = computed(() =>
     .join('|'),
 )
 
-const onboardingSteps = computed(() => [
-  {
-    id: 'daily',
-    title: 'Daily Focus',
-    description: 'Your home for today’s priorities, streaks, and AI-assisted ordering 🧭',
-    selector: '.daily-card',
-    placement: 'right',
-    icon: '🧭',
-    aiTip: 'Say “Plan my day” — I’ll reorder with your energy, streaks, and memory-aware context.',
-  },
-  {
-    id: 'calendar',
-    title: 'Calendar Guardrails',
-    description: 'Connect Google Calendar to auto-protect deep work and prep 🗓️',
-    selector: '.calendar-sync-card',
-    placement: 'left',
-    icon: '🗓️',
-    aiTip: 'I’ll pull meetings, prep agendas, and block white space before it disappears.',
-  },
-  {
-    id: 'talk',
-    title: 'Talk to Planner',
-    description: 'Hands-free planning; speak tasks or ideas and I route them 🎙️',
-    selector: '.talk-to-planner-entry',
-    placement: 'bottom',
-    icon: '🎙️',
-    aiTip: 'Ask “Plan my next sprint” and I’ll capture, tag, and set reminders automatically.',
-  },
-  {
-    id: 'weekly',
-    title: 'Weekly / Monthly Pulse',
-    description: 'Zoom out for insights, wins, and carryovers 📊',
-    selector: '.weekly-card',
-    placement: 'left',
-    icon: '📊',
-    aiTip: 'Ask for a recap — I’ll use your tasks, journal, and captures to build a highlight reel.',
-  },
-  {
-    id: 'journal',
-    title: 'Journal 2.0',
-    description: 'Voice + text + scan-to-plan — all in one reflective space 🪶',
-    selector: '.journal-card',
-    placement: 'top',
-    icon: '🪶',
-    aiTip: 'Speak or scan scribbles; I’ll transcribe, summarize, and track your streaks.',
-  },
-  {
-    id: 'reminders',
-    title: 'Reminders & Nudges',
-    description: 'WhatsApp, SMS, email, or voice reminders with smart timing 🔔',
-    selector: '.reminders-card',
-    placement: 'top',
-    icon: '🔔',
-    aiTip: 'Turn on nudges for critical tasks; I’ll avoid meeting conflicts automatically.',
-  },
-])
-
-const todayKeyRef = computed(() => toLocalDateKey(new Date()))
 const carryoverCandidates = computed(() => {
   const todayKey = todayKeyRef.value
   const currentWorkspaceId = activeWorkspaceId.value ? String(activeWorkspaceId.value) : null
@@ -1905,7 +1849,7 @@ const displayName = computed(() => {
 
 const greetingHeadline = computed(() => {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-  const hour = dayjs().tz(tz).hour()
+  const hour = dayjs(dayClockNow.value).tz(tz).hour()
   let prefix = 'Good evening'
   if (hour < 4) prefix = 'Rest well'
   else if (hour < 12) prefix = 'Good morning'
@@ -1933,7 +1877,6 @@ const journalStreak = computed(() => {
 
 const userStreak = ref(0)
 const displayStreak = computed(() => userStreak.value || journalStreak.value || 0)
-const ONBOARDING_SNOOZE_HOURS = 24
 let onboardingTimer = null
 const quickSetupState = computed(() => quickSetupStore.setupState)
 const quickSetupMissingLabels = computed(() => getIncompleteQuickSetupLabels(quickSetupState.value))
@@ -1994,90 +1937,8 @@ function syncOnboardingFromPreferences(pref = {}) {
   }
 }
 
-function shouldLaunchOnboarding() {
-  if (!authStore.user?.uid) return false
-  if (onboardingStatus.value.completed) return false
-  if (onboardingStatus.value.showLaterUntil) {
-    try {
-      if (dayjs().isBefore(dayjs(onboardingStatus.value.showLaterUntil))) return false
-    } catch {
-      /* noop */
-    }
-  }
-  return true
-}
-
-function maybeLaunchOnboarding(reason = 'auto') {
+function maybeLaunchOnboarding() {
   // Tour temporarily disabled; keep function as no-op for now
-  return
-}
-
-async function persistOnboardingStatus(patch = {}) {
-  if (!authStore.user?.uid) return
-  const payload = { ...patch }
-  if (payload.lastStep === undefined) payload.lastStep = onboardingStatus.value.lastStep || 0
-  const cleanPayload = {}
-  Object.entries(payload).forEach(([key, value]) => {
-    if (value !== undefined) cleanPayload[key] = value
-  })
-  if (!Object.keys(cleanPayload).length) return
-  try {
-    await updateOnboardingStatus(authStore.user.uid, cleanPayload)
-    onboardingStatus.value = {
-      ...onboardingStatus.value,
-      ...cleanPayload,
-    }
-  } catch (error) {
-    console.warn('Failed to update onboarding status', error?.response?.data || error?.message || error)
-  }
-}
-
-function handleOnboardingStarted() {
-  persistOnboardingStatus({ startedAt: new Date().toISOString(), completed: false })
-}
-
-function handleOnboardingStep(evt) {
-  if (!evt?.step) return
-  onboardingStatus.value = {
-    ...onboardingStatus.value,
-    lastStep: evt.step,
-  }
-}
-
-async function handleOnboardingFinished() {
-  onboardingTourVisible.value = false
-  await persistOnboardingStatus({
-    completed: true,
-    completedAt: new Date().toISOString(),
-    showLaterUntil: null,
-  })
-}
-
-async function handleOnboardingSkipped() {
-  onboardingTourVisible.value = false
-  await persistOnboardingStatus({
-    completed: true,
-    skippedAt: new Date().toISOString(),
-  })
-}
-
-async function handleOnboardingLater() {
-  onboardingTourVisible.value = false
-  onboardingSessionPlayed.value = false
-  if (onboardingTimer) {
-    clearTimeout(onboardingTimer)
-    onboardingTimer = null
-  }
-  const snoozeUntil = dayjs().add(ONBOARDING_SNOOZE_HOURS, 'hour').toISOString()
-  await persistOnboardingStatus({
-    showLaterUntil: snoozeUntil,
-    completed: false,
-    lastDeferredAt: new Date().toISOString(),
-  })
-}
-
-function handleOnboardingReplayEvent() {
-  // Tour temporarily disabled
   return
 }
 
@@ -2225,12 +2086,9 @@ function buildRotatingInsights() {
   restartInsightRotation()
 }
 
-const today = new Date()
-const selectedDate = toLocalDateKey(today)
-
 // Focus section date navigation (Today's Focus can show any day)
 const allWorkspaceTasksRef = ref([])
-const focusSelectedDate = ref(toLocalDateKey(new Date()))
+const focusSelectedDate = ref(todayKeyRef.value)
 const showFocusDatePicker = ref(false)
 
 watch(
@@ -2250,11 +2108,6 @@ const focusDateLabel = computed(() => {
   const monDay = dayjs(d).format('MMM D')
   if (isFocusToday.value) return `Today (${monDay})`
   return dayjs(d).format('ddd, MMM D')
-})
-
-const focusDateLabelShort = computed(() => {
-  if (isFocusToday.value) return 'Today'
-  return focusDateLabel.value
 })
 
 function prevFocusDay() {
@@ -2286,6 +2139,35 @@ function toYMD(date) {
   if (typeof date === 'string') return date
   return toLocalDateKey(date)
 }
+
+function buildCurrentWeekRange(anchor = dayClockNow.value) {
+  const start = new Date(anchor)
+  start.setDate(start.getDate() - (start.getDay() === 0 ? 6 : start.getDay() - 1))
+  start.setHours(0, 0, 0, 0)
+  const end = new Date(start)
+  end.setDate(start.getDate() + 6)
+  return {
+    start,
+    end,
+    startKey: toLocalDateKey(start),
+    endKey: toLocalDateKey(end),
+  }
+}
+
+function buildCurrentMonthRange(anchor = dayClockNow.value) {
+  const current = new Date(anchor)
+  const start = new Date(current.getFullYear(), current.getMonth(), 1)
+  const end = new Date(current.getFullYear(), current.getMonth() + 1, 0)
+  return {
+    start,
+    end,
+    startKey: toLocalDateKey(start),
+    endKey: toLocalDateKey(end),
+  }
+}
+
+const currentWeekRange = computed(() => buildCurrentWeekRange(dayClockNow.value))
+const currentMonthRange = computed(() => buildCurrentMonthRange(dayClockNow.value))
 
 async function triggerSummary() {
   if (isRefreshingSummary.value) return
@@ -2431,7 +2313,7 @@ async function onGenerateMonthly() {
 
 function getLast7DaysYMD() {
   const out = []
-  const d = new Date()
+  const d = new Date(dayClockNow.value)
   for (let i = 6; i >= 0; i -= 1) {
     const dd = new Date(d)
     dd.setDate(d.getDate() - i)
@@ -2578,24 +2460,16 @@ function syncDashboardTaskBuckets(sourceTasks = []) {
 
   allWorkspaceTasksRef.value = userTasks
   dailyTasks.value = userTasks.filter((t) => t.date === focusSelectedDate.value)
-  const weekDays = ymdRange(startOfWeek, endOfWeek)
+  const weekDays = ymdRange(currentWeekRange.value.start, currentWeekRange.value.end)
   weeklyTasks.value = userTasks.filter((t) => weekDays.includes(t.date))
-  const monthDays = ymdRange(startOfMonth, endOfMonth)
+  const monthDays = ymdRange(currentMonthRange.value.start, currentMonthRange.value.end)
   monthlyTasks.value = userTasks.filter((t) => monthDays.includes(t.date))
   buildRotatingInsights()
 }
 
-const startOfWeek = new Date(today)
-startOfWeek.setDate(today.getDate() - (today.getDay() === 0 ? 6 : today.getDay() - 1))
-startOfWeek.setHours(0, 0, 0, 0)
-const endOfWeek = new Date(startOfWeek)
-endOfWeek.setDate(startOfWeek.getDate() + 6)
-const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
-const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0)
-
 const allTasksPreset = ref('thisWeek')
-const allTasksStartDate = ref(toLocalDateKey(startOfWeek))
-const allTasksEndDate = ref(toLocalDateKey(endOfWeek))
+const allTasksStartDate = ref(currentWeekRange.value.startKey)
+const allTasksEndDate = ref(currentWeekRange.value.endKey)
 const allTasksStatus = ref('all')
 const allTasksCategory = ref('All')
 const allTasksSearch = ref('')
@@ -2610,7 +2484,7 @@ const allTasksPresets = computed(() => [
   { key: 'thisWeek', label: 'This week', hint: 'Week view' },
   { key: 'last7', label: 'Last 7 days', hint: 'Retro' },
   { key: 'next7', label: 'Next 7 days', hint: 'Upcoming' },
-  { key: 'thisMonth', label: 'This month', hint: dayjs(today).format('MMM') },
+  { key: 'thisMonth', label: 'This month', hint: dayjs(dayClockNow.value).format('MMM') },
   { key: 'custom', label: 'Custom range', hint: 'Pick dates' },
 ])
 
@@ -2630,13 +2504,13 @@ const allTasksRangeLabel = computed(() => {
 })
 
 function resolveAllTasksPresetRange(key) {
-  const now = dayjs()
-  if (key === 'thisWeek') return { start: toLocalDateKey(startOfWeek), end: toLocalDateKey(endOfWeek) }
+  const now = dayjs(dayClockNow.value)
+  if (key === 'thisWeek') return { start: currentWeekRange.value.startKey, end: currentWeekRange.value.endKey }
   if (key === 'last7')
     return { start: toLocalDateKey(now.subtract(6, 'day').toDate()), end: toLocalDateKey(now.toDate()) }
   if (key === 'next7')
     return { start: toLocalDateKey(now.toDate()), end: toLocalDateKey(now.add(6, 'day').toDate()) }
-  if (key === 'thisMonth') return { start: toLocalDateKey(startOfMonth), end: toLocalDateKey(endOfMonth) }
+  if (key === 'thisMonth') return { start: currentMonthRange.value.startKey, end: currentMonthRange.value.endKey }
   return {
     start: allTasksStartDate.value || todayKeyRef.value,
     end: allTasksEndDate.value || allTasksStartDate.value || todayKeyRef.value,
@@ -2653,6 +2527,26 @@ function applyAllTasksPreset(key) {
     applyingAllTasksPreset = false
   }, 0)
 }
+
+watch(todayKeyRef, (next, prev) => {
+  if (!prev || next === prev) return
+
+  if (focusSelectedDate.value === prev) {
+    focusSelectedDate.value = next
+  }
+
+  if (allTasksPreset.value !== 'custom') {
+    applyAllTasksPreset(allTasksPreset.value)
+  }
+
+  try {
+    carryoverDismissedToday.value = localStorage.getItem(`carryover:dismiss:${next}`) === '1'
+  } catch {
+    carryoverDismissedToday.value = false
+  }
+
+  syncDashboardTaskBuckets(allTasks.value)
+})
 
 const allTasksRangePool = computed(() => {
   const { start, end } = normalizedAllTaskRange.value
@@ -2790,7 +2684,9 @@ onUnmounted(() => {
 onBeforeUnmount(() => {
   try {
     document?.documentElement?.classList?.remove('today-fullscreen-mode')
-  } catch (_) {}
+  } catch {
+    /* noop */
+  }
 })
 
 async function redirectToLogin() {
