@@ -82,6 +82,19 @@ Pre-deploy check:
 Current flow:
 - Push to the repo and let Render auto-deploy, or trigger a manual deploy in Render.
 
+Recommended Render service settings:
+
+- Root Directory: `apps/backend-node`
+- Build Command: `npm install`
+- Start Command: `npm start`
+
+Do not point Render at the monorepo root with build command `yarn`.
+
+Why:
+- The repo root is a `pnpm` workspace.
+- `apps/backend-node` is already a standalone Node app with its own `package-lock.json`.
+- Building from the app directory avoids package-manager conflicts and unnecessary workspace installs.
+
 Checklist before backend deploy:
 - [ ] Routes working.
 - [ ] No breaking API changes without frontend coordination.
@@ -269,4 +282,3 @@ Web is the source of truth.
 - `docs/mobile-deployment.md`
 - `docs/app-store-listing.md`
 - `docs/app-store-screenshot-brief.md`
-

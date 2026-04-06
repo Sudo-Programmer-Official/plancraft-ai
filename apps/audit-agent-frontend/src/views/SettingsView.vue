@@ -607,6 +607,68 @@
       <!-- Account -->
       <section class="settings-panel">
         <h2 class="text-lg sm:text-xl font-semibold mb-4">👤 Account</h2>
+        <div class="grid grid-cols-1 xl:grid-cols-[0.92fr,1.08fr] gap-4 mb-6">
+          <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-4 space-y-4">
+            <div>
+              <p class="text-xs uppercase tracking-[0.24em] text-slate-300">Legal</p>
+              <h3 class="text-lg font-semibold text-white">Terms, privacy, and deletion policy</h3>
+              <p class="text-sm text-indigo-100/80 mt-1">
+                Keep the App Store-required documents one tap away inside the app.
+              </p>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <button
+                type="button"
+                class="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-left text-white hover:border-indigo-300/40 hover:bg-slate-900"
+                @click="openLegalDoc('/terms')"
+              >
+                Terms of Use
+              </button>
+              <button
+                type="button"
+                class="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-left text-white hover:border-indigo-300/40 hover:bg-slate-900"
+                @click="openLegalDoc('/privacy')"
+              >
+                Privacy Policy
+              </button>
+              <button
+                type="button"
+                class="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-left text-white hover:border-indigo-300/40 hover:bg-slate-900"
+                @click="openLegalDoc('/delete-account')"
+              >
+                Deletion Policy
+              </button>
+            </div>
+          </div>
+
+          <div class="rounded-2xl border border-red-400/25 bg-red-500/10 p-4 space-y-4">
+            <div>
+              <p class="text-xs uppercase tracking-[0.24em] text-red-200/80">Danger Zone</p>
+              <h3 class="text-lg font-semibold text-white">Delete account</h3>
+              <p class="text-sm text-red-100/85 mt-1">
+                Permanently removes your account, tasks, reminders, journal entries, and synced integrations.
+              </p>
+            </div>
+            <div class="rounded-xl border border-red-300/20 bg-slate-950/30 px-4 py-3 text-sm text-red-50/90 space-y-1">
+              <p>Your data is deleted, not just deactivated.</p>
+              <p>Shared workspace access is removed automatically before the account is deleted.</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                class="inline-flex items-center justify-center rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60"
+                :disabled="deleteAccountLoading"
+                @click="deleteAccountConfirmOpen = true"
+              >
+                Delete Account
+              </button>
+              <p class="text-xs text-red-100/75">
+                This action is permanent.
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div class="profile-identity mb-4">
           <AvatarUploader
             :url="authStore.user?.photoURL || authStore.user?.avatarUrl"
@@ -701,6 +763,51 @@
       </div>
     </div>
   </el-dialog>
+  <el-dialog
+    v-model="deleteAccountConfirmOpen"
+    title="Delete account"
+    width="460px"
+    :append-to-body="true"
+    :close-on-click-modal="!deleteAccountLoading"
+    :close-on-press-escape="!deleteAccountLoading"
+  >
+    <div class="space-y-4">
+      <p class="text-sm text-slate-300">
+        Are you sure? This permanently deletes your account and signs you out of PlanCraft AI.
+      </p>
+      <div class="rounded-xl border border-red-300/20 bg-red-500/10 px-4 py-3 text-sm text-red-50/90 space-y-1">
+        <p>This will permanently delete:</p>
+        <p>- Your account data</p>
+        <p>- Your tasks, reminders, and journal entries</p>
+        <p>- Your connected integrations and synced access</p>
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <el-button :disabled="deleteAccountLoading" @click="deleteAccountConfirmOpen = false">Cancel</el-button>
+        <el-button type="danger" :loading="deleteAccountLoading" @click="confirmDeleteAccount">Delete</el-button>
+      </div>
+    </div>
+  </el-dialog>
+  <el-dialog
+    v-model="deleteAccountSuccessOpen"
+    title="Account deleted"
+    width="420px"
+    :append-to-body="true"
+    :show-close="false"
+    :close-on-click-modal="false"
+    :close-on-press-escape="false"
+  >
+    <div class="space-y-4">
+      <p class="text-sm text-slate-300">
+        Your account has been deleted.
+      </p>
+      <p class="text-sm text-slate-400">
+        You are being signed out now.
+      </p>
+      <div class="flex justify-end">
+        <el-button type="primary" @click="finalizeDeletedAccount">Continue</el-button>
+      </div>
+    </div>
+  </el-dialog>
   <!-- Hidden container for re-auth phone reCAPTCHA -->
   <div id="reauth-recaptcha" style="position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;overflow:hidden" />
 </template>
@@ -729,8 +836,9 @@ import AvatarUploader from '@/components/AvatarUploader.vue'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { useQuickSetupStore } from '@/stores/quickSetupStore'
 import { getNativeAuthRestriction, isNativePackagedApp } from '@/utils/nativeAuthSupport'
-import { BILLING_WEB_HOST, isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
+import { isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
 import { copyText, openExternalUrl } from '@/utils/nativeUi'
+import { deleteAccount as requestAccountDeletion } from '@/services/accountService'
 import {
   buildQuickSetupState,
   dispatchQuickSetupUpdated,
@@ -760,7 +868,6 @@ const notificationEnableHelp = computed(() =>
     ? 'Shows local due-time reminders directly on this iPhone or Android device.'
     : 'Register this browser for instant reminder banners in the web/PWA app.',
 )
-const billingWebHost = BILLING_WEB_HOST
 const isAppleBillingSafeMode = computed(() => detectAppleBillingSafeMode())
 const quickSetupState = computed(() => quickSetupStore.setupState)
 const quickSetupMissingLabels = computed(() => getIncompleteQuickSetupLabels(quickSetupState.value))
@@ -870,7 +977,7 @@ function markDirty() {
 
 function focusNotifications() {
   nextTick(() => {
-    try { notificationsSection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }) } catch {}
+    try { notificationsSection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }) } catch { /* noop */ }
     highlightNotifications.value = true
     setTimeout(() => { highlightNotifications.value = false }, 1600)
   })
@@ -890,6 +997,11 @@ const profileForm = reactive({ name: '', email: '', phone: '' })
 const profileSaving = ref(false)
 const emailNeedsReauth = ref(false)
 const profileComplete = ref(true)
+const deleteAccountConfirmOpen = ref(false)
+const deleteAccountSuccessOpen = ref(false)
+const deleteAccountLoading = ref(false)
+const deleteAccountFinalizing = ref(false)
+let deleteAccountFinalizeTimer = null
 // Re-auth state
 const reauthOpen = ref(false)
 const reauthMethod = ref('')
@@ -906,7 +1018,9 @@ const maskedPhone = computed(() => {
     const s = String(raw)
     if (s.length <= 4) return s
     return s.slice(0, 4) + '…' + s.slice(-2)
-  } catch { return '' }
+  } catch {
+    return ''
+  }
 })
 
 // Reusable invisible reCAPTCHA instance for phone re-auth
@@ -914,14 +1028,14 @@ let reauthRecaptcha = null
 async function ensureReauthRecaptcha(force = false) {
   try {
     if (force && reauthRecaptcha) {
-      try { reauthRecaptcha.clear() } catch {}
+      try { reauthRecaptcha.clear() } catch { /* noop */ }
       reauthRecaptcha = null
     }
     if (!reauthRecaptcha) {
       reauthRecaptcha = new RecaptchaVerifier(auth, 'reauth-recaptcha', { size: 'invisible' })
-      try { await reauthRecaptcha.render() } catch {}
+      try { await reauthRecaptcha.render() } catch { /* noop */ }
     }
-  } catch {}
+  } catch { /* noop */ }
   return reauthRecaptcha
 }
 
@@ -1084,7 +1198,7 @@ async function hydrateSettingsForUser(uid) {
   if (!uid || settingsLoadInFlight.value) return
   settingsLoadInFlight.value = true
   try {
-    try { workspaceStore.init?.() } catch {}
+    try { workspaceStore.init?.() } catch { /* noop */ }
 
     const prefRes = await apiGetPrefs(uid).catch((error) => {
       console.warn('[Settings] preferences load failed', error?.message || error)
@@ -1121,13 +1235,15 @@ const isPremium = computed(() => {
     const isAdminRole = role === 'admin' || role === 'superadmin'
     const hasPremiumPlan = planCandidates.some((plan) => resolvePlanKey(plan) !== 'FREE')
     return hasPremiumPlan || isAdminRole
-  } catch { return false }
+  } catch {
+    return false
+  }
 })
 
 onMounted(async () => {
   try {
     // Ensure latest subscription state on entry
-    try { await refreshPremium() } catch {}
+    try { await refreshPremium() } catch { /* noop */ }
     quickSetupStore.refreshQuickSetupState()
     try {
       if (activeTab.value === 'account-notifications') {
@@ -1136,7 +1252,7 @@ onMounted(async () => {
       if (route?.query?.gpt !== undefined) {
         setTimeout(() => focusGptCard(true), 400)
       }
-    } catch {}
+    } catch { /* noop */ }
   } catch (e) {
     console.warn('Failed to load preferences', e)
   }
@@ -1169,7 +1285,6 @@ const gptHelpUrl = import.meta.env.VITE_GPT_HELP_URL || 'https://plancraftai.com
 const gptLaunchUrl = import.meta.env.VITE_GPT_LAUNCH_URL || ''
 const gptCardRef = ref(null)
 const highlightGpt = ref(false)
-const gptDeepLinkActive = computed(() => !!route?.query?.gpt)
 const gptLinkExpiryLabel = computed(() => {
   if (!gptLink.expiresAt) return ''
   try {
@@ -1236,7 +1351,7 @@ function focusGptCard(autoGenerate = false) {
   nextTick(() => {
     try {
       gptCardRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    } catch {}
+    } catch { /* noop */ }
   })
   setTimeout(() => {
     highlightGpt.value = false
@@ -1383,7 +1498,7 @@ async function loadGoogle(options = {}) {
     let status
     try {
       status = await getGoogleStatus(authStore.user.uid)
-    } catch (e) {
+    } catch {
       google.enabled = false
       google.connected = false
       google.accounts = []
@@ -1489,6 +1604,46 @@ function handleLogout() {
   router.push("/login")
 }
 
+async function openLegalDoc(path) {
+  if (!path) return
+  if (isNativePackagedApp()) {
+    await router.push(path)
+    return
+  }
+  const target = router.resolve({ path }).href
+  if (typeof window !== 'undefined') {
+    window.open(target, '_blank', 'noopener,noreferrer')
+  }
+}
+
+async function finalizeDeletedAccount() {
+  if (deleteAccountFinalizing.value) return
+  deleteAccountFinalizing.value = true
+  deleteAccountSuccessOpen.value = false
+  try {
+    await authStore.logout()
+  } finally {
+    deleteAccountFinalizing.value = false
+  }
+}
+
+async function confirmDeleteAccount() {
+  if (deleteAccountLoading.value) return
+  deleteAccountLoading.value = true
+  try {
+    await requestAccountDeletion()
+    deleteAccountConfirmOpen.value = false
+    deleteAccountSuccessOpen.value = true
+    deleteAccountFinalizeTimer = window.setTimeout(() => {
+      finalizeDeletedAccount()
+    }, 1500)
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.error || 'Failed to delete account')
+  } finally {
+    deleteAccountLoading.value = false
+  }
+}
+
 function openSubscriptionPage(hash = '') {
   if (isAppleBillingSafeMode.value) {
     router.push({ path: '/billing/upgrade', query: { source: 'settings-billing' } })
@@ -1513,7 +1668,7 @@ function handleTeamCta(plan = 'starter') {
   const workspace = activeTeamWorkspace.value
 
   if (!authStore.user?.uid || isGuest) {
-    try { localStorage.setItem('postLoginRedirect', target) } catch {}
+    try { localStorage.setItem('postLoginRedirect', target) } catch { /* noop */ }
     router.push({ path: '/signup', query: { mode: 'team', next: target } })
     return
   }
@@ -1536,17 +1691,8 @@ function handleTeamCta(plan = 'starter') {
 }
 
 function upgradePlan() {
-  try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_UPGRADE_CLICK) } catch {}
+  try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_UPGRADE_CLICK) } catch { /* noop */ }
   openSubscriptionPage() // redirect to subscription/pricing
-}
-
-async function copyBillingWebsite() {
-  const copied = await copyText(billingWebHost)
-  if (copied) {
-    ElMessage.success(`${billingWebHost} copied`)
-    return
-  }
-  ElMessage.info(`Visit ${billingWebHost}`)
 }
 
 async function refreshBillingAccess() {
@@ -1557,11 +1703,11 @@ async function refreshBillingAccess() {
       await subStore.fetchStatus(uid, { force: true, minIntervalMs: 0 })
       await refreshPremium?.()
     }
-  } catch {}
+  } catch { /* noop */ }
 
   try {
     await workspaceStore.init()
-  } catch {}
+  } catch { /* noop */ }
 
   ElMessage.success('Account access refreshed')
 }
@@ -1578,7 +1724,7 @@ async function saveSettings() {
       const rawWa = integrationEndpoints.value?.whatsapp?.phone
       const normWa = normalizePhone(rawWa, cc)
       if (normWa) integrationEndpoints.value.whatsapp.phone = normWa
-    } catch {}
+    } catch { /* noop */ }
     const channels = []
     if (prefs.email) channels.push('email')
     if (prefs.pwa) channels.push('pwa')
@@ -1649,7 +1795,7 @@ function onAvatarUpdated(url) {
     if (!url) return
     // reflect locally for instant UI update
     authStore.user = { ...(authStore.user || {}), photoURL: url, avatarUrl: url }
-  } catch {}
+  } catch { /* noop */ }
 }
 
 async function saveProfile() {
@@ -1659,14 +1805,14 @@ async function saveProfile() {
   try {
     // Normalize phone before writing
     let phoneE164 = profileForm.phone || ''
-    try { phoneE164 = normalizePhone(phoneE164, guessCountryFromLocale()) } catch {}
+    try { phoneE164 = normalizePhone(phoneE164, guessCountryFromLocale()) } catch { /* noop */ }
     await updateSettingsProfile(u.uid, {
       name: profileForm.name || null,
       email: profileForm.email || null,
       phone: phoneE164 || null,
       profileComplete: !!(profileForm.name && profileForm.name.trim().length),
     })
-    try { await updateFirebaseProfile(u, { displayName: profileForm.name || '' }) } catch {}
+    try { await updateFirebaseProfile(u, { displayName: profileForm.name || '' }) } catch { /* noop */ }
     if (profileForm.email && profileForm.email !== u.email) {
       try {
         await updateEmail(u, profileForm.email)
@@ -1687,7 +1833,7 @@ async function saveProfile() {
       phone: phoneE164 || '',
     }
     integrationEndpoints.value.email = profileForm.email || authStore.user?.email || ''
-    try { localStorage.setItem('user', JSON.stringify(authStore.user)) } catch {}
+    try { localStorage.setItem('user', JSON.stringify(authStore.user)) } catch { /* noop */ }
     syncQuickSetupFromSettings()
     ElMessage.success('Profile updated successfully!')
   } catch (e) {
@@ -1845,6 +1991,10 @@ onBeforeUnmount(() => {
   if (gptCopyTimer) {
     clearTimeout(gptCopyTimer)
     gptCopyTimer = null
+  }
+  if (deleteAccountFinalizeTimer) {
+    clearTimeout(deleteAccountFinalizeTimer)
+    deleteAccountFinalizeTimer = null
   }
 })
 

@@ -7,22 +7,30 @@
 
     <div class="max-w-4xl mx-auto py-16 px-6 text-gray-200">
       <h1 class="text-3xl font-bold mb-6">Delete Your Account</h1>
-      <p class="mb-4 text-sm text-gray-400">Last updated: March 20, 2026</p>
+      <p class="mb-4 text-sm text-gray-400">Last updated: April 6, 2026</p>
 
       <p class="mb-6">
-        If you want to permanently delete your <strong>PlanCraftAI</strong> account and associated data, contact
-        <a href="mailto:support@plancraftai.com" class="text-blue-400 underline">support@plancraftai.com</a>
-        from your registered email address or include your registered email in the request.
+        If you can sign in to <strong>PlanCraftAI</strong>, delete your account directly inside the app:
+        <strong> Settings → Account → Delete Account</strong>.
       </p>
 
       <div class="bg-white/5 border border-white/10 rounded-2xl p-6 mb-8 space-y-4">
-        <h2 class="text-xl font-semibold text-white">How to Request Deletion</h2>
+        <h2 class="text-xl font-semibold text-white">How to Delete Your Account</h2>
         <ol class="list-decimal pl-6 space-y-2">
-          <li>Email <a href="mailto:support@plancraftai.com" class="text-blue-400 underline">support@plancraftai.com</a>.</li>
-          <li>Use the subject line <strong>Delete my PlanCraftAI account</strong>.</li>
-          <li>Include the email address or phone number associated with your account.</li>
-          <li>We will verify the request and process deletion within <strong>7 days</strong>.</li>
+          <li>Open the app and sign in to your account.</li>
+          <li>Go to <strong>Settings</strong>.</li>
+          <li>Open the <strong>Account</strong> section.</li>
+          <li>Tap <strong>Delete Account</strong> and confirm the permanent deletion.</li>
         </ol>
+      </div>
+
+      <div class="bg-indigo-500/10 border border-indigo-300/20 rounded-2xl p-6 mb-8 space-y-3">
+        <h2 class="text-xl font-semibold text-white">Can't Sign In?</h2>
+        <p>
+          If you no longer have access to the account, email
+          <a href="mailto:support@plancraftai.com" class="text-blue-400 underline">support@plancraftai.com</a>
+          from your registered email address, or include the email address or phone number linked to the account so we can verify ownership manually.
+        </p>
       </div>
 
       <div class="space-y-5">
@@ -76,7 +84,7 @@ import { useSeoMeta } from '@/composables/useSeoMeta'
 useSeoMeta({
   title: 'Delete Your Account | PlanCraftAI',
   description:
-    'Request permanent deletion of your PlanCraftAI account and associated data, including integrations and stored productivity data.',
+    'Delete your PlanCraftAI account inside the app, or request manual help if you cannot access your account.',
   keywords: ['PlanCraftAI account deletion', 'delete PlanCraftAI account', 'PlanCraftAI data deletion'],
   canonicalPath: '/delete-account',
   type: 'article',

@@ -16,8 +16,8 @@
 
     <div class="max-w-4xl mx-auto py-16 px-6">
       <div class="max-w-4xl mx-auto px-6 py-12 text-gray-200">
-        <h1 class="text-3xl font-bold mb-6">📜 Terms & Conditions</h1>
-        <p class="mb-4 text-sm text-gray-400">Last updated: October 1, 2025</p>
+        <h1 class="text-3xl font-bold mb-6">📜 Terms of Use</h1>
+        <p class="mb-4 text-sm text-gray-400">Last updated: April 6, 2026</p>
 
         <p class="mb-6">
           Welcome to <strong>PlanCraftAI</strong>. By using our application, you agree to the
@@ -123,6 +123,17 @@
               <strong>Stripe</strong>. We do not store your card details. Subscription renewals,
               billing cycles, and cancellations are governed by Stripe’s policies.
             </p>
+            <p class="mt-3">
+              If you subscribe through the Apple App Store, Apple’s standard Licensed Application End User License Agreement also applies:
+              <a
+                href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
+                target="_blank"
+                rel="noreferrer"
+                class="text-blue-400 underline"
+              >
+                Apple Standard EULA
+              </a>.
+            </p>
           </section>
 
           <!-- Section 8 -->
@@ -174,9 +185,9 @@
 import { useSeoMeta } from '@/composables/useSeoMeta'
 
 useSeoMeta({
-  title: 'Terms of Service | PlanCraft AI',
+  title: 'Terms of Use | PlanCraft AI',
   description:
-    'Review the terms for using PlanCraft AI, including account responsibilities, billing, and data handling for calendar integrations.',
+    'Review the terms of use for PlanCraft AI, including billing, account responsibilities, calendar data handling, and the Apple standard EULA for App Store subscriptions.',
   keywords: ['PlanCraft terms', 'PlanCraft AI terms of service', 'PlanCraft user agreement'],
   canonicalPath: '/terms',
   type: 'article',

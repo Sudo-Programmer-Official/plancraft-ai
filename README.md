@@ -146,6 +146,39 @@ GOALS_TASK_SERVICE_URL=http://localhost:4000/api/tasks/create
 
 For the optional services, start from each folder's `.env.example` and service `README.md`.
 
+## Render deploy notes
+
+Do not deploy this repo on Render from `/` with build command `yarn`.
+
+The monorepo root is a `pnpm` workspace:
+- [package.json](/Users/abhishekkumarjha/Documents/sudo-programmer-official/audit-agent/package.json)
+- [pnpm-workspace.yaml](/Users/abhishekkumarjha/Documents/sudo-programmer-official/audit-agent/pnpm-workspace.yaml)
+
+If Render tries to run `yarn` at the root, it will fail on the workspace package manager check before it installs the service you actually want.
+
+Use app-level Render services instead:
+
+### Backend service
+
+- Root Directory: `apps/backend-node`
+- Build Command: `npm install`
+- Start Command: `npm start`
+
+This works because [apps/backend-node/package.json](/Users/abhishekkumarjha/Documents/sudo-programmer-official/audit-agent/apps/backend-node/package.json) is a standalone Node service with its own `package-lock.json`.
+
+### Frontend service
+
+- Root Directory: `apps/audit-agent-frontend`
+- Build Command: `npm install && npm run build`
+- Publish Directory: `dist`
+
+If you intentionally deploy from the repo root, use `pnpm`, not `yarn`:
+
+```bash
+corepack enable
+pnpm install
+```
+
 ## Mobile app
 
 The mobile shell lives in `mobile/` and packages the frontend build with Capacitor.
