@@ -521,7 +521,9 @@ export function queueReminder(rem) {
 export async function processReminderBatches(options = {}) {
   const now = new Date();
   const lookbackMinutes = Number.isFinite(options.lookbackMinutes) ? options.lookbackMinutes : 5;
-  const horizonMinutes = Number.isFinite(options.horizonMinutes) ? options.horizonMinutes : 1;
+  // The batch worker is a catch-up path. Exact on-time delivery should come from queueReminder().
+  // Keep the default horizon at zero so the worker does not fire reminders early.
+  const horizonMinutes = Number.isFinite(options.horizonMinutes) ? options.horizonMinutes : 0;
   const limit = Number.isFinite(options.limit) ? options.limit : 20;
 
   const start = new Date(now.getTime() - lookbackMinutes * 60000);
@@ -567,7 +569,7 @@ export async function processReminderBatches(options = {}) {
         id: reminder.id,
         scheduled: scheduled?.toISOString?.() || reminder?.scheduledTime || null,
       });
-      if (scheduled && scheduled.getTime() - now.getTime() > 60000) {
+      if (scheduled && scheduled.getTime() > now.getTime()) {
         queueReminder(reminder);
       } else {
         await sendReminder(reminder);

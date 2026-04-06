@@ -329,12 +329,17 @@
             <input type="checkbox" v-model="prefs.email" class="accent-indigo-500" @change="dirty = true" />
             <span>Email Notifications</span>
           </label>
-          <label class="flex items-center gap-3" v-if="canUseBrowserPush">
+          <label class="flex items-center gap-3" v-if="canUseBrowserPush || isNativePackagedApp()">
             <input type="checkbox" v-model="prefs.pwa" class="accent-indigo-500" @change="dirty = true" />
-            <span>Push Notifications (PWA)</span>
+            <span>{{ notificationChannelLabel }}</span>
           </label>
-          <div v-if="canUseBrowserPush && prefs.pwa" class="pl-7 mt-2">
-            <el-button size="small" @click="enablePush" class="bg-slate-800 hover:bg-slate-700">Enable Browser Push</el-button>
+          <div v-if="prefs.pwa && (canUseBrowserPush || isNativePackagedApp())" class="pl-7 mt-2 space-y-2">
+            <el-button size="small" @click="enablePush" class="bg-slate-800 hover:bg-slate-700">
+              {{ notificationEnableLabel }}
+            </el-button>
+            <p class="text-xs text-slate-400">
+              {{ notificationEnableHelp }}
+            </p>
           </div>
           <label class="flex items-center gap-3">
             <input type="checkbox" v-model="prefs.whatsapp" class="accent-indigo-500" @change="dirty = true" />
@@ -710,6 +715,7 @@ import { getPreferences as apiGetPrefs, updatePreferences as apiUpdatePrefs, get
 import { createGptLinkCode } from '@/services/gptService'
 import SocialIntegrationPanel from '@/components/settings/SocialIntegrationPanel.vue'
 import { subscribeUserToPush } from "@/services/pwaService"
+import { getNativeReminderPermissionStatus, requestNativeReminderPermissions, syncNativeReminderQueueNow } from '@/services/nativeReminderService'
 import { useAccessStore } from '@/stores/accessStore'
 import { useSubscriptionStore } from "@/stores/subscriptionStore"
 import { resolvePlanKey } from "@/services/planService"
@@ -743,6 +749,17 @@ const { refresh: refreshPremium } = useIsPremium()
 const workspaceStore = useWorkspaceStore()
 const quickSetupStore = useQuickSetupStore()
 const canUseBrowserPush = computed(() => !isNativePackagedApp())
+const notificationChannelLabel = computed(() =>
+  isNativePackagedApp() ? 'Device Notifications' : 'Push Notifications (PWA)',
+)
+const notificationEnableLabel = computed(() =>
+  isNativePackagedApp() ? 'Enable Device Notifications' : 'Enable Browser Push',
+)
+const notificationEnableHelp = computed(() =>
+  isNativePackagedApp()
+    ? 'Shows local due-time reminders directly on this iPhone or Android device.'
+    : 'Register this browser for instant reminder banners in the web/PWA app.',
+)
 const billingWebHost = BILLING_WEB_HOST
 const isAppleBillingSafeMode = computed(() => detectAppleBillingSafeMode())
 const quickSetupState = computed(() => quickSetupStore.setupState)
@@ -950,13 +967,15 @@ function applySettingsPreferences(res = {}) {
   if (chans) {
     const set = new Set(chans)
     prefs.email = set.has('email') || !!n.email || true
-    prefs.pwa = canUseBrowserPush.value ? (set.has('pwa') || !!n.push || true) : false
+    const storedPwaEnabled = set.has('pwa') || !!n.push || !!n.pwa
+    prefs.pwa = canUseBrowserPush.value ? (storedPwaEnabled || true) : storedPwaEnabled
     prefs.whatsapp = set.has('whatsapp') || !!n.whatsapp || true
     prefs.sms = set.has('sms') || !!n.sms || false
     prefs.voice_call = set.has('voice_call') || !!n.voice_call || false
   } else {
     prefs.email = n.email !== undefined ? !!n.email : true
-    prefs.pwa = canUseBrowserPush.value ? (n.push !== undefined ? !!n.push : true) : false
+    const hasExplicitPwa = n.push !== undefined || n.pwa !== undefined
+    prefs.pwa = hasExplicitPwa ? !!(n.push ?? n.pwa) : canUseBrowserPush.value
     prefs.whatsapp = n.whatsapp !== undefined ? !!n.whatsapp : true
     prefs.sms = !!n.sms
     prefs.voice_call = !!n.voice_call
@@ -1022,7 +1041,7 @@ function deriveQuickSetupPhone() {
 function deriveQuickSetupChannels() {
   return normalizeQuickSetupChannels([
     prefs.email && 'email',
-    canUseBrowserPush.value && prefs.pwa && 'pwa',
+    prefs.pwa && 'pwa',
     prefs.whatsapp && 'whatsapp',
     prefs.sms && 'sms',
     prefs.voice_call && 'voice_call',
@@ -1034,7 +1053,7 @@ function syncQuickSetupFromSettings() {
     timezone: currentQuickSetupTimezone(),
     channels: deriveQuickSetupChannels(),
     phone: deriveQuickSetupPhone(),
-    pushGranted: canUseBrowserPush.value ? !!prefs.pwa : false,
+    pushGranted: !!prefs.pwa,
     isNative: isNativePackagedApp(),
   })
   writeQuickSetupState(nextState)
@@ -1552,7 +1571,6 @@ async function saveSettings() {
   try {
     // Normalize phone before persisting
     try {
-      if (!canUseBrowserPush.value) prefs.pwa = false
       const cc = guessCountryFromLocale()
       const rawSms = integrationEndpoints.value?.sms?.phone
       const normSms = normalizePhone(rawSms, cc)
@@ -1563,13 +1581,13 @@ async function saveSettings() {
     } catch {}
     const channels = []
     if (prefs.email) channels.push('email')
-    if (canUseBrowserPush.value && prefs.pwa) channels.push('pwa')
+    if (prefs.pwa) channels.push('pwa')
     if (prefs.whatsapp) channels.push('whatsapp')
     if (prefs.sms) channels.push('sms')
   if (prefs.voice_call) channels.push('voice_call')
   const notifications = {
     email: !!prefs.email,
-    push: !!(canUseBrowserPush.value && prefs.pwa),
+    push: !!prefs.pwa,
     whatsapp: !!prefs.whatsapp,
     sms: !!prefs.sms,
     discord: !!prefs.discord,
@@ -1605,6 +1623,18 @@ async function saveSettings() {
       integrationToggles: toggles,
       integrationEndpoints: integrationEndpoints.value,
     })
+    if (isNativePackagedApp()) {
+      const workspaceId = workspaceStore.activeWorkspaceId || localStorage.getItem('activeWorkspaceId') || null
+      await syncNativeReminderQueueNow({
+        userId: authStore.user?.uid || null,
+        workspaceId,
+        reason: 'settings-save',
+      })
+      const permission = await getNativeReminderPermissionStatus()
+      if (prefs.pwa && !permission.granted) {
+        ElMessage.warning('Device notifications are enabled in settings, but system notification permission is still blocked.')
+      }
+    }
     syncQuickSetupFromSettings()
     ElMessage.success("✅ Settings saved successfully!")
     dirty.value = false // reset dirty flag
@@ -1863,6 +1893,16 @@ function resetReauth() {
 async function enablePush() {
   try {
     if (!authStore.user?.uid) throw new Error('Not signed in')
+    if (isNativePackagedApp()) {
+      const permission = await requestNativeReminderPermissions()
+      if (!permission.granted) {
+        throw new Error('Device notifications were not granted. Check iOS/Android notification settings and try again.')
+      }
+      prefs.pwa = true
+      dirty.value = true
+      ElMessage.success('🔔 Device notifications enabled. Save settings to keep due reminders synced.')
+      return
+    }
     if (!canUseBrowserPush.value) throw new Error('Browser push is only available in the web/PWA app.')
     await subscribeUserToPush(authStore.user.uid)
     ElMessage.success('🔔 Push notifications enabled')

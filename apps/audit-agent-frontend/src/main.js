@@ -12,6 +12,7 @@ import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import { useAuthStore } from '@/stores/authStore'
 import { useFeatureFlagsStore } from '@/stores/featureFlagsStore'
+import { useWorkspaceStore } from '@/stores/workspaceStore'
 import VoiceRecorder from '@/components/VoiceRecorder.vue'
 import { createHead } from '@vueuse/head'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
@@ -20,6 +21,7 @@ import { handleAuthError } from '@/services/firebaseService'
 import { setupLinkedInTag } from './analytics/linkedin.js'
 import { Capacitor } from '@capacitor/core'
 import { closeNativeAuthBrowser, parseNativeAuthCallbackUrl } from '@/services/mobileAuthHandoffService'
+import { initNativeReminderSync } from '@/services/nativeReminderService'
 
 const isBrowser =
   typeof globalThis.window !== 'undefined' &&
@@ -159,6 +161,7 @@ app.use(pinia)
 // ✅ Auth store init
 const authStore = useAuthStore(pinia)
 const featureFlagsStore = useFeatureFlagsStore(pinia)
+const workspaceStore = useWorkspaceStore(pinia)
 
 // Global components
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
@@ -415,6 +418,12 @@ async function bootstrapApp() {
     name: router.currentRoute.value?.name || null,
     authStoreUser: authStore.user?.uid || null,
   })
+
+  try {
+    initNativeReminderSync({ authStore, workspaceStore })
+  } catch (error) {
+    console.warn('[NativeReminder] bootstrap failed', error?.message || error)
+  }
 
   if (!routerReady && isNativeApp && Capacitor?.getPlatform?.() === 'ios') {
     try {

@@ -150,11 +150,11 @@
         </div>
         </section>
 
-        <section v-if="showBrowserNotifications" class="setup-card">
+        <section v-if="showInstantNotifications" class="setup-card">
         <div class="setup-card__header">
           <div>
-            <div class="setup-card__title">🛎️ Browser Push</div>
-            <p class="setup-card__copy">Optional. Enable device push now if you want instant browser reminders.</p>
+            <div class="setup-card__title">🛎️ {{ pushCardTitle }}</div>
+            <p class="setup-card__copy">{{ pushCardCopy }}</p>
           </div>
           <span class="setup-status" :class="pushGranted ? 'setup-status--complete' : 'setup-status--pending'">
             {{ pushGranted ? 'Enabled' : 'Optional' }}
@@ -162,7 +162,7 @@
         </div>
         <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p class="text-sm text-slate-300">
-            {{ pushGranted ? 'Browser push is ready on this device.' : 'You can skip this and still finish quick setup.' }}
+            {{ pushGranted ? pushReadyCopy : 'You can skip this and still finish quick setup.' }}
           </p>
           <el-button
             size="small"
@@ -172,7 +172,7 @@
             :disabled="pushGranted"
             @click="enablePush"
           >
-            {{ pushGranted ? 'Enabled ✓' : 'Enable push' }}
+            {{ pushGranted ? 'Enabled ✓' : pushButtonLabel }}
           </el-button>
         </div>
         </section>
@@ -220,6 +220,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { hasSubscription, registerPushSubscription } from '@/services/pushService'
 import { getIntegrations, getPreferences, getProfile, updateIntegrations, updatePreferences, updateProfile } from '@/services/settingsService'
+import { requestNativeReminderPermissions, syncNativeReminderQueueNow } from '@/services/nativeReminderService'
 import { useAuthFlags } from '@/composables/useAuthFlags'
 import { useAuthStore } from '@/stores/authStore'
 import { guessCountryFromLocale, normalizePhone } from '@/utils/phoneUtils'
@@ -261,7 +262,17 @@ const showLoadingShell = computed(() => loading.value && !contentReady.value)
 let suppressDialogCloseEmit = false
 const loadedRemoteUserId = ref('')
 
-const showBrowserNotifications = computed(() => !isNativePackagedApp())
+const showInstantNotifications = computed(() => true)
+const pushCardTitle = computed(() => isNativePackagedApp() ? 'Device Notifications' : 'Browser Push')
+const pushCardCopy = computed(() =>
+  isNativePackagedApp()
+    ? 'Optional. Enable local device notifications if you want due-time reminders on this phone or tablet.'
+    : 'Optional. Enable device push now if you want instant browser reminders.',
+)
+const pushReadyCopy = computed(() =>
+  isNativePackagedApp() ? 'Device notifications are ready on this device.' : 'Browser push is ready on this device.',
+)
+const pushButtonLabel = computed(() => isNativePackagedApp() ? 'Enable device notifications' : 'Enable push')
 const timezoneReady = computed(() => !!tz.value && tz.value !== 'UTC')
 const channelState = reactive({
   email: true,
@@ -301,7 +312,7 @@ const selectedChannels = computed(() =>
       channelState.whatsapp && 'whatsapp',
       channelState.sms && 'sms',
       channelState.voice_call && 'voice_call',
-      showBrowserNotifications.value && pushGranted.value && 'pwa',
+      pushGranted.value && 'pwa',
     ].filter(Boolean)
   )
 )
@@ -358,7 +369,7 @@ function applyChannels(channels) {
   pushGranted.value =
     set.has('pwa') ||
     (
-      showBrowserNotifications.value &&
+      showInstantNotifications.value &&
       typeof globalThis !== 'undefined' &&
       typeof globalThis.Notification !== 'undefined' &&
       globalThis.Notification.permission === 'granted'
@@ -493,11 +504,22 @@ function toggleChannel(key, checked) {
 }
 
 async function enablePush() {
-  if (!showBrowserNotifications.value) return
   try {
     loadingPush.value = true
     saveError.value = ''
     saveSuccess.value = ''
+    if (isNativePackagedApp()) {
+      const permission = await requestNativeReminderPermissions()
+      pushGranted.value = permission.granted
+      if (pushGranted.value) {
+        saveSuccess.value = 'Device notifications enabled. Save setup to sync due reminders.'
+      } else {
+        saveError.value = 'Device notifications were blocked. You can enable them later in iOS or Android settings.'
+      }
+      markDirty()
+      emitSetupState()
+      return
+    }
     if (typeof globalThis === 'undefined' || typeof globalThis.Notification === 'undefined') {
       throw new Error('Browser notifications are not supported on this device.')
     }
@@ -555,6 +577,12 @@ async function persistQuickSetup() {
           channels,
         },
       }), 15000, 'quick setup preferences save')
+      if (isNativePackagedApp()) {
+        await syncNativeReminderQueueNow({
+          userId,
+          reason: 'quick-setup-save',
+        })
+      }
 
       const mergedIntegrations = {
         ...existingIntegrations.value,

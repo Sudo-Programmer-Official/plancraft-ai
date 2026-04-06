@@ -36,7 +36,7 @@ export function buildQuickSetupState({
   const timezoneReady = !!timezoneValue && timezoneValue !== 'UTC'
   const channelsReady = normalizedChannels.length > 0
   const phoneReady = !!phoneValue
-  const pushRelevant = !isNative
+  const pushRelevant = true
   const pushReady = !!pushGranted
   const requiredComplete = timezoneReady && channelsReady && phoneReady
 
@@ -49,7 +49,7 @@ export function buildQuickSetupState({
   if (pushRelevant) {
     steps.push({
       key: 'push',
-      label: 'Browser push',
+      label: isNative ? 'Device notifications' : 'Browser push',
       complete: pushReady,
       required: false,
     })
@@ -68,7 +68,7 @@ export function buildQuickSetupState({
     timezone: timezoneValue || null,
     channels: normalizedChannels,
     phone: phoneValue || null,
-    pushGranted: pushRelevant ? pushReady : null,
+    pushGranted: pushReady,
     native: !!isNative,
     updatedAt: nowIso(),
   }

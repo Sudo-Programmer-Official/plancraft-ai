@@ -17,6 +17,7 @@
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		9B6A8A942E8F100100A1B001 /* AppViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B6A8A962E8F100100A1B001 /* AppViewController.swift */; };
 		9B6A8A952E8F100100A1B001 /* ApplePurchasesPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B6A8A972E8F100100A1B001 /* ApplePurchasesPlugin.swift */; };
+		9B6A8A982E8F100100A1B001 /* LocalReminderPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B6A8A992E8F100100A1B001 /* LocalReminderPlugin.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -32,6 +33,7 @@
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 		9B6A8A962E8F100100A1B001 /* AppViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewController.swift; sourceTree = "<group>"; };
 		9B6A8A972E8F100100A1B001 /* ApplePurchasesPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplePurchasesPlugin.swift; sourceTree = "<group>"; };
+		9B6A8A992E8F100100A1B001 /* LocalReminderPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalReminderPlugin.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -70,6 +72,7 @@
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				9B6A8A962E8F100100A1B001 /* AppViewController.swift */,
 				9B6A8A972E8F100100A1B001 /* ApplePurchasesPlugin.swift */,
+				9B6A8A992E8F100100A1B001 /* LocalReminderPlugin.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -162,6 +165,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9B6A8A982E8F100100A1B001 /* LocalReminderPlugin.swift in Sources */,
 				9B6A8A952E8F100100A1B001 /* ApplePurchasesPlugin.swift in Sources */,
 				9B6A8A942E8F100100A1B001 /* AppViewController.swift in Sources */,
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,

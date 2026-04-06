@@ -1490,9 +1490,10 @@ async function generateTasks() {
       if (parsedLocal) {
         const localMoment = parseLocalMoment(parsedLocal, tz)
         if (localMoment && localMoment.isValid()) {
-          scheduledUtc = localMoment.utc().toISOString()
-          if (!autoPlanDate) autoPlanDate = localMoment.format('YYYY-MM-DD')
-          if (!autoReminderTime) autoReminderTime = localMoment.format('HH:mm')
+          scheduledUtc = coerceFutureReminderIso(localMoment.utc().toISOString(), { timezoneOverride: tz })
+          const scheduledMoment = dayjs.utc(scheduledUtc).tz(tz)
+          if (!autoPlanDate) autoPlanDate = scheduledMoment.format('YYYY-MM-DD')
+          if (!autoReminderTime) autoReminderTime = scheduledMoment.format('HH:mm')
         }
       }
       resolved.push({
@@ -1791,6 +1792,28 @@ function enforceFutureReminder(iso, { allowDateChange = true } = {}) {
     return local.utc().toISOString()
   } catch {
     return iso
+  }
+}
+
+function coerceFutureReminderIso(isoInput, { timezoneOverride } = {}) {
+  if (!isoInput) return null
+  try {
+    const tzCandidate = timezoneOverride || getUserTimezone()
+    const tz =
+      typeof tzCandidate === 'string' && tzCandidate.includes('/')
+        ? tzCandidate
+        : Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+
+    const local = dayjs(isoInput).tz(tz)
+    if (!local.isValid()) return isoInput
+
+    const minFuture = dayjs().tz(tz).add(2, 'minute')
+    if (local.isBefore(minFuture)) {
+      return minFuture.utc().toISOString()
+    }
+    return local.utc().toISOString()
+  } catch {
+    return isoInput
   }
 }
 
