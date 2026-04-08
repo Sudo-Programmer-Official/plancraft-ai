@@ -283,6 +283,14 @@ async function sendViaChannel(channel, userId, payload, contacts = {}, meta = {}
 
   if (postingEnabled && to) {
     try {
+      const whatsappTemplate =
+        channel === 'whatsapp' && payload.whatsappPrimary && typeof payload.whatsappPrimary === 'object'
+          ? payload.whatsappPrimary
+          : null
+      const whatsappBody =
+        channel === 'whatsapp'
+          ? payload.whatsappFallback || payload.message
+          : null
       console.log('[Notification] enqueue posting-service', {
         channel: normalizedChannel,
         to: maskRecipient(to),
@@ -294,12 +302,13 @@ async function sendViaChannel(channel, userId, payload, contacts = {}, meta = {}
         to,
         body:
           channel === 'whatsapp'
-            ? payload.whatsappPrimary || payload.whatsappFallback || payload.message
+            ? whatsappBody
             : channel === 'email'
               ? payload.emailMessage || payload.message
               : channel === 'sms'
                 ? payload.smsMessage || payload.message
                 : payload.voiceMessage || payload.message,
+        template: whatsappTemplate,
         subject: payload.subject || 'PlanCraftAI Update',
         audioUrl: payload.voiceOptions?.audioUrl || null,
       }, { userId, ...meta })
@@ -532,10 +541,17 @@ export async function notifyReminderDue(userId, itemsInput = [], options = {}) {
   } catch {}
   for (const channel of channels) {
     try {
-      deliveries.push(
-        await sendViaChannel(channel, userId, payload, contacts, { type: 'reminder_due', workspaceId }),
-      )
-      console.log(`[Notify] Reminder alert sent to ${userId} via ${channel}`)
+      const result = await sendViaChannel(channel, userId, payload, contacts, { type: 'reminder_due', workspaceId })
+      deliveries.push(result)
+      const action =
+        result?.job || result?.success
+          ? 'enqueued'
+          : result?.status === 'sent'
+            ? 'sent'
+            : result?.skipped
+              ? 'skipped'
+              : 'processed'
+      console.log(`[Notify] Reminder alert ${action} for ${userId} via ${channel}`)
     } catch (err) {
       console.warn(`[Notification] ${channel} failed for reminder`, err?.message || err)
     }

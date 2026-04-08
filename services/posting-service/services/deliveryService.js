@@ -85,6 +85,87 @@ function isRetryableWhatsAppError(err) {
   return false
 }
 
+async function sendWhatsAppTemplate(to, message) {
+  const { token, phoneId } = resolveWhatsAppConfig()
+  const templateName = String(message?.template || '').trim()
+  if (!templateName) throw new Error('WhatsApp template name missing')
+
+  const headerVars = Array.isArray(message?.headerVars) ? message.headerVars : []
+  const bodyVars = Array.isArray(message?.bodyVars) ? message.bodyVars : []
+  const lang = String(message?.lang || message?.language?.code || 'en_US').trim() || 'en_US'
+  const payload = {
+    messaging_product: 'whatsapp',
+    to,
+    type: 'template',
+    template: {
+      name: templateName,
+      language: { code: lang },
+      components: [],
+    },
+  }
+
+  if (headerVars.length) {
+    payload.template.components.push({
+      type: 'header',
+      parameters: headerVars.map((value) => ({ type: 'text', text: String(value) })),
+    })
+  }
+  if (bodyVars.length) {
+    payload.template.components.push({
+      type: 'body',
+      parameters: bodyVars.map((value) => ({ type: 'text', text: String(value) })),
+    })
+  }
+
+  const url = `${API_BASE}/${phoneId}/messages`
+  if (DEBUG) {
+    console.log('[posting-service][WhatsApp] sending template', {
+      to: mask(to),
+      url,
+      template: templateName,
+      bodyVars,
+    })
+  }
+
+  try {
+    const res = await axios.post(url, payload, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      timeout: 10000,
+    })
+    if (DEBUG) {
+      console.log('[posting-service][WhatsApp] template response', {
+        status: res.status,
+        body: res.data,
+      })
+    }
+    return res.data
+  } catch (err) {
+    const status = err?.response?.status
+    const body = err?.response?.data
+    if (status === 401 && body?.error?.code === 190) {
+      console.warn('[posting-service][WhatsApp] Access token invalid/expired; refresh META_WHATSAPP_TOKEN', body?.error)
+    }
+    const detail = status ? `${status} ${JSON.stringify(body || {})}` : err?.message || 'unknown error'
+    throw new Error(`WhatsApp template send failed: ${detail}`)
+  }
+}
+
+function resolveWhatsAppTemplate(job) {
+  const directTemplate = job?.payload?.template
+  if (directTemplate && typeof directTemplate === 'object' && directTemplate.template) return directTemplate
+
+  const bodyTemplate = job?.payload?.body
+  if (bodyTemplate && typeof bodyTemplate === 'object' && bodyTemplate.template) return bodyTemplate
+
+  const messageTemplate = job?.message
+  if (messageTemplate && typeof messageTemplate === 'object' && messageTemplate.template) return messageTemplate
+
+  return null
+}
+
 async function sendWhatsAppText(to, message) {
   const { token, phoneId } = resolveWhatsAppConfig()
   const payload = {
@@ -142,6 +223,11 @@ async function sendWhatsAppText(to, message) {
 export async function sendTextWhatsApp(job) {
   const to = resolveRecipient(job)
   if (!to) throw new Error('WhatsApp recipient missing')
+  const template = resolveWhatsAppTemplate(job)
+  if (template) {
+    const resp = await sendWhatsAppTemplate(to, template)
+    return { status: 'sent', channel: 'whatsapp', recipient: to, response: resp, mode: 'template' }
+  }
   const message = job?.message || job?.payload?.body || ''
   const maxAttempts = 3
   const backoffs = [0, 1500, 5000]

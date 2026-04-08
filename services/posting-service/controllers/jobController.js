@@ -61,6 +61,10 @@ export async function createPostingJob(req, res, next) {
           jobType: job.jobType,
         })
       } catch (err) {
+        await markJobStatus(job.id, 'pending', {
+          lastResult: 'inline_failed',
+          error: err?.message || 'inline send failed',
+        })
         console.warn('[posting-service] inline send failed; will retry via scheduler', {
           id: job.id,
           channel: job.channel,

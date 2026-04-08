@@ -66,6 +66,16 @@ import { db } from '../firebaseAdmin.js'
 const API_BASE = 'https://graph.facebook.com/v18.0' // upgrade to latest stable
 const DEBUG = (process.env.WHATSAPP_DEBUG === '1' || process.env.WHATSAPP_LOG === '1')
 
+function readEnv(...keys) {
+  for (const key of keys) {
+    const raw = process.env[key]
+    if (raw === undefined || raw === null) continue
+    const value = String(raw).trim()
+    if (value) return value
+  }
+  return ''
+}
+
 function mask(s) {
   if (!s) return null
   const str = String(s)
@@ -74,8 +84,8 @@ function mask(s) {
 }
 
 export async function send(userId, message, options = {}) {
-  const token = process.env.META_WHATSAPP_TOKEN || process.env.WHATSAPP_TOKEN
-  const phoneId = process.env.META_WHATSAPP_PHONE_ID || process.env.WHATSAPP_PHONE_NUMBER_ID
+  const token = readEnv('META_WHATSAPP_TOKEN', 'WHATSAPP_TOKEN')
+  const phoneId = readEnv('META_WHATSAPP_PHONE_ID', 'WHATSAPP_PHONE_NUMBER_ID')
   if (!token || !phoneId) {
     console.error('[WhatsApp] Missing API config', { hasToken: !!token, hasPhoneId: !!phoneId })
     throw new Error('WhatsApp API not configured. Set META_WHATSAPP_TOKEN and META_WHATSAPP_PHONE_ID')
@@ -98,7 +108,8 @@ export async function send(userId, message, options = {}) {
   let payload
 
   if (typeof message === 'object' && message.template) {
-    const { template, headerVars = [], bodyVars = [], lang = 'en_US' } = message
+    const { template, headerVars = [], bodyVars = [] } = message
+    const lang = String(message?.lang || message?.language?.code || 'en_US').trim() || 'en_US'
 
     // Template message payload (approved in Meta)
     payload = {

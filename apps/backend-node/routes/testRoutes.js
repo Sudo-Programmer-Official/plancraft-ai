@@ -8,6 +8,14 @@ import { requireAuth, ensureUserMatches } from '../middleware/auth.js'
 const router = express.Router()
 router.use(requireAuth, ensureUserMatches)
 
+function hasNonEmptyEnv(...keys) {
+  return keys.some((key) => {
+    const raw = process.env[key]
+    if (raw === undefined || raw === null) return false
+    return !!String(raw).trim()
+  })
+}
+
 // POST /api/test/notify
 // Body: { userId: string, message?: string, channels?: string[] }
 // If channels not provided, derives from users/{uid}.preferences.notifications
@@ -73,8 +81,8 @@ router.get('/test/whatsapp/check', async (req, res) => {
     const userId = String(req.query.userId || '')
     if (!userId) return res.status(400).json({ ok: false, error: 'Missing userId' })
 
-    const token = !!(process.env.META_WHATSAPP_TOKEN || process.env.WHATSAPP_TOKEN)
-    const phoneId = !!(process.env.META_WHATSAPP_PHONE_ID || process.env.WHATSAPP_PHONE_NUMBER_ID)
+    const token = hasNonEmptyEnv('META_WHATSAPP_TOKEN', 'WHATSAPP_TOKEN')
+    const phoneId = hasNonEmptyEnv('META_WHATSAPP_PHONE_ID', 'WHATSAPP_PHONE_NUMBER_ID')
     const snap = await db.collection('users').doc(userId).get()
     const data = snap.exists ? (snap.data() || {}) : {}
     const to = data?.integrations?.whatsapp?.phone || null

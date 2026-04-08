@@ -103,6 +103,89 @@
             Built for founders, operators, creators, and small teams who are tired of losing tasks
             after meetings, voice notes, and busy days.
           </p>
+          <div
+            class="flex flex-wrap justify-center gap-3 pt-3"
+            data-aos="fade-up"
+            data-aos-delay="340"
+          >
+            <a
+              v-for="platform in appPlatforms"
+              :key="platform.key"
+              :href="platform.href"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="hero-store-pill"
+            >
+              <span class="text-base" aria-hidden="true">{{ platform.icon }}</span>
+              <span>{{ platform.heroLabel }}</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section
+      id="install"
+      class="py-16 md:py-20 bg-gradient-to-b from-slate-950 via-slate-950 to-indigo-950/70 text-white"
+    >
+      <div class="max-w-6xl mx-auto px-6">
+        <div class="relative overflow-hidden rounded-[32px] border border-white/10 bg-white/[0.06] p-8 md:p-10 shadow-2xl backdrop-blur-2xl">
+          <div class="absolute inset-0 opacity-90">
+            <div class="absolute -left-16 top-0 h-48 w-48 rounded-full bg-cyan-400/10 blur-3xl"></div>
+            <div class="absolute right-0 top-10 h-56 w-56 rounded-full bg-fuchsia-500/10 blur-3xl"></div>
+            <div class="absolute bottom-0 left-1/3 h-48 w-48 rounded-full bg-indigo-400/10 blur-3xl"></div>
+          </div>
+          <div class="relative grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+            <div class="max-w-xl">
+              <p class="text-xs font-semibold uppercase tracking-[0.35em] text-cyan-200">Now live</p>
+              <h2 class="mt-4 text-3xl md:text-5xl font-bold leading-tight">
+                Try PlanCraft AI on iPhone, Android, or the web
+              </h2>
+              <p class="mt-5 text-base md:text-lg text-indigo-100/90 leading-relaxed">
+                Install the app from the store you already trust, or open PlanCraft AI on the web.
+                Your planner, reminders, and account stay in one system across every screen.
+              </p>
+              <div class="mt-7 grid gap-3 sm:grid-cols-3">
+                <div
+                  v-for="point in appAvailabilityPoints"
+                  :key="point.label"
+                  class="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 shadow-lg"
+                >
+                  <p class="text-xs uppercase tracking-[0.25em] text-indigo-300">{{ point.label }}</p>
+                  <p class="mt-2 text-sm text-white/90 leading-relaxed">{{ point.value }}</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid gap-4 md:grid-cols-3">
+              <a
+                v-for="platform in appPlatforms"
+                :key="`${platform.key}-card`"
+                :href="platform.href"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="app-launch-card rounded-3xl border border-white/10 bg-slate-950/60 p-6 text-left shadow-[0_18px_50px_rgba(15,23,42,0.45)] backdrop-blur-xl"
+                :style="{ '--platform-accent': platform.accent }"
+              >
+                <div class="flex items-start justify-between gap-4">
+                  <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-2xl shadow-inner">
+                    <span aria-hidden="true">{{ platform.icon }}</span>
+                  </div>
+                  <span class="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-indigo-100">
+                    {{ platform.badge }}
+                  </span>
+                </div>
+                <h3 class="mt-6 text-2xl font-semibold text-white">{{ platform.title }}</h3>
+                <p class="mt-3 text-sm leading-relaxed text-indigo-100/85">
+                  {{ platform.description }}
+                </p>
+                <div class="mt-6 flex items-center justify-between text-sm font-semibold text-white">
+                  <span>{{ platform.cta }}</span>
+                  <span aria-hidden="true">↗</span>
+                </div>
+              </a>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -704,6 +787,18 @@
           <RouterLink to="/terms" class="hover:underline">Terms</RouterLink>
           <RouterLink to="/contact" class="hover:underline">Contact</RouterLink>
         </div>
+        <div class="mt-5 flex flex-wrap justify-center gap-3">
+          <a
+            v-for="platform in appPlatforms"
+            :key="`${platform.key}-footer`"
+            :href="platform.href"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="footer-store-link"
+          >
+            {{ platform.footerLabel }}
+          </a>
+        </div>
       </div>
     </footer>
   </div>
@@ -983,6 +1078,55 @@ const testimonialCards = [
 
 const SITE_URL = (import.meta.env.VITE_SITE_URL && String(import.meta.env.VITE_SITE_URL)) || 'https://plancraftai.com'
 const BASE_URL = SITE_URL.endsWith('/') ? SITE_URL.slice(0, -1) : SITE_URL
+const IOS_APP_URL = 'https://apps.apple.com/app/plancraft-ai/id6760917305'
+const ANDROID_APP_URL = 'https://play.google.com/store/apps/details?id=com.sudoprogrammer.plancraftai&pcampaignid=web_share'
+const WEB_APP_URL = BASE_URL
+const appPlatforms = [
+  {
+    key: 'ios',
+    icon: '🍎',
+    badge: 'iPhone + iPad',
+    heroLabel: 'iOS App',
+    footerLabel: 'iOS Download',
+    title: 'iOS',
+    description:
+      'Install PlanCraft AI from the App Store for fast capture, native reminders, and Apple billing for Solo Premium.',
+    cta: 'Open App Store',
+    href: IOS_APP_URL,
+    accent: 'rgba(125, 211, 252, 0.34)',
+  },
+  {
+    key: 'android',
+    icon: '🤖',
+    badge: 'Phones + tablets',
+    heroLabel: 'Android App',
+    footerLabel: 'Android Download',
+    title: 'Android',
+    description:
+      'Get PlanCraft AI on Google Play and keep your planner, voice notes, and reminder flows close at hand on Android.',
+    cta: 'Open Google Play',
+    href: ANDROID_APP_URL,
+    accent: 'rgba(74, 222, 128, 0.34)',
+  },
+  {
+    key: 'web',
+    icon: '🌐',
+    badge: 'Desktop + mobile',
+    heroLabel: 'Web App',
+    footerLabel: 'Open Web App',
+    title: 'Web',
+    description:
+      'Use PlanCraft AI instantly in the browser at plancraftai.com for team setup, planning, and cross-device access.',
+    cta: 'Open Web App',
+    href: WEB_APP_URL,
+    accent: 'rgba(196, 181, 253, 0.34)',
+  },
+]
+const appAvailabilityPoints = [
+  { label: 'Download', value: 'Available in the App Store and on Google Play today.' },
+  { label: 'Sync', value: 'Use the same account across mobile and web without starting over.' },
+  { label: 'Share', value: 'Send teammates to the web app while keeping your own mobile workflow.' },
+]
 const featureList = Array.from(
   new Set([
     ...features.map((f) => f.title),
@@ -1006,6 +1150,7 @@ const structuredData = [
     featureList,
     url: BASE_URL,
     installUrl: `${BASE_URL}/#install`,
+    sameAs: appPlatforms.map((platform) => platform.href),
     screenshot: `${BASE_URL}/plancraftai-post-one.png`,
     description:
       'PlanCraftAI is an AI task planner and voice reminder app with AI daily planning, calendar sync, recurring reminders, and shared workspaces for teams.',
@@ -1274,6 +1419,28 @@ onMounted(() => {
   transform: translateY(-1px);
 }
 
+.hero-store-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.85rem 1.05rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(15, 23, 42, 0.34);
+  color: #eef2ff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.22);
+  transition: transform 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
+}
+
+.hero-store-pill:hover {
+  transform: translateY(-1px);
+  border-color: rgba(199, 210, 254, 0.5);
+  background: rgba(30, 41, 59, 0.68);
+}
+
 .hero-cta {
   display: inline-flex !important;
   align-items: center;
@@ -1295,6 +1462,52 @@ onMounted(() => {
 
 .solo-cta .cta-icon {
   color: #e2e8f0;
+}
+
+.app-launch-card {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.app-launch-card::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  background: radial-gradient(circle at top left, var(--platform-accent), transparent 48%);
+  opacity: 0.95;
+  pointer-events: none;
+}
+
+.app-launch-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.app-launch-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.55);
+}
+
+.footer-store-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 132px;
+  padding: 0.75rem 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(129, 140, 248, 0.24);
+  background: rgba(255, 255, 255, 0.04);
+  color: #c7d2fe;
+  font-weight: 600;
+  transition: border-color 0.18s ease, color 0.18s ease, background-color 0.18s ease;
+}
+
+.footer-store-link:hover {
+  border-color: rgba(224, 231, 255, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
 }
 
 #team-pricing {
