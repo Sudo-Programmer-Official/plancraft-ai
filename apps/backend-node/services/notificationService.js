@@ -48,6 +48,7 @@ const CHANNEL_ENV_FLAGS = {
 }
 
 const ALL_CHANNELS = ['whatsapp', 'email', 'pwa', 'voice', 'sms']
+const ENABLE_POSTING_SERVICE_NOTIFICATIONS = resolveChannelFlag('ENABLE_POSTING_SERVICE_NOTIFICATIONS', false)
 
 function isChannelEnabled(flagValue) {
   if (flagValue === undefined || flagValue === null) return false
@@ -249,6 +250,12 @@ function hasPayloadForChannel(channel, payload = {}) {
   return false
 }
 
+function shouldUsePostingService(meta = {}) {
+  if (!ENABLE_POSTING_SERVICE_NOTIFICATIONS) return false
+  if (meta?.forceDirect === true) return false
+  return postingServiceAvailable()
+}
+
 async function sendViaChannel(channel, userId, payload, contacts = {}, meta = {}) {
   // PWA never needs posting-service; send directly so users always see at least one channel.
   if (channel === 'pwa') {
@@ -273,7 +280,7 @@ async function sendViaChannel(channel, userId, payload, contacts = {}, meta = {}
 
   // Prefer routing through posting-service if available and we have a recipient.
   const normalizedChannel = channel === 'voice' ? 'voice_call' : channel
-  const postingEnabled = postingServiceAvailable()
+  const postingEnabled = shouldUsePostingService(meta)
   const to = pickRecipientForChannel(channel, contacts)
 
   if (!hasPayloadForChannel(channel, payload)) {
