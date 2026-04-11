@@ -2,18 +2,40 @@
   <div class="app-page-shell relative">
     <div class="app-page-frame">
     <!-- Header -->
-    <div class="app-page-hero flex flex-col gap-3">
-      <div class="flex items-center justify-between gap-3">
-        <h2 class="app-page-title !text-[clamp(2rem,3vw,2.8rem)] flex items-center gap-2">
-          🔔 Reminders
-          <span v-if="loading" class="text-gray-400 text-base animate-pulse">Loading...</span>
-        </h2>
+    <div class="app-page-hero reminders-hero">
+      <div class="reminders-hero__top">
+        <div class="reminders-hero__content">
+          <span class="app-page-eyebrow">Gentle reminder queue</span>
+          <div class="reminders-hero__title-row">
+            <h2 class="app-page-title !text-[clamp(2rem,3vw,2.8rem)] min-w-0">🔔 Reminders</h2>
+            <span v-if="loading" class="reminders-status-pill">Refreshing</span>
+          </div>
+          <p class="app-page-description reminders-hero__description">
+            Quick filters, calmer cards, and one-tap actions that stay readable on smaller screens.
+          </p>
+        </div>
         <button
-          class="px-3 py-2 text-sm rounded-xl bg-gradient-to-r from-fuchsia-500 to-indigo-500 hover:from-fuchsia-400 hover:to-indigo-400 transition shadow shadow-indigo-950/30 add-reminder-btn"
+          class="px-4 py-3 text-sm rounded-2xl bg-gradient-to-r from-fuchsia-500 via-violet-500 to-indigo-500 hover:from-fuchsia-400 hover:via-violet-400 hover:to-indigo-400 transition shadow-lg shadow-indigo-950/30 add-reminder-btn reminders-hero__cta"
           @click="goToPlanner"
         >
-          <span class="add-reminder-icon">＋</span> Add reminder
+          <span class="add-reminder-icon">＋</span>
+          <span>Add reminder</span>
         </button>
+      </div>
+
+      <div class="reminders-hero__stats">
+        <div class="reminders-hero__stat">
+          <span>Window</span>
+          <strong>{{ activeFilterLabel }}</strong>
+        </div>
+        <div class="reminders-hero__stat">
+          <span>Queue</span>
+          <strong>{{ visibleCountLabel }}</strong>
+        </div>
+        <div class="reminders-hero__stat">
+          <span>Past</span>
+          <strong>{{ pastVisibilityLabel }}</strong>
+        </div>
       </div>
 
       <!-- Date Navigation Chips -->
@@ -45,54 +67,66 @@
           </button>
         </div>
 
-        <div class="date-picker-pill">
-          <span class="date-picker-icon">📅</span>
-          <input
-            type="date"
-            v-model="customDate"
-            class="date-picker-input"
-            @change="scrollToCustomDate"
-          />
-        </div>
+        <div class="date-nav-lite__utilities">
+          <div class="date-picker-pill">
+            <span class="date-picker-icon">📅</span>
+            <input
+              type="date"
+              v-model="customDate"
+              class="date-picker-input"
+              @change="scrollToCustomDate"
+            />
+          </div>
 
-        <button
-          class="text-xs text-gray-300 hover:text-white underline-offset-2 hover:underline"
-          @click="showPast = !showPast"
-        >
-          {{ showPast ? 'Hide past reminders' : 'View past reminders' }}
-        </button>
+          <button
+            class="past-toggle-pill"
+            @click="showPast = !showPast"
+          >
+            {{ showPast ? 'Hide past reminders' : 'View past reminders' }}
+          </button>
+        </div>
       </div>
     </div>
 
     <!-- Usage meter: Sign in for guests, Upgrade for signed-in free users -->
-    <div v-if="usage.plan === 'free' && !isPremium" class="app-page-section app-page-section--compact mb-2 flex items-center justify-between">
-      <span class="text-sm text-gray-300">You’ve used {{ usage.used }}/{{ usage.limit }} reminders today.</span>
+    <div v-if="usage.plan === 'free' && !isPremium" class="app-page-section app-page-section--compact reminders-usage">
+      <div class="min-w-0">
+        <p class="reminders-usage__eyebrow">Daily allowance</p>
+        <p class="text-sm text-gray-300">You’ve used {{ usage.used }}/{{ usage.limit }} reminders today.</p>
+      </div>
       <button
         v-if="!isGuest && !isAppleBillingSafeMode"
         @click="goToUpgrade"
-        class="px-3 py-1 text-xs bg-gradient-to-r from-fuchsia-500 to-indigo-500 hover:from-fuchsia-400 hover:to-indigo-400 rounded-lg text-white"
+        class="px-3 py-2 text-xs bg-gradient-to-r from-fuchsia-500 to-indigo-500 hover:from-fuchsia-400 hover:to-indigo-400 rounded-xl text-white reminders-usage__cta"
       >
         Upgrade for unlimited 🚀
       </button>
       <RouterLink
         v-else
         to="/login"
-        class="px-3 py-1 text-xs bg-gradient-to-r from-fuchsia-500 to-indigo-500 hover:from-fuchsia-400 hover:to-indigo-400 rounded-lg text-white"
+        class="px-3 py-2 text-xs bg-gradient-to-r from-fuchsia-500 to-indigo-500 hover:from-fuchsia-400 hover:to-indigo-400 rounded-xl text-white reminders-usage__cta"
       >
         🔑 Sign in
       </RouterLink>
     </div>
 
-    <div v-if="loading" class="mt-12">
-      <EmptyState
-        title="Syncing reminders"
-        subtitle="We’re pulling your upcoming reminders and notification channels."
-        icon="⏳"
-      >
-        <div class="w-full max-w-3xl mt-4">
-          <el-skeleton :rows="3" animated />
+    <div v-if="loading" class="reminders-loading-state">
+      <section class="app-page-section reminders-loading-panel">
+        <div class="reminders-loading-panel__copy">
+          <span class="reminders-status-pill reminders-status-pill--soft">Syncing reminders</span>
+          <h3 class="reminders-loading-panel__title">Bringing your next nudges into focus</h3>
+          <p class="reminders-loading-panel__subtitle">
+            We’re pulling your upcoming reminders and notification channels.
+          </p>
         </div>
-      </EmptyState>
+        <div class="reminders-loading-panel__skeleton" aria-hidden="true">
+          <div class="app-page-skeleton reminders-loading-panel__pill"></div>
+          <div class="app-page-skeleton reminders-loading-panel__line reminders-loading-panel__line--hero"></div>
+          <div class="app-page-skeleton reminders-loading-panel__line"></div>
+          <div class="app-page-skeleton reminders-loading-panel__line"></div>
+          <div class="app-page-skeleton reminders-loading-panel__line reminders-loading-panel__line--short"></div>
+        </div>
+      </section>
     </div>
 
     <EmptyState
@@ -110,44 +144,58 @@
         :ref="setGroupRef(date)"
         class="scroll-mt-20"
       >
-        <h3 class="text-xl font-semibold mt-8 mb-3 border-b border-white/10 pb-1">
+        <h3 class="reminders-group-heading">
           {{ date }}
         </h3>
 
         <TransitionGroup name="fade" tag="div" class="space-y-3">
-          <div
+          <article
             v-for="r in group"
             :key="r.id"
-            class="max-w-4xl mx-auto p-4 rounded-3xl bg-slate-950/30 border border-white/10 shadow-md hover:shadow-indigo-500/20 transition-all flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3"
+            class="reminder-card"
           >
-            <div class="flex flex-col flex-1 gap-1">
-              <div class="font-semibold text-lg">{{ r.task || r.text || 'Reminder' }}</div>
-              <div class="text-sm text-gray-300">🕒 {{ formatDualTime(r.scheduledTime) }}</div>
-              <div class="text-xs text-gray-500">{{ formatRelative(r.scheduledTime) }} • Channels: {{ (r.channels || []).join(', ') || '—' }}</div>
+            <div class="reminder-card__copy">
+              <div class="reminder-card__title-row">
+                <div class="font-semibold text-lg leading-snug text-white">{{ r.task || r.text || 'Reminder' }}</div>
+                <span class="reminder-card__relative">{{ formatRelative(r.scheduledTime) }}</span>
+              </div>
+              <div class="reminder-card__time">🕒 {{ formatDualTime(r.scheduledTime) }}</div>
+              <div class="reminder-card__channels">
+                <span
+                  v-for="channel in (r.channels || [])"
+                  :key="`${r.id}-${channel}`"
+                  class="reminder-card__chip"
+                >
+                  {{ channel }}
+                </span>
+                <span v-if="!(r.channels || []).length" class="reminder-card__chip reminder-card__chip--muted">
+                  No channel yet
+                </span>
+              </div>
               <div v-if="r.meetingLink" class="flex flex-wrap items-center gap-2 mt-1">
                 <a
                   :href="r.meetingLink"
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="text-xs px-2 py-1 rounded bg-emerald-700/20 border border-emerald-400/60 text-emerald-200 hover:bg-emerald-600/30 transition"
+                  class="text-xs px-2 py-1 rounded-full bg-emerald-700/20 border border-emerald-400/60 text-emerald-200 hover:bg-emerald-600/30 transition"
                 >
                   🔗 {{ r.meetingLabel || 'Open link' }}
                 </a>
               </div>
             </div>
 
-            <div class="flex gap-2 justify-end sm:justify-center shrink-0">
-              <button @click="goToPlannerWithReminder(r)" class="px-3 py-1 text-xs bg-slate-950/30 hover:border-indigo-300/50 border border-white/10 rounded-xl text-slate-200 w-[100px] text-center transition">
+            <div class="reminder-card__actions">
+              <button @click="goToPlannerWithReminder(r)" class="reminder-action reminder-action--primary">
                 Change time
               </button>
-              <button @click="onSnooze(r)" class="px-3 py-1 text-xs bg-yellow-500/20 hover:bg-yellow-500/40 border border-yellow-500 rounded-lg text-yellow-300 w-[90px] text-center">
+              <button @click="onSnooze(r)" class="reminder-action reminder-action--warm">
                 Snooze
               </button>
-              <button @click="onCancel(r)" class="px-3 py-1 text-xs bg-red-500/20 hover:bg-red-500/40 border border-red-500 rounded-lg text-red-300 w-[80px] text-center">
+              <button @click="onCancel(r)" class="reminder-action reminder-action--danger">
                 Cancel
               </button>
             </div>
-          </div>
+          </article>
         </TransitionGroup>
       </div>
     </div>
@@ -191,7 +239,7 @@ const chipRefs = new Map()
 let refreshTimer = null
 
 const usage = ref({ used: 0, limit: 0, plan: '' })
-const { isPremium, isGuest, isFreeUser } = useAuthFlags()
+const { isPremium, isGuest } = useAuthFlags()
 const isAppleBillingSafeMode = computed(() => detectAppleBillingSafeMode())
 const customDate = ref(dayjs().format('YYYY-MM-DD'))
 const filterMode = ref('Today') // Today | Next7 | Custom
@@ -209,6 +257,15 @@ const chipDates = computed(() =>
     (d) => d !== 'Today' && d !== 'Next 7 Days' && d !== 'Tomorrow',
   ),
 )
+const activeFilterLabel = computed(() => {
+  if (filterMode.value === 'Custom') return dayjs(customDate.value).format('MMM D, YYYY')
+  if (filterMode.value === 'Next7') return 'Next 7 days'
+  return 'Today'
+})
+const visibleCountLabel = computed(() =>
+  loading.value ? 'Refreshing…' : `${visibleCount.value} ${visibleCount.value === 1 ? 'reminder' : 'reminders'}`,
+)
+const pastVisibilityLabel = computed(() => (showPast.value ? 'Visible' : 'Hidden'))
 
 function logTimeBrainReminder(event, payload) {
   try {
@@ -245,12 +302,14 @@ async function fetchUsage() {
     if (!uid) return
     const { data } = await api.get('/reminders/usage', { params: { userId: uid } })
     if (data?.success) usage.value = { used: data.used || 0, limit: data.limit || 0, plan: data.plan || '' }
-  } catch {}
+  } catch {
+    /* noop */
+  }
 }
 
 function goToUpgrade() {
-  try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_UPGRADE_CLICK) } catch {}
-  try { router.push(isAppleBillingSafeMode.value ? '/billing/upgrade' : '/pricing') } catch {}
+  try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_UPGRADE_CLICK) } catch { /* noop */ }
+  try { router.push(isAppleBillingSafeMode.value ? '/billing/upgrade' : '/pricing') } catch { /* noop */ }
 }
 
 function setGroupRef(date) {
@@ -292,6 +351,54 @@ function normalizeChannels(candidate) {
   if (Array.isArray(candidate)) return candidate.filter(Boolean)
   if (!candidate) return []
   return [candidate].filter(Boolean)
+}
+
+function normalizeTaskDateCandidate(value) {
+  if (!value && value !== 0) return null
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    const directMatch = trimmed.match(/\d{4}-\d{2}-\d{2}/)
+    if (directMatch) return directMatch[0]
+    const parsed = new Date(trimmed)
+    return Number.isNaN(parsed.getTime()) ? null : dayjs(parsed).format('YYYY-MM-DD')
+  }
+
+  if (typeof value?.toDate === 'function') {
+    try {
+      return dayjs(value.toDate()).format('YYYY-MM-DD')
+    } catch {
+      return null
+    }
+  }
+
+  if (value instanceof Date || typeof value === 'number') {
+    const parsed = new Date(value)
+    return Number.isNaN(parsed.getTime()) ? null : dayjs(parsed).format('YYYY-MM-DD')
+  }
+
+  return null
+}
+
+function getTaskPlannedDate(task) {
+  if (!task || typeof task !== 'object') return null
+
+  const candidates = [
+    task.plannedDate,
+    task.date,
+    task.scheduledDate,
+    task.scheduled_time,
+    task.scheduledTime,
+    task.dueDate,
+    task?.metadata?.plannedDate,
+  ]
+
+  for (const value of candidates) {
+    const normalized = normalizeTaskDateCandidate(value)
+    if (normalized) return normalized
+  }
+
+  return null
 }
 
 function normalizeReminder(row) {
@@ -412,6 +519,7 @@ const visibleReminders = computed(() => {
     const dt = toJsDate(r.scheduledTime)
     if (!dt) return false
     const local = dayjs.utc(dt).tz(zone)
+    if (showPast.value && local.isBefore(today, 'day')) return true
     // Apply primary filter mode first
     if (filterMode.value === 'Today') {
       return local.isSame(today, 'day')
@@ -597,13 +705,17 @@ onMounted(() => {
   try {
     window.addEventListener('usage-refresh', fetchUsage)
     window.addEventListener('usage-refresh', handleReminderUsageRefresh)
-  } catch {}
+  } catch {
+    /* noop */
+  }
 })
 onUnmounted(() => {
   try {
     window.removeEventListener('usage-refresh', fetchUsage)
     window.removeEventListener('usage-refresh', handleReminderUsageRefresh)
-  } catch {}
+  } catch {
+    /* noop */
+  }
 })
 
 async function handleReminderUsageRefresh() {
@@ -669,10 +781,98 @@ function goToPlannerWithReminder(r) {
 .hide-scrollbar::-webkit-scrollbar { display: none; }
 .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-.date-nav-lite {
+.reminders-hero {
+  gap: 1rem;
+}
+
+.reminders-hero__top {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.reminders-hero__content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.reminders-hero__title-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  gap: 0.75rem;
+}
+
+.reminders-hero__description {
+  margin-top: 0.75rem;
+  max-width: 42rem;
+}
+
+.reminders-hero__cta {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  font-weight: 600;
+}
+
+.reminders-status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid rgba(196, 181, 253, 0.34);
+  background: rgba(99, 102, 241, 0.16);
+  color: #dbeafe;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.reminders-status-pill--soft {
+  width: fit-content;
+  background: rgba(167, 139, 250, 0.14);
+  color: #ede9fe;
+}
+
+.reminders-hero__stats {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.reminders-hero__stat {
+  min-width: 0;
+  padding: 0.95rem 1rem;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.34), rgba(67, 56, 202, 0.16));
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.reminders-hero__stat span {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: rgba(196, 181, 253, 0.72);
+}
+
+.reminders-hero__stat strong {
+  font-size: 1rem;
+  line-height: 1.35;
+  color: #fff;
+}
+
+.date-nav-lite {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   gap: 0.75rem;
 }
 
@@ -682,13 +882,15 @@ function goToPlannerWithReminder(r) {
   overflow-x: auto;
   white-space: nowrap;
   padding: 0.25rem 0.35rem;
+  width: 100%;
+  min-width: 0;
 }
 
 .chip {
-  padding: 0.35rem 0.75rem;
+  padding: 0.55rem 0.95rem;
   border-radius: 999px;
   font-size: 0.9rem;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.07);
   color: #f8fafc;
   border: 1px solid rgba(255, 255, 255, 0.12);
   transition: all 0.2s ease;
@@ -700,14 +902,21 @@ function goToPlannerWithReminder(r) {
   box-shadow: 0 6px 18px rgba(99, 102, 241, 0.35);
 }
 
+.date-nav-lite__utilities {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
 .date-picker-pill {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.2rem 0.5rem;
+  padding: 0.55rem 0.75rem;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
+  min-height: 46px;
 }
 
 .date-picker-icon {
@@ -721,17 +930,323 @@ function goToPlannerWithReminder(r) {
   border: none;
   outline: none;
   font-size: 0.9rem;
+  width: 100%;
+  min-width: 0;
 }
 
 .date-picker-input::-webkit-calendar-picker-indicator {
   filter: invert(1);
 }
 
+.past-toggle-pill {
+  min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(15, 23, 42, 0.22);
+  color: rgba(226, 232, 240, 0.9);
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.past-toggle-pill:hover {
+  color: #fff;
+  border-color: rgba(196, 181, 253, 0.34);
+}
+
+.reminders-usage {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.9rem;
+}
+
+.reminders-usage__eyebrow {
+  font-size: 0.72rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(196, 181, 253, 0.74);
+  margin-bottom: 0.35rem;
+}
+
+.reminders-usage__cta {
+  width: 100%;
+  text-align: center;
+  font-weight: 600;
+}
+
+.reminders-loading-state {
+  margin-top: 0.5rem;
+}
+
+.reminders-loading-panel {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.reminders-loading-panel__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.reminders-loading-panel__title {
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  line-height: 1.1;
+  font-weight: 700;
+  color: #fff;
+}
+
+.reminders-loading-panel__subtitle {
+  max-width: 36rem;
+  color: rgba(226, 232, 240, 0.8);
+  line-height: 1.6;
+}
+
+.reminders-loading-panel__skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.reminders-loading-panel__pill {
+  width: 9rem;
+  height: 2.6rem;
+  border-radius: 999px;
+}
+
+.reminders-loading-panel__line {
+  height: 1rem;
+  width: 100%;
+  border-radius: 999px;
+}
+
+.reminders-loading-panel__line--hero {
+  width: min(100%, 24rem);
+  height: 1.15rem;
+}
+
+.reminders-loading-panel__line--short {
+  width: min(100%, 14rem);
+}
+
+.reminders-group-heading {
+  margin: 2rem 0 0.9rem;
+  padding-bottom: 0.65rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: rgba(248, 250, 252, 0.96);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.reminder-card {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 1rem;
+  border-radius: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background:
+    radial-gradient(circle at top right, rgba(129, 140, 248, 0.12), transparent 32%),
+    linear-gradient(145deg, rgba(15, 23, 42, 0.46), rgba(49, 46, 129, 0.24));
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+
+.reminder-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(129, 140, 248, 0.32);
+  box-shadow: 0 22px 48px rgba(49, 46, 129, 0.24);
+}
+
+.reminder-card__copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.reminder-card__title-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.reminder-card__relative {
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.32rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(196, 181, 253, 0.2);
+  background: rgba(99, 102, 241, 0.14);
+  color: rgba(224, 231, 255, 0.92);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.reminder-card__time {
+  color: rgba(226, 232, 240, 0.86);
+  line-height: 1.5;
+}
+
+.reminder-card__channels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.reminder-card__chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.38rem 0.72rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(224, 231, 255, 0.88);
+  font-size: 0.74rem;
+  line-height: 1;
+  text-transform: capitalize;
+}
+
+.reminder-card__chip--muted {
+  color: rgba(148, 163, 184, 0.94);
+}
+
+.reminder-card__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.reminder-action {
+  min-height: 42px;
+  padding: 0.7rem 0.9rem;
+  border-radius: 16px;
+  border: 1px solid transparent;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.reminder-action--primary {
+  grid-column: 1 / -1;
+  background: rgba(15, 23, 42, 0.3);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+}
+
+.reminder-action--primary:hover {
+  border-color: rgba(129, 140, 248, 0.4);
+  color: #fff;
+}
+
+.reminder-action--warm {
+  background: rgba(234, 179, 8, 0.16);
+  border-color: rgba(234, 179, 8, 0.58);
+  color: #fde68a;
+}
+
+.reminder-action--warm:hover {
+  background: rgba(234, 179, 8, 0.26);
+}
+
+.reminder-action--danger {
+  background: rgba(239, 68, 68, 0.16);
+  border-color: rgba(248, 113, 113, 0.58);
+  color: #fecaca;
+}
+
+.reminder-action--danger:hover {
+  background: rgba(239, 68, 68, 0.26);
+}
+
 .add-reminder-btn {
   color: #f8fafc;
 }
+
 .add-reminder-icon {
   margin-right: 6px;
   color: #f8fafc;
+}
+
+@media (min-width: 640px) {
+  .reminders-hero {
+    gap: 1.25rem;
+  }
+
+  .reminders-hero__top {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+
+  .reminders-hero__cta {
+    width: auto;
+    min-width: 168px;
+  }
+
+  .reminders-hero__stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .date-nav-lite__utilities {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .date-picker-pill {
+    min-width: 220px;
+  }
+
+  .reminders-usage {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .reminders-usage__cta {
+    width: auto;
+  }
+
+  .reminders-loading-panel {
+    grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+    align-items: center;
+  }
+
+  .reminder-card {
+    padding: 1.15rem 1.2rem;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .reminder-card__title-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .reminder-card__actions {
+    flex: 0 0 auto;
+    width: auto;
+    display: flex;
+    align-items: center;
+  }
+
+  .reminder-action {
+    min-width: 96px;
+  }
+
+  .reminder-action--primary {
+    grid-column: auto;
+  }
 }
 </style>
