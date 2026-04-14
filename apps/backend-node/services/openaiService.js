@@ -412,8 +412,8 @@ Return ONLY valid JSON in this format:
 {
   "tasks": [
     {
-      "title": "Action verb + clear outcome (max 9 words)",
-      "displayTitle": "User-friendly phrasing retaining key noun (e.g., \"Prepare for sleep\")",
+      "title": "Action verb + recognizable outcome (max 12 words)",
+      "displayTitle": "User-friendly phrasing that preserves key context such as place, person, class, or deliverable when needed",
       "rawPhrase": "Exact snippet from the user input that inspired this task",
       "details": "Specifics or success criteria",
       "estimate_minutes": 15,
@@ -432,15 +432,20 @@ Return ONLY valid JSON in this format:
 Rules:
 - At most ${maxItems} tasks.
 - Each task must start with a verb (e.g., Write, Review, Prepare, Go).
-- Titles MUST include both the intent and the key noun (e.g., "Go to sleep" → "Prepare for sleep", "Attend" → "Attend biology class").
+- Titles MUST include both the intent and the key noun, plus any essential disambiguating context such as destination, person, class, or deliverable when dropping it would make the task unclear later.
+- Good title examples:
+  - "Tomorrow I have to go to college to print the slide" -> "Go to college to print slides"
+  - "Talk to Professor Rao about the thesis outline" -> "Talk to Professor Rao about thesis outline"
+  - "Pick up the charger from Rahul's desk" -> "Pick up charger from Rahul's desk"
 - Never output a generic verb alone ("Go", "Set", "Do"); expand it using the surrounding noun phrase.
-- Populate displayTitle with the polished, user-friendly text you would show in the UI (keep it short but descriptive).
+- Populate displayTitle with the polished, user-friendly text you would show in the UI. It should still make sense when the user sees it tomorrow, so do not compress it into 2-3 vague words.
 - Populate rawPhrase with the exact fragment from the user input so downstream systems can learn user language.
 - No sequence words like "First", "Second", "Lastly".
 - No reflections like "I feel grateful" or "Today is tough".
-- Each task should be atomic, completable in 10–30 minutes.
+- Each task should represent one follow-through item. Prefer 10-60 minute scope, but keep necessary travel/location context when it is part of recognizing the task.
 - Do not include duplicates or vague filler sentences.
 - Treat meta commands like "set a reminder" or "remember to" as part of the underlying action; do not output separate tasks that only restate the reminder mechanic unless the user explicitly asks for that as a standalone deliverable.
+- If the user needs to go somewhere to do the task, keep both the destination and the action in the title instead of shortening it to only the final verb phrase.
 - If the note implies a specific time (e.g., "at 3:15 PM", "after dinner", "tonight at 8"), set scheduledTime using YYYY-MM-DDTHH:mm (assume the user's current day unless otherwise specified) and copy the original phrase into timeHint.
 - If timing is relative (e.g., "after class", "then go to the gym"), set relation to "after_previous" and provide a reasonable gapMinutes (default 15 unless another break is implied). If it should start together with the prior task (e.g., "stretch while watching lecture"), use "same_time_previous".
 - When timing is unspecified, use relation "independent" and set scheduledTime/timeHint to null.
@@ -604,4 +609,103 @@ export async function extractReminderTime(input, { nowISO, timezone: tzOpt, time
     console.warn('[TimeFlow] extractReminderTime failed to resolve', { input, now, tz, cleaned })
   } catch {}
   return null
+}
+
+export async function detectActionSuggestions(
+  input,
+  { maxItems = 6, timezone: tzOpt = "UTC", nowISO = null } = {},
+) {
+  const text = String(input || "").trim();
+  if (!text) return { suggestions: [] };
+
+  const timezoneName = typeof tzOpt === "string" && tzOpt.trim() ? tzOpt.trim() : "UTC";
+  const now = typeof nowISO === "string" && nowISO ? nowISO : new Date().toISOString();
+
+  const system = {
+    role: "system",
+    content: [
+      "You detect actionable commitments inside messy notes, journal entries, and voice transcripts.",
+      "Your job is to surface only useful action suggestions, not every noun phrase.",
+      "Prioritize deadlines, commitments, promises, follow-ups, and time-based actions.",
+      "Return only valid JSON.",
+    ].join(" "),
+  };
+
+  const schema = `
+Return ONLY valid JSON in this format:
+[
+  {
+    "title": "Action title that starts with a verb and stays recognizable later",
+    "displayTitle": "Polished user-facing title that keeps essential context",
+    "rawPhrase": "Exact snippet from the note",
+    "details": "Optional extra context",
+    "confidence": 0.0,
+    "reason": "Why this is considered actionable",
+    "category": "Work|Health|Learning|Personal|Finance|Routine|Other",
+    "dueDate": "YYYY-MM-DD" | null,
+    "scheduledTime": "YYYY-MM-DDTHH:mm" | null,
+    "timeHint": "Timing in the user's words" | null,
+    "reasons": ["deadline", "commitment"],
+    "missingFields": ["dueDate", "time", "details"]
+  }
+]`;
+
+  const rules = `
+Rules:
+- At most ${maxItems} suggestions.
+- Include only actionable items.
+- Ignore pure reflections, feelings, vague themes, or general life updates unless they imply a concrete action.
+- confidence must be a number from 0 to 1.
+- Use 0.85 to 0.99 when the action and timing are both clear.
+- Use 0.55 to 0.84 when the action is clear but timing or scope is missing.
+- Use 0.25 to 0.54 when it may be actionable but is ambiguous.
+- Avoid values below 0.2 unless the phrase is barely actionable.
+- Titles must be specific, start with a verb, and keep the minimum context needed to recognize the task later.
+- If the action depends on a destination, person, class, or deliverable, keep that context in the title instead of reducing it to 2-3 words.
+- Prefer titles like "Print slides at college" or "Call John about the budget" over generic titles like "Print slides" or "Call John" when the note contains that context.
+- displayTitle should be concise and natural for a suggestion card, but still understandable tomorrow without reopening the source note.
+- details should preserve the fuller original intent in plain language when extra context helps execution.
+- rawPhrase must be copied exactly from the note when possible.
+- dueDate should be used for date-like commitments such as "before July 20" or "next Tuesday".
+- If no date is found, set dueDate to null.
+- scheduledTime should only be set when the note includes a concrete clock time or precise scheduled moment.
+- reason should be a single short sentence explaining why this should be surfaced.
+- missingFields should contain any missing pieces among dueDate, time, or details.
+- If timing is missing, include "dueDate" and/or "time" inside missingFields.
+- Use only these categories: Work, Health, Learning, Personal, Finance, Routine, Other.
+- reasons should be short labels such as deadline, promise, urgency, time_based, follow_up, commitment.
+- If nothing should be surfaced, return [].
+`;
+
+  const user = {
+    role: "user",
+    content: [
+      `Current time (ISO): ${now}`,
+      `User timezone (IANA): ${timezoneName}`,
+      `User note:\n"""${text}"""`,
+      schema,
+      rules,
+    ].join("\n\n"),
+  };
+
+  const content = await chatWithFallback({
+    messages: [system, user],
+    temperature: 0.1,
+  });
+
+  let cleaned = content.trim();
+  cleaned = cleaned.replace(/^```json\s*/i, "").replace(/```$/i, "").trim();
+  if (!cleaned.startsWith("{") && !cleaned.startsWith("[")) {
+    const match = cleaned.match(/\[[\s\S]*\]/) || cleaned.match(/\{[\s\S]*\}/);
+    if (match) cleaned = match[0];
+  }
+
+  try {
+    const parsed = JSON.parse(cleaned);
+    const suggestions = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.suggestions) ? parsed.suggestions : [];
+    return { suggestions };
+  } catch (err) {
+    console.error("❌ Failed to parse action suggestions JSON:", cleaned);
+    throw err;
+  }
 }

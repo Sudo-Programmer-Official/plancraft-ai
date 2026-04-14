@@ -719,6 +719,7 @@ import { ElMessage } from 'element-plus'
 import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
 import { isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
 import { fetchUserProfile } from '@/services/authService'
+import { syncActionInbox } from '@/services/actionInboxService'
 
 const SidebarIcon = defineComponent({
   name: 'SidebarIcon',
@@ -860,6 +861,7 @@ const coarseTouchViewport = ref(false)
 const likelyIpadViewport = ref(false)
 let storageHandler = null
 let viewportChangeHandler = null
+let pageVisibilityHandler = null
 
 function detectCoarseTouchViewport() {
   if (typeof window === 'undefined') return false
@@ -909,9 +911,14 @@ onMounted(() => {
   viewportChangeHandler = () => {
     updateViewportLayoutState()
   }
+  pageVisibilityHandler = () => {
+    if (document.visibilityState !== 'visible') return
+    maybeSyncActionInbox('app_resume')
+  }
   window.addEventListener('storage', storageHandler)
   window.addEventListener('resize', viewportChangeHandler)
   window.addEventListener('orientationchange', viewportChangeHandler)
+  document.addEventListener('visibilitychange', pageVisibilityHandler)
   navGroups.forEach((g) => {
     openGroups[g.key] = g.defaultOpen ?? true
   })
@@ -965,6 +972,12 @@ const showWorkspaceRecovery = computed(
 )
 
 const isOnTalkPlanner = computed(() => route.path === '/talk-to-planner')
+const ACTION_INBOX_SYNC_INTERVAL_MS = 15 * 60 * 1000
+const actionInboxSyncState = reactive({
+  key: '',
+  lastAt: 0,
+  busy: false,
+})
 const usesOverlaySidebar = computed(
   () =>
     viewportWidth.value < 768 ||
@@ -1039,6 +1052,39 @@ function clearWorkspaceRetryTimer() {
   workspaceRetryTimer = null
 }
 
+async function maybeSyncActionInbox(trigger = 'app_open') {
+  const uid = authStore.user?.uid
+  const workspaceId = workspaceStore.activeWorkspaceId
+  if (!uid || !workspaceId || isGuest.value || !hasResolvedWorkspace.value) return
+
+  const key = `${uid}:${workspaceId}:${trigger}`
+  const now = Date.now()
+  if (actionInboxSyncState.busy) return
+  if (actionInboxSyncState.key === key && now - actionInboxSyncState.lastAt < ACTION_INBOX_SYNC_INTERVAL_MS) {
+    return
+  }
+
+  actionInboxSyncState.busy = true
+  try {
+    const result = await syncActionInbox({ workspaceId, trigger, limit: 24 })
+    actionInboxSyncState.key = key
+    actionInboxSyncState.lastAt = now
+    if (result?.reopened > 0 && typeof window !== 'undefined') {
+      try {
+        window.dispatchEvent(
+          new CustomEvent('action-inbox-updated', {
+            detail: { reopened: result.reopened, workspaceId, trigger },
+          }),
+        )
+      } catch {}
+    }
+  } catch (err) {
+    console.warn('[AppLayout] action inbox sync failed', err?.response?.data || err?.message || err)
+  } finally {
+    actionInboxSyncState.busy = false
+  }
+}
+
 function scheduleWorkspaceHydrationRetry() {
   clearWorkspaceRetryTimer()
   if (authStore.logoutPending || !isAuthReady.value || hasResolvedWorkspace.value) {
@@ -1104,6 +1150,19 @@ watch(
     if (!workspaceHydratedNow && workspaceLoading) return
     if (workspaceLoading) return
     scheduleWorkspaceHydrationRetry()
+  },
+  { immediate: true },
+)
+
+watch(
+  () => [authStore.user?.uid, workspaceStore.activeWorkspaceId, isShellReady.value, hasResolvedWorkspace.value],
+  ([uid, workspaceId, shellReady, workspaceResolved]) => {
+    if (!uid || !workspaceId || !shellReady || !workspaceResolved) {
+      actionInboxSyncState.key = ''
+      actionInboxSyncState.lastAt = 0
+      return
+    }
+    maybeSyncActionInbox('app_open')
   },
   { immediate: true },
 )
@@ -1489,6 +1548,12 @@ onUnmounted(() => {
       window.removeEventListener('orientationchange', viewportChangeHandler)
     } catch {}
     viewportChangeHandler = null
+  }
+  if (pageVisibilityHandler) {
+    try {
+      document.removeEventListener('visibilitychange', pageVisibilityHandler)
+    } catch {}
+    pageVisibilityHandler = null
   }
   if (upgradeHandler) {
     try {

@@ -359,6 +359,91 @@
           </label>
         </div>
 
+        <div class="mt-6 rounded-2xl border border-white/10 bg-slate-950/30 p-4 sm:p-5">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div class="space-y-2">
+              <h3 class="text-base font-semibold text-white">Action Inbox Nudges</h3>
+              <p class="text-sm text-slate-300">
+                Keep the inbox as the primary surface, then escalate only when resurfaced suggestions become time-sensitive.
+              </p>
+            </div>
+            <label class="inline-flex items-center gap-3 text-sm text-slate-200">
+              <input type="checkbox" v-model="actionInboxNudges.enabled" class="accent-indigo-500" @change="dirty = true" />
+              <span>Allow external nudges</span>
+            </label>
+          </div>
+
+          <div v-if="actionInboxNudges.enabled" class="mt-5 grid gap-5 lg:grid-cols-2">
+            <div class="space-y-2">
+              <label class="block text-sm font-medium text-slate-200">Escalation level</label>
+              <select
+                v-model="actionInboxNudges.urgency"
+                class="w-full rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-white"
+                @change="dirty = true"
+              >
+                <option value="important">Important only</option>
+                <option value="urgent_only">Urgent only</option>
+              </select>
+              <p class="text-xs text-slate-400">
+                Important includes two-day heads-ups. Urgent waits until the same day or the final two-hour window.
+              </p>
+            </div>
+
+            <div class="space-y-2">
+              <label class="block text-sm font-medium text-slate-200">Max nudges per suggestion</label>
+              <select
+                v-model="actionInboxNudges.maxPerSuggestion"
+                class="w-full rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-white"
+                @change="dirty = true"
+              >
+                <option :value="1">1 nudge</option>
+                <option :value="2">2 nudges</option>
+                <option :value="3">3 nudges</option>
+              </select>
+              <p class="text-xs text-slate-400">
+                Caps repeat follow-up for the same suggestion so the engine stays useful instead of noisy.
+              </p>
+            </div>
+          </div>
+
+          <div v-if="actionInboxNudges.enabled" class="mt-5 space-y-3">
+            <div>
+              <p class="text-sm font-medium text-slate-200">Escalation channels</p>
+              <p class="text-xs text-slate-400">
+                These respect the main notification toggles above. If a channel is off there, it stays unavailable here too.
+              </p>
+            </div>
+            <div class="grid gap-3 sm:grid-cols-3">
+              <label
+                v-for="option in availableActionInboxNudgeChannels"
+                :key="option.value"
+                class="rounded-xl border px-3 py-3 transition"
+                :class="option.enabled ? 'border-white/10 bg-white/5 text-slate-100' : 'border-white/5 bg-white/[0.03] text-slate-500'"
+              >
+                <span class="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    v-model="actionInboxNudges.channels"
+                    :value="option.value"
+                    class="mt-0.5 accent-indigo-500"
+                    :disabled="!option.enabled"
+                    @change="dirty = true"
+                  />
+                  <span class="space-y-1">
+                    <span class="block text-sm font-medium">{{ option.label }}</span>
+                    <span class="block text-xs">
+                      {{ option.enabled ? 'Available for inbox escalation.' : 'Enable this channel above first.' }}
+                    </span>
+                  </span>
+                </span>
+              </label>
+            </div>
+            <p v-if="!availableActionInboxNudgeChannels.some((option) => option.enabled)" class="text-xs text-amber-300">
+              No eligible delivery channel is enabled right now. Suggestions will still resurface inside the inbox, but external nudges will stay off until you enable email, push, or WhatsApp.
+            </p>
+          </div>
+        </div>
+
         <!-- Delivery endpoints -->
         <div v-if="prefs.whatsapp" class="mt-4">
           <label class="block text-sm text-slate-300 mb-1">WhatsApp Phone Number</label>
@@ -871,6 +956,12 @@ const notificationEnableHelp = computed(() =>
 const isAppleBillingSafeMode = computed(() => detectAppleBillingSafeMode())
 const quickSetupState = computed(() => quickSetupStore.setupState)
 const quickSetupMissingLabels = computed(() => getIncompleteQuickSetupLabels(quickSetupState.value))
+const ACTION_INBOX_ALLOWED_CHANNELS = ['email', 'pwa', 'whatsapp']
+const ACTION_INBOX_NUDGE_CHANNEL_OPTIONS = [
+  { value: 'pwa', label: isNativePackagedApp() ? 'Device notifications' : 'Push notifications' },
+  { value: 'whatsapp', label: 'WhatsApp' },
+  { value: 'email', label: 'Email' },
+]
 const teamWorkspaces = computed(() =>
   (workspaceStore.workspaces || []).filter((w) => (w.workspaceType || w.type) === 'team'),
 )
@@ -971,10 +1062,6 @@ const dirty = ref(false) // tracks unsaved changes
 const notificationsSection = ref(null)
 const highlightNotifications = ref(false)
 
-function markDirty() {
-  dirty.value = true
-}
-
 function focusNotifications() {
   nextTick(() => {
     try { notificationsSection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }) } catch { /* noop */ }
@@ -1059,6 +1146,25 @@ const prefs = reactive({
   calls: false, // legacy toggle, derived below
 })
 
+const actionInboxNudges = reactive({
+  enabled: true,
+  urgency: 'important',
+  maxPerSuggestion: 2,
+  channels: ['pwa', 'whatsapp', 'email'],
+})
+
+const availableActionInboxNudgeChannels = computed(() =>
+  ACTION_INBOX_NUDGE_CHANNEL_OPTIONS.map((option) => ({
+    ...option,
+    enabled:
+      option.value === 'email'
+        ? !!prefs.email
+        : option.value === 'pwa'
+          ? !!prefs.pwa
+          : !!prefs.whatsapp,
+  })),
+)
+
 function withTimeout(promise, ms = 8000, label = 'request') {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
@@ -1105,6 +1211,19 @@ function applySettingsPreferences(res = {}) {
   meetingPrefs.defaultReminderMinutes = sanitizeReminderMinutes(
     meetingsPref.defaultReminderMinutes ?? meetingsPref.defaultMeetingReminderMinutes ?? DEFAULT_MEETING_REMINDER,
   )
+
+  const actionInboxPref = n?.actionInboxNudges || res?.actionInboxNudges || {}
+  actionInboxNudges.enabled = actionInboxPref?.enabled !== false
+  actionInboxNudges.urgency = actionInboxPref?.urgency === 'urgent_only' ? 'urgent_only' : 'important'
+  actionInboxNudges.maxPerSuggestion = sanitizeActionInboxNudgeCount(actionInboxPref?.maxPerSuggestion)
+  const incomingChannels = normalizeQuickSetupChannels(
+    Array.isArray(actionInboxPref?.channels)
+      ? actionInboxPref.channels.filter((channel) => ACTION_INBOX_ALLOWED_CHANNELS.includes(String(channel || '').toLowerCase()))
+      : deriveDefaultActionInboxNudgeChannels(),
+  )
+  actionInboxNudges.channels = incomingChannels.length
+    ? incomingChannels
+    : deriveDefaultActionInboxNudgeChannels()
 }
 
 function applyIntegrationEndpoints(resInts = {}) {
@@ -1160,6 +1279,20 @@ function deriveQuickSetupChannels() {
     prefs.sms && 'sms',
     prefs.voice_call && 'voice_call',
   ])
+}
+
+function deriveDefaultActionInboxNudgeChannels() {
+  return normalizeQuickSetupChannels([
+    prefs.pwa && 'pwa',
+    prefs.whatsapp && 'whatsapp',
+    prefs.email && 'email',
+  ])
+}
+
+function sanitizeActionInboxNudgeCount(value) {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return 2
+  return Math.min(Math.max(Math.round(numeric), 1), 3)
 }
 
 function syncQuickSetupFromSettings() {
@@ -1730,18 +1863,29 @@ async function saveSettings() {
     if (prefs.pwa) channels.push('pwa')
     if (prefs.whatsapp) channels.push('whatsapp')
     if (prefs.sms) channels.push('sms')
-  if (prefs.voice_call) channels.push('voice_call')
-  const notifications = {
-    email: !!prefs.email,
-    push: !!prefs.pwa,
-    whatsapp: !!prefs.whatsapp,
-    sms: !!prefs.sms,
-    discord: !!prefs.discord,
-    voice_call: !!prefs.voice_call,
-    // keep legacy aggregated flag for backward-compat
-    calls: !!(prefs.calls || prefs.sms || prefs.voice_call),
-    channels,
-  }
+    if (prefs.voice_call) channels.push('voice_call')
+    const actionInboxChannels = normalizeQuickSetupChannels(
+      (Array.isArray(actionInboxNudges.channels) ? actionInboxNudges.channels : [])
+        .map((channel) => String(channel || '').toLowerCase())
+        .filter((channel) => ACTION_INBOX_ALLOWED_CHANNELS.includes(channel)),
+    )
+    const notifications = {
+      email: !!prefs.email,
+      push: !!prefs.pwa,
+      whatsapp: !!prefs.whatsapp,
+      sms: !!prefs.sms,
+      discord: !!prefs.discord,
+      voice_call: !!prefs.voice_call,
+      // keep legacy aggregated flag for backward-compat
+      calls: !!(prefs.calls || prefs.sms || prefs.voice_call),
+      channels,
+      actionInboxNudges: {
+        enabled: !!actionInboxNudges.enabled,
+        urgency: actionInboxNudges.urgency === 'urgent_only' ? 'urgent_only' : 'important',
+        maxPerSuggestion: sanitizeActionInboxNudgeCount(actionInboxNudges.maxPerSuggestion),
+        channels: actionInboxChannels.length ? actionInboxChannels : deriveDefaultActionInboxNudgeChannels(),
+      },
+    }
     const reminderDefaults = {
       enabled: channels.length > 0,
       channels,

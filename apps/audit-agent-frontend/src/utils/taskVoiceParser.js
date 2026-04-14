@@ -270,6 +270,21 @@ function parseDueDate(text, { now = new Date() } = {}) {
   return null
 }
 
+function stripLeadingIntentPhrases(text) {
+  let working = normalizeWhitespace(text)
+  const patterns = [
+    /^(?:please\s+)?remind me to\s+/i,
+    /^(?:please\s+)?remind me\s+/i,
+    /^(?:i\s+(?:have|need|want)\s+to|i\s+(?:should|must)|have to|need to|want to|should|must)\s+/i,
+    /^(?:i['’]m|i am)\s+going to\s+/i,
+    /^(?:to|that)\s+/i,
+  ]
+  patterns.forEach((pattern) => {
+    working = working.replace(pattern, '')
+  })
+  return normalizeWhitespace(working)
+}
+
 function extractTitle(text) {
   let working = String(text || '')
 
@@ -296,10 +311,11 @@ function extractTitle(text) {
   })
 
   working = working
-    .replace(/\b(to|that|please)\b/gi, ' ')
+    .replace(/\bplease\b/gi, ' ')
     .replace(/^[,\s.-]+|[,\s.-]+$/g, ' ')
     .replace(/\s+/g, ' ')
-    .trim()
+
+  working = stripLeadingIntentPhrases(working)
 
   return capitalizeFirst(normalizeWhitespace(working))
 }
@@ -311,6 +327,9 @@ function hasClearTitle(title, original) {
   const normalizedOriginal = normalizeWhitespace(original).toLowerCase()
   if (cleaned === normalizedOriginal) return false
   if (/^(remind me|on that day|every \d+ days?|daily|weekly|weekend|monthly|every weekend)$/i.test(cleaned)) return false
+  if (/^(i|we)\b/i.test(cleaned)) return false
+  if (/^(have|need|want|should|must)\b/i.test(cleaned)) return false
+  if (/\bi\s+(have|need|want|should|must)\b/i.test(cleaned)) return false
   return /[a-z0-9]/i.test(cleaned)
 }
 

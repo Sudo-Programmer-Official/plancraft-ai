@@ -8,6 +8,14 @@ const DEFAULT_PREFS = {
   enable_sms: false,
 }
 
+const ACTION_INBOX_ALLOWED_CHANNELS = ['email', 'pwa', 'whatsapp']
+const DEFAULT_ACTION_INBOX_NUDGE_PREFS = {
+  enabled: true,
+  urgency: 'important',
+  maxPerSuggestion: 2,
+  channels: ['pwa', 'whatsapp', 'email'],
+}
+
 function coerceBoolean(value) {
   if (value === undefined || value === null) return null
   if (typeof value === 'boolean') return value
@@ -43,6 +51,34 @@ function normalizeChannelName(channel) {
   return normalized
 }
 
+function normalizeChannelList(values, allowed = null) {
+  if (!Array.isArray(values)) return []
+  const allowSet = Array.isArray(allowed) && allowed.length ? new Set(allowed) : null
+  const next = []
+  const seen = new Set()
+  values.forEach((value) => {
+    const normalized = normalizeChannelName(value)
+    if (!normalized) return
+    if (allowSet && !allowSet.has(normalized)) return
+    if (seen.has(normalized)) return
+    seen.add(normalized)
+    next.push(normalized)
+  })
+  return next
+}
+
+function normalizeActionInboxUrgency(value) {
+  const normalized = String(value || '').trim().toLowerCase()
+  if (normalized === 'urgent_only' || normalized === 'urgent-only') return 'urgent_only'
+  return 'important'
+}
+
+function clampActionInboxNudgeCount(value, fallback = DEFAULT_ACTION_INBOX_NUDGE_PREFS.maxPerSuggestion) {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return fallback
+  return Math.min(Math.max(Math.round(numeric), 1), 3)
+}
+
 function applyFromSource(prefs, source) {
   if (!source || typeof source !== 'object') return
   applyFlag(prefs, 'enable_whatsapp', source.enable_whatsapp ?? source.whatsapp)
@@ -50,6 +86,41 @@ function applyFromSource(prefs, source) {
   applyFlag(prefs, 'enable_pwa', source.enable_pwa ?? source.pwa ?? source.push ?? source.enable_push)
   applyFlag(prefs, 'enable_voice', source.enable_voice ?? source.voice ?? source.enable_voice_call ?? source.voice_call)
   applyFlag(prefs, 'enable_sms', source.enable_sms ?? source.sms ?? source.text)
+}
+
+function applyActionInboxPrefs(target, source) {
+  if (!source || typeof source !== 'object') return
+  const nested = source?.actionInboxNudges && typeof source.actionInboxNudges === 'object'
+    ? source.actionInboxNudges
+    : source
+
+  const enabled = coerceBoolean(nested?.enabled)
+  if (enabled !== null) target.enabled = enabled
+
+  if (nested?.urgency !== undefined) {
+    target.urgency = normalizeActionInboxUrgency(nested.urgency)
+  }
+
+  if (nested?.maxPerSuggestion !== undefined || nested?.max_per_suggestion !== undefined) {
+    target.maxPerSuggestion = clampActionInboxNudgeCount(
+      nested?.maxPerSuggestion ?? nested?.max_per_suggestion,
+      target.maxPerSuggestion,
+    )
+  }
+
+  const channels = normalizeChannelList(nested?.channels, ACTION_INBOX_ALLOWED_CHANNELS)
+  if (channels.length) {
+    target.channels = channels
+  }
+}
+
+function deriveDefaultActionInboxChannels(prefs) {
+  const derived = [
+    prefs?.enable_pwa && 'pwa',
+    prefs?.enable_whatsapp && 'whatsapp',
+    prefs?.enable_email && 'email',
+  ].filter(Boolean)
+  return derived.length ? derived : [...DEFAULT_ACTION_INBOX_NUDGE_PREFS.channels]
 }
 
 export async function getUserPrefs(userId) {
@@ -75,9 +146,14 @@ export async function getUserPrefs(userId) {
 
   const notifications = profile?.preferences?.notifications || profile?.notifications || {}
   const reminderPrefs = profile?.preferences?.reminders || {}
+  const actionInboxNudges = { ...DEFAULT_ACTION_INBOX_NUDGE_PREFS }
 
   applyFromSource(prefs, notifications)
   applyFromSource(prefs, reminderPrefs)
+  applyActionInboxPrefs(actionInboxNudges, overrides?.actionInboxNudges)
+  applyActionInboxPrefs(actionInboxNudges, overrides?.notifications?.actionInboxNudges)
+  applyActionInboxPrefs(actionInboxNudges, profile?.preferences?.actionInboxNudges)
+  applyActionInboxPrefs(actionInboxNudges, notifications?.actionInboxNudges)
 
   const channelLists = [
     Array.isArray(overrides?.channels) ? overrides.channels : null,
@@ -101,7 +177,17 @@ export async function getUserPrefs(userId) {
     if (channelSet.has('sms') && prefs.enable_sms !== false) prefs.enable_sms = true
   }
 
-  return prefs
+  if (!Array.isArray(actionInboxNudges.channels) || !actionInboxNudges.channels.length) {
+    actionInboxNudges.channels = deriveDefaultActionInboxChannels(prefs)
+  }
+
+  return {
+    ...prefs,
+    actionInboxNudges: {
+      ...actionInboxNudges,
+      channels: normalizeChannelList(actionInboxNudges.channels, ACTION_INBOX_ALLOWED_CHANNELS),
+    },
+  }
 }
 
 export default {

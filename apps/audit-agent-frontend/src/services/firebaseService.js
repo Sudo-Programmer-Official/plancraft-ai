@@ -954,11 +954,13 @@ export async function saveEntryToFirebase(entry) {
     throw new Error("User not logged in");
   }
 
-  await safeAction(addDoc(journalRef, {
+  const payload = {
     ...entry,
     userId: user.uid,
     createdAt: serverTimestamp(),
-  }));
+  }
+
+  const ref = await safeAction(addDoc(journalRef, payload));
 
   // Update streak based on this entry; fire-and-forget but surface confetti via event
   try {
@@ -971,6 +973,12 @@ export async function saveEntryToFirebase(entry) {
   } catch (e) {
     // Non-fatal; do not block journal save
     console.warn('Streak update failed:', e?.message || e)
+  }
+
+  return {
+    id: ref.id,
+    ...entry,
+    userId: user.uid,
   }
 }
 

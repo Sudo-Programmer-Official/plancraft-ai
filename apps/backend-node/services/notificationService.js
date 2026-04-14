@@ -109,6 +109,7 @@ async function resolveUserChannels(userId, overrides, options = {}) {
   const allowedSet = toNormalizedSet(options.allowed)
   const limitSet = toNormalizedSet(options.limitTo)
   const returnContext = options.returnContext === true
+  const disableFallback = options.disableFallback === true
   const requested = Array.isArray(overrides) ? overrides.map(normalizeChannelName).filter(Boolean) : []
   const prefs = await getUserPrefs(userId)
   const ctx = { includeVoice, allowedSet, limitSet, prefs }
@@ -127,7 +128,7 @@ async function resolveUserChannels(userId, overrides, options = {}) {
   }
 
   if (!channels.length) {
-    channels = ['pwa']
+    channels = disableFallback ? [] : ['pwa']
   }
 
   const unique = Array.from(new Set(channels))
@@ -221,6 +222,95 @@ function buildVoiceSummary(intro, items) {
   const first = titles[0]
   const middleJoined = middle.length ? ` Then: ${middle.join('. Then: ')}.` : ''
   return `${leadIn}. First: ${first}.${middleJoined} Finally: ${last}.`
+}
+
+function formatActionInboxTiming(suggestion = {}) {
+  const timezone = suggestion?.timezone || 'UTC'
+  if (suggestion?.scheduledTime) {
+    const local = dayjs(suggestion.scheduledTime).tz(timezone)
+    if (local.isValid()) return local.format('MMM D [at] h:mm A')
+  }
+  if (suggestion?.dueDate) {
+    const local = dayjs.tz(`${suggestion.dueDate} 09:00`, 'YYYY-MM-DD HH:mm', timezone)
+    if (local.isValid()) return local.format('MMM D')
+  }
+  return null
+}
+
+function describeActionInboxNudgeReason(reason) {
+  const normalized = String(reason || '').trim().toLowerCase()
+  if (normalized === 'deadline_today') return 'This deadline is today.'
+  if (normalized === 'deadline_2d') return 'This deadline is close.'
+  if (normalized === 'scheduled_2h') return 'This scheduled item is coming up soon.'
+  if (normalized === 'scheduled_1d') return 'This scheduled item is tomorrow.'
+  if (normalized === 'deadline_7d') return 'This deadline is approaching.'
+  return 'This suggestion deserves another look.'
+}
+
+export async function notifyActionInboxNudge(userId, suggestionInput = {}, options = {}) {
+  const suggestion = suggestionInput || {}
+  const titleText = suggestion.displayTitle || suggestion.title || 'Suggested action'
+  const timing = formatActionInboxTiming(suggestion)
+  const reason = options.reason || suggestion.lastSurfacedReason || suggestion.nextReviewReason || null
+  const reasonText = describeActionInboxNudgeReason(reason)
+  const title = options.title || (reason === 'deadline_today' ? 'Action due today' : 'Action needs attention')
+  const message =
+    options.message ||
+    [
+      `You said you would ${titleText}.`,
+      reasonText,
+      timing ? `Timing: ${timing}.` : null,
+      suggestion.followUpPrompt || 'Open PlanCraftAI to confirm it, ignore it, or add the missing details.',
+    ]
+      .filter(Boolean)
+      .join(' ')
+
+  const channelResolution = await resolveUserChannels(userId, options.channels, {
+    includeVoice: false,
+    allowed: ['whatsapp', 'email', 'pwa'],
+    limitTo: options.limitTo,
+    disableFallback: true,
+    returnContext: true,
+  })
+  const channels = channelResolution.channels
+  const contacts = await loadUserContacts(userId)
+  const payload = {
+    message,
+    subject: options.subject || 'PlanCraftAI action follow-up',
+    whatsappPrimary: options.whatsappTemplate || message,
+    whatsappFallback: options.whatsappFallback || message,
+    emailMessage: options.emailMessage || message.replace(/\n/g, '<br/>'),
+    pwa: options.pwa || {
+      title,
+      body:
+        suggestion.followUpPrompt ||
+        `${reasonText}${timing ? ` ${timing}.` : ''}`,
+      data: {
+        type: 'action-inbox-nudge',
+        suggestionId: suggestion.id || null,
+        workspaceId: suggestion.workspaceId || options.workspaceId || null,
+        url: '/journal',
+      },
+    },
+  }
+
+  const deliveries = []
+  for (const channel of channels) {
+    try {
+      deliveries.push(
+        await sendViaChannel(channel, userId, payload, contacts, {
+          type: 'action_inbox_nudge',
+          workspaceId: suggestion.workspaceId || options.workspaceId || null,
+          suggestionId: suggestion.id || null,
+        }),
+      )
+      console.log(`[Notify] Action inbox nudge sent to ${userId} via ${channel}`)
+    } catch (err) {
+      console.warn(`[Notification] ${channel} failed for action inbox nudge`, err?.message || err)
+    }
+  }
+
+  return { channels, deliveries, message, title }
 }
 
 async function sendWhatsAppWithFallback(userId, primary, fallback) {

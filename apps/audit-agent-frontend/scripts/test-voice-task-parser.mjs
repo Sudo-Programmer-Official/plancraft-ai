@@ -35,6 +35,18 @@ runCase('simple reminder keeps title only', 'remind me to update token', (parsed
   assert.equal(parsed.title, 'Update token')
 })
 
+runCase('contextual travel task keeps destination and action', 'tomorrow I have to go to college to print the slide', (parsed) => {
+  assert.equal(parsed.title, 'Go to college to print the slide')
+  assert.ok(parsed.dueDate)
+  assert.equal(parsed.meta?.hasClearTitle, true)
+})
+
+runCase('reminder phrasing still keeps destination context', 'remind me tomorrow to go to college to print the slide', (parsed) => {
+  assert.equal(parsed.title, 'Go to college to print the slide')
+  assert.ok(parsed.dueDate)
+  assert.equal(parsed.meta?.hasClearTitle, true)
+})
+
 runCase('same-day reminder omits offset', 'remind me on that day', (parsed) => {
   assert.equal(parsed.reminder?.includeOnDue, true)
   assert.equal('offsetDays' in (parsed.reminder || {}), false)

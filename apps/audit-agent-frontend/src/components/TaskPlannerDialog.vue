@@ -1377,6 +1377,45 @@ function capitalizeTitle(str) {
   return str.charAt(0).toUpperCase() + str.slice(1)
 }
 
+function normalizeReadableTitle(value) {
+  return String(value || '')
+    .replace(/\s+/g, ' ')
+    .replace(/^[,\s.-]+|[,\s.-]+$/g, '')
+    .trim()
+}
+
+function stripLeadingTaskFiller(value) {
+  let working = normalizeReadableTitle(value)
+  const patterns = [
+    /^(?:today|tomorrow|tonight|this weekend|next week)\b[:,]?\s*/i,
+    /^(?:please\s+)?remind me to\s+/i,
+    /^(?:please\s+)?remind me\s+/i,
+    /^(?:i\s+(?:have|need|want)\s+to|i\s+(?:should|must)|have to|need to|want to|should|must)\s+/i,
+    /^(?:i['’]m|i am)\s+going to\s+/i,
+    /^(?:to|that)\s+/i,
+  ]
+  patterns.forEach((pattern) => {
+    working = working.replace(pattern, '')
+  })
+  return normalizeReadableTitle(working)
+}
+
+function extractDestinationAction(rawPhrase) {
+  const cleaned = stripLeadingTaskFiller(rawPhrase)
+  const match = cleaned.match(/\b(?:go|head|stop|visit)\s+to\s+([^,.;]+?)\s+to\s+([^,.;]+)$/i)
+  if (!match?.[1] || !match?.[2]) return null
+
+  const place = normalizeReadableTitle(match[1])
+  const action = normalizeReadableTitle(match[2])
+  if (!place || !action) return null
+
+  return {
+    place,
+    action,
+    title: `Go to ${place} to ${action}`,
+  }
+}
+
 function enrichTitle(task) {
   const rawPhrase = task.rawPhrase || ''
   const displayTitle = task.displayTitle || ''
@@ -1394,11 +1433,23 @@ function enrichTitle(task) {
   }
 
   if (/^go$/i.test(chosen) && rawPhrase) chosen = rawPhrase
+  chosen = stripLeadingTaskFiller(chosen)
 
   if (/^(sleep|bed|dinner|lunch|breakfast)$/i.test(chosen)) {
     chosen = `Prepare for ${chosen}`
   } else if (/^(sleep|bed)\b/i.test(chosen) && !/(prepare|plan|schedule)/i.test(chosen)) {
     chosen = chosen.replace(/^\s*go\b/i, 'Prepare').trim()
+  }
+
+  const destinationAction = extractDestinationAction(rawPhrase)
+  if (destinationAction) {
+    const chosenKey = normalizeTitleKey(chosen)
+    const placeKey = normalizeTitleKey(destinationAction.place)
+    const wordCount = chosen.split(/\s+/).filter(Boolean).length
+    const genericAction = /^(print|submit|pick up|drop off|get|bring|collect|visit|go)\b/i.test(chosen)
+    if (!chosenKey.includes(placeKey) && (wordCount <= 4 || genericAction)) {
+      chosen = destinationAction.title
+    }
   }
 
   chosen = chosen.replace(/^\s*to\s+/i, '').trim()

@@ -7,11 +7,26 @@ const router = express.Router()
 router.use(requireAuth, ensureUserMatches)
 
 const CHANNEL_ALLOW_LIST = ['email','pwa','whatsapp','sms','voice_call']
+const ACTION_INBOX_NUDGE_CHANNELS = ['email', 'pwa', 'whatsapp']
+const ACTION_INBOX_NUDGE_URGENCY = ['important', 'urgent_only']
 
 function clampMinutes(value) {
   const num = Number(value)
   if (!Number.isFinite(num)) return null
   return Math.min(Math.max(Math.round(num), 1), 24 * 60)
+}
+
+function clampActionInboxNudgeCount(value) {
+  const num = Number(value)
+  if (!Number.isFinite(num)) return null
+  return Math.min(Math.max(Math.round(num), 1), 3)
+}
+
+function normalizeActionInboxUrgency(value) {
+  const normalized = String(value || '').trim().toLowerCase()
+  if (ACTION_INBOX_NUDGE_URGENCY.includes(normalized)) return normalized
+  if (normalized === 'urgent-only') return 'urgent_only'
+  return null
 }
 
 function parseDateInput(value) {
@@ -45,6 +60,25 @@ router.post('/settings/updatePreferences', async (req, res) => {
     if (reminderPref?.enabled !== undefined) reminderPayload.enabled = !!reminderPref.enabled
     if (reminderChannels) reminderPayload.channels = reminderChannels
 
+    const actionInboxPref =
+      preferences?.notifications?.actionInboxNudges ||
+      preferences?.actionInboxNudges ||
+      {}
+    const actionInboxChannels = Array.isArray(actionInboxPref?.channels)
+      ? actionInboxPref.channels
+          .map((c) => String(c).toLowerCase())
+          .filter((c) => ACTION_INBOX_NUDGE_CHANNELS.includes(c))
+      : undefined
+    const actionInboxPayload = {}
+    if (actionInboxPref?.enabled !== undefined) actionInboxPayload.enabled = !!actionInboxPref.enabled
+    const actionInboxUrgency = normalizeActionInboxUrgency(actionInboxPref?.urgency)
+    if (actionInboxUrgency) actionInboxPayload.urgency = actionInboxUrgency
+    const actionInboxMax = clampActionInboxNudgeCount(
+      actionInboxPref?.maxPerSuggestion ?? actionInboxPref?.max_per_suggestion,
+    )
+    if (actionInboxMax !== null) actionInboxPayload.maxPerSuggestion = actionInboxMax
+    if (actionInboxChannels) actionInboxPayload.channels = Array.from(new Set(actionInboxChannels))
+
     const meetingPref = preferences?.meetings || {}
     const meetingPayload = {}
     if (meetingPref?.autoCreateCalendarTasks !== undefined) {
@@ -72,6 +106,7 @@ router.post('/settings/updatePreferences', async (req, res) => {
             voice_call: !!preferences?.notifications?.voice_call,
             // persist channels array when provided
             ...(inChannels ? { channels: inChannels } : {}),
+            ...(Object.keys(actionInboxPayload).length ? { actionInboxNudges: actionInboxPayload } : {}),
           },
           ...(Object.keys(reminderPayload).length ? { reminders: reminderPayload } : {}),
           integrations: {
