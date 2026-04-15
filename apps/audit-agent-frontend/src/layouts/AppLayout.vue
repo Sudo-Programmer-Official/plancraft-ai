@@ -112,7 +112,16 @@
                 :class="iconClasses(isActive(item.to))"
               />
             </span>
-            <span class="truncate font-medium">{{ item.label }}</span>
+            <span class="flex min-w-0 items-center gap-2">
+              <span class="truncate font-medium">{{ item.label }}</span>
+              <span
+                v-if="navBadgeLabel(item)"
+                class="inline-flex min-w-[1.5rem] items-center justify-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+                :class="navBadgeClasses(item)"
+              >
+                {{ navBadgeLabel(item) }}
+              </span>
+            </span>
           </RouterLink>
         </div>
 
@@ -140,7 +149,16 @@
                 :class="iconClasses(isActive(item.to))"
               />
             </span>
-            <span class="truncate font-medium">{{ item.label }}</span>
+            <span class="flex min-w-0 items-center gap-2">
+              <span class="truncate font-medium">{{ item.label }}</span>
+              <span
+                v-if="navBadgeLabel(item)"
+                class="inline-flex min-w-[1.5rem] items-center justify-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+                :class="navBadgeClasses(item)"
+              >
+                {{ navBadgeLabel(item) }}
+              </span>
+            </span>
           </RouterLink>
         </div>
 
@@ -316,7 +334,16 @@
                     :class="iconClasses(isActive(item.to))"
                   />
                 </span>
-                <span class="truncate font-medium">{{ item.label }}</span>
+                <span class="flex min-w-0 items-center gap-2">
+                  <span class="truncate font-medium">{{ item.label }}</span>
+                  <span
+                    v-if="navBadgeLabel(item)"
+                    class="inline-flex min-w-[1.5rem] items-center justify-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+                    :class="navBadgeClasses(item)"
+                  >
+                    {{ navBadgeLabel(item) }}
+                  </span>
+                </span>
               </RouterLink>
             </div>
 
@@ -344,7 +371,16 @@
                     :class="iconClasses(isActive(item.to))"
                   />
                 </span>
-                <span class="truncate font-medium">{{ item.label }}</span>
+                <span class="flex min-w-0 items-center gap-2">
+                  <span class="truncate font-medium">{{ item.label }}</span>
+                  <span
+                    v-if="navBadgeLabel(item)"
+                    class="inline-flex min-w-[1.5rem] items-center justify-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+                    :class="navBadgeClasses(item)"
+                  >
+                    {{ navBadgeLabel(item) }}
+                  </span>
+                </span>
               </RouterLink>
             </div>
 
@@ -715,11 +751,11 @@ import { db } from '@/firebase/init'
 import { doc, setDoc } from 'firebase/firestore'
 import { trackLinkedInConversion } from '@/utils/ads'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElNotification } from 'element-plus'
 import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
 import { isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
 import { fetchUserProfile } from '@/services/authService'
-import { syncActionInbox } from '@/services/actionInboxService'
+import { fetchActionInbox, syncActionInbox } from '@/services/actionInboxService'
 
 const SidebarIcon = defineComponent({
   name: 'SidebarIcon',
@@ -920,9 +956,15 @@ onMounted(() => {
     if (document.visibilityState !== 'visible') return
     maybeSyncActionInbox('app_resume')
   }
+  actionInboxUpdatedHandler = (event) => {
+    const workspaceId = event?.detail?.workspaceId || workspaceStore.activeWorkspaceId
+    if (!workspaceId || workspaceId !== workspaceStore.activeWorkspaceId) return
+    refreshActionInboxNavState(workspaceId).catch(() => {})
+  }
   window.addEventListener('storage', storageHandler)
   window.addEventListener('resize', viewportChangeHandler)
   window.addEventListener('orientationchange', viewportChangeHandler)
+  window.addEventListener('action-inbox-updated', actionInboxUpdatedHandler)
   document.addEventListener('visibilitychange', pageVisibilityHandler)
   navGroups.forEach((g) => {
     openGroups[g.key] = g.defaultOpen ?? true
@@ -978,10 +1020,18 @@ const showWorkspaceRecovery = computed(
 
 const isOnTalkPlanner = computed(() => route.path === '/talk-to-planner')
 const ACTION_INBOX_SYNC_INTERVAL_MS = 15 * 60 * 1000
+const ACTION_INBOX_REMINDER_INTERVAL_MS = 6 * 60 * 60 * 1000
+const ACTION_INBOX_STALE_PENDING_MS = 18 * 60 * 60 * 1000
 const actionInboxSyncState = reactive({
   key: '',
   lastAt: 0,
   busy: false,
+})
+const actionInboxNavState = reactive({
+  pendingCount: 0,
+  stalePendingCount: 0,
+  focusTitle: '',
+  urgentCount: 0,
 })
 const usesOverlaySidebar = computed(
   () =>
@@ -1002,6 +1052,7 @@ const usesDocumentScrollShell = computed(
     ),
 )
 let upgradeHandler = null
+let actionInboxUpdatedHandler = null
 const SUBSCRIPTION_REFRESH_INTERVAL_MS = 5 * 60 * 1000
 
 function handleQuickSetupUpdated(nextState = null) {
@@ -1057,10 +1108,161 @@ function clearWorkspaceRetryTimer() {
   workspaceRetryTimer = null
 }
 
+function resetActionInboxNavState() {
+  actionInboxNavState.pendingCount = 0
+  actionInboxNavState.stalePendingCount = 0
+  actionInboxNavState.focusTitle = ''
+  actionInboxNavState.urgentCount = 0
+}
+
+function parseActionInboxDate(value) {
+  if (!value) return Number.NaN
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return new Date(`${value}T00:00:00`).getTime()
+  }
+  return new Date(value).getTime()
+}
+
+function isStalePendingSuggestion(item, nowMs = Date.now()) {
+  if (!item || item.status !== 'pending') return false
+  const score = Number(item.priorityScore) || 0
+  const confidence = Number(item.confidenceScore) || 0
+  const dueAt = parseActionInboxDate(item.dueDate || item.scheduledTime || null)
+  const createdAt = parseActionInboxDate(
+    item.lastShownAt || item.lastDetectedAt || item.createdAt || item.updatedAt || null,
+  )
+  const ageMs = Number.isFinite(createdAt) ? nowMs - createdAt : 0
+  const dueSoon = Number.isFinite(dueAt) && dueAt - nowMs <= 2 * 24 * 60 * 60 * 1000
+  return (
+    item.urgency === 'high' ||
+    dueSoon ||
+    (ageMs >= ACTION_INBOX_STALE_PENDING_MS && (score >= 55 || confidence >= 0.62))
+  )
+}
+
+function updateActionInboxNavState(suggestions = []) {
+  const items = Array.isArray(suggestions) ? suggestions : []
+  const nowMs = Date.now()
+  const stale = items.filter((item) => isStalePendingSuggestion(item, nowMs))
+  const urgent = items.filter((item) => item?.status === 'pending' && item?.urgency === 'high')
+  actionInboxNavState.pendingCount = items.length
+  actionInboxNavState.stalePendingCount = stale.length
+  actionInboxNavState.focusTitle =
+    items[0]?.displayTitle || items[0]?.title || stale[0]?.displayTitle || stale[0]?.title || ''
+  actionInboxNavState.urgentCount = urgent.length
+}
+
+async function refreshActionInboxNavState(workspaceId = workspaceStore.activeWorkspaceId) {
+  if (!authStore.user?.uid || !workspaceId || isGuest.value || !hasResolvedWorkspace.value) {
+    resetActionInboxNavState()
+    return []
+  }
+  try {
+    const suggestions = await fetchActionInbox({
+      workspaceId,
+      status: 'pending',
+      limit: 60,
+    })
+    updateActionInboxNavState(suggestions)
+    return suggestions
+  } catch (err) {
+    console.warn('[AppLayout] action inbox count refresh failed', err?.response?.data || err?.message || err)
+    return []
+  }
+}
+
+function actionInboxReminderStorageKey(uid, workspaceId) {
+  return `pcai:action-inbox-reminder:${uid}:${workspaceId}`
+}
+
+function navBadgeLabel(item) {
+  if (item?.to !== '/inbox') return ''
+  const count = Number(actionInboxNavState.pendingCount) || 0
+  if (!count) return ''
+  return count > 9 ? '9+' : String(count)
+}
+
+function navBadgeClasses(item) {
+  if (item?.to !== '/inbox') return ''
+  return actionInboxNavState.stalePendingCount > 0
+    ? 'border-amber-300/40 bg-amber-500/15 text-amber-100'
+    : 'border-indigo-300/40 bg-indigo-500/15 text-indigo-100'
+}
+
+function buildActionInboxReminderMessage({ reopened = 0, nudged = 0, stalePendingCount = 0, pendingCount = 0, focusTitle = '' } = {}) {
+  if (reopened > 0) {
+    if (reopened === 1 && focusTitle) {
+      return `${focusTitle} is back in your inbox because timing matters now. Click to review it.`
+    }
+    return `${reopened} inbox item${reopened === 1 ? ' is' : 's are'} back in play. ${pendingCount} suggestion${pendingCount === 1 ? '' : 's'} waiting in total.`
+  }
+  if (stalePendingCount > 0) {
+    if (stalePendingCount === 1 && focusTitle) {
+      return `${focusTitle} is still waiting in your inbox. Give it a quick pass before it slips.`
+    }
+    return `${stalePendingCount} pending inbox item${stalePendingCount === 1 ? ' has' : 's have'} been sitting for a while. Click to review them.`
+  }
+  if (nudged > 0) {
+    return `${nudged} urgent inbox item${nudged === 1 ? ' was' : 's were'} escalated outside the app. Review your inbox to act on them.`
+  }
+  return ''
+}
+
+function maybeNotifyActionInboxReminder(result, { uid, workspaceId, trigger = 'app_open' } = {}) {
+  if (!uid || !workspaceId || !['app_open', 'app_resume'].includes(trigger)) return
+  if (route.path === '/inbox') return
+  const pendingCount = Array.isArray(result?.suggestions) ? result.suggestions.length : actionInboxNavState.pendingCount
+  const stalePendingCount = actionInboxNavState.stalePendingCount
+  if (!(Number(result?.reopened) > 0 || Number(result?.nudged) > 0 || stalePendingCount > 0)) return
+
+  const message = buildActionInboxReminderMessage({
+    reopened: Number(result?.reopened) || 0,
+    nudged: Number(result?.nudged) || 0,
+    stalePendingCount,
+    pendingCount,
+    focusTitle: actionInboxNavState.focusTitle,
+  })
+  if (!message) return
+
+  try {
+    const now = Date.now()
+    const key = actionInboxReminderStorageKey(uid, workspaceId)
+    const raw = localStorage.getItem(key)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (parsed?.shownAt && now - Number(parsed.shownAt) < ACTION_INBOX_REMINDER_INTERVAL_MS) return
+    }
+
+    localStorage.setItem(
+      key,
+      JSON.stringify({
+        shownAt: now,
+        reopened: Number(result?.reopened) || 0,
+        nudged: Number(result?.nudged) || 0,
+        pendingCount,
+        stalePendingCount,
+      }),
+    )
+  } catch {}
+
+  try {
+    ElNotification({
+      title: actionInboxNavState.urgentCount > 0 ? 'Inbox needs attention' : 'Inbox reminder',
+      message,
+      type: actionInboxNavState.urgentCount > 0 ? 'warning' : 'info',
+      duration: 8000,
+      onClick: () => router.push('/inbox'),
+    })
+  } catch {}
+}
+
 async function maybeSyncActionInbox(trigger = 'app_open') {
   const uid = authStore.user?.uid
   const workspaceId = workspaceStore.activeWorkspaceId
-  if (!uid || !workspaceId || isGuest.value || !hasResolvedWorkspace.value) return
+  if (!uid || !workspaceId || isGuest.value || !hasResolvedWorkspace.value) {
+    resetActionInboxNavState()
+    return
+  }
 
   const key = `${uid}:${workspaceId}:${trigger}`
   const now = Date.now()
@@ -1072,13 +1274,21 @@ async function maybeSyncActionInbox(trigger = 'app_open') {
   actionInboxSyncState.busy = true
   try {
     const result = await syncActionInbox({ workspaceId, trigger, limit: 24 })
+    updateActionInboxNavState(result?.suggestions || [])
     actionInboxSyncState.key = key
     actionInboxSyncState.lastAt = now
+    maybeNotifyActionInboxReminder(result, { uid, workspaceId, trigger })
     if (result?.reopened > 0 && typeof window !== 'undefined') {
       try {
         window.dispatchEvent(
           new CustomEvent('action-inbox-updated', {
-            detail: { reopened: result.reopened, workspaceId, trigger },
+            detail: {
+              reopened: result.reopened,
+              nudged: result.nudged || 0,
+              pendingCount: Array.isArray(result?.suggestions) ? result.suggestions.length : 0,
+              workspaceId,
+              trigger,
+            },
           }),
         )
       } catch {}
@@ -1165,6 +1375,7 @@ watch(
     if (!uid || !workspaceId || !shellReady || !workspaceResolved) {
       actionInboxSyncState.key = ''
       actionInboxSyncState.lastAt = 0
+      resetActionInboxNavState()
       return
     }
     maybeSyncActionInbox('app_open')
@@ -1562,6 +1773,12 @@ onUnmounted(() => {
       document.removeEventListener('visibilitychange', pageVisibilityHandler)
     } catch {}
     pageVisibilityHandler = null
+  }
+  if (actionInboxUpdatedHandler) {
+    try {
+      window.removeEventListener('action-inbox-updated', actionInboxUpdatedHandler)
+    } catch {}
+    actionInboxUpdatedHandler = null
   }
   if (upgradeHandler) {
     try {

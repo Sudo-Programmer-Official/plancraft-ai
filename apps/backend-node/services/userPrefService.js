@@ -14,6 +14,8 @@ const DEFAULT_ACTION_INBOX_NUDGE_PREFS = {
   urgency: 'important',
   maxPerSuggestion: 2,
   channels: ['pwa', 'whatsapp', 'email'],
+  dailyDigest: true,
+  digestChannels: ['email'],
 }
 
 function coerceBoolean(value) {
@@ -97,6 +99,9 @@ function applyActionInboxPrefs(target, source) {
   const enabled = coerceBoolean(nested?.enabled)
   if (enabled !== null) target.enabled = enabled
 
+  const dailyDigest = coerceBoolean(nested?.dailyDigest ?? nested?.daily_digest)
+  if (dailyDigest !== null) target.dailyDigest = dailyDigest
+
   if (nested?.urgency !== undefined) {
     target.urgency = normalizeActionInboxUrgency(nested.urgency)
   }
@@ -112,6 +117,14 @@ function applyActionInboxPrefs(target, source) {
   if (channels.length) {
     target.channels = channels
   }
+
+  const digestChannels = normalizeChannelList(
+    nested?.digestChannels ?? nested?.digest_channels,
+    ACTION_INBOX_ALLOWED_CHANNELS,
+  )
+  if (digestChannels.length) {
+    target.digestChannels = digestChannels
+  }
 }
 
 function deriveDefaultActionInboxChannels(prefs) {
@@ -121,6 +134,15 @@ function deriveDefaultActionInboxChannels(prefs) {
     prefs?.enable_email && 'email',
   ].filter(Boolean)
   return derived.length ? derived : [...DEFAULT_ACTION_INBOX_NUDGE_PREFS.channels]
+}
+
+function deriveDefaultActionInboxDigestChannels(prefs) {
+  const derived = [
+    prefs?.enable_email && 'email',
+    prefs?.enable_pwa && 'pwa',
+    prefs?.enable_whatsapp && 'whatsapp',
+  ].filter(Boolean)
+  return derived.length ? [derived[0]] : [...DEFAULT_ACTION_INBOX_NUDGE_PREFS.digestChannels]
 }
 
 export async function getUserPrefs(userId) {
@@ -180,12 +202,16 @@ export async function getUserPrefs(userId) {
   if (!Array.isArray(actionInboxNudges.channels) || !actionInboxNudges.channels.length) {
     actionInboxNudges.channels = deriveDefaultActionInboxChannels(prefs)
   }
+  if (!Array.isArray(actionInboxNudges.digestChannels) || !actionInboxNudges.digestChannels.length) {
+    actionInboxNudges.digestChannels = deriveDefaultActionInboxDigestChannels(prefs)
+  }
 
   return {
     ...prefs,
     actionInboxNudges: {
       ...actionInboxNudges,
       channels: normalizeChannelList(actionInboxNudges.channels, ACTION_INBOX_ALLOWED_CHANNELS),
+      digestChannels: normalizeChannelList(actionInboxNudges.digestChannels, ACTION_INBOX_ALLOWED_CHANNELS),
     },
   }
 }

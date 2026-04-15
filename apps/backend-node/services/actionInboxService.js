@@ -3,7 +3,7 @@ import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc.js";
 import timezonePlugin from "dayjs/plugin/timezone.js";
 import { db } from "./firebaseAdmin.js";
-import { notifyActionInboxNudge } from "./notificationService.js";
+import { notifyActionInboxDigest, notifyActionInboxNudge } from "./notificationService.js";
 import { createTask } from "./taskService.js";
 import { getUserPrefs } from "./userPrefService.js";
 import { detectActionSuggestions } from "./openaiService.js";
@@ -385,13 +385,24 @@ function normalizeActionInboxNudgePrefs(value = {}) {
         ),
       )
     : [];
+  const digestChannels = Array.isArray(value?.digestChannels || value?.digest_channels)
+    ? Array.from(
+        new Set(
+          (value?.digestChannels || value?.digest_channels)
+            .map((entry) => sanitizeString(entry, "").toLowerCase())
+            .filter((entry) => ["email", "pwa", "whatsapp"].includes(entry)),
+        ),
+      )
+    : [];
 
   const urgencyToken = sanitizeString(value?.urgency, "important").toLowerCase().replace(/-/g, "_");
   return {
     enabled: value?.enabled !== false,
+    dailyDigest: value?.dailyDigest !== false && value?.daily_digest !== false,
     urgency: urgencyToken === "urgent_only" ? "urgent_only" : "important",
     maxPerSuggestion: Math.min(Math.max(Math.round(Number(value?.maxPerSuggestion) || 2), 1), 3),
     channels: channels.length ? channels : ["pwa", "whatsapp", "email"],
+    digestChannels: digestChannels.length ? digestChannels : ["email"],
   };
 }
 
@@ -581,6 +592,16 @@ function actionInboxCollection(userId, workspaceId) {
 
 function actionSuggestionDoc(userId, workspaceId, suggestionId) {
   return actionInboxCollection(userId, workspaceId).doc(String(suggestionId));
+}
+
+function actionInboxMetaDoc(userId, workspaceId, metaId = "digest") {
+  return db
+    .collection("users")
+    .doc(String(userId))
+    .collection("workspaces")
+    .doc(String(workspaceId))
+    .collection("actionInboxMeta")
+    .doc(String(metaId));
 }
 
 function serializeSuggestion(id, data = {}) {
@@ -860,6 +881,49 @@ function buildDailyIntentSecondarySummary({ focus = null, supportingCount = 0, p
   return "Pick one to start.";
 }
 
+function buildDailyIntentFromPending(pendingInput = [], { limit = 3, now = new Date() } = {}) {
+  const pending = sortSuggestions((Array.isArray(pendingInput) ? pendingInput : []).filter((item) => item.status === "pending"));
+  const important = pending.slice(0, Math.min(Math.max(limit, 1), 5));
+  const focus = important[0] || null;
+
+  const counts = pending.reduce(
+    (acc, item) => {
+      const state = suggestionTimingState(item, { now });
+      if (state === "overdue") acc.overdueCount += 1;
+      else if (state === "today") acc.dueTodayCount += 1;
+      else if (state === "soon") acc.dueSoonCount += 1;
+      return acc;
+    },
+    { overdueCount: 0, dueTodayCount: 0, dueSoonCount: 0 },
+  );
+
+  return {
+    generatedAt: new Date(now).toISOString(),
+    timezone: normalizeTimezone(focus?.timezone || pending[0]?.timezone || "UTC"),
+    pendingCount: pending.length,
+    importantCount: important.length,
+    overdueCount: counts.overdueCount,
+    dueTodayCount: counts.dueTodayCount,
+    dueSoonCount: counts.dueSoonCount,
+    focus,
+    important,
+    supporting: important.slice(1),
+    summary: buildDailyIntentSummary({
+      pendingCount: pending.length,
+      importantCount: important.length,
+      overdueCount: counts.overdueCount,
+      dueTodayCount: counts.dueTodayCount,
+      dueSoonCount: counts.dueSoonCount,
+    }),
+    secondarySummary: buildDailyIntentSecondarySummary({
+      focus,
+      supportingCount: Math.max(0, important.length - 1),
+      pendingCount: pending.length,
+    }),
+    prompt: focus ? "Pick one to start." : "Capture a note and the engine will guide your next step.",
+  };
+}
+
 function ratio(numerator, denominator) {
   if (!denominator) return 0;
   return numerator / denominator;
@@ -977,46 +1041,7 @@ export async function listActionSuggestions(userId, workspaceId, { status = "pen
 
 export async function getActionInboxDailyIntent(userId, workspaceId, { limit = 3, sourceLimit = 120 } = {}) {
   const items = await fetchRecentSuggestions(userId, workspaceId, Math.max(sourceLimit, 60));
-  const pending = sortSuggestions(items.filter((item) => item.status === "pending"));
-  const important = pending.slice(0, Math.min(Math.max(limit, 1), 5));
-  const focus = important[0] || null;
-
-  const counts = pending.reduce(
-    (acc, item) => {
-      const state = suggestionTimingState(item);
-      if (state === "overdue") acc.overdueCount += 1;
-      else if (state === "today") acc.dueTodayCount += 1;
-      else if (state === "soon") acc.dueSoonCount += 1;
-      return acc;
-    },
-    { overdueCount: 0, dueTodayCount: 0, dueSoonCount: 0 },
-  );
-
-  return {
-    generatedAt: new Date().toISOString(),
-    timezone: normalizeTimezone(focus?.timezone || pending[0]?.timezone || "UTC"),
-    pendingCount: pending.length,
-    importantCount: important.length,
-    overdueCount: counts.overdueCount,
-    dueTodayCount: counts.dueTodayCount,
-    dueSoonCount: counts.dueSoonCount,
-    focus,
-    important,
-    supporting: important.slice(1),
-    summary: buildDailyIntentSummary({
-      pendingCount: pending.length,
-      importantCount: important.length,
-      overdueCount: counts.overdueCount,
-      dueTodayCount: counts.dueTodayCount,
-      dueSoonCount: counts.dueSoonCount,
-    }),
-    secondarySummary: buildDailyIntentSecondarySummary({
-      focus,
-      supportingCount: Math.max(0, important.length - 1),
-      pendingCount: pending.length,
-    }),
-    prompt: focus ? "Pick one to start." : "Capture a note and the engine will guide your next step.",
-  };
+  return buildDailyIntentFromPending(items, { limit });
 }
 
 function shouldResurfaceSuggestion(item, now = new Date()) {
@@ -1090,6 +1115,75 @@ async function maybeSendActionInboxNudge(
   }
 }
 
+async function maybeSendActionInboxDigest(
+  userId,
+  workspaceId,
+  pendingInput = [],
+  { trigger = "scheduled_digest", now = new Date(), digestPrefs = null, force = false } = {},
+) {
+  const resolvedPrefs = normalizeActionInboxNudgePrefs(digestPrefs || {});
+  const pending = sortSuggestions((Array.isArray(pendingInput) ? pendingInput : []).filter((item) => item.status === "pending"));
+
+  if (!userId || !workspaceId) return { sent: false, channels: [], reason: "missing_scope" };
+  if (!resolvedPrefs.enabled || !resolvedPrefs.dailyDigest) return { sent: false, channels: [], reason: "disabled" };
+  if (!pending.length) return { sent: false, channels: [], reason: "no_pending" };
+
+  const intent = buildDailyIntentFromPending(pending, { limit: 3, now });
+  const timezone = normalizeTimezone(intent.timezone || pending[0]?.timezone || "UTC");
+  const localNow = dayjs(now).tz(timezone);
+  if (!force && trigger === "scheduled_digest" && localNow.hour() < 9) {
+    return { sent: false, channels: [], reason: "before_digest_window" };
+  }
+
+  const metaRef = actionInboxMetaDoc(userId, workspaceId, "digest");
+  let meta = {};
+  try {
+    const snap = await metaRef.get();
+    meta = snap.exists ? snap.data() || {} : {};
+  } catch (err) {
+    console.warn("[ActionInbox] digest meta lookup failed", err?.message || err);
+  }
+
+  const localDateKey = localNow.format("YYYY-MM-DD");
+  if (!force && sanitizeString(meta?.lastDigestLocalDate, "") === localDateKey) {
+    return { sent: false, channels: [], reason: "already_sent_today" };
+  }
+
+  try {
+    const result = await notifyActionInboxDigest(userId, pending.slice(0, 5), {
+      workspaceId,
+      intent,
+      channels: resolvedPrefs.digestChannels,
+      limitTo: resolvedPrefs.digestChannels,
+    });
+    const channels = Array.isArray(result?.channels) ? result.channels : [];
+    if (!channels.length) return { sent: false, channels: [], reason: "no_channels" };
+
+    await metaRef.set(
+      {
+        lastDigestAt: now,
+        lastDigestLocalDate: localDateKey,
+        lastDigestTrigger: trigger,
+        lastDigestChannels: channels,
+        lastDigestTimezone: timezone,
+        lastDigestPendingCount: pending.length,
+        updatedAt: now,
+      },
+      { merge: true },
+    );
+
+    return {
+      sent: true,
+      channels,
+      pendingCount: pending.length,
+      focusTitle: intent.focus?.displayTitle || intent.focus?.title || pending[0]?.displayTitle || pending[0]?.title || "",
+    };
+  } catch (err) {
+    console.warn("[ActionInbox] digest failed", err?.message || err);
+    return { sent: false, channels: [], reason: "send_failed" };
+  }
+}
+
 export async function runActionInboxSweep(userId, workspaceId, { trigger = "manual", limit = 24 } = {}) {
   const now = new Date();
   const items = await fetchRecentSuggestions(userId, workspaceId, 120);
@@ -1122,6 +1216,33 @@ export async function runActionInboxSweep(userId, workspaceId, { trigger = "manu
     nudged,
     suggestions,
   };
+}
+
+export async function triggerActionInboxDigest(
+  userId,
+  workspaceId,
+  { trigger = "manual_test", force = false, limit = 120 } = {},
+) {
+  const now = new Date();
+  const items = await fetchRecentSuggestions(userId, workspaceId, Math.max(limit, 60));
+  const userPrefs = userId
+    ? await getUserPrefs(userId).catch((err) => {
+        console.warn("[ActionInbox] failed to load digest prefs", err?.message || err);
+        return null;
+      })
+    : null;
+
+  return maybeSendActionInboxDigest(
+    userId,
+    workspaceId,
+    items.filter((item) => item.status === "pending"),
+    {
+      trigger,
+      now,
+      digestPrefs: userPrefs?.actionInboxNudges || null,
+      force,
+    },
+  );
 }
 
 export async function runGlobalActionInboxSweep({ trigger = "scheduled_sweep" } = {}) {
@@ -1167,6 +1288,61 @@ export async function runGlobalActionInboxSweep({ trigger = "scheduled_sweep" } 
     );
     if (nudgeResult.nudged) stats.nudged += 1;
     stats.reopened += 1;
+  }
+
+  return stats;
+}
+
+export async function runGlobalActionInboxDigest({ trigger = "scheduled_digest" } = {}) {
+  const now = new Date();
+  let snap;
+  try {
+    snap = await db.collectionGroup("actionInbox").where("status", "==", "pending").get();
+  } catch (err) {
+    console.warn("[ActionInbox] pending digest query failed, falling back to full collectionGroup", err?.message || err);
+    snap = await db.collectionGroup("actionInbox").get();
+  }
+
+  const grouped = new Map();
+  for (const docSnap of snap.docs) {
+    const suggestion = serializeSuggestion(docSnap.id, docSnap.data() || {});
+    if (suggestion.status !== "pending" || !suggestion.userId || !suggestion.workspaceId) continue;
+    const key = JSON.stringify([suggestion.userId, suggestion.workspaceId]);
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(suggestion);
+  }
+
+  const prefCache = new Map();
+  const stats = {
+    workspaces: grouped.size,
+    sent: 0,
+    deliveredChannels: {},
+  };
+
+  for (const [key, items] of grouped.entries()) {
+    const [userId, workspaceId] = JSON.parse(key);
+    let digestPrefs = null;
+    if (prefCache.has(userId)) {
+      digestPrefs = prefCache.get(userId);
+    } else {
+      const userPrefs = await getUserPrefs(userId).catch((err) => {
+        console.warn("[ActionInbox] failed to load global digest prefs", err?.message || err);
+        return null;
+      });
+      digestPrefs = userPrefs?.actionInboxNudges || null;
+      prefCache.set(userId, digestPrefs);
+    }
+
+    const result = await maybeSendActionInboxDigest(userId, workspaceId, items, {
+      trigger,
+      now,
+      digestPrefs,
+    });
+    if (!result.sent) continue;
+    stats.sent += 1;
+    (result.channels || []).forEach((channel) => {
+      stats.deliveredChannels[channel] = (stats.deliveredChannels[channel] || 0) + 1;
+    });
   }
 
   return stats;

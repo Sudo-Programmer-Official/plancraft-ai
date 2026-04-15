@@ -10,6 +10,7 @@ import {
   ignoreActionSuggestion,
   listActionSuggestions,
   runActionInboxSweep,
+  triggerActionInboxDigest,
 } from "../services/actionInboxService.js";
 
 const router = express.Router();
@@ -86,6 +87,22 @@ router.post("/sync", requireWorkspaceViewer, async (req, res) => {
   } catch (err) {
     console.error("[ActionInboxRoutes] sync failed", err?.message || err);
     return res.status(err?.statusCode || 500).json({ error: err?.message || "Failed to sync suggestions" });
+  }
+});
+
+router.post("/digest", requireWorkspaceViewer, async (req, res) => {
+  try {
+    const workspaceId = selectWorkspaceId(req);
+    const userId = req.user?.uid;
+    const force = req.body?.force === true;
+    const result = await triggerActionInboxDigest(userId, workspaceId, {
+      trigger: "manual_test",
+      force,
+    });
+    return res.json({ success: true, ...result });
+  } catch (err) {
+    console.error("[ActionInboxRoutes] digest failed", err?.message || err);
+    return res.status(err?.statusCode || 500).json({ error: err?.message || "Failed to send inbox digest" });
   }
 });
 

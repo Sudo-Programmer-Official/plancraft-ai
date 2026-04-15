@@ -501,7 +501,26 @@ watch(
   { immediate: true },
 )
 
-function handleInboxUpdated() {
+function emitActionInboxUpdated(detail = {}) {
+  if (typeof window === 'undefined') return
+  try {
+    window.dispatchEvent(
+      new CustomEvent('action-inbox-updated', {
+        detail: {
+          workspaceId: workspaceStore.activeWorkspaceId,
+          pendingCount: actionSuggestions.value.length,
+          source: 'action_inbox_panel',
+          ...detail,
+        },
+      }),
+    )
+  } catch {
+    /* noop */
+  }
+}
+
+function handleInboxUpdated(event) {
+  if (event?.detail?.source === 'action_inbox_panel') return
   refreshActionInbox().catch(() => {})
 }
 
@@ -657,6 +676,7 @@ async function confirmSuggestion(item) {
     })
     await refreshActionInbox()
     await refreshAllTasks()
+    emitActionInboxUpdated({ trigger: 'confirm' })
     ElNotification({
       title: 'Task created',
       message: task?.title || item.displayTitle || item.title || 'Your task was created.',
@@ -681,6 +701,7 @@ async function ignoreSuggestion(item) {
       workspaceId: workspaceStore.activeWorkspaceId,
     })
     await refreshActionInbox()
+    emitActionInboxUpdated({ trigger: 'ignore' })
     ElNotification({
       title: 'Suggestion ignored',
       message: 'We removed it for now and will only resurface it later if timing makes it important.',

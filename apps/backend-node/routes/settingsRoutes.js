@@ -71,6 +71,9 @@ router.post('/settings/updatePreferences', async (req, res) => {
       : undefined
     const actionInboxPayload = {}
     if (actionInboxPref?.enabled !== undefined) actionInboxPayload.enabled = !!actionInboxPref.enabled
+    if (actionInboxPref?.dailyDigest !== undefined || actionInboxPref?.daily_digest !== undefined) {
+      actionInboxPayload.dailyDigest = !!(actionInboxPref?.dailyDigest ?? actionInboxPref?.daily_digest)
+    }
     const actionInboxUrgency = normalizeActionInboxUrgency(actionInboxPref?.urgency)
     if (actionInboxUrgency) actionInboxPayload.urgency = actionInboxUrgency
     const actionInboxMax = clampActionInboxNudgeCount(
@@ -78,6 +81,14 @@ router.post('/settings/updatePreferences', async (req, res) => {
     )
     if (actionInboxMax !== null) actionInboxPayload.maxPerSuggestion = actionInboxMax
     if (actionInboxChannels) actionInboxPayload.channels = Array.from(new Set(actionInboxChannels))
+    const actionInboxDigestChannels = Array.isArray(actionInboxPref?.digestChannels || actionInboxPref?.digest_channels)
+      ? (actionInboxPref?.digestChannels || actionInboxPref?.digest_channels)
+          .map((c) => String(c).toLowerCase())
+          .filter((c) => ACTION_INBOX_NUDGE_CHANNELS.includes(c))
+      : undefined
+    if (actionInboxDigestChannels) {
+      actionInboxPayload.digestChannels = Array.from(new Set(actionInboxDigestChannels))
+    }
 
     const meetingPref = preferences?.meetings || {}
     const meetingPayload = {}

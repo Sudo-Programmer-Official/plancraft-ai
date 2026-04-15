@@ -52,6 +52,29 @@ export async function syncActionInbox({ workspaceId, trigger = 'app_open', limit
   return payload
 }
 
+export async function sendActionInboxDigest({ workspaceId, force = true } = {}) {
+  if (!workspaceId) throw new Error('Workspace is required')
+  const res = await api.post('/action-inbox/digest', {
+    workspaceId,
+    force,
+  })
+  const payload = {
+    sent: res?.data?.sent === true,
+    channels: Array.isArray(res?.data?.channels) ? res.data.channels : [],
+    reason: res?.data?.reason || null,
+    pendingCount: Number(res?.data?.pendingCount) || 0,
+    focusTitle: res?.data?.focusTitle || '',
+  }
+  trackEvent('Action Inbox Digest Requested', {
+    workspaceId,
+    sent: payload.sent,
+    channels: payload.channels,
+    pendingCount: payload.pendingCount,
+    reason: payload.reason,
+  })
+  return payload
+}
+
 export async function detectActionInboxSuggestions(payload = {}) {
   await ensureAiConsentOrThrow({ source: 'action-inbox-detect' })
   const res = await api.post('/action-inbox/detect', payload)

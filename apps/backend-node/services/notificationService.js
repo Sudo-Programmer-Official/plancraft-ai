@@ -289,7 +289,7 @@ export async function notifyActionInboxNudge(userId, suggestionInput = {}, optio
         type: 'action-inbox-nudge',
         suggestionId: suggestion.id || null,
         workspaceId: suggestion.workspaceId || options.workspaceId || null,
-        url: '/journal',
+        url: '/inbox',
       },
     },
   }
@@ -311,6 +311,101 @@ export async function notifyActionInboxNudge(userId, suggestionInput = {}, optio
   }
 
   return { channels, deliveries, message, title }
+}
+
+function describeActionInboxDigestOpening(intent = {}, suggestions = []) {
+  const pendingCount = Number(intent?.pendingCount || suggestions.length || 0)
+  if (!pendingCount) return 'Your inbox is clear right now.'
+  if (Number(intent?.overdueCount || 0) > 0) {
+    return `${intent.overdueCount} inbox item${intent.overdueCount === 1 ? ' is' : 's are'} already behind schedule.`
+  }
+  if (Number(intent?.dueTodayCount || 0) > 0) {
+    return `${intent.dueTodayCount} inbox item${intent.dueTodayCount === 1 ? ' needs' : 's need'} attention today.`
+  }
+  if (Number(intent?.dueSoonCount || 0) > 0) {
+    return `${intent.dueSoonCount} inbox item${intent.dueSoonCount === 1 ? ' is' : 's are'} coming up soon.`
+  }
+  return pendingCount === 1
+    ? 'You still have one suggested action waiting in your inbox.'
+    : `You still have ${pendingCount} suggested actions waiting in your inbox.`
+}
+
+function describeActionInboxDigestItem(suggestion = {}) {
+  const title = suggestion?.displayTitle || suggestion?.title || 'Suggested action'
+  const timing = formatActionInboxTiming(suggestion)
+  return timing ? `${title} (${timing})` : title
+}
+
+export async function notifyActionInboxDigest(userId, suggestionsInput = [], options = {}) {
+  const suggestions = ensureArray(suggestionsInput).filter(Boolean)
+  const intent = options.intent || {}
+  const focusTitle =
+    intent?.focus?.displayTitle ||
+    intent?.focus?.title ||
+    suggestions[0]?.displayTitle ||
+    suggestions[0]?.title ||
+    'Suggested action'
+  const title = options.title || 'Your Action Inbox Digest'
+  const intro = describeActionInboxDigestOpening(intent, suggestions)
+  const items = suggestions.slice(0, 3).map((suggestion) => ({
+    title: describeActionInboxDigestItem(suggestion),
+  }))
+  const message =
+    options.message ||
+    `${intro}\n\nFocus: ${focusTitle}\n${items.map((item, idx) => `${idx + 1}. ${item.title}`).join('\n')}\n\nOpen your inbox to confirm, ignore, or fill in the missing details.`
+
+  const channelResolution = await resolveUserChannels(userId, options.channels, {
+    includeVoice: false,
+    allowed: ['whatsapp', 'email', 'pwa'],
+    limitTo: options.limitTo,
+    disableFallback: true,
+    returnContext: true,
+  })
+  const channels = channelResolution.channels
+  const contacts = await loadUserContacts(userId)
+
+  const payload = {
+    message,
+    subject: options.subject || 'PlanCraftAI inbox digest',
+    whatsappPrimary: options.whatsappTemplate || message,
+    whatsappFallback: options.whatsappFallback || message,
+    emailMessage:
+      options.emailMessage ||
+      [
+        `<p>${intro}</p>`,
+        `<p><strong>Focus:</strong> ${focusTitle}</p>`,
+        `<ul>${items.map((item) => `<li>${item.title}</li>`).join('')}</ul>`,
+        `<p>Open your inbox to confirm, ignore, or fill in the missing details.</p>`,
+      ].join(''),
+    pwa: options.pwa || {
+      title,
+      body:
+        intro ||
+        `${suggestions.length || intent?.pendingCount || 0} items are still waiting in your inbox.`,
+      data: {
+        type: 'action-inbox-digest',
+        workspaceId: options.workspaceId || suggestions[0]?.workspaceId || null,
+        url: '/inbox',
+      },
+    },
+  }
+
+  const deliveries = []
+  for (const channel of channels) {
+    try {
+      deliveries.push(
+        await sendViaChannel(channel, userId, payload, contacts, {
+          type: 'action_inbox_digest',
+          workspaceId: options.workspaceId || suggestions[0]?.workspaceId || null,
+        }),
+      )
+      console.log(`[Notify] Action inbox digest sent to ${userId} via ${channel}`)
+    } catch (err) {
+      console.warn(`[Notification] ${channel} failed for action inbox digest`, err?.message || err)
+    }
+  }
+
+  return { channels, deliveries, message, title, focusTitle }
 }
 
 async function sendWhatsAppWithFallback(userId, primary, fallback) {

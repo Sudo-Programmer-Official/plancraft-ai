@@ -406,6 +406,70 @@
             </div>
           </div>
 
+          <div v-if="actionInboxNudges.enabled" class="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div class="space-y-1">
+                <p class="text-sm font-medium text-slate-100">Daily inbox digest</p>
+                <p class="text-xs text-slate-400">
+                  Send one summary of pending inbox items after the morning window so forgotten actions do not disappear.
+                </p>
+              </div>
+              <label class="inline-flex items-center gap-3 text-sm text-slate-200">
+                <input type="checkbox" v-model="actionInboxNudges.dailyDigest" class="accent-indigo-500" @change="dirty = true" />
+                <span>Send daily digest</span>
+              </label>
+            </div>
+
+            <div v-if="actionInboxNudges.dailyDigest" class="mt-4 space-y-3">
+              <div>
+                <p class="text-sm font-medium text-slate-200">Digest channels</p>
+                <p class="text-xs text-slate-400">
+                  Email is the best default. Push or WhatsApp can be added if you want the summary outside the inbox too.
+                </p>
+              </div>
+              <div class="grid gap-3 sm:grid-cols-3">
+                <label
+                  v-for="option in availableActionInboxNudgeChannels"
+                  :key="`digest-${option.value}`"
+                  class="rounded-xl border px-3 py-3 transition"
+                  :class="option.enabled ? 'border-white/10 bg-white/5 text-slate-100' : 'border-white/5 bg-white/[0.03] text-slate-500'"
+                >
+                  <span class="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      v-model="actionInboxNudges.digestChannels"
+                      :value="option.value"
+                      class="mt-0.5 accent-indigo-500"
+                      :disabled="!option.enabled"
+                      @change="dirty = true"
+                    />
+                    <span class="space-y-1">
+                      <span class="block text-sm font-medium">{{ option.label }}</span>
+                      <span class="block text-xs">
+                        {{ option.enabled ? 'Available for the daily digest.' : 'Enable this channel above first.' }}
+                      </span>
+                    </span>
+                  </span>
+                </label>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-3">
+                <el-button
+                  size="small"
+                  plain
+                  :loading="actionInboxDigestSending"
+                  :disabled="!workspaceStore.activeWorkspaceId"
+                  @click="sendTestActionInboxDigest"
+                >
+                  Send test digest
+                </el-button>
+                <p class="text-xs text-slate-400">
+                  Sends a real digest through the selected channels for the active workspace.
+                </p>
+              </div>
+            </div>
+          </div>
+
           <div v-if="actionInboxNudges.enabled" class="mt-5 space-y-3">
             <div>
               <p class="text-sm font-medium text-slate-200">Escalation channels</p>
@@ -904,6 +968,7 @@ import { ElMessage } from "element-plus"
 import { normalizePhone, guessCountryFromLocale } from '@/utils/phoneUtils'
 import { getGoogleStatus, getGoogleCalendars, saveGoogleCalendarSelection, triggerGoogleSyncNow, requestGoogleConnectUrl, disconnectGoogleIntegration } from '@/stores/integrationsStore'
 import { getPreferences as apiGetPrefs, updatePreferences as apiUpdatePrefs, getIntegrations, updateIntegrations, getProfile as getSettingsProfile, updateProfile as updateSettingsProfile } from "@/services/settingsService"
+import { sendActionInboxDigest } from '@/services/actionInboxService'
 import { createGptLinkCode } from '@/services/gptService'
 import SocialIntegrationPanel from '@/components/settings/SocialIntegrationPanel.vue'
 import { subscribeUserToPush } from "@/services/pwaService"
@@ -1151,7 +1216,10 @@ const actionInboxNudges = reactive({
   urgency: 'important',
   maxPerSuggestion: 2,
   channels: ['pwa', 'whatsapp', 'email'],
+  dailyDigest: true,
+  digestChannels: ['email'],
 })
+const actionInboxDigestSending = ref(false)
 
 const availableActionInboxNudgeChannels = computed(() =>
   ACTION_INBOX_NUDGE_CHANNEL_OPTIONS.map((option) => ({
@@ -1216,6 +1284,7 @@ function applySettingsPreferences(res = {}) {
   actionInboxNudges.enabled = actionInboxPref?.enabled !== false
   actionInboxNudges.urgency = actionInboxPref?.urgency === 'urgent_only' ? 'urgent_only' : 'important'
   actionInboxNudges.maxPerSuggestion = sanitizeActionInboxNudgeCount(actionInboxPref?.maxPerSuggestion)
+  actionInboxNudges.dailyDigest = actionInboxPref?.dailyDigest !== false && actionInboxPref?.daily_digest !== false
   const incomingChannels = normalizeQuickSetupChannels(
     Array.isArray(actionInboxPref?.channels)
       ? actionInboxPref.channels.filter((channel) => ACTION_INBOX_ALLOWED_CHANNELS.includes(String(channel || '').toLowerCase()))
@@ -1224,6 +1293,20 @@ function applySettingsPreferences(res = {}) {
   actionInboxNudges.channels = incomingChannels.length
     ? incomingChannels
     : deriveDefaultActionInboxNudgeChannels()
+  const rawDigestChannels = Array.isArray(actionInboxPref?.digestChannels)
+    ? actionInboxPref.digestChannels
+    : Array.isArray(actionInboxPref?.digest_channels)
+      ? actionInboxPref.digest_channels
+      : null
+  const incomingDigestChannels = normalizeQuickSetupChannels(
+    Array.isArray(rawDigestChannels)
+      ? rawDigestChannels
+          .filter((channel) => ACTION_INBOX_ALLOWED_CHANNELS.includes(String(channel || '').toLowerCase()))
+      : deriveDefaultActionInboxDigestChannels(),
+  )
+  actionInboxNudges.digestChannels = incomingDigestChannels.length
+    ? incomingDigestChannels
+    : deriveDefaultActionInboxDigestChannels()
 }
 
 function applyIntegrationEndpoints(resInts = {}) {
@@ -1289,10 +1372,40 @@ function deriveDefaultActionInboxNudgeChannels() {
   ])
 }
 
+function deriveDefaultActionInboxDigestChannels() {
+  return normalizeQuickSetupChannels([
+    prefs.email && 'email',
+    prefs.pwa && 'pwa',
+    prefs.whatsapp && 'whatsapp',
+  ]).slice(0, 1)
+}
+
 function sanitizeActionInboxNudgeCount(value) {
   const numeric = Number(value)
   if (!Number.isFinite(numeric)) return 2
   return Math.min(Math.max(Math.round(numeric), 1), 3)
+}
+
+async function sendTestActionInboxDigest() {
+  const workspaceId = workspaceStore.activeWorkspaceId || localStorage.getItem('activeWorkspaceId') || null
+  if (!workspaceId) {
+    ElMessage.warning('Select a workspace before sending a digest test.')
+    return
+  }
+  actionInboxDigestSending.value = true
+  try {
+    const result = await sendActionInboxDigest({ workspaceId, force: true })
+    if (!result.sent) {
+      ElMessage.warning('No digest was sent. Check inbox items and enabled delivery channels.')
+      return
+    }
+    const channelText = result.channels.length ? ` via ${result.channels.join(', ')}` : ''
+    ElMessage.success(`Inbox digest sent${channelText}.`)
+  } catch (err) {
+    ElMessage.error(err?.response?.data?.error || err?.message || 'Failed to send inbox digest')
+  } finally {
+    actionInboxDigestSending.value = false
+  }
 }
 
 function syncQuickSetupFromSettings() {
@@ -1869,6 +1982,11 @@ async function saveSettings() {
         .map((channel) => String(channel || '').toLowerCase())
         .filter((channel) => ACTION_INBOX_ALLOWED_CHANNELS.includes(channel)),
     )
+    const actionInboxDigestChannels = normalizeQuickSetupChannels(
+      (Array.isArray(actionInboxNudges.digestChannels) ? actionInboxNudges.digestChannels : [])
+        .map((channel) => String(channel || '').toLowerCase())
+        .filter((channel) => ACTION_INBOX_ALLOWED_CHANNELS.includes(channel)),
+    )
     const notifications = {
       email: !!prefs.email,
       push: !!prefs.pwa,
@@ -1881,9 +1999,11 @@ async function saveSettings() {
       channels,
       actionInboxNudges: {
         enabled: !!actionInboxNudges.enabled,
+        dailyDigest: !!actionInboxNudges.dailyDigest,
         urgency: actionInboxNudges.urgency === 'urgent_only' ? 'urgent_only' : 'important',
         maxPerSuggestion: sanitizeActionInboxNudgeCount(actionInboxNudges.maxPerSuggestion),
         channels: actionInboxChannels.length ? actionInboxChannels : deriveDefaultActionInboxNudgeChannels(),
+        digestChannels: actionInboxDigestChannels.length ? actionInboxDigestChannels : deriveDefaultActionInboxDigestChannels(),
       },
     }
     const reminderDefaults = {

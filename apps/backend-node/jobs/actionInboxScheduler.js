@@ -1,6 +1,6 @@
 import cron from "node-cron";
 import { normalizeCronSpec } from "../utils/cronSpec.js";
-import { runGlobalActionInboxSweep } from "../services/actionInboxService.js";
+import { runGlobalActionInboxDigest, runGlobalActionInboxSweep } from "../services/actionInboxService.js";
 
 function isEnabled() {
   const raw = String(process.env.ENABLE_ACTION_INBOX_SWEEPS || "1").trim().toLowerCase();
@@ -12,7 +12,9 @@ function cronSpec() {
 }
 
 export async function runActionInboxSweepOnce() {
-  const result = await runGlobalActionInboxSweep({ trigger: "scheduled_sweep" });
+  const sweep = await runGlobalActionInboxSweep({ trigger: "scheduled_sweep" });
+  const digest = await runGlobalActionInboxDigest({ trigger: "scheduled_digest" });
+  const result = { sweep, digest };
   console.log("[ActionInbox] scheduled sweep complete", JSON.stringify(result));
   return result;
 }
