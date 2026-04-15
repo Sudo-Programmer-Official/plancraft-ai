@@ -162,6 +162,7 @@ export const routes = [
         { path: 'daily', name: 'daily', component: () => import('@/views/DailyView.vue') },
         { path: 'weekly', name: 'weekly', component: () => import('@/views/WeeklyView.vue') },
         { path: 'monthly', name: 'monthly', component: () => import('@/views/MonthlyView.vue') },
+        { path: 'inbox', name: 'inbox', component: () => import('@/views/ActionInboxView.vue') },
         { path: 'journal', name: 'journal', component: () => import('@/views/JournalView.vue') },
         { path: 'reports', name: 'reports', component: () => import('@/views/ReportsView.vue') },
         { path: 'habits', name: 'habits', component: () => import('@/views/HabitDashboard.vue') },

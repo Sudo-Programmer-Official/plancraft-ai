@@ -1322,6 +1322,7 @@ const navGroups = [
     collapsible: true,
     defaultOpen: false,
     children: [
+      { label: 'Inbox', to: '/inbox' },
       { label: 'Journal', to: '/journal' },
       { label: 'Reports', to: '/reports' },
       { label: 'Habits', to: '/habits' },

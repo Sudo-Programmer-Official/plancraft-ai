@@ -357,10 +357,7 @@ async function uploadAudio(uid: string, itemId: string, blob: Blob, contentType?
 
 export async function createNapkinItem(payload: CreateNapkinPayload): Promise<NapkinItem> {
   const uid = userIdOrThrow()
-  const aiClassification = await classifyNapkinText(payload.text)
-  const classification = payload.classification
-    ? { ...aiClassification, ...payload.classification }
-    : aiClassification
+  const classification = payload.classification || (await classifyNapkinText(payload.text))
   const createdAtMs = Date.now()
   const workspaceId = currentWorkspaceId()
   const baseDoc = {

@@ -6,8 +6,8 @@
           <p class="app-page-eyebrow">AI Quick Actions</p>
           <h1 class="app-page-title !text-[clamp(2rem,3vw,2.85rem)]">Napkin</h1>
           <p class="app-page-description max-w-2xl text-sm">
-            Drop raw ideas, voice notes, and half-formed tasks. PlanCraft will classify, tag, and route them into Planner,
-            Creator, or Leader mode when you are ready.
+            Drop raw ideas, voice notes, and half-formed tasks. PlanCraft classifies them, routes them, and pushes
+            eligible actions into your inbox automatically.
           </p>
           <div class="flex flex-wrap gap-2 text-xs text-slate-300/80">
             <span class="rounded-full border border-white/10 bg-slate-950/30 px-3 py-1">Quick add</span>
@@ -69,7 +69,7 @@
                 @click="saveNapkin"
               >
                 <span v-if="saving" class="loader-dot" aria-hidden="true"></span>
-                <span>{{ saving ? 'Saving...' : 'Drop to Napkin' }}</span>
+                <span>{{ saving ? 'Submitting…' : 'Submit note' }}</span>
               </button>
               <button
                 class="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-slate-950/30 px-4 py-2.5 text-sm transition hover:border-indigo-400"
@@ -449,9 +449,10 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElNotification } from 'element-plus'
 import TaskPlannerDialog from '@/components/TaskPlannerDialog.vue'
 import api from '@/services/api'
+import { detectActionInboxSuggestions } from '@/services/actionInboxService'
 import { addTaskToFirebase, updateTaskInFirebase } from '@/services/firebaseService'
 import {
   classifyNapkinText,
@@ -470,6 +471,7 @@ import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { ensureAiConsentOrThrow } from '@/services/aiConsentService'
 
 type RecorderState = 'idle' | 'recording' | 'processing'
+type NapkinActionSource = 'typed' | 'voice'
 
 const router = useRouter()
 const workspaceStore = useWorkspaceStore()
@@ -580,6 +582,14 @@ function formatDate(ms: number) {
     }).format(new Date(ms))
   } catch {
     return new Date(ms).toLocaleString()
+  }
+}
+
+function timezoneGuess() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+  } catch {
+    return 'UTC'
   }
 }
 
@@ -753,6 +763,43 @@ function resetVoice() {
   stopStream()
 }
 
+async function detectNapkinActions(
+  text: string,
+  {
+    workspaceId = workspaceStore.activeWorkspaceId,
+    sourceRefId = null,
+    sourceKind = 'typed',
+  }: { workspaceId?: string | null; sourceRefId?: string | null; sourceKind?: NapkinActionSource } = {},
+) {
+  const rawText = String(text || '').trim()
+  if (!rawText || !workspaceId) return []
+
+  const sourceType = sourceKind === 'voice' ? 'napkin_voice_note' : 'napkin_note'
+  const sourceLabel = sourceKind === 'voice' ? 'napkin voice note' : 'napkin note'
+  const suggestions = await detectActionInboxSuggestions({
+    text: rawText,
+    workspaceId,
+    sourceType,
+    sourceLabel,
+    sourceRefId,
+    timezone: timezoneGuess(),
+    now: new Date().toISOString(),
+    maxItems: 6,
+  })
+
+  if (suggestions.length && typeof window !== 'undefined') {
+    try {
+      window.dispatchEvent(
+        new CustomEvent('action-inbox-updated', {
+          detail: { workspaceId, trigger: 'napkin_capture', suggestionCount: suggestions.length },
+        }),
+      )
+    } catch {}
+  }
+
+  return suggestions
+}
+
 async function saveNapkin() {
   const text = input.value.trim() || voiceTranscript.value.trim()
   if (!text) {
@@ -761,14 +808,17 @@ async function saveNapkin() {
   }
   saving.value = true
   try {
+    const sourceKind: NapkinActionSource = recordedBlob.value ? 'voice' : 'typed'
+    const transcript = voiceTranscript.value
+    const audioBlob = recordedBlob.value
     const cls = await classifyNapkinText(text)
     classification.value = cls
     const saved = await createNapkinItem({
       text,
-      source: recordedBlob.value ? 'voice' : 'typed',
-      transcript: voiceTranscript.value,
-      audioBlob: recordedBlob.value,
-      audioType: recordedBlob.value?.type,
+      source: sourceKind,
+      transcript,
+      audioBlob,
+      audioType: audioBlob?.type,
       classification: cls,
       metadata: { length: text.length },
     })
@@ -777,7 +827,25 @@ async function saveNapkin() {
     input.value = ''
     voiceTranscript.value = ''
     resetVoice()
-    ElMessage.success('Captured on your Napkin')
+    let detectedCount = 0
+    try {
+      const detected = await detectNapkinActions(text, {
+        workspaceId: saved.workspaceId || workspaceStore.activeWorkspaceId,
+        sourceRefId: saved.id,
+        sourceKind,
+      })
+      detectedCount = detected.length
+    } catch (detectErr: any) {
+      console.warn('[napkin] action detection after save failed', detectErr?.message || detectErr)
+    }
+    ElNotification({
+      title: detectedCount ? 'Inbox updated' : 'Saved',
+      message: detectedCount
+        ? `Saved your note and added ${detectedCount} eligible task${detectedCount === 1 ? '' : 's'} to your inbox. Click to open.`
+        : 'Captured on your Napkin',
+      type: 'success',
+      onClick: detectedCount ? () => router.push('/inbox') : undefined,
+    })
   } catch (err: any) {
     console.error(err)
     ElMessage.error(err?.message || 'Failed to save')
@@ -833,6 +901,15 @@ async function saveEdit() {
       text: nextText,
       metadata: nextMetadata,
     }))
+    try {
+      await detectNapkinActions(nextText, {
+        workspaceId: item.workspaceId || workspaceStore.activeWorkspaceId,
+        sourceRefId: item.id,
+        sourceKind: item.audioUrl || item.source === 'voice' ? 'voice' : 'typed',
+      })
+    } catch (detectErr: any) {
+      console.warn('[napkin] action detection after edit failed', detectErr?.message || detectErr)
+    }
     cancelEdit()
     ElMessage.success('Note updated')
   } catch (err: any) {
