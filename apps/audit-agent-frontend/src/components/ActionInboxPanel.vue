@@ -143,7 +143,7 @@
     </div>
 
     <div
-      v-else-if="actionInboxLoading && !actionSuggestions.length"
+      v-if="actionInboxLoading && !actionSuggestions.length"
       class="rounded-xl border border-white/10 bg-slate-900/45 px-4 py-6 text-sm text-slate-300"
     >
       Loading your suggested actions…
