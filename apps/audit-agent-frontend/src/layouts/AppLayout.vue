@@ -1296,17 +1296,19 @@ const coreNavItems = computed(() => {
     { label: 'Dashboard', iconName: 'dashboard', to: '/dashboard' },
     { label: 'Inbox', iconName: 'inbox', to: '/inbox' },
     { label: 'Planner', iconName: 'compass', to: '/planner' },
-    { label: 'Playbooks', iconName: 'book-open', to: '/playbooks', enabled: playbooksEnabled.value },
+    { label: 'Notes', iconName: 'file-text', to: '/napkin' },
   ]
   return items.filter((item) => item.enabled !== false)
 })
 
-const organizeNavItems = computed(() => [
-  { label: 'Meetings', iconName: 'calendar', to: '/meetings' },
-  { label: 'Links', iconName: 'link', to: '/links' },
-  { label: 'Reminders', iconName: 'bell', to: '/reminders' },
-  { label: 'Notes', iconName: 'file-text', to: '/napkin' },
-])
+const organizeNavItems = computed(() =>
+  [
+    { label: 'Meetings', iconName: 'calendar', to: '/meetings' },
+    { label: 'Links', iconName: 'link', to: '/links' },
+    { label: 'Reminders', iconName: 'bell', to: '/reminders' },
+    { label: 'Playbooks', iconName: 'book-open', to: '/playbooks', enabled: playbooksEnabled.value },
+  ].filter((item) => item.enabled !== false),
+)
 
 const navGroups = [
   {
