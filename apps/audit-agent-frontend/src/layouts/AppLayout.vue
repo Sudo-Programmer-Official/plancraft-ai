@@ -756,6 +756,11 @@ const SidebarIcon = defineComponent({
             h('rect', { x: '4', y: '14', width: '6', height: '6', rx: '1.5' }),
             h('rect', { x: '14', y: '14', width: '6', height: '6', rx: '1.5' }),
           ])
+        case 'inbox':
+          return renderSvg([
+            h('path', { d: 'M4.5 6.25h15v11.5a2 2 0 01-2 2h-11a2 2 0 01-2-2V6.25z' }),
+            h('path', { d: 'M4.5 12.25h4.2l1.35 2h3.9l1.35-2h4.2' }),
+          ])
         case 'compass':
           return renderSvg([
             h('circle', { cx: '12', cy: '12', r: '8.5' }),
@@ -1289,6 +1294,7 @@ function utilityLinkClasses(path) {
 const coreNavItems = computed(() => {
   const items = [
     { label: 'Dashboard', iconName: 'dashboard', to: '/dashboard' },
+    { label: 'Inbox', iconName: 'inbox', to: '/inbox' },
     { label: 'Planner', iconName: 'compass', to: '/planner' },
     { label: 'Playbooks', iconName: 'book-open', to: '/playbooks', enabled: playbooksEnabled.value },
   ]
@@ -1322,7 +1328,6 @@ const navGroups = [
     collapsible: true,
     defaultOpen: false,
     children: [
-      { label: 'Inbox', to: '/inbox' },
       { label: 'Journal', to: '/journal' },
       { label: 'Reports', to: '/reports' },
       { label: 'Habits', to: '/habits' },
