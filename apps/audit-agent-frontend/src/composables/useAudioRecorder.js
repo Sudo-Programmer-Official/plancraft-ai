@@ -14,6 +14,8 @@ const STOP_FALLBACK_MS = 1_800
 const NATIVE_STOP_TIMEOUT_MS = 8_000
 const MINIMUM_AUDIO_BYTES = 1_024
 const MINIMUM_RECORDING_SECONDS = 1
+const MINIMUM_RECORDING_MS = 900
+const MEDIARECORDER_TIMESLICE_MS = 250
 const MIME_CANDIDATES = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4', 'audio/webm']
 const BASE64_DECODE_CHUNK_SIZE = 8_192
 
@@ -225,6 +227,8 @@ export function useAudioRecorder(options = {}) {
   let nativeStopEventPromise = null
   let nativeStopEventResolve = null
   let nativeStopEventReject = null
+  let recordingStartedAt = 0
+  let recordingStoppedAt = 0
 
   const clearTimers = (resetDuration = false) => {
     if (tickId) {
@@ -377,7 +381,24 @@ export function useAudioRecorder(options = {}) {
     recordedChunks = []
     stopRequested = false
     stopHandled = false
+    recordingStartedAt = 0
+    recordingStoppedAt = 0
     if (resetTranscript) transcript.value = ''
+  }
+
+  const markRecordingStarted = () => {
+    recordingStartedAt = Date.now()
+    recordingStoppedAt = 0
+  }
+
+  const markRecordingStopped = () => {
+    if (!recordingStoppedAt) recordingStoppedAt = Date.now()
+  }
+
+  const getElapsedRecordingMs = () => {
+    if (!recordingStartedAt) return Math.max(0, Number(durationSeconds.value || 0) * 1000)
+    const stoppedAt = recordingStoppedAt || Date.now()
+    return Math.max(0, stoppedAt - recordingStartedAt)
   }
 
   const setRecorderError = (err, fallbackMessage = 'Voice recording failed') => {
@@ -572,6 +593,7 @@ export function useAudioRecorder(options = {}) {
     nativeRecorderActive = true
     activeRecorderStrategy = 'native'
     state.value = 'recording'
+    markRecordingStarted()
     console.log(`${logPrefix} native recording started`, {
       platform: Capacitor.getPlatform?.() || 'native',
     })
@@ -590,6 +612,7 @@ export function useAudioRecorder(options = {}) {
     })
     activeRecorderStrategy = 'recordrtc'
     state.value = 'recording'
+    markRecordingStarted()
     tickId = window.setInterval(() => (durationSeconds.value += 1), 1000)
     if (autoStopMs > 0) autoStopId = window.setTimeout(() => stopRecording('auto'), autoStopMs)
   }
@@ -617,12 +640,14 @@ export function useAudioRecorder(options = {}) {
     mediaRecorder.addEventListener('error', onError)
     mediaRecorder.__listeners = { onData, onStop, onError }
 
-    mediaRecorder.start(1000)
+    mediaRecorder.start(MEDIARECORDER_TIMESLICE_MS)
     state.value = 'recording'
+    markRecordingStarted()
     console.log(`${logPrefix} recording started`, {
       mimeType,
       platform: getPlatformName(),
       strategy: 'browser',
+      timesliceMs: MEDIARECORDER_TIMESLICE_MS,
     })
     tickId = window.setInterval(() => (durationSeconds.value += 1), 1000)
     if (autoStopMs > 0) autoStopId = window.setTimeout(() => stopRecording('auto'), autoStopMs)
@@ -723,15 +748,21 @@ export function useAudioRecorder(options = {}) {
       }
 
       const totalBytes = recordedChunks.reduce((sum, chunk) => sum + Number(chunk?.size || 0), 0)
+      const elapsedMs = getElapsedRecordingMs()
       console.log(`${logPrefix} finalize`, {
         trigger,
         strategy: activeRecorderStrategy,
         durationSeconds: durationSeconds.value,
+        elapsedMs,
         chunkCount: recordedChunks.length,
         chunkBytes: recordedChunks.map((chunk) => Number(chunk?.size || 0)).slice(0, 8),
         totalBytes,
       })
-      if (durationSeconds.value < MINIMUM_RECORDING_SECONDS && totalBytes < MINIMUM_AUDIO_BYTES) {
+      if (
+        elapsedMs < MINIMUM_RECORDING_MS &&
+        durationSeconds.value < MINIMUM_RECORDING_SECONDS &&
+        totalBytes < MINIMUM_AUDIO_BYTES
+      ) {
         throw buildShortRecordingError()
       }
 
@@ -740,8 +771,9 @@ export function useAudioRecorder(options = {}) {
         size: blob?.size || 0,
         type: blob?.type || 'unknown',
         strategy: activeRecorderStrategy,
+        elapsedMs,
       })
-      if (!blob || blob.size < MINIMUM_AUDIO_BYTES) {
+      if (!blob || (blob.size < MINIMUM_AUDIO_BYTES && elapsedMs < MINIMUM_RECORDING_MS)) {
         throw buildShortRecordingError()
       }
       const text = await transcribeBlob(blob)
@@ -760,6 +792,7 @@ export function useAudioRecorder(options = {}) {
     if (stopRequested) return
     if (!isRecording.value && state.value !== 'recording') return
     stopRequested = true
+    markRecordingStopped()
     state.value = 'transcribing'
     clearTimers()
     console.log(`${logPrefix} stop requested ${stringifyLogPayload({ reason })}`)

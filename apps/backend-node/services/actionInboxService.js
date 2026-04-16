@@ -1050,7 +1050,10 @@ function shouldResurfaceSuggestion(item, now = new Date()) {
   if (Number.isFinite(item.maxResurfaceCount) && (item.resurfaceCount || 0) >= item.maxResurfaceCount) {
     return false;
   }
-  return dayjs(item.nextReviewAt).isSameOrBefore(dayjs(now));
+  const nextReviewAt = dayjs(item.nextReviewAt);
+  const current = dayjs(now);
+  if (!nextReviewAt.isValid() || !current.isValid()) return false;
+  return !nextReviewAt.isAfter(current);
 }
 
 async function reopenSuggestionDoc(docRef, suggestion, { trigger = "manual", now = new Date() } = {}) {

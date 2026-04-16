@@ -128,15 +128,13 @@
                 </el-button>
               </div>
               <div>
-                <button
-                  type="button"
+                <div
                   class="icon-btn mic-btn"
                   :class="{
                     'mic-btn--active': loading || plannerVoiceState === 'recording',
                     'mic-btn--processing': plannerVoiceState === 'transcribing',
                   }"
                   :title="plannerVoiceButtonLabel"
-                  :aria-label="plannerVoiceButtonLabel"
                 >
                   <VoiceRecorder
                     :autoCommit="true"
@@ -146,7 +144,7 @@
                     @state-change="onPlannerVoiceStateChange"
                   />
                   <span class="mic-visual" aria-hidden="true"></span>
-                </button>
+                </div>
               </div>
               <div>
                 <el-button
