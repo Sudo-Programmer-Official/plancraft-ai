@@ -66,33 +66,6 @@ async function listTasksForScope({ workspaceId, date = null, startDate = null, e
   return snap.docs.map((docSnap) => mapTaskDoc(docSnap));
 }
 
-function stripVoiceChannels(channels, voiceAllowed) {
-  if (voiceAllowed) return channels;
-  if (!Array.isArray(channels)) return null;
-  const filtered = channels
-    .map((c) => String(c || "").trim())
-    .filter(Boolean)
-    .filter((c) => {
-      const normalized = c.toLowerCase();
-      return (
-        normalized !== "voice" &&
-        normalized !== "voice_call" &&
-        normalized !== "voice-call" &&
-        normalized !== "call" &&
-        normalized !== "phone"
-      );
-    });
-  return filtered.length ? filtered : null;
-}
-
-function sanitizeVoiceChannels(task, voiceAllowed) {
-  if (voiceAllowed || !task || typeof task !== "object") return task;
-  const next = { ...task };
-  if ("channels" in next) next.channels = stripVoiceChannels(next.channels, voiceAllowed);
-  if ("reminderChannels" in next) next.reminderChannels = stripVoiceChannels(next.reminderChannels, voiceAllowed);
-  return next;
-}
-
 function toTaskPayload(task = {}) {
   if (!task || typeof task !== "object") return {};
   return {
@@ -155,6 +128,52 @@ router.get("/", requireWorkspaceViewer, async (req, res) => {
   }
 });
 
+router.patch("/:taskId/completion", requireWorkspaceViewer, async (req, res) => {
+  try {
+    const workspaceId = selectWorkspaceId(req);
+    const taskId = String(req.params?.taskId || "").trim();
+    const completed = req.body?.completed === true;
+    const completedAtRaw = req.body?.completedAt || null;
+
+    if (!workspaceId) return res.status(400).json({ error: "workspaceId is required" });
+    if (!taskId) return res.status(400).json({ error: "taskId is required" });
+
+    const ref = db.collection("tasks").doc(taskId);
+    const snap = await ref.get();
+    if (!snap.exists) return res.status(404).json({ error: "Task not found" });
+
+    const data = snap.data() || {};
+    if (String(data.workspaceId || "") !== workspaceId) {
+      return res.status(403).json({ error: "Task does not belong to the active workspace" });
+    }
+
+    const completedAt =
+      completed && completedAtRaw
+        ? new Date(completedAtRaw)
+        : completed
+          ? new Date()
+          : null;
+
+    const updates = {
+      completed,
+      updatedAt: new Date(),
+    };
+    if (completed && completedAt && !Number.isNaN(completedAt.getTime())) {
+      updates.completedAt = completedAt;
+    }
+    if (!completed) {
+      updates.completedAt = null;
+    }
+
+    await ref.set(updates, { merge: true });
+    const refreshed = await ref.get();
+    return res.json({ success: true, task: mapTaskDoc(refreshed) });
+  } catch (err) {
+    console.error("[TaskRoutes] completion update failed", err?.message || err);
+    return res.status(500).json({ error: "Failed to update task completion" });
+  }
+});
+
 router.post("/create", requireWorkspaceEditor, async (req, res) => {
   try {
     const { userId, options = {}, ...payload } = req.body || {};
@@ -207,9 +226,8 @@ router.post("/announce", requireWorkspaceEditor, async (req, res) => {
         console.warn("[TaskRoutes] announce lookup failed", err?.message || err);
       }
     }
-    base = sanitizeVoiceChannels(base, voiceAllowed);
     if (!voiceAllowed) {
-      console.info("[TaskRoutes] voice stripped", {
+      console.info("[TaskRoutes] workspace voice entitlement unavailable; delivery quota will decide", {
         workspaceId,
         userId,
         taskId: base?.id || task?.id || null,

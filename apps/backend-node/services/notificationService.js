@@ -6,6 +6,9 @@ import { sendPWA } from './integrations/pwaProvider.js'
 import { sendEmail } from './integrations/emailProvider.js'
 import { makeCallForUser, sendSMSForUser } from './twilioService.js'
 import { getUserPrefs } from './userPrefService.js'
+import { getEffectiveAccess } from './planService.js'
+import { getWorkspace } from './workspaceService.js'
+import { canUseFeature, FEATURE_KEYS } from './entitlements.js'
 import { buildReminderBrandCopy } from './notificationTemplates.js'
 import { enqueueNotificationJob, postingServiceAvailable } from './postingServiceClient.js'
 import { offlineMessagesEnabled } from '../config/flags.js'
@@ -49,6 +52,10 @@ const CHANNEL_ENV_FLAGS = {
 
 const ALL_CHANNELS = ['whatsapp', 'email', 'pwa', 'voice', 'sms']
 const ENABLE_POSTING_SERVICE_NOTIFICATIONS = resolveChannelFlag('ENABLE_POSTING_SERVICE_NOTIFICATIONS', false)
+const FREE_VOICE_REMINDERS_PER_DAY = (() => {
+  const value = Number(process.env.FREE_VOICE_REMINDERS_PER_DAY || 2)
+  return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 2
+})()
 
 function isChannelEnabled(flagValue) {
   if (flagValue === undefined || flagValue === null) return false
@@ -60,6 +67,90 @@ function resolveChannelFlag(envKey, defaultValue = true) {
   const raw = process.env[envKey]
   if (raw === undefined || raw === null || raw === '') return defaultValue
   return isChannelEnabled(raw)
+}
+
+async function hasWorkspaceVoiceEntitlement(workspaceId) {
+  if (!workspaceId) return false
+  try {
+    const workspace = await getWorkspace(workspaceId)
+    return canUseFeature({ workspace, userRole: 'viewer' }, FEATURE_KEYS.voiceReminders)
+  } catch (err) {
+    console.warn('[Notification] workspace voice entitlement lookup failed', err?.message || err)
+    return false
+  }
+}
+
+async function getFreeVoiceUsageToday(userId, dateKey = dayjs().format('YYYY-MM-DD')) {
+  if (!userId) return 0
+  try {
+    const snap = await db.collection('usage').doc(`${String(userId)}_${dateKey}`).get()
+    if (!snap.exists) return 0
+    return Number(snap.data()?.voiceReminderCall || 0)
+  } catch (err) {
+    console.warn('[Notification] free voice usage lookup failed', err?.message || err)
+    return 0
+  }
+}
+
+async function incrementFreeVoiceUsage(userId, dateKey = dayjs().format('YYYY-MM-DD')) {
+  if (!userId) return
+  const ref = db.collection('usage').doc(`${String(userId)}_${dateKey}`)
+  await db.runTransaction(async (txn) => {
+    const snap = await txn.get(ref)
+    const current = snap.exists ? Number(snap.data()?.voiceReminderCall || 0) : 0
+    txn.set(
+      ref,
+      {
+        voiceReminderCall: current + 1,
+        updatedAt: new Date(),
+      },
+      { merge: true },
+    )
+  })
+}
+
+async function resolveVoiceDeliveryPolicy(userId, meta = {}) {
+  const workspaceId = meta?.workspaceId || null
+  if (await hasWorkspaceVoiceEntitlement(workspaceId)) {
+    return {
+      allowed: true,
+      isUnlimited: true,
+      source: 'workspace',
+      limit: null,
+      used: null,
+      remaining: null,
+      dateKey: dayjs().format('YYYY-MM-DD'),
+    }
+  }
+
+  const access = await getEffectiveAccess(userId)
+  if (access?.entitlements?.voiceReminders === true) {
+    return {
+      allowed: true,
+      isUnlimited: true,
+      source: 'plan',
+      limit: null,
+      used: null,
+      remaining: null,
+      access,
+      dateKey: access?.date || dayjs().format('YYYY-MM-DD'),
+    }
+  }
+
+  const dateKey = access?.date || dayjs().format('YYYY-MM-DD')
+  const limit = FREE_VOICE_REMINDERS_PER_DAY
+  const used = await getFreeVoiceUsageToday(userId, dateKey)
+
+  return {
+    allowed: limit > 0 && used < limit,
+    isUnlimited: false,
+    source: 'free_allowance',
+    limit,
+    used,
+    remaining: Math.max(limit - used, 0),
+    access,
+    dateKey,
+  }
 }
 
 function normalizeChannelName(channel) {
@@ -473,6 +564,24 @@ async function sendViaChannel(channel, userId, payload, contacts = {}, meta = {}
     return null
   }
 
+  const voicePolicy = channel === 'voice' ? await resolveVoiceDeliveryPolicy(userId, meta) : null
+  if (channel === 'voice' && !voicePolicy?.allowed) {
+    console.info('[Notification] voice delivery skipped by allowance', {
+      userId,
+      workspaceId: meta.workspaceId || payload.workspaceId || null,
+      source: voicePolicy?.source || 'unknown',
+      used: voicePolicy?.used ?? null,
+      limit: voicePolicy?.limit ?? null,
+      plan: voicePolicy?.access?.effectivePlan || 'free',
+    })
+    return {
+      skipped: true,
+      reason: 'voice_allowance_reached',
+      used: voicePolicy?.used ?? null,
+      limit: voicePolicy?.limit ?? null,
+    }
+  }
+
   if (postingEnabled && to) {
     try {
       const whatsappTemplate =
@@ -510,6 +619,9 @@ async function sendViaChannel(channel, userId, payload, contacts = {}, meta = {}
         jobId: res?.job?.id || res?.job?.jobId || null,
         workspaceId: meta.workspaceId || payload.workspaceId || null,
       })
+      if (channel === 'voice' && voicePolicy && !voicePolicy.isUnlimited && (res?.job || res?.success)) {
+        await incrementFreeVoiceUsage(userId, voicePolicy.dateKey)
+      }
       if (res) return res
     } catch (err) {
       console.warn('[Notification] posting-service send failed; falling back', err?.message || err)
@@ -524,7 +636,11 @@ async function sendViaChannel(channel, userId, payload, contacts = {}, meta = {}
   }
   if (channel === 'voice') {
     if (!payload.voiceMessage) return null
-    return makeCallForUser(userId, payload.voiceMessage, payload.voiceOptions || {})
+    const sid = await makeCallForUser(userId, payload.voiceMessage, payload.voiceOptions || {})
+    if (voicePolicy && !voicePolicy.isUnlimited && sid) {
+      await incrementFreeVoiceUsage(userId, voicePolicy.dateKey)
+    }
+    return sid
   }
   if (channel === 'sms') {
     if (!payload.smsMessage) return null

@@ -825,10 +825,40 @@ export async function updateTaskInFirebase(task) {
   if ('date' in updates) updates.date = normalizeTaskDate(updates.date)
 
   const ref = taskDocRef(id)
-  await safeAction(updateDoc(ref, {
-    ...updates,
-    updatedAt: serverTimestamp(),
-  }))
+  try {
+    await safeAction(updateDoc(ref, {
+      ...updates,
+      updatedAt: serverTimestamp(),
+    }))
+  } catch (err) {
+    const code = String(err?.code || '')
+    const message = String(err?.message || '')
+    const permissionDenied = code === 'permission-denied' || /insufficient permissions|permission denied/i.test(message)
+    const completionOnly =
+      Object.keys(updates).length > 0 &&
+      Object.keys(updates).every((key) => ['completed', 'completedAt', 'updatedAt'].includes(key))
+
+    if (!permissionDenied || !completionOnly || !normalizedWsId) {
+      throw err
+    }
+
+    const request = api.patch(
+      `/tasks/${id}/completion`,
+      {
+        userId: user.uid,
+        workspaceId: normalizedWsId,
+        completed: !!updates.completed,
+        completedAt: updates.completed === true ? new Date().toISOString() : null,
+      },
+      {
+        headers: {
+          'x-workspace-id': normalizedWsId,
+        },
+      },
+    )
+
+    await withTimeout(request, 8000, 'task completion api fallback')
+  }
   dispatchTaskRefresh({
     reason: 'task-updated',
     taskId: id,

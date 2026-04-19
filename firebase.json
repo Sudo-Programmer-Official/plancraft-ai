@@ -1,4 +1,7 @@
 {
+  "firestore": {
+    "rules": "apps/audit-agent-frontend/firestore.rules"
+  },
   "hosting": {
     "public": "apps/audit-agent-frontend/dist",
     "ignore": [
