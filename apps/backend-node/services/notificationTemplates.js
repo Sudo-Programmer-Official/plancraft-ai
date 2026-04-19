@@ -277,19 +277,27 @@ function buildEmailHtml({ safeFirstName, segment, reminders, actions, tz }) {
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="color-scheme" content="light" />
+        <meta name="supported-color-schemes" content="light" />
         <title>PlanCraftAI reminder</title>
       </head>
-      <body style="margin:0;padding:0;background:#f4f0ff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#23163d;">
+      <body bgcolor="#f4f0ff" style="margin:0;padding:0;background:#f4f0ff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#23163d;">
         <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${preheader}</div>
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;background:#f4f0ff;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#f4f0ff" style="border-collapse:collapse;background:#f4f0ff;">
           <tr>
             <td align="center" style="padding:24px 12px;">
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;max-width:640px;background:#ffffff;border:1px solid #e9ddff;border-radius:28px;overflow:hidden;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#ffffff" style="border-collapse:collapse;max-width:640px;background:#ffffff;border:1px solid #e9ddff;border-radius:28px;overflow:hidden;">
                 <tr>
-                  <td style="padding:28px 28px 18px;background:linear-gradient(135deg,#2b1759 0%,#4f2eb8 58%,#7c4dff 100%);">
-                    <div style="display:inline-block;padding:7px 12px;border-radius:999px;background:rgba(255,255,255,0.15);font-size:11px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#f5f3ff;">PlanCraftAI reminder</div>
-                    <h1 style="margin:18px 0 8px;font-size:30px;line-height:1.2;font-weight:800;color:#ffffff;">Good ${escapeHtml(segment.label)}, ${escapeHtml(safeFirstName)}</h1>
-                    <p style="margin:0;font-size:16px;line-height:1.7;color:#ece7ff;">${escapeHtml(intro)}</p>
+                  <td bgcolor="#2b1759" style="padding:28px 28px 18px;background:#2b1759;background-image:linear-gradient(135deg,#2b1759 0%,#4f2eb8 58%,#7c4dff 100%);">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:separate;">
+                      <tr>
+                        <td bgcolor="#f7f3ff" style="padding:18px 18px 20px;background:#f7f3ff !important;border:1px solid #d9cbff;border-radius:22px;">
+                          <div style="display:inline-block;padding:7px 12px;border-radius:999px;background:#ebe3ff !important;font-size:11px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#4f2eb8 !important;">PlanCraftAI reminder</div>
+                          <h1 style="margin:18px 0 8px;font-size:30px;line-height:1.2;font-weight:800;color:#1f1537 !important;">Good ${escapeHtml(segment.label)}, ${escapeHtml(safeFirstName)}</h1>
+                          <p style="margin:0;font-size:16px;line-height:1.7;color:#4b3d68 !important;">${escapeHtml(intro)}</p>
+                        </td>
+                      </tr>
+                    </table>
                   </td>
                 </tr>
                 <tr>
