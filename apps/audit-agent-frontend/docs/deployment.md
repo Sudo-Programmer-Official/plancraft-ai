@@ -96,6 +96,16 @@ When deploying:
 npm run build --mode production
 firebase deploy
 
+If you changed Firestore rules, local edits are not enough. Deploy them explicitly:
+
+firebase deploy --only firestore --project audit-agent-66451
+
+This frontend app now has a `firestore.rules` target in `firebase.json`, so:
+	•	`firebase deploy --project audit-agent-66451` deploys Hosting plus Firestore rules
+	•	`firebase deploy --only firestore --project audit-agent-66451` deploys only the rules
+
+You can run the same rules deploy from the repo root too, because the root `firebase.json` points at `apps/audit-agent-frontend/firestore.rules`.
+
 If you use CI/CD (GitHub Actions or Cloud Build), explicitly inject:
 
 env:

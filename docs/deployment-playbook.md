@@ -35,11 +35,12 @@ Current reality:
 Use this order when a release touches multiple surfaces:
 
 1. Backend deploy on Render if API behavior changed.
-2. Frontend build and Firebase deploy.
-3. Rebuild the production web bundle.
-4. Sync Capacitor.
-5. Build and upload Android.
-6. Archive and upload iOS.
+2. Deploy Firestore rules if `apps/audit-agent-frontend/firestore.rules` changed.
+3. Frontend build and Firebase deploy.
+4. Rebuild the production web bundle.
+5. Sync Capacitor.
+6. Build and upload Android.
+7. Archive and upload iOS.
 
 Rule:
 
@@ -51,7 +52,7 @@ Run from `apps/audit-agent-frontend`:
 
 ```bash
 npm run build
-firebase deploy
+firebase deploy --project audit-agent-66451
 ```
 
 Or use the existing shortcut:
@@ -64,12 +65,23 @@ What this does:
 - Builds the production bundle.
 - Generates release metadata and sitemap output.
 - Deploys the built app to Firebase Hosting.
+- Deploys Firestore rules too, because `apps/audit-agent-frontend/firebase.json` includes a `firestore.rules` target.
+
+If you changed only Firestore rules, run:
+
+```bash
+firebase deploy --only firestore --project audit-agent-66451
+```
+
+You can run the same rules deploy from the repo root because the root `firebase.json` points at `apps/audit-agent-frontend/firestore.rules`.
 
 Critical rules:
 - Always build before deploying.
 - Never deploy a stale `dist/`.
 - Confirm production env values before the build.
 - If backend APIs changed, do not deploy frontend first.
+- Local edits to `firestore.rules` do nothing until they are deployed to Firebase.
+- If a change depends on backend auth fallback plus Firestore rules, deploy backend before the web release.
 
 Pre-deploy check:
 - [ ] `VITE_API_BASE_URL` points to production.
