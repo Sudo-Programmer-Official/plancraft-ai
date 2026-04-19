@@ -1,5 +1,5 @@
 import { db, uploadBufferToStorage } from './firebaseAdmin.js'
-import dayjs from 'dayjs'
+import dayjs from '../utils/dayjs.js'
 import { getWorkspace, getWorkspaceMembership, listWorkspaceMembers } from './workspaceService.js'
 
 function ymd(d = new Date()) {

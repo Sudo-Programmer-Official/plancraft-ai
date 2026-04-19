@@ -5,7 +5,7 @@ import { db } from "../services/firebaseAdmin.js"
 import { queueReminder } from "../services/reminderService.js"
 import { handleVoiceCommand } from "../services/voiceHandler.js"
 import { planUsageMiddleware, getUsageToday } from "../services/planService.js"
-import dayjs from 'dayjs'
+import dayjs from '../utils/dayjs.js'
 import utc from 'dayjs/plugin/utc.js'
 import timezone from 'dayjs/plugin/timezone.js'
 import { requireAuth, ensureUserMatches } from "../middleware/auth.js"

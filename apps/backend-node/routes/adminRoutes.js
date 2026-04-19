@@ -2,7 +2,7 @@ import express from 'express'
 import requireAdmin from '../middleware/requireAdmin.js'
 import { dataStore } from './dataStore.js'
 import { db } from '../services/firebaseAdmin.js'
-import dayjs from 'dayjs'
+import dayjs from '../utils/dayjs.js'
 import { WORKSPACE_COLLECTION } from '../services/workspaceService.js'
 import {
   DEFAULT_ACCESS_CONTROL,

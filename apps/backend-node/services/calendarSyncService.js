@@ -1,4 +1,4 @@
-import dayjs from "dayjs";
+import dayjs from "../utils/dayjs.js";
 import utc from "dayjs/plugin/utc.js";
 import timezone from "dayjs/plugin/timezone.js";
 import { ensureFreshAccessToken, getUserGoogleIntegration, saveUserGoogleIntegration } from "./googleOAuth.js";

@@ -1,7 +1,7 @@
 // services/openaiService.js
 import OpenAI from "openai";
 import dotenv from "dotenv";
-import dayjs from 'dayjs'
+import dayjs from '../utils/dayjs.js'
 import utc from 'dayjs/plugin/utc.js'
 import timezone from 'dayjs/plugin/timezone.js'
 dotenv.config();

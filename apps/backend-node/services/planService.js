@@ -1,5 +1,5 @@
 import { db } from './firebaseAdmin.js'
-import dayjs from 'dayjs'
+import dayjs from '../utils/dayjs.js'
 
 export const LIMIT_KEYS = Object.freeze([
   'remindersPerDay',

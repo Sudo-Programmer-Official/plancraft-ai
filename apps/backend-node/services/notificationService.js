@@ -1,4 +1,4 @@
-import dayjs from 'dayjs'
+import dayjs from '../utils/dayjs.js'
 import { db } from './firebaseAdmin.js'
 import { providers } from './integrations/index.js'
 import { send as sendWhatsApp } from './integrations/whatsappProvider.js'

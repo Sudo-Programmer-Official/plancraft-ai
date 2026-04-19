@@ -1,4 +1,4 @@
-import dayjs from "dayjs";
+import dayjs from "../../utils/dayjs.js";
 import { db } from "../firebaseAdmin.js";
 import { sendEmail } from "../emailService.js";
 import { getUserPrefs } from "../userPrefService.js";

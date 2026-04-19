@@ -1,4 +1,4 @@
-import dayjs from "dayjs";
+import dayjs from "../../utils/dayjs.js";
 import { db } from "../firebaseAdmin.js";
 import {
   WORKSPACE_MEMBERS_COLLECTION,

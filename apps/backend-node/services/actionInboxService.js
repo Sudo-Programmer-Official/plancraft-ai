@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import dayjs from "dayjs";
+import dayjs from "../utils/dayjs.js";
 import utc from "dayjs/plugin/utc.js";
 import timezonePlugin from "dayjs/plugin/timezone.js";
 import { db } from "./firebaseAdmin.js";

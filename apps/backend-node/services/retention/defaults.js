@@ -1,4 +1,4 @@
-import dayjs from "dayjs";
+import dayjs from "../../utils/dayjs.js";
 
 export const DEFAULT_SUPPRESSION_RULES = {
   maxEmailsPerDay: 1,
