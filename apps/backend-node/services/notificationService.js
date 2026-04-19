@@ -609,6 +609,7 @@ async function sendViaChannel(channel, userId, payload, contacts = {}, meta = {}
               : channel === 'sms'
                 ? payload.smsMessage || payload.message
                 : payload.voiceMessage || payload.message,
+        html: channel === 'email' ? payload.emailHtml || null : null,
         template: whatsappTemplate,
         subject: payload.subject || 'PlanCraftAI Update',
         audioUrl: payload.voiceOptions?.audioUrl || null,
@@ -632,7 +633,15 @@ async function sendViaChannel(channel, userId, payload, contacts = {}, meta = {}
     return sendWhatsAppWithFallback(userId, payload.whatsappPrimary, payload.whatsappFallback || payload.message)
   }
   if (channel === 'email') {
-    return sendEmail(userId, payload.emailMessage || payload.message, payload.subject)
+    return sendEmail(
+      userId,
+      {
+        text: payload.emailMessage || payload.message,
+        html: payload.emailHtml || null,
+        subject: payload.subject,
+      },
+      payload.subject
+    )
   }
   if (channel === 'voice') {
     if (!payload.voiceMessage) return null
@@ -773,7 +782,13 @@ export async function notifyReminderDue(userId, itemsInput = [], options = {}) {
       const callerCta =
         options.ctaUrl ||
         options.deepLink ||
-        (options.pwa && options.pwa.data && (options.pwa.data.url || options.pwa.data.cta)) ||
+        (options.pwa &&
+          options.pwa.data &&
+          (options.pwa.data.url || options.pwa.data.cta || options.pwa.data.link)) ||
+        reminders[0]?.link ||
+        reminders[0]?.context?.meetingLink ||
+        reminders[0]?.context?.joinUrl ||
+        reminders[0]?.context?.eventLink ||
         null
       brandCopy = buildReminderBrandCopy({
         name: identity.firstName || identity.displayName,
@@ -822,7 +837,8 @@ export async function notifyReminderDue(userId, itemsInput = [], options = {}) {
     subject,
     whatsappPrimary: options.whatsappTemplate || options.whatsapp,
     whatsappFallback: options.whatsappFallback || brandCopy?.whatsapp || message,
-    emailMessage: options.emailMessage || brandCopy?.email || message,
+    emailMessage: options.emailMessage || brandCopy?.emailText || brandCopy?.email || message,
+    emailHtml: options.emailHtml || brandCopy?.emailHtml || null,
     pwa: options.pwa || {
       title: 'Reminder due',
       body: message,

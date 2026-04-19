@@ -414,7 +414,6 @@ export async function sendReminder(reminder) {
       whatsappFallback: fallbackText,
       voiceMessage: includeVoice ? `Here is your reminder: ${task}. Scheduled for ${when}.` : null,
       smsMessage: fallbackText,
-      subject: `PlanCraftAI Reminder • ${task}`,
       message: fallbackText,
       pwa: {
         title: 'Reminder due',
