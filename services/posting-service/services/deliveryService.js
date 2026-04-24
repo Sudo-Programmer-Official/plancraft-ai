@@ -77,6 +77,32 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+function decodeHtmlEntities(value) {
+  return String(value || '').replace(/&nbsp;|&amp;|&lt;|&gt;|&quot;|&#39;/g, (match) => {
+    if (match === '&nbsp;') return ' '
+    if (match === '&amp;') return '&'
+    if (match === '&lt;') return '<'
+    if (match === '&gt;') return '>'
+    if (match === '&quot;') return '"'
+    if (match === '&#39;') return "'"
+    return match
+  })
+}
+
+function htmlToText(value) {
+  return decodeHtmlEntities(
+    String(value || '')
+      .replace(/<\s*br\s*\/?>/gi, '\n')
+      .replace(/<\/p\s*>/gi, '\n\n')
+      .replace(/<\s*li[^>]*>/gi, '- ')
+      .replace(/<\/li\s*>/gi, '\n')
+      .replace(/<\/(ul|ol)\s*>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+  )
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
 function isRetryableWhatsAppError(err) {
   const status = err?.response?.status
   const code = err?.response?.data?.error?.code
@@ -340,16 +366,24 @@ export async function sendEmail(job) {
   ensureSesConfig()
 
   const subject = job?.payload?.subject || 'PlanCraftAI update'
-  const body = String(job?.message || job?.payload?.body || '')
+  const html = String(job?.payload?.html || '').trim()
+  const body = String(job?.message || job?.payload?.body || '').trim() || (html ? htmlToText(html) : '')
+  if (!body && !html) throw new Error('Email body missing')
+
+  const emailBody = {}
+  if (body) {
+    emailBody.Text = { Data: body, Charset: 'UTF-8' }
+  }
+  if (html) {
+    emailBody.Html = { Data: html, Charset: 'UTF-8' }
+  }
 
   const cmd = new SendEmailCommand({
     Destination: { ToAddresses: [to] },
     Source: SES_FROM,
     Message: {
-      Subject: { Data: subject },
-      Body: {
-        Text: { Data: body },
-      },
+      Subject: { Data: subject, Charset: 'UTF-8' },
+      Body: emailBody,
     },
     ReplyToAddresses: SES_FROM ? [SES_FROM] : undefined,
   })

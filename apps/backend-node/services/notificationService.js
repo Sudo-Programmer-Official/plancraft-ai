@@ -370,7 +370,8 @@ export async function notifyActionInboxNudge(userId, suggestionInput = {}, optio
     subject: options.subject || 'PlanCraftAI action follow-up',
     whatsappPrimary: options.whatsappTemplate || message,
     whatsappFallback: options.whatsappFallback || message,
-    emailMessage: options.emailMessage || message.replace(/\n/g, '<br/>'),
+    emailMessage: options.emailMessage || message,
+    emailHtml: options.emailHtml || null,
     pwa: options.pwa || {
       title,
       body:
@@ -460,14 +461,18 @@ export async function notifyActionInboxDigest(userId, suggestionsInput = [], opt
     subject: options.subject || 'PlanCraftAI inbox digest',
     whatsappPrimary: options.whatsappTemplate || message,
     whatsappFallback: options.whatsappFallback || message,
-    emailMessage:
-      options.emailMessage ||
-      [
-        `<p>${intro}</p>`,
-        `<p><strong>Focus:</strong> ${focusTitle}</p>`,
-        `<ul>${items.map((item) => `<li>${item.title}</li>`).join('')}</ul>`,
-        `<p>Open your inbox to confirm, ignore, or fill in the missing details.</p>`,
-      ].join(''),
+    emailMessage: options.emailMessage || message,
+    emailHtml:
+      options.emailHtml ||
+      buildEmailShell(
+        'PlanCraftAI inbox digest',
+        [
+          `<p style="margin:0 0 14px;">${escapeHtml(intro)}</p>`,
+          `<p style="margin:0 0 14px;"><strong>Focus:</strong> ${escapeHtml(focusTitle)}</p>`,
+          `<ul style="margin:0 0 14px;padding-left:20px;">${items.map((item) => `<li>${escapeHtml(item.title)}</li>`).join('')}</ul>`,
+          `<p style="margin:0;">Open your inbox to confirm, ignore, or fill in the missing details.</p>`,
+        ].join(''),
+      ),
     pwa: options.pwa || {
       title,
       body:
@@ -517,10 +522,95 @@ function maskRecipient(value) {
   return `${s.slice(0, 2)}…${s.slice(-2)}`
 }
 
+function looksLikeHtml(value) {
+  const text = String(value || '').trim()
+  if (!text) return false
+  return /<\/?[a-z][\s\S]*>/i.test(text)
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function decodeHtmlEntities(value) {
+  return String(value || '').replace(/&nbsp;|&amp;|&lt;|&gt;|&quot;|&#39;/g, (match) => {
+    if (match === '&nbsp;') return ' '
+    if (match === '&amp;') return '&'
+    if (match === '&lt;') return '<'
+    if (match === '&gt;') return '>'
+    if (match === '&quot;') return '"'
+    if (match === '&#39;') return "'"
+    return match
+  })
+}
+
+function htmlToText(value) {
+  return decodeHtmlEntities(
+    String(value || '')
+      .replace(/<\s*br\s*\/?>/gi, '\n')
+      .replace(/<\/p\s*>/gi, '\n\n')
+      .replace(/<\s*li[^>]*>/gi, '- ')
+      .replace(/<\/li\s*>/gi, '\n')
+      .replace(/<\/(ul|ol)\s*>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+  )
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+function buildEmailShell(label, bodyHtml) {
+  return `
+    <!doctype html>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>${escapeHtml(label)}</title>
+      </head>
+      <body style="margin:0;padding:24px;background:#f7f4ff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#24163d;">
+        <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #eadfff;border-radius:20px;padding:24px;">
+          <div style="font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#7b61c9;margin:0 0 14px;">${escapeHtml(label)}</div>
+          <div style="font-size:15px;line-height:1.7;color:#24163d;">${bodyHtml}</div>
+          <hr style="border:none;border-top:1px solid #efe8ff;margin:18px 0" />
+          <p style="color:#7d6b9e;font-size:12px;margin:0;">Sent automatically by PlanCraftAI.</p>
+        </div>
+      </body>
+    </html>`
+}
+
+function resolveEmailContent(payload = {}) {
+  if (payload.emailHtml) {
+    const html = String(payload.emailHtml)
+    return {
+      html,
+      text: String(payload.message || payload.emailMessage || htmlToText(html)),
+    }
+  }
+
+  const body = payload.emailMessage ?? payload.message ?? ''
+  if (looksLikeHtml(body)) {
+    const html = String(body)
+    return {
+      html,
+      text: String(payload.message || htmlToText(html)),
+    }
+  }
+
+  return {
+    html: null,
+    text: String(body || ''),
+  }
+}
+
 function hasPayloadForChannel(channel, payload = {}) {
   if (channel === 'sms') return !!payload.smsMessage
   if (channel === 'voice') return !!payload.voiceMessage
-  if (channel === 'email') return !!payload.emailMessage || !!payload.message
+  if (channel === 'email') return !!payload.emailHtml || !!payload.emailMessage || !!payload.message
   if (channel === 'whatsapp') return !!(payload.whatsappPrimary || payload.whatsappFallback || payload.message)
   if (channel === 'pwa') return !!payload.pwa || !!payload.message
   return false
@@ -558,6 +648,7 @@ async function sendViaChannel(channel, userId, payload, contacts = {}, meta = {}
   const normalizedChannel = channel === 'voice' ? 'voice_call' : channel
   const postingEnabled = shouldUsePostingService(meta)
   const to = pickRecipientForChannel(channel, contacts)
+  const emailContent = channel === 'email' ? resolveEmailContent(payload) : null
 
   if (!hasPayloadForChannel(channel, payload)) {
     console.log('[Notification] skipping channel due to empty payload', { channel })
@@ -605,11 +696,11 @@ async function sendViaChannel(channel, userId, payload, contacts = {}, meta = {}
           channel === 'whatsapp'
             ? whatsappBody
             : channel === 'email'
-              ? payload.emailMessage || payload.message
+              ? emailContent?.text || payload.message
               : channel === 'sms'
                 ? payload.smsMessage || payload.message
                 : payload.voiceMessage || payload.message,
-        html: channel === 'email' ? payload.emailHtml || null : null,
+        html: channel === 'email' ? emailContent?.html || null : null,
         template: whatsappTemplate,
         subject: payload.subject || 'PlanCraftAI Update',
         audioUrl: payload.voiceOptions?.audioUrl || null,
@@ -636,8 +727,8 @@ async function sendViaChannel(channel, userId, payload, contacts = {}, meta = {}
     return sendEmail(
       userId,
       {
-        text: payload.emailMessage || payload.message,
-        html: payload.emailHtml || null,
+        text: emailContent?.text || payload.message,
+        html: emailContent?.html || null,
         subject: payload.subject,
       },
       payload.subject
@@ -747,7 +838,7 @@ export async function sendCalendarDigestNotification(userId, createdTasks = []) 
     subject: 'Calendar sync update',
     whatsappPrimary: message,
     whatsappFallback: message,
-    emailMessage: message.replace(/\n/g, '<br/>'),
+    emailMessage: message,
     pwa: {
       title: 'Calendar Sync',
       body:
