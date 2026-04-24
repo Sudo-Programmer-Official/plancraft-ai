@@ -125,9 +125,12 @@
           </RouterLink>
         </div>
 
-        <div class="mx-2 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+        <div
+          v-if="organizeNavItems.length"
+          class="mx-2 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"
+        ></div>
 
-        <div class="space-y-1">
+        <div v-if="organizeNavItems.length" class="space-y-1">
           <div class="px-3 pb-1 text-[11px] font-medium uppercase tracking-[0.28em] text-slate-500">
             Organize
           </div>
@@ -162,9 +165,12 @@
           </RouterLink>
         </div>
 
-        <div class="mx-2 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+        <div
+          v-if="filteredNavGroups.length"
+          class="mx-2 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"
+        ></div>
 
-        <div class="space-y-2">
+        <div v-if="filteredNavGroups.length" class="space-y-2">
           <button
             type="button"
             :class="groupButtonClasses({ key: 'advanced', children: filteredNavGroups }, true)"
@@ -347,9 +353,12 @@
               </RouterLink>
             </div>
 
-            <div class="mx-2 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+            <div
+              v-if="organizeNavItems.length"
+              class="mx-2 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"
+            ></div>
 
-            <div class="space-y-1">
+            <div v-if="organizeNavItems.length" class="space-y-1">
               <div class="px-3 pb-1 text-[11px] font-medium uppercase tracking-[0.28em] text-slate-500">
                 Organize
               </div>
@@ -384,9 +393,12 @@
               </RouterLink>
             </div>
 
-            <div class="mx-2 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+            <div
+              v-if="filteredNavGroups.length"
+              class="mx-2 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"
+            ></div>
 
-            <div class="space-y-2">
+            <div v-if="filteredNavGroups.length" class="space-y-2">
               <button
                 type="button"
                 :class="groupButtonClasses({ key: 'advanced-mobile', children: filteredNavGroups }, true)"
@@ -1007,6 +1019,7 @@ const activeWorkspace = computed(() => workspaceStore.activeWorkspace || {})
 const activeWorkspaceSettings = computed(() => activeWorkspace.value?.settings || {})
 const playbooksEnabled = computed(() => featureFlagsStore.isEnabled('PLAYBOOKS'))
 const autoDeployEnabled = computed(() => featureFlagsStore.isEnabled('AUTO_DEPLOY'))
+const useGuestFocusNav = computed(() => isGuest.value)
 const showLogoutOverlay = computed(() => authStore.logoutPending === true)
 let lastWorkspaceInitKickAt = 0
 const workspaceRetryCount = ref(0)
@@ -1512,14 +1525,16 @@ const coreNavItems = computed(() => {
   return items.filter((item) => item.enabled !== false)
 })
 
-const organizeNavItems = computed(() =>
-  [
+const organizeNavItems = computed(() => {
+  if (useGuestFocusNav.value) return []
+
+  return [
     { label: 'Meetings', iconName: 'calendar', to: '/meetings' },
     { label: 'Links', iconName: 'link', to: '/links' },
     { label: 'Reminders', iconName: 'bell', to: '/reminders' },
     { label: 'Playbooks', iconName: 'book-open', to: '/playbooks', enabled: playbooksEnabled.value },
-  ].filter((item) => item.enabled !== false),
-)
+  ].filter((item) => item.enabled !== false)
+})
 
 const navGroups = [
   {
@@ -1592,6 +1607,11 @@ const navGroups = [
 const filteredNavGroups = computed(() => {
   const creatorOn = !!activeWorkspaceSettings.value.creatorModeEnabled
   const leaderOn = !!activeWorkspaceSettings.value.leaderModeEnabled
+
+  if (useGuestFocusNav.value) {
+    return navGroups.filter((group) => group.key === 'ai')
+  }
+
   return navGroups
     .filter((group) => {
       if (group.key === 'creator') return creatorOn
@@ -1607,10 +1627,14 @@ const filteredNavGroups = computed(() => {
     })
 })
 
-const systemLinks = computed(() => [
-  { label: 'Workspaces', iconName: 'box', to: '/workspaces' },
-  { label: 'Settings', iconName: 'settings', to: '/settings' },
-])
+const systemLinks = computed(() => (
+  useGuestFocusNav.value
+    ? [{ label: 'Settings', iconName: 'settings', to: '/settings' }]
+    : [
+        { label: 'Workspaces', iconName: 'box', to: '/workspaces' },
+        { label: 'Settings', iconName: 'settings', to: '/settings' },
+      ]
+))
 const isAppleBillingSafeMode = computed(() => detectAppleBillingSafeMode())
 const billingRoutePath = computed(() => (isAppleBillingSafeMode.value ? '/billing/upgrade' : '/subscription'))
 const headerBillingRoute = computed(() => ({

@@ -285,7 +285,7 @@ async function completeGuestSetup() {
       noteProvided: intentionNote.value.trim().length > 0,
       source: route.query.guestFromLanding === '1' ? 'landing' : 'direct',
     })
-    trackSignupCompleted({ method: 'guest' })
+    trackSignupCompleted({ method: 'guest', registration: true })
     router.push('/dashboard')
   } catch (error) {
     console.error('Guest onboarding failed', error)

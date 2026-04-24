@@ -21,6 +21,7 @@ import {
   signInWithRedirect,
   linkWithRedirect,
   getRedirectResult,
+  getAdditionalUserInfo,
   signInWithPhoneNumber,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -1324,11 +1325,19 @@ export const useAuthStore = defineStore('authStore', {
           email: user.email,
           photoURL: user.photoURL,
           role: profile?.role || 'user',
+          mode: profile?.mode || 'guest',
+          isGuest: true,
+          isAnonymous: true,
+          firstVisitInitialized: profile?.firstVisitInitialized === true,
+          createdAt: profile?.createdAt || Date.now(),
         }
         this.guest = true
         this.token = await user.getIdToken()
         localStorage.setItem('user', JSON.stringify(this.user))
         localStorage.setItem('token', this.token)
+        try {
+          identifyUser(this.user)
+        } catch (_) {}
         try {
           if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
             const mod = await import('@/services/appTokenService.js')
@@ -1754,8 +1763,9 @@ export const useAuthStore = defineStore('authStore', {
           localStorage.setItem('token', this.token)
           try {
             identifyUser(this.user)
+            const additionalInfo = getAdditionalUserInfo(result)
             const method = (result?.providerId || (result?.user?.providerData || [])[0]?.providerId || '').includes('apple') ? 'apple' : 'google'
-            trackSignupCompleted({ method })
+            trackSignupCompleted({ method, registration: additionalInfo?.isNewUser === true })
           } catch (_) {}
           try {
             if (import.meta.env.VITE_USE_APP_TOKEN === '1') {
@@ -2468,6 +2478,9 @@ export const useAuthStore = defineStore('authStore', {
         })
         localStorage.setItem('user', JSON.stringify(this.user))
         if (this.token) localStorage.setItem('token', this.token)
+        try {
+          identifyUser(this.user)
+        } catch (_) {}
 
         if (platform === 'ios') {
           persistNativeIosAuthSnapshot(
@@ -2541,7 +2554,7 @@ export const useAuthStore = defineStore('authStore', {
 
         if (shouldTrackSignup) {
           try {
-            trackSignupCompleted({ method: 'email' })
+            trackSignupCompleted({ method: 'email', registration: true })
           } catch {}
         }
 

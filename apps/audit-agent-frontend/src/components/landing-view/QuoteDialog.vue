@@ -109,7 +109,7 @@
 
 <script setup>
 import { ref, watch, computed, nextTick } from 'vue'
-import { trackEvent } from '@/utils/mixpanel'
+import { trackEvent } from '@/services/analytics'
 import { useQuoteStore } from '@/stores/quoteStore'
 import { ElMessage } from 'element-plus'
 import { exportPDF, exportZip, exportMarkdown, exportDocx } from '@/utils/exportUtils'

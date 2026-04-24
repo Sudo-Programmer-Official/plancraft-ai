@@ -72,7 +72,7 @@
             type="primary"
             size="large"
             class="primary-team-cta hero-cta w-full sm:w-auto !px-8 !py-3.5 !rounded-2xl font-semibold"
-            @click="startSoloFlow"
+            @click="startGuestPlanner('hero')"
             >
             <span>Start Planning Free</span>
             </el-button
@@ -609,12 +609,13 @@
               </div>
               <div class="mt-auto">
                 <div class="text-3xl font-bold text-white mb-4">Free</div>
-                <RouterLink
-                  to="/login"
+                <button
+                  type="button"
                   class="inline-block w-full px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition shadow-lg shadow-indigo-800/40"
+                  @click="startGuestPlanner('solo_plan')"
                 >
                   Get Started
-                </RouterLink>
+                </button>
               </div>
             </div>
 
@@ -1225,6 +1226,29 @@ function startSoloFlow() {
   router.push({ path: '/login', query: { redirect: '/dashboard' } })
 }
 
+function startGuestPlanner(entry = 'landing') {
+  const hasSession = !!authStore?.user?.uid
+  if (hasSession) {
+    router.push('/dashboard')
+    return
+  }
+
+  try {
+    trackGuestStartFromLanding({
+      entry,
+    })
+  } catch {
+    /* analytics optional */
+  }
+  router.push({
+    path: '/signup',
+    query: {
+      guest: '1',
+      guestFromLanding: '1',
+    },
+  })
+}
+
 function scrollToTeamPricing() {
   if (typeof document !== 'undefined') {
     const el = document.getElementById('team-pricing')
@@ -1253,12 +1277,7 @@ function startTeamWorkspace(plan = 'starter') {
 }
 
 function continueAsGuest() {
-  try {
-    trackGuestStartFromLanding()
-  } catch {
-    /* analytics optional */
-  }
-  router.push({ path: '/login', query: { guestFromLanding: '1' } })
+  startGuestPlanner('solo_cta')
 }
 
 const stars = ref(null)

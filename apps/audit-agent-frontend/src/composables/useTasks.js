@@ -1,7 +1,7 @@
 // src/composables/useTasks.js
 import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { trackEvent } from '@/services/analytics'
+import { trackEvent, trackFirstTaskCreated, trackFirstVoiceTaskCreated } from '@/services/analytics'
 import { useAuthStore } from '@/stores/authStore'
 import { toLocalDateKey } from '@/utils/dateHelper'
 import {
@@ -477,14 +477,31 @@ export function useTasks() {
         uniqueById([normalized, ...allTasks.value.filter((t) => t.id !== optimisticId && t.id !== normalized.id)]),
       )
       syncFiltered()
+      const taskSource = String(newTask?.source || 'manual')
       try {
         trackEvent('Task Created', {
-          source: newTask?.source || 'manual',
+          source: taskSource,
           task_type: normalized?.category || 'Uncategorized',
           guest: !!authStore?.isGuest,
         })
       } catch (e) {
         console.warn('analytics: Task Created track failed', e)
+      }
+      try {
+        trackFirstTaskCreated({
+          source: taskSource,
+          task_type: normalized?.category || 'Uncategorized',
+          guest: !!authStore?.isGuest,
+        })
+        if (/(voice|speech|talk)/i.test(taskSource)) {
+          trackFirstVoiceTaskCreated({
+            source: taskSource,
+            task_type: normalized?.category || 'Uncategorized',
+            guest: !!authStore?.isGuest,
+          })
+        }
+      } catch (e) {
+        console.warn('analytics: first task activation track failed', e)
       }
       return normalized
     } catch (err) {

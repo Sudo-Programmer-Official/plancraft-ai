@@ -980,6 +980,11 @@ import PlanSummaryModal from "@/components/PlanSummaryModal.vue"
 import KnowledgePanel from "@/components/KnowledgePanel.vue"
 import ProposalInbox from "@/components/ProposalInbox.vue"
 import { useIsPremium } from "@/composables/useIsPremium"
+import {
+  trackCalendarConnected,
+  trackCalendarConnectStarted,
+  trackFirstReminderChannelSaved,
+} from '@/services/analytics'
 import { trackLinkedInConversion } from '@/utils/ads'
 import { getAuth, updateProfile as updateFirebaseProfile, updateEmail, GoogleAuthProvider, reauthenticateWithPopup, RecaptchaVerifier, PhoneAuthProvider, reauthenticateWithCredential } from 'firebase/auth'
 import AvatarUploader from '@/components/AvatarUploader.vue'
@@ -1680,6 +1685,14 @@ async function connectGoogle() {
       ElMessage.error('Failed to get Google consent URL')
       return
     }
+    try {
+      trackCalendarConnectStarted({
+        provider: 'google',
+        surface: 'settings',
+      })
+    } catch {
+      /* analytics optional */
+    }
     const opened = openExternalUrl(url)
     if (!opened) {
       ElMessage.error('Unable to open Google consent right now')
@@ -1741,6 +1754,7 @@ async function loadGoogle(options = {}) {
   if (!suppressLoader) googleLoading.value = true
   try {
     if (!authStore.user?.uid) return
+    const wasConnected = google.connected
     let status
     try {
       status = await getGoogleStatus(authStore.user.uid)
@@ -1767,6 +1781,17 @@ async function loadGoogle(options = {}) {
     if (desiredId) activeGoogleAccountId.value = desiredId
     if (google.accounts.length) {
       await loadGoogleCalendars(activeGoogleAccountId.value, { suppressLoader: true })
+    }
+    if (!wasConnected && google.connected) {
+      try {
+        trackCalendarConnected({
+          provider: 'google',
+          surface: 'settings',
+          account_count: google.accounts.length,
+        })
+      } catch {
+        /* analytics optional */
+      }
     }
   } catch (e) {
     console.warn('loadGoogle failed', e?.message || e)
@@ -2046,6 +2071,21 @@ async function saveSettings() {
       }
     }
     syncQuickSetupFromSettings()
+    try {
+      if (channels.length) {
+        trackFirstReminderChannelSaved({
+          surface: 'settings',
+          guest:
+            authStore?.guest === true ||
+            authStore?.isGuest === true ||
+            authStore?.user?.mode === 'guest',
+          channels: [...channels],
+          channel_count: channels.length,
+        })
+      }
+    } catch (error) {
+      console.warn('[Settings] reminder analytics failed', error?.message || error)
+    }
     ElMessage.success("✅ Settings saved successfully!")
     dirty.value = false // reset dirty flag
   } catch (error) {

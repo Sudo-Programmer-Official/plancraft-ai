@@ -221,6 +221,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { hasSubscription, registerPushSubscription } from '@/services/pushService'
 import { getIntegrations, getPreferences, getProfile, updateIntegrations, updatePreferences, updateProfile } from '@/services/settingsService'
 import { requestNativeReminderPermissions, syncNativeReminderQueueNow } from '@/services/nativeReminderService'
+import { trackFirstReminderChannelSaved } from '@/services/analytics'
 import { useAuthFlags } from '@/composables/useAuthFlags'
 import { useAuthStore } from '@/stores/authStore'
 import { guessCountryFromLocale, normalizePhone } from '@/utils/phoneUtils'
@@ -634,6 +635,18 @@ async function persistQuickSetup() {
       saveSuccess.value = nextState.requiredComplete
         ? 'Quick setup complete.'
         : 'Progress saved. You can finish the remaining items later.'
+    }
+    try {
+      if (selectedChannels.value.length) {
+        trackFirstReminderChannelSaved({
+          surface: 'quick_setup',
+          guest: isGuest.value,
+          channels: [...selectedChannels.value],
+          channel_count: selectedChannels.value.length,
+        })
+      }
+    } catch (error) {
+      console.warn('[QuickSetup] reminder analytics failed', error?.message || error)
     }
     return nextState
   } catch (error) {

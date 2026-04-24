@@ -321,7 +321,7 @@ import { queryPlannerAssistant } from '@/services/plannerService'
 import { requestSpeechUrl, supportsWebSpeech, speakWithWebSpeech } from '@/services/ttsService'
 import { useAuthStore } from '@/stores/authStore'
 import { ElMessage } from 'element-plus'
-import { trackEvent, trackAISuggestionAccepted } from '@/services/analytics'
+import { trackEvent, trackAISuggestionAccepted, trackFirstVoiceCapture } from '@/services/analytics'
 import { auth } from '@/firebase/init'
 import { getAppToken } from '@/services/appTokenService'
 import dayjs from 'dayjs'
@@ -410,6 +410,7 @@ const {
     stageVoiceResult(cleaned)
     try {
       trackEvent('Voice Transcribed', { length: cleaned.length, surface: 'talk_to_planner' })
+      trackFirstVoiceCapture({ surface: 'talk_to_planner' })
     } catch (_) {}
     await nextTick()
     syncComposerHeight()
