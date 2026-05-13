@@ -5,6 +5,7 @@ import { deliverVoiceCoach } from "../services/voiceCoachService.js";
 import { normalizeCronSpec } from "../utils/cronSpec.js";
 
 const USERS_COLLECTION = "users";
+const LOCK_COLLECTION = "job_locks";
 
 function isEnabled() {
   const raw = String(process.env.ENABLE_VOICE_COACH || "").trim().toLowerCase();
@@ -68,6 +69,28 @@ async function runOnce() {
   return { processed: stats.sent, skipped: stats.skipped };
 }
 
+async function acquireDailyRunLock() {
+  const dateKey = new Date().toISOString().slice(0, 10);
+  const lockId = `voice_coach_${dateKey}`;
+  const ref = db.collection(LOCK_COLLECTION).doc(lockId);
+  const owner = process.env.HOSTNAME || process.pid || "local";
+  let acquired = false;
+
+  await db.runTransaction(async (txn) => {
+    const snap = await txn.get(ref);
+    if (snap.exists) return;
+    txn.set(ref, {
+      createdAt: new Date(),
+      dateKey,
+      owner: String(owner),
+      job: "morning_coach",
+    });
+    acquired = true;
+  });
+
+  return { acquired, lockId, owner: String(owner) };
+}
+
 export function initMorningCoach() {
   if (!isEnabled()) {
     console.log("[VoiceCoach] scheduler disabled (set ENABLE_VOICE_COACH=1 to enable)");
@@ -78,6 +101,11 @@ export function initMorningCoach() {
   console.log(`[VoiceCoach] scheduler enabled (spec=${spec})`);
   cron.schedule(spec, async () => {
     try {
+      const lock = await acquireDailyRunLock();
+      if (!lock.acquired) {
+        console.log("[VoiceCoach] skipped duplicate morning run (lock exists)");
+        return;
+      }
       console.log("[VoiceCoach] cron triggered", new Date().toISOString());
       await runOnce();
     } catch (err) {

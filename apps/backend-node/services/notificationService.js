@@ -563,6 +563,16 @@ function htmlToText(value) {
     .trim()
 }
 
+function sanitizeVoiceText(value) {
+  if (!value) return ''
+  return String(value)
+    .replace(/[\u{1F300}-\u{1FAFF}]/gu, ' ')
+    .replace(/[\u{2600}-\u{27BF}]/gu, ' ')
+    .replace(/[*_`~#|<>[\]{}]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 function buildEmailShell(label, bodyHtml) {
   return `
     <!doctype html>
@@ -656,6 +666,7 @@ async function sendViaChannel(channel, userId, payload, contacts = {}, meta = {}
   }
 
   const voicePolicy = channel === 'voice' ? await resolveVoiceDeliveryPolicy(userId, meta) : null
+  const voiceBody = channel === 'voice' ? sanitizeVoiceText(payload.voiceMessage || payload.message || '') : null
   if (channel === 'voice' && !voicePolicy?.allowed) {
     console.info('[Notification] voice delivery skipped by allowance', {
       userId,
@@ -697,9 +708,9 @@ async function sendViaChannel(channel, userId, payload, contacts = {}, meta = {}
             ? whatsappBody
             : channel === 'email'
               ? emailContent?.text || payload.message
-              : channel === 'sms'
-                ? payload.smsMessage || payload.message
-                : payload.voiceMessage || payload.message,
+                : channel === 'sms'
+                  ? payload.smsMessage || payload.message
+                : voiceBody,
         html: channel === 'email' ? emailContent?.html || null : null,
         template: whatsappTemplate,
         subject: payload.subject || 'PlanCraftAI Update',
@@ -735,8 +746,8 @@ async function sendViaChannel(channel, userId, payload, contacts = {}, meta = {}
     )
   }
   if (channel === 'voice') {
-    if (!payload.voiceMessage) return null
-    const sid = await makeCallForUser(userId, payload.voiceMessage, payload.voiceOptions || {})
+    if (!voiceBody) return null
+    const sid = await makeCallForUser(userId, voiceBody, payload.voiceOptions || {})
     if (voicePolicy && !voicePolicy.isUnlimited && sid) {
       await incrementFreeVoiceUsage(userId, voicePolicy.dateKey)
     }
@@ -903,6 +914,7 @@ export async function notifyReminderDue(userId, itemsInput = [], options = {}) {
     (options.voiceMessage ||
       brandCopy?.voiceMessage ||
       buildVoiceSummary('Here is a quick summary of your reminder', reminders))
+  const cleanedVoiceMessage = voiceMessage ? sanitizeVoiceText(voiceMessage) : null
 
   const subject = options.subject || brandCopy?.subject || 'PlanCraftAI Reminder'
   const smsMessageBaseline = brandCopy?.sms || message.replace(/\*/g, '')
@@ -939,7 +951,7 @@ export async function notifyReminderDue(userId, itemsInput = [], options = {}) {
         taskIds: reminders.map((reminder) => reminder?.taskId).filter(Boolean),
       },
     },
-    voiceMessage,
+    voiceMessage: cleanedVoiceMessage,
     voiceOptions: options.voiceOptions || {},
     smsMessage: options.sms === false ? null : smsMessage,
   }

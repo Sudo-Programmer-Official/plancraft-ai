@@ -61,20 +61,20 @@ function buildCoachText(summary, profile = {}) {
     return {
       tone,
       headline: "Momentum Master!",
-      message: `🔥 ${name}, you’ve crushed the last week! Your streak is at ${streak} days and consistency is ${(consistency * 100).toFixed(0)}%. Keep the momentum going!`,
+      message: `${name}, your momentum is strong. You built a ${streak}-day streak and ${(consistency * 100).toFixed(0)} percent consistency. Protect this run with one focused win this morning.`,
     };
   }
   if (tone === "medium") {
     return {
       tone,
       headline: "Keep Building",
-      message: `👍 ${name}, you're on a solid streak. You hit ${(consistency * 100).toFixed(0)}% of your plan. Let’s push for one more win today.`,
+      message: `${name}, you're building real consistency at ${(consistency * 100).toFixed(0)} percent. Lock in one important task now and let that progress carry your day.`,
     };
   }
   return {
     tone,
     headline: "Fresh Start",
-    message: `💪 ${name}, every day is a new chance. Pick one small win today and I’ll be right here to celebrate with you.`,
+    message: `${name}, this is a clean start. Choose one small but meaningful task and finish it early. Small wins today become strong habits tomorrow.`,
   };
 }
 
