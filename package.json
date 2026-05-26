@@ -5,6 +5,7 @@
   "scripts": {
     "dev:quote": "pnpm --filter quote dev",
     "dev:page": "pnpm --filter page dev",
+    "dev:stack": "bash scripts/dev_stack.sh",
     "lint": "pnpm -r --if-present lint"
   },
   "dependencies": {

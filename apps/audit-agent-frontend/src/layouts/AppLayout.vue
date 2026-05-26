@@ -88,7 +88,7 @@
         <img src="/logo-bg-remove.png" alt="PlanCraftAI" class="h-9 w-9" />
         <div class="min-w-0">
           <div class="truncate text-lg font-semibold text-white">PlanCraftAI</div>
-          <div class="text-[11px] uppercase tracking-[0.28em] text-slate-500">Workspace OS</div>
+          <div class="text-[11px] uppercase tracking-[0.28em] text-slate-500">Daily Companion</div>
         </div>
       </div>
 
@@ -308,7 +308,7 @@
               <img src="/logo-bg-remove.png" alt="PlanCraftAI" class="h-9 w-9" />
               <div class="min-w-0">
                 <div class="truncate text-lg font-semibold text-white">PlanCraftAI</div>
-                <div class="text-[11px] uppercase tracking-[0.28em] text-slate-500">Workspace OS</div>
+                <div class="text-[11px] uppercase tracking-[0.28em] text-slate-500">Daily Companion</div>
               </div>
             </div>
             <button
@@ -555,7 +555,7 @@
           </button>
           <div class="header-title flex items-center gap-2 min-w-0">
             <h2 class="text-lg sm:text-2xl font-semibold capitalize truncate max-w-[36vw]">
-              {{ $route.name }}
+              {{ currentSectionTitle }}
             </h2>
             <button
               v-if="activeWorkspace?.name"
@@ -1515,25 +1515,37 @@ function utilityLinkClasses(path) {
   ]
 }
 
+const routeTitleOverrides = {
+  dashboard: 'Today',
+  today: 'Today',
+  inbox: 'Inbox',
+  'quick-add': 'Capture',
+  napkin: 'Capture',
+  workspaces: 'Workspace',
+}
+
+const currentSectionTitle = computed(() => {
+  const routeName = String(route.name || '').trim()
+  if (routeName && routeTitleOverrides[routeName]) return routeTitleOverrides[routeName]
+  return routeName || 'Workspace'
+})
+
 const coreNavItems = computed(() => {
-  const items = [
-    { label: 'Dashboard', iconName: 'dashboard', to: '/dashboard' },
-    { label: 'Inbox', iconName: 'inbox', to: '/inbox' },
-    { label: 'Planner', iconName: 'compass', to: '/planner' },
-    { label: 'Notes', iconName: 'file-text', to: '/napkin' },
-  ]
+  const items = useGuestFocusNav.value
+    ? [
+        { label: 'Today', iconName: 'dashboard', to: '/dashboard' },
+        { label: 'Capture', iconName: 'file-text', to: '/quick-add' },
+      ]
+    : [
+        { label: 'Today', iconName: 'dashboard', to: '/dashboard' },
+        { label: 'Capture', iconName: 'file-text', to: '/quick-add' },
+        { label: 'Workspace', iconName: 'box', to: '/workspaces' },
+      ]
   return items.filter((item) => item.enabled !== false)
 })
 
 const organizeNavItems = computed(() => {
-  if (useGuestFocusNav.value) return []
-
-  return [
-    { label: 'Meetings', iconName: 'calendar', to: '/meetings' },
-    { label: 'Links', iconName: 'link', to: '/links' },
-    { label: 'Reminders', iconName: 'bell', to: '/reminders' },
-    { label: 'Playbooks', iconName: 'book-open', to: '/playbooks', enabled: playbooksEnabled.value },
-  ].filter((item) => item.enabled !== false)
+  return []
 })
 
 const navGroups = [
@@ -1625,13 +1637,33 @@ const filteredNavGroups = computed(() => {
         children: group.children.filter((child) => autoDeployEnabled.value || child.to !== '/creator/publish'),
       }
     })
+    .map((group) => {
+      if (group.key === 'planning') {
+        return {
+          ...group,
+          children: [{ label: 'Planner', to: '/planner' }, ...group.children],
+        }
+      }
+      if (group.key === 'review') {
+        return {
+          ...group,
+          children: [
+            { label: 'Meetings', to: '/meetings' },
+            { label: 'Reminders', to: '/reminders' },
+            { label: 'Links', to: '/links' },
+            { label: 'Playbooks', to: '/playbooks', enabled: playbooksEnabled.value },
+            ...group.children,
+          ].filter((item) => item.enabled !== false),
+        }
+      }
+      return group
+    })
 })
 
 const systemLinks = computed(() => (
   useGuestFocusNav.value
     ? [{ label: 'Settings', iconName: 'settings', to: '/settings' }]
     : [
-        { label: 'Workspaces', iconName: 'box', to: '/workspaces' },
         { label: 'Settings', iconName: 'settings', to: '/settings' },
       ]
 ))

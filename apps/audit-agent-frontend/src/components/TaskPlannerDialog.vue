@@ -466,7 +466,7 @@ const repeatPresetOptions = [
   { value: 'off', label: 'Once' },
   { value: 'daily', label: 'Daily' },
   { value: 'weekly', label: 'Weekly' },
-  { value: 'weekend', label: 'Weekend' },
+  { value: 'weekend', label: 'Weekend (Sat/Sun)' },
   { value: 'monthly', label: 'Monthly' },
   { value: 'custom', label: 'Custom' },
 ]
@@ -743,8 +743,8 @@ const repeatHelperText = computed(() => {
   }
   if (repeatType.value === 'weekend') {
     return isWeekendDate(selectedDate.value)
-      ? `Repeats every ${weekendDayLabel(selectedDate.value)} after you complete it.`
-      : 'Weekend tasks are scheduled for Saturday or Sunday. Weekday picks move to Saturday.'
+      ? `Repeats weekly on ${weekendDayLabel(selectedDate.value)} after you complete it.`
+      : 'Weekend repeat runs weekly on Saturday or Sunday. Weekday picks move to Saturday.'
   }
   if (repeatType.value === 'custom') {
     return `Creates the next task ${Math.max(1, Number(repeatIntervalDays.value) || 1)} day(s) after completion.`
@@ -1795,7 +1795,7 @@ async function save() {
     if (props.lockDate) {
       ElMessage({
         type: 'warning',
-        message: 'Weekend repeats need a Saturday or Sunday date.',
+        message: 'Weekend (Sat/Sun) repeat needs a Saturday or Sunday date.',
         duration: 3500,
       })
       return

@@ -27,6 +27,7 @@ const DEFAULT_CHANNELS = (ENV_DEFAULT_CHANNELS && ENV_DEFAULT_CHANNELS.length)
   ? ENV_DEFAULT_CHANNELS
   : ['pwa', 'whatsapp'];
 const MAX_DELAY_MS = 24 * 60 * 60 * 1000;
+const REMINDER_DISPATCH_LOCK_TTL_MS = 15 * 60 * 1000;
 
 function coerceDateValue(input) {
   if (!input && input !== 0) return null;
@@ -187,6 +188,48 @@ function getSalutationToken(opts = {}) {
     if (gender === 'female') return 'Queen'
   } catch {}
   return 'there'
+}
+
+async function acquireReminderDispatchLock(reminderId) {
+  if (!reminderId) return { acquired: false, reason: 'missing_id' };
+  const ref = db.collection("reminders").doc(String(reminderId));
+  const now = Date.now();
+  let outcome = { acquired: false, reason: 'unknown' };
+
+  await db.runTransaction(async (txn) => {
+    const snap = await txn.get(ref);
+    if (!snap.exists) {
+      outcome = { acquired: false, reason: 'not_found' };
+      return;
+    }
+    const data = snap.data() || {};
+    const status = String(data?.status || '').toLowerCase();
+    if (data?.sentAt || status === 'sent') {
+      outcome = { acquired: false, reason: 'already_sent' };
+      return;
+    }
+
+    const lockDate = coerceDateValue(data?.dispatchingAt);
+    const lockMs = lockDate ? lockDate.getTime() : null;
+    const lockActive = Number.isFinite(lockMs) && now - lockMs < REMINDER_DISPATCH_LOCK_TTL_MS;
+    if (status === 'sending' && lockActive) {
+      outcome = { acquired: false, reason: 'already_dispatching' };
+      return;
+    }
+
+    txn.set(
+      ref,
+      {
+        status: "sending",
+        dispatchingAt: new Date(now),
+        updatedAt: new Date(now),
+      },
+      { merge: true },
+    );
+    outcome = { acquired: true };
+  });
+
+  return outcome;
 }
 
 // ---------------------------------------------
@@ -359,6 +402,20 @@ export async function createReminderFromText(
 // 2️⃣ SEND REMINDER (Triggered by Scheduler)
 // ---------------------------------------------
 export async function sendReminder(reminder) {
+  const reminderId = String(reminder?.id || reminder?._id || "");
+  if (!reminderId) {
+    console.warn("[ReminderService:delivery] Missing reminder id; skipping dispatch");
+    return;
+  }
+  const lock = await acquireReminderDispatchLock(reminderId);
+  if (!lock?.acquired) {
+    console.log("[ReminderService:delivery] Skipping duplicate dispatch", {
+      id: reminderId,
+      reason: lock?.reason || 'lock_rejected',
+    });
+    return;
+  }
+
   const channels = Array.isArray(reminder?.channels) ? reminder.channels : [];
   const userId = String(reminder?.userId || "");
   const task = String(reminder?.task || "");
@@ -429,7 +486,7 @@ export async function sendReminder(reminder) {
   } catch (err) {
     console.error("[ReminderService:delivery] notifyReminderDue failed", err?.message || err);
   } finally {
-    await db.collection("reminders").doc(String(reminder.id || reminder._id || "")).set({ sentAt: new Date(), status: "sent" }, { merge: true });
+    await db.collection("reminders").doc(reminderId).set({ sentAt: new Date(), status: "sent", dispatchingAt: null }, { merge: true });
   }
 }
 
@@ -489,7 +546,7 @@ export function queueReminder(rem) {
           return;
         }
         const data = snap.data() || {};
-        if (data?.sentAt || (data?.status && String(data.status).toLowerCase() === "sent")) {
+        if (data?.sentAt || (data?.status && ["sent", "sending"].includes(String(data.status).toLowerCase()))) {
           console.log(`[ReminderService:scheduler] Reminder ${id} already sent; skipping dispatch`);
           return;
         }
@@ -553,7 +610,7 @@ export async function processReminderBatches(options = {}) {
   snap.forEach((doc) => {
     const data = doc.data() || {};
     if (data?.sentAt) return;
-    if (data?.status && String(data.status).toLowerCase() === "sent") return;
+    if (data?.status && ["sent", "sending"].includes(String(data.status).toLowerCase())) return;
     pending.push({ id: doc.id, ...data });
   });
 
