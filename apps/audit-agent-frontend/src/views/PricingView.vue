@@ -1,69 +1,77 @@
 <template>
-  <template v-if="isAppleBillingSafeMode">
-    <div class="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
-      <div class="rounded-3xl border border-white/10 bg-gradient-to-br from-slate-900/85 via-indigo-950/80 to-slate-900/85 p-8 sm:p-10 shadow-2xl space-y-8">
-        <div class="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-          <div class="space-y-6">
-            <div class="space-y-3">
-              <p class="text-sm uppercase tracking-[0.35em] text-indigo-300">Solo Premium</p>
-              <h1 class="text-3xl sm:text-4xl font-semibold text-white">Upgrade to Solo Premium on iPhone</h1>
-              <p class="max-w-3xl text-indigo-100/85 text-base sm:text-lg">
-                Solo Premium is available via Apple In-App Purchase at $2.99/month. Team plans are
-                managed by workspace owners on web.
+  <div class="pricing-page-root">
+    <template v-if="isAppleBillingSafeMode">
+      <div class="max-w-5xl mx-auto px-4 sm:px-6 pt-8 pb-3 sm:py-16">
+        <div class="rounded-3xl border border-white/10 bg-gradient-to-br from-slate-900/85 via-indigo-950/80 to-slate-900/85 p-8 sm:p-10 shadow-2xl space-y-8">
+          <div class="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+            <div class="space-y-6">
+              <div class="space-y-3">
+                <p class="text-sm uppercase tracking-[0.35em] text-indigo-300">Solo Premium</p>
+                <h1 class="text-3xl sm:text-4xl font-semibold text-white">Upgrade to Solo Premium on iPhone</h1>
+                <p class="max-w-3xl text-indigo-100/85 text-base sm:text-lg">
+                  Solo Premium is available via Apple In-App Purchase at $2.99/month. Team plans are
+                  managed by workspace owners on web.
+                </p>
+              </div>
+
+              <AppleSoloPremiumCard />
+            </div>
+            <div class="space-y-4">
+              <div class="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-3">
+                <p class="text-xs uppercase tracking-[0.24em] text-indigo-200">Already subscribed?</p>
+                <ul class="space-y-2 text-sm text-indigo-100/90">
+                  <li>Sign in with the same account you use for Solo Premium or your team workspace.</li>
+                  <li>Use restore purchases for Apple subscriptions, or refresh access for existing synced billing.</li>
+                  <li>Your premium features unlock automatically when the account entitlement is active.</li>
+                </ul>
+              </div>
+              <div class="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-3">
+                <p class="text-xs uppercase tracking-[0.24em] text-indigo-200">For team workspaces</p>
+                <ul class="space-y-2 text-sm text-indigo-100/90">
+                  <li>Team plans are managed by workspace owners on web.</li>
+                  <li>Paid workspace memberships sync to your account after the next refresh.</li>
+                  <li>No team pricing or external checkout is shown in the iPhone app.</li>
+                </ul>
+              </div>
+
+              <div class="flex flex-wrap gap-3">
+                <RouterLink
+                  v-if="!authStore.user?.uid"
+                  to="/login"
+                  class="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
+                >
+                  Sign in
+                </RouterLink>
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:border-indigo-300/40"
+                  @click="refreshPremiumAccess"
+                >
+                  Refresh access
+                </button>
+              </div>
+
+              <p class="text-sm text-indigo-100/70">
+                Existing Solo Premium access and paid workspace access sync automatically after sign-in.
               </p>
             </div>
-
-            <AppleSoloPremiumCard />
-          </div>
-          <div class="space-y-4">
-            <div class="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-3">
-              <p class="text-xs uppercase tracking-[0.24em] text-indigo-200">Already subscribed?</p>
-              <ul class="space-y-2 text-sm text-indigo-100/90">
-                <li>Sign in with the same account you use for Solo Premium or your team workspace.</li>
-                <li>Use restore purchases for Apple subscriptions, or refresh access for existing synced billing.</li>
-                <li>Your premium features unlock automatically when the account entitlement is active.</li>
-              </ul>
-            </div>
-            <div class="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-3">
-              <p class="text-xs uppercase tracking-[0.24em] text-indigo-200">For team workspaces</p>
-              <ul class="space-y-2 text-sm text-indigo-100/90">
-                <li>Team plans are managed by workspace owners on web.</li>
-                <li>Paid workspace memberships sync to your account after the next refresh.</li>
-                <li>No team pricing or external checkout is shown in the iPhone app.</li>
-              </ul>
-            </div>
-
-            <div class="flex flex-wrap gap-3">
-              <RouterLink
-                v-if="!authStore.user?.uid"
-                to="/login"
-                class="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
-              >
-                Sign in
-              </RouterLink>
-              <button
-                type="button"
-                class="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:border-indigo-300/40"
-                @click="refreshPremiumAccess"
-              >
-                Refresh access
-              </button>
-            </div>
-
-            <p class="text-sm text-indigo-100/70">
-              Existing Solo Premium access and paid workspace access sync automatically after sign-in.
-            </p>
           </div>
         </div>
       </div>
-    </div>
-  </template>
-  <template v-else>
-    <div class="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+    </template>
+    <template v-else>
+      <div class="max-w-5xl mx-auto px-4 sm:px-6 pt-6 pb-12 sm:pt-8 sm:pb-16">
       <div class="mb-6 sm:mb-8">
         <p class="text-sm uppercase tracking-[0.35em] text-indigo-300">Solo</p>
         <h3 class="text-3xl font-semibold text-white">Solo plans</h3>
         <p class="text-indigo-200">Personal pricing for individual workspaces.</p>
+      </div>
+      <div class="mb-6 rounded-2xl border border-indigo-400/30 bg-indigo-500/10 p-4 sm:p-5">
+        <p class="text-xs uppercase tracking-[0.24em] text-indigo-200">Premium outcome</p>
+        <p class="mt-2 text-lg font-semibold text-white">Get your first reminder loop working in minutes</p>
+        <p class="mt-1 text-sm text-indigo-100/85">
+          Capture tasks, get nudges on your preferred channels, and follow through with less friction.
+        </p>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
         <div class="bg-gray-900 rounded-2xl shadow-lg p-8 border border-gray-700">
@@ -130,12 +138,12 @@
             class="w-full py-2 rounded-lg bg-black/20 text-white font-semibold hover:bg-black/30 transition disabled:opacity-60 text-sm sm:text-base"
           >
             <span v-if="loading">Redirecting…</span>
-            <span v-else>Upgrade Now</span>
+            <span v-else>Start Premium — $2/mo</span>
           </button>
         </div>
       </div>
     </div>
-    <div id="teams" class="max-w-5xl mx-auto px-4 sm:px-6 mt-10 space-y-4">
+      <div id="teams" class="max-w-5xl mx-auto px-4 sm:px-6 mt-0 sm:mt-10 space-y-4">
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <p class="text-sm uppercase tracking-[0.35em] text-indigo-300">Teams & Workspaces</p>
@@ -216,11 +224,31 @@
         </div>
       </div>
     </div>
-    <div class="text-center text-sm mt-6">
-      <p v-if="$route.query.status === 'success'" class="text-green-400">✅ Payment complete. Premium is now active! 🎉</p>
-      <p v-else-if="$route.query.status === 'cancel'" class="text-red-400">❌ Checkout canceled. You can try again anytime.</p>
-    </div>
-  </template>
+      <div class="text-center text-sm mt-6">
+        <p v-if="$route.query.status === 'success'" class="text-green-400">✅ Payment complete. Premium is now active! 🎉</p>
+        <p v-else-if="$route.query.status === 'cancel'" class="text-red-400">❌ Checkout canceled. You can try again anytime.</p>
+      </div>
+      <div
+        v-if="showMobileStickyUpgrade"
+        class="fixed inset-x-0 bottom-0 z-[60] border-t border-white/10 bg-slate-950/95 px-4 py-3 backdrop-blur sm:hidden"
+      >
+        <div class="mx-auto flex max-w-5xl items-center justify-between gap-3">
+          <div class="min-w-0">
+            <p class="text-[11px] uppercase tracking-[0.22em] text-indigo-200/80">Solo Premium</p>
+            <p class="truncate text-sm font-semibold text-white">
+              {{ offerActive ? '$2/mo limited offer' : '$2/mo' }}
+            </p>
+          </div>
+          <button
+            :disabled="loading"
+            @click="onUpgrade"
+            class="shrink-0 rounded-lg bg-gradient-to-r from-fuchsia-500 to-indigo-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+          >
+            {{ loading ? 'Redirecting…' : 'Upgrade' }}
+          </button>
+        </div>
+      </div>
+    </template>
   <el-dialog
     v-model="dialogVisible"
     title="Cancel Subscription"
@@ -246,6 +274,7 @@
     title="Action Failed"
     message="❌ We couldn't complete that action. Please try again later."
   />
+  </div>
 </template>
 
 <script setup>
@@ -336,6 +365,16 @@ const isAppleManagedPremium = computed(() => {
 })
 
 const dialogVisible = ref(false)
+const showMobileStickyUpgrade = computed(() => !isAppleBillingSafeMode && !isPremium.value)
+
+function trackSubscriptionFunnel(step, extra = {}) {
+  trackEvent(`subscription_funnel_${step}`, {
+    surface: 'subscription_page',
+    is_apple_billing_mode: !!isAppleBillingSafeMode,
+    is_premium: !!isPremium.value,
+    ...extra,
+  })
+}
 
 function stopPromoTimer() {
   if (promoTimer) {
@@ -404,6 +443,7 @@ function startPromoTimer() {
 // }
 async function onUpgrade() {
   if (isAppleBillingSafeMode) {
+    trackSubscriptionFunnel('cta_click', { cta: 'solo_upgrade', target: 'billing_upgrade' })
     return router.push(billingSafeRoute)
   }
   try {
@@ -411,6 +451,7 @@ async function onUpgrade() {
     const isGuest = authStore.isGuest === true || authStore.guest === true || authStore.user?.mode === 'guest'
 
     if (!authStore.user?.uid || isGuest) {
+      trackSubscriptionFunnel('cta_click', { cta: 'solo_upgrade', auth_state: 'logged_out_or_guest' })
       try {
         trackLinkedInConversion(import.meta.env.VITE_LI_CONV_UPGRADE_CLICK)
       } catch {
@@ -441,12 +482,14 @@ async function onUpgrade() {
 
     // Proceed with checkout
     loading.value = true
+    trackSubscriptionFunnel('cta_click', { cta: 'solo_upgrade', auth_state: 'signed_in' })
     trackEvent('upgrade_started')
     try {
       trackLinkedInConversion(import.meta.env.VITE_LI_CONV_UPGRADE_CLICK)
     } catch {
       /* noop */
     }
+    trackSubscriptionFunnel('checkout_redirect', { cta: 'solo_upgrade' })
     const url = await createCheckoutSession('monthly', authStore.user?.uid)
     window.location.href = url
 
@@ -491,6 +534,7 @@ function handleTeamCta(plan = 'starter') {
 }
 
 onMounted(() => {
+  trackSubscriptionFunnel('page_view')
   if (isAppleBillingSafeMode) {
     stopPromoTimer()
     return
@@ -520,6 +564,7 @@ onMounted(() => {
   const isReactivated = qs.includes('reactivated=1')
   const wantsUpgrade = (new URLSearchParams(qs).get('upgrade') === '1') || localStorage.getItem('upgradeAfterLogin') === '1'
   if (isSuccess) {
+    trackSubscriptionFunnel('success', { source: 'query_status_success' })
     trackEvent('upgrade_success')
     try {
       ElNotification({ title: '🎉 Payment successful', message: 'Premium is now active!', type: 'success', duration: 2600, offset: 80 })

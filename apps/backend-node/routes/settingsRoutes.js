@@ -2,6 +2,7 @@ import express from 'express'
 import { db } from '../services/firebaseAdmin.js'
 import { requireAuth, ensureUserMatches } from '../middleware/auth.js'
 import { normalizePhone, guessCountry } from '../utils/phone.js'
+import { makeCallForUser } from '../services/twilioService.js'
 
 const router = express.Router()
 router.use(requireAuth, ensureUserMatches)
@@ -9,6 +10,7 @@ router.use(requireAuth, ensureUserMatches)
 const CHANNEL_ALLOW_LIST = ['email','pwa','whatsapp','sms','voice_call']
 const ACTION_INBOX_NUDGE_CHANNELS = ['email', 'pwa', 'whatsapp']
 const ACTION_INBOX_NUDGE_URGENCY = ['important', 'urgent_only']
+const MORNING_CALL_TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/
 
 function clampMinutes(value) {
   const num = Number(value)
@@ -35,6 +37,20 @@ function parseDateInput(value) {
   if (value instanceof Date) return value
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? undefined : date
+}
+
+function sanitizeMorningCoachPrefs(raw = {}) {
+  const out = {}
+  if (raw.enabled !== undefined) out.enabled = !!raw.enabled
+  if (raw.firstCallTime !== undefined) {
+    const time = String(raw.firstCallTime || '').trim()
+    out.firstCallTime = MORNING_CALL_TIME_RE.test(time) ? time : '09:00'
+  }
+  if (raw.customMessage !== undefined) {
+    const customMessage = String(raw.customMessage || '').trim()
+    out.customMessage = customMessage ? customMessage.slice(0, 600) : ''
+  }
+  return out
 }
 
 // POST /api/settings/updatePreferences
@@ -102,6 +118,7 @@ router.post('/settings/updatePreferences', async (req, res) => {
     if (clampedMinutes !== null) {
       meetingPayload.defaultReminderMinutes = clampedMinutes
     }
+    const morningCoachPayload = sanitizeMorningCoachPrefs(preferences?.morningCoach || {})
 
     await db.collection('users').doc(userId).set(
       {
@@ -128,6 +145,7 @@ router.post('/settings/updatePreferences', async (req, res) => {
             whatsapp: !!preferences?.integrations?.whatsapp,
           },
           ...(Object.keys(meetingPayload).length ? { meetings: meetingPayload } : {}),
+          ...(Object.keys(morningCoachPayload).length ? { morningCoach: morningCoachPayload } : {}),
         },
         updatedAt: new Date(),
       },
@@ -138,6 +156,79 @@ router.post('/settings/updatePreferences', async (req, res) => {
   } catch (err) {
     console.error('❌ updatePreferences error:', err)
     res.status(500).json({ error: 'Failed to update preferences' })
+  }
+})
+
+router.post('/settings/test-morning-call', async (req, res) => {
+  try {
+    const { userId, message } = req.body || {}
+    if (!userId) return res.status(400).json({ error: 'Missing userId' })
+
+    const text = String(message || '').trim()
+    if (!text) return res.status(400).json({ error: 'Missing message' })
+
+    await makeCallForUser(String(userId), text, { source: 'settings_test_morning_call' })
+    return res.json({ success: true })
+  } catch (err) {
+    console.error('❌ test-morning-call error:', err)
+    return res.status(500).json({ error: err?.message || 'Failed to send test morning call' })
+  }
+})
+
+// POST /api/settings/welcome-call
+// Body: { userId, force?: boolean }
+router.post('/settings/welcome-call', async (req, res) => {
+  try {
+    const { userId, force } = req.body || {}
+    if (!userId) return res.status(400).json({ error: 'Missing userId' })
+
+    const ref = db.collection('users').doc(String(userId))
+    const snap = await ref.get()
+    const data = snap.exists ? snap.data() : {}
+    const onboarding = data?.preferences?.onboarding || {}
+    const alreadyCalledAt = onboarding?.welcomeCallSentAt || null
+
+    if (alreadyCalledAt && force !== true) {
+      return res.json({
+        success: true,
+        skipped: true,
+        reason: 'already_sent',
+        welcomeCallSentAt: alreadyCalledAt,
+      })
+    }
+
+    const message =
+      'Hi, this is PlanCraft AI. Save this number as PlanCraft AI to recognize future reminder calls. ' +
+      'You can reply on WhatsApp or adjust channels in Settings anytime. Welcome aboard.'
+
+    const sid = await makeCallForUser(String(userId), message, {
+      source: 'welcome_intro',
+      bypassChecks: force === true,
+    })
+
+    const nowIso = new Date().toISOString()
+    await ref.set(
+      {
+        preferences: {
+          onboarding: {
+            welcomeCallSentAt: nowIso,
+            welcomeCallSid: sid || null,
+          },
+        },
+        updatedAt: new Date(),
+      },
+      { merge: true },
+    )
+
+    return res.json({
+      success: true,
+      sid: sid || null,
+      welcomeCallSentAt: nowIso,
+    })
+  } catch (err) {
+    const status = /phone not configured/i.test(String(err?.message || '')) ? 400 : 500
+    console.error('❌ welcome-call error:', err)
+    return res.status(status).json({ error: err?.message || 'Failed to send welcome call' })
   }
 })
 

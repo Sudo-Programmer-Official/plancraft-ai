@@ -102,7 +102,15 @@
           </p>
         </header>
 
-        <div class="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 space-y-4 shadow-xl">
+        <div class="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 pb-24 sm:pb-6 space-y-4 shadow-xl">
+          <div class="rounded-xl border border-indigo-400/30 bg-indigo-500/10 p-4 text-sm text-indigo-100">
+            <p class="text-xs uppercase tracking-[0.2em] text-indigo-200/80">What you unlock</p>
+            <p class="mt-1 text-base font-semibold text-white">Shared accountability + reliable reminder flows for your team</p>
+            <p class="mt-1 text-indigo-100/85">
+              Upgrade once at workspace level so everyone gets the same follow-through system.
+            </p>
+          </div>
+
           <div class="grid gap-4 sm:grid-cols-2">
             <label class="space-y-1">
               <span class="text-sm text-indigo-200/80">Workspace ID</span>
@@ -143,6 +151,17 @@
             </ul>
           </div>
 
+          <div class="rounded-xl border border-white/10 bg-slate-900/70 p-4 space-y-2">
+            <p class="text-xs uppercase tracking-[0.2em] text-indigo-200/80">Checkout preview</p>
+            <p class="text-sm text-indigo-100">
+              Plan: <span class="font-semibold text-white">{{ planLabel }}</span> · Seats:
+              <span class="font-semibold text-white">{{ seats }}</span>
+            </p>
+            <p class="text-xs text-indigo-100/75">
+              You will be redirected to Stripe Checkout and can cancel anytime.
+            </p>
+          </div>
+
           <button
             class="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-lg shadow-indigo-900/40"
             :disabled="submitting || !workspaceId || !isOwner"
@@ -150,8 +169,27 @@
           >
             {{ submitting ? 'Redirecting…' : 'Start Checkout' }}
           </button>
-          <p v-if="!isOwner" class="text-sm text-amber-200">Only workspace owners can upgrade billing.</p>
+          <p v-if="!isOwner" class="text-sm text-amber-200">Only workspace owners can upgrade billing. Ask the owner to open this page.</p>
           <p v-if="error" class="text-sm text-rose-200">{{ error }}</p>
+        </div>
+
+        <div
+          v-if="showMobileStickyCheckout"
+          class="fixed inset-x-0 bottom-0 z-[60] border-t border-white/10 bg-slate-950/95 px-4 py-3 backdrop-blur sm:hidden"
+        >
+          <div class="mx-auto flex max-w-3xl items-center justify-between gap-3">
+            <div class="min-w-0">
+              <p class="text-[11px] uppercase tracking-[0.22em] text-indigo-200/80">{{ planLabel }}</p>
+              <p class="truncate text-sm font-semibold text-white">{{ seats }} seats · Stripe checkout</p>
+            </div>
+            <button
+              class="shrink-0 rounded-lg bg-gradient-to-r from-fuchsia-500 to-indigo-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              :disabled="submitting || !workspaceId || !isOwner"
+              @click="submit"
+            >
+              {{ submitting ? 'Redirecting…' : 'Checkout' }}
+            </button>
+          </div>
         </div>
       </template>
     </div>
@@ -169,6 +207,7 @@ import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
 import AppleSoloPremiumCard from '@/components/AppleSoloPremiumCard.vue'
+import { trackEvent } from '@/services/analytics'
 
 const route = useRoute()
 const router = useRouter()
@@ -210,6 +249,21 @@ const isOwner = computed(() => {
   const uid = authStore?.user?.uid
   return !!uid && !!selectedWorkspace.value && selectedWorkspace.value.ownerId === uid
 })
+const showMobileStickyCheckout = computed(() =>
+  !isAppleBillingSafeMode.value && !!workspaceId.value && isOwner.value,
+)
+
+function trackBillingUpgradeFunnel(step, extra = {}) {
+  trackEvent(`subscription_funnel_${step}`, {
+    surface: 'billing_upgrade',
+    is_apple_billing_mode: !!isAppleBillingSafeMode.value,
+    workspace_id: workspaceId.value || null,
+    plan: plan.value || null,
+    seats: Number(seats.value || 0),
+    is_owner: !!isOwner.value,
+    ...extra,
+  })
+}
 const appleBillingEyebrow = computed(() => (
   showHeaderFreePlanFlow.value ? 'Solo Premium' : isTeamBillingContext.value ? 'Team billing' : 'Billing'
 ))
@@ -268,9 +322,12 @@ const headerFreePlanSteps = [
 ]
 
 onMounted(async () => {
+  trackBillingUpgradeFunnel('page_view')
   try {
     if (!workspaceStore.hydrated) await workspaceStore.init()
-  } catch {}
+  } catch {
+    /* noop */
+  }
   const qsPlan = route.query.plan
   const qsWs = route.query.workspaceId
   if (typeof qsPlan === 'string') plan.value = qsPlan
@@ -299,7 +356,9 @@ function goBack() {
       router.back()
       return
     }
-  } catch {}
+  } catch {
+    /* noop */
+  }
   router.push('/dashboard')
 }
 
@@ -310,11 +369,15 @@ async function refreshAccess() {
       await accessStore.fetchAccess(uid, { force: true, minIntervalMs: 0 })
       await subStore.fetchStatus(uid, { force: true, minIntervalMs: 0 })
     }
-  } catch {}
+  } catch {
+    /* noop */
+  }
 
   try {
     await workspaceStore.init()
-  } catch {}
+  } catch {
+    /* noop */
+  }
 
   ElMessage.success('Account access refreshed')
   goBack()
@@ -324,6 +387,7 @@ async function submit() {
   submitting.value = true
   error.value = ''
   try {
+    trackBillingUpgradeFunnel('cta_click', { cta: 'workspace_checkout' })
     const { data } = await api.post('/billing/checkout', {
       workspaceId: workspaceId.value,
       plan: plan.value,
@@ -331,6 +395,7 @@ async function submit() {
     })
     const url = data?.url
     if (url) {
+      trackBillingUpgradeFunnel('checkout_redirect', { cta: 'workspace_checkout' })
       window.location.href = url
       return
     }

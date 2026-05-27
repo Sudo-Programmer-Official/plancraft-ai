@@ -193,7 +193,7 @@
       </div>
     </div>
 
-    <section class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-6">
+    <section v-if="!isMobileDashboard" class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-6">
       <div class="dashboard-card flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div class="space-y-1">
           <p class="text-[11px] uppercase tracking-[0.3em] text-indigo-200/80">Layout</p>
@@ -222,6 +222,24 @@
             Show all
           </button>
         </div>
+      </div>
+    </section>
+
+    <section v-if="isMobileDashboard" class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-6">
+      <div class="dashboard-card flex items-center justify-between gap-3">
+        <div class="space-y-1">
+          <p class="text-[11px] uppercase tracking-[0.3em] text-indigo-200/80">Workspace Modules</p>
+          <p class="text-xs text-indigo-200/80">
+            {{ mobileModulesExpanded ? 'Showing full dashboard' : 'Showing focused daily view' }}
+          </p>
+        </div>
+        <button
+          type="button"
+          class="px-3 py-1.5 rounded-lg border border-white/20 bg-transparent text-xs text-indigo-100 hover:border-indigo-300/70 transition"
+          @click="mobileModulesExpanded = !mobileModulesExpanded"
+        >
+          {{ mobileModulesExpanded ? 'Show less' : 'Show more' }}
+        </button>
       </div>
     </section>
 
@@ -475,7 +493,7 @@
       </div>
 
     <div
-      v-if="showAllTasks"
+      v-if="showAllTasks && showOptionalModules"
       class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-5"
     >
         <div class="dashboard-card all-tasks-card max-w-full min-w-0 space-y-5">
@@ -688,7 +706,7 @@
 
     <section class="space-y-4 lg:space-y-5 order-7">
         <div
-          v-if="showWeekly"
+          v-if="showWeekly && showOptionalModules"
           class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4"
         >
         <div class="dashboard-card weekly-card space-y-4">
@@ -786,7 +804,7 @@
       </div>
 
       <div
-        v-if="showQuickLinks"
+        v-if="showQuickLinks && showOptionalModules"
         class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4"
       >
         <div class="dashboard-card quick-links-card">
@@ -795,7 +813,7 @@
       </div>
 
       <div
-        v-if="showMonthly"
+        v-if="showMonthly && showOptionalModules"
         class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4"
       >
         <div class="dashboard-card monthly-card space-y-4">
@@ -827,7 +845,7 @@
         </div>
       </div>
 
-      <div class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4">
+      <div v-if="showOptionalModules" class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4">
         <div
           class="dashboard-card calendar-sync-card space-y-4 bg-gradient-to-br from-indigo-900/70 via-purple-900/60 to-slate-900/70 border border-indigo-600/40 shadow-lg"
         >
@@ -922,7 +940,7 @@
 <!-- Tier 3 · Analytics & Insights -->
 <section class="space-y-4 lg:space-y-5 order-8">
   <div
-    v-if="showJournal"
+    v-if="showJournal && showOptionalModules"
     class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4"
   >
         <div class="dashboard-card journal-card space-y-4">
@@ -964,7 +982,7 @@
       </div>
 
       <div
-        v-if="showAIInsights"
+        v-if="showAIInsights && showOptionalModules"
         class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4"
       >
         <div class="dashboard-card ai-card space-y-4">
@@ -1037,7 +1055,7 @@
       </div>
 
   <div
-    v-if="showNapkin"
+    v-if="showNapkin && showOptionalModules"
     class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4"
   >
         <div
@@ -1386,8 +1404,18 @@ const DASHBOARD_CARD_STORAGE_KEY = 'dashboard:cards:v2'
 const allCardKeys = dashboardCardOptions.map((c) => c.key)
 
 const cardVisibility = ref(new Set(allCardKeys))
+const dashboardViewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1280)
+const isMobileDashboard = computed(() => dashboardViewportWidth.value < 768)
+const mobileModulesExpanded = ref(false)
+const showOptionalModules = computed(() => !isMobileDashboard.value || mobileModulesExpanded.value)
 let savePrefsTimer = null
 let lastPrefsRequestId = 0
+
+function syncDashboardViewport() {
+  if (typeof window === 'undefined') return
+  dashboardViewportWidth.value = window.innerWidth
+  mobileModulesExpanded.value = dashboardViewportWidth.value >= 768
+}
 
 function storageKey() {
   const wsId = activeWorkspaceId.value || 'default'
@@ -2213,6 +2241,12 @@ watch(
 )
 
 onMounted(async () => {
+  syncDashboardViewport()
+  try {
+    window.addEventListener('resize', syncDashboardViewport, { passive: true })
+  } catch {
+    /* noop */
+  }
   if (allTasks.value.length) {
     syncDashboardTaskBuckets(allTasks.value)
     dashboardTasksLoading.value = false
@@ -2660,6 +2694,11 @@ watch(activeWorkspaceId, () => {
 })
 
 onUnmounted(() => {
+  try {
+    window.removeEventListener('resize', syncDashboardViewport)
+  } catch {
+    /* noop */
+  }
   if (authStateStop) {
     try {
       authStateStop()

@@ -219,7 +219,15 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { hasSubscription, registerPushSubscription } from '@/services/pushService'
-import { getIntegrations, getPreferences, getProfile, updateIntegrations, updatePreferences, updateProfile } from '@/services/settingsService'
+import {
+  getIntegrations,
+  getPreferences,
+  getProfile,
+  requestWelcomeIntroCall,
+  updateIntegrations,
+  updatePreferences,
+  updateProfile,
+} from '@/services/settingsService'
 import { requestNativeReminderPermissions, syncNativeReminderQueueNow } from '@/services/nativeReminderService'
 import { trackFirstReminderChannelSaved } from '@/services/analytics'
 import { useAuthFlags } from '@/composables/useAuthFlags'
@@ -493,7 +501,9 @@ async function ensureSetupLoaded(force = false) {
 function confirmTimezone() {
   try {
     localStorage.setItem('user_timezone', tz.value)
-  } catch {}
+  } catch {
+    /* noop */
+  }
   markDirty()
   emitSetupState()
 }
@@ -619,6 +629,31 @@ async function persistQuickSetup() {
       if (deferredProfileSync) {
         saveSuccess.value = 'Quick setup saved. Profile details will finish syncing shortly.'
       }
+
+      // One-time onboarding intro call to help user save PlanCraft AI number.
+      // Keep non-blocking so setup completion is never interrupted.
+      const canSendWelcomeCall =
+        !isGuest.value &&
+        !!normalizedPhone &&
+        !localStorage.getItem(`pcai_welcome_call_sent:${userId}`)
+      if (canSendWelcomeCall) {
+        try {
+          const result = await withTimeout(
+            requestWelcomeIntroCall(userId),
+            10000,
+            'quick setup welcome call',
+          )
+          if (result?.success && !result?.skipped) {
+            localStorage.setItem(`pcai_welcome_call_sent:${userId}`, '1')
+            saveSuccess.value =
+              'Quick setup complete. We just placed a short intro call from PlanCraft AI so you can save this number for future reminders.'
+          } else if (result?.success && result?.skipped) {
+            localStorage.setItem(`pcai_welcome_call_sent:${userId}`, '1')
+          }
+        } catch (error) {
+          console.warn('[QuickSetup] welcome intro call skipped', error?.message || error)
+        }
+      }
     }
 
     clearQuickSetupSnooze()
@@ -635,6 +670,9 @@ async function persistQuickSetup() {
       saveSuccess.value = nextState.requiredComplete
         ? 'Quick setup complete.'
         : 'Progress saved. You can finish the remaining items later.'
+    }
+    if (nextState.requiredComplete && !isGuest.value) {
+      saveSuccess.value += ' Premium adds deeper AI insights and stronger automation as you scale.'
     }
     try {
       if (selectedChannels.value.length) {

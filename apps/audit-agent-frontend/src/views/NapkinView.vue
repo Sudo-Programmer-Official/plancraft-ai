@@ -1,21 +1,26 @@
 <template>
   <div class="app-page-shell napkin-page">
     <div class="app-page-frame">
-      <header class="app-page-hero flex flex-col items-start gap-4 lg:flex-row">
+      <header class="app-page-hero flex flex-col items-start gap-3">
         <div class="min-w-0 space-y-2">
           <p class="app-page-eyebrow">AI Quick Actions</p>
           <h1 class="app-page-title !text-[clamp(2rem,3vw,2.85rem)]">Napkin</h1>
-          <p class="app-page-description max-w-2xl text-sm">
+          <p v-if="!compactHeroMode" class="app-page-description max-w-2xl text-sm">
             Drop raw ideas, voice notes, and half-formed tasks. PlanCraft classifies them, routes them, and pushes
             eligible actions into your inbox automatically.
           </p>
-          <div class="flex flex-wrap gap-2 text-xs text-slate-300/80">
+          <div v-if="!compactHeroMode" class="flex flex-wrap gap-2 text-xs text-slate-300/80">
             <span class="rounded-full border border-white/10 bg-slate-950/30 px-3 py-1">Quick add</span>
             <span class="rounded-full border border-white/10 bg-slate-950/30 px-3 py-1">Voice-ready</span>
             <span class="rounded-full border border-white/10 bg-slate-950/30 px-3 py-1">Auto-tagged</span>
           </div>
+          <div v-if="compactHeroMode" class="flex flex-wrap gap-2 text-xs text-slate-200/90">
+            <span class="rounded-full border border-white/10 bg-slate-950/35 px-3 py-1">Captured {{ items.length }}</span>
+            <span class="rounded-full border border-white/10 bg-slate-950/35 px-3 py-1">Converted {{ convertedCount }}</span>
+            <span class="rounded-full border border-white/10 bg-slate-950/35 px-3 py-1">Voice {{ voiceCount }}</span>
+          </div>
         </div>
-        <div class="app-page-kpis ml-auto grid w-full grid-cols-2 text-center sm:grid-cols-3 lg:w-auto">
+        <div v-if="!compactHeroMode" class="app-page-kpis ml-auto grid w-full grid-cols-2 text-center sm:grid-cols-3 lg:w-auto">
           <div class="app-page-kpi stat-tile">
             <p class="stat-label">Captured</p>
             <p class="stat-value">{{ items.length }}</p>
@@ -53,7 +58,7 @@
           </div>
         </div>
 
-        <div class="grid gap-4 lg:grid-cols-[1.2fr_0.9fr]">
+        <div class="grid gap-4">
           <div class="min-w-0 space-y-3">
             <textarea
               v-model="input"
@@ -110,35 +115,6 @@
               <span class="pill pill-ghost">AI: {{ classification.type }}</span>
               <span class="pill pill-ghost">Category: {{ classification.category }}</span>
               <span class="pill pill-ghost">{{ classification.suggestion }}</span>
-            </div>
-          </div>
-
-          <div class="space-y-3 rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-            <div class="flex items-center justify-between">
-              <p class="text-sm font-semibold text-slate-200">AI quick actions</p>
-              <span class="rounded-full border border-white/10 bg-slate-950/35 px-2 py-0.5 text-[11px] text-slate-300/80">
-                {{ latestSaved ? 'Ready' : 'Waiting for input' }}
-              </span>
-            </div>
-            <p class="text-xs text-slate-400">PlanCraft recommends where this note should land.</p>
-
-            <div class="grid gap-2 sm:grid-cols-2">
-              <button class="action-btn" :disabled="!latestSaved" @click="latestSaved && openPlanner(latestSaved)">
-                <span>Add to Planner</span>
-              </button>
-              <button class="action-btn" :disabled="!latestSaved" @click="latestSaved && convertToCreator(latestSaved)">
-                <span>Send to Creator</span>
-              </button>
-              <button class="action-btn" :disabled="!latestSaved" @click="latestSaved && convertToLeader(latestSaved)">
-                <span>Add Leader Event</span>
-              </button>
-              <button class="action-btn" :disabled="!latestSaved" @click="latestSaved && keepNapkin(latestSaved)">
-                <span>Keep in Napkin</span>
-              </button>
-            </div>
-
-            <div v-if="latestSaved" class="mt-2 text-xs text-slate-400">
-              {{ latestSaved.suggestion || 'Ready for routing.' }}
             </div>
           </div>
         </div>
@@ -266,134 +242,6 @@
             </div>
           </div>
 
-          <aside
-            v-if="selectedItem || isTwoPane"
-            class="napkin-detail-pane"
-            :class="{
-              'napkin-detail-pane--open': detailOpen || isTwoPane,
-              'napkin-detail-pane--two-pane': isTwoPane,
-            }"
-            @click.self="closeDetail"
-          >
-            <div class="napkin-detail-card">
-              <div class="napkin-detail-toolbar">
-                <div class="min-w-0">
-                  <p class="text-xs font-semibold uppercase tracking-[0.28em] text-indigo-200/80">Full note</p>
-                  <h4 class="truncate text-xl font-semibold text-white">
-                    {{ selectedItem ? detailHeading(selectedItem) : 'Napkin detail' }}
-                  </h4>
-                  <p v-if="selectedItem" class="mt-1 text-sm text-slate-400">
-                    {{ formatDetailMeta(selectedItem) }}
-                  </p>
-                </div>
-                <div class="flex shrink-0 items-center gap-2">
-                  <button
-                    v-if="selectedItem && !isEditingSelected"
-                    type="button"
-                    class="detail-action-btn"
-                    @click="beginEdit(selectedItem)"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    v-if="selectedItem && isEditingSelected"
-                    type="button"
-                    class="detail-action-btn"
-                    @click="cancelEdit"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    v-if="selectedItem"
-                    type="button"
-                    class="detail-action-btn detail-action-btn--danger"
-                    @click="requestDelete(selectedItem)"
-                  >
-                    Delete
-                  </button>
-                  <button v-if="!isTwoPane" type="button" class="detail-close-btn" @click="closeDetail">
-                    Close
-                  </button>
-                </div>
-              </div>
-
-              <div v-if="selectedItem" class="napkin-detail-scroll">
-                <div class="space-y-5">
-                  <div class="flex flex-wrap gap-2 text-xs text-slate-300">
-                    <span class="pill">{{ selectedItem.type }}</span>
-                    <span class="pill pill-ghost">{{ selectedItem.category }}</span>
-                    <span class="pill pill-ghost">{{ routeSuggestion(selectedItem.intent) }}</span>
-                    <span v-for="tag in selectedItem.tags" :key="tag" class="pill pill-ghost">#{{ tag }}</span>
-                  </div>
-
-                  <div v-if="isEditingSelected" class="space-y-3">
-                    <label class="block space-y-2">
-                      <span class="text-sm font-medium text-slate-200">Edit note</span>
-                      <textarea
-                        v-model="editDraft"
-                        rows="10"
-                        class="detail-textarea"
-                        placeholder="Update your note..."
-                      ></textarea>
-                    </label>
-                    <div class="flex flex-col gap-2 sm:flex-row">
-                      <button type="button" class="detail-primary-btn" @click="saveEdit">
-                        {{ savingEdit ? 'Saving...' : 'Save changes' }}
-                      </button>
-                      <button type="button" class="detail-secondary-btn" @click="cancelEdit">Cancel</button>
-                    </div>
-                  </div>
-
-                  <div v-else class="space-y-4">
-                    <p class="napkin-detail-body">
-                      {{ selectedItem.text }}
-                    </p>
-
-                    <div
-                      v-if="selectedItem.transcript && selectedItem.transcript !== selectedItem.text"
-                      class="rounded-2xl border border-white/10 bg-slate-950/35 p-4"
-                    >
-                      <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Transcript</p>
-                      <p class="napkin-detail-body mt-3 text-sm text-slate-300">
-                        {{ selectedItem.transcript }}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div
-                    v-if="selectedItem.audioUrl"
-                    class="rounded-2xl border border-white/10 bg-slate-950/35 p-4"
-                  >
-                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Voice attachment</p>
-                    <audio
-                      :src="selectedItem.audioUrl"
-                      controls
-                      class="mt-3 w-full rounded-lg border border-slate-800 bg-slate-950/60"
-                    />
-                  </div>
-
-                  <div class="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p class="text-sm font-semibold text-white">Move this note</p>
-                        <p class="text-xs text-slate-400">Send it where you want to work on it next.</p>
-                      </div>
-                    </div>
-                    <div class="mt-4 flex flex-wrap gap-2">
-                      <button type="button" class="action-chip" @click="openPlanner(selectedItem)">Add to Planner</button>
-                      <button type="button" class="action-chip" @click="convertToCreator(selectedItem)">Send to Creator</button>
-                      <button type="button" class="action-chip" @click="convertToLeader(selectedItem)">Add Leader Event</button>
-                      <button type="button" class="action-chip" @click="keepNapkin(selectedItem)">Keep here</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div v-else class="napkin-detail-empty">
-                Select a note to review the full content and move it where it belongs.
-              </div>
-            </div>
-          </aside>
         </div>
       </section>
     </div>
@@ -406,6 +254,81 @@
       @close="closePlanner"
       @saved="handleTaskSaved"
     />
+
+    <el-dialog
+      v-model="detailOpen"
+      width="min(880px, calc(100vw - 2rem))"
+      class="napkin-detail-dialog"
+      :close-on-click-modal="!savingEdit && !deleting"
+      :close-on-press-escape="!savingEdit && !deleting"
+      :show-close="true"
+    >
+      <template #header>
+        <div class="min-w-0">
+          <p class="text-xs font-semibold uppercase tracking-[0.28em] text-indigo-200/80">Full note</p>
+          <h4 class="truncate text-xl font-semibold text-white">
+            {{ selectedItem ? detailHeading(selectedItem) : 'Napkin detail' }}
+          </h4>
+          <p v-if="selectedItem" class="mt-1 text-sm text-slate-400">
+            {{ formatDetailMeta(selectedItem) }}
+          </p>
+        </div>
+      </template>
+      <div v-if="selectedItem" class="napkin-detail-scroll">
+        <div class="space-y-5">
+          <div class="flex flex-wrap gap-2 text-xs text-slate-300">
+            <span class="pill">{{ selectedItem.type }}</span>
+            <span class="pill pill-ghost">{{ selectedItem.category }}</span>
+            <span class="pill pill-ghost">{{ routeSuggestion(selectedItem.intent) }}</span>
+            <span v-for="tag in selectedItem.tags" :key="tag" class="pill pill-ghost">#{{ tag }}</span>
+          </div>
+          <div v-if="isEditingSelected" class="space-y-3">
+            <label class="block space-y-2">
+              <span class="text-sm font-medium text-slate-200">Edit note</span>
+              <textarea v-model="editDraft" rows="10" class="detail-textarea" placeholder="Update your note..."></textarea>
+            </label>
+            <div class="flex flex-col gap-2 sm:flex-row">
+              <button type="button" class="detail-primary-btn" @click="saveEdit">
+                {{ savingEdit ? 'Saving...' : 'Save changes' }}
+              </button>
+              <button type="button" class="detail-secondary-btn" @click="cancelEdit">Cancel</button>
+            </div>
+          </div>
+          <div v-else class="space-y-4">
+            <p class="napkin-detail-body">{{ selectedItem.text }}</p>
+            <div
+              v-if="selectedItem.transcript && selectedItem.transcript !== selectedItem.text"
+              class="rounded-2xl border border-white/10 bg-slate-950/35 p-4"
+            >
+              <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Transcript</p>
+              <p class="napkin-detail-body mt-3 text-sm text-slate-300">{{ selectedItem.transcript }}</p>
+            </div>
+          </div>
+          <div v-if="selectedItem.audioUrl" class="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Voice attachment</p>
+            <audio :src="selectedItem.audioUrl" controls class="mt-3 w-full rounded-lg border border-slate-800 bg-slate-950/60" />
+          </div>
+          <div class="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+            <p class="text-sm font-semibold text-white">Move this note</p>
+            <p class="text-xs text-slate-400">Send it where you want to work on it next.</p>
+            <div class="mt-4 flex flex-wrap gap-2">
+              <button type="button" class="action-chip" @click="openPlanner(selectedItem)">Add to Planner</button>
+              <button type="button" class="action-chip" @click="convertToCreator(selectedItem)">Send to Creator</button>
+              <button type="button" class="action-chip" @click="convertToLeader(selectedItem)">Add Leader Event</button>
+              <button type="button" class="action-chip" @click="keepNapkin(selectedItem)">Keep here</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <button v-if="selectedItem && !isEditingSelected" type="button" class="detail-action-btn" @click="beginEdit(selectedItem)">Edit</button>
+          <button v-if="selectedItem && isEditingSelected" type="button" class="detail-action-btn" @click="cancelEdit">Cancel edit</button>
+          <button v-if="selectedItem" type="button" class="detail-action-btn detail-action-btn--danger" @click="requestDelete(selectedItem)">Delete</button>
+          <button type="button" class="detail-secondary-btn" @click="closeDetail">Close</button>
+        </div>
+      </template>
+    </el-dialog>
 
     <el-dialog
       v-model="deleteDialogOpen"
@@ -501,7 +424,6 @@ const convertingFrom = ref<NapkinItem | null>(null)
 const latestSavedId = ref<string | null>(null)
 const selectedItemId = ref<string | null>(null)
 const detailOpen = ref(false)
-const isTwoPane = ref(false)
 const editingItemId = ref<string | null>(null)
 const editDraft = ref('')
 const deleteCandidate = ref<NapkinItem | null>(null)
@@ -519,7 +441,6 @@ let unsubscribe: (() => void) | null = null
 let mediaRecorder: MediaRecorder | null = null
 let timerId: number | null = null
 let stream: MediaStream | null = null
-let workspaceUnsub: (() => void) | null = null
 const nextWorkspaceCursor = ref<NapkinPageInfo['workspaceCursor']>(null)
 const nextLegacyCursor = ref<NapkinPageInfo['legacyCursor']>(null)
 const hasMoreWorkspace = ref(false)
@@ -565,6 +486,7 @@ const latestSaved = computed(() => items.value.find((i) => i.id === latestSavedI
 const convertedCount = computed(() => items.value.filter((i) => i.status === 'converted').length)
 const voiceCount = computed(() => items.value.filter((i) => i.audioUrl || i.source === 'voice').length)
 const hasMoreItems = computed(() => hasMoreWorkspace.value || hasMoreLegacy.value)
+const compactHeroMode = computed(() => true)
 
 const formattedTimer = computed(() => {
   const mins = Math.floor(recordingSeconds.value / 60)
@@ -658,12 +580,6 @@ function removeLocalItem(itemId: string) {
   liveItems.value = liveItems.value.filter((entry) => entry.id !== itemId)
   olderItems.value = olderItems.value.filter((entry) => entry.id !== itemId)
   syncMergedItems()
-}
-
-function syncLayoutMode() {
-  if (typeof window === 'undefined') return
-  isTwoPane.value = window.innerWidth >= 768
-  if (isTwoPane.value) detailOpen.value = false
 }
 
 async function toggleRecording() {
@@ -856,11 +772,10 @@ async function saveNapkin() {
 
 function openDetail(item: NapkinItem) {
   selectedItemId.value = item.id
-  if (!isTwoPane.value) detailOpen.value = true
+  detailOpen.value = true
 }
 
 function closeDetail() {
-  if (isTwoPane.value) return
   detailOpen.value = false
   cancelEdit()
 }
@@ -869,7 +784,7 @@ function beginEdit(item: NapkinItem) {
   selectedItemId.value = item.id
   editDraft.value = item.text
   editingItemId.value = item.id
-  if (!isTwoPane.value) detailOpen.value = true
+  detailOpen.value = true
 }
 
 function cancelEdit() {
@@ -920,7 +835,7 @@ async function saveEdit() {
 }
 
 function openPlanner(item: NapkinItem) {
-  if (!isTwoPane.value) detailOpen.value = false
+  detailOpen.value = false
   convertingFrom.value = item
   plannerTask.value = {
     title: item.text.slice(0, 120),
@@ -1025,7 +940,7 @@ async function confirmDelete() {
   try {
     await deleteNapkinItem(item.id, item.workspaceId)
     removeLocalItem(item.id)
-    if (!isTwoPane.value) detailOpen.value = false
+    detailOpen.value = false
     if (selectedItemId.value === item.id) {
       selectedItemId.value = null
     }
@@ -1101,39 +1016,31 @@ watch(
       cancelEdit()
       return
     }
-
     const hasSelected = !!selectedItemId.value && list.some((item) => item.id === selectedItemId.value)
     if (!hasSelected) {
-      selectedItemId.value = list[0].id
+      selectedItemId.value = null
       cancelEdit()
-      if (!isTwoPane.value) detailOpen.value = false
+      detailOpen.value = false
     }
   },
   { immediate: true },
 )
 
-watch(isTwoPane, (enabled) => {
-  if (enabled) detailOpen.value = false
+onMounted(() => {
+  subscribe()
 })
 
-onMounted(() => {
-  syncLayoutMode()
-  window.addEventListener('resize', syncLayoutMode)
-  subscribe()
-  try {
-    workspaceUnsub = workspaceStore.$subscribe(() => {
-      if (unsubscribe) unsubscribe()
-      subscribe()
-    })
-  } catch {
-    /* noop */
-  }
-})
+watch(
+  () => workspaceStore.activeWorkspaceId,
+  (next, prev) => {
+    if (next === prev) return
+    if (unsubscribe) unsubscribe()
+    subscribe()
+  },
+)
 
 onBeforeUnmount(() => {
   if (unsubscribe) unsubscribe()
-  if (workspaceUnsub) workspaceUnsub()
-  window.removeEventListener('resize', syncLayoutMode)
   resetVoice()
 })
 </script>
@@ -1343,8 +1250,7 @@ onBeforeUnmount(() => {
 }
 
 .napkin-stream-layout {
-  display: grid;
-  gap: 1rem;
+  display: block;
   min-width: 0;
 }
 
@@ -1411,34 +1317,6 @@ onBeforeUnmount(() => {
   font-size: 0.72rem;
   font-weight: 600;
   color: #cbd5f5;
-}
-
-.napkin-detail-pane {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  align-items: stretch;
-  justify-content: center;
-  background: rgba(2, 6, 23, 0.82);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease;
-}
-
-.napkin-detail-pane--open {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.napkin-detail-pane--two-pane {
-  position: sticky;
-  top: calc(var(--safe-area-top) + 1rem);
-  inset: auto;
-  z-index: 0;
-  background: transparent;
-  opacity: 1;
-  pointer-events: auto;
 }
 
 .napkin-detail-card {
@@ -1571,6 +1449,17 @@ onBeforeUnmount(() => {
   padding-top: 0.5rem;
 }
 
+.napkin-detail-dialog :deep(.el-dialog) {
+  border-radius: 1.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #0f172a;
+  box-shadow: 0 24px 60px rgba(2, 6, 23, 0.42);
+}
+
+.napkin-detail-dialog :deep(.el-dialog__body) {
+  padding-top: 0.25rem;
+}
+
 @media (min-width: 768px) {
   .napkin-stream-toolbar {
     flex-direction: row;
@@ -1581,11 +1470,6 @@ onBeforeUnmount(() => {
   .napkin-search-box {
     flex: 1 1 auto;
     max-width: 32rem;
-  }
-
-  .napkin-stream-layout {
-    grid-template-columns: minmax(0, 0.92fr) minmax(320px, 0.88fr);
-    align-items: start;
   }
 
   .napkin-detail-card {

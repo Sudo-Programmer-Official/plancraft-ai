@@ -3,6 +3,12 @@ import { db } from "../services/firebaseAdmin.js";
 import { getUserPrefs } from "../services/userPrefService.js";
 import { deliverVoiceCoach } from "../services/voiceCoachService.js";
 import { normalizeCronSpec } from "../utils/cronSpec.js";
+import dayjs from "../utils/dayjs.js";
+import utc from "dayjs/plugin/utc.js";
+import timezone from "dayjs/plugin/timezone.js";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 const USERS_COLLECTION = "users";
 const LOCK_COLLECTION = "job_locks";
@@ -13,7 +19,30 @@ function isEnabled() {
 }
 
 function cronSpec() {
-  return normalizeCronSpec(process.env.MORNING_COACH_CRON, "0 14 * * *"); // default 14:00 UTC (~9am ET)
+  return normalizeCronSpec(process.env.MORNING_COACH_CRON, "*/5 * * * *");
+}
+
+function parsePreferredTime(value) {
+  const raw = String(value || "").trim();
+  const match = raw.match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+  if (!match) return { hour: 9, minute: 0 };
+  return { hour: Number(match[1]), minute: Number(match[2]) };
+}
+
+function isDueNow(user = {}, now = dayjs.utc()) {
+  const tz =
+    user?.preferences?.morningCoach?.timezone ||
+    user?.timezone ||
+    user?.tz ||
+    user?.preferences?.timezone ||
+    "UTC";
+  const firstCallTime = user?.preferences?.morningCoach?.firstCallTime || "09:00";
+  const { hour, minute } = parsePreferredTime(firstCallTime);
+
+  const localNow = now.tz(tz);
+  const nowTotal = localNow.hour() * 60 + localNow.minute();
+  const targetTotal = hour * 60 + minute;
+  return nowTotal >= targetTotal && nowTotal < targetTotal + 5;
 }
 
 async function fetchUsers() {
@@ -41,6 +70,10 @@ async function runOnce() {
   };
   for (const user of users) {
     try {
+      if (!isDueNow(user)) {
+        stats.skipped.other += 1;
+        continue;
+      }
       const prefs = await getUserPrefs(user.id);
       if (!prefs.enable_voice) {
         stats.skipped.opted_out += 1;
@@ -70,8 +103,12 @@ async function runOnce() {
 }
 
 async function acquireDailyRunLock() {
-  const dateKey = new Date().toISOString().slice(0, 10);
-  const lockId = `voice_coach_${dateKey}`;
+  const now = new Date();
+  const minuteBucket = Math.floor(now.getUTCMinutes() / 5) * 5;
+  const slot = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}-${String(
+    now.getUTCDate(),
+  ).padStart(2, "0")}T${String(now.getUTCHours()).padStart(2, "0")}:${String(minuteBucket).padStart(2, "0")}Z`;
+  const lockId = `voice_coach_${slot}`;
   const ref = db.collection(LOCK_COLLECTION).doc(lockId);
   const owner = process.env.HOSTNAME || process.pid || "local";
   let acquired = false;
@@ -81,7 +118,7 @@ async function acquireDailyRunLock() {
     if (snap.exists) return;
     txn.set(ref, {
       createdAt: new Date(),
-      dateKey,
+      slot,
       owner: String(owner),
       job: "morning_coach",
     });

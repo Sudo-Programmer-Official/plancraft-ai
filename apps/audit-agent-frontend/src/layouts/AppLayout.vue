@@ -1535,10 +1535,12 @@ const coreNavItems = computed(() => {
     ? [
         { label: 'Today', iconName: 'dashboard', to: '/dashboard' },
         { label: 'Capture', iconName: 'file-text', to: '/quick-add' },
+        { label: 'Inbox', iconName: 'inbox', to: '/inbox' },
       ]
     : [
         { label: 'Today', iconName: 'dashboard', to: '/dashboard' },
         { label: 'Capture', iconName: 'file-text', to: '/quick-add' },
+        { label: 'Inbox', iconName: 'inbox', to: '/inbox' },
         { label: 'Workspace', iconName: 'box', to: '/workspaces' },
       ]
   return items.filter((item) => item.enabled !== false)

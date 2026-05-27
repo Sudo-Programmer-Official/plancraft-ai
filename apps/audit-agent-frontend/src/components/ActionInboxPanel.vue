@@ -30,14 +30,14 @@
     </div>
 
     <div
-      v-else-if="actionInboxDailyIntentLoading && !actionInboxDailyIntent"
+      v-else-if="!props.compact && actionInboxDailyIntentLoading && !actionInboxDailyIntent"
       class="rounded-2xl border border-fuchsia-400/20 bg-fuchsia-500/10 px-4 py-5 text-sm text-fuchsia-50"
     >
       Shaping today’s focus from your action inbox…
     </div>
 
     <section
-      v-else-if="actionInboxDailyIntent?.focus"
+      v-else-if="!props.compact && actionInboxDailyIntent?.focus"
       class="rounded-2xl border border-fuchsia-400/20 bg-gradient-to-br from-fuchsia-500/12 via-indigo-500/12 to-cyan-500/10 p-5 shadow-lg"
     >
       <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -100,13 +100,13 @@
     </section>
 
     <div
-      v-if="hasWorkspace && actionInboxInsightsLoading && !actionInboxInsights"
+      v-if="!props.compact && hasWorkspace && actionInboxInsightsLoading && !actionInboxInsights"
       class="rounded-xl border border-white/10 bg-slate-900/35 px-4 py-5 text-sm text-slate-300"
     >
       Learning what tends to stick from your inbox…
     </div>
 
-    <div v-if="hasWorkspace && actionInboxInsights" class="space-y-3">
+    <div v-if="!props.compact && hasWorkspace && actionInboxInsights" class="space-y-3">
       <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <div
           v-for="card in actionInboxInsightCards"
@@ -204,20 +204,22 @@
           >
             {{ formatSuggestionTiming(item) }}
           </span>
-          <span
-            v-for="reason in item.reasons || []"
-            :key="`${item.id}-${reason}`"
-            class="px-2.5 py-1 rounded-full border border-indigo-300/20 bg-indigo-500/10 text-indigo-100"
-          >
-            {{ formatReason(reason) }}
-          </span>
-          <span
-            v-for="field in item.missingFields || []"
-            :key="`${item.id}-missing-${field}`"
-            class="px-2.5 py-1 rounded-full border border-amber-300/20 bg-amber-500/10 text-amber-100"
-          >
-            Needs {{ formatMissingField(field) }}
-          </span>
+          <template v-if="!props.compact">
+            <span
+              v-for="reason in item.reasons || []"
+              :key="`${item.id}-${reason}`"
+              class="px-2.5 py-1 rounded-full border border-indigo-300/20 bg-indigo-500/10 text-indigo-100"
+            >
+              {{ formatReason(reason) }}
+            </span>
+            <span
+              v-for="field in item.missingFields || []"
+              :key="`${item.id}-missing-${field}`"
+              class="px-2.5 py-1 rounded-full border border-amber-300/20 bg-amber-500/10 text-amber-100"
+            >
+              Needs {{ formatMissingField(field) }}
+            </span>
+          </template>
           <span
             v-if="item.lastSurfacedReason"
             class="px-2.5 py-1 rounded-full border border-sky-300/20 bg-sky-500/10 text-sky-100"
@@ -233,14 +235,14 @@
         </div>
 
         <blockquote
-          v-if="item.rawPhrase"
+          v-if="!props.compact && item.rawPhrase"
           class="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-slate-200"
         >
           “{{ item.rawPhrase }}”
         </blockquote>
 
         <div
-          v-if="item.followUpPrompt"
+          v-if="!props.compact && item.followUpPrompt"
           class="rounded-xl border border-amber-300/20 bg-amber-500/10 px-3 py-3 text-sm text-amber-50"
         >
           <p class="text-[11px] uppercase tracking-[0.2em] text-amber-100/80">Missing info</p>
@@ -312,7 +314,7 @@ import {
   syncActionInbox,
 } from '@/services/actionInboxService'
 
-defineProps({
+const props = defineProps({
   eyebrow: {
     type: String,
     default: 'Action inbox',
@@ -328,6 +330,10 @@ defineProps({
   emptyMessage: {
     type: String,
     default: 'No suggestions waiting. Submit a note from Napkin or Journal and eligible actions will show up here automatically.',
+  },
+  compact: {
+    type: Boolean,
+    default: false,
   },
 })
 

@@ -216,6 +216,7 @@ import { ElMessage } from 'element-plus'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { useTasks } from '@/composables/useTasks'
 import { EMPTY_TEMPLATE, TEAM_TEMPLATES } from '@/utils/teamTemplates'
+import { trackEvent } from '@/services/analytics'
 
 const router = useRouter()
 const route = useRoute()
@@ -321,7 +322,14 @@ onMounted(() => {
   if (upgradedPlan) {
     try {
       ElMessage.success(`Workspace upgraded to ${String(upgradedPlan).toUpperCase()}`)
-    } catch {}
+    } catch {
+      /* noop */
+    }
+    trackEvent('subscription_funnel_success', {
+      surface: 'billing_upgrade',
+      source: 'workspace_upgraded_query',
+      plan: String(upgradedPlan || '').toLowerCase() || null,
+    })
     const cleanQuery = { ...route.query }
     delete cleanQuery.upgraded
     router.replace({ query: cleanQuery }).catch(() => {})

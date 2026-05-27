@@ -43,3 +43,18 @@ export async function updateOnboardingStatus(userId, onboarding) {
   const res = await api.post('/settings/onboarding', { userId, onboarding })
   return res?.data?.onboarding || {}
 }
+
+export async function requestWelcomeIntroCall(userId, options = {}) {
+  if (!userId) throw new Error('Missing userId')
+  const res = await api.post('/settings/welcome-call', {
+    userId,
+    force: options?.force === true,
+  })
+  return res?.data || { success: false }
+}
+
+export async function sendTestMorningCall(userId, message) {
+  if (!userId) throw new Error('Missing userId')
+  const res = await api.post('/settings/test-morning-call', { userId, message })
+  return res?.data || { success: true }
+}

@@ -2,17 +2,48 @@
   <div class="app-page-shell text-white">
     <!-- Header -->
     <main class="settings-shell app-page-frame space-y-8 sm:space-y-10">
-    <header class="app-page-hero mb-0 text-center">
-      <h1 class="text-3xl sm:text-4xl font-bold mb-2 text-white">⚙️ Settings</h1>
-      <p class="app-page-description mx-auto">Manage your notifications, integrations, and account preferences.</p>
-    </header>
+    <section class="settings-hero-wrap">
+      <transition name="hero-fade" mode="out-in">
+        <header v-if="showSettingsHero" key="full-hero" class="app-page-hero mb-0 text-center settings-hero-content">
+          <h1 class="text-3xl sm:text-4xl font-bold mb-2 text-white">⚙️ Settings</h1>
+          <p class="app-page-description mx-auto">Manage your notifications, integrations, and account preferences.</p>
+        </header>
+        <div v-else key="compact-hero" class="settings-hero-compact">
+          <p class="settings-hero-compact__title">Settings</p>
+          <p class="settings-hero-compact__subtitle">Notifications, integrations, and account controls</p>
+        </div>
+      </transition>
+      <div class="settings-hero-toggle" v-if="isMobileSettingsView">
+        <button
+          type="button"
+          class="inline-flex items-center justify-center rounded-lg border border-white/15 bg-slate-900/50 px-3 py-1.5 text-xs text-slate-200 hover:border-indigo-300/40"
+          @click="showSettingsHero = !showSettingsHero"
+        >
+          {{ showSettingsHero ? 'Hide intro' : 'Show intro' }}
+        </button>
+      </div>
+    </section>
 
     <div class="space-y-8 sm:space-y-10">
       <!-- Settings navigation -->
       <nav class="settings-panel nav-panel">
+        <div class="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <p class="text-xs uppercase tracking-[0.24em] text-indigo-200/80">Mode</p>
+            <p class="text-sm text-slate-200">{{ showAdvancedSettings ? 'Advanced controls visible' : 'Focused daily settings' }}</p>
+          </div>
+          <button
+            type="button"
+            class="inline-flex items-center justify-center rounded-lg border px-3 py-1.5 text-sm transition"
+            :class="showAdvancedSettings ? 'border-indigo-300/50 bg-indigo-500/20 text-indigo-100' : 'border-white/15 bg-slate-900/50 text-slate-200 hover:border-indigo-300/40'"
+            @click="toggleAdvancedSettings"
+          >
+            {{ showAdvancedSettings ? 'Hide advanced' : 'Show advanced' }}
+          </button>
+        </div>
         <div class="nav-scroll">
           <div class="nav-grid">
-            <div v-for="group in tabGroups" :key="group.id" class="space-y-2 min-w-[220px]">
+            <div v-for="group in visibleTabGroups" :key="group.id" class="space-y-2 min-w-[220px]">
               <p class="text-xs uppercase tracking-[0.2em] text-slate-300">{{ group.label }}</p>
               <div class="flex flex-wrap gap-2">
                 <button
@@ -318,13 +349,14 @@
       <section
         v-if="activeTab === 'account-notifications'"
         ref="notificationsSection"
-        :class="['settings-panel',
+        :class="['settings-panel settings-panel--notifications',
+                 isMobileSettingsView ? 'pb-24' : '',
                  highlightNotifications ? 'ring-2 ring-indigo-400 ring-offset-2 ring-offset-transparent' : '']"
       >
-        <h2 class="text-lg sm:text-xl font-semibold mb-4">🔔 Notification Preferences</h2>
-        <p class="text-sm text-indigo-200 mb-4">Choose how you’d like to be reminded about tasks, reflections, and insights.</p>
+        <h2 class="text-lg sm:text-xl font-semibold mb-3">🔔 Notification Preferences</h2>
+        <p class="text-sm text-indigo-200 mb-3">Choose how you’d like to be reminded.</p>
 
-        <div class="space-y-3">
+        <div class="space-y-2.5">
           <label class="flex items-center gap-3">
             <input type="checkbox" v-model="prefs.email" class="accent-indigo-500" @change="dirty = true" />
             <span>Email Notifications</span>
@@ -359,21 +391,30 @@
           </label>
         </div>
 
-        <div class="mt-6 rounded-2xl border border-white/10 bg-slate-950/30 p-4 sm:p-5">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div class="mt-4 rounded-2xl border border-white/10 bg-slate-950/30 p-3.5 sm:p-5">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div class="space-y-2">
               <h3 class="text-base font-semibold text-white">Action Inbox Nudges</h3>
               <p class="text-sm text-slate-300">
                 Keep the inbox as the primary surface, then escalate only when resurfaced suggestions become time-sensitive.
               </p>
             </div>
-            <label class="inline-flex items-center gap-3 text-sm text-slate-200">
+            <div class="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                class="inline-flex items-center rounded-lg border border-white/15 bg-slate-900/50 px-3 py-1 text-xs text-slate-200 hover:border-indigo-300/40"
+                @click="showNotificationAdvanced = !showNotificationAdvanced"
+              >
+                {{ showNotificationAdvanced ? 'Hide advanced' : 'Show advanced' }}
+              </button>
+              <label class="inline-flex items-center gap-2 text-sm text-slate-200">
               <input type="checkbox" v-model="actionInboxNudges.enabled" class="accent-indigo-500" @change="dirty = true" />
               <span>Allow external nudges</span>
-            </label>
+              </label>
+            </div>
           </div>
 
-          <div v-if="actionInboxNudges.enabled" class="mt-5 grid gap-5 lg:grid-cols-2">
+          <div v-if="actionInboxNudges.enabled && showNotificationAdvanced" class="mt-4 grid gap-4 lg:grid-cols-2">
             <div class="space-y-2">
               <label class="block text-sm font-medium text-slate-200">Escalation level</label>
               <select
@@ -406,7 +447,7 @@
             </div>
           </div>
 
-          <div v-if="actionInboxNudges.enabled" class="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+          <div v-if="actionInboxNudges.enabled && showNotificationAdvanced" class="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-3.5">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div class="space-y-1">
                 <p class="text-sm font-medium text-slate-100">Daily inbox digest</p>
@@ -424,35 +465,9 @@
               <div>
                 <p class="text-sm font-medium text-slate-200">Digest channels</p>
                 <p class="text-xs text-slate-400">
-                  Email is the best default. Push or WhatsApp can be added if you want the summary outside the inbox too.
+                  Uses the same channels selected below for escalation, so you only configure this once.
                 </p>
               </div>
-              <div class="grid gap-3 sm:grid-cols-3">
-                <label
-                  v-for="option in availableActionInboxNudgeChannels"
-                  :key="`digest-${option.value}`"
-                  class="rounded-xl border px-3 py-3 transition"
-                  :class="option.enabled ? 'border-white/10 bg-white/5 text-slate-100' : 'border-white/5 bg-white/[0.03] text-slate-500'"
-                >
-                  <span class="flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      v-model="actionInboxNudges.digestChannels"
-                      :value="option.value"
-                      class="mt-0.5 accent-indigo-500"
-                      :disabled="!option.enabled"
-                      @change="dirty = true"
-                    />
-                    <span class="space-y-1">
-                      <span class="block text-sm font-medium">{{ option.label }}</span>
-                      <span class="block text-xs">
-                        {{ option.enabled ? 'Available for the daily digest.' : 'Enable this channel above first.' }}
-                      </span>
-                    </span>
-                  </span>
-                </label>
-              </div>
-
               <div class="flex flex-wrap items-center gap-3">
                 <el-button
                   size="small"
@@ -470,7 +485,7 @@
             </div>
           </div>
 
-          <div v-if="actionInboxNudges.enabled" class="mt-5 space-y-3">
+          <div v-if="actionInboxNudges.enabled && showNotificationAdvanced" class="mt-4 space-y-3">
             <div>
               <p class="text-sm font-medium text-slate-200">Escalation channels</p>
               <p class="text-xs text-slate-400">
@@ -524,12 +539,46 @@
           </p>
         </div>
 
+        <div v-if="prefs.voice_call" class="mt-4 rounded-2xl border border-white/10 bg-slate-950/30 p-3.5 sm:p-5 space-y-3">
+          <h3 class="text-base font-semibold text-white">Morning Call Settings</h3>
+          <label class="flex items-center gap-3">
+            <input type="checkbox" v-model="morningCoach.enabled" class="accent-indigo-500" @change="dirty = true" />
+            <span>Enable morning coach call</span>
+          </label>
+          <div class="space-y-1">
+            <label class="block text-sm text-slate-300">First call time</label>
+            <input
+              v-model="morningCoach.firstCallTime"
+              type="time"
+              class="w-full rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-white"
+              @input="dirty = true"
+            />
+          </div>
+          <div class="space-y-1">
+            <label class="block text-sm text-slate-300">Morning message text</label>
+            <textarea
+              v-model="morningCoach.customMessage"
+              rows="3"
+              maxlength="600"
+              class="w-full rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-white"
+              placeholder="Good morning. Start with one meaningful win today."
+              @input="dirty = true"
+            />
+          </div>
+          <div class="flex items-center gap-3">
+            <el-button size="small" plain :loading="morningCallTesting" @click="sendTestMorningCallNow">
+              Send test call
+            </el-button>
+            <p class="text-xs text-slate-400">Calls your configured phone with this exact message text.</p>
+          </div>
+        </div>
+
         <div v-if="prefs.discord" class="mt-4">
           <label class="block text-sm text-slate-300 mb-1">Discord Webhook URL</label>
           <el-input v-model="integrationEndpoints.discord.webhook" placeholder="https://discord.com/api/webhooks/..." clearable class="w-full" @input="dirty = true" />
         </div>
 
-        <div class="mt-6 text-center" v-if="dirty">
+        <div class="mt-5 text-center" v-if="dirty">
           <p class="text-sm text-yellow-300 mb-2">⚠️ You have unsaved changes.</p>
           <el-button type="primary" @click="saveSettings" class="bg-gradient-to-r from-indigo-600 to-purple-600">💾 Save Settings</el-button>
         </div>
@@ -540,7 +589,8 @@
         class="settings-panel"
       >
         <h2 class="text-lg sm:text-xl font-semibold mb-2">🌐 Social Accounts</h2>
-        <p class="text-sm text-indigo-200">Connect LinkedIn, GitHub, and other accounts to sync ownership context. Social linking UI will land here.</p>
+        <p class="text-sm text-indigo-200 mb-4">Connect and manage social destinations for posting workflows.</p>
+        <SocialIntegrationPanel />
       </section>
 
       <!-- Integrations -->
@@ -748,13 +798,8 @@
         </div>
       </section>
 
-      <!-- Social Accounts -->
-      <div class="mt-8">
-        <SocialIntegrationPanel />
-      </div>
-
       <!-- Account -->
-      <section class="settings-panel">
+      <section v-if="activeTab === 'account-profile'" class="settings-panel">
         <h2 class="text-lg sm:text-xl font-semibold mb-4">👤 Account</h2>
         <div class="grid grid-cols-1 xl:grid-cols-[0.92fr,1.08fr] gap-4 mb-6">
           <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-4 space-y-4">
@@ -860,6 +905,14 @@
     </main>
   </div>
   <PlanSummaryModal :open="planOpen" @close="planOpen=false" />
+  <div
+    v-if="activeTab === 'account-notifications' && isMobileSettingsView && dirty"
+    class="fixed inset-x-0 bottom-0 z-[60] border-t border-white/10 bg-slate-950/90 px-4 py-3 backdrop-blur"
+  >
+    <el-button type="primary" @click="saveSettings" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600">
+      💾 Save Settings
+    </el-button>
+  </div>
   <!-- Re-auth dialog -->
   <el-dialog v-model="reauthOpen" title="Re-authenticate" width="420px" :append-to-body="true">
     <div v-if="reauthStep === 0" class="space-y-3">
@@ -967,7 +1020,7 @@ import { useRouter, useRoute } from "vue-router"
 import { ElMessage } from "element-plus"
 import { normalizePhone, guessCountryFromLocale } from '@/utils/phoneUtils'
 import { getGoogleStatus, getGoogleCalendars, saveGoogleCalendarSelection, triggerGoogleSyncNow, requestGoogleConnectUrl, disconnectGoogleIntegration } from '@/stores/integrationsStore'
-import { getPreferences as apiGetPrefs, updatePreferences as apiUpdatePrefs, getIntegrations, updateIntegrations, getProfile as getSettingsProfile, updateProfile as updateSettingsProfile } from "@/services/settingsService"
+import { getPreferences as apiGetPrefs, updatePreferences as apiUpdatePrefs, getIntegrations, updateIntegrations, getProfile as getSettingsProfile, updateProfile as updateSettingsProfile, sendTestMorningCall as apiSendTestMorningCall } from "@/services/settingsService"
 import { sendActionInboxDigest } from '@/services/actionInboxService'
 import { createGptLinkCode } from '@/services/gptService'
 import SocialIntegrationPanel from '@/components/settings/SocialIntegrationPanel.vue'
@@ -1023,6 +1076,9 @@ const notificationEnableHelp = computed(() =>
     ? 'Shows local due-time reminders directly on this iPhone or Android device.'
     : 'Register this browser for instant reminder banners in the web/PWA app.',
 )
+const settingsViewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1280)
+const isMobileSettingsView = computed(() => settingsViewportWidth.value < 768)
+const showSettingsHero = ref(!isMobileSettingsView.value)
 const isAppleBillingSafeMode = computed(() => detectAppleBillingSafeMode())
 const quickSetupState = computed(() => quickSetupStore.setupState)
 const quickSetupMissingLabels = computed(() => getIncompleteQuickSetupLabels(quickSetupState.value))
@@ -1105,8 +1161,33 @@ const tabGroups = [
   },
 ]
 
+const CORE_TAB_IDS = new Set([
+  'account-profile',
+  'account-notifications',
+  'workspace-integrations',
+  'billing-subscription',
+])
+const showAdvancedSettings = ref(false)
+const visibleTabGroups = computed(() =>
+  tabGroups
+    .map((group) => ({
+      ...group,
+      tabs: group.tabs.filter((tab) => showAdvancedSettings.value || CORE_TAB_IDS.has(tab.id)),
+    }))
+    .filter((group) => group.tabs.length),
+)
+
 const DEFAULT_SETTINGS_TAB = 'account-profile'
 const activeTab = ref(normalizeTab(route.query?.tab) || DEFAULT_SETTINGS_TAB)
+if (!CORE_TAB_IDS.has(activeTab.value)) showAdvancedSettings.value = true
+
+const hasVisibleActiveTab = computed(() =>
+  visibleTabGroups.value.some((group) => group.tabs.some((tab) => tab.id === activeTab.value)),
+)
+
+function toggleAdvancedSettings() {
+  showAdvancedSettings.value = !showAdvancedSettings.value
+}
 
 watch(
   () => route.query?.tab,
@@ -1124,11 +1205,29 @@ function setActiveTab(id) {
   if (target === 'account-notifications') focusNotifications()
 }
 
+watch(hasVisibleActiveTab, (isVisible) => {
+  if (isVisible) return
+  setActiveTab(DEFAULT_SETTINGS_TAB)
+})
+
 function openQuickSetupPanel() {
   quickSetupStore.refreshQuickSetupState()
   quickSetupStore.openQuickSetup({ source: 'manual' })
 }
+
+function syncSettingsViewport() {
+  if (typeof window === 'undefined') return
+  settingsViewportWidth.value = window.innerWidth
+  if (settingsViewportWidth.value < 768) {
+    if (showSettingsHero.value !== false) showSettingsHero.value = false
+    if (showNotificationAdvanced.value !== false) showNotificationAdvanced.value = false
+    return
+  }
+  if (!showSettingsHero.value) showSettingsHero.value = true
+  if (!showNotificationAdvanced.value) showNotificationAdvanced.value = true
+}
 const dirty = ref(false) // tracks unsaved changes
+const showNotificationAdvanced = ref(false)
 const notificationsSection = ref(null)
 const highlightNotifications = ref(false)
 
@@ -1215,6 +1314,12 @@ const prefs = reactive({
   discord: false,
   calls: false, // legacy toggle, derived below
 })
+const morningCoach = reactive({
+  enabled: true,
+  firstCallTime: '09:00',
+  customMessage: '',
+})
+const morningCallTesting = ref(false)
 
 const actionInboxNudges = reactive({
   enabled: true,
@@ -1312,6 +1417,16 @@ function applySettingsPreferences(res = {}) {
   actionInboxNudges.digestChannels = incomingDigestChannels.length
     ? incomingDigestChannels
     : deriveDefaultActionInboxDigestChannels()
+  if (actionInboxNudges.channels.length) {
+    actionInboxNudges.digestChannels = [...actionInboxNudges.channels]
+  }
+
+  const morningPrefs = res?.morningCoach || {}
+  morningCoach.enabled = morningPrefs?.enabled !== false
+  morningCoach.firstCallTime = typeof morningPrefs?.firstCallTime === 'string' && /^\d{2}:\d{2}$/.test(morningPrefs.firstCallTime)
+    ? morningPrefs.firstCallTime
+    : '09:00'
+  morningCoach.customMessage = typeof morningPrefs?.customMessage === 'string' ? morningPrefs.customMessage : ''
 }
 
 function applyIntegrationEndpoints(resInts = {}) {
@@ -1493,6 +1608,8 @@ const isPremium = computed(() => {
 
 onMounted(async () => {
   try {
+    syncSettingsViewport()
+    window.addEventListener('resize', syncSettingsViewport, { passive: true })
     // Ensure latest subscription state on entry
     try { await refreshPremium() } catch { /* noop */ }
     quickSetupStore.refreshQuickSetupState()
@@ -1814,6 +1931,18 @@ watch(
   { immediate: true },
 )
 
+watch(
+  () => [...(actionInboxNudges.channels || [])],
+  (channels) => {
+    const normalized = normalizeQuickSetupChannels(
+      channels
+        .map((channel) => String(channel || '').toLowerCase())
+        .filter((channel) => ACTION_INBOX_ALLOWED_CHANNELS.includes(channel)),
+    )
+    actionInboxNudges.digestChannels = normalized.length ? [...normalized] : deriveDefaultActionInboxDigestChannels()
+  },
+)
+
 async function saveSelection() {
   try {
     if (!authStore.user?.uid || !activeGoogleAccount.value) return
@@ -2007,11 +2136,9 @@ async function saveSettings() {
         .map((channel) => String(channel || '').toLowerCase())
         .filter((channel) => ACTION_INBOX_ALLOWED_CHANNELS.includes(channel)),
     )
-    const actionInboxDigestChannels = normalizeQuickSetupChannels(
-      (Array.isArray(actionInboxNudges.digestChannels) ? actionInboxNudges.digestChannels : [])
-        .map((channel) => String(channel || '').toLowerCase())
-        .filter((channel) => ACTION_INBOX_ALLOWED_CHANNELS.includes(channel)),
-    )
+    const actionInboxDigestChannels = actionInboxChannels.length
+      ? [...actionInboxChannels]
+      : deriveDefaultActionInboxDigestChannels()
     const notifications = {
       email: !!prefs.email,
       push: !!prefs.pwa,
@@ -2028,12 +2155,17 @@ async function saveSettings() {
         urgency: actionInboxNudges.urgency === 'urgent_only' ? 'urgent_only' : 'important',
         maxPerSuggestion: sanitizeActionInboxNudgeCount(actionInboxNudges.maxPerSuggestion),
         channels: actionInboxChannels.length ? actionInboxChannels : deriveDefaultActionInboxNudgeChannels(),
-        digestChannels: actionInboxDigestChannels.length ? actionInboxDigestChannels : deriveDefaultActionInboxDigestChannels(),
+        digestChannels: actionInboxDigestChannels,
       },
     }
     const reminderDefaults = {
       enabled: channels.length > 0,
       channels,
+    }
+    const morningCoachPayload = {
+      enabled: !!morningCoach.enabled,
+      firstCallTime: morningCoach.firstCallTime || '09:00',
+      customMessage: String(morningCoach.customMessage || '').trim(),
     }
     const meetingSettingsPayload = {
       autoCreateCalendarTasks: !!meetingPrefs.autoCreate,
@@ -2048,12 +2180,14 @@ async function saveSettings() {
       notifications,
       integrations: toggles,
       reminders: reminderDefaults,
+      morningCoach: morningCoachPayload,
       meetings: meetingSettingsPayload,
     })
     await updateIntegrations(authStore.user?.uid, integrationEndpoints.value)
     console.log("Settings saved:", {
       notifications,
       reminderDefaults,
+      morningCoach: morningCoachPayload,
       meetings: meetingSettingsPayload,
       integrationToggles: toggles,
       integrationEndpoints: integrationEndpoints.value,
@@ -2091,6 +2225,25 @@ async function saveSettings() {
   } catch (error) {
     console.error("Failed to save settings:", error)
     ElMessage.error("❌ Failed to save settings. Please try again.")
+  }
+}
+
+async function sendTestMorningCallNow() {
+  const uid = authStore.user?.uid
+  const message = String(morningCoach.customMessage || '').trim()
+  if (!uid) return
+  if (!message) {
+    ElMessage.warning('Add a custom morning message first.')
+    return
+  }
+  morningCallTesting.value = true
+  try {
+    await apiSendTestMorningCall(uid, message)
+    ElMessage.success('Test morning call sent.')
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.error || error?.message || 'Failed to send test morning call')
+  } finally {
+    morningCallTesting.value = false
   }
 }
 
@@ -2291,6 +2444,11 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  try {
+    window.removeEventListener('resize', syncSettingsViewport)
+  } catch {
+    /* noop */
+  }
   clearResendCooldown()
   if (gptCopyTimer) {
     clearTimeout(gptCopyTimer)
@@ -2426,6 +2584,54 @@ const premiumEndsOn = computed(() => {
   margin: 0 auto;
 }
 
+.settings-hero-wrap {
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.28), rgba(168, 85, 247, 0.2));
+  border-radius: 18px;
+  padding: 1rem 1rem 0.9rem;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(8px);
+}
+
+.settings-hero-content {
+  padding-bottom: 0.25rem;
+}
+
+.settings-hero-compact {
+  text-align: center;
+  padding: 0.4rem 0 0.2rem;
+}
+
+.settings-hero-compact__title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.settings-hero-compact__subtitle {
+  margin-top: 0.15rem;
+  font-size: 0.82rem;
+  color: rgba(224, 231, 255, 0.85);
+}
+
+.settings-hero-toggle {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.55rem;
+}
+
+.hero-fade-enter-active,
+.hero-fade-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.hero-fade-enter-from,
+.hero-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
 .settings-panel {
   width: 100%;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -2496,6 +2702,10 @@ const premiumEndsOn = computed(() => {
 }
 
 @media (max-width: 640px) {
+  .settings-hero-wrap {
+    padding: 0.9rem 0.9rem 0.85rem;
+  }
+
   .settings-panel {
     padding: 1rem;
   }

@@ -51,6 +51,16 @@ async function loadUserProfile(userId) {
 }
 
 function buildCoachText(summary, profile = {}) {
+  const customMessageRaw = profile?.preferences?.morningCoach?.customMessage;
+  const customMessage = typeof customMessageRaw === "string" ? customMessageRaw.trim() : "";
+  if (customMessage) {
+    return {
+      tone: "custom",
+      headline: "Your Morning Prompt",
+      message: customMessage.slice(0, 600),
+    };
+  }
+
   const strength = Number(summary?.habit_strength || 0);
   const streak = summary?.current_streak || 0;
   const consistency = summary?.consistency_score || 0;
@@ -161,7 +171,7 @@ export async function deliverVoiceCoach(userId, options = {}) {
   const channels = options.channels || { voice: true, whatsapp: true };
   if (channels.voice !== false) {
     try {
-      await makeCallForUser(userId, message, { userId, source: "voice_coach", bypassChecks: true });
+      await makeCallForUser(userId, message, { userId, source: "voice_coach" });
       if (verbose) console.log("[VoiceCoach] voice call queued", { userId });
     } catch (err) {
       console.error("[VoiceCoach] voice call failed", err?.message || err);

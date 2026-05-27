@@ -19,7 +19,7 @@
       @close="closeDialog"
     >
       <div class="planner-stack planner-stack--mobile-order">
-        <section class="planner-card section-date">
+        <section v-show="showAdvancedSections" class="planner-card section-date">
           <div class="card-heading">
             <div>
               <p class="card-eyebrow">Plan basics</p>
@@ -102,7 +102,7 @@
             class="task-textarea"
           />
           <p class="datetime-hint">
-            Date and time can be detected automatically from what you type.
+            Date and time can be detected automatically from what you type or say.
           </p>
           <div class="assistive-bar">
             <div class="assistive-actions">
@@ -146,17 +146,6 @@
                   <span class="mic-visual" aria-hidden="true"></span>
                 </div>
               </div>
-              <div>
-                <el-button
-                  size="small"
-                  class="save-draft-btn"
-                  :disabled="!getInputText().trim() || draftSaving"
-                  :loading="draftSaving"
-                  @click="saveDraftToNapkin"
-                >
-                  Save Draft
-                </el-button>
-              </div>
             </div>
             <el-button @click="generateTasks" :disabled="generateDisabled" class="generate-btn">
               <span class="generate-inner">
@@ -168,6 +157,25 @@
                 <span class="generate-text">{{ generateButtonLabel }}</span>
               </span>
             </el-button>
+          </div>
+          <div v-if="isMobile" class="planner-advanced-toggle-row">
+            <button
+              type="button"
+              class="card-toggle planner-advanced-toggle"
+              @click="showAdvancedOnMobile = !showAdvancedOnMobile"
+            >
+              <span>{{ showAdvancedOnMobile ? 'Hide schedule & reminders' : 'Schedule & reminders' }}</span>
+              <svg
+                class="card-toggle__icon"
+                :class="{ 'card-toggle__icon--open': showAdvancedOnMobile }"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
           </div>
           <div v-if="imageTasksEnabled" class="attachment-block">
             <input
@@ -242,6 +250,7 @@
 
         <div class="section-divider" />
         <section
+          v-show="showAdvancedSections"
           class="planner-card reminder-card section-reminder"
           :class="{ 'reminder-card--collapsed': !reminderOptionsVisible }"
         >
@@ -427,7 +436,6 @@ import {
   getReminderPreferences,
 } from '@/services/settingsService'
 import { getReminderStatus } from '@/services/reminderService'
-import { createNapkinItem } from '@/services/napkinService'
 import { isFeatureAllowed } from '@/services/planService'
 import { hasNotificationSetup } from '@/utils/notificationCheck'
 import { areImageTasksEnabled } from '@/utils/imageTasksAccess'
@@ -910,22 +918,8 @@ onBeforeUnmount(() => {
 const dialogWidth = computed(() => (screenWidth.value < 768 ? '92vw' : '520px'))
 const isMobile = computed(() => screenWidth.value < 768)
 const textareaRows = computed(() => (isMobile.value ? 2 : 3))
-
-const draftSaving = ref(false)
-async function saveDraftToNapkin() {
-  const text = getInputText().trim()
-  if (!text) return
-  draftSaving.value = true
-  try {
-    await createNapkinItem({ text, source: 'draft' })
-    ElMessage.success('Saved. You can find this in Napkin.')
-  } catch (err) {
-    console.warn('Save draft to Napkin failed', err)
-    ElMessage.error('Could not save draft. Try again.')
-  } finally {
-    draftSaving.value = false
-  }
-}
+const showAdvancedOnMobile = ref(false)
+const showAdvancedSections = computed(() => !isMobile.value || showAdvancedOnMobile.value)
 
 /* ---------------- Watchers ---------------- */
 watch(
@@ -939,6 +933,7 @@ watch(
     }
     await ensureReminderPreferences(true)
     await ensureNotificationPrompt()
+    showAdvancedOnMobile.value = !!props.editMode
     if (!task.value) {
       resetNewTaskState()
     }
@@ -2267,6 +2262,34 @@ function appendDetails(result = {}) {
   margin-top: 0.5rem;
 }
 
+.planner-advanced-toggle-row {
+  display: flex;
+  justify-content: stretch;
+  margin-top: 0.75rem;
+  padding-top: 0.15rem;
+}
+
+.planner-advanced-toggle {
+  width: 100%;
+  min-height: 44px;
+  justify-content: center;
+  border-radius: 0.9rem;
+  border-color: rgba(125, 211, 252, 0.34);
+  color: rgba(224, 242, 254, 0.95);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.35), rgba(30, 41, 59, 0.28));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  font-weight: 600;
+}
+
+.planner-advanced-toggle:hover {
+  border-color: rgba(96, 165, 250, 0.75);
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.5), rgba(51, 65, 85, 0.4));
+}
+
+.card-toggle__icon--open {
+  transform: rotate(180deg);
+}
+
 .assistive-actions {
   display: flex;
   justify-content: space-between;
@@ -2481,7 +2504,7 @@ function appendDetails(result = {}) {
   font-weight: 600;
   box-shadow: 0 15px 35px rgba(79, 70, 229, 0.35);
   background: linear-gradient(120deg, #7c3aed, #0ea5e9);
-  border: none;
+  border: 1px solid rgba(125, 211, 252, 0.2);
   color: #fdf4ff;
   height: 44px;
   padding: 0 18px;
@@ -2491,9 +2514,10 @@ function appendDetails(result = {}) {
 }
 
 .generate-btn:disabled {
-  opacity: 0.75;
-  background: linear-gradient(120deg, #4b5563, #475569);
-  color: #e2e8f0;
+  opacity: 1;
+  background: linear-gradient(120deg, rgba(99, 102, 241, 0.28), rgba(71, 85, 105, 0.55));
+  border-color: rgba(148, 163, 184, 0.28);
+  color: rgba(226, 232, 240, 0.86);
   box-shadow: none;
   cursor: not-allowed;
 }
