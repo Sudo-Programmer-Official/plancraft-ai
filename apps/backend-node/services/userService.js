@@ -1,5 +1,6 @@
 import admin from 'firebase-admin'
 import { db } from './firebaseAdmin.js'
+import { sendWelcomeEmailIfNeeded } from './welcomeEmailService.js'
 
 // Returns an array of { id, email, name }
 export async function getAllActiveUsers(limit = 1000) {
@@ -23,7 +24,8 @@ export async function ensureUserProfile(uid, data = {}) {
     data?.isGuest === true ||
     existing?.isGuest === true ||
     existing?.mode === 'guest'
-  if (!snap.exists) {
+  const isNewProfile = !snap.exists
+  if (isNewProfile) {
     const base = {
       ...data,
       createdAt: new Date(),
@@ -48,7 +50,18 @@ export async function ensureUserProfile(uid, data = {}) {
     )
   }
   const fresh = await ref.get()
-  return fresh.exists ? fresh.data() : null
+  const profile = fresh.exists ? fresh.data() : null
+
+  // Send onboarding email only once for newly-created non-guest profiles.
+  if (isNewProfile && profile) {
+    try {
+      await sendWelcomeEmailIfNeeded(String(uid), profile)
+    } catch (err) {
+      console.warn('[WelcomeEmail] skipped:', err?.message || err)
+    }
+  }
+
+  return profile
 }
 
 // Merge updates into a user profile and bump updatedAt
