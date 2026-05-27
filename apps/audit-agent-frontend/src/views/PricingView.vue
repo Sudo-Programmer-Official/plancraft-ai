@@ -60,170 +60,125 @@
       </div>
     </template>
     <template v-else>
-      <div class="max-w-5xl mx-auto px-4 sm:px-6 pt-6 pb-12 sm:pt-8 sm:pb-16">
-      <div class="mb-6 sm:mb-8">
-        <p class="text-sm uppercase tracking-[0.35em] text-indigo-300">Solo</p>
-        <h3 class="text-3xl font-semibold text-white">Solo plans</h3>
-        <p class="text-indigo-200">Personal pricing for individual workspaces.</p>
-      </div>
-      <div class="mb-6 rounded-2xl border border-indigo-400/30 bg-indigo-500/10 p-4 sm:p-5">
-        <p class="text-xs uppercase tracking-[0.24em] text-indigo-200">Premium outcome</p>
-        <p class="mt-2 text-lg font-semibold text-white">Get your first reminder loop working in minutes</p>
-        <p class="mt-1 text-sm text-indigo-100/85">
-          Capture tasks, get nudges on your preferred channels, and follow through with less friction.
-        </p>
-      </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
-        <div class="bg-gray-900 rounded-2xl shadow-lg p-8 border border-gray-700">
-          <h3 class="text-xl font-bold mb-4">🌱 Solo Free</h3>
-          <ul class="space-y-2 text-gray-300 mb-6">
-            <li>✅ Unlimited journaling</li>
-            <li>✅ Basic AI (10 insights/mo)</li>
-            <li>❌ No reminders</li>
-            <li>❌ No integrations</li>
-          </ul>
-          <p class="text-2xl font-bold mb-4">$0</p>
-          <button
-            disabled
-            class="w-full py-2 rounded-lg bg-gray-700 text-gray-400 cursor-not-allowed"
-          >
-            Current Plan
-          </button>
-        </div>
+      <div class="mx-auto max-w-5xl px-4 pb-14 pt-6 sm:px-6 sm:pt-8">
+        <section class="rounded-3xl border border-indigo-300/25 bg-gradient-to-br from-slate-900 via-indigo-950/80 to-slate-900 p-6 sm:p-8">
+          <p class="text-xs uppercase tracking-[0.28em] text-indigo-200/90">Solo Premium</p>
+          <h1 class="mt-2 text-3xl font-semibold text-white sm:text-4xl">Finish your first reminder loop faster</h1>
+          <p class="mt-3 max-w-2xl text-sm text-indigo-100/90 sm:text-base">
+            Capture tasks, get nudges, and follow through with less friction.
+          </p>
+          <div class="mt-5 flex flex-wrap items-center gap-3">
+            <button
+              v-if="!isPremium"
+              :disabled="loading"
+              @click="onUpgrade"
+              class="inline-flex min-h-11 items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-semibold text-indigo-900 transition hover:bg-slate-100 disabled:opacity-60"
+            >
+              <span v-if="loading">Redirecting…</span>
+              <span v-else>Start Premium — $2/mo</span>
+            </button>
+            <button
+              v-else-if="!isAppleManagedPremium"
+              :disabled="cancelLoading"
+              @click="onCancel"
+              class="inline-flex min-h-11 items-center justify-center rounded-xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:opacity-60"
+            >
+              <span v-if="cancelLoading">Canceling…</span>
+              <span v-else>Cancel Subscription</span>
+            </button>
+            <div
+              v-else
+              class="inline-flex min-h-11 items-center rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-medium text-white/90"
+            >
+              Managed through Apple on iPhone
+            </div>
+            <button
+              type="button"
+              class="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white/90 transition hover:border-indigo-300/50"
+              @click="refreshPremiumAccess"
+            >
+              Refresh Access
+            </button>
+          </div>
+          <p v-if="offerActive && !isPremium" class="mt-3 text-xs text-indigo-100/85">
+            Limited offer active: $2/month. Ends in {{ countdown }}.
+          </p>
+        </section>
 
-        <div
-          class="bg-gradient-to-br from-purple-700 to-pink-600 rounded-2xl shadow-xl p-8 border border-purple-400 relative"
-        >
-          <span class="premium-badge">
-            {{ offerActive ? 'Limited Offer' : 'Most Popular' }}
-          </span>
-          <h3 class="text-xl font-bold mb-4">🚀 Solo Premium</h3>
-          <ul class="space-y-2 text-white mb-6">
-            <li>✅ Unlimited AI Insights</li>
-            <li>✅ Smart Reminders</li>
-            <li>✅ Calendar & WhatsApp integration</li>
-            <li>✅ Priority Support</li>
-          </ul>
-          <div v-if="offerActive" class="mb-2 flex items-baseline gap-2">
-            <s class="text-gray-200/90 text-lg">$4</s>
-            <span class="text-3xl font-extrabold">$2</span>
-            <span class="text-sm text-green-200">50% OFF</span>
-          </div>
-          <p v-if="offerActive" class="text-xs text-yellow-400 mb-4">
-            ⚡ Limited-time offer! Ends in {{ countdown }}
-          </p>
-          <p v-else class="text-2xl font-bold mb-4">$2 / month</p>
-          <div v-if="isPremium" class="space-y-2">
-            <template v-if="isAppleManagedPremium">
-              <div class="rounded-xl border border-white/10 bg-black/15 px-4 py-4 text-sm text-white/85">
-                This premium subscription is managed through Apple on your iPhone.
+        <section class="mt-5 rounded-2xl border border-white/10 bg-slate-900/65 p-4 sm:p-5">
+          <details>
+            <summary class="cursor-pointer list-none text-sm font-semibold text-white">Compare plans and features</summary>
+            <div class="mt-4 grid gap-4 sm:grid-cols-2">
+              <div class="rounded-xl border border-white/10 bg-slate-900/85 p-4">
+                <h3 class="text-base font-semibold text-white">Solo Free</h3>
+                <p class="mt-1 text-2xl font-bold text-white">$0</p>
+                <ul class="mt-3 space-y-1 text-sm text-indigo-100/90">
+                  <li>Unlimited journaling</li>
+                  <li>Basic AI (10 insights/mo)</li>
+                  <li>No reminders</li>
+                  <li>No integrations</li>
+                </ul>
               </div>
-            </template>
-            <template v-else>
-              <button
-                :disabled="cancelLoading"
-                @click="onCancel"
-                class="w-full py-2 rounded-lg bg-gradient-to-r from-rose-600 to-red-500 text-white font-semibold hover:from-rose-700 hover:to-red-600 transition disabled:opacity-60 text-sm sm:text-base"
-              >
-                <span v-if="cancelLoading">Canceling…</span>
-                <span v-else>Cancel Subscription</span>
-              </button>
-              <p class="text-sm text-white/80">You're currently on Premium.</p>
-            </template>
-          </div>
-          <button
-            v-else
-            :disabled="loading"
-            @click="onUpgrade"
-            class="w-full py-2 rounded-lg bg-black/20 text-white font-semibold hover:bg-black/30 transition disabled:opacity-60 text-sm sm:text-base"
-          >
-            <span v-if="loading">Redirecting…</span>
-            <span v-else>Start Premium — $2/mo</span>
-          </button>
-        </div>
+              <div class="relative rounded-xl border border-indigo-300/40 bg-indigo-900/35 p-4">
+                <span class="premium-badge">{{ offerActive ? 'Limited Offer' : 'Most Popular' }}</span>
+                <h3 class="text-base font-semibold text-white">Solo Premium</h3>
+                <p class="mt-1 text-2xl font-bold text-white">$2 / month</p>
+                <ul class="mt-3 space-y-1 text-sm text-indigo-100/90">
+                  <li>Unlimited AI insights</li>
+                  <li>Smart reminders</li>
+                  <li>Calendar and WhatsApp integration</li>
+                  <li>Priority support</li>
+                </ul>
+              </div>
+            </div>
+          </details>
+        </section>
+
+        <section id="teams" class="mt-5 rounded-2xl border border-white/10 bg-slate-900/65 p-4 sm:p-5">
+          <details>
+            <summary class="cursor-pointer list-none text-sm font-semibold text-white">Team plans and workspace billing</summary>
+            <div class="mt-4 space-y-4">
+              <p class="text-sm text-indigo-100/85">Seat-based plans for shared workspaces with roles and voice reminders.</p>
+              <div class="grid gap-4 md:grid-cols-2">
+                <div class="rounded-xl border border-indigo-400/35 bg-slate-900/85 p-4">
+                  <h4 class="text-lg font-semibold text-white">Team Starter</h4>
+                  <p class="mt-1 text-xl font-bold text-white">$6 <span class="text-sm font-normal text-indigo-200">/ seat / month</span></p>
+                  <p class="mt-1 text-sm text-indigo-200">Minimum 3 seats</p>
+                  <ul class="mt-3 space-y-1 text-sm text-indigo-100/90">
+                    <li>Shared workspace</li>
+                    <li>Invite teammates</li>
+                    <li>Role-based access</li>
+                    <li>Voice AI reminders</li>
+                  </ul>
+                  <button
+                    class="mt-4 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500"
+                    @click="handleTeamCta('starter')"
+                  >
+                    {{ starterCtaLabel }}
+                  </button>
+                </div>
+                <div class="rounded-xl border border-indigo-300/45 bg-indigo-950/45 p-4">
+                  <h4 class="text-lg font-semibold text-white">Team Pro</h4>
+                  <p class="mt-1 text-xl font-bold text-white">$10 <span class="text-sm font-normal text-indigo-200">/ seat / month</span></p>
+                  <p class="mt-1 text-sm text-indigo-200">Minimum 3 seats</p>
+                  <ul class="mt-3 space-y-1 text-sm text-indigo-100/90">
+                    <li>Everything in Starter</li>
+                    <li>Advanced admin controls (coming soon)</li>
+                    <li>Priority support</li>
+                  </ul>
+                  <button
+                    class="mt-4 w-full rounded-xl bg-white px-4 py-3 text-sm font-semibold text-indigo-900 transition hover:bg-slate-100"
+                    @click="handleTeamCta('pro')"
+                  >
+                    {{ proCtaLabel }}
+                  </button>
+                </div>
+              </div>
+              <p class="text-xs text-indigo-200/90">Seats are active teammates in your workspace. Billing adjusts automatically when seats change.</p>
+            </div>
+          </details>
+        </section>
       </div>
-    </div>
-      <div id="teams" class="max-w-5xl mx-auto px-4 sm:px-6 mt-0 sm:mt-10 space-y-4">
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <p class="text-sm uppercase tracking-[0.35em] text-indigo-300">Teams & Workspaces</p>
-          <h3 class="text-3xl font-semibold text-white">Teams pricing</h3>
-          <p class="text-indigo-200">
-            Seat-based plans for shared Workspaces with roles and Voice AI reminders.
-          </p>
-        </div>
-        <button
-          class="px-4 py-2 rounded-lg bg-white text-indigo-800 font-semibold hover:bg-slate-100 transition"
-          @click="handleTeamCta('starter')"
-        >
-          Create Workspace
-        </button>
-      </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="rounded-2xl border border-indigo-500/30 bg-slate-900/70 p-6 space-y-3 shadow-lg">
-          <h4 class="text-2xl font-semibold text-white">Team Starter</h4>
-          <div class="flex items-baseline gap-2">
-            <span class="text-3xl font-bold text-white">$6</span>
-            <span class="text-sm text-indigo-200">/ seat / month</span>
-          </div>
-          <p class="text-sm text-indigo-200">Min 3 seats</p>
-          <ul class="space-y-2 text-sm text-indigo-100/90">
-            <li>✅ Shared workspace</li>
-            <li>✅ Invite teammates</li>
-            <li>✅ Role-based access</li>
-            <li>✅ Voice AI reminders</li>
-          </ul>
-          <button
-            class="w-full mt-4 px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition"
-            @click="handleTeamCta('starter')"
-          >
-            {{ starterCtaLabel }}
-          </button>
-        </div>
-        <div class="rounded-2xl border border-indigo-400/40 bg-gradient-to-br from-indigo-900/80 via-slate-900 to-indigo-950 p-6 space-y-3 shadow-lg ring-2 ring-indigo-400/40">
-          <div class="flex items-center justify-between">
-            <h4 class="text-2xl font-semibold text-white">Team Pro</h4>
-            <span class="text-[11px] px-2 py-1 rounded-full bg-indigo-500/20 border border-indigo-300/50 text-indigo-100">
-              Advanced admin controls — coming soon
-            </span>
-          </div>
-          <div class="flex items-baseline gap-2">
-            <span class="text-3xl font-bold text-white">$10</span>
-            <span class="text-sm text-indigo-200">/ seat / month</span>
-          </div>
-          <p class="text-sm text-indigo-200">Min 3 seats</p>
-          <ul class="space-y-2 text-sm text-indigo-100/90">
-            <li>✅ Everything in Starter</li>
-            <li>✅ Advanced admin controls (Coming soon)</li>
-            <li>✅ Priority support</li>
-          </ul>
-          <button
-            class="w-full mt-4 px-4 py-3 rounded-xl bg-white text-indigo-800 font-semibold hover:bg-slate-100 transition"
-            @click="handleTeamCta('pro')"
-          >
-            {{ proCtaLabel }}
-          </button>
-        </div>
-      </div>
-      <p class="text-sm text-indigo-200">
-        Seats = people you invite to collaborate in a workspace. You only pay for active teammates, not viewers or guests.
-      </p>
-      <p class="text-sm text-indigo-200">Change seats anytime. Billing adjusts automatically.</p>
-      <p class="text-sm text-indigo-200">
-        Trusted by founders, creators, and small teams who want less noise and more follow-through.
-      </p>
-      <div class="rounded-2xl border border-indigo-400/30 bg-indigo-500/10 p-5 mt-4 shadow-lg w-full">
-        <div class="flex items-start gap-3">
-          <div class="h-10 w-10 rounded-full bg-white/10 flex items-center justify-center text-lg">🛡️</div>
-          <div>
-            <p class="text-lg font-semibold text-white">Billing you can trust</p>
-            <p class="text-sm text-indigo-100 mt-1">
-              No hidden fees. Cancel anytime. Change seats anytime. Billing adjusts automatically. No long-term contracts.
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
       <div class="text-center text-sm mt-6">
         <p v-if="$route.query.status === 'success'" class="text-green-400">✅ Payment complete. Premium is now active! 🎉</p>
         <p v-else-if="$route.query.status === 'cancel'" class="text-red-400">❌ Checkout canceled. You can try again anytime.</p>
