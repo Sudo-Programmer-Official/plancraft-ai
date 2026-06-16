@@ -21,6 +21,7 @@
     "@capacitor/app": "^8.0.1",
     "@capacitor/browser": "^8.0.2",
     "@capacitor/core": "^8.2.0",
+    "@capacitor/push-notifications": "^8.1.1",
     "@capgo/capacitor-audio-recorder": "^8.0.12",
     "@dataconnect/generated": "file:src/dataconnect-generated",
     "@element-plus/icons-vue": "^2.3.1",

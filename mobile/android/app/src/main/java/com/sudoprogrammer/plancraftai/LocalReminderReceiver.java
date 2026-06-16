@@ -24,6 +24,8 @@ public class LocalReminderReceiver extends BroadcastReceiver {
         String body = valueOrEmpty(intent.getStringExtra("body"));
         String taskId = valueOrEmpty(intent.getStringExtra("taskId"));
         String workspaceId = valueOrEmpty(intent.getStringExtra("workspaceId"));
+        String type = valueOrEmpty(intent.getStringExtra("type"));
+        boolean wakeUp = "wake_up".equalsIgnoreCase(type);
 
         ensureNotificationChannel(context);
 
@@ -53,17 +55,21 @@ public class LocalReminderReceiver extends BroadcastReceiver {
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, LocalReminderPlugin.CHANNEL_ID)
             .setSmallIcon(context.getApplicationInfo().icon)
-            .setContentTitle(title.isEmpty() ? "Task reminder" : title)
-            .setContentText(body.isEmpty() ? "A scheduled task is due now." : body)
-            .setStyle(new NotificationCompat.BigTextStyle().bigText(body.isEmpty() ? "A scheduled task is due now." : body))
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setContentTitle(title.isEmpty() ? (wakeUp ? "Wake-up reminder" : "Task reminder") : title)
+            .setContentText(body.isEmpty() ? (wakeUp ? "Wake up now." : "A scheduled task is due now.") : body)
+            .setStyle(new NotificationCompat.BigTextStyle().bigText(body.isEmpty() ? (wakeUp ? "Wake up now." : "A scheduled task is due now.") : body))
+            .setPriority(wakeUp ? NotificationCompat.PRIORITY_MAX : NotificationCompat.PRIORITY_HIGH)
+            .setCategory(wakeUp ? NotificationCompat.CATEGORY_ALARM : NotificationCompat.CATEGORY_REMINDER)
             .setAutoCancel(true)
             .setDefaults(Notification.DEFAULT_ALL)
-            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE);
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setOngoing(wakeUp);
 
         if (contentIntent != null) {
             builder.setContentIntent(contentIntent);
+            if (wakeUp) {
+                builder.setFullScreenIntent(contentIntent, true);
+            }
         }
 
         NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);

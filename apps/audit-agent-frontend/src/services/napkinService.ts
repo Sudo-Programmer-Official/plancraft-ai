@@ -224,8 +224,14 @@ function shouldRepairAudioUrl(rawUrl?: string | null) {
   }
 }
 
+function shouldDropBrokenAudioUrl(rawUrl?: string | null) {
+  if (!rawUrl || typeof rawUrl !== 'string') return false
+  return shouldRepairAudioUrl(rawUrl)
+}
+
 async function resolveNapkinAudioUrl(uid: string, itemId: string, rawUrl?: string | null) {
-  if (rawUrl && !shouldRepairAudioUrl(rawUrl)) return rawUrl
+  const needsRepair = shouldRepairAudioUrl(rawUrl)
+  if (rawUrl && !needsRepair) return rawUrl
 
   const cacheKey = `${uid}:${itemId}:${rawUrl || ''}`
   if (napkinAudioUrlCache.has(cacheKey)) {
@@ -248,7 +254,7 @@ async function resolveNapkinAudioUrl(uid: string, itemId: string, rawUrl?: strin
       }
     }
 
-    return rawUrl || null
+    return shouldDropBrokenAudioUrl(rawUrl) ? null : (rawUrl || null)
   })()
 
   napkinAudioUrlCache.set(cacheKey, resolver)

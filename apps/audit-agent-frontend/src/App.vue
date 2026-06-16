@@ -1,8 +1,10 @@
 <template>
   <div class="app-root">
-    <transition name="page-fade" mode="out-in">
-      <RouterView />
-    </transition>
+    <RouterView v-slot="{ Component }">
+      <transition name="page-fade">
+        <component :is="Component" :key="$route.fullPath" />
+      </transition>
+    </RouterView>
 
     <transition name="startup-fade">
       <div v-if="showStartupOverlay" class="startup-overlay" aria-live="polite" aria-busy="true">

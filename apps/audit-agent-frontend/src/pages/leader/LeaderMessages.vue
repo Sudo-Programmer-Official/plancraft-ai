@@ -21,7 +21,7 @@
         <div class="p-3 rounded-xl bg-slate-900/70 border border-slate-800 space-y-2">
           <div class="flex items-center justify-between">
             <h3 class="text-sm font-semibold text-slate-200">AI generate message</h3>
-            <span class="text-xs text-slate-500">Powered by ai-nlp-service</span>
+            <span class="text-xs text-slate-500">Powered by PlanCraft backend</span>
           </div>
           <textarea
             v-model="state.prompt"

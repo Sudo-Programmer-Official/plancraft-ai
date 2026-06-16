@@ -9,7 +9,7 @@
   >
     <div class="content space-y-4 text-center">
       <p class="text-slate-300 leading-relaxed">
-        Receive reminders for your tasks. We only send notifications for your own plans.
+        Receive wake-up reminders and task alerts. We only send notifications for your own plans.
       </p>
 
       <div v-if="permission === 'denied'" class="text-red-400 text-sm">

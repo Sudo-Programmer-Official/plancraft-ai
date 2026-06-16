@@ -52,10 +52,17 @@ function normalizeChannels(task) {
   if (Array.isArray(task?.reminderChannels)) {
     return task.reminderChannels.map((channel) => String(channel || '').toLowerCase())
   }
+  if (Array.isArray(task?.deliveryChannels)) {
+    return task.deliveryChannels.map((channel) => String(channel || '').toLowerCase())
+  }
   if (Array.isArray(task?.channels)) {
     return task.channels.map((channel) => String(channel || '').toLowerCase())
   }
   return []
+}
+
+function isWakeUpTask(task) {
+  return String(task?.type || '').toLowerCase() === 'wake_up'
 }
 
 function truncateNotificationBody(value, limit = 180) {
@@ -66,17 +73,19 @@ function truncateNotificationBody(value, limit = 180) {
 }
 
 function buildReminderBody(task) {
+  const when = [task?.date, task?.reminderTime].filter(Boolean).join(' ')
+  if (isWakeUpTask(task)) {
+    return when ? `Wake up at ${when}` : 'Wake-up reminder due now.'
+  }
   const details = truncateNotificationBody(task?.details)
   if (details) return details
-
-  const when = [task?.date, task?.reminderTime].filter(Boolean).join(' ')
   if (when) return `Due ${when}`
   return 'A scheduled task is due now.'
 }
 
 function taskAllowsNativeReminder(task) {
   const channels = normalizeChannels(task)
-  return !channels.length || channels.includes('pwa')
+  return isWakeUpTask(task) || !channels.length || channels.includes('pwa')
 }
 
 function buildManagedReminder(task) {
@@ -96,7 +105,8 @@ function buildManagedReminder(task) {
     id: `${MANAGED_PREFIX}${task.id}`,
     taskId: String(task.id),
     workspaceId: task?.workspaceId || null,
-    title: truncateNotificationBody(task?.title || 'Task reminder', 80),
+    type: isWakeUpTask(task) ? 'wake_up' : String(task?.type || '').trim() || null,
+    title: truncateNotificationBody(task?.title || (isWakeUpTask(task) ? 'Wake-up reminder' : 'Task reminder'), 80),
     body: buildReminderBody(task),
     scheduledAt,
   }
@@ -255,6 +265,39 @@ export async function syncNativeReminderQueueNow({
   }
 }
 
+export async function scheduleNativeTestReminder({
+  title = 'PlanCraftAI reminder test',
+  body = 'This is a test notification from the notification debug screen.',
+  delaySeconds = 10,
+  type = 'wake_up',
+} = {}) {
+  if (!isNativeLocalReminderSupported()) {
+    return { ok: false, reason: 'unsupported' }
+  }
+
+  const permission = await getNativeReminderPermissionStatus()
+  if (!permission.granted) {
+    return { ok: false, reason: 'permission_denied', permission }
+  }
+
+  const scheduledAt = new Date(Date.now() + Math.max(5, Number(delaySeconds) || 10) * 1000).toISOString()
+  const reminder = {
+    id: `debug-reminder:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
+    title: String(title || 'PlanCraftAI reminder test').trim(),
+    body: String(body || '').trim(),
+    scheduledAt,
+    type: String(type || '').trim() || null,
+  }
+
+  try {
+    const result = await LocalReminder.schedule({ reminder })
+    return { ok: true, result, reminder }
+  } catch (error) {
+    console.warn('[NativeReminder] schedule test reminder failed', error?.message || error)
+    return { ok: false, error }
+  }
+}
+
 export function queueNativeReminderSync(context = {}) {
   if (!isNativeLocalReminderSupported()) {
     return Promise.resolve({ ok: false, reason: 'unsupported' })
@@ -332,7 +375,9 @@ export function initNativeReminderSync({ authStore, workspaceStore } = {}) {
     window.addEventListener('tasks:refresh-request', () => {
       queueCurrentSync('tasks-refresh-request')
     })
-  } catch {}
+  } catch {
+    /* noop */
+  }
 
   import('@capacitor/app')
     .then(({ App }) => App.addListener('appStateChange', ({ isActive }) => {

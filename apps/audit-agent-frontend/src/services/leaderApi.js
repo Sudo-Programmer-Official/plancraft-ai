@@ -19,7 +19,20 @@ async function authedHeaders() {
 }
 
 function getNlpBase() {
-  return import.meta.env.VITE_NLP_API_BASE || (import.meta.env.VITE_AI_NLP_URL ? `${import.meta.env.VITE_AI_NLP_URL}/api/ai` : '/nlp-api')
+  const direct = import.meta.env.VITE_NLP_API_BASE
+  if (direct) {
+    if (typeof window !== 'undefined' && /^https?:\/\//i.test(direct)) {
+      try {
+        if (new URL(direct).origin !== window.location.origin) {
+          return '/api/nlp'
+        }
+      } catch {
+        return '/api/nlp'
+      }
+    }
+    return direct.replace(/\/+$/, '')
+  }
+  return '/api/nlp'
 }
 
 function getGrowthBase() {

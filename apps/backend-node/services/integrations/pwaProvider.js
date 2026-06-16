@@ -18,9 +18,20 @@ if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
 export async function sendPWA(userId, message) {
   try {
     if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return { ok: false, error: 'missing vapid keys' }
-    const snap = await db.collection('users').doc(String(userId)).get()
+    const userRef = db.collection('users').doc(String(userId))
+    const snap = await userRef.get()
     const data = snap.exists ? snap.data() : {}
-    const subs = Array.isArray(data?.integrations?.pwa?.subscriptions) ? data.integrations.pwa.subscriptions : []
+    let subs = Array.isArray(data?.integrations?.pwa?.subscriptions) ? data.integrations.pwa.subscriptions : []
+    if (!subs.length) {
+      try {
+        const subSnap = await userRef.collection('pushSubscriptions').get()
+        subs = subSnap.docs
+          .map((doc) => doc.data() || {})
+          .filter((entry) => entry?.endpoint)
+      } catch (error) {
+        console.warn('[PWA] Failed to load pushSubscriptions subcollection', error?.message || error)
+      }
+    }
     if (!subs.length) {
       console.warn('[PWA] No push subscriptions for user', userId)
       return { ok: false, error: 'no subscriptions' }

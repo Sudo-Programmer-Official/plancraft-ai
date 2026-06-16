@@ -123,6 +123,7 @@ import featureFlagRoutes from "./routes/featureFlagRoutes.js";
 import playbookRoutes from "./routes/playbookRoutes.js";
 import accountRoutes from "./routes/accountRoutes.js";
 import actionInboxRoutes from "./routes/actionInboxRoutes.js";
+import nlpProxyRoutes from "./routes/nlpProxyRoutes.js";
 
 dotenv.config();
 
@@ -284,6 +285,7 @@ app.get("/health", (req, res) => res.status(200).send("OK"));
 app.use("/api/ai", aiRoutes);
 // Back-compat: allow calling AI endpoints under /api as well
 app.use("/api", aiRoutes);
+app.use("/api/nlp", nlpProxyRoutes);
 app.use("/api/action-inbox", actionInboxRoutes);
 app.use("/api/usage", usageRoutes);
 app.use("/api/access", accessRoutes);

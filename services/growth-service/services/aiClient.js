@@ -2,7 +2,7 @@ import axios from 'axios'
 
 export async function callAi(type, input, token, workspaceId = null) {
   const base = (process.env.AI_NLP_SERVICE_URL || '').replace(/\/+$/, '')
-  if (!base) throw new Error('Missing AI_NLP_SERVICE_URL')
+  if (!base) throw new Error('Missing AI_NLP_SERVICE_URL for standalone growth-service deployment')
   const url = `${base}/api/ai/generate/${type}`
   const headers = {}
   if (token) headers.Authorization = `Bearer ${token}`

@@ -38,12 +38,12 @@ export function buildQuickSetupState({
   const phoneReady = !!phoneValue
   const pushRelevant = true
   const pushReady = !!pushGranted
-  const requiredComplete = timezoneReady && channelsReady && phoneReady
+  const requiredComplete = timezoneReady && channelsReady
 
   const steps = [
     { key: 'timezone', label: 'Timezone', complete: timezoneReady, required: true },
     { key: 'channels', label: 'Reminder channels', complete: channelsReady, required: true },
-    { key: 'phone', label: 'Phone number', complete: phoneReady, required: true },
+    { key: 'phone', label: 'Phone number', complete: phoneReady, required: false },
   ]
 
   if (pushRelevant) {

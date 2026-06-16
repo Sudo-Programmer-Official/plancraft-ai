@@ -79,6 +79,7 @@ const OFFSET_PATTERN = new RegExp(
   'i',
 )
 const EVERY_DAYS_PATTERN = /\bevery\s+(\d+)\s+days?\b/i
+const WAKE_UP_PATTERN = /\b(wake me up|wake\s*me\s*up|set an alarm|alarm me|wake up)\b/i
 
 function clampDays(value) {
   const next = Math.trunc(Number(value) || 0)
@@ -208,10 +209,11 @@ function parseRepeat(text) {
 
 function parseReminder(text, repeat) {
   const raw = String(text || '')
+  const wakeUp = WAKE_UP_PATTERN.test(raw)
   if (SAME_DAY_PATTERN.test(raw)) {
     return {
       reminder: { includeOnDue: true },
-      meta: { appliedDefaultReminder: false, explicitDueDayOnly: true },
+      meta: { appliedDefaultReminder: false, explicitDueDayOnly: true, wakeUp },
     }
   }
 
@@ -224,7 +226,7 @@ function parseReminder(text, repeat) {
           offsetDays,
           includeOnDue: true,
         },
-        meta: { appliedDefaultReminder: false, explicitDueDayOnly: offsetDays === 0 },
+        meta: { appliedDefaultReminder: false, explicitDueDayOnly: offsetDays === 0, wakeUp },
       }
     }
   }
@@ -235,11 +237,11 @@ function parseReminder(text, repeat) {
         offsetDays: 2,
         includeOnDue: true,
       },
-      meta: { appliedDefaultReminder: true, explicitDueDayOnly: false },
+      meta: { appliedDefaultReminder: true, explicitDueDayOnly: false, wakeUp },
     }
   }
 
-  return { reminder: undefined, meta: { appliedDefaultReminder: false, explicitDueDayOnly: false } }
+  return { reminder: undefined, meta: { appliedDefaultReminder: false, explicitDueDayOnly: false, wakeUp } }
 }
 
 function parseDueDate(text, { now = new Date() } = {}) {
@@ -354,20 +356,28 @@ export function parseVoiceTaskIntent(transcript, options = {}) {
   const dueDate = parseDueDate(raw, options)
   const extractedTitle = extractTitle(raw)
   const clearTitle = hasClearTitle(extractedTitle, raw)
+  const wakeUpIntent = !!reminderMeta?.wakeUp
 
   const parsed = {
     title: clearTitle ? extractedTitle : capitalizeFirst(raw),
     dueDate,
-    confidence: clearTitle || repeat || reminder ? 'high' : 'low',
+    confidence: clearTitle || repeat || reminder || wakeUpIntent ? 'high' : 'low',
     meta: {
       hasClearTitle: clearTitle,
       appliedDefaultReminder: reminderMeta.appliedDefaultReminder,
       explicitDueDayOnly: reminderMeta.explicitDueDayOnly,
       usedAiFallback: false,
+      wakeUpIntent,
     },
   }
 
   if (repeat) parsed.repeat = repeat
   if (reminder) parsed.reminder = reminder
+  if (wakeUpIntent) {
+    parsed.taskType = 'wake_up'
+    parsed.priority = 'critical'
+    parsed.deliveryChannels = ['pwa', 'voice_call']
+    parsed.reminder = parsed.reminder || { includeOnDue: true }
+  }
   return parsed
 }

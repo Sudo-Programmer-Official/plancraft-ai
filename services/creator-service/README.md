@@ -1,6 +1,8 @@
 # Creator Service
 
-Purpose: manage creator plans (ContentCampaign) and proxy AI generation via ai-nlp-service.
+Purpose: manage creator plans (ContentCampaign) and, as an optional standalone deployment, proxy AI generation via ai-nlp-service.
+
+The main PlanCraft app now routes generation through its own backend `/api/nlp` handlers instead of this external service path.
 
 ## Endpoints
 - `POST /creator/plan/create` – create draft campaign
@@ -16,7 +18,7 @@ pnpm dev
 ```
 
 ## Env
-See `.env.example`. Requires Firebase Admin credentials and AI service URL.
+See `.env.example`. Optional standalone deployments require Firebase Admin credentials and an AI service URL.
 
 ## AWS App Runner Deployment
 1) Create an ECR repo for `creator-service` in `us-east-1`.
@@ -31,7 +33,7 @@ See `.env.example`. Requires Firebase Admin credentials and AI service URL.
    - FIREBASE_PROJECT_ID
    - FIREBASE_CLIENT_EMAIL
    - FIREBASE_PRIVATE_KEY
-   - AI_NLP_SERVICE_URL (base of ai-nlp-service, e.g., https://<ai-service>/api/ai)
+   - AI_NLP_SERVICE_URL (optional standalone creator-service deployment; base of ai-nlp-service, e.g., https://<ai-service>/api/ai)
    - SERVICE_APP_TOKEN (shared secret; must match ai-nlp-service)
    - APP_TOKEN (same value as SERVICE_APP_TOKEN for backward compatibility)
    - CORS_ALLOW_ALL=1 (optional; keep 0 to lock down origins)

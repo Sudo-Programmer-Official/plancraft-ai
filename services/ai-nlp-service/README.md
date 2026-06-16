@@ -1,6 +1,8 @@
 # AI NLP Service
 
-Handles AI generation for hooks, repurposing, reels scripts, story frames, LinkedIn posts, tweet threads, and outreach messages.
+Optional standalone AI generation service for hooks, repurposing, reels scripts, story frames, LinkedIn posts, tweet threads, and outreach messages.
+
+The main PlanCraft app now routes browser NLP traffic through its own backend `/api/nlp` handlers. Keep this service only for standalone creator/growth deployments that still proxy through it.
 
 ## Dev
 ```

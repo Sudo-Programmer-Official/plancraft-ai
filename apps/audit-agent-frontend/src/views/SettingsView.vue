@@ -391,6 +391,16 @@
           </label>
         </div>
 
+        <div class="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/30 p-3.5">
+          <div class="space-y-1">
+            <p class="text-sm font-medium text-white">Notification debug</p>
+            <p class="text-xs text-slate-400">Inspect permission, token, and delivery tests on this device.</p>
+          </div>
+          <RouterLink to="/notification-debug" class="inline-flex items-center rounded-lg border border-white/15 bg-slate-900/60 px-3 py-1.5 text-sm text-slate-100 hover:border-indigo-300/40">
+            Open debug screen
+          </RouterLink>
+        </div>
+
         <div class="mt-4 rounded-2xl border border-white/10 bg-slate-950/30 p-3.5 sm:p-5">
           <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div class="space-y-2">

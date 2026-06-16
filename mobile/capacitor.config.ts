@@ -6,6 +6,11 @@ const config: CapacitorConfig = {
   webDir: '../apps/audit-agent-frontend/dist',
   bundledWebRuntime: false,
   npmClient: 'pnpm',
+  plugins: {
+    PushNotifications: {
+      presentationOptions: ['badge', 'sound', 'alert', 'banner', 'list'],
+    },
+  },
 
   server: {
     cleartext: false,

@@ -22,6 +22,7 @@ import { setupLinkedInTag } from './analytics/linkedin.js'
 import { Capacitor } from '@capacitor/core'
 import { closeNativeAuthBrowser, parseNativeAuthCallbackUrl } from '@/services/mobileAuthHandoffService'
 import { initNativeReminderSync } from '@/services/nativeReminderService'
+import { initNativePushSync } from '@/services/nativePushService'
 
 const isBrowser =
   typeof globalThis.window !== 'undefined' &&
@@ -423,6 +424,12 @@ async function bootstrapApp() {
     initNativeReminderSync({ authStore, workspaceStore })
   } catch (error) {
     console.warn('[NativeReminder] bootstrap failed', error?.message || error)
+  }
+
+  try {
+    initNativePushSync({ authStore })
+  } catch (error) {
+    console.warn('[NativePush] bootstrap failed', error?.message || error)
   }
 
   if (!routerReady && isNativeApp && Capacitor?.getPlatform?.() === 'ios') {

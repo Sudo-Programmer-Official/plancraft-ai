@@ -67,6 +67,25 @@ function deriveUserReminderPrefs(data = {}) {
   }
 }
 
+function hasReminderPhone(data = {}) {
+  try {
+    const rootPrefs = data?.notifications || {}
+    const nested = data?.preferences?.notifications || {}
+    const integrations = data?.integrations || {}
+    return Boolean(
+      rootPrefs?.phone_voice ||
+        rootPrefs?.phone_sms ||
+        nested?.phone_voice ||
+        nested?.phone_sms ||
+        integrations?.sms?.phone ||
+        integrations?.whatsapp?.phone ||
+        data?.phone,
+    )
+  } catch {
+    return false
+  }
+}
+
 const router = express.Router()
 // Require auth for all reminder endpoints and ensure userId matches token
 router.use(requireAuth, ensureUserMatches)
@@ -78,12 +97,14 @@ router.use(['/text', '/batch', '/sync'], planUsageMiddleware)
 // POST /api/reminders/text
 router.post("/text", async (req, res) => {
   try {
-    const { userId, text, channels, taskId, scheduledTime } = req.body || {}
+    const { userId, text, channels, deliveryChannels, taskId, scheduledTime, type, priority } = req.body || {}
     const tz = (req.body && req.body.timezone) || req.headers['x-user-tz'] || 'UTC'
     console.log("[Reminder API] /reminders/text", {
       userId,
       taskId,
       channels,
+      deliveryChannels,
+      type,
       scheduledTime,
       timezone: tz,
       now: new Date().toISOString(),
@@ -95,7 +116,11 @@ router.post("/text", async (req, res) => {
       return res.status(400).json({ success: false, error: 'Missing scheduledTime for task-bound reminder' })
     }
     // Resolve channels precedence: request body ∪ user preference
-    let channelsToUse = Array.isArray(channels) ? [...channels] : []
+    let channelsToUse = Array.isArray(deliveryChannels)
+      ? [...deliveryChannels]
+      : Array.isArray(channels)
+        ? [...channels]
+        : []
     try {
       const u = await db.collection('users').doc(String(userId)).get()
       const data = u.exists ? (u.data() || {}) : {}
@@ -111,9 +136,19 @@ router.post("/text", async (req, res) => {
     } catch {
       channelsToUse = Array.isArray(channelsToUse) ? channelsToUse : []
     }
+    if (String(type || '').toLowerCase() === 'wake_up' && !channelsToUse.length) {
+      channelsToUse = ['pwa', 'voice_call']
+    }
     if (!channelsToUse.length) channelsToUse = ['pwa']
 
-    const reminder = await handleTextReminder(text, userId, channelsToUse, { taskId, scheduledTime, timezone: tz })
+    const reminder = await handleTextReminder(text, userId, channelsToUse, {
+      taskId,
+      scheduledTime,
+      timezone: tz,
+      type,
+      priority,
+      deliveryChannels: channelsToUse,
+    })
 
     // Optional mirror to tasks/{taskId}.reminderTime so UI reflects immediately
     try {
@@ -145,10 +180,12 @@ async function handleBatchRequest(req, res) {
     const voiceCallCutoffMs = 60 * 1000
 
     let userDefaults = { enabled: true, channels: ['pwa'] }
+    let hasPhoneContact = false
     try {
       const snap = await db.collection('users').doc(String(userId)).get()
       const data = snap.exists ? (snap.data() || {}) : {}
       userDefaults = deriveUserReminderPrefs(data)
+      hasPhoneContact = hasReminderPhone(data)
       if (!userDefaults.enabled || !userDefaults.channels.length) {
         userDefaults.channels = ['pwa']
       }
@@ -163,13 +200,21 @@ async function handleBatchRequest(req, res) {
         if (!(dt instanceof Date) || isNaN(dt.getTime())) return null
         const text = String(rem.text || rem.title || '').trim()
         if (!text) return null
+        const reminderType = String(rem.type || '').toLowerCase()
         return {
           idx,
           taskId: rem.taskId || null,
           text,
           scheduledAt: dt,
           timezone: rem.timezone || tzHeader,
-          channels: Array.isArray(rem.channels) ? rem.channels : [],
+          type: reminderType || null,
+          priority: rem.priority || null,
+          hasPhoneContact,
+          channels: Array.isArray(rem.deliveryChannels)
+            ? rem.deliveryChannels
+            : Array.isArray(rem.channels)
+              ? rem.channels
+              : [],
         }
       })
       .filter(Boolean)
@@ -202,6 +247,19 @@ async function handleBatchRequest(req, res) {
           )
         )
 
+        if (entry.type === 'wake_up') {
+          const wakeUpChannels = normalized.filter((channel) => {
+            if (channel === 'pwa' || channel === 'email') return true
+            if (!entry.hasPhoneContact) {
+              return !['voice_call', 'whatsapp', 'sms'].includes(channel)
+            }
+            return true
+          })
+          if (!wakeUpChannels.includes('pwa')) wakeUpChannels.unshift('pwa')
+          normalized.length = 0
+          normalized.push(...wakeUpChannels)
+        }
+
         const filteredChannels = normalized
           .filter((c) => REMINDER_CHANNEL_ALLOW_LIST.includes(c))
           .filter((c) => {
@@ -231,6 +289,8 @@ async function handleBatchRequest(req, res) {
           scheduledTime,
           timezone: entry.timezone || tzHeader,
           channels: channelsToPersist,
+          type: entry.type || null,
+          priority: entry.priority || null,
         })
       }
     }
@@ -243,6 +303,8 @@ async function handleBatchRequest(req, res) {
           taskId: payload.taskId,
           task: payload.text || '',
           channels: payload.channels,
+          type: payload.type || null,
+          priority: payload.priority || null,
           scheduledTime: scheduledDate,
           createdAt: new Date(),
           status: 'scheduled',

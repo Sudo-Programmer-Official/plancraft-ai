@@ -86,6 +86,8 @@ function toTaskPayload(task = {}) {
     repeatMeta: task.repeatMeta && typeof task.repeatMeta === "object" ? task.repeatMeta : null,
     reminderChannels: Array.isArray(task.reminderChannels) ? task.reminderChannels : null,
     channels: Array.isArray(task.channels) ? task.channels : null,
+    deliveryChannels: Array.isArray(task.deliveryChannels) ? task.deliveryChannels : null,
+    type: task.type || null,
     timezone: task.timezone || task.tz || null,
     order: Number.isFinite(task.order) ? task.order : null,
     link: task.link || null,

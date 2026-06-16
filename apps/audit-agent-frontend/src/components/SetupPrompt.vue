@@ -21,7 +21,7 @@
       <div class="text-center">
         <h2 class="text-2xl font-bold text-white mb-1">Quick Setup</h2>
         <p class="text-indigo-200 text-sm leading-snug">
-          Set your timezone, reminder channels, and phone once so reminders work without another trip to settings.
+          Set your timezone and reminder channels once. Add a phone only if you want call or WhatsApp backup.
         </p>
       </div>
     </template>
@@ -98,7 +98,7 @@
           <div>
             <div class="setup-card__title">📱 Reminder Phone</div>
             <p class="setup-card__copy">
-              Used for WhatsApp, SMS, and voice reminders so you can finish setup without going to settings.
+              Optional. Used for WhatsApp, SMS, and voice reminders when you want backup delivery.
             </p>
           </div>
           <span class="setup-status" :class="phoneReady ? 'setup-status--complete' : 'setup-status--pending'">
@@ -147,6 +147,28 @@
               <span class="block text-xs text-slate-400">{{ channel.copy }}</span>
             </span>
           </label>
+        </div>
+        </section>
+
+        <section class="setup-card">
+        <div class="setup-card__header">
+          <div>
+            <div class="setup-card__title">🛎️ Reminder Coverage</div>
+            <p class="setup-card__copy">This is what a wake-up reminder can actually use on this account.</p>
+          </div>
+        </div>
+        <div class="mt-3 grid gap-3 sm:grid-cols-3">
+          <div
+            v-for="item in reminderCoverage"
+            :key="item.key"
+            class="rounded-xl border px-4 py-3"
+            :class="item.enabled ? 'border-emerald-400/30 bg-emerald-500/10' : 'border-white/10 bg-slate-950/30'"
+          >
+            <p class="text-sm font-medium text-white">{{ item.label }}</p>
+            <p class="mt-1 text-xs" :class="item.enabled ? 'text-emerald-200' : 'text-slate-400'">
+              {{ item.status }}
+            </p>
+          </div>
         </div>
         </section>
 
@@ -327,6 +349,32 @@ const selectedChannels = computed(() =>
 )
 const channelsReady = computed(() => selectedChannels.value.length > 0)
 const phoneReady = computed(() => !!String(reminderPhone.value || '').trim())
+const reminderCoverage = computed(() => [
+  {
+    key: 'voice',
+    label: 'Voice Calls',
+    enabled: channelState.voice_call && phoneReady.value,
+    status: channelState.voice_call
+      ? (phoneReady.value ? 'Available for wake-up reminders.' : 'Add a phone number to enable calls.')
+      : 'Disabled in your reminder setup.',
+  },
+  {
+    key: 'push',
+    label: 'Push Notifications',
+    enabled: pushGranted.value,
+    status: pushGranted.value
+      ? 'Ready on this device.'
+      : 'Allow notifications so wake-up reminders can land on time.',
+  },
+  {
+    key: 'whatsapp',
+    label: 'WhatsApp',
+    enabled: channelState.whatsapp && phoneReady.value,
+    status: channelState.whatsapp
+      ? (phoneReady.value ? 'Can deliver reminder text here.' : 'Needs a saved phone number.')
+      : 'Not selected for this setup.',
+  },
+])
 const setupState = computed(() =>
   buildQuickSetupState({
     timezone: tz.value,

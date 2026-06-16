@@ -58,3 +58,13 @@ export async function sendTestMorningCall(userId, message) {
   const res = await api.post('/settings/test-morning-call', { userId, message })
   return res?.data || { success: true }
 }
+
+export async function registerNativePushToken(payload = {}) {
+  const res = await api.post('/settings/native-push/register', payload)
+  return res?.data || { success: true }
+}
+
+export async function sendNativePushTest(payload = {}) {
+  const res = await api.post('/settings/native-push/test', payload)
+  return res?.data || { success: true }
+}

@@ -181,6 +181,7 @@ export const routes = [
         { path: 'goals', name: 'goals', component: () => import('@/views/GoalsView.vue') },
         { path: 'links', name: 'links', component: () => import('@/views/LinksView.vue') },
         { path: 'settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },
+        { path: 'notification-debug', name: 'notification-debug', component: () => import('@/views/NotificationDebugView.vue') },
         { path: 'subscription', name: 'subscription', component: () => import('@/views/PricingView.vue') },
         { path: 'workspaces', name: 'workspaces', component: () => import('@/views/WorkspacesView.vue') },
         { path: 'workspaces/new', name: 'workspace-new', component: () => import('@/views/WorkspaceOnboarding.vue') },

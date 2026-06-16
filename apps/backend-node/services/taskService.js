@@ -123,6 +123,13 @@ function normalizeReminderChannels(...sources) {
   return filtered.length ? filtered : null;
 }
 
+function normalizeTaskType(value) {
+  const token = sanitizeString(value, "").toLowerCase();
+  if (!token) return null;
+  if (token === "wake_up" || token === "wake-up" || token === "alarm") return "wake_up";
+  return token;
+}
+
 function coerceDate(input) {
   if (!input && input !== 0) return null;
   if (input instanceof Date) return Number.isNaN(input.getTime()) ? null : input;
@@ -272,8 +279,10 @@ export async function scheduleTaskReminder(userId, task, payload = {}, options =
     }
 
     const channels = normalizeReminderChannels(
+      payload.deliveryChannels,
       payload.reminderChannels,
       payload.channels,
+      task.deliveryChannels,
       task.reminderChannels,
       task.channels
     );
@@ -289,6 +298,8 @@ export async function scheduleTaskReminder(userId, task, payload = {}, options =
         source: options.source || "task_create",
         now: options.clientNow,
         context: options.context || payload.context || null,
+        type: normalizeTaskType(payload.type || task.type || null),
+        deliveryChannels: channels || undefined,
       }
     );
 
@@ -342,6 +353,12 @@ export async function advanceRecurringTask(userId, task = {}, options = {}) {
     repeat,
     reminderOffsetDays,
     reminder: sanitizeReminderConfig(task?.reminder, reminderOffsetDays),
+    type: normalizeTaskType(task?.type || null),
+    deliveryChannels: normalizeReminderChannels(
+      task?.deliveryChannels,
+      task?.reminderChannels,
+      task?.channels,
+    ),
     metadata: {
       ...(task?.metadata && typeof task.metadata === "object" ? task.metadata : {}),
       recurringOriginTaskId: task?.id || null,
@@ -439,6 +456,12 @@ export async function createTask(userId, payload = {}, options = {}) {
     gapMinutes: Number.isFinite(payload.gapMinutes) ? payload.gapMinutes : null,
     timeConfidence: Number.isFinite(payload.timeConfidence) ? payload.timeConfidence : null,
     timeMeta: payload.timeMeta && typeof payload.timeMeta === "object" ? payload.timeMeta : null,
+    type: normalizeTaskType(payload.type || null),
+    deliveryChannels: normalizeReminderChannels(
+      payload.deliveryChannels,
+      payload.reminderChannels,
+      payload.channels,
+    ),
     userId: uid,
     workspaceId,
     createdAt: now,
@@ -478,6 +501,8 @@ export async function createTask(userId, payload = {}, options = {}) {
   if (!doc.gapMinutes && doc.gapMinutes !== 0) delete doc.gapMinutes;
   if (!doc.timeConfidence && doc.timeConfidence !== 0) delete doc.timeConfidence;
   if (!doc.timeMeta) delete doc.timeMeta;
+  if (!doc.type) delete doc.type;
+  if (!doc.deliveryChannels) delete doc.deliveryChannels;
   if (!doc.goalId) delete doc.goalId;
   if (!doc.goalTitle) delete doc.goalTitle;
   if (!doc.goalTargetDate) delete doc.goalTargetDate;

@@ -25,12 +25,22 @@ const messaging = (() => {
   }
 })()
 
-export async function sendPushNotification(token, title, body) {
+function normalizeNotificationData(data = {}) {
+  if (!data || typeof data !== 'object') return {}
+  return Object.entries(data).reduce((acc, [key, value]) => {
+    if (value === null || value === undefined) return acc
+    acc[key] = typeof value === 'string' ? value : JSON.stringify(value)
+    return acc
+  }, {})
+}
+
+export async function sendPushNotification(token, title, body, data = {}) {
   if (!messaging) throw new Error("Firebase admin messaging not initialized")
 
   const message = {
     token,
     notification: { title, body },
+    data: normalizeNotificationData(data),
   }
 
   try {
@@ -42,4 +52,3 @@ export async function sendPushNotification(token, title, body) {
     throw err
   }
 }
-

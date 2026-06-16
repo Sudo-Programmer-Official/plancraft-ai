@@ -3,6 +3,7 @@ import { db } from '../services/firebaseAdmin.js'
 import { requireAuth, ensureUserMatches } from '../middleware/auth.js'
 import { normalizePhone, guessCountry } from '../utils/phone.js'
 import { makeCallForUser } from '../services/twilioService.js'
+import { sendPushNotification } from '../services/notifyService.js'
 
 const router = express.Router()
 router.use(requireAuth, ensureUserMatches)
@@ -258,6 +259,68 @@ router.get('/settings/profile', async (req, res) => {
   } catch (err) {
     console.error('❌ getProfile error:', err)
     res.status(500).json({ error: 'Failed to fetch profile' })
+  }
+})
+
+router.post('/settings/native-push/register', async (req, res) => {
+  try {
+    const uid = String(req?.user?.uid || '')
+    const { pushToken, pushTokenPlatform, pushPermissionState } = req.body || {}
+    if (!uid) return res.status(401).json({ error: 'Unauthorized' })
+    if (!String(pushToken || '').trim()) {
+      return res.status(400).json({ error: 'Missing pushToken' })
+    }
+
+    const platform = String(pushTokenPlatform || '').trim().toLowerCase()
+    const normalizedPlatform = platform === 'android' || platform === 'ios' ? platform : null
+    const permissionState = String(pushPermissionState || '').trim().toLowerCase() || 'granted'
+
+    await db.collection('users').doc(uid).set(
+      {
+        pushToken: String(pushToken).trim(),
+        pushTokenPlatform: normalizedPlatform,
+        pushPermissionState: permissionState,
+        pushTokenUpdatedAt: new Date().toISOString(),
+      },
+      { merge: true },
+    )
+
+    return res.json({
+      success: true,
+      pushTokenPlatform: normalizedPlatform,
+      pushPermissionState: permissionState,
+      pushTokenUpdatedAt: new Date().toISOString(),
+    })
+  } catch (err) {
+    console.error('❌ native-push register error:', err)
+    return res.status(500).json({ error: err?.message || 'Failed to register native push token' })
+  }
+})
+
+router.post('/settings/native-push/test', async (req, res) => {
+  try {
+    const uid = String(req?.user?.uid || '')
+    const { title, body } = req.body || {}
+    if (!uid) return res.status(401).json({ error: 'Unauthorized' })
+
+    const snap = await db.collection('users').doc(uid).get()
+    const data = snap.exists ? (snap.data() || {}) : {}
+    const token = String(data?.pushToken || '').trim()
+    if (!token) {
+      return res.status(400).json({ error: 'No native push token registered for this account' })
+    }
+
+    const pushTitle = String(title || 'PlanCraftAI push test').trim()
+    const pushBody = String(body || 'This is a remote push test from PlanCraftAI.').trim()
+    const response = await sendPushNotification(token, pushTitle, pushBody, {
+      type: 'native-push-test',
+      platform: data?.pushTokenPlatform || '',
+    })
+
+    return res.json({ success: true, response })
+  } catch (err) {
+    console.error('❌ native-push test error:', err)
+    return res.status(500).json({ error: err?.message || 'Failed to send native push test' })
   }
 })
 

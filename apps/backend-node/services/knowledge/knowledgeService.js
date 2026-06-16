@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import axios from "axios";
+import OpenAI from "openai";
 import { db } from "../firebaseAdmin.js";
 import { chunkText } from "./chunker.js";
 import { deleteChunks, queryChunks, upsertChunks, vectorStoreEnabled } from "./vectorStore.js";
@@ -17,9 +17,7 @@ const CHUNK_SIZE = Number(process.env.KNOWLEDGE_CHUNK_SIZE || 1200);
 const CHUNK_OVERLAP = Number(process.env.KNOWLEDGE_CHUNK_OVERLAP || 120);
 const FALLBACK_DOC_WINDOW_DAYS = Number(process.env.KNOWLEDGE_FALLBACK_DAYS || 30);
 const FALLBACK_CHUNK_LIMIT = Number(process.env.KNOWLEDGE_FALLBACK_CHUNKS || 50);
-
-const EMBED_URL_BASE = (process.env.AI_NLP_SERVICE_URL || "").replace(/\/+$/, "");
-const APP_TOKEN = process.env.SERVICE_APP_TOKEN || process.env.APP_TOKEN || "";
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 function normalizeContent(raw) {
   return String(raw || "").replace(/\r\n/g, "\n").trim();
@@ -44,25 +42,20 @@ async function findDuplicate(workspaceId, docHash) {
 
 async function embedTexts(texts = []) {
   if (!Array.isArray(texts) || !texts.length) return [];
-  if (!EMBED_URL_BASE) throw new Error("AI_NLP_SERVICE_URL is not configured");
-  const url = `${EMBED_URL_BASE}/api/ai/embed`;
-  const headers = {};
-  if (APP_TOKEN) headers["x-app-token"] = APP_TOKEN;
-  const { data } = await axios.post(
-    url,
-    { texts },
-    {
-      headers,
-      timeout: Number(process.env.KNOWLEDGE_EMBED_TIMEOUT_MS || 45000),
-    },
-  );
-  if (!data || !Array.isArray(data.embeddings)) {
+  const response = await openai.embeddings.create({
+    model: process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small",
+    input: texts,
+  });
+  const embeddings = Array.isArray(response?.data)
+    ? response.data.map((item) => Array.isArray(item?.embedding) ? item.embedding : [])
+    : [];
+  if (!embeddings.length) {
     throw new Error("Embedding service returned no embeddings");
   }
-  if (data.embeddings.length !== texts.length) {
+  if (embeddings.length !== texts.length) {
     throw new Error("Embedding service returned mismatched embeddings length");
   }
-  return data.embeddings;
+  return embeddings;
 }
 
 async function enforceWorkspaceChunkBudget(workspaceId, nextChunkCount) {

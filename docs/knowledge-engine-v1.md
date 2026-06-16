@@ -27,14 +27,14 @@ If exceeded, doc is marked `failed` with a friendly error.
 - Chunk metadata keeps `heading` when present.
 
 ## Embeddings & Vector store
-- Backend calls `AI_NLP_SERVICE_URL/api/ai/embed` (header `x-app-token`).
+- Backend generates embeddings locally via OpenAI (`text-embedding-3-small` by default).
 - Pinecone via `@pinecone-database/pinecone`; namespace = `workspaceId`; metadata includes `docId`, `chunkId`, `chunkIndex`, `heading`, `text`.
 - Vector optional; if missing, doc `vectorStatus=skipped` and search falls back.
-Env: `PINECONE_API_KEY`, `PINECONE_INDEX_NAME`, `SERVICE_APP_TOKEN`, `AI_NLP_SERVICE_URL`.
+Env: `PINECONE_API_KEY`, `PINECONE_INDEX_NAME`, `OPENAI_API_KEY`, `OPENAI_EMBEDDING_MODEL`.
 
 ## AI NLP service
-- New endpoint: `POST /api/ai/embed {texts:string[]}` → `{embeddings:number[][]}` (x-app-token).
-- Orchestrator (`/api/ai/orchestrate`): intents include `req_to_tasks`, `change_impact`; if `useKnowledge !== false` and intent in {plan, recall, reflect, team, req_to_tasks, change_impact}, runs knowledge search (vector→fallback, optional docId) and injects “Relevant knowledge snippets” into prompt.
+- App runtime now uses local `/api/nlp/*` handlers for outreach copy, image parsing, summaries, search, and orchestration.
+- The old external NLP service path is no longer required by the mobile/web app.
 
 ## Frontend
 - `KnowledgePanel.vue` (Settings) lets editors/admins paste/upload, view doc status, trigger processing, and call orchestrator to propose tasks. Viewers see/read only.

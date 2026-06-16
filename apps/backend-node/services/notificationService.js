@@ -5,6 +5,7 @@ import { send as sendWhatsApp } from './integrations/whatsappProvider.js'
 import { sendPWA } from './integrations/pwaProvider.js'
 import { sendEmail } from './integrations/emailProvider.js'
 import { makeCallForUser, sendSMSForUser } from './twilioService.js'
+import { sendPushNotification } from './notifyService.js'
 import { getUserPrefs } from './userPrefService.js'
 import { getEffectiveAccess } from './planService.js'
 import { getWorkspace } from './workspaceService.js'
@@ -260,6 +261,23 @@ async function loadUserContacts(userId) {
   } catch (err) {
     console.warn('[Notification] loadUserContacts failed', err?.message || err)
     return {}
+  }
+}
+
+async function loadNativePushTarget(userId) {
+  try {
+    const snap = await db.collection('users').doc(String(userId)).get()
+    const data = snap.exists ? snap.data() : {}
+    const token = String(data?.pushToken || '').trim()
+    if (!token) return null
+    return {
+      token,
+      platform: data?.pushTokenPlatform || null,
+      permissionState: data?.pushPermissionState || null,
+    }
+  } catch (err) {
+    console.warn('[Notification] loadNativePushTarget failed', err?.message || err)
+    return null
   }
 }
 
@@ -635,7 +653,7 @@ function shouldUsePostingService(meta = {}) {
 async function sendViaChannel(channel, userId, payload, contacts = {}, meta = {}) {
   // PWA never needs posting-service; send directly so users always see at least one channel.
   if (channel === 'pwa') {
-    return sendPWA(
+    const pwaResult = await sendPWA(
       userId,
       payload.pwa || {
         title: 'PlanCraftAI',
@@ -643,6 +661,39 @@ async function sendViaChannel(channel, userId, payload, contacts = {}, meta = {}
         data: payload.pwaData || {},
       },
     )
+
+    const nativeTarget = await loadNativePushTarget(userId)
+    if (!nativeTarget?.token) {
+      return pwaResult
+    }
+
+    try {
+      const nativeResult = await sendPushNotification(
+        nativeTarget.token,
+        payload.pwa?.title || 'PlanCraftAI',
+        payload.pwa?.body || payload.message || 'You have a new reminder.',
+        {
+          ...(payload.pwa?.data || {}),
+          type: payload.pwa?.data?.type || meta.type || 'reminder-due',
+          source: 'native-fallback',
+          platform: nativeTarget.platform || '',
+          permissionState: nativeTarget.permissionState || '',
+        },
+      )
+
+      return {
+        pwa: pwaResult,
+        nativePush: nativeResult,
+        success: true,
+      }
+    } catch (error) {
+      console.warn('[Notification] native fallback push failed', error?.message || error)
+      return {
+        pwa: pwaResult,
+        nativePushError: error?.message || String(error),
+        success: true,
+      }
+    }
   }
 
   // Cost guard: disable SMS sends when offline messaging is turned off.

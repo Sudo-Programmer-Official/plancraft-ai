@@ -4,7 +4,7 @@ import { logger } from '../utils/logger.js'
 function resolveAiBaseStrict() {
   const raw = (process.env.AI_NLP_SERVICE_URL || '').trim()
   if (!raw) {
-    throw new Error('AI_NLP_SERVICE_URL is not configured for creator-service')
+    throw new Error('AI_NLP_SERVICE_URL is not configured for standalone creator-service deployment')
   }
   return raw.replace(/\/+$/, '')
 }

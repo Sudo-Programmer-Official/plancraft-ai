@@ -20,6 +20,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const REMINDER_CHANNEL_ALLOW_LIST = ['pwa', 'whatsapp', 'email', 'sms', 'voice_call'];
 const VOICE_CALL_MIN_LEAD_MS = 60 * 1000;
+const WAKE_UP_REMINDER_TYPES = new Set(['wake_up', 'wake-up', 'alarm', 'critical']);
 const ENV_DEFAULT_CHANNELS = Array.isArray(process.env.DEFAULT_REMINDER_CHANNELS?.split?.(','))
   ? process.env.DEFAULT_REMINDER_CHANNELS.split(',').map((c) => String(c || '').trim().toLowerCase()).filter((c) => REMINDER_CHANNEL_ALLOW_LIST.includes(c))
   : null;
@@ -131,6 +132,65 @@ function sanitizeReminderChannels(channels = [], scheduledDate, source = '') {
   });
 
   return filtered.length ? filtered : fallback;
+}
+
+function hasConfiguredVoiceContact(data = {}) {
+  try {
+    const root = data?.notifications || {};
+    const nested = data?.preferences?.notifications || {};
+    const integrations = data?.integrations || {};
+
+    return Boolean(
+      root?.phone_voice ||
+        root?.phone_sms ||
+        nested?.phone_voice ||
+        nested?.phone_sms ||
+        integrations?.sms?.phone ||
+        integrations?.whatsapp?.phone ||
+        data?.phone,
+    );
+  } catch {
+    return false;
+  }
+}
+
+function normalizeWakeUpChannels(channels = [], scheduledDate, { hasVoiceContact = false } = {}) {
+  const now = Date.now();
+  const scheduledMs = scheduledDate instanceof Date ? scheduledDate.getTime() : NaN;
+  const phoneDependentChannels = new Set(['voice_call', 'whatsapp', 'sms']);
+  const normalized = Array.from(
+    new Set(
+      (channels || [])
+        .map((c) => String(c || '').toLowerCase())
+        .filter((c) => REMINDER_CHANNEL_ALLOW_LIST.includes(c))
+    )
+  );
+
+  const filtered = normalized.filter((c) => {
+    if (phoneDependentChannels.has(c) && !hasVoiceContact) return false;
+    if (c !== 'voice_call') return true;
+    if (!hasVoiceContact) return false;
+    if (!Number.isFinite(scheduledMs)) return false;
+    return scheduledMs - now > VOICE_CALL_MIN_LEAD_MS;
+  });
+
+  if (!filtered.includes('pwa')) {
+    filtered.unshift('pwa');
+  }
+
+  return Array.from(new Set(filtered.length ? filtered : ['pwa']));
+}
+
+function normalizeReminderType(value, text = '') {
+  const token = String(value || '').trim().toLowerCase();
+  if (WAKE_UP_REMINDER_TYPES.has(token)) return 'wake_up';
+
+  const haystack = String(text || '').toLowerCase();
+  if (/\b(wake me up|wake\s*me\s*up|set an alarm|alarm me|wake up)\b/i.test(haystack)) {
+    return 'wake_up';
+  }
+
+  return null;
 }
 
 function normalizeReminderChannel(channel) {
@@ -250,6 +310,7 @@ export async function createReminderFromText(
   let when = null;
   let parsedByAi = false;
   const timezoneOverride = options?.timezone || "UTC";
+  const reminderType = normalizeReminderType(options?.type, text);
   const nowOverride =
     options?.now && !Number.isNaN(new Date(options.now).getTime())
       ? new Date(options.now)
@@ -320,10 +381,12 @@ export async function createReminderFromText(
 
   // Resolve channels: provided list, else user preferences, else sane default
   let derivedPrefs = null
+  let hasVoiceContact = false
   try {
     const doc = await db.collection('users').doc(String(userId)).get()
     const data = doc.exists ? (doc.data() || {}) : {}
     derivedPrefs = deriveReminderPrefsFromUser(data)
+    hasVoiceContact = hasConfiguredVoiceContact(data)
   } catch {
     derivedPrefs = null
   }
@@ -339,18 +402,22 @@ export async function createReminderFromText(
     candidateChannels = DEFAULT_CHANNELS.slice()
   }
 
-  const reminderChannels = sanitizeReminderChannels(candidateChannels, when, options?.source)
+  const reminderChannels = reminderType === 'wake_up'
+    ? normalizeWakeUpChannels(candidateChannels, when, { hasVoiceContact })
+    : sanitizeReminderChannels(candidateChannels, when, options?.source)
   const reminder = {
     task: String(parsed.task || text),
     scheduledTime: when,
     userId: String(userId),
     channels: reminderChannels,
+    deliveryChannels: reminderChannels.slice(),
     createdAt: new Date(),
     status: "scheduled",
     sentAt: null,
     taskId: options?.taskId || null,
     timezone: tzForUser,
-    source: options?.source || 'reminder',
+    source: options?.source || reminderType || 'reminder',
+    type: reminderType || null,
   };
   if (options?.context && typeof options.context === 'object' && Object.keys(options.context).length) {
     reminder.context = options.context;
@@ -429,6 +496,7 @@ export async function sendReminder(reminder) {
     ) || null;
   const when = scheduledDate ? formatLocalTime(scheduledDate, reminder?.timezone || undefined) : "soon";
   const source = reminder?.source || 'manual';
+  const reminderType = normalizeReminderType(reminder?.type, task);
 
   console.log(`[ReminderService:${source}] Executing reminder`, { id: reminder?.id, userId, task, when, channels, ts: new Date().toISOString() });
 
@@ -443,7 +511,8 @@ export async function sendReminder(reminder) {
   const eventLink = meetingLink ? null : (context.eventLink || context.calendarLink || null);
   const linkLine = meetingLink ? `Join: ${meetingLink}` : eventLink ? `Open: ${eventLink}` : null;
   const extras = [locationLine, linkLine].filter(Boolean).join(" • ");
-  const fallbackText = `⏰ Reminder: ${task} (${when})${extras ? `. ${extras}` : ""}`;
+  const fallbackPrefix = reminderType === 'wake_up' ? '⏰ Wake-up reminder' : '⏰ Reminder';
+  const fallbackText = `${fallbackPrefix}: ${task} (${when})${extras ? `. ${extras}` : ""}`;
   const who = getSalutationToken(reminder);
 
   const reminderPayload = {
@@ -469,14 +538,19 @@ export async function sendReminder(reminder) {
           }
         : null,
       whatsappFallback: fallbackText,
-      voiceMessage: includeVoice ? `Here is your reminder: ${task}. Scheduled for ${when}.` : null,
+      voiceMessage: includeVoice
+        ? (reminderType === 'wake_up'
+          ? `Wake up now. ${task}. Scheduled for ${when}.`
+          : `Here is your reminder: ${task}. Scheduled for ${when}.`)
+        : null,
       smsMessage: fallbackText,
       message: fallbackText,
       pwa: {
-        title: 'Reminder due',
+        title: reminderType === 'wake_up' ? 'Wake-up reminder' : 'Reminder due',
         body: fallbackText,
         data: {
           type: 'reminder-due',
+          reminderType: reminderType || null,
           reminderId: reminder?.id || reminder?._id || null,
           taskId: reminder?.taskId || null,
           link: meetingLink || eventLink || null,

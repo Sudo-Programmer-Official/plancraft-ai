@@ -611,6 +611,20 @@ function computeReminderChannels() {
   return merged.length ? merged : ['pwa']
 }
 
+function resolveWakeUpDeliveryChannels(baseChannels = []) {
+  const channels = Array.from(
+    new Set(
+      (Array.isArray(baseChannels) ? baseChannels : [])
+        .map((channel) => String(channel || '').toLowerCase())
+        .filter((channel) => REMINDER_CHANNEL_ALLOW_LIST.includes(channel)),
+    ),
+  )
+
+  if (!channels.includes('pwa')) channels.unshift('pwa')
+  if (!channels.includes('voice_call')) channels.push('voice_call')
+  return Array.from(new Set(channels))
+}
+
 function normalizeReminderConfig(value, fallback = {}) {
   if (!value || typeof value !== 'object') return fallback || null
   const includeOnDue = value.includeOnDue !== false
@@ -721,6 +735,7 @@ const setReminder = ref(false)
 const reminderOffsetDays = ref(0)
 const includeOnDue = ref(true)
 const reminderOptionsVisible = ref(false)
+const taskType = ref('task')
 const repeatEnabled = ref(false)
 const repeatType = ref('daily')
 const repeatIntervalDays = ref(30)
@@ -799,12 +814,16 @@ const plannerVoiceButtonLabel = computed(() => {
 
 const voiceReminderSummaryTitle = computed(() => {
   if (!voiceParsedIntent.value?.reminder) return ''
+  if (voiceParsedIntent.value?.taskType === 'wake_up') return 'Wake-up reminder'
   return voiceParsedIntent.value?.meta?.appliedDefaultReminder ? 'Reminders (auto)' : 'Reminders from voice'
 })
 
 const voiceReminderSummaryLines = computed(() => {
   if (!setReminder.value || !voiceParsedIntent.value?.reminder) return []
   const lines = []
+  if (voiceParsedIntent.value?.taskType === 'wake_up') {
+    lines.push('Wake-up mode')
+  }
   const offsetDays = normalizeReminderOffsetDays(reminderOffsetDays.value, { fallback: null })
   if (offsetDays && offsetDays > 0) {
     lines.push(`${offsetDays} day${offsetDays === 1 ? '' : 's'} before`)
@@ -1063,6 +1082,7 @@ function resetNewTaskState() {
   if (!props.lockDate) selectedDate.value = normalizeDateInput(props.date)
   setReminder.value = !!reminderPrefs.value.enabled
   reminderOptionsVisible.value = false
+  taskType.value = 'task'
   repeatEnabled.value = false
   repeatType.value = 'daily'
   repeatIntervalDays.value = 30
@@ -1095,6 +1115,7 @@ function hydrateFromTask(current) {
   repeatEnabled.value = !!repeatRule
   repeatType.value = repeatRule?.type || 'daily'
   repeatIntervalDays.value = repeatRule?.intervalDays || 30
+  taskType.value = current.type || 'task'
   reminderOffsetDays.value = normalizeReminderOffsetDays(current.reminderOffsetDays, { fallback: 0 }) || 0
   const reminderConfig = normalizeReminderConfig(current.reminder, null)
   includeOnDue.value = reminderConfig?.includeOnDue !== false
@@ -1832,11 +1853,16 @@ async function save() {
     : null
 
   const channelsToSave = setReminder.value ? computeReminderChannels() : []
+  const deliveryChannelsToSave =
+    taskType.value === 'wake_up' ? resolveWakeUpDeliveryChannels(channelsToSave) : channelsToSave
+  const taskTypeToSave = taskType.value === 'wake_up' ? 'wake_up' : props.task?.type || null
+  const priorityToSave = taskType.value === 'wake_up' ? 'critical' : props.task?.priority || null
 
   const safeTitle = getInputText() || props.task?.title || 'Untitled Task'
 
   emit('saved', {
     ...props.task,
+    type: taskTypeToSave,
     title: safeTitle,
     details: details.value,
     date: dateToSave,
@@ -1846,8 +1872,10 @@ async function save() {
       ? { reminder: reminderConfigToSave }
       : {}),
     scheduledTime: scheduledIso,
-    reminderChannels: channelsToSave,
-    channels: channelsToSave,
+    reminderChannels: deliveryChannelsToSave,
+    deliveryChannels: deliveryChannelsToSave,
+    channels: deliveryChannelsToSave,
+    priority: priorityToSave,
     repeat: repeatToSave,
     attachments: attachments.value.length ? attachments.value : props.task?.attachments,
   })
@@ -2018,6 +2046,8 @@ function applyParsedTask(parsed, rawValue) {
     repeatType.value = safeParsed.repeat.type || 'daily'
     repeatIntervalDays.value = safeParsed.repeat.intervalDays || 30
   }
+
+  taskType.value = safeParsed?.taskType || 'task'
 
   if (!props.disableReminder && safeParsed?.reminder) {
     setReminder.value = true

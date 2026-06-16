@@ -657,7 +657,9 @@ async function syncTaskNotification(userId, taskId, payload) {
         reminderTime: payload.reminderTime ?? null,
         scheduledTime: payload.scheduledTime ?? null,
         reminderChannels: payload.reminderChannels ?? null,
+        deliveryChannels: payload.deliveryChannels ?? null,
         channels: payload.channels ?? null,
+        type: payload.type ?? null,
         timezone: payload.timezone ?? null,
       },
       schedule: payload.reminderTime != null || payload.scheduledTime != null,
@@ -700,6 +702,7 @@ export async function addTaskToFirebase(task, options = {}) {
   if ('scheduledTime' in task) payload.scheduledTime = task.scheduledTime ?? null
   if ('time' in task) payload.time = task.time ?? null
   if ('source' in task) payload.source = task.source || 'manual'
+  if ('type' in task) payload.type = task.type || null
   if ('duration' in task) payload.duration = task.duration
   if ('metadata' in task) payload.metadata = task.metadata
   const repeatRule = normalizeTaskRepeat(task?.repeat)
@@ -722,6 +725,9 @@ export async function addTaskToFirebase(task, options = {}) {
   if ('channels' in task) payload.channels = Array.isArray(task.channels) ? task.channels : null
   if ('reminderChannels' in task) {
     payload.reminderChannels = Array.isArray(task.reminderChannels) ? task.reminderChannels : null
+  }
+  if ('deliveryChannels' in task) {
+    payload.deliveryChannels = Array.isArray(task.deliveryChannels) ? task.deliveryChannels : null
   }
   if ('timeHint' in task) payload.timeHint = task.timeHint || null
   if ('relation' in task) payload.timeRelation = task.relation || null

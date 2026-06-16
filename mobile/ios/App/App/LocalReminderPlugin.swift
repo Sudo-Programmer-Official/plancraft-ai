@@ -17,6 +17,7 @@ private struct LocalReminderItem {
     let identifier: String
     let taskId: String?
     let workspaceId: String?
+    let type: String?
     let title: String
     let body: String
     let scheduledAt: Date
@@ -30,6 +31,7 @@ class LocalReminderPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "checkPermissions", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "requestPermissions", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "sync", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "schedule", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "listPending", returnType: CAPPluginReturnPromise),
     ]
 
@@ -65,14 +67,34 @@ class LocalReminderPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func sync(_ call: CAPPluginCall) {
         let rawReminders = call.getArray("reminders", JSArray())
         let reminders = self.parseReminders(rawReminders)
+        self.replaceManagedReminders(reminders, call: call)
+    }
 
+    @objc func schedule(_ call: CAPPluginCall) {
+        guard let reminder = self.parseSingleReminder(call) else {
+            call.reject("Missing reminder payload.")
+            return
+        }
+        self.scheduleReminder(reminder, replaceExisting: false, call: call)
+    }
+
+    private func replaceManagedReminders(_ reminders: [LocalReminderItem], call: CAPPluginCall) {
+        self.scheduleReminder(reminders, replaceExisting: true, call: call)
+    }
+
+    private func scheduleReminder(_ reminder: LocalReminderItem, replaceExisting: Bool, call: CAPPluginCall) {
+        self.scheduleReminder([reminder], replaceExisting: replaceExisting, call: call)
+    }
+
+    private func scheduleReminder(_ reminders: [LocalReminderItem], replaceExisting: Bool, call: CAPPluginCall) {
+        
         UNUserNotificationCenter.current().getPendingNotificationRequests { requests in
             let existingManagedIds = requests
                 .map { $0.identifier }
                 .filter { $0.hasPrefix(self.managedPrefix) }
 
             let incomingIds = Set(reminders.map { $0.identifier })
-            let removals = existingManagedIds.filter { !incomingIds.contains($0) }
+            let removals = replaceExisting ? existingManagedIds.filter { !incomingIds.contains($0) } : []
 
             if !removals.isEmpty {
                 UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: removals)
@@ -97,7 +119,7 @@ class LocalReminderPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve([
                     "scheduled": scheduledCount,
                     "cancelled": removals.count,
-                    "count": reminders.count,
+                    "count": replaceExisting ? reminders.count : existingManagedIds.count + scheduledCount,
                 ])
             }
         }
@@ -116,6 +138,7 @@ class LocalReminderPlugin: CAPPlugin, CAPBridgedPlugin {
                         "scheduledAt": nextTrigger.map { self.isoFormatterWithFractionalSeconds.string(from: $0) } ?? "",
                         "taskId": request.content.userInfo["taskId"] as? String ?? "",
                         "workspaceId": request.content.userInfo["workspaceId"] as? String ?? "",
+                        "type": request.content.userInfo["type"] as? String ?? "",
                     ]
                 }
                 .sorted {
@@ -173,11 +196,45 @@ private extension LocalReminderPlugin {
                 identifier: identifier,
                 taskId: reminder["taskId"] as? String,
                 workspaceId: reminder["workspaceId"] as? String,
+                type: reminder["type"] as? String,
                 title: titleValue.isEmpty ? "Task reminder" : titleValue,
                 body: (reminder["body"] as? String) ?? "",
                 scheduledAt: scheduledAt
             )
         }
+    }
+
+    func parseSingleReminder(_ call: CAPPluginCall) -> LocalReminderItem? {
+        guard let rawReminder = call.getObject("reminder") as? [String: Any] else {
+            let rawArray = call.getArray("reminders", JSArray())
+            guard rawArray.count > 0, let entry = rawArray[0] as? [String: Any] else { return nil }
+            return self.parseReminder(entry)
+        }
+        return self.parseReminder(rawReminder)
+    }
+
+    func parseReminder(_ reminder: [String: Any]) -> LocalReminderItem? {
+        let now = Date()
+        guard
+            let identifier = reminder["id"] as? String,
+            !identifier.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            let scheduledAtRaw = reminder["scheduledAt"] as? String,
+            let scheduledAt = parseIsoDate(scheduledAtRaw),
+            scheduledAt > now.addingTimeInterval(5)
+        else {
+            return nil
+        }
+
+        let titleValue = (reminder["title"] as? String) ?? "Task reminder"
+        return LocalReminderItem(
+            identifier: identifier,
+            taskId: reminder["taskId"] as? String,
+            workspaceId: reminder["workspaceId"] as? String,
+            type: reminder["type"] as? String,
+            title: titleValue.isEmpty ? "Task reminder" : titleValue,
+            body: (reminder["body"] as? String) ?? "",
+            scheduledAt: scheduledAt
+        )
     }
 
     func parseIsoDate(_ raw: String) -> Date? {
@@ -195,6 +252,7 @@ private extension LocalReminderPlugin {
         content.userInfo = [
             "taskId": reminder.taskId ?? "",
             "workspaceId": reminder.workspaceId ?? "",
+            "type": reminder.type ?? "",
         ]
 
         let components = Calendar.current.dateComponents(

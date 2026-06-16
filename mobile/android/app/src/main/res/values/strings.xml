@@ -4,4 +4,5 @@
     <string name="title_activity_main">PlanCraftAI</string>
     <string name="package_name">com.sudoprogrammer.plancraftai</string>
     <string name="custom_url_scheme">com.sudoprogrammer.plancraftai</string>
+    <string name="default_notification_channel_id">task_reminders</string>
 </resources>

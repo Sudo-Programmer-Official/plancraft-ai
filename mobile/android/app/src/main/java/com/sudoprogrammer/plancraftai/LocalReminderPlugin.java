@@ -78,9 +78,6 @@ public class LocalReminderPlugin extends Plugin {
 
             JSONArray reminderArray = call.getArray("reminders", new JSArray());
             List<JSONObject> reminders = new ArrayList<>();
-            Set<String> incomingIds = new HashSet<>();
-            JSONObject nextPayloads = new JSONObject();
-            int scheduledCount = 0;
 
             if (reminderArray != null) {
                 for (int i = 0; i < reminderArray.length(); i++) {
@@ -93,32 +90,43 @@ public class LocalReminderPlugin extends Plugin {
                     if (scheduledAtMs <= System.currentTimeMillis() + 5000) continue;
 
                     reminders.add(reminder);
-                    incomingIds.add(identifier);
                 }
             }
 
-            Set<String> existingIds = getManagedIds();
-            for (String existingId : existingIds) {
-                if (!incomingIds.contains(existingId)) {
-                    cancelReminder(existingId);
-                }
-            }
-
-            for (JSONObject reminder : reminders) {
-                if (scheduleReminder(reminder, nextPayloads)) {
-                    scheduledCount += 1;
-                }
-            }
-
-            persistManagedState(incomingIds, nextPayloads);
-
-            JSObject result = new JSObject();
-            result.put("scheduled", scheduledCount);
-            result.put("cancelled", Math.max(0, existingIds.size() - incomingIds.size() + Math.max(0, reminders.size() - scheduledCount)));
-            result.put("count", incomingIds.size());
+            JSObject result = scheduleManagedReminders(reminders, true);
             call.resolve(result);
         } catch (Exception error) {
             call.reject("Failed to sync local reminders: " + error.getMessage());
+        }
+    }
+
+    @PluginMethod
+    public void schedule(PluginCall call) {
+        try {
+            ensureNotificationChannel();
+
+            JSONObject reminder = call.getObject("reminder");
+            if (reminder == null) {
+                JSONArray reminderArray = call.getArray("reminders", new JSArray());
+                if (reminderArray != null && reminderArray.length() > 0) {
+                    Object item = reminderArray.get(0);
+                    if (item instanceof JSONObject) {
+                        reminder = (JSONObject) item;
+                    }
+                }
+            }
+
+            if (reminder == null) {
+                call.reject("Missing reminder payload");
+                return;
+            }
+
+            List<JSONObject> reminders = new ArrayList<>();
+            reminders.add(reminder);
+            JSObject result = scheduleManagedReminders(reminders, false);
+            call.resolve(result);
+        } catch (Exception error) {
+            call.reject("Failed to schedule local reminder: " + error.getMessage());
         }
     }
 
@@ -200,6 +208,7 @@ public class LocalReminderPlugin extends Plugin {
         intent.putExtra("body", reminder.optString("body", ""));
         intent.putExtra("taskId", reminder.optString("taskId", ""));
         intent.putExtra("workspaceId", reminder.optString("workspaceId", ""));
+        intent.putExtra("type", reminder.optString("type", ""));
 
         PendingIntent pendingIntent = PendingIntent.getBroadcast(
             getContext(),
@@ -229,6 +238,7 @@ public class LocalReminderPlugin extends Plugin {
             payload.put("scheduledAt", reminder.optString("scheduledAt", ""));
             payload.put("taskId", reminder.optString("taskId", ""));
             payload.put("workspaceId", reminder.optString("workspaceId", ""));
+            payload.put("type", reminder.optString("type", ""));
             payload.put("exact", exact);
             nextPayloads.put(identifier, payload);
         } catch (JSONException ignored) {
@@ -262,6 +272,44 @@ public class LocalReminderPlugin extends Plugin {
             .putStringSet(PREF_IDS, ids)
             .putString(PREF_PAYLOADS, payloads.toString())
             .apply();
+    }
+
+    private JSObject scheduleManagedReminders(List<JSONObject> reminders, boolean replaceExisting) throws JSONException {
+        Set<String> existingIds = getManagedIds();
+        JSONObject nextPayloads = replaceExisting ? new JSONObject() : getManagedPayloads();
+        Set<String> nextIds = replaceExisting ? new HashSet<>() : new HashSet<>(existingIds);
+        int scheduledCount = 0;
+
+        if (replaceExisting) {
+            Set<String> incomingIds = new HashSet<>();
+            for (JSONObject reminder : reminders) {
+                String identifier = reminder.optString("id", "").trim();
+                if (!identifier.isEmpty()) {
+                    incomingIds.add(identifier);
+                }
+            }
+            for (String existingId : existingIds) {
+                if (!incomingIds.contains(existingId)) {
+                    cancelReminder(existingId);
+                }
+            }
+            nextIds = incomingIds;
+        }
+
+        for (JSONObject reminder : reminders) {
+            if (scheduleReminder(reminder, nextPayloads)) {
+                scheduledCount += 1;
+                nextIds.add(reminder.optString("id", "").trim());
+            }
+        }
+
+        persistManagedState(nextIds, nextPayloads);
+
+        JSObject result = new JSObject();
+        result.put("scheduled", scheduledCount);
+        result.put("cancelled", replaceExisting ? Math.max(0, existingIds.size() - nextIds.size() + Math.max(0, reminders.size() - scheduledCount)) : 0);
+        result.put("count", nextIds.size());
+        return result;
     }
 
     private SharedPreferences getPrefs() {

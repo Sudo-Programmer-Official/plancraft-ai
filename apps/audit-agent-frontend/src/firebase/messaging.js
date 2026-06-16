@@ -29,7 +29,24 @@ async function getMessagingSafe() {
   return getMessaging(app)
 }
 
-export async function requestNotificationPermission() {
+async function persistFcmToken(token) {
+  try {
+    const auth = getAuth()
+    const user = auth.currentUser
+    if (!user?.uid) return
+
+    const db = getFirestore()
+    await setDoc(
+      doc(db, "users", user.uid),
+      { fcmToken: token, fcmTokenUpdatedAt: new Date().toISOString() },
+      { merge: true },
+    )
+  } catch (error) {
+    console.warn("Failed to persist FCM token:", error?.message || error)
+  }
+}
+
+export async function getCurrentFcmToken({ persist = false } = {}) {
   try {
     const messaging = await getMessagingSafe()
     if (!messaging) {
@@ -43,6 +60,10 @@ export async function requestNotificationPermission() {
       return null
     }
 
+    if (typeof globalThis !== 'undefined' && globalThis.Notification?.permission !== 'granted') {
+      return null
+    }
+
     const token = await getToken(messaging, { vapidKey })
     if (!token) {
       console.warn("No FCM token returned (permission denied or blocked)")
@@ -50,22 +71,25 @@ export async function requestNotificationPermission() {
     }
 
     console.log("FCM token:", token)
-
-    // Persist under the logged-in user if available
-    const auth = getAuth()
-    const user = auth.currentUser
-    if (user?.uid) {
-      const db = getFirestore()
-      await setDoc(
-        doc(db, "users", user.uid),
-        { fcmToken: token, fcmTokenUpdatedAt: new Date().toISOString() },
-        { merge: true }
-      )
-    }
+    if (persist) await persistFcmToken(token)
 
     return token
   } catch (err) {
     console.error("Failed to get FCM token:", err)
+    return null
+  }
+}
+
+export async function requestNotificationPermission() {
+  try {
+    if (typeof globalThis !== 'undefined' && globalThis.Notification?.permission !== 'granted') {
+      if (typeof globalThis.Notification === 'undefined') return null
+      const permission = await globalThis.Notification.requestPermission()
+      if (permission !== 'granted') return null
+    }
+    return getCurrentFcmToken({ persist: true })
+  } catch (error) {
+    console.error("Failed to request notification permission:", error)
     return null
   }
 }
@@ -76,4 +100,3 @@ export async function onForegroundMessage(callback) {
   if (!messaging) return () => {}
   return onMessage(messaging, callback)
 }
-
