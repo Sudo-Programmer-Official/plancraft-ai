@@ -18,21 +18,42 @@ dayjs.extend(timezone);
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const REMINDER_CHANNEL_ALLOW_LIST = ['pwa', 'whatsapp', 'email', 'sms', 'voice_call'];
+const REMINDER_CHANNEL_ALLOW_LIST = [
+  "pwa",
+  "whatsapp",
+  "email",
+  "sms",
+  "voice_call",
+];
 const VOICE_CALL_MIN_LEAD_MS = 60 * 1000;
-const WAKE_UP_REMINDER_TYPES = new Set(['wake_up', 'wake-up', 'alarm', 'critical']);
-const ENV_DEFAULT_CHANNELS = Array.isArray(process.env.DEFAULT_REMINDER_CHANNELS?.split?.(','))
-  ? process.env.DEFAULT_REMINDER_CHANNELS.split(',').map((c) => String(c || '').trim().toLowerCase()).filter((c) => REMINDER_CHANNEL_ALLOW_LIST.includes(c))
+const WAKE_UP_REMINDER_TYPES = new Set([
+  "wake_up",
+  "wake-up",
+  "alarm",
+  "critical",
+]);
+const ENV_DEFAULT_CHANNELS = Array.isArray(
+  process.env.DEFAULT_REMINDER_CHANNELS?.split?.(","),
+)
+  ? process.env.DEFAULT_REMINDER_CHANNELS.split(",")
+      .map((c) =>
+        String(c || "")
+          .trim()
+          .toLowerCase(),
+      )
+      .filter((c) => REMINDER_CHANNEL_ALLOW_LIST.includes(c))
   : null;
-const DEFAULT_CHANNELS = (ENV_DEFAULT_CHANNELS && ENV_DEFAULT_CHANNELS.length)
-  ? ENV_DEFAULT_CHANNELS
-  : ['pwa', 'whatsapp'];
+const DEFAULT_CHANNELS =
+  ENV_DEFAULT_CHANNELS && ENV_DEFAULT_CHANNELS.length
+    ? ENV_DEFAULT_CHANNELS
+    : ["pwa", "whatsapp"];
 const MAX_DELAY_MS = 24 * 60 * 60 * 1000;
 const REMINDER_DISPATCH_LOCK_TTL_MS = 15 * 60 * 1000;
 
 function coerceDateValue(input) {
   if (!input && input !== 0) return null;
-  if (input instanceof Date) return Number.isNaN(input.getTime()) ? null : input;
+  if (input instanceof Date)
+    return Number.isNaN(input.getTime()) ? null : input;
   if (typeof input?.toDate === "function") {
     try {
       const d = input.toDate();
@@ -59,7 +80,7 @@ function coerceDateValue(input) {
 
 function deriveReminderPrefsFromUser(data = {}) {
   try {
-    if (!data || typeof data !== 'object') {
+    if (!data || typeof data !== "object") {
       return { enabled: true, channels: DEFAULT_CHANNELS.slice(0, 2) };
     }
     const root = data?.notifications || {};
@@ -74,19 +95,20 @@ function deriveReminderPrefsFromUser(data = {}) {
           : Array.isArray(root?.channels) && root.channels.length
             ? root.channels
             : [
-                (nested.email ?? root.email) && 'email',
-                ((nested.push ?? root.push) || (nested.pwa ?? root.pwa)) && 'pwa',
-                (nested.whatsapp ?? root.whatsapp) && 'whatsapp',
-                (nested.sms ?? root.sms) && 'sms',
-                (nested.voice_call ?? root.voice_call) && 'voice_call',
+                (nested.email ?? root.email) && "email",
+                ((nested.push ?? root.push) || (nested.pwa ?? root.pwa)) &&
+                  "pwa",
+                (nested.whatsapp ?? root.whatsapp) && "whatsapp",
+                (nested.sms ?? root.sms) && "sms",
+                (nested.voice_call ?? root.voice_call) && "voice_call",
               ].filter(Boolean);
 
     const channels = Array.from(
       new Set(
         channelCandidates
-          .map((c) => String(c || '').toLowerCase())
-          .filter((c) => REMINDER_CHANNEL_ALLOW_LIST.includes(c))
-      )
+          .map((c) => String(c || "").toLowerCase())
+          .filter((c) => REMINDER_CHANNEL_ALLOW_LIST.includes(c)),
+      ),
     );
 
     const enabled =
@@ -113,20 +135,21 @@ function deriveReminderPrefsFromUser(data = {}) {
   }
 }
 
-function sanitizeReminderChannels(channels = [], scheduledDate, source = '') {
+function sanitizeReminderChannels(channels = [], scheduledDate, source = "") {
   const now = Date.now();
-  const scheduledMs = scheduledDate instanceof Date ? scheduledDate.getTime() : NaN;
+  const scheduledMs =
+    scheduledDate instanceof Date ? scheduledDate.getTime() : NaN;
   const fallback = DEFAULT_CHANNELS.slice(0, 2);
   const normalized = Array.from(
     new Set(
       (channels || [])
-        .map((c) => String(c || '').toLowerCase())
-        .filter((c) => REMINDER_CHANNEL_ALLOW_LIST.includes(c))
-    )
+        .map((c) => String(c || "").toLowerCase())
+        .filter((c) => REMINDER_CHANNEL_ALLOW_LIST.includes(c)),
+    ),
   );
 
   const filtered = normalized.filter((c) => {
-    if (c !== 'voice_call') return true;
+    if (c !== "voice_call") return true;
     if (!Number.isFinite(scheduledMs)) return false;
     return scheduledMs - now > VOICE_CALL_MIN_LEAD_MS;
   });
@@ -154,40 +177,51 @@ function hasConfiguredVoiceContact(data = {}) {
   }
 }
 
-function normalizeWakeUpChannels(channels = [], scheduledDate, { hasVoiceContact = false } = {}) {
+function normalizeWakeUpChannels(
+  channels = [],
+  scheduledDate,
+  { hasVoiceContact = false } = {},
+) {
   const now = Date.now();
-  const scheduledMs = scheduledDate instanceof Date ? scheduledDate.getTime() : NaN;
-  const phoneDependentChannels = new Set(['voice_call', 'whatsapp', 'sms']);
+  const scheduledMs =
+    scheduledDate instanceof Date ? scheduledDate.getTime() : NaN;
+  const phoneDependentChannels = new Set(["voice_call", "whatsapp", "sms"]);
   const normalized = Array.from(
     new Set(
       (channels || [])
-        .map((c) => String(c || '').toLowerCase())
-        .filter((c) => REMINDER_CHANNEL_ALLOW_LIST.includes(c))
-    )
+        .map((c) => String(c || "").toLowerCase())
+        .filter((c) => REMINDER_CHANNEL_ALLOW_LIST.includes(c)),
+    ),
   );
 
   const filtered = normalized.filter((c) => {
     if (phoneDependentChannels.has(c) && !hasVoiceContact) return false;
-    if (c !== 'voice_call') return true;
+    if (c !== "voice_call") return true;
     if (!hasVoiceContact) return false;
     if (!Number.isFinite(scheduledMs)) return false;
     return scheduledMs - now > VOICE_CALL_MIN_LEAD_MS;
   });
 
-  if (!filtered.includes('pwa')) {
-    filtered.unshift('pwa');
+  if (!filtered.includes("pwa")) {
+    filtered.unshift("pwa");
   }
 
-  return Array.from(new Set(filtered.length ? filtered : ['pwa']));
+  return Array.from(new Set(filtered.length ? filtered : ["pwa"]));
 }
 
-function normalizeReminderType(value, text = '') {
-  const token = String(value || '').trim().toLowerCase();
-  if (WAKE_UP_REMINDER_TYPES.has(token)) return 'wake_up';
+function normalizeReminderType(value, text = "") {
+  const token = String(value || "")
+    .trim()
+    .toLowerCase();
+  if (WAKE_UP_REMINDER_TYPES.has(token)) return "wake_up";
 
-  const haystack = String(text || '').toLowerCase();
-  if (/\b(wake me up|wake\s*me\s*up|set an alarm|alarm me|wake up)\b/i.test(haystack)) {
-    return 'wake_up';
+  const haystack = String(text || "").toLowerCase();
+  if (
+    /\b(wake me up|wake\s*me\s*up|set an alarm|alarm me|wake up)\b/i.test(
+      haystack,
+    )
+  ) {
+    return "wake_up";
   }
 
   return null;
@@ -197,10 +231,31 @@ function normalizeReminderChannel(channel) {
   if (!channel) return null;
   const normalized = String(channel).trim().toLowerCase();
   if (!normalized) return null;
-  if (normalized === 'voice_call' || normalized === 'voice-call') return 'voice';
-  if (normalized === 'push' || normalized === 'webpush' || normalized === 'web-push') return 'pwa';
-  if (normalized === 'text' || normalized === 'sms_text') return 'sms';
+  if (normalized === "voice_call" || normalized === "voice-call")
+    return "voice";
+  if (
+    normalized === "push" ||
+    normalized === "webpush" ||
+    normalized === "web-push"
+  )
+    return "pwa";
+  if (normalized === "text" || normalized === "sms_text") return "sms";
   return normalized;
+}
+
+function buildWakeUpCopy(task, when, extras = "") {
+  const cleanTask = String(task || "").trim();
+  const cleanWhen = String(when || "").trim();
+  const cleanExtras = String(extras || "").trim();
+  return [
+    "Wake up now.",
+    cleanTask ? `${cleanTask}.` : null,
+    cleanWhen ? `Scheduled for ${cleanWhen}.` : null,
+    "This is your wake-up alarm from PlanCraftAI.",
+    cleanExtras ? cleanExtras : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 // Normalize any ISO-like input to a single UTC ISO string.
@@ -213,7 +268,11 @@ function ensureUtcIso(isoLike, tzOpt) {
     const tz = tzOpt || "UTC";
     return dayjs.tz(s, tz, true).utc().toISOString();
   } catch {
-    try { return new Date(isoLike).toISOString(); } catch { return null; }
+    try {
+      return new Date(isoLike).toISOString();
+    } catch {
+      return null;
+    }
   }
 }
 
@@ -228,11 +287,18 @@ function isoAsLocalWallToUtc(isoLike, tzOpt) {
       const hh = m[2];
       const mm = m[3];
       const ss = m[4] || "00";
-      return dayjs.tz(`${date} ${hh}:${mm}:${ss}`, tz, true).utc().toISOString();
+      return dayjs
+        .tz(`${date} ${hh}:${mm}:${ss}`, tz, true)
+        .utc()
+        .toISOString();
     }
     return dayjs.tz(s, tz, true).utc().toISOString();
   } catch {
-    try { return new Date(isoLike).toISOString(); } catch { return null; }
+    try {
+      return new Date(isoLike).toISOString();
+    } catch {
+      return null;
+    }
   }
 }
 
@@ -241,39 +307,40 @@ function isoAsLocalWallToUtc(isoLike, tzOpt) {
 // Prefer name when available, else a friendly title, else "there".
 function getSalutationToken(opts = {}) {
   try {
-    const name = String(opts?.displayName || opts?.name || '').trim()
-    if (name) return name
-    const gender = String(opts?.gender || '').toLowerCase()
-    if (gender === 'male') return 'King'
-    if (gender === 'female') return 'Queen'
+    const name = String(opts?.displayName || opts?.name || "").trim();
+    if (name) return name;
+    const gender = String(opts?.gender || "").toLowerCase();
+    if (gender === "male") return "King";
+    if (gender === "female") return "Queen";
   } catch {}
-  return 'there'
+  return "there";
 }
 
 async function acquireReminderDispatchLock(reminderId) {
-  if (!reminderId) return { acquired: false, reason: 'missing_id' };
+  if (!reminderId) return { acquired: false, reason: "missing_id" };
   const ref = db.collection("reminders").doc(String(reminderId));
   const now = Date.now();
-  let outcome = { acquired: false, reason: 'unknown' };
+  let outcome = { acquired: false, reason: "unknown" };
 
   await db.runTransaction(async (txn) => {
     const snap = await txn.get(ref);
     if (!snap.exists) {
-      outcome = { acquired: false, reason: 'not_found' };
+      outcome = { acquired: false, reason: "not_found" };
       return;
     }
     const data = snap.data() || {};
-    const status = String(data?.status || '').toLowerCase();
-    if (data?.sentAt || status === 'sent') {
-      outcome = { acquired: false, reason: 'already_sent' };
+    const status = String(data?.status || "").toLowerCase();
+    if (data?.sentAt || status === "sent") {
+      outcome = { acquired: false, reason: "already_sent" };
       return;
     }
 
     const lockDate = coerceDateValue(data?.dispatchingAt);
     const lockMs = lockDate ? lockDate.getTime() : null;
-    const lockActive = Number.isFinite(lockMs) && now - lockMs < REMINDER_DISPATCH_LOCK_TTL_MS;
-    if (status === 'sending' && lockActive) {
-      outcome = { acquired: false, reason: 'already_dispatching' };
+    const lockActive =
+      Number.isFinite(lockMs) && now - lockMs < REMINDER_DISPATCH_LOCK_TTL_MS;
+    if (status === "sending" && lockActive) {
+      outcome = { acquired: false, reason: "already_dispatching" };
       return;
     }
 
@@ -299,7 +366,7 @@ export async function createReminderFromText(
   userText,
   userId,
   channels = ["whatsapp"],
-  options = {}
+  options = {},
 ) {
   if (!userId) throw new Error("Missing userId");
 
@@ -321,10 +388,14 @@ export async function createReminderFromText(
   if (options?.scheduledTime) {
     try {
       when = new Date(options.scheduledTime);
-      if (!(when instanceof Date) || isNaN(when.getTime())) throw new Error("Invalid scheduledTime");
+      if (!(when instanceof Date) || isNaN(when.getTime()))
+        throw new Error("Invalid scheduledTime");
       parsed = { task: text, time: when.toISOString() };
     } catch (e) {
-      console.warn("[ReminderService:parse] Invalid scheduledTime, falling back to GPT:", e?.message);
+      console.warn(
+        "[ReminderService:parse] Invalid scheduledTime, falling back to GPT:",
+        e?.message,
+      );
     }
   }
 
@@ -342,7 +413,11 @@ export async function createReminderFromText(
       const gpt = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
-          { role: "system", content: "Extract a reminder from text. Return JSON: { task: string, time: ISO8601 string }. Time should reflect the user's spoken request." },
+          {
+            role: "system",
+            content:
+              "Extract a reminder from text. Return JSON: { task: string, time: ISO8601 string }. Time should reflect the user's spoken request.",
+          },
           { role: "user", content: `Reminder request: "${text}"` },
         ],
         response_format: { type: "json_object" },
@@ -352,17 +427,23 @@ export async function createReminderFromText(
       parsed = JSON.parse(content);
       parsedByAi = true;
     } catch (e) {
-      console.warn("[ReminderService:ai] GPT parse failed; fallback:", e?.message);
+      console.warn(
+        "[ReminderService:ai] GPT parse failed; fallback:",
+        e?.message,
+      );
     }
   }
 
-  if (!parsed || typeof parsed !== 'object') {
+  if (!parsed || typeof parsed !== "object") {
     parsed = {};
   }
 
   // Fallback heuristic (+1h if GPT parse fails)
   if (!parsed || !parsed.task || !parsed.time) {
-    parsed = { task: text, time: new Date(nowMs + 60 * 60 * 1000).toISOString() };
+    parsed = {
+      task: text,
+      time: new Date(nowMs + 60 * 60 * 1000).toISOString(),
+    };
   }
 
   // Normalize to UTC for storage. If time came from AI, treat it as user's local wall‑clock.
@@ -380,31 +461,34 @@ export async function createReminderFromText(
   const tzForUser = timezoneOverride || null;
 
   // Resolve channels: provided list, else user preferences, else sane default
-  let derivedPrefs = null
-  let hasVoiceContact = false
+  let derivedPrefs = null;
+  let hasVoiceContact = false;
   try {
-    const doc = await db.collection('users').doc(String(userId)).get()
-    const data = doc.exists ? (doc.data() || {}) : {}
-    derivedPrefs = deriveReminderPrefsFromUser(data)
-    hasVoiceContact = hasConfiguredVoiceContact(data)
+    const doc = await db.collection("users").doc(String(userId)).get();
+    const data = doc.exists ? doc.data() || {} : {};
+    derivedPrefs = deriveReminderPrefsFromUser(data);
+    hasVoiceContact = hasConfiguredVoiceContact(data);
   } catch {
-    derivedPrefs = null
+    derivedPrefs = null;
   }
 
-  const requestedChannels = Array.isArray(channels) ? channels.slice() : []
-  let candidateChannels = requestedChannels.slice()
+  const requestedChannels = Array.isArray(channels) ? channels.slice() : [];
+  let candidateChannels = requestedChannels.slice();
   if (!candidateChannels.length && derivedPrefs?.enabled) {
-    candidateChannels = derivedPrefs.channels.slice()
+    candidateChannels = derivedPrefs.channels.slice();
   } else if (candidateChannels.length && derivedPrefs?.enabled) {
-    candidateChannels = Array.from(new Set([...candidateChannels, ...derivedPrefs.channels]))
+    candidateChannels = Array.from(
+      new Set([...candidateChannels, ...derivedPrefs.channels]),
+    );
   }
   if (!candidateChannels.length) {
-    candidateChannels = DEFAULT_CHANNELS.slice()
+    candidateChannels = DEFAULT_CHANNELS.slice();
   }
 
-  const reminderChannels = reminderType === 'wake_up'
-    ? normalizeWakeUpChannels(candidateChannels, when, { hasVoiceContact })
-    : sanitizeReminderChannels(candidateChannels, when, options?.source)
+  const reminderChannels =
+    reminderType === "wake_up"
+      ? normalizeWakeUpChannels(candidateChannels, when, { hasVoiceContact })
+      : sanitizeReminderChannels(candidateChannels, when, options?.source);
   const reminder = {
     task: String(parsed.task || text),
     scheduledTime: when,
@@ -416,14 +500,18 @@ export async function createReminderFromText(
     sentAt: null,
     taskId: options?.taskId || null,
     timezone: tzForUser,
-    source: options?.source || reminderType || 'reminder',
+    source: options?.source || reminderType || "reminder",
     type: reminderType || null,
   };
-  if (options?.context && typeof options.context === 'object' && Object.keys(options.context).length) {
+  if (
+    options?.context &&
+    typeof options.context === "object" &&
+    Object.keys(options.context).length
+  ) {
     reminder.context = options.context;
   }
 
-  const logSource = options?.source || 'manual'
+  const logSource = options?.source || "manual";
   console.log(`[ReminderService:${logSource}] Persisting reminder`, {
     userId: reminder.userId,
     taskId: reminder.taskId,
@@ -436,29 +524,51 @@ export async function createReminderFromText(
 
   // Confirmation via WhatsApp (template + fallback)
   try {
-    if (reminder.channels.includes('whatsapp')) {
+    if (reminder.channels.includes("whatsapp")) {
       const who = getSalutationToken(options);
       await sendWhatsApp(userId, {
         template: "reminder_notification_2",
         // Template expects exactly 3 body params: {{1}} name, {{2}} task, {{3}} local time
-        bodyVars: [who, reminder.task, formatLocalTime(when, reminder.timezone || undefined)],
+        bodyVars: [
+          who,
+          reminder.task,
+          formatLocalTime(when, reminder.timezone || undefined),
+        ],
         language: { code: "en_US" },
       });
-      console.log("[ReminderService:delivery] WhatsApp confirmation sent via template");
+      console.log(
+        "[ReminderService:delivery] WhatsApp confirmation sent via template",
+      );
     }
   } catch (e) {
     const msg = e?.message || "";
-    const isTemplateMissing = msg.includes("132001") || msg.includes("Template name does not exist") || msg.includes("404");
-    if (isTemplateMissing && reminder.channels.includes('whatsapp')) {
-      console.warn("[ReminderService:delivery] WhatsApp template missing — falling back to text mode");
+    const isTemplateMissing =
+      msg.includes("132001") ||
+      msg.includes("Template name does not exist") ||
+      msg.includes("404");
+    if (isTemplateMissing && reminder.channels.includes("whatsapp")) {
+      console.warn(
+        "[ReminderService:delivery] WhatsApp template missing — falling back to text mode",
+      );
       try {
-        await sendWhatsApp(userId, `✅ Reminder set: "${reminder.task}" at ${formatLocalTime(when, reminder.timezone || undefined)}`);
-        console.log("[ReminderService:delivery] WhatsApp confirmation sent via text fallback");
+        await sendWhatsApp(
+          userId,
+          `✅ Reminder set: "${reminder.task}" at ${formatLocalTime(when, reminder.timezone || undefined)}`,
+        );
+        console.log(
+          "[ReminderService:delivery] WhatsApp confirmation sent via text fallback",
+        );
       } catch (fallbackErr) {
-        console.error("[ReminderService:delivery] WhatsApp fallback failed:", fallbackErr?.message);
+        console.error(
+          "[ReminderService:delivery] WhatsApp fallback failed:",
+          fallbackErr?.message,
+        );
       }
-    } else if (reminder.channels.includes('whatsapp')) {
-      console.error("[ReminderService:delivery] WhatsApp confirmation failed:", msg);
+    } else if (reminder.channels.includes("whatsapp")) {
+      console.error(
+        "[ReminderService:delivery] WhatsApp confirmation failed:",
+        msg,
+      );
     }
   }
 
@@ -471,14 +581,16 @@ export async function createReminderFromText(
 export async function sendReminder(reminder) {
   const reminderId = String(reminder?.id || reminder?._id || "");
   if (!reminderId) {
-    console.warn("[ReminderService:delivery] Missing reminder id; skipping dispatch");
+    console.warn(
+      "[ReminderService:delivery] Missing reminder id; skipping dispatch",
+    );
     return;
   }
   const lock = await acquireReminderDispatchLock(reminderId);
   if (!lock?.acquired) {
     console.log("[ReminderService:delivery] Skipping duplicate dispatch", {
       id: reminderId,
-      reason: lock?.reason || 'lock_rejected',
+      reason: lock?.reason || "lock_rejected",
     });
     return;
   }
@@ -494,31 +606,61 @@ export async function sendReminder(reminder) {
         reminder?.time ||
         null,
     ) || null;
-  const when = scheduledDate ? formatLocalTime(scheduledDate, reminder?.timezone || undefined) : "soon";
-  const source = reminder?.source || 'manual';
+  const when = scheduledDate
+    ? formatLocalTime(scheduledDate, reminder?.timezone || undefined)
+    : "soon";
+  const source = reminder?.source || "manual";
   const reminderType = normalizeReminderType(reminder?.type, task);
 
-  console.log(`[ReminderService:${source}] Executing reminder`, { id: reminder?.id, userId, task, when, channels, ts: new Date().toISOString() });
+  console.log(`[ReminderService:${source}] Executing reminder`, {
+    id: reminder?.id,
+    userId,
+    task,
+    when,
+    channels,
+    ts: new Date().toISOString(),
+  });
 
   const normalizedChannels = Array.isArray(channels)
     ? channels.map((c) => normalizeReminderChannel(c)).filter(Boolean)
     : [];
   const limitTo = normalizedChannels.length ? normalizedChannels : undefined;
-  const includeVoice = normalizedChannels.includes('voice');
-  const context = reminder?.context && typeof reminder.context === 'object' ? reminder.context : {};
+  const includeVoice = normalizedChannels.includes("voice");
+  const context =
+    reminder?.context && typeof reminder.context === "object"
+      ? reminder.context
+      : {};
   const locationLine = context.location ? `Where: ${context.location}` : null;
-  const meetingLink = context.meetingLink || context.joinUrl || context.link || null;
-  const eventLink = meetingLink ? null : (context.eventLink || context.calendarLink || null);
-  const linkLine = meetingLink ? `Join: ${meetingLink}` : eventLink ? `Open: ${eventLink}` : null;
+  const meetingLink =
+    context.meetingLink || context.joinUrl || context.link || null;
+  const eventLink = meetingLink
+    ? null
+    : context.eventLink || context.calendarLink || null;
+  const linkLine = meetingLink
+    ? `Join: ${meetingLink}`
+    : eventLink
+      ? `Open: ${eventLink}`
+      : null;
   const extras = [locationLine, linkLine].filter(Boolean).join(" • ");
-  const fallbackPrefix = reminderType === 'wake_up' ? '⏰ Wake-up reminder' : '⏰ Reminder';
-  const fallbackText = `${fallbackPrefix}: ${task} (${when})${extras ? `. ${extras}` : ""}`;
+  const fallbackPrefix =
+    reminderType === "wake_up" ? "⏰ Wake-up alarm" : "⏰ Reminder";
+  const fallbackText =
+    reminderType === "wake_up"
+      ? buildWakeUpCopy(
+          task,
+          when,
+          extras
+            ? `Open PlanCraftAI and mark it done when you are up.${extras ? ` ${extras}` : ""}`
+            : "Open PlanCraftAI and mark it done when you are up.",
+        )
+      : `${fallbackPrefix}: ${task} (${when})${extras ? `. ${extras}` : ""}`;
   const who = getSalutationToken(reminder);
 
   const reminderPayload = {
     id: reminder?.id || reminder?._id || null,
     taskId: reminder?.taskId || null,
     title: task,
+    type: reminderType || null,
     scheduledTime: scheduledDate ? scheduledDate.toISOString() : null,
     reminderTime: reminder?.reminderTime || null,
     timezone: reminder?.timezone || null,
@@ -530,7 +672,7 @@ export async function sendReminder(reminder) {
     await notifyReminderDue(userId, [reminderPayload], {
       limitTo,
       includeVoice,
-      whatsappTemplate: normalizedChannels.includes('whatsapp')
+      whatsappTemplate: normalizedChannels.includes("whatsapp")
         ? {
             template: "reminder_notification_2",
             bodyVars: [who, task, when],
@@ -539,17 +681,23 @@ export async function sendReminder(reminder) {
         : null,
       whatsappFallback: fallbackText,
       voiceMessage: includeVoice
-        ? (reminderType === 'wake_up'
-          ? `Wake up now. ${task}. Scheduled for ${when}.`
-          : `Here is your reminder: ${task}. Scheduled for ${when}.`)
+        ? reminderType === "wake_up"
+          ? buildWakeUpCopy(
+              task,
+              when,
+              extras
+                ? `Open the app after you are up.${extras ? ` ${extras}` : ""}`
+                : "Open the app after you are up.",
+            )
+          : `Here is your reminder: ${task}. Scheduled for ${when}.`
         : null,
       smsMessage: fallbackText,
       message: fallbackText,
       pwa: {
-        title: reminderType === 'wake_up' ? 'Wake-up reminder' : 'Reminder due',
+        title: reminderType === "wake_up" ? "Wake-up alarm" : "Reminder due",
         body: fallbackText,
         data: {
-          type: 'reminder-due',
+          type: "reminder-due",
           reminderType: reminderType || null,
           reminderId: reminder?.id || reminder?._id || null,
           taskId: reminder?.taskId || null,
@@ -558,9 +706,18 @@ export async function sendReminder(reminder) {
       },
     });
   } catch (err) {
-    console.error("[ReminderService:delivery] notifyReminderDue failed", err?.message || err);
+    console.error(
+      "[ReminderService:delivery] notifyReminderDue failed",
+      err?.message || err,
+    );
   } finally {
-    await db.collection("reminders").doc(reminderId).set({ sentAt: new Date(), status: "sent", dispatchingAt: null }, { merge: true });
+    await db
+      .collection("reminders")
+      .doc(reminderId)
+      .set(
+        { sentAt: new Date(), status: "sent", dispatchingAt: null },
+        { merge: true },
+      );
   }
 }
 
@@ -575,17 +732,18 @@ export function queueReminder(rem) {
     const toDate = (input) => {
       if (!input) return null;
       if (input instanceof Date) return isNaN(input.getTime()) ? null : input;
-      if (typeof input.toDate === 'function') {
+      if (typeof input.toDate === "function") {
         try {
           const converted = input.toDate();
-          if (converted instanceof Date && !isNaN(converted.getTime())) return converted;
+          if (converted instanceof Date && !isNaN(converted.getTime()))
+            return converted;
         } catch {}
       }
-      if (typeof input.seconds === 'number') {
+      if (typeof input.seconds === "number") {
         const d = new Date(input.seconds * 1000);
         if (!isNaN(d.getTime())) return d;
       }
-      if (typeof input._seconds === 'number') {
+      if (typeof input._seconds === "number") {
         const d = new Date(input._seconds * 1000);
         if (!isNaN(d.getTime())) return d;
       }
@@ -598,50 +756,79 @@ export function queueReminder(rem) {
 
     const ts = toDate(whenRaw);
     if (!ts) {
-      console.warn('[ReminderService:scheduler] Unable to coerce scheduledTime', { id, whenRaw });
+      console.warn(
+        "[ReminderService:scheduler] Unable to coerce scheduledTime",
+        { id, whenRaw },
+      );
       return;
     }
 
     const delay = ts.getTime() - Date.now();
     if (!Number.isFinite(delay)) return;
 
-    console.log(`[ReminderService:scheduler] Queued reminder id=${id} taskId=${rem?.taskId || "n/a"} at=${ts.toISOString()}`);
+    console.log(
+      `[ReminderService:scheduler] Queued reminder id=${id} taskId=${rem?.taskId || "n/a"} at=${ts.toISOString()}`,
+    );
 
     const safeDelay = Math.min(Math.max(delay, 0), MAX_DELAY_MS, 0x7fffffff);
     if (delay > MAX_DELAY_MS) {
-      console.warn(`[ReminderService:scheduler] Reminder ${id} scheduled beyond 24h (${(delay / 3600000).toFixed(1)}h). Will re-queue closer to send time.`);
+      console.warn(
+        `[ReminderService:scheduler] Reminder ${id} scheduled beyond 24h (${(delay / 3600000).toFixed(1)}h). Will re-queue closer to send time.`,
+      );
     }
 
     const fire = async () => {
       try {
         const snap = await db.collection("reminders").doc(id).get();
         if (!snap.exists) {
-          console.warn("[ReminderService:scheduler] Reminder doc missing at send time", { id });
+          console.warn(
+            "[ReminderService:scheduler] Reminder doc missing at send time",
+            { id },
+          );
           return;
         }
         const data = snap.data() || {};
-        if (data?.sentAt || (data?.status && ["sent", "sending"].includes(String(data.status).toLowerCase()))) {
-          console.log(`[ReminderService:scheduler] Reminder ${id} already sent; skipping dispatch`);
+        if (
+          data?.sentAt ||
+          (data?.status &&
+            ["sent", "sending"].includes(String(data.status).toLowerCase()))
+        ) {
+          console.log(
+            `[ReminderService:scheduler] Reminder ${id} already sent; skipping dispatch`,
+          );
           return;
         }
 
         const scheduled =
           coerceDateValue(data?.scheduledTime || data?.time || whenRaw) || ts;
         if (!scheduled) {
-          console.warn("[ReminderService:scheduler] Unable to resolve scheduled date when firing", { id });
+          console.warn(
+            "[ReminderService:scheduler] Unable to resolve scheduled date when firing",
+            { id },
+          );
           return;
         }
 
         const remaining = scheduled.getTime() - Date.now();
         if (remaining > 1000) {
-          console.log(`[ReminderService:scheduler] Re-queuing reminder ${id}; ${Math.ceil(remaining / 60000)}m remaining`);
+          console.log(
+            `[ReminderService:scheduler] Re-queuing reminder ${id}; ${Math.ceil(remaining / 60000)}m remaining`,
+          );
           return queueReminder({ id, ...data });
         }
         await sendReminder({ id, ...data });
-      } catch (e) { console.error("sendReminder error:", e?.message); }
+      } catch (e) {
+        console.error("sendReminder error:", e?.message);
+      }
     };
 
-    if (delay <= 0) { console.log("[ReminderService:scheduler] Firing overdue reminder immediately", { id, at: ts.toISOString() }); return fire(); }
+    if (delay <= 0) {
+      console.log(
+        "[ReminderService:scheduler] Firing overdue reminder immediately",
+        { id, at: ts.toISOString() },
+      );
+      return fire();
+    }
     setTimeout(fire, safeDelay);
   } catch (e) {
     console.error("queueReminder error:", e);
@@ -650,10 +837,14 @@ export function queueReminder(rem) {
 
 export async function processReminderBatches(options = {}) {
   const now = new Date();
-  const lookbackMinutes = Number.isFinite(options.lookbackMinutes) ? options.lookbackMinutes : 5;
+  const lookbackMinutes = Number.isFinite(options.lookbackMinutes)
+    ? options.lookbackMinutes
+    : 5;
   // The batch worker is a catch-up path. Exact on-time delivery should come from queueReminder().
   // Keep the default horizon at zero so the worker does not fire reminders early.
-  const horizonMinutes = Number.isFinite(options.horizonMinutes) ? options.horizonMinutes : 0;
+  const horizonMinutes = Number.isFinite(options.horizonMinutes)
+    ? options.horizonMinutes
+    : 0;
   const limit = Number.isFinite(options.limit) ? options.limit : 20;
 
   const start = new Date(now.getTime() - lookbackMinutes * 60000);
@@ -670,7 +861,10 @@ export async function processReminderBatches(options = {}) {
       .limit(limit)
       .get();
   } catch (err) {
-    console.warn("[ReminderService:worker] Primary batch query failed; falling back", err?.message || err);
+    console.warn(
+      "[ReminderService:worker] Primary batch query failed; falling back",
+      err?.message || err,
+    );
     snap = await db
       .collection("reminders")
       .where("scheduledTime", ">=", start)
@@ -684,7 +878,11 @@ export async function processReminderBatches(options = {}) {
   snap.forEach((doc) => {
     const data = doc.data() || {};
     if (data?.sentAt) return;
-    if (data?.status && ["sent", "sending"].includes(String(data.status).toLowerCase())) return;
+    if (
+      data?.status &&
+      ["sent", "sending"].includes(String(data.status).toLowerCase())
+    )
+      return;
     pending.push({ id: doc.id, ...data });
   });
 
@@ -695,17 +893,25 @@ export async function processReminderBatches(options = {}) {
       const scheduled = reminder?.scheduledTime
         ? coerceDateValue(reminder.scheduledTime)
         : null;
-      console.log(`[Worker] Sending reminder batch for ${reminder?.userId || "unknown"}`, {
-        id: reminder.id,
-        scheduled: scheduled?.toISOString?.() || reminder?.scheduledTime || null,
-      });
+      console.log(
+        `[Worker] Sending reminder batch for ${reminder?.userId || "unknown"}`,
+        {
+          id: reminder.id,
+          scheduled:
+            scheduled?.toISOString?.() || reminder?.scheduledTime || null,
+        },
+      );
       if (scheduled && scheduled.getTime() > now.getTime()) {
         queueReminder(reminder);
       } else {
         await sendReminder(reminder);
       }
     } catch (err) {
-      console.error("[ReminderService:worker] Failed to process reminder", reminder?.id, err?.message || err);
+      console.error(
+        "[ReminderService:worker] Failed to process reminder",
+        reminder?.id,
+        err?.message || err,
+      );
     }
   }
 

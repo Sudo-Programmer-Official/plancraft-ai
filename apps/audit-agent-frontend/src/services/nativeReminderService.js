@@ -4,6 +4,7 @@ import { fetchAllTasksForWorkspace } from '@/services/firebaseService'
 import { getPreferences } from '@/services/settingsService'
 import { resolveReminderIso } from '@/utils/timeHelper'
 import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
+import { normalizeNotificationSound } from '@/utils/notificationSound'
 
 const LocalReminder = registerPlugin('LocalReminder')
 
@@ -32,18 +33,15 @@ function resolveActiveWorkspaceId(explicitWorkspaceId = null) {
 function buildPermissionShape(result = {}, fallback = 'prompt') {
   const raw =
     String(
-      result?.display ||
-      result?.notifications ||
-      result?.receive ||
-      result?.status ||
-      fallback
+      result?.display || result?.notifications || result?.receive || result?.status || fallback,
     )
       .trim()
       .toLowerCase() || fallback
 
   return {
     raw,
-    granted: raw === 'granted' || raw === 'authorized' || raw === 'provisional' || raw === 'ephemeral',
+    granted:
+      raw === 'granted' || raw === 'authorized' || raw === 'provisional' || raw === 'ephemeral',
     canPrompt: raw === 'prompt' || raw === 'prompt-with-rationale',
   }
 }
@@ -65,6 +63,19 @@ function isWakeUpTask(task) {
   return String(task?.type || '').toLowerCase() === 'wake_up'
 }
 
+function buildWakeUpBody(task) {
+  const title = truncateNotificationBody(task?.title || 'Wake-up reminder', 120)
+  const when = [task?.date, task?.reminderTime].filter(Boolean).join(' ')
+  const parts = [
+    'Wake up now.',
+    title ? `${title}.` : null,
+    when ? `Scheduled for ${when}.` : null,
+    'This is your alarm-backed wake-up reminder from PlanCraftAI.',
+    'Get up, open the app, and mark it done when you are ready.',
+  ].filter(Boolean)
+  return parts.join(' ')
+}
+
 function truncateNotificationBody(value, limit = 180) {
   const trimmed = String(value || '').trim()
   if (!trimmed) return ''
@@ -75,7 +86,7 @@ function truncateNotificationBody(value, limit = 180) {
 function buildReminderBody(task) {
   const when = [task?.date, task?.reminderTime].filter(Boolean).join(' ')
   if (isWakeUpTask(task)) {
-    return when ? `Wake up at ${when}` : 'Wake-up reminder due now.'
+    return buildWakeUpBody(task)
   }
   const details = truncateNotificationBody(task?.details)
   if (details) return details
@@ -83,12 +94,16 @@ function buildReminderBody(task) {
   return 'A scheduled task is due now.'
 }
 
+function resolveReminderSound(taskSound = null) {
+  return normalizeNotificationSound(taskSound)
+}
+
 function taskAllowsNativeReminder(task) {
   const channels = normalizeChannels(task)
   return isWakeUpTask(task) || !channels.length || channels.includes('pwa')
 }
 
-function buildManagedReminder(task) {
+function buildManagedReminder(task, sound = 'default') {
   if (!task?.id || task?.completed || !taskAllowsNativeReminder(task)) return null
 
   const scheduledAt = resolveReminderIso(task)
@@ -106,9 +121,13 @@ function buildManagedReminder(task) {
     taskId: String(task.id),
     workspaceId: task?.workspaceId || null,
     type: isWakeUpTask(task) ? 'wake_up' : String(task?.type || '').trim() || null,
-    title: truncateNotificationBody(task?.title || (isWakeUpTask(task) ? 'Wake-up reminder' : 'Task reminder'), 80),
+    title: truncateNotificationBody(
+      task?.title || (isWakeUpTask(task) ? 'Wake-up alarm' : 'Task reminder'),
+      80,
+    ),
     body: buildReminderBody(task),
     scheduledAt,
+    sound: resolveReminderSound(sound),
   }
 }
 
@@ -116,8 +135,12 @@ function parsePreferenceChannels(notifications = {}) {
   if (Array.isArray(notifications?.channels)) {
     return new Set(
       notifications.channels
-        .map((channel) => String(channel || '').trim().toLowerCase())
-        .filter(Boolean)
+        .map((channel) =>
+          String(channel || '')
+            .trim()
+            .toLowerCase(),
+        )
+        .filter(Boolean),
     )
   }
 
@@ -128,7 +151,7 @@ function parsePreferenceChannels(notifications = {}) {
       notifications?.whatsapp && 'whatsapp',
       notifications?.sms && 'sms',
       notifications?.voice_call && 'voice_call',
-    ].filter(Boolean)
+    ].filter(Boolean),
   )
 }
 
@@ -143,16 +166,22 @@ async function getNativeReminderPreferences(userId) {
       notifications,
       channels,
       enabled: channels.has('pwa'),
+      sound: normalizeNotificationSound(
+        notifications?.sound ||
+          notifications?.notificationSound ||
+          preferences?.reminders?.sound ||
+          'default',
+      ),
     }
   } catch (error) {
     console.warn('[NativeReminder] Failed to load preferences', error?.message || error)
-    return { notifications: {}, channels: new Set(), enabled: false }
+    return { notifications: {}, channels: new Set(), enabled: false, sound: 'default' }
   }
 }
 
-function buildReminderPayloads(tasks = []) {
+function buildReminderPayloads(tasks = [], sound = 'default') {
   const reminders = (Array.isArray(tasks) ? tasks : [])
-    .map((task) => buildManagedReminder(task))
+    .map((task) => buildManagedReminder(task, sound))
     .filter(Boolean)
     .sort((left, right) => Date.parse(left.scheduledAt) - Date.parse(right.scheduledAt))
     .slice(0, MAX_NATIVE_REMINDERS)
@@ -247,7 +276,7 @@ export async function syncNativeReminderQueueNow({
   }
 
   const sourceTasks = Array.isArray(tasks) ? tasks : await fetchAllTasksForWorkspace()
-  const reminders = buildReminderPayloads(sourceTasks)
+  const reminders = buildReminderPayloads(sourceTasks, prefs.sound)
 
   try {
     const result = await LocalReminder.sync({ reminders })
@@ -270,6 +299,7 @@ export async function scheduleNativeTestReminder({
   body = 'This is a test notification from the notification debug screen.',
   delaySeconds = 10,
   type = 'wake_up',
+  sound = 'default',
 } = {}) {
   if (!isNativeLocalReminderSupported()) {
     return { ok: false, reason: 'unsupported' }
@@ -280,13 +310,22 @@ export async function scheduleNativeTestReminder({
     return { ok: false, reason: 'permission_denied', permission }
   }
 
-  const scheduledAt = new Date(Date.now() + Math.max(5, Number(delaySeconds) || 10) * 1000).toISOString()
+  const scheduledAt = new Date(
+    Date.now() + Math.max(5, Number(delaySeconds) || 10) * 1000,
+  ).toISOString()
+  const isWakeUp = String(type || '').toLowerCase() === 'wake_up'
   const reminder = {
     id: `debug-reminder:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
-    title: String(title || 'PlanCraftAI reminder test').trim(),
-    body: String(body || '').trim(),
+    title: String(title || (isWakeUp ? 'Wake-up alarm' : 'PlanCraftAI reminder test')).trim(),
+    body: String(
+      body ||
+        (isWakeUp
+          ? 'Wake up now. This is your wake-up alarm test from PlanCraftAI. Get out of bed and check the app.'
+          : 'This is a test notification from the notification debug screen.'),
+    ).trim(),
     scheduledAt,
     type: String(type || '').trim() || null,
+    sound: resolveReminderSound(sound),
   }
 
   try {
@@ -368,7 +407,7 @@ export function initNativeReminderSync({ authStore, workspaceStore } = {}) {
 
       queueCurrentSync('auth-or-workspace-ready')
     },
-    { immediate: true }
+    { immediate: true },
   )
 
   try {
@@ -380,11 +419,13 @@ export function initNativeReminderSync({ authStore, workspaceStore } = {}) {
   }
 
   import('@capacitor/app')
-    .then(({ App }) => App.addListener('appStateChange', ({ isActive }) => {
-      if (isActive) {
-        queueCurrentSync('app-resume')
-      }
-    }))
+    .then(({ App }) =>
+      App.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) {
+          queueCurrentSync('app-resume')
+        }
+      }),
+    )
     .catch((error) => {
       console.warn('[NativeReminder] app state listener unavailable', error?.message || error)
     })

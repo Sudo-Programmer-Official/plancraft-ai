@@ -2,924 +2,1274 @@
   <div class="app-page-shell text-white">
     <!-- Header -->
     <main class="settings-shell app-page-frame space-y-8 sm:space-y-10">
-    <section class="settings-hero-wrap">
-      <transition name="hero-fade" mode="out-in">
-        <header v-if="showSettingsHero" key="full-hero" class="app-page-hero mb-0 text-center settings-hero-content">
-          <h1 class="text-3xl sm:text-4xl font-bold mb-2 text-white">⚙️ Settings</h1>
-          <p class="app-page-description mx-auto">Manage your notifications, integrations, and account preferences.</p>
-        </header>
-        <div v-else key="compact-hero" class="settings-hero-compact">
-          <p class="settings-hero-compact__title">Settings</p>
-          <p class="settings-hero-compact__subtitle">Notifications, integrations, and account controls</p>
-        </div>
-      </transition>
-      <div class="settings-hero-toggle" v-if="isMobileSettingsView">
-        <button
-          type="button"
-          class="inline-flex items-center justify-center rounded-lg border border-white/15 bg-slate-900/50 px-3 py-1.5 text-xs text-slate-200 hover:border-indigo-300/40"
-          @click="showSettingsHero = !showSettingsHero"
-        >
-          {{ showSettingsHero ? 'Hide intro' : 'Show intro' }}
-        </button>
-      </div>
-    </section>
-
-    <div class="space-y-8 sm:space-y-10">
-      <!-- Settings navigation -->
-      <nav class="settings-panel nav-panel">
-        <div class="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <p class="text-xs uppercase tracking-[0.24em] text-indigo-200/80">Mode</p>
-            <p class="text-sm text-slate-200">{{ showAdvancedSettings ? 'Advanced controls visible' : 'Focused daily settings' }}</p>
+      <section class="settings-hero-wrap">
+        <transition name="hero-fade" mode="out-in">
+          <header
+            v-if="showSettingsHero"
+            key="full-hero"
+            class="app-page-hero mb-0 text-center settings-hero-content"
+          >
+            <h1 class="text-3xl sm:text-4xl font-bold mb-2 text-white">⚙️ Settings</h1>
+            <p class="app-page-description mx-auto">
+              Manage your notifications, integrations, and account preferences.
+            </p>
+          </header>
+          <div v-else key="compact-hero" class="settings-hero-compact">
+            <p class="settings-hero-compact__title">Settings</p>
+            <p class="settings-hero-compact__subtitle">
+              Notifications, integrations, and account controls
+            </p>
           </div>
+        </transition>
+        <div class="settings-hero-toggle" v-if="isMobileSettingsView">
           <button
             type="button"
-            class="inline-flex items-center justify-center rounded-lg border px-3 py-1.5 text-sm transition"
-            :class="showAdvancedSettings ? 'border-indigo-300/50 bg-indigo-500/20 text-indigo-100' : 'border-white/15 bg-slate-900/50 text-slate-200 hover:border-indigo-300/40'"
-            @click="toggleAdvancedSettings"
+            class="inline-flex items-center justify-center rounded-lg border border-white/15 bg-slate-900/50 px-3 py-1.5 text-xs text-slate-200 hover:border-indigo-300/40"
+            @click="showSettingsHero = !showSettingsHero"
           >
-            {{ showAdvancedSettings ? 'Hide advanced' : 'Show advanced' }}
+            {{ showSettingsHero ? 'Hide intro' : 'Show intro' }}
           </button>
         </div>
-        <div class="nav-scroll">
-          <div class="nav-grid">
-            <div v-for="group in visibleTabGroups" :key="group.id" class="space-y-2 min-w-[220px]">
-              <p class="text-xs uppercase tracking-[0.2em] text-slate-300">{{ group.label }}</p>
-              <div class="flex flex-wrap gap-2">
-                <button
-                  v-for="tab in group.tabs"
-                  :key="tab.id"
-                  type="button"
-                  :class="[
-                    'px-3 py-1.5 rounded-lg text-sm border transition min-w-[140px] text-left',
-                    activeTab === tab.id
-                      ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg'
-                      : 'bg-slate-900/40 border-slate-700 text-slate-200 hover:border-slate-500'
-                  ]"
-                  @click="setActiveTab(tab.id)"
-                >
-                  <span class="inline-flex items-center gap-2">
-                    <span v-if="tab.icon" aria-hidden="true">{{ tab.icon }}</span>
-                    <span>{{ tab.label }}</span>
-                  </span>
-                </button>
+      </section>
+
+      <div class="space-y-8 sm:space-y-10">
+        <!-- Settings navigation -->
+        <nav class="settings-panel nav-panel">
+          <div class="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <p class="text-xs uppercase tracking-[0.24em] text-indigo-200/80">Mode</p>
+              <p class="text-sm text-slate-200">
+                {{ showAdvancedSettings ? 'Advanced controls visible' : 'Focused daily settings' }}
+              </p>
+            </div>
+            <button
+              type="button"
+              class="inline-flex items-center justify-center rounded-lg border px-3 py-1.5 text-sm transition"
+              :class="
+                showAdvancedSettings
+                  ? 'border-indigo-300/50 bg-indigo-500/20 text-indigo-100'
+                  : 'border-white/15 bg-slate-900/50 text-slate-200 hover:border-indigo-300/40'
+              "
+              @click="toggleAdvancedSettings"
+            >
+              {{ showAdvancedSettings ? 'Hide advanced' : 'Show advanced' }}
+            </button>
+          </div>
+          <div class="nav-scroll">
+            <div class="nav-grid">
+              <div
+                v-for="group in visibleTabGroups"
+                :key="group.id"
+                class="space-y-2 min-w-[220px]"
+              >
+                <p class="text-xs uppercase tracking-[0.2em] text-slate-300">{{ group.label }}</p>
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    v-for="tab in group.tabs"
+                    :key="tab.id"
+                    type="button"
+                    :class="[
+                      'px-3 py-1.5 rounded-lg text-sm border transition min-w-[140px] text-left',
+                      activeTab === tab.id
+                        ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg'
+                        : 'bg-slate-900/40 border-slate-700 text-slate-200 hover:border-slate-500',
+                    ]"
+                    @click="setActiveTab(tab.id)"
+                  >
+                    <span class="inline-flex items-center gap-2">
+                      <span v-if="tab.icon" aria-hidden="true">{{ tab.icon }}</span>
+                      <span>{{ tab.label }}</span>
+                    </span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </nav>
+        </nav>
 
-      <div v-if="activeTab === 'workspace-knowledge'">
-        <KnowledgePanel />
-      </div>
-
-      <div v-if="activeTab === 'workspace-proposals'">
-        <ProposalInbox />
-      </div>
-
-      <section
-        v-if="activeTab === 'workspace-policies'"
-        class="settings-panel"
-      >
-        <h2 class="text-lg sm:text-xl font-semibold mb-2">🛡️ Policies</h2>
-        <p class="text-sm text-indigo-200">
-          Approval and action policies live here. Manage auto-approve/reject rules, admin-only approvals, and two-approver flags.
-        </p>
-        <p class="text-sm text-slate-300 mt-3">
-          Coming soon to UI — policies are already enforced server-side. Ask an admin to adjust workspace policies in the backend for now.
-        </p>
-      </section>
-
-      <!-- Plan status and usage -->
-      <section
-        v-if="activeTab === 'billing-subscription'"
-        class="settings-panel space-y-4"
-      >
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Billing</p>
-            <h2 class="text-lg sm:text-xl font-semibold mb-1">🌟 Subscription & Usage</h2>
-            <p class="text-sm text-indigo-200">
-              {{ billingSectionIntro }}
-            </p>
-          </div>
-          <div class="flex items-center gap-2 flex-wrap">
-            <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/20 border border-indigo-300/40 text-indigo-50 text-sm">
-              <span class="text-[11px] uppercase tracking-[0.18em] text-indigo-100/80">Plan</span>
-              <strong class="text-white">{{ normalizedPlanLabel }}</strong>
-            </span>
-            <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/70 border border-white/10 text-slate-200 text-sm">
-              <span class="text-[11px] uppercase tracking-[0.18em] text-slate-300">AI today</span>
-              <span>{{ aiUsed }} / {{ aiLimitLabel }}</span>
-            </span>
-          </div>
+        <div v-if="activeTab === 'workspace-knowledge'">
+          <KnowledgePanel />
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-[1.05fr,1fr] gap-4">
-          <div class="rounded-2xl border border-white/10 bg-slate-900/60 p-4 sm:p-5 space-y-4 shadow-lg">
+        <div v-if="activeTab === 'workspace-proposals'">
+          <ProposalInbox />
+        </div>
+
+        <section v-if="activeTab === 'workspace-policies'" class="settings-panel">
+          <h2 class="text-lg sm:text-xl font-semibold mb-2">🛡️ Policies</h2>
+          <p class="text-sm text-indigo-200">
+            Approval and action policies live here. Manage auto-approve/reject rules, admin-only
+            approvals, and two-approver flags.
+          </p>
+          <p class="text-sm text-slate-300 mt-3">
+            Coming soon to UI — policies are already enforced server-side. Ask an admin to adjust
+            workspace policies in the backend for now.
+          </p>
+        </section>
+
+        <!-- Plan status and usage -->
+        <section v-if="activeTab === 'billing-subscription'" class="settings-panel space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Billing</p>
+              <h2 class="text-lg sm:text-xl font-semibold mb-1">🌟 Subscription & Usage</h2>
+              <p class="text-sm text-indigo-200">
+                {{ billingSectionIntro }}
+              </p>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span
+                class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/20 border border-indigo-300/40 text-indigo-50 text-sm"
+              >
+                <span class="text-[11px] uppercase tracking-[0.18em] text-indigo-100/80">Plan</span>
+                <strong class="text-white">{{ normalizedPlanLabel }}</strong>
+              </span>
+              <span
+                class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/70 border border-white/10 text-slate-200 text-sm"
+              >
+                <span class="text-[11px] uppercase tracking-[0.18em] text-slate-300">AI today</span>
+                <span>{{ aiUsed }} / {{ aiLimitLabel }}</span>
+              </span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-[1.05fr,1fr] gap-4">
+            <div
+              class="rounded-2xl border border-white/10 bg-slate-900/60 p-4 sm:p-5 space-y-4 shadow-lg"
+            >
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p class="text-sm text-indigo-200 font-semibold">Personal plan</p>
+                  <p class="text-xs text-slate-300">
+                    Daily AI limit {{ aiLimitLabel }}, reminders {{ remindersLimitLabel }} / day.
+                  </p>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <button
+                    v-if="!isPremium && !isAppleBillingSafeMode"
+                    @click="upgradePlan"
+                    class="bg-gradient-to-r from-purple-500 to-pink-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-white shadow-lg hover:from-purple-600 hover:to-pink-700 transition text-sm sm:text-base"
+                  >
+                    {{ personalPlanCtaLabel }}
+                  </button>
+                  <el-button
+                    v-if="!isAppleBillingSafeMode"
+                    size="small"
+                    plain
+                    @click="openSubscriptionPage"
+                    >Manage in billing</el-button
+                  >
+                  <el-button v-else size="small" plain @click="refreshBillingAccess"
+                    >Refresh access</el-button
+                  >
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div class="rounded-lg bg-slate-800/70 border border-white/10 p-3">
+                  <p class="text-[11px] uppercase tracking-[0.2em] text-indigo-200 mb-1">
+                    AI generations
+                  </p>
+                  <p class="text-2xl font-semibold text-white">
+                    {{ aiUsed }}
+                    <span class="text-sm text-slate-300">/ {{ aiLimitLabel }}</span>
+                  </p>
+                </div>
+                <div class="rounded-lg bg-slate-800/70 border border-white/10 p-3">
+                  <p class="text-[11px] uppercase tracking-[0.2em] text-indigo-200 mb-1">
+                    Reminders
+                  </p>
+                  <p class="text-2xl font-semibold text-white">
+                    {{ remindersUsed }}
+                    <span class="text-sm text-slate-300">/ {{ remindersLimitLabel }}</span>
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-2 flex-wrap">
+                <el-button size="small" @click="planOpen = true">Usage breakdown</el-button>
+                <p
+                  v-if="isPremium && subStore.subscription?.remainingDays > 0"
+                  class="text-xs text-indigo-300"
+                >
+                  ⏳ Ends on {{ premiumEndsOn }}
+                </p>
+                <p v-if="isAppleBillingSafeMode" class="text-xs text-indigo-200/80">
+                  Solo Premium is available in the iPhone app. Existing premium access also syncs
+                  here automatically.
+                </p>
+              </div>
+            </div>
+
+            <div
+              v-if="isAppleBillingSafeMode"
+              class="rounded-2xl border border-indigo-400/30 bg-indigo-900/60 p-4 sm:p-5 space-y-4 shadow-lg"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="text-xs uppercase tracking-[0.25em] text-indigo-200">
+                    Workspace upgrades
+                  </p>
+                  <h3 class="text-xl font-semibold text-white">Team access syncs into the app</h3>
+                  <p class="text-sm text-indigo-100/90">
+                    Team plans are managed by workspace owners on web. If this account already
+                    belongs to a paid workspace, refresh and the access will appear here.
+                  </p>
+                </div>
+              </div>
+              <div class="rounded-xl border border-white/10 bg-slate-950/50 p-4 space-y-2">
+                <p class="text-sm font-semibold text-white">Included in paid workspaces</p>
+                <ul class="text-sm text-indigo-100/90 space-y-1">
+                  <li>Shared workspace access and invites</li>
+                  <li>Role-based collaboration</li>
+                  <li>Voice AI reminders and team workflows</li>
+                </ul>
+              </div>
+              <div class="flex flex-wrap gap-3">
+                <button
+                  class="px-3 py-2 rounded-lg bg-white text-indigo-800 font-semibold text-sm hover:bg-slate-100 transition"
+                  @click="refreshBillingAccess"
+                >
+                  Refresh access
+                </button>
+              </div>
+            </div>
+            <div
+              v-else
+              class="rounded-2xl border border-indigo-400/30 bg-indigo-900/60 p-4 sm:p-5 space-y-3 shadow-lg"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="text-xs uppercase tracking-[0.25em] text-indigo-200">Teams pricing</p>
+                  <h3 class="text-xl font-semibold text-white">Seat-based workspaces</h3>
+                  <p class="text-sm text-indigo-100/90">
+                    Starter from $6/seat · Pro from $10/seat. Roles, invites, and Voice AI
+                    reminders.
+                  </p>
+                </div>
+                <button
+                  class="px-3 py-1.5 rounded-lg bg-white text-indigo-800 font-semibold text-sm hover:bg-slate-100 transition"
+                  @click="goToTeamsPricing"
+                >
+                  View plans
+                </button>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div class="rounded-xl border border-white/10 bg-slate-950/50 p-3 space-y-2">
+                  <div class="flex items-center justify-between">
+                    <h4 class="text-lg font-semibold text-white">Team Starter</h4>
+                    <span class="text-[11px] px-2 py-1 rounded-full bg-white/10 text-indigo-100"
+                      >Launch teams</span
+                    >
+                  </div>
+                  <div class="flex items-baseline gap-2">
+                    <span class="text-2xl font-bold text-white">$6</span>
+                    <span class="text-xs text-indigo-200">/ seat / month</span>
+                  </div>
+                  <ul class="text-xs text-indigo-100/90 space-y-1">
+                    <li>✅ Shared workspace & invites</li>
+                    <li>✅ Role-based access</li>
+                    <li>✅ Voice AI reminders</li>
+                  </ul>
+                  <button
+                    class="w-full mt-2 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition"
+                    @click="handleTeamCta('starter')"
+                  >
+                    {{ starterCtaLabel }}
+                  </button>
+                </div>
+                <div
+                  class="rounded-xl border border-indigo-300/40 bg-gradient-to-br from-indigo-900/80 via-slate-900 to-indigo-950 p-3 space-y-2 shadow ring-1 ring-indigo-400/30"
+                >
+                  <div class="flex items-center justify-between">
+                    <h4 class="text-lg font-semibold text-white">Team Pro</h4>
+                    <span
+                      class="text-[11px] px-2 py-1 rounded-full bg-indigo-500/20 border border-indigo-300/50 text-indigo-100"
+                    >
+                      Admin controls
+                    </span>
+                  </div>
+                  <div class="flex items-baseline gap-2">
+                    <span class="text-2xl font-bold text-white">$10</span>
+                    <span class="text-xs text-indigo-200">/ seat / month</span>
+                  </div>
+                  <ul class="text-xs text-indigo-100/90 space-y-1">
+                    <li>✅ Everything in Starter</li>
+                    <li>✅ Advanced admin controls (Coming soon)</li>
+                    <li>✅ Priority support</li>
+                  </ul>
+                  <button
+                    class="w-full mt-2 px-3 py-2 rounded-lg bg-white text-indigo-800 font-semibold text-sm hover:bg-slate-100 transition"
+                    @click="handleTeamCta('pro')"
+                  >
+                    {{ proCtaLabel }}
+                  </button>
+                </div>
+              </div>
+
+              <p class="text-xs text-indigo-100/80">
+                Seats = teammates you invite. Billing adjusts automatically when seats change.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section v-if="activeTab === 'account-profile'" class="settings-panel">
+          <h2 class="text-lg sm:text-xl font-semibold mb-2">🙋 Profile</h2>
+          <p class="text-sm text-indigo-200">
+            Profile editing lives in your account menu. A dedicated editor will arrive here soon.
+          </p>
+          <p class="text-sm text-slate-300 mt-2">
+            Signed in as: <strong>{{ authStore.user?.email || 'Unknown user' }}</strong>
+          </p>
+        </section>
+
+        <section v-if="activeTab === 'account-preferences'" class="settings-panel">
+          <h2 class="text-lg sm:text-xl font-semibold mb-2">⚙️ Preferences</h2>
+          <p class="text-sm text-indigo-200">
+            Workspace-specific preferences (theme, locale, AI persona) will be managed here soon.
+          </p>
+        </section>
+
+        <section v-if="activeTab === 'account-quick-setup'" class="settings-panel space-y-5">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div class="space-y-2">
+              <p class="text-xs uppercase tracking-[0.25em] text-indigo-200/80">Setup Assistant</p>
+              <h2 class="text-lg sm:text-xl font-semibold text-white">✨ Quick Setup</h2>
+              <p class="text-sm text-indigo-100/85 max-w-2xl">
+                Reopen the onboarding assistant any time to finish reminder channels, timezone, and
+                phone setup.
+              </p>
+            </div>
+            <button
+              type="button"
+              class="inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-fuchsia-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:from-indigo-400 hover:to-fuchsia-500"
+              @click="openQuickSetupPanel"
+            >
+              <span aria-hidden="true">✨</span>
+              <span>{{ quickSetupState?.completed ? 'Review setup' : 'Finish setup' }}</span>
+            </button>
+          </div>
+
+          <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-4 space-y-4">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p class="text-sm text-indigo-200 font-semibold">Personal plan</p>
-                <p class="text-xs text-slate-300">
-                  Daily AI limit {{ aiLimitLabel }}, reminders {{ remindersLimitLabel }} / day.
+                <p class="text-xs uppercase tracking-[0.24em] text-slate-300">Progress</p>
+                <p class="text-sm text-slate-100">
+                  {{ quickSetupState?.completedSteps || 0 }}/{{ quickSetupState?.totalSteps || 0 }}
+                  setup items complete
                 </p>
               </div>
-              <div class="flex items-center gap-2 flex-wrap">
-                <button
-                  v-if="!isPremium && !isAppleBillingSafeMode"
-                  @click="upgradePlan"
-                  class="bg-gradient-to-r from-purple-500 to-pink-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-white shadow-lg hover:from-purple-600 hover:to-pink-700 transition text-sm sm:text-base"
-                >
-                  {{ personalPlanCtaLabel }}
-                </button>
-                <el-button v-if="!isAppleBillingSafeMode" size="small" plain @click="openSubscriptionPage">Manage in billing</el-button>
-                <el-button v-else size="small" plain @click="refreshBillingAccess">Refresh access</el-button>
-              </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
-              <div class="rounded-lg bg-slate-800/70 border border-white/10 p-3">
-                <p class="text-[11px] uppercase tracking-[0.2em] text-indigo-200 mb-1">AI generations</p>
-                <p class="text-2xl font-semibold text-white">
-                  {{ aiUsed }}
-                  <span class="text-sm text-slate-300">/ {{ aiLimitLabel }}</span>
-                </p>
-              </div>
-              <div class="rounded-lg bg-slate-800/70 border border-white/10 p-3">
-                <p class="text-[11px] uppercase tracking-[0.2em] text-indigo-200 mb-1">Reminders</p>
-                <p class="text-2xl font-semibold text-white">
-                  {{ remindersUsed }}
-                  <span class="text-sm text-slate-300">/ {{ remindersLimitLabel }}</span>
-                </p>
-              </div>
-            </div>
-
-            <div class="flex items-center gap-2 flex-wrap">
-              <el-button size="small" @click="planOpen = true">Usage breakdown</el-button>
-              <p v-if="isPremium && subStore.subscription?.remainingDays > 0" class="text-xs text-indigo-300">
-                ⏳ Ends on {{ premiumEndsOn }}
-              </p>
-              <p v-if="isAppleBillingSafeMode" class="text-xs text-indigo-200/80">
-                Solo Premium is available in the iPhone app. Existing premium access also syncs here automatically.
-              </p>
-            </div>
-          </div>
-
-          <div v-if="isAppleBillingSafeMode" class="rounded-2xl border border-indigo-400/30 bg-indigo-900/60 p-4 sm:p-5 space-y-4 shadow-lg">
-            <div class="flex items-start justify-between gap-3">
-              <div>
-                <p class="text-xs uppercase tracking-[0.25em] text-indigo-200">Workspace upgrades</p>
-                <h3 class="text-xl font-semibold text-white">Team access syncs into the app</h3>
-                <p class="text-sm text-indigo-100/90">
-                  Team plans are managed by workspace owners on web. If this account already belongs to
-                  a paid workspace, refresh and the access will appear here.
-                </p>
-              </div>
-            </div>
-            <div class="rounded-xl border border-white/10 bg-slate-950/50 p-4 space-y-2">
-              <p class="text-sm font-semibold text-white">Included in paid workspaces</p>
-              <ul class="text-sm text-indigo-100/90 space-y-1">
-                <li>Shared workspace access and invites</li>
-                <li>Role-based collaboration</li>
-                <li>Voice AI reminders and team workflows</li>
-              </ul>
-            </div>
-            <div class="flex flex-wrap gap-3">
-              <button
-                class="px-3 py-2 rounded-lg bg-white text-indigo-800 font-semibold text-sm hover:bg-slate-100 transition"
-                @click="refreshBillingAccess"
+              <span
+                class="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold"
+                :class="
+                  quickSetupState?.requiredComplete
+                    ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
+                    : 'border-amber-400/40 bg-amber-500/10 text-amber-100'
+                "
               >
-                Refresh access
-              </button>
+                {{ quickSetupState?.requiredComplete ? 'Core setup complete' : 'Setup incomplete' }}
+              </span>
             </div>
-          </div>
-          <div v-else class="rounded-2xl border border-indigo-400/30 bg-indigo-900/60 p-4 sm:p-5 space-y-3 shadow-lg">
-            <div class="flex items-start justify-between gap-3">
-              <div>
-                <p class="text-xs uppercase tracking-[0.25em] text-indigo-200">Teams pricing</p>
-                <h3 class="text-xl font-semibold text-white">Seat-based workspaces</h3>
-                <p class="text-sm text-indigo-100/90">
-                  Starter from $6/seat · Pro from $10/seat. Roles, invites, and Voice AI reminders.
-                </p>
-              </div>
-              <button
-                class="px-3 py-1.5 rounded-lg bg-white text-indigo-800 font-semibold text-sm hover:bg-slate-100 transition"
-                @click="goToTeamsPricing"
+
+            <div class="h-2 overflow-hidden rounded-full bg-white/10">
+              <div
+                class="h-full rounded-full bg-gradient-to-r from-indigo-400 via-violet-500 to-fuchsia-500 transition-all"
+                :style="{ width: `${quickSetupState?.completionPercent || 0}%` }"
+              />
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+              <span
+                v-for="step in quickSetupState?.steps || []"
+                :key="step.key"
+                class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs"
+                :class="
+                  step.complete
+                    ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
+                    : 'border-white/10 bg-white/5 text-slate-300'
+                "
               >
-                View plans
-              </button>
+                <span>{{ step.complete ? '✓' : '•' }}</span>
+                <span>{{ step.label }}</span>
+              </span>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div class="rounded-xl border border-white/10 bg-slate-950/50 p-3 space-y-2">
-                <div class="flex items-center justify-between">
-                  <h4 class="text-lg font-semibold text-white">Team Starter</h4>
-                  <span class="text-[11px] px-2 py-1 rounded-full bg-white/10 text-indigo-100">Launch teams</span>
-                </div>
-                <div class="flex items-baseline gap-2">
-                  <span class="text-2xl font-bold text-white">$6</span>
-                  <span class="text-xs text-indigo-200">/ seat / month</span>
-                </div>
-                <ul class="text-xs text-indigo-100/90 space-y-1">
-                  <li>✅ Shared workspace & invites</li>
-                  <li>✅ Role-based access</li>
-                  <li>✅ Voice AI reminders</li>
-                </ul>
-                <button
-                  class="w-full mt-2 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition"
-                  @click="handleTeamCta('starter')"
-                >
-                  {{ starterCtaLabel }}
-                </button>
-              </div>
-              <div class="rounded-xl border border-indigo-300/40 bg-gradient-to-br from-indigo-900/80 via-slate-900 to-indigo-950 p-3 space-y-2 shadow ring-1 ring-indigo-400/30">
-                <div class="flex items-center justify-between">
-                  <h4 class="text-lg font-semibold text-white">Team Pro</h4>
-                  <span class="text-[11px] px-2 py-1 rounded-full bg-indigo-500/20 border border-indigo-300/50 text-indigo-100">
-                    Admin controls
-                  </span>
-                </div>
-                <div class="flex items-baseline gap-2">
-                  <span class="text-2xl font-bold text-white">$10</span>
-                  <span class="text-xs text-indigo-200">/ seat / month</span>
-                </div>
-                <ul class="text-xs text-indigo-100/90 space-y-1">
-                  <li>✅ Everything in Starter</li>
-                  <li>✅ Advanced admin controls (Coming soon)</li>
-                  <li>✅ Priority support</li>
-                </ul>
-                <button
-                  class="w-full mt-2 px-3 py-2 rounded-lg bg-white text-indigo-800 font-semibold text-sm hover:bg-slate-100 transition"
-                  @click="handleTeamCta('pro')"
-                >
-                  {{ proCtaLabel }}
-                </button>
-              </div>
-            </div>
-
-            <p class="text-xs text-indigo-100/80">Seats = teammates you invite. Billing adjusts automatically when seats change.</p>
-          </div>
-        </div>
-      </section>
-
-      <section
-        v-if="activeTab === 'account-profile'"
-        class="settings-panel"
-      >
-        <h2 class="text-lg sm:text-xl font-semibold mb-2">🙋 Profile</h2>
-        <p class="text-sm text-indigo-200">Profile editing lives in your account menu. A dedicated editor will arrive here soon.</p>
-        <p class="text-sm text-slate-300 mt-2">Signed in as: <strong>{{ authStore.user?.email || 'Unknown user' }}</strong></p>
-      </section>
-
-      <section
-        v-if="activeTab === 'account-preferences'"
-        class="settings-panel"
-      >
-        <h2 class="text-lg sm:text-xl font-semibold mb-2">⚙️ Preferences</h2>
-        <p class="text-sm text-indigo-200">Workspace-specific preferences (theme, locale, AI persona) will be managed here soon.</p>
-      </section>
-
-      <section
-        v-if="activeTab === 'account-quick-setup'"
-        class="settings-panel space-y-5"
-      >
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div class="space-y-2">
-            <p class="text-xs uppercase tracking-[0.25em] text-indigo-200/80">Setup Assistant</p>
-            <h2 class="text-lg sm:text-xl font-semibold text-white">✨ Quick Setup</h2>
-            <p class="text-sm text-indigo-100/85 max-w-2xl">
-              Reopen the onboarding assistant any time to finish reminder channels, timezone, and phone setup.
+            <p
+              v-if="quickSetupMissingLabels.length"
+              class="rounded-xl border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100"
+            >
+              Finish setup to unlock calmer reminders: {{ quickSetupMissingLabels.join(', ') }}.
+            </p>
+            <p
+              v-else
+              class="rounded-xl border border-emerald-400/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100"
+            >
+              Quick Setup is complete. You can reopen it any time to review or change your setup.
             </p>
           </div>
-          <button
-            type="button"
-            class="inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-fuchsia-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:from-indigo-400 hover:to-fuchsia-500"
-            @click="openQuickSetupPanel"
-          >
-            <span aria-hidden="true">✨</span>
-            <span>{{ quickSetupState?.completed ? 'Review setup' : 'Finish setup' }}</span>
-          </button>
-        </div>
+        </section>
 
-        <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-4 space-y-4">
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p class="text-xs uppercase tracking-[0.24em] text-slate-300">Progress</p>
-              <p class="text-sm text-slate-100">
-                {{ quickSetupState?.completedSteps || 0 }}/{{ quickSetupState?.totalSteps || 0 }} setup items complete
+        <!-- Notification Preferences -->
+        <section
+          v-if="activeTab === 'account-notifications'"
+          ref="notificationsSection"
+          :class="[
+            'settings-panel settings-panel--notifications',
+            isMobileSettingsView ? 'pb-24' : '',
+            highlightNotifications
+              ? 'ring-2 ring-indigo-400 ring-offset-2 ring-offset-transparent'
+              : '',
+          ]"
+        >
+          <h2 class="text-lg sm:text-xl font-semibold mb-3">🔔 Notification Preferences</h2>
+          <p class="text-sm text-indigo-200 mb-3">Choose how you’d like to be reminded.</p>
+
+          <div class="space-y-2.5">
+            <label class="flex items-center gap-3">
+              <input
+                type="checkbox"
+                v-model="prefs.email"
+                class="accent-indigo-500"
+                @change="dirty = true"
+              />
+              <span>Email Notifications</span>
+            </label>
+            <label
+              class="flex items-center gap-3"
+              v-if="canUseBrowserPush || isNativePackagedApp()"
+            >
+              <input
+                type="checkbox"
+                v-model="prefs.pwa"
+                class="accent-indigo-500"
+                @change="dirty = true"
+              />
+              <span>{{ notificationChannelLabel }}</span>
+            </label>
+            <div
+              v-if="prefs.pwa && (canUseBrowserPush || isNativePackagedApp())"
+              class="pl-7 mt-2 space-y-2"
+            >
+              <el-button size="small" @click="enablePush" class="bg-slate-800 hover:bg-slate-700">
+                {{ notificationEnableLabel }}
+              </el-button>
+              <p class="text-xs text-slate-400">
+                {{ notificationEnableHelp }}
               </p>
             </div>
-            <span
-              class="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold"
-              :class="quickSetupState?.requiredComplete ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200' : 'border-amber-400/40 bg-amber-500/10 text-amber-100'"
-            >
-              {{ quickSetupState?.requiredComplete ? 'Core setup complete' : 'Setup incomplete' }}
-            </span>
+            <div class="space-y-2 rounded-2xl border border-white/10 bg-slate-950/30 p-3.5">
+              <div class="space-y-1">
+                <label class="block text-sm font-medium text-white">Notification sound</label>
+                <p class="text-xs text-slate-400">{{ notificationSoundHelp }}</p>
+              </div>
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <select
+                  v-model="prefs.sound"
+                  class="w-full rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-white outline-none transition focus:border-indigo-400/60"
+                  @change="dirty = true"
+                >
+                  <option
+                    v-for="option in NOTIFICATION_SOUND_OPTIONS"
+                    :key="option.value"
+                    :value="option.value"
+                  >
+                    {{ option.label }}
+                  </option>
+                </select>
+                <el-button
+                  size="small"
+                  :loading="soundPreviewing"
+                  class="shrink-0 bg-slate-800 hover:bg-slate-700"
+                  @click="previewNotificationSound"
+                >
+                  Preview
+                </el-button>
+              </div>
+            </div>
+            <label class="flex items-center gap-3">
+              <input
+                type="checkbox"
+                v-model="prefs.whatsapp"
+                class="accent-indigo-500"
+                @change="dirty = true"
+              />
+              <span>WhatsApp Alerts</span>
+            </label>
+            <label class="flex items-center gap-3">
+              <input
+                type="checkbox"
+                v-model="prefs.sms"
+                class="accent-indigo-500"
+                @change="dirty = true"
+              />
+              <span>SMS</span>
+            </label>
+            <label class="flex items-center gap-3">
+              <input
+                type="checkbox"
+                v-model="prefs.voice_call"
+                class="accent-indigo-500"
+                @change="dirty = true"
+              />
+              <span>Voice Call</span>
+            </label>
+            <label class="flex items-center gap-3">
+              <input type="checkbox" v-model="prefs.discord" class="accent-indigo-500" disabled />
+              <span>Discord Channel (coming soon)</span>
+            </label>
           </div>
 
-          <div class="h-2 overflow-hidden rounded-full bg-white/10">
+          <div
+            class="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/30 p-3.5"
+          >
+            <div class="space-y-1">
+              <p class="text-sm font-medium text-white">Notification debug</p>
+              <p class="text-xs text-slate-400">
+                Inspect permission, token, and delivery tests on this device.
+              </p>
+            </div>
+            <RouterLink
+              to="/notification-debug"
+              class="inline-flex items-center rounded-lg border border-white/15 bg-slate-900/60 px-3 py-1.5 text-sm text-slate-100 hover:border-indigo-300/40"
+            >
+              Open debug screen
+            </RouterLink>
+          </div>
+
+          <div class="mt-4 rounded-2xl border border-white/10 bg-slate-950/30 p-3.5 sm:p-5">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div class="space-y-2">
+                <h3 class="text-base font-semibold text-white">Action Inbox Nudges</h3>
+                <p class="text-sm text-slate-300">
+                  Keep the inbox as the primary surface, then escalate only when resurfaced
+                  suggestions become time-sensitive.
+                </p>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  class="inline-flex items-center rounded-lg border border-white/15 bg-slate-900/50 px-3 py-1 text-xs text-slate-200 hover:border-indigo-300/40"
+                  @click="showNotificationAdvanced = !showNotificationAdvanced"
+                >
+                  {{ showNotificationAdvanced ? 'Hide advanced' : 'Show advanced' }}
+                </button>
+                <label class="inline-flex items-center gap-2 text-sm text-slate-200">
+                  <input
+                    type="checkbox"
+                    v-model="actionInboxNudges.enabled"
+                    class="accent-indigo-500"
+                    @change="dirty = true"
+                  />
+                  <span>Allow external nudges</span>
+                </label>
+              </div>
+            </div>
+
             <div
-              class="h-full rounded-full bg-gradient-to-r from-indigo-400 via-violet-500 to-fuchsia-500 transition-all"
-              :style="{ width: `${quickSetupState?.completionPercent || 0}%` }"
+              v-if="actionInboxNudges.enabled && showNotificationAdvanced"
+              class="mt-4 grid gap-4 lg:grid-cols-2"
+            >
+              <div class="space-y-2">
+                <label class="block text-sm font-medium text-slate-200">Escalation level</label>
+                <select
+                  v-model="actionInboxNudges.urgency"
+                  class="w-full rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-white"
+                  @change="dirty = true"
+                >
+                  <option value="important">Important only</option>
+                  <option value="urgent_only">Urgent only</option>
+                </select>
+                <p class="text-xs text-slate-400">
+                  Important includes two-day heads-ups. Urgent waits until the same day or the final
+                  two-hour window.
+                </p>
+              </div>
+
+              <div class="space-y-2">
+                <label class="block text-sm font-medium text-slate-200"
+                  >Max nudges per suggestion</label
+                >
+                <select
+                  v-model="actionInboxNudges.maxPerSuggestion"
+                  class="w-full rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-white"
+                  @change="dirty = true"
+                >
+                  <option :value="1">1 nudge</option>
+                  <option :value="2">2 nudges</option>
+                  <option :value="3">3 nudges</option>
+                </select>
+                <p class="text-xs text-slate-400">
+                  Caps repeat follow-up for the same suggestion so the engine stays useful instead
+                  of noisy.
+                </p>
+              </div>
+            </div>
+
+            <div
+              v-if="actionInboxNudges.enabled && showNotificationAdvanced"
+              class="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-3.5"
+            >
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div class="space-y-1">
+                  <p class="text-sm font-medium text-slate-100">Daily inbox digest</p>
+                  <p class="text-xs text-slate-400">
+                    Send one summary of pending inbox items after the morning window so forgotten
+                    actions do not disappear.
+                  </p>
+                </div>
+                <label class="inline-flex items-center gap-3 text-sm text-slate-200">
+                  <input
+                    type="checkbox"
+                    v-model="actionInboxNudges.dailyDigest"
+                    class="accent-indigo-500"
+                    @change="dirty = true"
+                  />
+                  <span>Send daily digest</span>
+                </label>
+              </div>
+
+              <div v-if="actionInboxNudges.dailyDigest" class="mt-4 space-y-3">
+                <div>
+                  <p class="text-sm font-medium text-slate-200">Digest channels</p>
+                  <p class="text-xs text-slate-400">
+                    Uses the same channels selected below for escalation, so you only configure this
+                    once.
+                  </p>
+                </div>
+                <div class="flex flex-wrap items-center gap-3">
+                  <el-button
+                    size="small"
+                    plain
+                    :loading="actionInboxDigestSending"
+                    :disabled="!workspaceStore.activeWorkspaceId"
+                    @click="sendTestActionInboxDigest"
+                  >
+                    Send test digest
+                  </el-button>
+                  <p class="text-xs text-slate-400">
+                    Sends a real digest through the selected channels for the active workspace.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div
+              v-if="actionInboxNudges.enabled && showNotificationAdvanced"
+              class="mt-4 space-y-3"
+            >
+              <div>
+                <p class="text-sm font-medium text-slate-200">Escalation channels</p>
+                <p class="text-xs text-slate-400">
+                  These respect the main notification toggles above. If a channel is off there, it
+                  stays unavailable here too.
+                </p>
+              </div>
+              <div class="grid gap-3 sm:grid-cols-3">
+                <label
+                  v-for="option in availableActionInboxNudgeChannels"
+                  :key="option.value"
+                  class="rounded-xl border px-3 py-3 transition"
+                  :class="
+                    option.enabled
+                      ? 'border-white/10 bg-white/5 text-slate-100'
+                      : 'border-white/5 bg-white/[0.03] text-slate-500'
+                  "
+                >
+                  <span class="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      v-model="actionInboxNudges.channels"
+                      :value="option.value"
+                      class="mt-0.5 accent-indigo-500"
+                      :disabled="!option.enabled"
+                      @change="dirty = true"
+                    />
+                    <span class="space-y-1">
+                      <span class="block text-sm font-medium">{{ option.label }}</span>
+                      <span class="block text-xs">
+                        {{
+                          option.enabled
+                            ? 'Available for inbox escalation.'
+                            : 'Enable this channel above first.'
+                        }}
+                      </span>
+                    </span>
+                  </span>
+                </label>
+              </div>
+              <p
+                v-if="!availableActionInboxNudgeChannels.some((option) => option.enabled)"
+                class="text-xs text-amber-300"
+              >
+                No eligible delivery channel is enabled right now. Suggestions will still resurface
+                inside the inbox, but external nudges will stay off until you enable email, push, or
+                WhatsApp.
+              </p>
+            </div>
+          </div>
+
+          <!-- Delivery endpoints -->
+          <div v-if="prefs.whatsapp" class="mt-4">
+            <label class="block text-sm text-slate-300 mb-1">WhatsApp Phone Number</label>
+            <el-input
+              v-model="integrationEndpoints.whatsapp.phone"
+              placeholder="+1 234 567 8901"
+              clearable
+              class="w-full"
+              @input="dirty = true"
+            />
+            <small class="text-slate-400">Format: +12135551234 (E.164)</small>
+          </div>
+
+          <div v-if="prefs.sms || prefs.voice_call" class="mt-4">
+            <label class="block text-sm text-slate-300 mb-1">Phone Number (for SMS)</label>
+            <el-input
+              v-model="integrationEndpoints.sms.phone"
+              placeholder="+1 234 567 8901"
+              clearable
+              class="w-full"
+              @input="dirty = true"
+            />
+            <p v-if="effectiveTwilioPhone" class="text-xs text-slate-400 mt-1">
+              💬 SMS and voice calls will be sent to {{ effectiveTwilioPhone }}.
+              <span class="text-slate-400"
+                >You can update this under <strong>Integrations → Phone</strong>.</span
+              >
+            </p>
+          </div>
+
+          <div
+            v-if="prefs.voice_call"
+            class="mt-4 rounded-2xl border border-white/10 bg-slate-950/30 p-3.5 sm:p-5 space-y-3"
+          >
+            <h3 class="text-base font-semibold text-white">Morning Call Settings</h3>
+            <label class="flex items-center gap-3">
+              <input
+                type="checkbox"
+                v-model="morningCoach.enabled"
+                class="accent-indigo-500"
+                @change="dirty = true"
+              />
+              <span>Enable morning coach call</span>
+            </label>
+            <div class="space-y-1">
+              <label class="block text-sm text-slate-300">First call time</label>
+              <input
+                v-model="morningCoach.firstCallTime"
+                type="time"
+                class="w-full rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-white"
+                @input="dirty = true"
+              />
+            </div>
+            <div class="space-y-1">
+              <label class="block text-sm text-slate-300">Morning message text</label>
+              <textarea
+                v-model="morningCoach.customMessage"
+                rows="3"
+                maxlength="600"
+                class="w-full rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-white"
+                placeholder="Good morning. Start with one meaningful win today."
+                @input="dirty = true"
+              />
+            </div>
+            <div class="flex items-center gap-3">
+              <el-button
+                size="small"
+                plain
+                :loading="morningCallTesting"
+                @click="sendTestMorningCallNow"
+              >
+                Send test call
+              </el-button>
+              <p class="text-xs text-slate-400">
+                Calls your configured phone with this exact message text.
+              </p>
+            </div>
+          </div>
+
+          <div v-if="prefs.discord" class="mt-4">
+            <label class="block text-sm text-slate-300 mb-1">Discord Webhook URL</label>
+            <el-input
+              v-model="integrationEndpoints.discord.webhook"
+              placeholder="https://discord.com/api/webhooks/..."
+              clearable
+              class="w-full"
+              @input="dirty = true"
             />
           </div>
 
-          <div class="flex flex-wrap gap-2">
-            <span
-              v-for="step in quickSetupState?.steps || []"
-              :key="step.key"
-              class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs"
-              :class="step.complete ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200' : 'border-white/10 bg-white/5 text-slate-300'"
+          <div class="mt-5 text-center" v-if="dirty">
+            <p class="text-sm text-yellow-300 mb-2">⚠️ You have unsaved changes.</p>
+            <el-button
+              type="primary"
+              @click="saveSettings"
+              class="bg-gradient-to-r from-indigo-600 to-purple-600"
+              >💾 Save Settings</el-button
             >
-              <span>{{ step.complete ? '✓' : '•' }}</span>
-              <span>{{ step.label }}</span>
-            </span>
           </div>
+        </section>
 
-          <p v-if="quickSetupMissingLabels.length" class="rounded-xl border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-            Finish setup to unlock calmer reminders: {{ quickSetupMissingLabels.join(', ') }}.
+        <section v-if="activeTab === 'account-social'" class="settings-panel">
+          <h2 class="text-lg sm:text-xl font-semibold mb-2">🌐 Social Accounts</h2>
+          <p class="text-sm text-indigo-200 mb-4">
+            Connect and manage social destinations for posting workflows.
           </p>
-          <p v-else class="rounded-xl border border-emerald-400/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
-            Quick Setup is complete. You can reopen it any time to review or change your setup.
+          <SocialIntegrationPanel />
+        </section>
+
+        <!-- Integrations -->
+        <section v-if="activeTab === 'workspace-integrations'" class="settings-panel">
+          <h2 class="text-lg sm:text-xl font-semibold mb-4">🔗 Integrations</h2>
+          <p class="text-sm text-indigo-200 mb-4">
+            Connect your favorite platforms to sync tasks and reminders.
           </p>
-        </div>
-      </section>
-
-      <!-- Notification Preferences -->
-      <section
-        v-if="activeTab === 'account-notifications'"
-        ref="notificationsSection"
-        :class="['settings-panel settings-panel--notifications',
-                 isMobileSettingsView ? 'pb-24' : '',
-                 highlightNotifications ? 'ring-2 ring-indigo-400 ring-offset-2 ring-offset-transparent' : '']"
-      >
-        <h2 class="text-lg sm:text-xl font-semibold mb-3">🔔 Notification Preferences</h2>
-        <p class="text-sm text-indigo-200 mb-3">Choose how you’d like to be reminded.</p>
-
-        <div class="space-y-2.5">
-          <label class="flex items-center gap-3">
-            <input type="checkbox" v-model="prefs.email" class="accent-indigo-500" @change="dirty = true" />
-            <span>Email Notifications</span>
-          </label>
-          <label class="flex items-center gap-3" v-if="canUseBrowserPush || isNativePackagedApp()">
-            <input type="checkbox" v-model="prefs.pwa" class="accent-indigo-500" @change="dirty = true" />
-            <span>{{ notificationChannelLabel }}</span>
-          </label>
-          <div v-if="prefs.pwa && (canUseBrowserPush || isNativePackagedApp())" class="pl-7 mt-2 space-y-2">
-            <el-button size="small" @click="enablePush" class="bg-slate-800 hover:bg-slate-700">
-              {{ notificationEnableLabel }}
-            </el-button>
-            <p class="text-xs text-slate-400">
-              {{ notificationEnableHelp }}
-            </p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+            <button
+              v-for="i in integrationOptions"
+              :key="i.key"
+              @click="
+                () => {
+                  i.selected = !i.selected
+                  dirty = true
+                }
+              "
+              :class="[
+                'flex flex-col items-center justify-center p-4 rounded-lg transition',
+                i.selected
+                  ? 'bg-indigo-600 text-white shadow-lg'
+                  : 'bg-slate-900/50 hover:bg-slate-800',
+              ]"
+            >
+              <span class="text-2xl mb-2">{{ i.icon }}</span>
+              <span class="text-sm">{{ i.name }}</span>
+            </button>
           </div>
-          <label class="flex items-center gap-3">
-            <input type="checkbox" v-model="prefs.whatsapp" class="accent-indigo-500" @change="dirty = true" />
-            <span>WhatsApp Alerts</span>
-          </label>
-          <label class="flex items-center gap-3">
-            <input type="checkbox" v-model="prefs.sms" class="accent-indigo-500" @change="dirty = true" />
-            <span>SMS</span>
-          </label>
-          <label class="flex items-center gap-3">
-            <input type="checkbox" v-model="prefs.voice_call" class="accent-indigo-500" @change="dirty = true" />
-            <span>Voice Call</span>
-          </label>
-          <label class="flex items-center gap-3">
-            <input type="checkbox" v-model="prefs.discord" class="accent-indigo-500" disabled />
-            <span>Discord Channel (coming soon)</span>
-          </label>
-        </div>
 
-        <div class="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/30 p-3.5">
-          <div class="space-y-1">
-            <p class="text-sm font-medium text-white">Notification debug</p>
-            <p class="text-xs text-slate-400">Inspect permission, token, and delivery tests on this device.</p>
-          </div>
-          <RouterLink to="/notification-debug" class="inline-flex items-center rounded-lg border border-white/15 bg-slate-900/60 px-3 py-1.5 text-sm text-slate-100 hover:border-indigo-300/40">
-            Open debug screen
-          </RouterLink>
-        </div>
-
-        <div class="mt-4 rounded-2xl border border-white/10 bg-slate-950/30 p-3.5 sm:p-5">
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div class="space-y-2">
-              <h3 class="text-base font-semibold text-white">Action Inbox Nudges</h3>
-              <p class="text-sm text-slate-300">
-                Keep the inbox as the primary surface, then escalate only when resurfaced suggestions become time-sensitive.
-              </p>
-            </div>
-            <div class="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                class="inline-flex items-center rounded-lg border border-white/15 bg-slate-900/50 px-3 py-1 text-xs text-slate-200 hover:border-indigo-300/40"
-                @click="showNotificationAdvanced = !showNotificationAdvanced"
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
+            <!-- GPT integration card -->
+            <div
+              ref="gptCardRef"
+              :class="[
+                'integration-card rounded-lg border border-white/10 bg-slate-900/40 p-4 space-y-4 transition',
+                highlightGpt ? 'ring-2 ring-indigo-400 shadow-lg shadow-indigo-500/20' : '',
+              ]"
+            >
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div class="min-w-0">
+                  <div class="font-semibold flex items-center gap-2">
+                    🤖 PlanCraft GPT
+                    <span
+                      class="text-[10px] px-2 py-0.5 rounded bg-indigo-500/30 text-indigo-100 uppercase tracking-wide"
+                      >Beta</span
+                    >
+                  </div>
+                  <p class="text-xs text-slate-300 mt-1">
+                    Generate a short-lived link code and paste it inside ChatGPT to connect the
+                    PlanCraft GPT Actions.
+                  </p>
+                  <p v-if="gptLink.expiresAt" class="text-[11px] text-slate-400">
+                    {{ gptLinkExpired ? 'Expired' : 'Expires' }} {{ gptLinkExpiryLabel }}
+                  </p>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <button
+                    class="px-3 py-1.5 rounded bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm disabled:opacity-60"
+                    :disabled="gptLink.loading || !authStore.user"
+                    @click="generateGptCode"
+                  >
+                    {{
+                      gptLink.loading
+                        ? 'Generating…'
+                        : gptLink.code
+                          ? 'Refresh Code'
+                          : 'Generate Code'
+                    }}
+                  </button>
+                  <button
+                    v-if="gptLink.code"
+                    class="px-3 py-1.5 rounded border border-indigo-500/50 text-indigo-100 hover:bg-indigo-500/10 text-sm disabled:opacity-40"
+                    :disabled="gptLink.copied"
+                    @click="copyGptCode"
+                  >
+                    {{ gptLink.copied ? 'Copied!' : 'Copy Code' }}
+                  </button>
+                  <button
+                    v-if="gptLink.code && gptLaunchUrl"
+                    class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-sm text-white flex items-center gap-1"
+                    @click="openChatGpt"
+                  >
+                    Open ChatGPT ↗
+                  </button>
+                </div>
+              </div>
+              <div
+                v-if="gptLink.code"
+                class="rounded-lg border border-indigo-500/30 bg-slate-950/50 p-4 space-y-3"
               >
-                {{ showNotificationAdvanced ? 'Hide advanced' : 'Show advanced' }}
-              </button>
-              <label class="inline-flex items-center gap-2 text-sm text-slate-200">
-              <input type="checkbox" v-model="actionInboxNudges.enabled" class="accent-indigo-500" @change="dirty = true" />
-              <span>Allow external nudges</span>
-              </label>
+                <div>
+                  <p class="text-xs text-slate-400 uppercase tracking-[0.2em]">Link Code</p>
+                  <p class="text-3xl font-mono tracking-[0.25em] text-white break-all">
+                    {{ gptLink.code }}
+                  </p>
+                </div>
+                <ul class="list-decimal list-inside text-xs text-slate-300 space-y-1">
+                  <li>Open ChatGPT and launch the PlanCraft AI GPT.</li>
+                  <li>Say “Link my account” and paste this code when prompted.</li>
+                  <li>Approve the connection to sync tasks, reminders, and journal entries.</li>
+                </ul>
+                <a
+                  :href="gptHelpUrl"
+                  target="_blank"
+                  rel="noreferrer"
+                  class="text-indigo-300 text-xs inline-flex items-center gap-1 hover:text-indigo-200"
+                >
+                  Need help? <span aria-hidden="true">↗</span>
+                </a>
+              </div>
+              <p v-else class="text-xs text-slate-400">
+                Codes expire after a few minutes. Generate a fresh one whenever you want to connect
+                ChatGPT.
+              </p>
+              <p v-if="gptLink.error" class="text-xs text-red-300">⚠️ {{ gptLink.error }}</p>
+            </div>
+
+            <!-- Google Calendar Card -->
+            <div
+              class="integration-card rounded-lg border border-white/10 bg-slate-900/40 p-4 space-y-3"
+            >
+              <div v-if="googleLoading" class="space-y-4 animate-pulse">
+                <div class="h-5 w-40 bg-slate-800/60 rounded"></div>
+                <div class="h-4 w-3/4 bg-slate-800/40 rounded"></div>
+                <div class="h-10 bg-slate-800/50 rounded"></div>
+              </div>
+              <template v-else>
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div class="font-semibold flex items-center gap-2">
+                      📆 Google Calendar
+                      <span
+                        v-if="google.enabled"
+                        :class="[
+                          'text-xs px-2 py-0.5 rounded',
+                          google.connected
+                            ? 'bg-emerald-700/50 text-emerald-200'
+                            : 'bg-yellow-700/40 text-yellow-200',
+                        ]"
+                      >
+                        {{
+                          google.connected
+                            ? `${google.accounts.length} account${google.accounts.length > 1 ? 's' : ''} connected`
+                            : 'Not Connected'
+                        }}
+                      </span>
+                      <span
+                        v-else
+                        class="text-xs px-2 py-0.5 rounded bg-slate-700/50 text-slate-300"
+                        >Disabled by server</span
+                      >
+                    </div>
+                    <p class="text-xs text-slate-300 mt-1">
+                      Import meetings and show Join links in your tasks.
+                      <span v-if="activeGoogleAccount?.lastRun"
+                        >Last sync: {{ formatGoogleLastSync(activeGoogleAccount.lastRun) }}</span
+                      >
+                    </p>
+                  </div>
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <button
+                      v-if="google.enabled && authStore.user"
+                      @click="connectGoogle"
+                      :disabled="googleLoading"
+                      class="px-3 py-1.5 rounded bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm disabled:opacity-50"
+                    >
+                      {{ google.connected ? 'Add account' : 'Connect' }}
+                    </button>
+                    <button
+                      v-if="google.connected && activeGoogleAccount"
+                      @click="syncNow"
+                      :disabled="activeGoogleAccount.syncing"
+                      class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-sm flex items-center gap-2 disabled:opacity-60"
+                    >
+                      <span
+                        v-if="activeGoogleAccount.syncing"
+                        class="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin"
+                        aria-hidden="true"
+                      ></span>
+                      <span>{{ activeGoogleAccount.syncing ? 'Syncing…' : 'Sync Now' }}</span>
+                    </button>
+                    <button
+                      v-if="google.connected && activeGoogleAccount"
+                      @click="disconnectGoogle(activeGoogleAccount.accountId)"
+                      class="px-3 py-1.5 rounded bg-red-700/80 hover:bg-red-700 text-sm"
+                    >
+                      Disconnect
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  v-if="google.connected && google.accounts.length"
+                  class="mt-3 flex items-center gap-3 flex-wrap"
+                >
+                  <label class="text-sm text-slate-300">Active account:</label>
+                  <select
+                    :value="activeGoogleAccountId"
+                    @change="(e) => setActiveGoogleAccount(e.target.value)"
+                    class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm"
+                  >
+                    <option
+                      v-for="acc in google.accounts"
+                      :key="acc.accountId"
+                      :value="acc.accountId"
+                    >
+                      {{ acc.accountEmail || acc.accountId }} {{ acc.primary ? '(primary)' : '' }}
+                    </option>
+                  </select>
+                  <span v-if="activeGoogleAccount?.status" class="text-xs text-slate-400"
+                    >Status: {{ activeGoogleAccount.status }}</span
+                  >
+                  <span v-if="activeGoogleAccount?.lastRun" class="text-xs text-slate-400"
+                    >Last sync: {{ formatGoogleLastSync(activeGoogleAccount.lastRun) }}</span
+                  >
+                </div>
+
+                <!-- Calendars selection -->
+                <div
+                  v-if="google.connected && activeGoogleAccount"
+                  class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3"
+                >
+                  <label
+                    v-for="cal in activeCalendars"
+                    :key="cal.id"
+                    class="flex items-center gap-2 bg-slate-800/40 border border-slate-700/40 rounded p-2"
+                  >
+                    <input type="checkbox" v-model="cal.selected" class="accent-indigo-500" />
+                    <div class="flex-1">
+                      <div class="text-sm">{{ cal.summary || cal.id }}</div>
+                      <div class="text-xs text-slate-400">{{ cal.timeZone || '—' }}</div>
+                    </div>
+                    <span
+                      v-if="cal.primary"
+                      class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-700/50"
+                      >primary</span
+                    >
+                  </label>
+                </div>
+
+                <!-- Window + save -->
+                <div
+                  v-if="google.connected && activeGoogleAccount"
+                  class="mt-3 flex items-center gap-3 flex-wrap"
+                >
+                  <label class="text-sm text-slate-300">Look-ahead window:</label>
+                  <select
+                    v-model.number="activeGoogleAccount.windowDays"
+                    class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm"
+                  >
+                    <option :value="7">7 days</option>
+                    <option :value="14">14 days</option>
+                    <option :value="30">30 days</option>
+                    <option :value="60">60 days</option>
+                  </select>
+                  <button
+                    @click="saveSelection"
+                    class="px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-sm"
+                  >
+                    Save Selection
+                  </button>
+                  <span v-if="activeGoogleAccount.status" class="text-xs text-slate-400"
+                    >Status: {{ activeGoogleAccount.status }}</span
+                  >
+                </div>
+
+                <div v-if="google.enabled" class="pt-3 border-t border-white/5 space-y-3">
+                  <label class="flex items-center gap-3 text-sm text-slate-200">
+                    <input
+                      type="checkbox"
+                      v-model="meetingPrefs.autoCreate"
+                      @change="markDirty"
+                      class="accent-indigo-500"
+                    />
+                    Auto-create tasks from calendar events
+                  </label>
+                  <div class="flex items-center gap-2 text-sm text-slate-200 flex-wrap">
+                    <span>Default meeting reminder:</span>
+                    <select
+                      v-model.number="meetingPrefs.defaultReminderMinutes"
+                      @change="markDirty"
+                      class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm"
+                    >
+                      <option :value="5">5 minutes</option>
+                      <option :value="10">10 minutes</option>
+                      <option :value="15">15 minutes</option>
+                      <option :value="30">30 minutes</option>
+                      <option :value="60">1 hour</option>
+                    </select>
+                    <span class="text-xs text-slate-400"
+                      >Adjust reminder lead time for meetings.</span
+                    >
+                  </div>
+                </div>
+              </template>
             </div>
           </div>
+        </section>
 
-          <div v-if="actionInboxNudges.enabled && showNotificationAdvanced" class="mt-4 grid gap-4 lg:grid-cols-2">
-            <div class="space-y-2">
-              <label class="block text-sm font-medium text-slate-200">Escalation level</label>
-              <select
-                v-model="actionInboxNudges.urgency"
-                class="w-full rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-white"
-                @change="dirty = true"
-              >
-                <option value="important">Important only</option>
-                <option value="urgent_only">Urgent only</option>
-              </select>
-              <p class="text-xs text-slate-400">
-                Important includes two-day heads-ups. Urgent waits until the same day or the final two-hour window.
-              </p>
-            </div>
-
-            <div class="space-y-2">
-              <label class="block text-sm font-medium text-slate-200">Max nudges per suggestion</label>
-              <select
-                v-model="actionInboxNudges.maxPerSuggestion"
-                class="w-full rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-white"
-                @change="dirty = true"
-              >
-                <option :value="1">1 nudge</option>
-                <option :value="2">2 nudges</option>
-                <option :value="3">3 nudges</option>
-              </select>
-              <p class="text-xs text-slate-400">
-                Caps repeat follow-up for the same suggestion so the engine stays useful instead of noisy.
-              </p>
-            </div>
-          </div>
-
-          <div v-if="actionInboxNudges.enabled && showNotificationAdvanced" class="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-3.5">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div class="space-y-1">
-                <p class="text-sm font-medium text-slate-100">Daily inbox digest</p>
-                <p class="text-xs text-slate-400">
-                  Send one summary of pending inbox items after the morning window so forgotten actions do not disappear.
+        <!-- Account -->
+        <section v-if="activeTab === 'account-profile'" class="settings-panel">
+          <h2 class="text-lg sm:text-xl font-semibold mb-4">👤 Account</h2>
+          <div class="grid grid-cols-1 xl:grid-cols-[0.92fr,1.08fr] gap-4 mb-6">
+            <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-4 space-y-4">
+              <div>
+                <p class="text-xs uppercase tracking-[0.24em] text-slate-300">Legal</p>
+                <h3 class="text-lg font-semibold text-white">
+                  Terms, privacy, and deletion policy
+                </h3>
+                <p class="text-sm text-indigo-100/80 mt-1">
+                  Keep the App Store-required documents one tap away inside the app.
                 </p>
               </div>
-              <label class="inline-flex items-center gap-3 text-sm text-slate-200">
-                <input type="checkbox" v-model="actionInboxNudges.dailyDigest" class="accent-indigo-500" @change="dirty = true" />
-                <span>Send daily digest</span>
-              </label>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  class="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-left text-white hover:border-indigo-300/40 hover:bg-slate-900"
+                  @click="openLegalDoc('/terms')"
+                >
+                  Terms of Use
+                </button>
+                <button
+                  type="button"
+                  class="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-left text-white hover:border-indigo-300/40 hover:bg-slate-900"
+                  @click="openLegalDoc('/privacy')"
+                >
+                  Privacy Policy
+                </button>
+                <button
+                  type="button"
+                  class="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-left text-white hover:border-indigo-300/40 hover:bg-slate-900"
+                  @click="openLegalDoc('/delete-account')"
+                >
+                  Deletion Policy
+                </button>
+              </div>
             </div>
 
-            <div v-if="actionInboxNudges.dailyDigest" class="mt-4 space-y-3">
+            <div class="rounded-2xl border border-red-400/25 bg-red-500/10 p-4 space-y-4">
               <div>
-                <p class="text-sm font-medium text-slate-200">Digest channels</p>
-                <p class="text-xs text-slate-400">
-                  Uses the same channels selected below for escalation, so you only configure this once.
+                <p class="text-xs uppercase tracking-[0.24em] text-red-200/80">Danger Zone</p>
+                <h3 class="text-lg font-semibold text-white">Delete account</h3>
+                <p class="text-sm text-red-100/85 mt-1">
+                  Permanently removes your account, tasks, reminders, journal entries, and synced
+                  integrations.
+                </p>
+              </div>
+              <div
+                class="rounded-xl border border-red-300/20 bg-slate-950/30 px-4 py-3 text-sm text-red-50/90 space-y-1"
+              >
+                <p>Your data is deleted, not just deactivated.</p>
+                <p>
+                  Shared workspace access is removed automatically before the account is deleted.
                 </p>
               </div>
               <div class="flex flex-wrap items-center gap-3">
-                <el-button
-                  size="small"
-                  plain
-                  :loading="actionInboxDigestSending"
-                  :disabled="!workspaceStore.activeWorkspaceId"
-                  @click="sendTestActionInboxDigest"
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-center rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60"
+                  :disabled="deleteAccountLoading"
+                  @click="deleteAccountConfirmOpen = true"
                 >
-                  Send test digest
-                </el-button>
-                <p class="text-xs text-slate-400">
-                  Sends a real digest through the selected channels for the active workspace.
-                </p>
+                  Delete Account
+                </button>
+                <p class="text-xs text-red-100/75">This action is permanent.</p>
               </div>
             </div>
           </div>
 
-          <div v-if="actionInboxNudges.enabled && showNotificationAdvanced" class="mt-4 space-y-3">
-            <div>
-              <p class="text-sm font-medium text-slate-200">Escalation channels</p>
-              <p class="text-xs text-slate-400">
-                These respect the main notification toggles above. If a channel is off there, it stays unavailable here too.
+          <div class="profile-identity mb-4">
+            <AvatarUploader
+              :url="authStore.user?.photoURL || authStore.user?.avatarUrl"
+              :name="profileForm.name || authStore.user?.displayName || authStore.user?.name"
+              :email="profileForm.email || authStore.user?.email"
+              class="profile-identity-uploader"
+              @updated="onAvatarUpdated"
+            />
+            <div class="profile-identity-copy">
+              <p class="font-medium">
+                {{ profileForm.name || authStore.user?.displayName || 'Guest User' }}
+              </p>
+              <p class="text-sm text-indigo-300">
+                {{ profileForm.email || authStore.user?.email }}
               </p>
             </div>
-            <div class="grid gap-3 sm:grid-cols-3">
-              <label
-                v-for="option in availableActionInboxNudgeChannels"
-                :key="option.value"
-                class="rounded-xl border px-3 py-3 transition"
-                :class="option.enabled ? 'border-white/10 bg-white/5 text-slate-100' : 'border-white/5 bg-white/[0.03] text-slate-500'"
-              >
-                <span class="flex items-start gap-3">
-                  <input
-                    type="checkbox"
-                    v-model="actionInboxNudges.channels"
-                    :value="option.value"
-                    class="mt-0.5 accent-indigo-500"
-                    :disabled="!option.enabled"
-                    @change="dirty = true"
-                  />
-                  <span class="space-y-1">
-                    <span class="block text-sm font-medium">{{ option.label }}</span>
-                    <span class="block text-xs">
-                      {{ option.enabled ? 'Available for inbox escalation.' : 'Enable this channel above first.' }}
-                    </span>
-                  </span>
-                </span>
-              </label>
-            </div>
-            <p v-if="!availableActionInboxNudgeChannels.some((option) => option.enabled)" class="text-xs text-amber-300">
-              No eligible delivery channel is enabled right now. Suggestions will still resurface inside the inbox, but external nudges will stay off until you enable email, push, or WhatsApp.
-            </p>
           </div>
-        </div>
 
-        <!-- Delivery endpoints -->
-        <div v-if="prefs.whatsapp" class="mt-4">
-          <label class="block text-sm text-slate-300 mb-1">WhatsApp Phone Number</label>
-          <el-input v-model="integrationEndpoints.whatsapp.phone" placeholder="+1 234 567 8901" clearable class="w-full" @input="dirty = true" />
-          <small class="text-slate-400">Format: +12135551234 (E.164)</small>
-        </div>
+          <div v-if="!profileComplete" class="mb-3 text-yellow-300 text-sm">
+            ⚠️ Your profile is incomplete — add your name to personalize your experience.
+          </div>
 
-        <div v-if="prefs.sms || prefs.voice_call" class="mt-4">
-          <label class="block text-sm text-slate-300 mb-1">Phone Number (for SMS)</label>
-          <el-input v-model="integrationEndpoints.sms.phone" placeholder="+1 234 567 8901" clearable class="w-full" @input="dirty = true" />
-          <p v-if="effectiveTwilioPhone" class="text-xs text-slate-400 mt-1">
-            💬 SMS and voice calls will be sent to {{ effectiveTwilioPhone }}.
-            <span class="text-slate-400">You can update this under <strong>Integrations → Phone</strong>.</span>
-          </p>
-        </div>
-
-        <div v-if="prefs.voice_call" class="mt-4 rounded-2xl border border-white/10 bg-slate-950/30 p-3.5 sm:p-5 space-y-3">
-          <h3 class="text-base font-semibold text-white">Morning Call Settings</h3>
-          <label class="flex items-center gap-3">
-            <input type="checkbox" v-model="morningCoach.enabled" class="accent-indigo-500" @change="dirty = true" />
-            <span>Enable morning coach call</span>
-          </label>
-          <div class="space-y-1">
-            <label class="block text-sm text-slate-300">First call time</label>
-            <input
-              v-model="morningCoach.firstCallTime"
-              type="time"
-              class="w-full rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-white"
-              @input="dirty = true"
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
+            <el-input v-model="profileForm.name" placeholder="Your name" clearable />
+            <el-input
+              v-model="profileForm.email"
+              placeholder="Email (optional)"
+              type="email"
+              clearable
+            />
+            <el-input
+              v-model="profileForm.phone"
+              placeholder="Phone (optional)"
+              type="tel"
+              clearable
             />
           </div>
-          <div class="space-y-1">
-            <label class="block text-sm text-slate-300">Morning message text</label>
-            <textarea
-              v-model="morningCoach.customMessage"
-              rows="3"
-              maxlength="600"
-              class="w-full rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-white"
-              placeholder="Good morning. Start with one meaningful win today."
-              @input="dirty = true"
-            />
-          </div>
-          <div class="flex items-center gap-3">
-            <el-button size="small" plain :loading="morningCallTesting" @click="sendTestMorningCallNow">
-              Send test call
-            </el-button>
-            <p class="text-xs text-slate-400">Calls your configured phone with this exact message text.</p>
-          </div>
-        </div>
-
-        <div v-if="prefs.discord" class="mt-4">
-          <label class="block text-sm text-slate-300 mb-1">Discord Webhook URL</label>
-          <el-input v-model="integrationEndpoints.discord.webhook" placeholder="https://discord.com/api/webhooks/..." clearable class="w-full" @input="dirty = true" />
-        </div>
-
-        <div class="mt-5 text-center" v-if="dirty">
-          <p class="text-sm text-yellow-300 mb-2">⚠️ You have unsaved changes.</p>
-          <el-button type="primary" @click="saveSettings" class="bg-gradient-to-r from-indigo-600 to-purple-600">💾 Save Settings</el-button>
-        </div>
-      </section>
-
-      <section
-        v-if="activeTab === 'account-social'"
-        class="settings-panel"
-      >
-        <h2 class="text-lg sm:text-xl font-semibold mb-2">🌐 Social Accounts</h2>
-        <p class="text-sm text-indigo-200 mb-4">Connect and manage social destinations for posting workflows.</p>
-        <SocialIntegrationPanel />
-      </section>
-
-      <!-- Integrations -->
-      <section
-        v-if="activeTab === 'workspace-integrations'"
-        class="settings-panel"
-      >
-        <h2 class="text-lg sm:text-xl font-semibold mb-4">🔗 Integrations</h2>
-        <p class="text-sm text-indigo-200 mb-4">Connect your favorite platforms to sync tasks and reminders.</p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-          <button
-            v-for="i in integrationOptions"
-            :key="i.key"
-            @click="() => { i.selected = !i.selected; dirty = true }"
-            :class="[ 'flex flex-col items-center justify-center p-4 rounded-lg transition', i.selected ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-900/50 hover:bg-slate-800']"
-          >
-            <span class="text-2xl mb-2">{{ i.icon }}</span>
-            <span class="text-sm">{{ i.name }}</span>
-          </button>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
-          <!-- GPT integration card -->
           <div
-            ref="gptCardRef"
-            :class="[
-              'integration-card rounded-lg border border-white/10 bg-slate-900/40 p-4 space-y-4 transition',
-              highlightGpt ? 'ring-2 ring-indigo-400 shadow-lg shadow-indigo-500/20' : ''
-            ]"
+            v-if="emailNeedsReauth"
+            class="mb-4 text-xs text-yellow-300 bg-yellow-400/10 border border-yellow-300/30 rounded px-3 py-2 flex items-center justify-between gap-3"
           >
-            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div class="min-w-0">
-                <div class="font-semibold flex items-center gap-2">
-                  🤖 PlanCraft GPT
-                  <span class="text-[10px] px-2 py-0.5 rounded bg-indigo-500/30 text-indigo-100 uppercase tracking-wide">Beta</span>
-                </div>
-                <p class="text-xs text-slate-300 mt-1">
-                  Generate a short-lived link code and paste it inside ChatGPT to connect the PlanCraft GPT Actions.
-                </p>
-                <p v-if="gptLink.expiresAt" class="text-[11px] text-slate-400">
-                  {{ gptLinkExpired ? 'Expired' : 'Expires' }} {{ gptLinkExpiryLabel }}
-                </p>
-              </div>
-              <div class="flex items-center gap-2 flex-wrap">
-                <button
-                  class="px-3 py-1.5 rounded bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm disabled:opacity-60"
-                  :disabled="gptLink.loading || !authStore.user"
-                  @click="generateGptCode"
-                >
-                  {{ gptLink.loading ? 'Generating…' : gptLink.code ? 'Refresh Code' : 'Generate Code' }}
-                </button>
-                <button
-                  v-if="gptLink.code"
-                  class="px-3 py-1.5 rounded border border-indigo-500/50 text-indigo-100 hover:bg-indigo-500/10 text-sm disabled:opacity-40"
-                  :disabled="gptLink.copied"
-                  @click="copyGptCode"
-                >
-                  {{ gptLink.copied ? 'Copied!' : 'Copy Code' }}
-                </button>
-                <button
-                  v-if="gptLink.code && gptLaunchUrl"
-                  class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-sm text-white flex items-center gap-1"
-                  @click="openChatGpt"
-                >
-                  Open ChatGPT ↗
-                </button>
-              </div>
-            </div>
-            <div v-if="gptLink.code" class="rounded-lg border border-indigo-500/30 bg-slate-950/50 p-4 space-y-3">
-              <div>
-                <p class="text-xs text-slate-400 uppercase tracking-[0.2em]">Link Code</p>
-                <p class="text-3xl font-mono tracking-[0.25em] text-white break-all">{{ gptLink.code }}</p>
-              </div>
-              <ul class="list-decimal list-inside text-xs text-slate-300 space-y-1">
-                <li>Open ChatGPT and launch the PlanCraft AI GPT.</li>
-                <li>Say “Link my account” and paste this code when prompted.</li>
-                <li>Approve the connection to sync tasks, reminders, and journal entries.</li>
-              </ul>
-              <a :href="gptHelpUrl" target="_blank" rel="noreferrer" class="text-indigo-300 text-xs inline-flex items-center gap-1 hover:text-indigo-200">
-                Need help? <span aria-hidden="true">↗</span>
-              </a>
-            </div>
-            <p v-else class="text-xs text-slate-400">
-              Codes expire after a few minutes. Generate a fresh one whenever you want to connect ChatGPT.
-            </p>
-            <p v-if="gptLink.error" class="text-xs text-red-300">⚠️ {{ gptLink.error }}</p>
+            <span> Changing your email requires a recent login. Re-authenticate to continue. </span>
+            <el-button size="small" type="primary" @click="reauthenticate"
+              >Re-authenticate</el-button
+            >
+          </div>
+          <div class="flex items-center justify-end gap-3 mb-6">
+            <el-button
+              type="primary"
+              class="bg-gradient-to-r from-indigo-600 to-purple-600"
+              :loading="profileSaving"
+              @click="saveProfile"
+              >Save Changes</el-button
+            >
           </div>
 
-          <!-- Google Calendar Card -->
-          <div class="integration-card rounded-lg border border-white/10 bg-slate-900/40 p-4 space-y-3">
-            <div v-if="googleLoading" class="space-y-4 animate-pulse">
-              <div class="h-5 w-40 bg-slate-800/60 rounded"></div>
-              <div class="h-4 w-3/4 bg-slate-800/40 rounded"></div>
-              <div class="h-10 bg-slate-800/50 rounded"></div>
-            </div>
-            <template v-else>
-            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div class="font-semibold flex items-center gap-2">📆 Google Calendar
-                  <span v-if="google.enabled" :class="['text-xs px-2 py-0.5 rounded', google.connected ? 'bg-emerald-700/50 text-emerald-200' : 'bg-yellow-700/40 text-yellow-200']">
-                    {{ google.connected ? `${google.accounts.length} account${google.accounts.length > 1 ? 's' : ''} connected` : 'Not Connected' }}
-                  </span>
-                  <span v-else class="text-xs px-2 py-0.5 rounded bg-slate-700/50 text-slate-300">Disabled by server</span>
-                </div>
-                <p class="text-xs text-slate-300 mt-1">
-                  Import meetings and show Join links in your tasks.
-                  <span v-if="activeGoogleAccount?.lastRun">Last sync: {{ formatGoogleLastSync(activeGoogleAccount.lastRun) }}</span>
-                </p>
-              </div>
-              <div class="flex items-center gap-2 flex-wrap">
-                <button
-                  v-if="google.enabled && authStore.user"
-                  @click="connectGoogle"
-                  :disabled="googleLoading"
-                  class="px-3 py-1.5 rounded bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm disabled:opacity-50"
-                >
-                  {{ google.connected ? 'Add account' : 'Connect' }}
-                </button>
-                <button
-                  v-if="google.connected && activeGoogleAccount"
-                  @click="syncNow"
-                  :disabled="activeGoogleAccount.syncing"
-                  class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-sm flex items-center gap-2 disabled:opacity-60"
-                >
-                  <span
-                    v-if="activeGoogleAccount.syncing"
-                    class="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin"
-                    aria-hidden="true"
-                  ></span>
-                  <span>{{ activeGoogleAccount.syncing ? 'Syncing…' : 'Sync Now' }}</span>
-                </button>
-                <button
-                  v-if="google.connected && activeGoogleAccount"
-                  @click="disconnectGoogle(activeGoogleAccount.accountId)"
-                  class="px-3 py-1.5 rounded bg-red-700/80 hover:bg-red-700 text-sm"
-                >
-                  Disconnect
-                </button>
-              </div>
-            </div>
-
-            <div v-if="google.connected && google.accounts.length" class="mt-3 flex items-center gap-3 flex-wrap">
-              <label class="text-sm text-slate-300">Active account:</label>
-              <select
-                :value="activeGoogleAccountId"
-                @change="(e) => setActiveGoogleAccount(e.target.value)"
-                class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm"
-              >
-                <option v-for="acc in google.accounts" :key="acc.accountId" :value="acc.accountId">
-                  {{ acc.accountEmail || acc.accountId }} {{ acc.primary ? '(primary)' : '' }}
-                </option>
-              </select>
-              <span v-if="activeGoogleAccount?.status" class="text-xs text-slate-400">Status: {{ activeGoogleAccount.status }}</span>
-              <span v-if="activeGoogleAccount?.lastRun" class="text-xs text-slate-400">Last sync: {{ formatGoogleLastSync(activeGoogleAccount.lastRun) }}</span>
-            </div>
-
-            <!-- Calendars selection -->
-            <div v-if="google.connected && activeGoogleAccount" class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <label v-for="cal in activeCalendars" :key="cal.id" class="flex items-center gap-2 bg-slate-800/40 border border-slate-700/40 rounded p-2">
-                <input type="checkbox" v-model="cal.selected" class="accent-indigo-500">
-                <div class="flex-1">
-                  <div class="text-sm">{{ cal.summary || cal.id }}</div>
-                  <div class="text-xs text-slate-400">{{ cal.timeZone || '—' }}</div>
-                </div>
-                <span v-if="cal.primary" class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-700/50">primary</span>
-              </label>
-            </div>
-
-            <!-- Window + save -->
-            <div v-if="google.connected && activeGoogleAccount" class="mt-3 flex items-center gap-3 flex-wrap">
-              <label class="text-sm text-slate-300">Look-ahead window:</label>
-              <select v-model.number="activeGoogleAccount.windowDays" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm">
-                <option :value="7">7 days</option>
-                <option :value="14">14 days</option>
-                <option :value="30">30 days</option>
-                <option :value="60">60 days</option>
-              </select>
-              <button @click="saveSelection" class="px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-sm">Save Selection</button>
-              <span v-if="activeGoogleAccount.status" class="text-xs text-slate-400">Status: {{ activeGoogleAccount.status }}</span>
-            </div>
-
-              <div v-if="google.enabled" class="pt-3 border-t border-white/5 space-y-3">
-                <label class="flex items-center gap-3 text-sm text-slate-200">
-                  <input type="checkbox" v-model="meetingPrefs.autoCreate" @change="markDirty" class="accent-indigo-500" />
-                  Auto-create tasks from calendar events
-                </label>
-                <div class="flex items-center gap-2 text-sm text-slate-200 flex-wrap">
-                  <span>Default meeting reminder:</span>
-                  <select
-                    v-model.number="meetingPrefs.defaultReminderMinutes"
-                    @change="markDirty"
-                    class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm"
-                  >
-                    <option :value="5">5 minutes</option>
-                    <option :value="10">10 minutes</option>
-                    <option :value="15">15 minutes</option>
-                    <option :value="30">30 minutes</option>
-                    <option :value="60">1 hour</option>
-                  </select>
-                  <span class="text-xs text-slate-400">Adjust reminder lead time for meetings.</span>
-                </div>
-              </div>
-            </template>
+          <div class="flex flex-col sm:flex-row gap-3 justify-center items-center w-full">
+            <RouterLink
+              to="/help"
+              class="px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base rounded-lg bg-gray-800 hover:bg-gray-700 transition"
+              >💬 Help & Feedback</RouterLink
+            >
+            <button
+              class="px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base rounded-lg bg-red-600 hover:bg-red-700 transition"
+              @click="handleLogout"
+            >
+              Logout
+            </button>
           </div>
-        </div>
-      </section>
-
-      <!-- Account -->
-      <section v-if="activeTab === 'account-profile'" class="settings-panel">
-        <h2 class="text-lg sm:text-xl font-semibold mb-4">👤 Account</h2>
-        <div class="grid grid-cols-1 xl:grid-cols-[0.92fr,1.08fr] gap-4 mb-6">
-          <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-4 space-y-4">
-            <div>
-              <p class="text-xs uppercase tracking-[0.24em] text-slate-300">Legal</p>
-              <h3 class="text-lg font-semibold text-white">Terms, privacy, and deletion policy</h3>
-              <p class="text-sm text-indigo-100/80 mt-1">
-                Keep the App Store-required documents one tap away inside the app.
-              </p>
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <button
-                type="button"
-                class="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-left text-white hover:border-indigo-300/40 hover:bg-slate-900"
-                @click="openLegalDoc('/terms')"
-              >
-                Terms of Use
-              </button>
-              <button
-                type="button"
-                class="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-left text-white hover:border-indigo-300/40 hover:bg-slate-900"
-                @click="openLegalDoc('/privacy')"
-              >
-                Privacy Policy
-              </button>
-              <button
-                type="button"
-                class="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-left text-white hover:border-indigo-300/40 hover:bg-slate-900"
-                @click="openLegalDoc('/delete-account')"
-              >
-                Deletion Policy
-              </button>
-            </div>
-          </div>
-
-          <div class="rounded-2xl border border-red-400/25 bg-red-500/10 p-4 space-y-4">
-            <div>
-              <p class="text-xs uppercase tracking-[0.24em] text-red-200/80">Danger Zone</p>
-              <h3 class="text-lg font-semibold text-white">Delete account</h3>
-              <p class="text-sm text-red-100/85 mt-1">
-                Permanently removes your account, tasks, reminders, journal entries, and synced integrations.
-              </p>
-            </div>
-            <div class="rounded-xl border border-red-300/20 bg-slate-950/30 px-4 py-3 text-sm text-red-50/90 space-y-1">
-              <p>Your data is deleted, not just deactivated.</p>
-              <p>Shared workspace access is removed automatically before the account is deleted.</p>
-            </div>
-            <div class="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                class="inline-flex items-center justify-center rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60"
-                :disabled="deleteAccountLoading"
-                @click="deleteAccountConfirmOpen = true"
-              >
-                Delete Account
-              </button>
-              <p class="text-xs text-red-100/75">
-                This action is permanent.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div class="profile-identity mb-4">
-          <AvatarUploader
-            :url="authStore.user?.photoURL || authStore.user?.avatarUrl"
-            :name="profileForm.name || authStore.user?.displayName || authStore.user?.name"
-            :email="profileForm.email || authStore.user?.email"
-            class="profile-identity-uploader"
-            @updated="onAvatarUpdated"
-          />
-          <div class="profile-identity-copy">
-            <p class="font-medium">{{ profileForm.name || authStore.user?.displayName || 'Guest User' }}</p>
-            <p class="text-sm text-indigo-300">{{ profileForm.email || authStore.user?.email }}</p>
-          </div>
-        </div>
-
-        <div v-if="!profileComplete" class="mb-3 text-yellow-300 text-sm">
-          ⚠️ Your profile is incomplete — add your name to personalize your experience.
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
-          <el-input v-model="profileForm.name" placeholder="Your name" clearable />
-          <el-input v-model="profileForm.email" placeholder="Email (optional)" type="email" clearable />
-          <el-input v-model="profileForm.phone" placeholder="Phone (optional)" type="tel" clearable />
-        </div>
-        <div v-if="emailNeedsReauth" class="mb-4 text-xs text-yellow-300 bg-yellow-400/10 border border-yellow-300/30 rounded px-3 py-2 flex items-center justify-between gap-3">
-          <span>
-            Changing your email requires a recent login. Re-authenticate to continue.
-          </span>
-          <el-button size="small" type="primary" @click="reauthenticate">Re-authenticate</el-button>
-        </div>
-        <div class="flex items-center justify-end gap-3 mb-6">
-          <el-button type="primary" class="bg-gradient-to-r from-indigo-600 to-purple-600" :loading="profileSaving" @click="saveProfile">Save Changes</el-button>
-        </div>
-
-        <div class="flex flex-col sm:flex-row gap-3 justify-center items-center w-full">
-          <RouterLink to="/help" class="px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base rounded-lg bg-gray-800 hover:bg-gray-700 transition">💬 Help & Feedback</RouterLink>
-          <button class="px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base rounded-lg bg-red-600 hover:bg-red-700 transition" @click="handleLogout">Logout</button>
-        </div>
-      </section>
-    </div>
+        </section>
+      </div>
     </main>
   </div>
-  <PlanSummaryModal :open="planOpen" @close="planOpen=false" />
+  <PlanSummaryModal :open="planOpen" @close="planOpen = false" />
   <div
     v-if="activeTab === 'account-notifications' && isMobileSettingsView && dirty"
     class="fixed inset-x-0 bottom-0 z-[60] border-t border-white/10 bg-slate-950/90 px-4 py-3 backdrop-blur"
   >
-    <el-button type="primary" @click="saveSettings" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600">
+    <el-button
+      type="primary"
+      @click="saveSettings"
+      class="w-full bg-gradient-to-r from-indigo-600 to-purple-600"
+    >
       💾 Save Settings
     </el-button>
   </div>
@@ -928,12 +1278,16 @@
     <div v-if="reauthStep === 0" class="space-y-3">
       <p class="text-sm text-slate-300">Choose a method to verify your identity.</p>
       <el-radio-group v-model="reauthMethod" class="flex flex-col gap-2">
-        <el-radio v-if="reauthHasGoogle && !isNativePackagedApp()" label="google">Google Popup</el-radio>
+        <el-radio v-if="reauthHasGoogle && !isNativePackagedApp()" label="google"
+          >Google Popup</el-radio
+        >
         <el-radio v-if="reauthHasPhone" label="phone">Phone ({{ maskedPhone }})</el-radio>
       </el-radio-group>
       <div class="flex justify-end gap-2 pt-2">
-        <el-button @click="reauthOpen=false">Cancel</el-button>
-        <el-button type="primary" :disabled="!reauthMethod" @click="startReauth">Continue</el-button>
+        <el-button @click="reauthOpen = false">Cancel</el-button>
+        <el-button type="primary" :disabled="!reauthMethod" @click="startReauth"
+          >Continue</el-button
+        >
       </div>
     </div>
     <div v-else-if="reauthMethod === 'phone'" class="space-y-3">
@@ -942,8 +1296,15 @@
       <div class="text-xs text-slate-400 flex items-center justify-between">
         <span>Didn't receive the code?</span>
         <div class="flex items-center gap-1">
-          <el-tooltip effect="dark" placement="top" :content="`You can request a new code every ${cooldownDefault}s. Multiple attempts may trigger a longer wait.`">
-            <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-slate-600/40 text-slate-200 cursor-help">i</span>
+          <el-tooltip
+            effect="dark"
+            placement="top"
+            :content="`You can request a new code every ${cooldownDefault}s. Multiple attempts may trigger a longer wait.`"
+          >
+            <span
+              class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-slate-600/40 text-slate-200 cursor-help"
+              >i</span
+            >
           </el-tooltip>
           <el-button
             link
@@ -959,7 +1320,7 @@
       <div class="flex justify-between items-center">
         <el-button link type="primary" @click="resetReauth">Use different method</el-button>
         <div class="flex gap-2">
-          <el-button @click="reauthOpen=false">Cancel</el-button>
+          <el-button @click="reauthOpen = false">Cancel</el-button>
           <el-button type="primary" :loading="reauthLoading" @click="verifyOtp">Verify</el-button>
         </div>
       </div>
@@ -969,8 +1330,10 @@
       <div class="flex justify-between items-center">
         <el-button link type="primary" @click="resetReauth">Use different method</el-button>
         <div class="flex gap-2">
-          <el-button @click="reauthOpen=false">Cancel</el-button>
-          <el-button type="primary" :loading="reauthLoading" @click="doGoogleReauth">Continue</el-button>
+          <el-button @click="reauthOpen = false">Cancel</el-button>
+          <el-button type="primary" :loading="reauthLoading" @click="doGoogleReauth"
+            >Continue</el-button
+          >
         </div>
       </div>
     </div>
@@ -987,15 +1350,21 @@
       <p class="text-sm text-slate-700">
         Are you sure? This permanently deletes your account and signs you out of PlanCraft AI.
       </p>
-      <div class="rounded-xl border border-red-300/40 bg-red-50 px-4 py-3 text-sm text-red-900 space-y-1">
+      <div
+        class="rounded-xl border border-red-300/40 bg-red-50 px-4 py-3 text-sm text-red-900 space-y-1"
+      >
         <p>This will permanently delete:</p>
         <p>- Your account data</p>
         <p>- Your tasks, reminders, and journal entries</p>
         <p>- Your connected integrations and synced access</p>
       </div>
       <div class="flex justify-end gap-2 pt-2">
-        <el-button :disabled="deleteAccountLoading" @click="deleteAccountConfirmOpen = false">Cancel</el-button>
-        <el-button type="danger" :loading="deleteAccountLoading" @click="confirmDeleteAccount">Delete</el-button>
+        <el-button :disabled="deleteAccountLoading" @click="deleteAccountConfirmOpen = false"
+          >Cancel</el-button
+        >
+        <el-button type="danger" :loading="deleteAccountLoading" @click="confirmDeleteAccount"
+          >Delete</el-button
+        >
       </div>
     </div>
   </el-dialog>
@@ -1009,53 +1378,92 @@
     :close-on-press-escape="false"
   >
     <div class="space-y-4">
-      <p class="text-sm text-slate-700">
-        Your account has been deleted.
-      </p>
-      <p class="text-sm text-slate-500">
-        You are being signed out now.
-      </p>
+      <p class="text-sm text-slate-700">Your account has been deleted.</p>
+      <p class="text-sm text-slate-500">You are being signed out now.</p>
       <div class="flex justify-end">
         <el-button type="primary" @click="finalizeDeletedAccount">Continue</el-button>
       </div>
     </div>
   </el-dialog>
   <!-- Hidden container for re-auth phone reCAPTCHA -->
-  <div id="reauth-recaptcha" style="position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;overflow:hidden" />
+  <div
+    id="reauth-recaptcha"
+    style="
+      position: absolute;
+      left: -9999px;
+      top: -9999px;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+    "
+  />
 </template>
 <script setup>
-import { reactive, ref, onMounted, computed, watch, onBeforeUnmount, nextTick } from "vue"
-import { useAuthStore } from "@/stores/authStore"
-import { useRouter, useRoute } from "vue-router"
-import { ElMessage } from "element-plus"
+import { reactive, ref, onMounted, computed, watch, onBeforeUnmount, nextTick } from 'vue'
+import { useAuthStore } from '@/stores/authStore'
+import { useRouter, useRoute } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { normalizePhone, guessCountryFromLocale } from '@/utils/phoneUtils'
-import { getGoogleStatus, getGoogleCalendars, saveGoogleCalendarSelection, triggerGoogleSyncNow, requestGoogleConnectUrl, disconnectGoogleIntegration } from '@/stores/integrationsStore'
-import { getPreferences as apiGetPrefs, updatePreferences as apiUpdatePrefs, getIntegrations, updateIntegrations, getProfile as getSettingsProfile, updateProfile as updateSettingsProfile, sendTestMorningCall as apiSendTestMorningCall } from "@/services/settingsService"
+import {
+  getGoogleStatus,
+  getGoogleCalendars,
+  saveGoogleCalendarSelection,
+  triggerGoogleSyncNow,
+  requestGoogleConnectUrl,
+  disconnectGoogleIntegration,
+} from '@/stores/integrationsStore'
+import {
+  getPreferences as apiGetPrefs,
+  updatePreferences as apiUpdatePrefs,
+  getIntegrations,
+  updateIntegrations,
+  getProfile as getSettingsProfile,
+  updateProfile as updateSettingsProfile,
+  sendTestMorningCall as apiSendTestMorningCall,
+} from '@/services/settingsService'
 import { sendActionInboxDigest } from '@/services/actionInboxService'
 import { createGptLinkCode } from '@/services/gptService'
 import SocialIntegrationPanel from '@/components/settings/SocialIntegrationPanel.vue'
-import { subscribeUserToPush } from "@/services/pwaService"
-import { getNativeReminderPermissionStatus, requestNativeReminderPermissions, syncNativeReminderQueueNow } from '@/services/nativeReminderService'
+import { subscribeUserToPush } from '@/services/pwaService'
+import {
+  getNativeReminderPermissionStatus,
+  requestNativeReminderPermissions,
+  syncNativeReminderQueueNow,
+} from '@/services/nativeReminderService'
 import { useAccessStore } from '@/stores/accessStore'
-import { useSubscriptionStore } from "@/stores/subscriptionStore"
-import { resolvePlanKey } from "@/services/planService"
-import PlanSummaryModal from "@/components/PlanSummaryModal.vue"
-import KnowledgePanel from "@/components/KnowledgePanel.vue"
-import ProposalInbox from "@/components/ProposalInbox.vue"
-import { useIsPremium } from "@/composables/useIsPremium"
+import { useSubscriptionStore } from '@/stores/subscriptionStore'
+import { resolvePlanKey } from '@/services/planService'
+import PlanSummaryModal from '@/components/PlanSummaryModal.vue'
+import KnowledgePanel from '@/components/KnowledgePanel.vue'
+import ProposalInbox from '@/components/ProposalInbox.vue'
+import { useIsPremium } from '@/composables/useIsPremium'
 import {
   trackCalendarConnected,
   trackCalendarConnectStarted,
   trackFirstReminderChannelSaved,
 } from '@/services/analytics'
 import { trackLinkedInConversion } from '@/utils/ads'
-import { getAuth, updateProfile as updateFirebaseProfile, updateEmail, GoogleAuthProvider, reauthenticateWithPopup, RecaptchaVerifier, PhoneAuthProvider, reauthenticateWithCredential } from 'firebase/auth'
+import {
+  getAuth,
+  updateProfile as updateFirebaseProfile,
+  updateEmail,
+  GoogleAuthProvider,
+  reauthenticateWithPopup,
+  RecaptchaVerifier,
+  PhoneAuthProvider,
+  reauthenticateWithCredential,
+} from 'firebase/auth'
 import AvatarUploader from '@/components/AvatarUploader.vue'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { useQuickSetupStore } from '@/stores/quickSetupStore'
 import { getNativeAuthRestriction, isNativePackagedApp } from '@/utils/nativeAuthSupport'
 import { isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
 import { copyText, openExternalUrl } from '@/utils/nativeUi'
+import {
+  NOTIFICATION_SOUND_OPTIONS,
+  normalizeNotificationSound,
+  playNotificationSoundPreview,
+} from '@/utils/notificationSound'
 import { deleteAccount as requestAccountDeletion } from '@/services/accountService'
 import {
   buildQuickSetupState,
@@ -1086,6 +1494,11 @@ const notificationEnableHelp = computed(() =>
     ? 'Shows local due-time reminders directly on this iPhone or Android device.'
     : 'Register this browser for instant reminder banners in the web/PWA app.',
 )
+const notificationSoundHelp = computed(() =>
+  isNativePackagedApp()
+    ? 'Used by device reminders and native push on this phone.'
+    : 'Saved for device reminders and native push when the app runs natively.',
+)
 const settingsViewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1280)
 const isMobileSettingsView = computed(() => settingsViewportWidth.value < 768)
 const showSettingsHero = ref(!isMobileSettingsView.value)
@@ -1103,12 +1516,14 @@ const teamWorkspaces = computed(() =>
 )
 const activeTeamWorkspace = computed(() => {
   const active = workspaceStore.activeWorkspace
-  if (active && ((active.workspaceType || active.type) === 'team')) return active
+  if (active && (active.workspaceType || active.type) === 'team') return active
   return teamWorkspaces.value[0] || null
 })
 
 function normalizeTab(tab) {
-  const t = String(tab || '').trim().toLowerCase()
+  const t = String(tab || '')
+    .trim()
+    .toLowerCase()
   if (!t) return ''
   const alias = {
     notifications: 'account-notifications',
@@ -1243,9 +1658,15 @@ const highlightNotifications = ref(false)
 
 function focusNotifications() {
   nextTick(() => {
-    try { notificationsSection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }) } catch { /* noop */ }
+    try {
+      notificationsSection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    } catch {
+      /* noop */
+    }
     highlightNotifications.value = true
-    setTimeout(() => { highlightNotifications.value = false }, 1600)
+    setTimeout(() => {
+      highlightNotifications.value = false
+    }, 1600)
   })
 }
 
@@ -1294,14 +1715,24 @@ let reauthRecaptcha = null
 async function ensureReauthRecaptcha(force = false) {
   try {
     if (force && reauthRecaptcha) {
-      try { reauthRecaptcha.clear() } catch { /* noop */ }
+      try {
+        reauthRecaptcha.clear()
+      } catch {
+        /* noop */
+      }
       reauthRecaptcha = null
     }
     if (!reauthRecaptcha) {
       reauthRecaptcha = new RecaptchaVerifier(auth, 'reauth-recaptcha', { size: 'invisible' })
-      try { await reauthRecaptcha.render() } catch { /* noop */ }
+      try {
+        await reauthRecaptcha.render()
+      } catch {
+        /* noop */
+      }
     }
-  } catch { /* noop */ }
+  } catch {
+    /* noop */
+  }
   return reauthRecaptcha
 }
 
@@ -1318,6 +1749,7 @@ const cooldownDefault = getCooldownSeconds()
 const prefs = reactive({
   email: true,
   pwa: canUseBrowserPush.value,
+  sound: 'default',
   whatsapp: true,
   sms: false,
   voice_call: false,
@@ -1330,6 +1762,7 @@ const morningCoach = reactive({
   customMessage: '',
 })
 const morningCallTesting = ref(false)
+const soundPreviewing = ref(false)
 
 const actionInboxNudges = reactive({
   enabled: true,
@@ -1376,7 +1809,7 @@ function applySettingsPreferences(res = {}) {
     const set = new Set(chans)
     prefs.email = set.has('email') || !!n.email || true
     const storedPwaEnabled = set.has('pwa') || !!n.push || !!n.pwa
-    prefs.pwa = canUseBrowserPush.value ? (storedPwaEnabled || true) : storedPwaEnabled
+    prefs.pwa = canUseBrowserPush.value ? storedPwaEnabled || true : storedPwaEnabled
     prefs.whatsapp = set.has('whatsapp') || !!n.whatsapp || true
     prefs.sms = set.has('sms') || !!n.sms || false
     prefs.voice_call = set.has('voice_call') || !!n.voice_call || false
@@ -1390,24 +1823,37 @@ function applySettingsPreferences(res = {}) {
   }
   prefs.discord = !!n.discord
   prefs.calls = !!(n.calls || prefs.sms || prefs.voice_call)
+  prefs.sound = normalizeNotificationSound(
+    n.sound || n.notificationSound || res?.reminders?.sound || 'default',
+  )
 
   notifPhones.value = { sms: n.phone_sms || '', voice: n.phone_voice || '' }
-  integrationOptions.forEach((i) => { i.selected = !!ints[i.key] })
+  integrationOptions.forEach((i) => {
+    i.selected = !!ints[i.key]
+  })
 
   const meetingsPref = res?.meetings || {}
   meetingPrefs.autoCreate = meetingsPref.autoCreateCalendarTasks !== false
   meetingPrefs.defaultReminderMinutes = sanitizeReminderMinutes(
-    meetingsPref.defaultReminderMinutes ?? meetingsPref.defaultMeetingReminderMinutes ?? DEFAULT_MEETING_REMINDER,
+    meetingsPref.defaultReminderMinutes ??
+      meetingsPref.defaultMeetingReminderMinutes ??
+      DEFAULT_MEETING_REMINDER,
   )
 
   const actionInboxPref = n?.actionInboxNudges || res?.actionInboxNudges || {}
   actionInboxNudges.enabled = actionInboxPref?.enabled !== false
-  actionInboxNudges.urgency = actionInboxPref?.urgency === 'urgent_only' ? 'urgent_only' : 'important'
-  actionInboxNudges.maxPerSuggestion = sanitizeActionInboxNudgeCount(actionInboxPref?.maxPerSuggestion)
-  actionInboxNudges.dailyDigest = actionInboxPref?.dailyDigest !== false && actionInboxPref?.daily_digest !== false
+  actionInboxNudges.urgency =
+    actionInboxPref?.urgency === 'urgent_only' ? 'urgent_only' : 'important'
+  actionInboxNudges.maxPerSuggestion = sanitizeActionInboxNudgeCount(
+    actionInboxPref?.maxPerSuggestion,
+  )
+  actionInboxNudges.dailyDigest =
+    actionInboxPref?.dailyDigest !== false && actionInboxPref?.daily_digest !== false
   const incomingChannels = normalizeQuickSetupChannels(
     Array.isArray(actionInboxPref?.channels)
-      ? actionInboxPref.channels.filter((channel) => ACTION_INBOX_ALLOWED_CHANNELS.includes(String(channel || '').toLowerCase()))
+      ? actionInboxPref.channels.filter((channel) =>
+          ACTION_INBOX_ALLOWED_CHANNELS.includes(String(channel || '').toLowerCase()),
+        )
       : deriveDefaultActionInboxNudgeChannels(),
   )
   actionInboxNudges.channels = incomingChannels.length
@@ -1420,8 +1866,9 @@ function applySettingsPreferences(res = {}) {
       : null
   const incomingDigestChannels = normalizeQuickSetupChannels(
     Array.isArray(rawDigestChannels)
-      ? rawDigestChannels
-          .filter((channel) => ACTION_INBOX_ALLOWED_CHANNELS.includes(String(channel || '').toLowerCase()))
+      ? rawDigestChannels.filter((channel) =>
+          ACTION_INBOX_ALLOWED_CHANNELS.includes(String(channel || '').toLowerCase()),
+        )
       : deriveDefaultActionInboxDigestChannels(),
   )
   actionInboxNudges.digestChannels = incomingDigestChannels.length
@@ -1433,10 +1880,25 @@ function applySettingsPreferences(res = {}) {
 
   const morningPrefs = res?.morningCoach || {}
   morningCoach.enabled = morningPrefs?.enabled !== false
-  morningCoach.firstCallTime = typeof morningPrefs?.firstCallTime === 'string' && /^\d{2}:\d{2}$/.test(morningPrefs.firstCallTime)
-    ? morningPrefs.firstCallTime
-    : '09:00'
-  morningCoach.customMessage = typeof morningPrefs?.customMessage === 'string' ? morningPrefs.customMessage : ''
+  morningCoach.firstCallTime =
+    typeof morningPrefs?.firstCallTime === 'string' &&
+    /^\d{2}:\d{2}$/.test(morningPrefs.firstCallTime)
+      ? morningPrefs.firstCallTime
+      : '09:00'
+  morningCoach.customMessage =
+    typeof morningPrefs?.customMessage === 'string' ? morningPrefs.customMessage : ''
+}
+
+async function previewNotificationSound() {
+  try {
+    soundPreviewing.value = true
+    await playNotificationSoundPreview(prefs.sound)
+  } catch (error) {
+    console.warn('[Settings] sound preview failed', error?.message || error)
+    ElMessage.error(error?.message || 'Audio preview is not available.')
+  } finally {
+    soundPreviewing.value = false
+  }
 }
 
 function applyIntegrationEndpoints(resInts = {}) {
@@ -1445,7 +1907,7 @@ function applyIntegrationEndpoints(resInts = {}) {
     sms: { phone: resInts?.sms?.phone || '' },
     discord: { webhook: resInts?.discord?.webhook || '' },
     slack: { userId: resInts?.slack?.userId || '', token: resInts?.slack?.token || '' },
-    email: resInts?.email || authStore.user?.email || ''
+    email: resInts?.email || authStore.user?.email || '',
   }
 }
 
@@ -1477,11 +1939,7 @@ function deriveQuickSetupPhone() {
     profileForm.phone,
     authStore.user?.phone,
   ]
-  return (
-    candidates
-      .map((value) => String(value || '').trim())
-      .find(Boolean) || ''
-  )
+  return candidates.map((value) => String(value || '').trim()).find(Boolean) || ''
 }
 
 function deriveQuickSetupChannels() {
@@ -1517,7 +1975,8 @@ function sanitizeActionInboxNudgeCount(value) {
 }
 
 async function sendTestActionInboxDigest() {
-  const workspaceId = workspaceStore.activeWorkspaceId || localStorage.getItem('activeWorkspaceId') || null
+  const workspaceId =
+    workspaceStore.activeWorkspaceId || localStorage.getItem('activeWorkspaceId') || null
   if (!workspaceId) {
     ElMessage.warning('Select a workspace before sending a digest test.')
     return
@@ -1574,7 +2033,11 @@ async function hydrateSettingsForUser(uid) {
   if (!uid || settingsLoadInFlight.value) return
   settingsLoadInFlight.value = true
   try {
-    try { workspaceStore.init?.() } catch { /* noop */ }
+    try {
+      workspaceStore.init?.()
+    } catch {
+      /* noop */
+    }
 
     const prefRes = await apiGetPrefs(uid).catch((error) => {
       console.warn('[Settings] preferences load failed', error?.message || error)
@@ -1621,7 +2084,11 @@ onMounted(async () => {
     syncSettingsViewport()
     window.addEventListener('resize', syncSettingsViewport, { passive: true })
     // Ensure latest subscription state on entry
-    try { await refreshPremium() } catch { /* noop */ }
+    try {
+      await refreshPremium()
+    } catch {
+      /* noop */
+    }
     quickSetupStore.refreshQuickSetupState()
     try {
       if (activeTab.value === 'account-notifications') {
@@ -1630,7 +2097,9 @@ onMounted(async () => {
       if (route?.query?.gpt !== undefined) {
         setTimeout(() => focusGptCard(true), 400)
       }
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
   } catch (e) {
     console.warn('Failed to load preferences', e)
   }
@@ -1676,7 +2145,6 @@ const gptLinkExpired = computed(() => {
   return dayjs(gptLink.expiresAt).valueOf() <= Date.now()
 })
 let gptCopyTimer = null
-
 
 async function generateGptCode() {
   if (!authStore.user?.uid) {
@@ -1729,7 +2197,9 @@ function focusGptCard(autoGenerate = false) {
   nextTick(() => {
     try {
       gptCardRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
   })
   setTimeout(() => {
     highlightGpt.value = false
@@ -1758,7 +2228,7 @@ const integrationEndpoints = ref({
   sms: { phone: '' },
   discord: { webhook: '' },
   slack: { userId: '', token: '' },
-  email: ''
+  email: '',
 })
 
 // Derived phone used by Twilio (mirrors backend resolution order)
@@ -1771,16 +2241,25 @@ const effectiveTwilioPhone = computed(() => {
     const waInt = (integrationEndpoints.value?.whatsapp?.phone || '').trim()
     const userPhone = (authStore?.user?.phone || '').trim()
     return smsPref || voicePref || smsInt || waInt || userPhone || ''
-  } catch { return '' }
+  } catch {
+    return ''
+  }
 })
 
 // Google Calendar integration state and handlers
 const google = reactive({ enabled: true, connected: false, status: '', accounts: [] })
 const googleLoading = ref(true)
-const meetingPrefs = reactive({ autoCreate: true, defaultReminderMinutes: DEFAULT_MEETING_REMINDER })
+const meetingPrefs = reactive({
+  autoCreate: true,
+  defaultReminderMinutes: DEFAULT_MEETING_REMINDER,
+})
 const activeGoogleAccountId = ref('')
 const activeGoogleAccount = computed(() => {
-  return google.accounts.find((a) => a.accountId === activeGoogleAccountId.value) || google.accounts[0] || null
+  return (
+    google.accounts.find((a) => a.accountId === activeGoogleAccountId.value) ||
+    google.accounts[0] ||
+    null
+  )
 })
 const activeCalendars = computed(() => activeGoogleAccount.value?.calendars || [])
 function buildGoogleAccountModel(acc = {}, primaryId = '') {
@@ -1788,7 +2267,12 @@ function buildGoogleAccountModel(acc = {}, primaryId = '') {
   const primaryCal = calendars.find((c) => c.primary)
   return {
     accountId: acc.accountId || acc.id || 'primary',
-    accountEmail: acc.accountEmail || acc.token?.email || primaryCal?.summary || primaryCal?.id || 'Google account',
+    accountEmail:
+      acc.accountEmail ||
+      acc.token?.email ||
+      primaryCal?.summary ||
+      primaryCal?.id ||
+      'Google account',
     connected: acc.connected !== false,
     calendars,
     windowDays: Number(acc?.sync?.windowDays || 30),
@@ -1802,7 +2286,11 @@ function buildGoogleAccountModel(acc = {}, primaryId = '') {
 }
 function formatGoogleLastSync(ts) {
   if (!ts) return null
-  try { return dayjs(ts).format('MMM D • hh:mm A') } catch { return ts }
+  try {
+    return dayjs(ts).format('MMM D • hh:mm A')
+  } catch {
+    return ts
+  }
 }
 async function connectGoogle() {
   try {
@@ -1894,10 +2382,13 @@ async function loadGoogle(options = {}) {
     const enabledFromServer = status?.integration?.enabled ?? status?.enabled
     const integration = status?.integration || status || {}
     google.enabled = enabledFromServer !== false
-    const rawAccounts = Array.isArray(integration.accounts) && integration.accounts.length
-      ? integration.accounts
-      : [{ ...integration, accountId: integration.primaryAccountId || 'primary' }]
-    google.accounts = rawAccounts.map((acc) => buildGoogleAccountModel(acc, integration.primaryAccountId))
+    const rawAccounts =
+      Array.isArray(integration.accounts) && integration.accounts.length
+        ? integration.accounts
+        : [{ ...integration, accountId: integration.primaryAccountId || 'primary' }]
+    google.accounts = rawAccounts.map((acc) =>
+      buildGoogleAccountModel(acc, integration.primaryAccountId),
+    )
     google.connected = google.accounts.some((a) => a.connected)
     const desiredId =
       options?.keepActive ||
@@ -1949,15 +2440,22 @@ watch(
         .map((channel) => String(channel || '').toLowerCase())
         .filter((channel) => ACTION_INBOX_ALLOWED_CHANNELS.includes(channel)),
     )
-    actionInboxNudges.digestChannels = normalized.length ? [...normalized] : deriveDefaultActionInboxDigestChannels()
+    actionInboxNudges.digestChannels = normalized.length
+      ? [...normalized]
+      : deriveDefaultActionInboxDigestChannels()
   },
 )
 
 async function saveSelection() {
   try {
     if (!authStore.user?.uid || !activeGoogleAccount.value) return
-    const selected = (activeCalendars.value || []).filter(c => c.selected).map(c => c.id)
-    await saveGoogleCalendarSelection(authStore.user.uid, selected, activeGoogleAccount.value.windowDays, activeGoogleAccount.value.accountId)
+    const selected = (activeCalendars.value || []).filter((c) => c.selected).map((c) => c.id)
+    await saveGoogleCalendarSelection(
+      authStore.user.uid,
+      selected,
+      activeGoogleAccount.value.windowDays,
+      activeGoogleAccount.value.accountId,
+    )
     ElMessage.success('Google calendar selection saved')
     await loadGoogleCalendars(activeGoogleAccount.value.accountId, { suppressLoader: true })
   } catch (e) {
@@ -1979,7 +2477,9 @@ async function syncNow() {
       if (stats.updated) summaryParts.push(`${stats.updated} updated`)
       if (cleared) summaryParts.push(`${cleared} cleared`)
       if (stats.skipped) summaryParts.push(`${stats.skipped} unchanged`)
-      const label = summaryParts.length ? `Synced ${summaryParts.join(', ')}` : 'Calendar sync completed'
+      const label = summaryParts.length
+        ? `Synced ${summaryParts.join(', ')}`
+        : 'Calendar sync completed'
       ElMessage.success(label)
       await loadGoogle({ suppressLoader: true, keepActive: acc.accountId })
     } else {
@@ -2011,7 +2511,7 @@ async function disconnectGoogle(accountId = null) {
 
 function handleLogout() {
   authStore.logout()
-  router.push("/login")
+  router.push('/login')
 }
 
 async function openLegalDoc(path) {
@@ -2070,15 +2570,23 @@ function goToTeamsPricing() {
 function handleTeamCta(plan = 'starter') {
   if (isAppleBillingSafeMode.value) {
     const workspace = activeTeamWorkspace.value
-    router.push({ path: '/billing/upgrade', query: { source: 'settings-team', plan, workspaceId: workspace?.id || '' } })
+    router.push({
+      path: '/billing/upgrade',
+      query: { source: 'settings-team', plan, workspaceId: workspace?.id || '' },
+    })
     return
   }
-  const isGuest = authStore.isGuest === true || authStore.guest === true || authStore.user?.mode === 'guest'
+  const isGuest =
+    authStore.isGuest === true || authStore.guest === true || authStore.user?.mode === 'guest'
   const target = plan === 'pro' ? '/workspaces/new?plan=pro' : '/workspaces/new'
   const workspace = activeTeamWorkspace.value
 
   if (!authStore.user?.uid || isGuest) {
-    try { localStorage.setItem('postLoginRedirect', target) } catch { /* noop */ }
+    try {
+      localStorage.setItem('postLoginRedirect', target)
+    } catch {
+      /* noop */
+    }
     router.push({ path: '/signup', query: { mode: 'team', next: target } })
     return
   }
@@ -2090,7 +2598,8 @@ function handleTeamCta(plan = 'starter') {
 
   const currentPlan = String(workspace.plan || 'free').toLowerCase()
   const needsUpgrade =
-    (plan === 'starter' && currentPlan === 'free') || (plan === 'pro' && !currentPlan.includes('pro'))
+    (plan === 'starter' && currentPlan === 'free') ||
+    (plan === 'pro' && !currentPlan.includes('pro'))
 
   if (needsUpgrade) {
     router.push({ path: '/billing/upgrade', query: { plan, workspaceId: workspace.id } })
@@ -2101,7 +2610,11 @@ function handleTeamCta(plan = 'starter') {
 }
 
 function upgradePlan() {
-  try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_UPGRADE_CLICK) } catch { /* noop */ }
+  try {
+    trackLinkedInConversion(import.meta.env.VITE_LI_CONV_UPGRADE_CLICK)
+  } catch {
+    /* noop */
+  }
   openSubscriptionPage() // redirect to subscription/pricing
 }
 
@@ -2113,11 +2626,15 @@ async function refreshBillingAccess() {
       await subStore.fetchStatus(uid, { force: true, minIntervalMs: 0 })
       await refreshPremium?.()
     }
-  } catch { /* noop */ }
+  } catch {
+    /* noop */
+  }
 
   try {
     await workspaceStore.init()
-  } catch { /* noop */ }
+  } catch {
+    /* noop */
+  }
 
   ElMessage.success('Account access refreshed')
 }
@@ -2134,7 +2651,9 @@ async function saveSettings() {
       const rawWa = integrationEndpoints.value?.whatsapp?.phone
       const normWa = normalizePhone(rawWa, cc)
       if (normWa) integrationEndpoints.value.whatsapp.phone = normWa
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
     const channels = []
     if (prefs.email) channels.push('email')
     if (prefs.pwa) channels.push('pwa')
@@ -2152,6 +2671,7 @@ async function saveSettings() {
     const notifications = {
       email: !!prefs.email,
       push: !!prefs.pwa,
+      sound: normalizeNotificationSound(prefs.sound),
       whatsapp: !!prefs.whatsapp,
       sms: !!prefs.sms,
       discord: !!prefs.discord,
@@ -2164,13 +2684,16 @@ async function saveSettings() {
         dailyDigest: !!actionInboxNudges.dailyDigest,
         urgency: actionInboxNudges.urgency === 'urgent_only' ? 'urgent_only' : 'important',
         maxPerSuggestion: sanitizeActionInboxNudgeCount(actionInboxNudges.maxPerSuggestion),
-        channels: actionInboxChannels.length ? actionInboxChannels : deriveDefaultActionInboxNudgeChannels(),
+        channels: actionInboxChannels.length
+          ? actionInboxChannels
+          : deriveDefaultActionInboxNudgeChannels(),
         digestChannels: actionInboxDigestChannels,
       },
     }
     const reminderDefaults = {
       enabled: channels.length > 0,
       channels,
+      sound: normalizeNotificationSound(prefs.sound),
     }
     const morningCoachPayload = {
       enabled: !!morningCoach.enabled,
@@ -2194,7 +2717,7 @@ async function saveSettings() {
       meetings: meetingSettingsPayload,
     })
     await updateIntegrations(authStore.user?.uid, integrationEndpoints.value)
-    console.log("Settings saved:", {
+    console.log('Settings saved:', {
       notifications,
       reminderDefaults,
       morningCoach: morningCoachPayload,
@@ -2203,7 +2726,8 @@ async function saveSettings() {
       integrationEndpoints: integrationEndpoints.value,
     })
     if (isNativePackagedApp()) {
-      const workspaceId = workspaceStore.activeWorkspaceId || localStorage.getItem('activeWorkspaceId') || null
+      const workspaceId =
+        workspaceStore.activeWorkspaceId || localStorage.getItem('activeWorkspaceId') || null
       await syncNativeReminderQueueNow({
         userId: authStore.user?.uid || null,
         workspaceId,
@@ -2211,7 +2735,9 @@ async function saveSettings() {
       })
       const permission = await getNativeReminderPermissionStatus()
       if (prefs.pwa && !permission.granted) {
-        ElMessage.warning('Device notifications are enabled in settings, but system notification permission is still blocked.')
+        ElMessage.warning(
+          'Device notifications are enabled in settings, but system notification permission is still blocked.',
+        )
       }
     }
     syncQuickSetupFromSettings()
@@ -2230,11 +2756,11 @@ async function saveSettings() {
     } catch (error) {
       console.warn('[Settings] reminder analytics failed', error?.message || error)
     }
-    ElMessage.success("✅ Settings saved successfully!")
+    ElMessage.success('✅ Settings saved successfully!')
     dirty.value = false // reset dirty flag
   } catch (error) {
-    console.error("Failed to save settings:", error)
-    ElMessage.error("❌ Failed to save settings. Please try again.")
+    console.error('Failed to save settings:', error)
+    ElMessage.error('❌ Failed to save settings. Please try again.')
   }
 }
 
@@ -2251,7 +2777,9 @@ async function sendTestMorningCallNow() {
     await apiSendTestMorningCall(uid, message)
     ElMessage.success('Test morning call sent.')
   } catch (error) {
-    ElMessage.error(error?.response?.data?.error || error?.message || 'Failed to send test morning call')
+    ElMessage.error(
+      error?.response?.data?.error || error?.message || 'Failed to send test morning call',
+    )
   } finally {
     morningCallTesting.value = false
   }
@@ -2262,7 +2790,9 @@ function onAvatarUpdated(url) {
     if (!url) return
     // reflect locally for instant UI update
     authStore.user = { ...(authStore.user || {}), photoURL: url, avatarUrl: url }
-  } catch { /* noop */ }
+  } catch {
+    /* noop */
+  }
 }
 
 async function saveProfile() {
@@ -2272,14 +2802,22 @@ async function saveProfile() {
   try {
     // Normalize phone before writing
     let phoneE164 = profileForm.phone || ''
-    try { phoneE164 = normalizePhone(phoneE164, guessCountryFromLocale()) } catch { /* noop */ }
+    try {
+      phoneE164 = normalizePhone(phoneE164, guessCountryFromLocale())
+    } catch {
+      /* noop */
+    }
     await updateSettingsProfile(u.uid, {
       name: profileForm.name || null,
       email: profileForm.email || null,
       phone: phoneE164 || null,
       profileComplete: !!(profileForm.name && profileForm.name.trim().length),
     })
-    try { await updateFirebaseProfile(u, { displayName: profileForm.name || '' }) } catch { /* noop */ }
+    try {
+      await updateFirebaseProfile(u, { displayName: profileForm.name || '' })
+    } catch {
+      /* noop */
+    }
     if (profileForm.email && profileForm.email !== u.email) {
       try {
         await updateEmail(u, profileForm.email)
@@ -2300,7 +2838,11 @@ async function saveProfile() {
       phone: phoneE164 || '',
     }
     integrationEndpoints.value.email = profileForm.email || authStore.user?.email || ''
-    try { localStorage.setItem('user', JSON.stringify(authStore.user)) } catch { /* noop */ }
+    try {
+      localStorage.setItem('user', JSON.stringify(authStore.user))
+    } catch {
+      /* noop */
+    }
     syncQuickSetupFromSettings()
     ElMessage.success('Profile updated successfully!')
   } catch (e) {
@@ -2314,7 +2856,7 @@ async function saveProfile() {
 function reauthenticate() {
   const u = auth.currentUser
   if (!u) return
-  const providers = (u.providerData || []).map(p => p.providerId)
+  const providers = (u.providerData || []).map((p) => p.providerId)
   reauthHasGoogle.value = providers.includes('google.com')
   reauthHasPhone.value = providers.includes('phone') && !!u.phoneNumber
   if (isNativePackagedApp() && reauthHasGoogle.value && !reauthHasPhone.value) {
@@ -2322,8 +2864,14 @@ function reauthenticate() {
     return
   }
   reauthMethod.value = isNativePackagedApp()
-    ? (reauthHasPhone.value ? 'phone' : '')
-    : (reauthHasGoogle.value && !reauthHasPhone.value ? 'google' : (!reauthHasGoogle.value && reauthHasPhone.value ? 'phone' : ''))
+    ? reauthHasPhone.value
+      ? 'phone'
+      : ''
+    : reauthHasGoogle.value && !reauthHasPhone.value
+      ? 'google'
+      : !reauthHasGoogle.value && reauthHasPhone.value
+        ? 'phone'
+        : ''
   reauthStep.value = 0
   otp.value = ''
   reauthVerificationId.value = ''
@@ -2387,7 +2935,8 @@ async function resendOtp() {
       return ElMessage.warning(`Please wait ${resendCooldown.value}s before requesting a new code`)
     }
     const since = Date.now() - lastOtpSentAt
-    if (since < 2000) { // prevent accidental double-clicks
+    if (since < 2000) {
+      // prevent accidental double-clicks
       return ElMessage.warning('Please wait a moment before retrying')
     }
     reauthLoading.value = true
@@ -2435,14 +2984,17 @@ function startResendCooldown(seconds = 10) {
   }, 1000)
 }
 
-watch(() => reauthOpen.value, (open) => {
-  if (!open) {
-    clearResendCooldown()
-    reauthStep.value = 0
-    otp.value = ''
-    reauthVerificationId.value = ''
-  }
-})
+watch(
+  () => reauthOpen.value,
+  (open) => {
+    if (!open) {
+      clearResendCooldown()
+      reauthStep.value = 0
+      otp.value = ''
+      reauthVerificationId.value = ''
+    }
+  },
+)
 
 watch(
   () => route.query?.gpt,
@@ -2518,14 +3070,19 @@ async function enablePush() {
     if (isNativePackagedApp()) {
       const permission = await requestNativeReminderPermissions()
       if (!permission.granted) {
-        throw new Error('Device notifications were not granted. Check iOS/Android notification settings and try again.')
+        throw new Error(
+          'Device notifications were not granted. Check iOS/Android notification settings and try again.',
+        )
       }
       prefs.pwa = true
       dirty.value = true
-      ElMessage.success('🔔 Device notifications enabled. Save settings to keep due reminders synced.')
+      ElMessage.success(
+        '🔔 Device notifications enabled. Save settings to keep due reminders synced.',
+      )
       return
     }
-    if (!canUseBrowserPush.value) throw new Error('Browser push is only available in the web/PWA app.')
+    if (!canUseBrowserPush.value)
+      throw new Error('Browser push is only available in the web/PWA app.')
     await subscribeUserToPush(authStore.user.uid)
     ElMessage.success('🔔 Push notifications enabled')
   } catch (e) {
@@ -2536,11 +3093,22 @@ async function enablePush() {
 
 // Plan gates
 // Use unified premium flag to control gates for a consistent UX
-const usageToday = computed(() => accessStore.access?.today || authStore.user?.usage?.today || { aiGenerations: 0, reminders: 0 })
+const usageToday = computed(
+  () =>
+    accessStore.access?.today || authStore.user?.usage?.today || { aiGenerations: 0, reminders: 0 },
+)
 const aiUsed = computed(() => Number(usageToday.value.aiGenerations || 0))
 const remindersUsed = computed(() => Number(usageToday.value.reminders || 0))
-const aiLimitLabel = computed(() => (accessStore.access?.limits?.aiGenerations == null ? '∞' : accessStore.access?.limits?.aiGenerations ?? 10))
-const remindersLimitLabel = computed(() => (accessStore.access?.limits?.remindersPerDay == null ? '∞' : accessStore.access?.limits?.remindersPerDay ?? 10))
+const aiLimitLabel = computed(() =>
+  accessStore.access?.limits?.aiGenerations == null
+    ? '∞'
+    : (accessStore.access?.limits?.aiGenerations ?? 10),
+)
+const remindersLimitLabel = computed(() =>
+  accessStore.access?.limits?.remindersPerDay == null
+    ? '∞'
+    : (accessStore.access?.limits?.remindersPerDay ?? 10),
+)
 const planOpen = ref(false)
 const billingSectionIntro = computed(() =>
   isAppleBillingSafeMode.value
@@ -2633,7 +3201,9 @@ const premiumEndsOn = computed(() => {
 
 .hero-fade-enter-active,
 .hero-fade-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
 }
 
 .hero-fade-enter-from,
@@ -2645,7 +3215,9 @@ const premiumEndsOn = computed(() => {
 .settings-panel {
   width: 100%;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: radial-gradient(120% 120% at 10% 10%, rgba(99, 102, 241, 0.08), rgba(15, 23, 42, 0.8)), rgba(15, 23, 42, 0.6);
+  background:
+    radial-gradient(120% 120% at 10% 10%, rgba(99, 102, 241, 0.08), rgba(15, 23, 42, 0.8)),
+    rgba(15, 23, 42, 0.6);
   border-radius: 18px;
   padding: 1.25rem;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);

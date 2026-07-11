@@ -8,6 +8,9 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.media.AudioAttributes;
+import android.media.RingtoneManager;
+import android.net.Uri;
 import android.os.Build;
 
 import androidx.annotation.NonNull;
@@ -42,12 +45,22 @@ public class LocalReminderPlugin extends Plugin {
     static final String PREFS_NAME = "LocalReminderPlugin";
     static final String PREF_IDS = "managed_ids";
     static final String PREF_PAYLOADS = "managed_payloads";
-    static final String CHANNEL_ID = "task_reminders";
+    static final String CHANNEL_ID = "task_reminders_default";
+    static final String CHANNEL_WAKE_CHIME_ID = "task_reminders_wake_chime";
+    static final String CHANNEL_SOFT_BELL_ID = "task_reminders_soft_bell";
+    static final String CHANNEL_RISING_ALARM_ID = "task_reminders_rising_alarm";
     static final String CHANNEL_NAME = "Task reminders";
+    static final String CHANNEL_WAKE_CHIME_NAME = "Wake-up reminders";
+    static final String CHANNEL_SOFT_BELL_NAME = "Soft bell reminders";
+    static final String CHANNEL_RISING_ALARM_NAME = "Rising alarm reminders";
+    static final String EXTRA_SOUND = "sound";
+    static final String SOUND_WAKE_CHIME = "wake_chime";
+    static final String SOUND_SOFT_BELL = "soft_bell";
+    static final String SOUND_RISING_ALARM = "rising_alarm";
 
     @Override
     public void load() {
-        ensureNotificationChannel();
+        ensureNotificationChannels(getContext());
     }
 
     @PluginMethod
@@ -74,7 +87,7 @@ public class LocalReminderPlugin extends Plugin {
     @PluginMethod
     public void sync(PluginCall call) {
         try {
-            ensureNotificationChannel();
+            ensureNotificationChannels(getContext());
 
             JSONArray reminderArray = call.getArray("reminders", new JSArray());
             List<JSONObject> reminders = new ArrayList<>();
@@ -103,7 +116,7 @@ public class LocalReminderPlugin extends Plugin {
     @PluginMethod
     public void schedule(PluginCall call) {
         try {
-            ensureNotificationChannel();
+            ensureNotificationChannels(getContext());
 
             JSONObject reminder = call.getObject("reminder");
             if (reminder == null) {
@@ -200,6 +213,8 @@ public class LocalReminderPlugin extends Plugin {
 
         long scheduledAtMs = parseIsoMillis(reminder.optString("scheduledAt", ""));
         if (scheduledAtMs <= System.currentTimeMillis() + 5000) return false;
+        String sound = normalizeSound(reminder.optString(EXTRA_SOUND, ""));
+        String channelId = channelIdForSound(sound);
 
         Intent intent = new Intent(getContext(), LocalReminderReceiver.class);
         intent.setAction("com.sudoprogrammer.plancraftai.LOCAL_REMINDER");
@@ -209,6 +224,8 @@ public class LocalReminderPlugin extends Plugin {
         intent.putExtra("taskId", reminder.optString("taskId", ""));
         intent.putExtra("workspaceId", reminder.optString("workspaceId", ""));
         intent.putExtra("type", reminder.optString("type", ""));
+        intent.putExtra(EXTRA_SOUND, sound);
+        intent.putExtra("channelId", channelId);
 
         PendingIntent pendingIntent = PendingIntent.getBroadcast(
             getContext(),
@@ -239,6 +256,8 @@ public class LocalReminderPlugin extends Plugin {
             payload.put("taskId", reminder.optString("taskId", ""));
             payload.put("workspaceId", reminder.optString("workspaceId", ""));
             payload.put("type", reminder.optString("type", ""));
+            payload.put(EXTRA_SOUND, sound);
+            payload.put("channelId", channelId);
             payload.put("exact", exact);
             nextPayloads.put(identifier, payload);
         } catch (JSONException ignored) {
@@ -336,26 +355,86 @@ public class LocalReminderPlugin extends Plugin {
         }
     }
 
-    private void ensureNotificationChannel() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
-
-        NotificationManager notificationManager = (NotificationManager) getContext().getSystemService(Context.NOTIFICATION_SERVICE);
-        if (notificationManager == null) return;
-
-        NotificationChannel channel = new NotificationChannel(
-            CHANNEL_ID,
-            CHANNEL_NAME,
-            NotificationManager.IMPORTANCE_HIGH
-        );
-        channel.setDescription("Due task reminders from PlanCraftAI");
-        notificationManager.createNotificationChannel(channel);
-    }
-
     private long parseIsoMillis(String raw) {
         try {
             return Instant.parse(raw).toEpochMilli();
         } catch (Exception error) {
             return -1L;
         }
+    }
+
+    static void ensureNotificationChannels(Context context) {
+        if (context == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
+
+        NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (notificationManager == null) return;
+
+        AudioAttributes attributes = new AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build();
+
+        NotificationChannel defaultChannel = new NotificationChannel(
+            CHANNEL_ID,
+            CHANNEL_NAME,
+            NotificationManager.IMPORTANCE_HIGH
+        );
+        defaultChannel.setDescription("Due task reminders from PlanCraftAI");
+        defaultChannel.enableVibration(true);
+        defaultChannel.setSound(
+            RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
+            attributes
+        );
+        notificationManager.createNotificationChannel(defaultChannel);
+
+        NotificationChannel wakeChannel = new NotificationChannel(
+            CHANNEL_WAKE_CHIME_ID,
+            CHANNEL_WAKE_CHIME_NAME,
+            NotificationManager.IMPORTANCE_HIGH
+        );
+        wakeChannel.setDescription("Wake-up reminders from PlanCraftAI");
+        wakeChannel.enableVibration(true);
+        Uri wakeSound = Uri.parse("android.resource://" + context.getPackageName() + "/raw/wake_chime");
+        wakeChannel.setSound(wakeSound, attributes);
+        notificationManager.createNotificationChannel(wakeChannel);
+
+        NotificationChannel softBellChannel = new NotificationChannel(
+            CHANNEL_SOFT_BELL_ID,
+            CHANNEL_SOFT_BELL_NAME,
+            NotificationManager.IMPORTANCE_HIGH
+        );
+        softBellChannel.setDescription("Soft bell reminders from PlanCraftAI");
+        softBellChannel.enableVibration(true);
+        Uri softBellSound = Uri.parse("android.resource://" + context.getPackageName() + "/raw/soft_bell");
+        softBellChannel.setSound(softBellSound, attributes);
+        notificationManager.createNotificationChannel(softBellChannel);
+
+        NotificationChannel risingAlarmChannel = new NotificationChannel(
+            CHANNEL_RISING_ALARM_ID,
+            CHANNEL_RISING_ALARM_NAME,
+            NotificationManager.IMPORTANCE_HIGH
+        );
+        risingAlarmChannel.setDescription("Rising alarm reminders from PlanCraftAI");
+        risingAlarmChannel.enableVibration(true);
+        Uri risingAlarmSound = Uri.parse("android.resource://" + context.getPackageName() + "/raw/rising_alarm");
+        risingAlarmChannel.setSound(risingAlarmSound, attributes);
+        notificationManager.createNotificationChannel(risingAlarmChannel);
+    }
+
+    static String normalizeSound(String raw) {
+        if (raw == null) return "default";
+        String normalized = raw.trim().toLowerCase().replace('-', '_').replace(' ', '_');
+        if (SOUND_WAKE_CHIME.equals(normalized)) return SOUND_WAKE_CHIME;
+        if (SOUND_SOFT_BELL.equals(normalized)) return SOUND_SOFT_BELL;
+        if (SOUND_RISING_ALARM.equals(normalized)) return SOUND_RISING_ALARM;
+        return "default";
+    }
+
+    static String channelIdForSound(String sound) {
+        String normalized = normalizeSound(sound);
+        if (SOUND_WAKE_CHIME.equals(normalized)) return CHANNEL_WAKE_CHIME_ID;
+        if (SOUND_SOFT_BELL.equals(normalized)) return CHANNEL_SOFT_BELL_ID;
+        if (SOUND_RISING_ALARM.equals(normalized)) return CHANNEL_RISING_ALARM_ID;
+        return CHANNEL_ID;
     }
 }

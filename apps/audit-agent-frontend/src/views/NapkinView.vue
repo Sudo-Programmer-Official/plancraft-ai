@@ -259,6 +259,7 @@
       v-model="detailOpen"
       width="min(880px, calc(100vw - 2rem))"
       class="napkin-detail-dialog"
+      :style="napkinDialogStyle"
       :close-on-click-modal="!savingEdit && !deleting"
       :close-on-press-escape="!savingEdit && !deleting"
       :show-close="true"
@@ -334,6 +335,7 @@
       v-model="deleteDialogOpen"
       width="min(420px, calc(100vw - 2rem))"
       class="napkin-delete-dialog"
+      :style="napkinDialogStyle"
       :close-on-click-modal="!deleting"
       :close-on-press-escape="!deleting"
       :show-close="!deleting"
@@ -427,6 +429,14 @@ const detailOpen = ref(false)
 const editingItemId = ref<string | null>(null)
 const editDraft = ref('')
 const deleteCandidate = ref<NapkinItem | null>(null)
+const napkinDialogStyle = Object.freeze({
+  background: 'linear-gradient(145deg, #1e1b4b, #312e81, #4c1d95)',
+  color: '#e2e8f0',
+  borderRadius: '1.35rem',
+  boxShadow: '0 24px 60px rgba(2, 6, 23, 0.42)',
+  border: '1px solid rgba(255, 255, 255, 0.08)',
+  backdropFilter: 'blur(12px)',
+})
 
 const filters = [
   { label: 'All', value: 'all' },
@@ -1450,14 +1460,31 @@ onBeforeUnmount(() => {
 }
 
 .napkin-detail-dialog :deep(.el-dialog) {
-  border-radius: 1.35rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: #0f172a;
-  box-shadow: 0 24px 60px rgba(2, 6, 23, 0.42);
+  overflow: hidden;
 }
 
 .napkin-detail-dialog :deep(.el-dialog__body) {
   padding-top: 0.25rem;
+}
+
+.napkin-detail-dialog :deep(.el-dialog__header) {
+  color: #e2e8f0;
+}
+
+.napkin-detail-dialog :deep(.el-dialog__title) {
+  color: #e2e8f0;
+}
+
+.napkin-detail-dialog :deep(.el-dialog__headerbtn .el-dialog__close) {
+  color: rgba(226, 232, 240, 0.8);
+}
+
+.napkin-detail-dialog :deep(.el-dialog__headerbtn:hover .el-dialog__close) {
+  color: #ffffff;
+}
+
+.napkin-detail-dialog :deep(.el-dialog__footer) {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 @media (min-width: 768px) {

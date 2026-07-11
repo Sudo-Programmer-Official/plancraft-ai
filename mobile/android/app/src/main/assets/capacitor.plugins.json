@@ -8,6 +8,10 @@
 		"classpath": "com.capacitorjs.plugins.browser.BrowserPlugin"
 	},
 	{
+		"pkg": "@capacitor/push-notifications",
+		"classpath": "com.capacitorjs.plugins.pushnotifications.PushNotificationsPlugin"
+	},
+	{
 		"pkg": "@capgo/capacitor-audio-recorder",
 		"classpath": "app.capgo.audiorecorder.CapacitorAudioRecorderPlugin"
 	}

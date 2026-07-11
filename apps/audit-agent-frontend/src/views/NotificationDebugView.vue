@@ -1,27 +1,31 @@
 <template>
-  <main class="app-page-shell text-white">
-    <section class="app-page-frame space-y-6">
-      <header class="space-y-2">
+  <main class="app-page-shell w-full max-w-full min-w-0 overflow-x-hidden box-border text-white">
+    <section class="app-page-frame w-full max-w-full min-w-0 space-y-6">
+      <header class="max-w-full min-w-0 space-y-2">
         <p class="text-xs uppercase tracking-[0.28em] text-indigo-200/80">Diagnostics</p>
-        <h1 class="text-3xl sm:text-4xl font-bold">Notification Debug</h1>
+        <h1 class="max-w-full break-words text-3xl font-bold leading-tight sm:text-4xl">
+          Notification Debug
+        </h1>
         <p class="max-w-3xl text-sm sm:text-base text-slate-300">
           Use this screen to verify notification permission state, inspect the current device token or subscription,
           and trigger immediate or scheduled reminder tests on this device.
         </p>
       </header>
 
-      <section class="grid gap-4 lg:grid-cols-[1.1fr,0.9fr]">
+      <section class="grid w-full max-w-full min-w-0 gap-4 lg:grid-cols-[1.1fr,0.9fr]">
         <div class="rounded-3xl border border-white/10 bg-slate-950/50 p-5 shadow-xl shadow-black/20">
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <div>
+          <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="min-w-0">
               <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Status</p>
-              <h2 class="text-xl font-semibold text-white">Current Notification State</h2>
+              <h2 class="max-w-full break-words text-xl font-semibold text-white">
+                Current Notification State
+              </h2>
             </div>
-            <div class="flex flex-wrap gap-2">
-              <el-button size="small" plain @click="refreshSnapshot" :loading="loading">
+            <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
+              <el-button class="w-full sm:w-auto" size="small" plain @click="refreshSnapshot" :loading="loading">
                 Refresh
               </el-button>
-              <el-button size="small" type="primary" @click="requestAccess" :loading="requesting">
+              <el-button class="w-full sm:w-auto" size="small" type="primary" @click="requestAccess" :loading="requesting">
                 Request permission
               </el-button>
             </div>
@@ -87,15 +91,15 @@
         </div>
       </section>
 
-      <section class="grid gap-4 lg:grid-cols-2">
+      <section class="grid w-full max-w-full min-w-0 gap-4 lg:grid-cols-2">
         <div class="rounded-3xl border border-indigo-400/20 bg-indigo-950/40 p-5 shadow-xl shadow-black/20">
           <p class="text-xs uppercase tracking-[0.2em] text-indigo-200/80">Immediate test</p>
-          <h2 class="text-xl font-semibold text-white">Send now</h2>
+          <h2 class="max-w-full break-words text-xl font-semibold text-white">Send now</h2>
           <p class="mt-2 text-sm text-indigo-100/80">
             Fires a remote push test on native devices. Web fallback can still show a local foreground notification.
           </p>
-          <div class="mt-4 flex flex-wrap gap-2">
-            <el-button type="primary" @click="sendImmediateTest" :loading="sendingImmediate">
+          <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <el-button class="w-full sm:w-auto" type="primary" @click="sendImmediateTest" :loading="sendingImmediate">
               Send immediate native push
             </el-button>
           </div>
@@ -103,26 +107,26 @@
 
         <div class="rounded-3xl border border-amber-400/20 bg-amber-950/35 p-5 shadow-xl shadow-black/20">
           <p class="text-xs uppercase tracking-[0.2em] text-amber-200/80">Scheduled test</p>
-          <h2 class="text-xl font-semibold text-white">1-minute reminder</h2>
+          <h2 class="max-w-full break-words text-xl font-semibold text-white">1-minute reminder</h2>
           <p class="mt-2 text-sm text-amber-100/80">
             Verifies that the local reminder path can survive backgrounding or app closure on iOS and Android.
           </p>
-          <div class="mt-4 flex flex-wrap gap-2">
-            <el-button class="!border-amber-300/40 !bg-amber-500/10 !text-amber-50 hover:!border-amber-200/60" plain @click="scheduleOneMinuteTest" :loading="scheduling">
+          <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <el-button class="w-full sm:w-auto !border-amber-300/40 !bg-amber-500/10 !text-amber-50 hover:!border-amber-200/60" plain @click="scheduleOneMinuteTest" :loading="scheduling">
               Schedule 1-minute local reminder
             </el-button>
           </div>
         </div>
       </section>
 
-      <section class="grid gap-4 lg:grid-cols-[1fr,0.95fr]">
+      <section class="grid w-full max-w-full min-w-0 gap-4 lg:grid-cols-[1fr,0.95fr]">
         <div class="rounded-3xl border border-white/10 bg-slate-950/50 p-5 shadow-xl shadow-black/20">
-          <div class="flex items-center justify-between gap-3">
-            <div>
+          <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="min-w-0">
               <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Pending</p>
-              <h2 class="text-xl font-semibold text-white">Native pending reminders</h2>
+              <h2 class="max-w-full break-words text-xl font-semibold text-white">Native pending reminders</h2>
             </div>
-            <span class="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-slate-300">
+            <span class="inline-flex w-fit max-w-full self-start rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-slate-300 sm:self-center">
               {{ pendingReminders.length }} items
             </span>
           </div>
@@ -153,7 +157,7 @@
 
         <div class="rounded-3xl border border-white/10 bg-slate-950/50 p-5 shadow-xl shadow-black/20">
           <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Notes</p>
-          <h2 class="text-xl font-semibold text-white">What this test proves</h2>
+          <h2 class="max-w-full break-words text-xl font-semibold text-white">What this test proves</h2>
           <ul class="mt-3 space-y-2 text-sm text-slate-300">
             <li>Permission prompt behavior on this device.</li>
             <li>Native push token persistence on the backend profile.</li>

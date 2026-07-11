@@ -21,6 +21,7 @@ private struct LocalReminderItem {
     let title: String
     let body: String
     let scheduledAt: Date
+    let sound: String
 }
 
 @objc(LocalReminderPlugin)
@@ -46,6 +47,12 @@ class LocalReminderPlugin: CAPPlugin, CAPBridgedPlugin {
         formatter.formatOptions = [.withInternetDateTime]
         return formatter
     }()
+    private static let wakeChimeSoundName = "wake_chime"
+    private static let softBellSoundName = "soft_bell"
+    private static let risingAlarmSoundName = "rising_alarm"
+    private static let wakeChimeFileName = "wake_chime.wav"
+    private static let softBellFileName = "soft_bell.wav"
+    private static let risingAlarmFileName = "rising_alarm.wav"
 
     @objc override func checkPermissions(_ call: CAPPluginCall) {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
@@ -139,6 +146,7 @@ class LocalReminderPlugin: CAPPlugin, CAPBridgedPlugin {
                         "taskId": request.content.userInfo["taskId"] as? String ?? "",
                         "workspaceId": request.content.userInfo["workspaceId"] as? String ?? "",
                         "type": request.content.userInfo["type"] as? String ?? "",
+                        "sound": request.content.userInfo["sound"] as? String ?? "",
                     ]
                 }
                 .sorted {
@@ -199,7 +207,8 @@ private extension LocalReminderPlugin {
                 type: reminder["type"] as? String,
                 title: titleValue.isEmpty ? "Task reminder" : titleValue,
                 body: (reminder["body"] as? String) ?? "",
-                scheduledAt: scheduledAt
+                scheduledAt: scheduledAt,
+                sound: normalizeSound(reminder["sound"] as? String)
             )
         }
     }
@@ -233,7 +242,8 @@ private extension LocalReminderPlugin {
             type: reminder["type"] as? String,
             title: titleValue.isEmpty ? "Task reminder" : titleValue,
             body: (reminder["body"] as? String) ?? "",
-            scheduledAt: scheduledAt
+            scheduledAt: scheduledAt,
+            sound: normalizeSound(reminder["sound"] as? String)
         )
     }
 
@@ -248,11 +258,16 @@ private extension LocalReminderPlugin {
         let content = UNMutableNotificationContent()
         content.title = reminder.title
         content.body = reminder.body
-        content.sound = .default
+        if let soundName = soundFileName(for: reminder.sound) {
+            content.sound = UNNotificationSound(named: UNNotificationSoundName(soundName))
+        } else {
+            content.sound = .default
+        }
         content.userInfo = [
             "taskId": reminder.taskId ?? "",
             "workspaceId": reminder.workspaceId ?? "",
             "type": reminder.type ?? "",
+            "sound": reminder.sound,
         ]
 
         let components = Calendar.current.dateComponents(
@@ -261,5 +276,32 @@ private extension LocalReminderPlugin {
         )
         let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
         return UNNotificationRequest(identifier: reminder.identifier, content: content, trigger: trigger)
+    }
+
+    private func normalizeSound(_ raw: String?) -> String {
+        let normalized = (raw ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(of: "-", with: "_")
+            .replacingOccurrences(of: " ", with: "_")
+        switch normalized {
+        case Self.wakeChimeSoundName, Self.softBellSoundName, Self.risingAlarmSoundName:
+            return normalized
+        default:
+            return "default"
+        }
+    }
+
+    private func soundFileName(for sound: String) -> String? {
+        switch normalizeSound(sound) {
+        case Self.wakeChimeSoundName:
+            return Self.wakeChimeFileName
+        case Self.softBellSoundName:
+            return Self.softBellFileName
+        case Self.risingAlarmSoundName:
+            return Self.risingAlarmFileName
+        default:
+            return nil
+        }
     }
 }

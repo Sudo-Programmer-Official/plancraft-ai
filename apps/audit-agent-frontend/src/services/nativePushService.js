@@ -105,9 +105,19 @@ async function persistRegisteredToken({ token, permissionState, platform, authSt
     pushPermissionState: normalizePermissionState(permissionState).raw,
   }
 
-  await registerNativePushToken(payload)
-  clearPendingRegistration()
-  return { ok: true, payload }
+  try {
+    await registerNativePushToken(payload)
+    clearPendingRegistration()
+    return { ok: true, payload }
+  } catch (error) {
+    console.warn('[NativePush] backend token register failed', error?.message || error)
+    cachePendingRegistration({
+      token,
+      platform: payload.pushTokenPlatform,
+      permissionState: payload.pushPermissionState,
+    })
+    return { ok: false, reason: 'backend-register-failed', error }
+  }
 }
 
 async function handleRegistrationEvent(token, authStore) {
@@ -192,7 +202,12 @@ async function ensureNativePushRegistration(authStore, { prompt = false, reason 
 }
 
 export async function requestNativePushPermissionAndRegister(authStore) {
-  return ensureNativePushRegistration(authStore, { prompt: true, reason: 'user-request' })
+  const permission = await ensureNativePushRegistration(authStore, { prompt: true, reason: 'user-request' })
+  return permission
+}
+
+export async function syncNativePushRegistrationNow(authStore) {
+  return ensureNativePushRegistration(authStore, { prompt: false, reason: 'manual-sync' })
 }
 
 export async function getNativePushPermissionStatus() {

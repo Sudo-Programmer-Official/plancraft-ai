@@ -2,13 +2,14 @@ package com.sudoprogrammer.plancraftai;
 
 import android.Manifest;
 import android.app.Notification;
-import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.media.RingtoneManager;
+import android.net.Uri;
 import android.os.Build;
 
 import androidx.core.app.NotificationCompat;
@@ -25,9 +26,14 @@ public class LocalReminderReceiver extends BroadcastReceiver {
         String taskId = valueOrEmpty(intent.getStringExtra("taskId"));
         String workspaceId = valueOrEmpty(intent.getStringExtra("workspaceId"));
         String type = valueOrEmpty(intent.getStringExtra("type"));
+        String sound = LocalReminderPlugin.normalizeSound(intent.getStringExtra("sound"));
         boolean wakeUp = "wake_up".equalsIgnoreCase(type);
+        String channelId = valueOrEmpty(intent.getStringExtra("channelId"));
+        if (channelId.isEmpty()) {
+            channelId = LocalReminderPlugin.channelIdForSound(sound);
+        }
 
-        ensureNotificationChannel(context);
+        LocalReminderPlugin.ensureNotificationChannels(context);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             boolean granted =
@@ -53,7 +59,7 @@ public class LocalReminderReceiver extends BroadcastReceiver {
             );
         }
 
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, LocalReminderPlugin.CHANNEL_ID)
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, channelId)
             .setSmallIcon(context.getApplicationInfo().icon)
             .setContentTitle(title.isEmpty() ? (wakeUp ? "Wake-up reminder" : "Task reminder") : title)
             .setContentText(body.isEmpty() ? (wakeUp ? "Wake up now." : "A scheduled task is due now.") : body)
@@ -61,9 +67,24 @@ public class LocalReminderReceiver extends BroadcastReceiver {
             .setPriority(wakeUp ? NotificationCompat.PRIORITY_MAX : NotificationCompat.PRIORITY_HIGH)
             .setCategory(wakeUp ? NotificationCompat.CATEGORY_ALARM : NotificationCompat.CATEGORY_REMINDER)
             .setAutoCancel(true)
-            .setDefaults(Notification.DEFAULT_ALL)
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setOngoing(wakeUp);
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            Uri soundUri;
+            if ("wake_chime".equals(sound)) {
+                soundUri = Uri.parse("android.resource://" + context.getPackageName() + "/raw/wake_chime");
+            } else if ("soft_bell".equals(sound)) {
+                soundUri = Uri.parse("android.resource://" + context.getPackageName() + "/raw/soft_bell");
+            } else if ("rising_alarm".equals(sound)) {
+                soundUri = Uri.parse("android.resource://" + context.getPackageName() + "/raw/rising_alarm");
+            } else {
+                soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+            }
+            builder.setSound(soundUri);
+        } else {
+            builder.setDefaults(Notification.DEFAULT_ALL);
+        }
 
         if (contentIntent != null) {
             builder.setContentIntent(contentIntent);
@@ -78,21 +99,6 @@ public class LocalReminderReceiver extends BroadcastReceiver {
         }
 
         LocalReminderPlugin.removeManagedReminder(context, identifier);
-    }
-
-    private static void ensureNotificationChannel(Context context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
-
-        NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-        if (notificationManager == null) return;
-
-        NotificationChannel channel = new NotificationChannel(
-            LocalReminderPlugin.CHANNEL_ID,
-            LocalReminderPlugin.CHANNEL_NAME,
-            NotificationManager.IMPORTANCE_HIGH
-        );
-        channel.setDescription("Due task reminders from PlanCraftAI");
-        notificationManager.createNotificationChannel(channel);
     }
 
     private static String valueOrEmpty(String value) {
