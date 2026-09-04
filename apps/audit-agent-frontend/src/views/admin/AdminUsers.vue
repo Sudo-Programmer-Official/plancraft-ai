@@ -3,6 +3,22 @@
     <div class="flex items-center justify-between">
       <h2 class="text-2xl font-bold">Users</h2>
       <div class="flex items-center gap-2">
+        <input
+          v-model="searchQuery"
+          type="search"
+          placeholder="Search name or email"
+          aria-label="Search users by name or email"
+          class="w-56 rounded border border-gray-700 bg-gray-800 px-3 py-1 text-sm text-white placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none"
+          @keyup.enter="refresh"
+        />
+        <button
+          v-if="searchQuery"
+          @click="clearSearch"
+          class="rounded bg-gray-800 px-3 py-1 text-xs text-gray-300 hover:bg-gray-700"
+        >
+          Clear
+        </button>
+        <button @click="refresh" class="rounded bg-indigo-700 px-3 py-1 text-xs text-white hover:bg-indigo-600">Search</button>
         <select v-model="filterRole" @change="refresh()" class="rounded bg-gray-800 px-3 py-1 text-sm text-white">
           <option value="">All Roles</option>
           <option value="user">User</option>
@@ -308,6 +324,7 @@ const prevStack = ref([])
 const currentCursor = ref(null)
 const filterRole = ref('')
 const filterPlan = ref('')
+const searchQuery = ref('')
 const updatingPlanId = ref(null)
 
 const overrideOpen = ref(false)
@@ -322,6 +339,7 @@ async function fetchUsers(cursor = null) {
     if (cursor) params.last = cursor
     if (filterRole.value) params.role = filterRole.value
     if (filterPlan.value) params.plan = filterPlan.value
+    if (searchQuery.value.trim()) params.search = searchQuery.value.trim()
     const res = await api.get('/admin/users', { params })
     const data = res?.data || {}
     users.value = data.users || []
@@ -348,6 +366,11 @@ function prevPageFn() {
 function refresh() {
   prevStack.value = []
   fetchUsers(null)
+}
+
+function clearSearch() {
+  searchQuery.value = ''
+  refresh()
 }
 
 async function toggleRole(user) {

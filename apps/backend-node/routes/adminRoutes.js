@@ -101,6 +101,52 @@ router.get('/users', requireAdmin, async (req, res) => {
     const last = req.query.last ? String(req.query.last) : null
     const role = req.query.role ? String(req.query.role) : null
     const plan = req.query.plan ? String(req.query.plan) : null
+    const search = String(req.query.search || '').trim().toLowerCase()
+
+    const mapUser = (doc) => {
+      const data = doc.data() || {}
+      const accessOverride = sanitizeUserAccessOverride(data?.accessOverride || null)
+      return {
+        id: doc.id,
+        name: data.name || data.displayName || '',
+        email: data.email || '',
+        role: data.role || 'user',
+        plan: (data.plan || 'free'),
+        accessOverride,
+        guest: !!data.guest,
+        createdAt: data.createdAt || null,
+      }
+    }
+
+    // Firestore does not provide a case-insensitive contains query. Search the
+    // admin-only result set in one read so partial name/email matches work
+    // consistently regardless of capitalization or which profile field exists.
+    if (search) {
+      const allUsersSnap = await db.collection('users').get()
+      const matchingDocs = allUsersSnap.docs
+        .filter((doc) => {
+          const data = doc.data() || {}
+          if (role && String(data.role || 'user') !== role) return false
+          if (plan && String(data.plan || 'free') !== plan) return false
+          const name = `${data.name || ''} ${data.displayName || ''}`.toLowerCase()
+          const email = String(data.email || '').toLowerCase()
+          return name.includes(search) || email.includes(search)
+        })
+        .sort((a, b) => {
+          const aCreated = a.data()?.createdAt
+          const bCreated = b.data()?.createdAt
+          const aTime = aCreated?.toMillis?.() || (aCreated ? new Date(aCreated).getTime() : 0) || 0
+          const bTime = bCreated?.toMillis?.() || (bCreated ? new Date(bCreated).getTime() : 0) || 0
+          return bTime - aTime || a.id.localeCompare(b.id)
+        })
+
+      const startIndex = last ? Math.max(0, matchingDocs.findIndex((doc) => doc.id === last) + 1) : 0
+      const pageDocs = matchingDocs.slice(startIndex, startIndex + limit)
+      const lastVisible = pageDocs.length && startIndex + pageDocs.length < matchingDocs.length
+        ? pageDocs[pageDocs.length - 1].id
+        : null
+      return res.json({ users: pageDocs.map(mapUser), nextPage: lastVisible, limit, search })
+    }
 
     let ref = db.collection('users')
     if (role) ref = ref.where('role', '==', role)
@@ -120,26 +166,22 @@ router.get('/users', requireAdmin, async (req, res) => {
     }
 
     const snap = await ref.limit(limit).get()
-    const users = snap.docs.map((doc) => {
-      const data = doc.data() || {}
-      const accessOverride = sanitizeUserAccessOverride(data?.accessOverride || null)
-      return {
-        id: doc.id,
-        name: data.name || data.displayName || '',
-        email: data.email || '',
-        role: data.role || 'user',
-        plan: (data.plan || 'free'),
-        accessOverride,
-        guest: !!data.guest,
-        createdAt: data.createdAt || null,
-      }
-    })
+    const users = snap.docs.map(mapUser)
     const lastVisible = snap.docs.length ? snap.docs[snap.docs.length - 1].id : null
-    return res.json({ users, nextPage: lastVisible, limit })
+    return res.json({ users, nextPage: lastVisible, limit, search: '' })
   } catch (e) {
     console.error('Admin users fetch failed', e)
     // Fallback to demo data in dev
-    return res.json({ users: dataStore.users, nextPage: null, limit: 25 })
+    const search = String(req.query.search || '').trim().toLowerCase()
+    const role = req.query.role ? String(req.query.role) : null
+    const plan = req.query.plan ? String(req.query.plan) : null
+    const users = dataStore.users.filter((user) => {
+      if (role && user.role !== role) return false
+      if (plan && user.plan !== plan) return false
+      if (!search) return true
+      return `${user.name || ''} ${user.email || ''}`.toLowerCase().includes(search)
+    })
+    return res.json({ users, nextPage: null, limit, search })
   }
 })
 
