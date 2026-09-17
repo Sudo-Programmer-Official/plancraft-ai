@@ -37,7 +37,8 @@ for (const c of cases) {
   assertEqual(gotUtc, expectedUtc, `${tz} ${date} ${time} toUtcIso`)
 
   const backHHMM = toLocalHHMM(gotUtc, tz)
-  assertEqual(backHHMM, time, `${tz} ${date} ${time} roundtrip HH:mm`)
+  const expectedLocalHHMM = dayjs.utc(expectedUtc).tz(tz).format('HH:mm')
+  assertEqual(backHHMM, expectedLocalHHMM, `${tz} ${date} ${time} roundtrip HH:mm`)
 
   const jsDate = toJsDate(gotUtc)
   if (!(jsDate instanceof Date) || isNaN(jsDate.getTime())) {
@@ -50,4 +51,3 @@ for (const c of cases) {
 if (!process.exitCode) {
   log(`PASS: ${passed} timezone cases OK`)
 }
-

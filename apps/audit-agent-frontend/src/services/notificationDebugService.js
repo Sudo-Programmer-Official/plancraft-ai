@@ -125,9 +125,9 @@ export async function sendImmediateNativePushTest({ title, body } = {}) {
   return sendNativePushTest({ title, body })
 }
 
-export async function scheduleOneMinuteNotificationTest({ title, body } = {}) {
+export async function scheduleOneMinuteNotificationTest(authStore, { title, body } = {}) {
   if (isNativePackagedApp()) {
-    const uid = globalThis?.localStorage?.getItem?.('uid') || null
+    const uid = authStore?.user?.uid || null
     let sound = 'default'
     if (uid) {
       try {

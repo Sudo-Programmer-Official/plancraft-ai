@@ -17,7 +17,6 @@ import {
   signInWithPopup,
   linkWithPopup,
   linkWithCredential,
-  signInWithCredential,
   signInWithRedirect,
   linkWithRedirect,
   getRedirectResult,
@@ -49,6 +48,7 @@ import {
   readNativeIosAuthSnapshot,
   writeNativeIosAuthSnapshot,
 } from '@/utils/authStorage'
+import { normalizePhone } from '@/utils/phoneUtils'
 import {
   buildNativeAuthCallbackUrl,
   buildNativeAuthFallbackSchemeUrl,
@@ -521,16 +521,48 @@ async function exchangeNativeSessionForCustomToken(idToken, provider = 'password
 
     return normalizedPayload
   } catch (error) {
+    if (error?.response?.status === 409 || error?.response?.data?.code === 'auth/identity-conflict') {
+      const conflict = new Error(
+        error?.response?.data?.error ||
+          'This phone number is associated with another PlanCraft account. Sign in to that account first. No accounts or data were merged.',
+      )
+      conflict.code = 'auth/identity-conflict'
+      conflict.conflicts = Array.isArray(error?.response?.data?.conflicts)
+        ? error.response.data.conflicts
+        : []
+      throw conflict
+    }
     console.error('[Auth] Native session exchange failed', JSON.stringify({
       endpoint: '/auth/native-session/exchange',
       status: error?.response?.status || null,
       code: error?.code || null,
       message: error?.message || String(error),
-      responseData: error?.response?.data || null,
       hasAuthorizationHeader: !!(error?.config?.headers?.Authorization || error?.config?.headers?.authorization),
       platform,
     }))
     throw error
+  }
+}
+
+async function syncVerifiedAuthIdentity(user, provider = '') {
+  if (!user?.uid) return null
+  const idToken = await user.getIdToken()
+  try {
+    const response = await api.post('/auth/identity/sync', { idToken, provider })
+    return response?.data || null
+  } catch (error) {
+    if (error?.response?.status === 409 || error?.response?.data?.code === 'auth/identity-conflict') {
+      const conflict = new Error(
+        error?.response?.data?.error ||
+          'This sign-in method is already linked to another PlanCraft account.',
+      )
+      conflict.code = 'auth/identity-conflict'
+      throw conflict
+    }
+    // Firebase remains the source of truth for the sign-in. A temporary API
+    // outage must not strand a user after a provider was successfully linked.
+    console.warn('[Auth] verified identity sync deferred', error?.message || error)
+    return null
   }
 }
 
@@ -1411,6 +1443,7 @@ export const useAuthStore = defineStore('authStore', {
             }
             this.guest = false
             this.token = await user.getIdToken()
+            await syncVerifiedAuthIdentity(user, 'google')
             localStorage.setItem('user', JSON.stringify(this.user))
             localStorage.setItem('token', this.token)
             ElNotification({
@@ -1533,6 +1566,7 @@ export const useAuthStore = defineStore('authStore', {
         }
         this.guest = false
         this.token = await user.getIdToken()
+        await syncVerifiedAuthIdentity(user, 'google')
         localStorage.setItem('user', JSON.stringify(this.user))
         localStorage.setItem('token', this.token)
         notifySignedIn(this.user)
@@ -1697,6 +1731,7 @@ export const useAuthStore = defineStore('authStore', {
         }
         this.guest = false
         this.token = await user.getIdToken()
+        await syncVerifiedAuthIdentity(user, 'apple')
         localStorage.setItem('user', JSON.stringify(this.user))
         localStorage.setItem('token', this.token)
         try {
@@ -1730,9 +1765,9 @@ export const useAuthStore = defineStore('authStore', {
         const result = await getRedirectResult(auth)
         if (result && result.user) {
           const user = result.user
+          const providerId = result?.providerId || (result?.user?.providerData || [])[0]?.providerId
+          const mode = providerId === 'apple.com' ? 'apple' : providerId === 'google.com' ? 'google' : null
           try {
-            const providerId = result?.providerId || (result?.user?.providerData || [])[0]?.providerId
-            const mode = providerId === 'apple.com' ? 'apple' : providerId === 'google.com' ? 'google' : null
             if (mode) {
               await setDoc(
                 doc(db, 'users', user.uid),
@@ -1759,6 +1794,7 @@ export const useAuthStore = defineStore('authStore', {
           }
           this.guest = false
           this.token = await user.getIdToken()
+          if (mode) await syncVerifiedAuthIdentity(user, mode)
           localStorage.setItem('user', JSON.stringify(this.user))
           localStorage.setItem('token', this.token)
           try {
@@ -1917,10 +1953,16 @@ export const useAuthStore = defineStore('authStore', {
 
     // 📱 Phone OTP: send code
     async sendPhoneOtp(phone, recaptchaVerifier) {
-      if (!phone) throw new Error('Missing phone number')
+      const normalizedPhone = normalizePhone(phone)
+      if (!normalizedPhone) {
+        const error = new Error('Enter a valid phone number in international format.')
+        error.code = 'auth/invalid-phone-number'
+        throw error
+      }
       if (!recaptchaVerifier) throw new Error('Missing reCAPTCHA verifier')
-      // Use Firebase auth directly for OTP
-      return await signInWithPhoneNumber(auth, phone, recaptchaVerifier)
+      // Firebase owns the reCAPTCHA challenge and OTP lifecycle. Do not invoke
+      // the verifier separately; doing so can consume the challenge.
+      return await signInWithPhoneNumber(auth, normalizedPhone, recaptchaVerifier)
     },
 
     // 📱 Phone OTP: confirm code and finalize login
@@ -1929,15 +1971,14 @@ export const useAuthStore = defineStore('authStore', {
       if (!otp) throw new Error('Missing OTP code')
       this.setAuthenticating(true)
       this.loading = true
+      let directPhoneSignIn = false
       try {
         const current = auth.currentUser
         const alreadyLinked = (current?.providerData || []).some((p) => p?.providerId === 'phone')
 
         let user = null
         let resolvedPhoneNumber = ''
-        let providerLinked = false
         let canonicalized = false
-        let resolvedBy = 'phone-auth'
         if (current && !alreadyLinked) {
           // Link phone credential to existing session to avoid duplicate UIDs.
           const verificationId = confirmationResult?.verificationId
@@ -1952,15 +1993,20 @@ export const useAuthStore = defineStore('authStore', {
               code === 'auth/credential-already-in-use' ||
               code === 'auth/account-exists-with-different-credential'
             ) {
-              const signInRes = await signInWithCredential(auth, cred)
-              user = signInRes?.user
-            } else {
-              throw err
+              const conflict = new Error(
+                'This phone number is already linked to another account. Sign out and sign in to that account before linking it here.',
+              )
+              conflict.code = 'auth/identity-conflict'
+              throw conflict
             }
+            throw err
           }
           resolvedPhoneNumber = user?.phoneNumber || current?.phoneNumber || ''
-          providerLinked = true
+          // Persist the verified provider identity without changing the UID.
+          // A conflict is surfaced instead of merging accounts implicitly.
+          await syncVerifiedAuthIdentity(user, 'phone')
         } else {
+          directPhoneSignIn = true
           const result = await confirmationResult.confirm(otp)
           const phoneUser = result?.user
           if (!phoneUser?.uid) throw new Error('Phone sign-in failed')
@@ -1976,7 +2022,6 @@ export const useAuthStore = defineStore('authStore', {
             (typeof exchanged?.sourceUid === 'string' &&
               typeof exchanged?.uid === 'string' &&
               exchanged.sourceUid !== exchanged.uid)
-          resolvedBy = String(exchanged?.resolvedBy || 'phone-auth')
 
           if (customToken) {
             const tokenCredential = await signInWithCustomToken(auth, customToken)
@@ -1991,7 +2036,6 @@ export const useAuthStore = defineStore('authStore', {
               user?.phoneNumber ||
               ''
           }
-          providerLinked = !canonicalized
         }
         if (!user?.uid) throw new Error('Phone sign-in failed')
 
@@ -2001,14 +2045,6 @@ export const useAuthStore = defineStore('authStore', {
           const profilePayload = {
             phone: resolvedPhoneNumber || null,
             lastLoginAt: now,
-            authProviders: {
-              phone: {
-                phoneNumber: resolvedPhoneNumber || null,
-                providerLinked,
-                source: resolvedBy,
-                lastLoginAt: new Date(),
-              },
-            },
           }
 
           if (!canonicalized) {
@@ -2050,6 +2086,22 @@ export const useAuthStore = defineStore('authStore', {
         })
         notifySignedIn(this.user)
         return user
+      } catch (error) {
+        // confirmationResult.confirm() signs the phone user into Firebase
+        // before the backend can reject a historical/canonical conflict. Do
+        // not leave that account active after a conflict response.
+        if (directPhoneSignIn && error?.code === 'auth/identity-conflict') {
+          try {
+            await signOutUser()
+          } catch (signOutError) {
+            console.warn('[Auth] conflict cleanup sign-out failed', {
+              code: signOutError?.code || null,
+              message: signOutError?.message || String(signOutError),
+            })
+          }
+          this.resetAuth()
+        }
+        throw error
       } finally {
         this.setAuthenticating(false)
         this.loading = false
@@ -2064,7 +2116,10 @@ export const useAuthStore = defineStore('authStore', {
       const canFallbackGuestLink =
         current?.isAnonymous === true || this.guest === true || this.user?.mode === 'guest'
       const nativePlatform = Capacitor?.getPlatform?.() || 'web'
-      const useNativeDirectEmail = isNativePackagedApp() && isIosCapacitorApp()
+      // Keep anonymous/guest conversion on the normal link path so its UID and
+      // guest-created tasks survive. The native direct flow is only for a
+      // fresh native session where no Firebase user can be linked.
+      const useNativeDirectEmail = isNativePackagedApp() && isIosCapacitorApp() && !current
 
       const completeNativeDirectEmailLogin = async (platform = nativePlatform) => {
           console.info('[Auth] Native packaged app email login via Identity Toolkit + custom token exchange', {
@@ -2241,6 +2296,7 @@ export const useAuthStore = defineStore('authStore', {
               label: 'email link token',
               fallback: () => readStoredToken(),
             })
+            await syncVerifiedAuthIdentity(user, 'password')
             localStorage.setItem('user', JSON.stringify(this.user))
             if (this.token) localStorage.setItem('token', this.token)
             try {
@@ -2301,7 +2357,11 @@ export const useAuthStore = defineStore('authStore', {
                 code === 'auth/account-exists-with-different-credential'
               )
             if (!canFallbackToSignIn) throw error
-            console.info('[Auth] Existing email account detected during guest link; falling back to direct sign-in')
+            const conflict = new Error(
+              'That email already belongs to an account. Sign in to that account first so your guest tasks are not lost.',
+            )
+            conflict.code = 'auth/identity-conflict'
+            throw conflict
           }
         }
 
@@ -2332,6 +2392,7 @@ export const useAuthStore = defineStore('authStore', {
         label: 'email sign-in token',
         fallback: () => readStoredToken(),
       })
+      await syncVerifiedAuthIdentity(user, 'password')
       localStorage.setItem('user', JSON.stringify(this.user))
       if (this.token) localStorage.setItem('token', this.token)
       try {
@@ -2476,6 +2537,7 @@ export const useAuthStore = defineStore('authStore', {
           label: `${source} token`,
           fallback: () => String(options?.tokenFallback || readStoredToken() || ''),
         })
+        await syncVerifiedAuthIdentity(user, 'password')
         localStorage.setItem('user', JSON.stringify(this.user))
         if (this.token) localStorage.setItem('token', this.token)
         try {
@@ -2504,13 +2566,6 @@ export const useAuthStore = defineStore('authStore', {
               lastLoginAt: Date.now(),
               ...(createdAt ? { createdAt } : {}),
               ...(resolvedDisplayName ? { profileComplete: true } : {}),
-              authProviders: {
-                password: {
-                  providerLinked: true,
-                  ...(createdAt ? { linkedAt: new Date() } : {}),
-                  lastLoginAt: new Date(),
-                },
-              },
             },
             { merge: true },
           ).catch((error) => {
@@ -2684,6 +2739,18 @@ export const useAuthStore = defineStore('authStore', {
       this.setAuthenticating(false)
       this.logoutPending = true
       try {
+        if (isNativePackagedApp() && this.user?.uid) {
+          try {
+            const { revokeNativePushRegistration } = await import('@/services/nativePushService')
+            await withTimeout(
+              revokeNativePushRegistration(this),
+              3500,
+              'native push token revoke',
+            )
+          } catch (error) {
+            console.warn('[NativePush] token revoke during logout failed', error?.message || error)
+          }
+        }
         await withTimeout(signOutUser(), isIosCapacitorApp() ? 5000 : 8000, 'logout sign-out')
       } catch (e) {
         console.warn('Sign-out failed:', e)

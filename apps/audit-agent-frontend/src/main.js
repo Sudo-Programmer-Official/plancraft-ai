@@ -1,5 +1,5 @@
 // Global styles
-import './assets/tailwind.scss'
+import './assets/tailwind.css'
 import './assets/theme.scss'
 import './assets/styles/app-surfaces.css'
 import './assets/styles/scrollbar.css'

@@ -9,6 +9,15 @@
   >
     <GuestBanner :isGuest="authStore.guest" class="order-1" @login="redirectToLogin" />
 
+    <OnboardingTour
+      v-model="onboardingTourVisible"
+      :steps="onboardingSteps"
+      :first-name="displayName"
+      @finished="finishOnboarding"
+      @skipped="skipOnboarding"
+      @later="postponeOnboarding"
+    />
+
     <section
       v-if="showQuickSetupBanner"
       class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-2"
@@ -248,7 +257,11 @@
       v-if="showDaily"
       class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-3"
     >
-        <div class="dashboard-card daily-card max-w-full min-w-0 space-y-5" :class="{ 'daily-card--fullscreen': isTodayFullscreen }">
+        <div
+          class="dashboard-card daily-card max-w-full min-w-0 space-y-5"
+          data-onboarding="today-focus"
+          :class="{ 'daily-card--fullscreen': isTodayFullscreen }"
+        >
           <div class="daily-card__header">
             <div class="daily-card__heading">
               <div class="focus-date-row flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap w-full">
@@ -316,6 +329,7 @@
               </button>
               <button
                 @click="openPlanner"
+                data-onboarding="plan-task"
                 class="daily-card__plan-btn inline-flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg text-white bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 shadow-md transition"
               >
                 <span class="text-base">＋</span>
@@ -1269,6 +1283,7 @@
           </button>
           <RouterLink
             to="/talk-to-planner"
+            data-onboarding="talk-to-planner"
             class="action-chip talk-to-planner-entry bg-transparent border border-indigo-400/60 text-indigo-200 hover:bg-indigo-500/10"
           >
             <span class="text-lg">💬</span>
@@ -1285,7 +1300,6 @@
       </div>
     </section>
 
-    <!-- Onboarding tour temporarily disabled -->
   </main>
 </template>
 
@@ -1297,6 +1311,7 @@ import { onAuthStateChanged } from 'firebase/auth'
 import { toLocalDateKey, parseLocalDateKey } from '@/utils/dateHelper'
 import { summarizeTasks } from '@/services/aiService'
 import GuestBanner from '@/components/GuestBanner.vue'
+import OnboardingTour from '@/components/OnboardingTour.vue'
 import { useAuthStore } from '@/stores/authStore'
 import { useAccessStore } from '@/stores/accessStore'
 import TaskPlannerDialog from '@/components/TaskPlannerDialog.vue'
@@ -1316,7 +1331,7 @@ import { trackGuestDashboardLoaded } from '@/services/analytics'
 import { getReminderStatus, scheduleReminder } from '@/services/reminderService'
 import { listReports, generateReport } from '@/services/reportsService'
 import api from '@/services/api'
-import { getPreferences as getUserPreferences } from '@/services/settingsService'
+import { getPreferences as getUserPreferences, updateOnboardingStatus } from '@/services/settingsService'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { ElMessage, ElNotification } from 'element-plus'
 import { TASK_CATEGORY_FILTERS, getCategoryIcon, getCategoryColor, resolveCategory } from '@/constants/taskCategories'
@@ -1792,6 +1807,29 @@ const onboardingStatus = ref({
   completedAt: null,
 })
 const onboardingSessionPlayed = ref(false)
+const onboardingSteps = [
+  {
+    id: 'today-focus',
+    title: 'Start with Today',
+    description: 'This is your calm home base for the next useful thing. Keep the day visible and manageable.',
+    element: '[data-onboarding="today-focus"]',
+    placement: 'bottom',
+  },
+  {
+    id: 'plan-task',
+    title: 'Plan a task in seconds',
+    description: 'Use the planner to turn a thought into a clear task with timing and reminders.',
+    element: '[data-onboarding="plan-task"]',
+    placement: 'bottom',
+  },
+  {
+    id: 'talk-to-planner',
+    title: 'Talk to your planner',
+    description: 'When typing feels like work, describe what you need and let the assistant shape the next steps.',
+    element: '[data-onboarding="talk-to-planner"]',
+    placement: 'top',
+  },
+]
 const AI_SUMMARY_DEBOUNCE_MS = 220
 let aiSummaryDebounceTimer = null
 let aiSummaryRequestId = 0
@@ -1966,8 +2004,74 @@ function syncOnboardingFromPreferences(pref = {}) {
 }
 
 function maybeLaunchOnboarding() {
-  // Tour temporarily disabled; keep function as no-op for now
-  return
+  if (isGuest.value || !authStore.user?.uid || onboardingStatus.value.completed || onboardingSessionPlayed.value) return
+  const laterUntil = onboardingStatus.value.showLaterUntil
+  if (laterUntil && new Date(laterUntil).getTime() > Date.now()) return
+  window.setTimeout(() => {
+    if (!onboardingStatus.value.completed && !onboardingSessionPlayed.value) {
+      onboardingTourVisible.value = true
+    }
+  }, 450)
+}
+
+async function saveOnboardingStatus(next = {}) {
+  const uid = authStore.user?.uid
+  if (!uid) return
+  const updated = await updateOnboardingStatus(uid, next)
+  syncOnboardingFromPreferences({ onboarding: updated })
+  try {
+    authStore.user.preferences = {
+      ...(authStore.user.preferences || {}),
+      onboarding: updated,
+    }
+  } catch {
+    /* The server remains the source of truth when the local snapshot is immutable. */
+  }
+}
+
+async function finishOnboarding() {
+  onboardingTourVisible.value = false
+  try {
+    await saveOnboardingStatus({
+      completed: true,
+      completedAt: new Date().toISOString(),
+      lastStep: onboardingSteps.length,
+    })
+    if (!quickSetupStore.setupState?.completed) {
+      quickSetupStore.openQuickSetup({ clearSnooze: false, source: 'auto' })
+    }
+  } catch (error) {
+    console.warn('Failed to persist onboarding completion:', error?.message || error)
+  }
+}
+
+async function skipOnboarding() {
+  onboardingTourVisible.value = false
+  await routerNav.push('/today/dashboard').catch(() => {})
+  try {
+    await saveOnboardingStatus({
+      completed: true,
+      completedAt: new Date().toISOString(),
+      skippedAt: new Date().toISOString(),
+      lastStep: 0,
+    })
+  } catch (error) {
+    console.warn('Failed to persist skipped onboarding:', error?.message || error)
+  }
+}
+
+async function postponeOnboarding() {
+  onboardingTourVisible.value = false
+  const showLaterUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+  try {
+    await saveOnboardingStatus({
+      completed: false,
+      showLaterUntil,
+      lastStep: onboardingStatus.value.lastStep,
+    })
+  } catch (error) {
+    console.warn('Failed to persist onboarding snooze:', error?.message || error)
+  }
 }
 
 async function bootstrapPreferences(uid) {
@@ -2261,7 +2365,8 @@ onMounted(async () => {
     const storedSetup = readQuickSetupState()
     refreshQuickSetupState(storedSetup)
     const seen = storedSetup?.completed || localStorage.getItem('pcai_setup_done') === '1'
-    if (!isGuest.value && !seen && !isQuickSetupSnoozed()) {
+    const onboardingReadyForQuickSetup = onboardingStatus.value.completed || onboardingStatus.value.showLaterUntil
+    if (!isGuest.value && onboardingReadyForQuickSetup && !seen && !isQuickSetupSnoozed()) {
       quickSetupStore.openQuickSetup({ clearSnooze: false, source: 'auto' })
     }
   } catch {

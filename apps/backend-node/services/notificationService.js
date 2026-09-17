@@ -326,15 +326,27 @@ async function loadUserContacts(userId) {
 
 async function loadNativePushTarget(userId) {
   try {
-    const snap = await db.collection("users").doc(String(userId)).get();
+    const userRef = db.collection("users").doc(String(userId));
+    const [snap, deviceSnap] = await Promise.all([
+      userRef.get(),
+      userRef.collection("nativePushDevices").where("active", "==", true).get(),
+    ]);
     const data = snap.exists ? snap.data() : {};
-    const token = String(data?.pushToken || "").trim();
-    if (!token) return null;
-    return {
-      token,
-      platform: data?.pushTokenPlatform || null,
-      permissionState: data?.pushPermissionState || null,
-    };
+    const devices = deviceSnap.docs.map((entry) => ({
+      deviceId: entry.id,
+      token: String(entry.data()?.pushToken || "").trim(),
+      platform: entry.data()?.pushTokenPlatform || null,
+      permissionState: entry.data()?.pushPermissionState || null,
+    })).filter((device) => device.token);
+    if (!devices.length && data?.pushToken) {
+      devices.push({
+        deviceId: data?.pushTokenDeviceId || "legacy",
+        token: String(data.pushToken).trim(),
+        platform: data?.pushTokenPlatform || null,
+        permissionState: data?.pushPermissionState || null,
+      });
+    }
+    return devices.length ? devices : null;
   } catch (err) {
     console.warn(
       "[Notification] loadNativePushTarget failed",
@@ -804,31 +816,36 @@ async function sendViaChannel(
     );
 
     const nativeTarget = await loadNativePushTarget(userId);
-    if (!nativeTarget?.token) {
+    if (!nativeTarget?.length) {
       return pwaResult;
     }
 
     try {
-      const nativeResult = await sendPushNotification(
-        nativeTarget.token,
-        payload.pwa?.title || "PlanCraftAI",
-        payload.pwa?.body || payload.message || "You have a new reminder.",
-        {
-          ...(payload.pwa?.data || {}),
-          type: payload.pwa?.data?.type || meta.type || "reminder-due",
-          source: "native-fallback",
-          platform: nativeTarget.platform || "",
-          permissionState: nativeTarget.permissionState || "",
-        },
-        {
-          sound,
-        },
-      );
+      const nativeResults = await Promise.allSettled(nativeTarget.map((target) =>
+        sendPushNotification(
+          target.token,
+          payload.pwa?.title || "PlanCraftAI",
+          payload.pwa?.body || payload.message || "You have a new reminder.",
+          {
+            ...(payload.pwa?.data || {}),
+            type: payload.pwa?.data?.type || meta.type || "reminder-due",
+            source: "native-fallback",
+            platform: target.platform || "",
+            permissionState: target.permissionState || "",
+          },
+          { sound },
+        ),
+      ));
 
       return {
         pwa: pwaResult,
-        nativePush: nativeResult,
-        success: true,
+        nativePush: nativeResults.map((result, index) => ({
+          deviceId: nativeTarget[index].deviceId,
+          ok: result.status === "fulfilled",
+          response: result.status === "fulfilled" ? result.value : null,
+          error: result.status === "rejected" ? result.reason?.message || "Push failed" : null,
+        })),
+        success: nativeResults.some((result) => result.status === "fulfilled"),
       };
     } catch (error) {
       console.warn(

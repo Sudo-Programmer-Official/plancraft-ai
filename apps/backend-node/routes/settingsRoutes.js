@@ -1,4 +1,5 @@
 import express from "express";
+import admin from "firebase-admin";
 import { db } from "../services/firebaseAdmin.js";
 import { requireAuth, ensureUserMatches } from "../middleware/auth.js";
 import { normalizePhone, guessCountry } from "../utils/phone.js";
@@ -330,11 +331,15 @@ router.get("/settings/profile", async (req, res) => {
 router.post("/settings/native-push/register", async (req, res) => {
   try {
     const uid = String(req?.user?.uid || "");
-    const { pushToken, pushTokenPlatform, pushPermissionState } =
+    const { pushToken, pushTokenPlatform, pushPermissionState, deviceId } =
       req.body || {};
     if (!uid) return res.status(401).json({ error: "Unauthorized" });
     if (!String(pushToken || "").trim()) {
       return res.status(400).json({ error: "Missing pushToken" });
+    }
+    const normalizedDeviceId = String(deviceId || "").trim().replace(/[^a-zA-Z0-9._:-]/g, "_").slice(0, 160);
+    if (!normalizedDeviceId) {
+      return res.status(400).json({ error: "Missing deviceId" });
     }
 
     const platform = String(pushTokenPlatform || "")
@@ -347,21 +352,37 @@ router.post("/settings/native-push/register", async (req, res) => {
         .trim()
         .toLowerCase() || "granted";
 
-    await db
-      .collection("users")
-      .doc(uid)
-      .set(
+    const now = new Date().toISOString();
+    const userRef = db.collection("users").doc(uid);
+    await Promise.all([
+      userRef.collection("nativePushDevices").doc(normalizedDeviceId).set(
         {
+          deviceId: normalizedDeviceId,
           pushToken: String(pushToken).trim(),
           pushTokenPlatform: normalizedPlatform,
           pushPermissionState: permissionState,
-          pushTokenUpdatedAt: new Date().toISOString(),
+          active: true,
+          updatedAt: now,
         },
         { merge: true },
-      );
+      ),
+      userRef.set(
+        {
+          // Keep the legacy fields for older senders while the device
+          // subcollection supports multiple phones/tablets per user.
+          pushToken: String(pushToken).trim(),
+          pushTokenPlatform: normalizedPlatform,
+          pushPermissionState: permissionState,
+          pushTokenUpdatedAt: now,
+          pushTokenDeviceId: normalizedDeviceId,
+        },
+        { merge: true },
+      ),
+    ]);
 
     return res.json({
       success: true,
+      deviceId: normalizedDeviceId,
       pushTokenPlatform: normalizedPlatform,
       pushPermissionState: permissionState,
       pushTokenUpdatedAt: new Date().toISOString(),
@@ -374,16 +395,99 @@ router.post("/settings/native-push/register", async (req, res) => {
   }
 });
 
+router.get("/settings/native-push/status", async (req, res) => {
+  try {
+    const uid = String(req?.user?.uid || "");
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+    const userRef = db.collection("users").doc(uid);
+    const [profileSnap, devicesSnap] = await Promise.all([
+      userRef.get(),
+      userRef.collection("nativePushDevices").where("active", "==", true).get(),
+    ]);
+    const profile = profileSnap.exists ? profileSnap.data() || {} : {};
+    const devices = devicesSnap.docs.map((entry) => ({
+      deviceId: entry.id,
+      pushToken: entry.data()?.pushToken || null,
+      pushTokenPlatform: entry.data()?.pushTokenPlatform || null,
+      pushPermissionState: entry.data()?.pushPermissionState || null,
+      updatedAt: entry.data()?.updatedAt || null,
+    }));
+    if (!devices.length && profile?.pushToken) {
+      devices.push({
+        deviceId: profile?.pushTokenDeviceId || "legacy",
+        pushToken: profile.pushToken,
+        pushTokenPlatform: profile.pushTokenPlatform || null,
+        pushPermissionState: profile.pushPermissionState || null,
+        updatedAt: profile.pushTokenUpdatedAt || null,
+      });
+    }
+    return res.json({
+      success: true,
+      profile: {
+        pushToken: profile?.pushToken || null,
+        pushTokenPlatform: profile?.pushTokenPlatform || null,
+        pushPermissionState: profile?.pushPermissionState || null,
+        pushTokenUpdatedAt: profile?.pushTokenUpdatedAt || null,
+      },
+      devices,
+    });
+  } catch (err) {
+    console.error("❌ native-push status error:", err);
+    return res.status(500).json({ error: "Failed to load native push status" });
+  }
+});
+
+router.post("/settings/native-push/revoke", async (req, res) => {
+  try {
+    const uid = String(req?.user?.uid || "");
+    const deviceId = String(req?.body?.deviceId || "").trim().replace(/[^a-zA-Z0-9._:-]/g, "_").slice(0, 160);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+    if (!deviceId) return res.status(400).json({ error: "Missing deviceId" });
+
+    const userRef = db.collection("users").doc(uid);
+    const profileSnap = await userRef.get();
+    const profile = profileSnap.exists ? profileSnap.data() || {} : {};
+    const writes = [userRef.collection("nativePushDevices").doc(deviceId).delete()];
+    if (String(profile?.pushTokenDeviceId || "") === deviceId) {
+      writes.push(userRef.set({
+        pushToken: admin.firestore.FieldValue.delete(),
+        pushTokenPlatform: admin.firestore.FieldValue.delete(),
+        pushPermissionState: "revoked",
+        pushTokenUpdatedAt: new Date().toISOString(),
+        pushTokenDeviceId: admin.firestore.FieldValue.delete(),
+      }, { merge: true }));
+    }
+    await Promise.all(writes);
+    return res.json({ success: true, deviceId, revoked: true });
+  } catch (err) {
+    console.error("❌ native-push revoke error:", err);
+    return res.status(500).json({ error: "Failed to revoke native push token" });
+  }
+});
+
 router.post("/settings/native-push/test", async (req, res) => {
   try {
     const uid = String(req?.user?.uid || "");
     const { title, body } = req.body || {};
     if (!uid) return res.status(401).json({ error: "Unauthorized" });
 
-    const snap = await db.collection("users").doc(uid).get();
+    const userRef = db.collection("users").doc(uid);
+    const snap = await userRef.get();
     const data = snap.exists ? snap.data() || {} : {};
-    const token = String(data?.pushToken || "").trim();
-    if (!token) {
+    const deviceSnap = await userRef.collection("nativePushDevices").where("active", "==", true).get();
+    const devices = deviceSnap.docs.map((entry) => ({
+      deviceId: entry.id,
+      token: String(entry.data()?.pushToken || "").trim(),
+      platform: entry.data()?.pushTokenPlatform || "",
+    })).filter((device) => device.token);
+    if (!devices.length && data?.pushToken) {
+      devices.push({
+        deviceId: data?.pushTokenDeviceId || "legacy",
+        token: String(data.pushToken).trim(),
+        platform: data?.pushTokenPlatform || "",
+      });
+    }
+    if (!devices.length) {
       return res
         .status(400)
         .json({ error: "No native push token registered for this account" });
@@ -398,20 +502,29 @@ router.post("/settings/native-push/test", async (req, res) => {
         data?.preferences?.notifications?.notificationSound ||
         data?.preferences?.reminders?.sound,
     );
-    const response = await sendPushNotification(
-      token,
-      pushTitle,
-      pushBody,
-      {
-        type: "native-push-test",
-        platform: data?.pushTokenPlatform || "",
-      },
-      {
-        sound: notificationSound,
-      },
-    );
+    const responses = await Promise.allSettled(devices.map((device) =>
+      sendPushNotification(
+        device.token,
+        pushTitle,
+        pushBody,
+        {
+          type: "native-push-test",
+          platform: device.platform,
+        },
+        { sound: notificationSound },
+      ),
+    ));
 
-    return res.json({ success: true, response });
+    return res.json({
+      success: responses.some((result) => result.status === "fulfilled"),
+      devices: devices.length,
+      responses: responses.map((result, index) => ({
+        deviceId: devices[index].deviceId,
+        ok: result.status === "fulfilled",
+        response: result.status === "fulfilled" ? result.value : null,
+        error: result.status === "rejected" ? result.reason?.message || "Push failed" : null,
+      })),
+    });
   } catch (err) {
     console.error("❌ native-push test error:", err);
     return res
@@ -650,7 +763,7 @@ router.post("/settings/updateIntegrations", async (req, res) => {
       return obj;
     };
 
-    // Mirror phone to preferences.notifications for backend phone resolution
+    // Mirror normalized phone contacts to the legacy notification preferences.
     const notifPhones = {
       phone_sms: sPhone || undefined,
       phone_voice:

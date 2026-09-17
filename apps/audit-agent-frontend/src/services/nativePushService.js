@@ -9,6 +9,7 @@ const PENDING_TOKEN_KEY = 'nativePush.pendingToken'
 const PENDING_PLATFORM_KEY = 'nativePush.pendingPlatform'
 const PENDING_PERMISSION_KEY = 'nativePush.pendingPermission'
 const PENDING_UPDATED_AT_KEY = 'nativePush.pendingUpdatedAt'
+const DEVICE_ID_KEY = 'nativePush.deviceId'
 
 let nativePushInitialized = false
 let nativePushListenersInstalled = false
@@ -36,6 +37,22 @@ function normalizePlatform(value = null) {
   return Capacitor?.getPlatform?.() === 'ios' ? 'ios' : 'android'
 }
 
+function getNativeDeviceId() {
+  const storage = getStorage()
+  if (!storage) return null
+  try {
+    const existing = String(storage.getItem(DEVICE_ID_KEY) || '').trim()
+    if (existing) return existing
+    const generated = typeof globalThis?.crypto?.randomUUID === 'function'
+      ? globalThis.crypto.randomUUID()
+      : `device-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+    storage.setItem(DEVICE_ID_KEY, generated)
+    return generated
+  } catch {
+    return null
+  }
+}
+
 function cachePendingRegistration(payload = {}) {
   const storage = getStorage()
   if (!storage) return
@@ -57,6 +74,7 @@ function readPendingRegistration() {
     if (!token) return null
     return {
       token,
+      deviceId: storage.getItem(DEVICE_ID_KEY) || null,
       platform: storage.getItem(PENDING_PLATFORM_KEY) || normalizePlatform(),
       permissionState: storage.getItem(PENDING_PERMISSION_KEY) || 'granted',
       updatedAt: storage.getItem(PENDING_UPDATED_AT_KEY) || null,
@@ -98,9 +116,15 @@ async function persistRegisteredToken({ token, permissionState, platform, authSt
     cachePendingRegistration({ token, platform, permissionState })
     return { ok: false, reason: uid ? 'missing-token' : 'missing-auth' }
   }
+  const deviceId = getNativeDeviceId()
+  if (!deviceId) {
+    cachePendingRegistration({ token, platform, permissionState })
+    return { ok: false, reason: 'missing-device-id' }
+  }
 
   const payload = {
     pushToken: String(token).trim(),
+    deviceId,
     pushTokenPlatform: normalizePlatform(platform),
     pushPermissionState: normalizePermissionState(permissionState).raw,
   }
@@ -219,9 +243,11 @@ export async function getNativePushProfileSnapshot(authStore) {
   const uid = authStore?.user?.uid || null
   let profile = null
 
+  let devices = []
   if (uid) {
     try {
-      const res = await api.get('/settings/profile', { params: { userId: uid } })
+      const res = await api.get('/settings/native-push/status')
+      devices = Array.isArray(res?.data?.devices) ? res.data.devices : []
       profile = res?.data?.profile || null
     } catch (error) {
       console.warn('[NativePush] get profile snapshot failed', error?.message || error)
@@ -236,6 +262,22 @@ export async function getNativePushProfileSnapshot(authStore) {
     pushTokenPlatform: profile?.pushTokenPlatform || null,
     pushPermissionState: profile?.pushPermissionState || permission.raw,
     pushTokenUpdatedAt: profile?.pushTokenUpdatedAt || null,
+    deviceId: getNativeDeviceId(),
+    devices,
+  }
+}
+
+export async function revokeNativePushRegistration(authStore) {
+  if (!isNativePackagedApp() || !authStore?.user?.uid) return { ok: false, reason: 'missing-auth' }
+  const deviceId = getNativeDeviceId()
+  if (!deviceId) return { ok: false, reason: 'missing-device-id' }
+  try {
+    const res = await api.post('/settings/native-push/revoke', { deviceId })
+    clearPendingRegistration()
+    return res?.data || { ok: true }
+  } catch (error) {
+    console.warn('[NativePush] revoke failed', error?.message || error)
+    return { ok: false, error }
   }
 }
 

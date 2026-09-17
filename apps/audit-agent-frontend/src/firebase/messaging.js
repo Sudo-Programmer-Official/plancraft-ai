@@ -70,7 +70,7 @@ export async function getCurrentFcmToken({ persist = false } = {}) {
       return null
     }
 
-    console.log("FCM token:", token)
+    // Never log raw FCM tokens; they are bearer-like device credentials.
     if (persist) await persistFcmToken(token)
 
     return token

@@ -74,6 +74,15 @@
               <p class="text-[11px] uppercase tracking-[0.2em] text-slate-400">Platform / Updated</p>
               <pre class="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words text-xs text-slate-100">{{ formattedNativeMeta }}</pre>
             </div>
+            <div v-if="isNative && snapshot.nativeProfile?.devices?.length" class="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+              <p class="text-[11px] uppercase tracking-[0.2em] text-slate-400">Active devices</p>
+              <div class="mt-2 space-y-2 text-xs text-slate-200">
+                <div v-for="device in snapshot.nativeProfile.devices" :key="device.deviceId" class="flex flex-wrap items-center justify-between gap-2">
+                  <span>{{ device.pushTokenPlatform || 'native' }} · {{ device.deviceId }}</span>
+                  <span class="text-slate-400">{{ device.updatedAt || 'unknown' }}</span>
+                </div>
+              </div>
+            </div>
             <div v-if="!isNative" class="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
               <p class="text-[11px] uppercase tracking-[0.2em] text-slate-400">Push subscription</p>
               <pre class="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words text-xs text-slate-100">{{ formattedSubscription }}</pre>
@@ -322,7 +331,7 @@ async function sendImmediateTest() {
 async function scheduleOneMinuteTest() {
   scheduling.value = true
   try {
-    const result = await scheduleOneMinuteNotificationTest()
+    const result = await scheduleOneMinuteNotificationTest(authStore)
     if (result?.ok) {
       ElMessage.success('1-minute reminder scheduled')
     } else {

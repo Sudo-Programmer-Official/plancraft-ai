@@ -225,6 +225,7 @@
                   <p v-else class="text-xs text-indigo-200/70">{{ phoneHint }}</p>
                   <div v-if="!otpSent">
                     <button
+                      type="button"
                       @click="sendOtp"
                       :disabled="sendingOtp || !normalizedPhone"
                       class="auth-action primary w-full disabled:opacity-60"
@@ -244,13 +245,23 @@
                       class="auth-input"
                       enterkeyhint="done"
                       @input="sanitizeOtpInput"
+                      @keydown.enter.prevent="verifyOtp"
                     />
                     <button
+                      type="button"
                       @click="verifyOtp"
-                      :disabled="verifyingOtp || !otp"
+                      :disabled="verifyingOtp || otp.length < 6"
                       class="auth-action primary w-full disabled:opacity-60"
                     >
                       {{ verifyingOtp ? 'Verifying…' : 'Verify & Sign In' }}
+                    </button>
+                    <button
+                      type="button"
+                      class="auth-inline-action w-full"
+                      :disabled="sendingOtp || otpCooldownSeconds > 0"
+                      @click="resendOtp"
+                    >
+                      {{ otpCooldownSeconds > 0 ? `Resend code in ${otpCooldownSeconds}s` : 'Resend code' }}
                     </button>
                   </div>
                 </div>
@@ -289,7 +300,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, nextTick, watch } from "vue"
+import { ref, onMounted, onBeforeUnmount, computed, nextTick, watch } from "vue"
 import { useRouter, useRoute } from "vue-router"
 import { useAuthStore } from "@/stores/authStore"
 import { useFeatureFlagsStore } from '@/stores/featureFlagsStore'
@@ -825,6 +836,8 @@ const otp = ref('')
 const otpSent = ref(false)
 const sendingOtp = ref(false)
 const verifyingOtp = ref(false)
+const otpCooldownSeconds = ref(0)
+let otpCooldownTimer = null
 const phoneFieldRef = ref(null)
 const otpFieldRef = ref(null)
 let confirmationResult = null
@@ -985,6 +998,7 @@ function sanitizeOtpInput() {
 }
 
 function resetOtpStep() {
+  stopOtpCooldown()
   otpSent.value = false
   otp.value = ''
   confirmationResult = null
@@ -992,6 +1006,23 @@ function resetOtpStep() {
     ensureRecaptcha(true)
   }, 0)
   nextTick(() => focusPhoneField())
+}
+
+function stopOtpCooldown() {
+  if (otpCooldownTimer) {
+    window.clearInterval(otpCooldownTimer)
+    otpCooldownTimer = null
+  }
+  otpCooldownSeconds.value = 0
+}
+
+function startOtpCooldown(seconds = 30) {
+  stopOtpCooldown()
+  otpCooldownSeconds.value = Math.max(0, Number(seconds) || 30)
+  otpCooldownTimer = window.setInterval(() => {
+    otpCooldownSeconds.value = Math.max(0, otpCooldownSeconds.value - 1)
+    if (!otpCooldownSeconds.value) stopOtpCooldown()
+  }, 1000)
 }
 
 function mapPhoneOtpError(error) {
@@ -1169,26 +1200,20 @@ async function launchPhoneAuthInBrowser() {
   }
 }
 
-async function sendOtp() {
+async function sendOtp({ resend = false } = {}) {
   if (!normalizedPhone.value) return ElMessage.error('Enter a valid phone number.')
+  if (sendingOtp.value || (resend && otpCooldownSeconds.value > 0)) return
   try {
     sendingOtp.value = true
-    let verifier = await ensureRecaptcha()
+    if (resend) resetRecaptcha()
+    const verifier = await ensureRecaptcha(resend)
     if (!verifier) throw new Error('reCAPTCHA not ready. Please try again.')
     const formatted = normalizedPhone.value
-    // Execute reCAPTCHA once to ensure a fresh token
-    try { await verifier.verify() } catch (e) {
-      // If element was removed, rebuild and retry once
-      if (String(e?.message || '').toLowerCase().includes('removed')) {
-        verifier = await ensureRecaptcha(true)
-        await verifier.verify()
-      } else {
-        throw e
-      }
-    }
-    // Use centralized store action
+    // signInWithPhoneNumber owns the reCAPTCHA challenge. Calling verify()
+    // manually first can consume the challenge and make a fresh OTP expire.
     confirmationResult = await authStore.sendPhoneOtp(formatted, verifier)
     otpSent.value = true
+    startOtpCooldown(30)
     nextTick(() => focusOtpField())
     ElMessage.success('OTP sent successfully!')
   } catch (error) {
@@ -1198,7 +1223,6 @@ async function sendOtp() {
       native: isNativeApp.value,
       ios: isIosApp.value,
       testing: phoneAuthTestingEnabled,
-      phone: normalizedPhone.value,
     })
     resetRecaptcha()
     const msg = IS_LOCAL
@@ -1210,9 +1234,14 @@ async function sendOtp() {
   }
 }
 
+async function resendOtp() {
+  await sendOtp({ resend: true })
+}
+
 async function verifyOtp() {
+  if (verifyingOtp.value) return
   const code = String(otp.value || '').replace(/\D/g, '')
-  if (!code) return alert('Enter the OTP you received.')
+  if (code.length < 6) return ElMessage.error('Enter the 6-digit code you received.')
   if (!confirmationResult) {
     ElMessage.error('OTP session expired. Please request a new code.')
     return
@@ -1220,11 +1249,19 @@ async function verifyOtp() {
   try {
     verifyingOtp.value = true
     await authStore.confirmPhoneOtp(confirmationResult, code)
+    stopOtpCooldown()
     redirectAfterLogin()
   } catch (error) {
-    console.error('[OTP] verify failed', error)
+    console.error('[OTP] verify failed', {
+      code: error?.code || null,
+      message: error?.message || String(error),
+    })
     const code = String(error?.code || '')
-    if (code.includes('auth/code-expired')) {
+    if (code.includes('auth/identity-conflict')) {
+      ElMessage.error(error?.message || 'That phone number is linked to another account. Sign in to that account first.')
+    } else if (code.includes('auth/code-expired')) {
+      confirmationResult = null
+      stopOtpCooldown()
       ElMessage.error('OTP expired. Please request a new code.')
     } else {
       ElMessage.error('Invalid OTP. Please try again.')
@@ -1316,6 +1353,11 @@ onMounted(async () => {
   } catch (e) {
     // ignore when not a magic link
   }
+})
+
+onBeforeUnmount(() => {
+  stopOtpCooldown()
+  resetRecaptcha()
 })
 </script>
 

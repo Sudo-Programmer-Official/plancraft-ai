@@ -11,14 +11,13 @@ dayjs.extend(utc)
 dayjs.extend(timezone)
 
 // Centralized helper with model fallbacks and friendlier errors
-const DEFAULT_MODEL = process.env.OPENAI_MODEL || "gpt-3.5-turbo";
+const DEFAULT_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const FALLBACK_MODELS = (
   process.env.OPENAI_MODEL_FALLBACKS?.split(",") || [
     // Ordered by preference; edit via env if needed
-    "gpt-3.5-turbo",
-    "gpt-3.5-turbo-16k",
     "gpt-4.1-mini",
     "gpt-4.1",
+    "gpt-3.5-turbo",
   ]
 ).map((s) => s.trim()).filter(Boolean);
 const VISION_MODEL_CANDIDATES = (
@@ -72,6 +71,7 @@ export async function chatWithFallback({ messages, temperature = 0.7, modelList,
       const isModelAccessError =
         code === "model_not_found" ||
         status === 403 ||
+        status === 404 ||
         /does not have access to model/i.test(msg);
       if (isModelAccessError) {
         // Try next model in the list

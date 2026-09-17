@@ -160,6 +160,7 @@ import { ElMessage } from 'element-plus'
 import { trackGuestCompletedOnboarding, trackGuestReachedSignup, trackSignupCompleted } from '@/services/analytics'
 import { seedGuestStarterTasks } from '@/utils/guestTasks'
 import { useSeoMeta } from '@/composables/useSeoMeta'
+import { updateOnboardingStatus } from '@/services/settingsService'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -240,6 +241,10 @@ function prevStep() {
 }
 
 function skipFlow() {
+  if (isLastStep.value) {
+    void completeGuestSetup({ skipped: true })
+    return
+  }
   currentStepIndex.value = steps.length - 1
 }
 
@@ -251,7 +256,7 @@ async function handlePrimary() {
   nextStep()
 }
 
-async function completeGuestSetup() {
+async function completeGuestSetup(options = {}) {
   if (finishing.value) return
   finishing.value = true
   try {
@@ -278,6 +283,27 @@ async function completeGuestSetup() {
       }
     }
 
+    if (uid) {
+      try {
+        const onboarding = {
+          completed: true,
+          completedAt: new Date().toISOString(),
+          ...(options?.skipped ? { skippedAt: new Date().toISOString() } : {}),
+          lastStep: currentStepIndex.value + 1,
+        }
+        const savedOnboarding = await updateOnboardingStatus(uid, onboarding)
+        authStore.user = {
+          ...(authStore.user || {}),
+          preferences: {
+            ...(authStore.user?.preferences || {}),
+            onboarding: savedOnboarding,
+          },
+        }
+      } catch (error) {
+        console.warn('Guest onboarding status sync failed', error?.message || error)
+      }
+    }
+
     trackGuestCompletedOnboarding({
       focus: selectedFocus.value,
       reminderTone: reminderTone.value,
@@ -286,7 +312,7 @@ async function completeGuestSetup() {
       source: route.query.guestFromLanding === '1' ? 'landing' : 'direct',
     })
     trackSignupCompleted({ method: 'guest', registration: true })
-    router.push('/dashboard')
+    router.push('/today/dashboard')
   } catch (error) {
     console.error('Guest onboarding failed', error)
     ElMessage.error('Could not start guest session. Please try again.')

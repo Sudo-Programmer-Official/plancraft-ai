@@ -922,16 +922,35 @@ async function onAttachmentChange(event) {
 /* ---------------- Screen Size Reactive ---------------- */
 const screenWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1024)
 let resizeHandler = null
+let visualViewportHandler = null
 onMounted(() => {
   if (typeof window !== 'undefined') {
-    resizeHandler = () => (screenWidth.value = window.innerWidth)
+    const updateViewportMetrics = () => {
+      screenWidth.value = window.innerWidth
+      const height = window.visualViewport?.height || window.innerHeight
+      try {
+        document.documentElement.style.setProperty('--planner-viewport-height', `${height}px`)
+      } catch {
+        /* noop */
+      }
+    }
+    resizeHandler = updateViewportMetrics
+    visualViewportHandler = updateViewportMetrics
     window.addEventListener('resize', resizeHandler)
+    window.visualViewport?.addEventListener('resize', visualViewportHandler)
+    window.visualViewport?.addEventListener('scroll', visualViewportHandler)
+    updateViewportMetrics()
   }
 })
 onBeforeUnmount(() => {
   if (resizeHandler) {
     window.removeEventListener('resize', resizeHandler)
     resizeHandler = null
+  }
+  if (visualViewportHandler && typeof window !== 'undefined') {
+    window.visualViewport?.removeEventListener('resize', visualViewportHandler)
+    window.visualViewport?.removeEventListener('scroll', visualViewportHandler)
+    visualViewportHandler = null
   }
 })
 const dialogWidth = computed(() => (screenWidth.value < 768 ? '92vw' : '520px'))
@@ -2878,13 +2897,20 @@ function appendDetails(result = {}) {
 </style>
 
 <style lang="scss">
+:root {
+  --planner-viewport-height: 100dvh;
+}
+
  .planner-overlay {
   position: fixed;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1.5rem;
+  padding-top: max(1.5rem, env(safe-area-inset-top, 0px));
+  padding-right: max(1.5rem, env(safe-area-inset-right, 0px));
+  padding-bottom: max(1.5rem, env(safe-area-inset-bottom, 0px));
+  padding-left: max(1.5rem, env(safe-area-inset-left, 0px));
   background: rgba(10, 10, 20, 0.6);
   backdrop-filter: blur(6px);
   z-index: 2000;
@@ -2916,7 +2942,7 @@ function appendDetails(result = {}) {
   padding: 1rem;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
   max-height: calc(100vh - 64px);
-  max-height: calc(100dvh - 64px);
+  max-height: calc(var(--planner-viewport-height, 100dvh) - 64px);
   display: flex;
   flex-direction: column;
   position: relative;
@@ -3094,7 +3120,7 @@ function appendDetails(result = {}) {
     top: auto !important;
     margin: 0 auto !important;
     margin-top: var(--planner-mobile-top-gap) !important;
-    max-height: calc(100dvh - var(--planner-mobile-top-gap) - var(--planner-mobile-bottom-gap));
+    max-height: calc(var(--planner-viewport-height, 100dvh) - var(--planner-mobile-top-gap) - var(--planner-mobile-bottom-gap));
     border-radius: 1rem;
     padding: 0.85rem;
   }
@@ -3159,7 +3185,7 @@ function appendDetails(result = {}) {
     margin-top: var(--planner-mobile-top-gap) !important;
     width: 92vw !important;
     max-width: 560px !important;
-    max-height: calc(100dvh - var(--planner-mobile-top-gap) - var(--planner-mobile-bottom-gap));
+    max-height: calc(var(--planner-viewport-height, 100dvh) - var(--planner-mobile-top-gap) - var(--planner-mobile-bottom-gap));
   }
   .task-planner-dialog .el-dialog__header {
     flex-shrink: 0;

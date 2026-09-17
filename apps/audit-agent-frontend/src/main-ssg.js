@@ -1,5 +1,5 @@
 import 'element-plus/dist/index.css'
-import './assets/tailwind.scss'
+import './assets/tailwind.css'
 
 import { ViteSSG } from 'vite-ssg'
 import App from './App.vue'

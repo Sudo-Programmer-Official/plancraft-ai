@@ -9,6 +9,11 @@
     @done="handleQuickSetupDone"
     @updated="handleQuickSetupUpdated"
   />
+  <PremiumActivationPrompt
+    v-model="premiumActivationOpen"
+    @upgrade="handlePremiumActivationUpgrade"
+    @dismissed="handlePremiumActivationDismissed"
+  />
   <transition name="fade">
     <div
       v-if="showLogoutOverlay"
@@ -747,6 +752,7 @@ import { hasSubscription, registerPushSubscription } from '@/services/pushServic
 import FeedbackPrompt from '@/components/feedback/FeedbackPrompt.vue'
 import FeedbackDrawer from '@/components/feedback/FeedbackDrawer.vue'
 import SetupPrompt from '@/components/SetupPrompt.vue'
+import PremiumActivationPrompt from '@/components/PremiumActivationPrompt.vue'
 import { RouterLink, useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { useAccessStore } from '@/stores/accessStore'
@@ -999,6 +1005,7 @@ onMounted(() => {
 
 const mobileMenu = ref(false) // mobile drawer toggle
 const showUpgrade = ref(false)
+const premiumActivationOpen = ref(false)
 const planOpen = ref(false)
 const profileSetupOpen = ref(false)
 
@@ -1066,7 +1073,9 @@ const usesDocumentScrollShell = computed(
 )
 let upgradeHandler = null
 let actionInboxUpdatedHandler = null
+let premiumActivationHandler = null
 const SUBSCRIPTION_REFRESH_INTERVAL_MS = 5 * 60 * 1000
+const PREMIUM_ACTIVATION_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000
 
 function handleQuickSetupUpdated(nextState = null) {
   quickSetupStore.refreshQuickSetupState(nextState)
@@ -1749,6 +1758,44 @@ function trackUpgradeClick() {
   try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_UPGRADE_CLICK) } catch {}
 }
 
+function premiumActivationStorageKey(uid) {
+  return `plancraftai:premium-activation:last-shown:${uid}`
+}
+
+async function maybeShowPremiumActivation() {
+  const uid = authStore.user?.uid
+  if (!uid || isGuest.value || isPremium.value) return
+
+  try {
+    await accessStore.fetchAccess(uid, { minIntervalMs: 15000 })
+  } catch {
+    // The prompt is only a soft conversion aid; never block task completion on access refresh.
+  }
+  if (isPremium.value || isGuest.value) return
+
+  try {
+    const lastShownAt = Number(localStorage.getItem(premiumActivationStorageKey(uid)) || 0)
+    if (lastShownAt > 0 && Date.now() - lastShownAt < PREMIUM_ACTIVATION_COOLDOWN_MS) return
+    localStorage.setItem(premiumActivationStorageKey(uid), String(Date.now()))
+  } catch {
+    // Continue without a frequency cap if storage is unavailable.
+  }
+
+  premiumActivationOpen.value = true
+}
+
+function handlePremiumActivationUpgrade() {
+  trackUpgradeClick()
+  router.push({
+    path: billingRoutePath.value,
+    query: { source: 'task-value-prompt' },
+  }).catch(() => {})
+}
+
+function handlePremiumActivationDismissed() {
+  premiumActivationOpen.value = false
+}
+
 function goToTalkPlanner() {
   try {
     if (route.path !== '/talk-to-planner') {
@@ -1778,6 +1825,14 @@ onMounted(() => {
       showUpgrade.value = true
     }
     window.addEventListener('upgrade-required', upgradeHandler)
+
+    premiumActivationHandler = (event) => {
+      if (event?.detail?.reason !== 'task-created') return
+      window.setTimeout(() => {
+        maybeShowPremiumActivation().catch(() => {})
+      }, 700)
+    }
+    window.addEventListener('tasks:refresh-request', premiumActivationHandler)
   } catch {}
 })
 
@@ -1843,6 +1898,12 @@ onUnmounted(() => {
       window.removeEventListener('upgrade-required', upgradeHandler)
     } catch {}
     upgradeHandler = null
+  }
+  if (premiumActivationHandler) {
+    try {
+      window.removeEventListener('tasks:refresh-request', premiumActivationHandler)
+    } catch {}
+    premiumActivationHandler = null
   }
 })
 </script>
