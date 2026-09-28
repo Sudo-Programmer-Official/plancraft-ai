@@ -24,6 +24,13 @@
       </div>
 
       <div class="flex flex-col items-center gap-3 pt-2">
+        <a
+          v-if="chromeIntentUrl"
+          :href="chromeIntentUrl"
+          class="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm w-full transition-all"
+        >
+          Open in Chrome
+        </a>
         <button
           type="button"
           @click="copyLink"
@@ -58,14 +65,24 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { isAndroidDevice, buildChromeIntentUrl } from '@/utils/inAppBrowser'
 
 const props = defineProps({
   onContinue: { type: Function, default: null },
   redirectUrl: { type: String, default: window.location.href }
 })
 
+const emit = defineEmits(['close'])
 const visible = ref(true)
+const chromeIntentUrl = computed(() => {
+  if (!isAndroidDevice()) return ''
+  try {
+    return buildChromeIntentUrl(props.redirectUrl)
+  } catch {
+    return ''
+  }
+})
 const copied = ref(false)
 
 function copyLink() {
@@ -83,10 +100,12 @@ function copyLink() {
 function continueFlow() {
   if (typeof props.onContinue === 'function') props.onContinue()
   visible.value = false
+  emit('close')
 }
 
 function close() {
   visible.value = false
+  emit('close')
 }
 </script>
 

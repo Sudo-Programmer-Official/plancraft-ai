@@ -34,7 +34,7 @@
                   :disabled="authUiBusy"
                   class="w-full flex items-center justify-center gap-3 bg-white text-gray-900 px-6 py-4 rounded-xl font-semibold shadow-lg hover:-translate-y-0.5 hover:shadow-2xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 disabled:opacity-70"
                 >
-                  <img src="https://www.svgrepo.com/show/355037/google.svg" alt="Google" class="w-5 h-5" />
+                  <img src="/icons/google-g.svg" alt="Google" class="w-5 h-5" />
                   Continue with Google
                 </button>
                 <button
@@ -43,7 +43,7 @@
                   :disabled="authUiBusy"
                   class="w-full flex items-center justify-center gap-3 bg-white text-gray-900 px-6 py-4 rounded-xl font-semibold shadow-lg hover:-translate-y-0.5 hover:shadow-2xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 disabled:opacity-70"
                 >
-                  <img src="https://www.svgrepo.com/show/303128/apple-logo.svg" alt="Apple" class="w-5 h-5" />
+                  <img src="/icons/apple-logo.svg" alt="Apple" class="w-5 h-5" />
                   Continue with Apple
                 </button>
                 <button
@@ -294,6 +294,12 @@
 
           <GoogleAuthDiagnostic v-if="!isNativeApp" class="mt-6" />
         </div>
+        <InAppBrowserWarning
+          v-if="showInAppWarning"
+          :redirect-url="inAppRedirectUrl"
+          :on-continue="() => setActiveAuthMode('email')"
+          @close="showInAppWarning = false"
+        />
       </div>
     </div>
   </div>
@@ -305,6 +311,7 @@ import { useRouter, useRoute } from "vue-router"
 import { useAuthStore } from "@/stores/authStore"
 import { useFeatureFlagsStore } from '@/stores/featureFlagsStore'
 import LoginFeatureSlider from '@/components/LoginFeatureSlider.vue'
+import { useStarfield } from '@/composables/useStarfield'
 import { useSeoMeta } from '@/composables/useSeoMeta'
 import { Capacitor } from '@capacitor/core'
 
@@ -350,6 +357,8 @@ import { parsePhoneNumberFromString } from 'libphonenumber-js'
 import { sendMagicLink, completeMagicLinkSignIn } from '@/services/authService'
 import { trackSignupCompleted } from '@/services/analytics'
 import GoogleAuthDiagnostic from '@/components/GoogleAuthDiagnostic.vue'
+import InAppBrowserWarning from '@/components/InAppBrowserWarning.vue'
+import { isInAppBrowser } from '@/utils/inAppBrowser'
 import {
   isNativePackagedApp,
   getNativeAuthRestriction,
@@ -405,14 +414,38 @@ function surfaceAppleAuthError(errorCode) {
   clearAppleAuthErrorQuery()
 }
 
+const showInAppWarning = ref(false)
+const inAppRedirectUrl = ref('')
+
+function openInAppBrowserWarning() {
+  inAppRedirectUrl.value = window.location.href
+  showInAppWarning.value = true
+}
+
 async function loginGoogle() {
   try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_SIGNIN_CLICK) } catch {}
+  if (isInAppBrowser()) {
+    openInAppBrowserWarning()
+    return
+  }
   try {
     await authStore.loginWithGoogle()
     if (authStore.user) await redirectAfterLogin()
   } catch (err) {
-    console.warn('Google login failed; offering OTP fallback', err)
-    if (err?.code === 'auth/native-google-unsupported') {
+    console.warn('Google login failed', err)
+    const code = String(err?.code || '')
+    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+      return
+    }
+    if (code === 'auth/in-app-browser') {
+      openInAppBrowserWarning()
+      return
+    }
+    if (code === 'auth/popup-blocked') {
+      try { ElMessage.warning('Your browser blocked the Google sign-in window. Allow pop-ups for this site and try again.') } catch {}
+      return
+    }
+    if (code === 'auth/native-google-unsupported') {
       try { ElMessage.info(getNativeAuthRestriction('google')) } catch {}
       setActiveAuthMode('email')
       return
@@ -421,8 +454,8 @@ async function loginGoogle() {
       try { ElMessage.info('Google account linking from inside the Android app is not available yet. Sign in directly instead.') } catch {}
       return
     }
-    setActiveAuthMode('phone')
-    try { ElMessage.info('Google sign-in unavailable. Try phone OTP.') } catch {}
+    setActiveAuthMode('email')
+    try { ElMessage.error('Google sign-in did not finish. Try again, or use email instead.') } catch {}
   }
 }
 
@@ -735,11 +768,24 @@ async function onLoginEmail() {
       triggerEmailErrorFeedback('Incorrect email or password.')
       return
     }
-    if (code.includes('timed out')) {
-      ElMessage.error('Login timed out. Please try again.')
+    if (code.includes('auth/identity-conflict')) {
+      triggerEmailErrorFeedback(e?.message || 'That email already belongs to another account.', {
+        highlightEmail: true,
+        highlightPassword: false,
+      })
       return
     }
-    ElMessage.error(`Login failed: ${code || 'unknown error'}`)
+    if (code.includes('auth/too-many-requests')) {
+      triggerEmailErrorFeedback('Too many attempts. Wait a minute or reset your password.', {
+        highlightPassword: false,
+      })
+      return
+    }
+    if (code.includes('timed out') || code.includes('auth/network-request-failed')) {
+      ElMessage.error('Login timed out. Check your connection and try again.')
+      return
+    }
+    ElMessage.error('Could not sign you in right now. Please try again.')
   } finally {
     emailSubmitting.value = false
   }
@@ -1298,37 +1344,9 @@ async function redirectAfterLogin() {
   }
 }
 
-// --- Star animation ---
+useStarfield(starsCanvas)
+
 onMounted(() => {
-  const canvas = starsCanvas.value
-  const ctx = canvas.getContext("2d")
-  canvas.width = window.innerWidth
-  canvas.height = window.innerHeight
-
-  const stars = Array.from({ length: 100 }, () => ({
-    x: Math.random() * canvas.width,
-    y: Math.random() * canvas.height,
-    radius: Math.random() * 1.5,
-    speed: Math.random() * 0.5 + 0.2,
-  }))
-
-  function animate() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
-    ctx.fillStyle = "white"
-    stars.forEach((star) => {
-      ctx.beginPath()
-      ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2)
-      ctx.fill()
-      star.y += star.speed
-      if (star.y > canvas.height) {
-        star.y = 0
-        star.x = Math.random() * canvas.width
-      }
-    })
-    requestAnimationFrame(animate)
-  }
-  animate()
-
   if (isNativeApp.value) {
     setActiveAuthMode('email', { focus: false })
     return

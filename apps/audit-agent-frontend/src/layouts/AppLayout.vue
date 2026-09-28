@@ -740,7 +740,7 @@
         <RouterView v-else />
       </main>
       <PlanSummaryModal :open="planOpen" @close="planOpen = false" />
-      <ProfileSetup :open="profileSetupOpen" @close="profileSetupOpen=false" @saved="onProfileSaved" />
+      <ProfileSetup :open="profileSetupOpen" @close="profileSetupOpen=false" @saved="onProfileSaved" @dismissed="onProfileDismissed" />
     </div>
     </template>
   </div>
@@ -1428,6 +1428,9 @@ async function maybePromptProfile() {
     if (authStore?.isGuest || authStore?.guest === true) return
     const localKey = `profile_setup_done:${uid}`
     if (localStorage.getItem(localKey) === '1') return
+    const snoozedUntil = Number(localStorage.getItem(`profile_setup_snooze:${uid}`) || 0)
+    if (snoozedUntil > Date.now()) return
+    if (profileSetupOpen.value) return
     const data = await fetchUserProfile(uid)
     if (!data || typeof data !== 'object' || !Object.keys(data).length) {
       const ref = doc(db, 'users', uid)
@@ -1449,6 +1452,15 @@ function onProfileSaved() {
   try {
     const uid = authStore?.user?.uid
     if (uid) localStorage.setItem(`profile_setup_done:${uid}`, '1')
+  } catch {}
+}
+
+const PROFILE_SETUP_SNOOZE_MS = 3 * 24 * 60 * 60 * 1000
+
+function onProfileDismissed() {
+  try {
+    const uid = authStore?.user?.uid
+    if (uid) localStorage.setItem(`profile_setup_snooze:${uid}`, String(Date.now() + PROFILE_SETUP_SNOOZE_MS))
   } catch {}
 }
 

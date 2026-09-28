@@ -2899,6 +2899,9 @@ function appendDetails(result = {}) {
 <style lang="scss">
 :root {
   --planner-viewport-height: 100dvh;
+  /* Space kept clear above/below the dialog (notch, home indicator). */
+  --planner-edge-top: max(1rem, calc(env(safe-area-inset-top, 0px) + 0.75rem));
+  --planner-edge-bottom: max(1rem, calc(env(safe-area-inset-bottom, 0px) + 0.75rem));
 }
 
  .planner-overlay {
@@ -2918,31 +2921,29 @@ function appendDetails(result = {}) {
 
 .planner-overlay .el-overlay-dialog {
   display: flex;
-  align-items: center;
   justify-content: center;
   width: 100%;
+  height: var(--planner-viewport-height, 100dvh);
+  box-sizing: border-box;
+  padding: var(--planner-edge-top) 0.75rem var(--planner-edge-bottom);
 }
 
+/* margin:auto centers vertically but, unlike align-items:center, never pushes
+   the top of a tall dialog off-screen. */
 .planner-overlay .el-dialog {
-  margin: 0 !important;
+  margin: auto !important;
+  top: auto !important;
 }
 
-/* Dialog background */
-.task-planner-dialog .el-dialog {
-  --planner-mobile-top-gap: max(
-    calc(var(--safe-area-top, env(safe-area-inset-top, 0px)) + 0.85rem),
-    2rem
-  );
-  --planner-mobile-bottom-gap: calc(
-    var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 0.85rem
-  );
+/* The class sits on the .el-dialog element itself, not a wrapper. */
+.el-dialog.task-planner-dialog {
   background: linear-gradient(145deg, #1e1b4b, #312e81, #4c1d95);
   color: #e2e8f0;
   border-radius: 1rem;
   padding: 1rem;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
-  max-height: calc(100vh - 64px);
-  max-height: calc(var(--planner-viewport-height, 100dvh) - 64px);
+  max-height: calc(100vh - 2rem);
+  max-height: calc(var(--planner-viewport-height, 100dvh) - var(--planner-edge-top) - var(--planner-edge-bottom));
   display: flex;
   flex-direction: column;
   position: relative;
@@ -3103,24 +3104,7 @@ function appendDetails(result = {}) {
 }
 
 @media (max-width: 640px) {
-  .planner-overlay {
-    align-items: flex-start;
-    padding-top: 1rem;
-    padding-right: 0.85rem;
-    padding-bottom: calc(var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 0.85rem);
-    padding-left: 0.85rem;
-  }
-
-  .planner-overlay .el-overlay-dialog {
-    align-items: flex-start;
-  }
-
-  .task-planner-dialog .el-dialog {
-    width: min(100%, 560px);
-    top: auto !important;
-    margin: 0 auto !important;
-    margin-top: var(--planner-mobile-top-gap) !important;
-    max-height: calc(var(--planner-viewport-height, 100dvh) - var(--planner-mobile-top-gap) - var(--planner-mobile-bottom-gap));
+  .el-dialog.task-planner-dialog {
     border-radius: 1rem;
     padding: 0.85rem;
   }
@@ -3168,24 +3152,9 @@ function appendDetails(result = {}) {
 
  /* Mobile: safe-area offset, fixed header/footer, scrollable body */
 @media (max-width: 768px) {
-  .planner-overlay {
-    align-items: flex-start;
-    justify-content: center;
-    padding-top: 1rem;
-    padding-right: 0.85rem;
-    padding-bottom: calc(var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 0.85rem);
-    padding-left: 0.85rem;
-  }
-
-  .task-planner-dialog .el-dialog {
-    top: auto !important;
-    display: flex;
-    flex-direction: column;
-    margin: 0 auto !important;
-    margin-top: var(--planner-mobile-top-gap) !important;
+  .el-dialog.task-planner-dialog {
     width: 92vw !important;
     max-width: 560px !important;
-    max-height: calc(var(--planner-viewport-height, 100dvh) - var(--planner-mobile-top-gap) - var(--planner-mobile-bottom-gap));
   }
   .task-planner-dialog .el-dialog__header {
     flex-shrink: 0;

@@ -809,6 +809,7 @@
 import { computed, ref, onMounted } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
 import SeoLongForm from '@/components/SeoLongForm.vue'
+import { useStarfield } from '@/composables/useStarfield'
 import TestimonialsSection from '@/components/TestimonialsSection.vue'
 import { useSeoMeta } from '@/composables/useSeoMeta'
 import { trackGuestStartFromLanding } from '@/services/analytics'
@@ -1282,6 +1283,7 @@ function continueAsGuest() {
 
 const stars = ref(null)
 const starsCanvas = ref(null)
+useStarfield(starsCanvas, { minSpeed: 0.5, maxSpeed: 1.5 })
 const latestBlogs = ref([])
 
 async function loadLatestBlogs() {
@@ -1320,28 +1322,6 @@ function getFallbackImage(title = '') {
 
 onMounted(() => {
   loadLatestBlogs()
-  const canvas = starsCanvas.value
-  const ctx = canvas.getContext('2d')
-  canvas.width = window.innerWidth
-  canvas.height = window.innerHeight
-  const s = Array.from({ length: 100 }, () => ({
-    x: Math.random() * canvas.width,
-    y: Math.random() * canvas.height,
-    r: Math.random() * 1.5,
-    sp: Math.random() * 1 + 0.5,
-  }))
-  ;(function animate() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
-    ctx.fillStyle = 'white'
-    s.forEach((st) => {
-      ctx.beginPath()
-      ctx.arc(st.x, st.y, st.r, 0, Math.PI * 2)
-      ctx.fill()
-      st.y += st.sp
-      if (st.y > canvas.height) st.y = 0
-    })
-    requestAnimationFrame(animate)
-  })()
 })
 </script>
 

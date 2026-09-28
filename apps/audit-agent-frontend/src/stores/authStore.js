@@ -25,6 +25,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithCustomToken,
+  signInWithCredential,
   EmailAuthProvider,
   PhoneAuthProvider,
   updateProfile,
@@ -49,6 +50,7 @@ import {
   writeNativeIosAuthSnapshot,
 } from '@/utils/authStorage'
 import { normalizePhone } from '@/utils/phoneUtils'
+import { isInAppBrowser } from '@/utils/inAppBrowser'
 import {
   buildNativeAuthCallbackUrl,
   buildNativeAuthFallbackSchemeUrl,
@@ -60,12 +62,6 @@ import {
   launchNativeAuthRoute,
   normalizeRedirectPath,
 } from '@/services/mobileAuthHandoffService'
-
-// 🧠 Helper: detect in-app / insecure browsers (LinkedIn, Instagram, etc.)
-function isInAppBrowser() {
-  const ua = navigator.userAgent || navigator.vendor || window.opera
-  return /FBAN|FBAV|Instagram|LinkedInApp|Twitter/i.test(ua)
-}
 
 function isIosCapacitorApp() {
   try {
@@ -1396,6 +1392,12 @@ export const useAuthStore = defineStore('authStore', {
         err.code = 'auth/native-google-unsupported'
         throw err
       }
+      if (isInAppBrowser()) {
+        // Google blocks OAuth in embedded webviews (disallowed_useragent).
+        const err = new Error('Google sign-in does not work inside in-app browsers.')
+        err.code = 'auth/in-app-browser'
+        throw err
+      }
 
       const provider = new GoogleAuthProvider()
       provider.setCustomParameters({ prompt: 'select_account' })
@@ -1417,6 +1419,9 @@ export const useAuthStore = defineStore('authStore', {
         }
 
         console.info('[Auth] Web platform detected; using popup Google sign-in', { linking: !!current && !alreadyLinked })
+
+        // Set when a guest session is replaced by the user's existing Google account.
+        let user = null
 
         // If already signed in (phone/email/guest), link Google to the current UID to avoid duplicates.
         if (current && !alreadyLinked) {
@@ -1459,102 +1464,28 @@ export const useAuthStore = defineStore('authStore', {
             if (code.includes('provider-already-linked')) {
               return current
             }
-            // Do not fall through to sign-in while a session exists; avoids duplicate users.
-            console.warn('[Auth] Google link failed; aborting sign-in to avoid duplicates', err?.message || err)
-            throw err
+            // Returning user on an anonymous guest session: the Google account
+            // already has a PlanCraftAI account, so sign into it directly.
+            const existingCredential =
+              current?.isAnonymous === true && code.includes('credential-already-in-use')
+                ? GoogleAuthProvider.credentialFromError(err)
+                : null
+            if (!existingCredential) {
+              // Do not fall through to sign-in while a session exists; avoids duplicate users.
+              console.warn('[Auth] Google link failed; aborting sign-in to avoid duplicates', err?.message || err)
+              throw err
+            }
+            console.warn('[Auth] Guest link conflict; signing into existing Google account', {
+              guestUid: current.uid,
+            })
+            user = (await signInWithCredential(auth, existingCredential)).user
           }
         }
 
-        // Redirect is reserved for native builds; browsers stay on popup flow.
-        if (isNative) {
-          try {
-            const ua = navigator.userAgent || ''
-            const isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone
-            const isIOS = /iP(hone|ad|od)/i.test(ua)
-            const isSafari = /safari/i.test(ua) && !/crios|fxios|fxios|edgios|chrome/i.test(ua)
-            if (isStandalone || (isIOS && isSafari)) {
-              await signInWithRedirect(auth, provider)
-              return
-            }
-          } catch {}
-        }
-
-        // if (isInAppBrowser()) {
-        //   console.warn('In-app browser detected — showing warning modal')
-        //   // Dynamically mount the modal to DOM
-        //   const container = document.createElement('div')
-        //   document.body.appendChild(container)
-
-        //   const { createApp } = await import('vue')
-        //   const InAppBrowserWarning = (await import('@/components/InAppBrowserWarning.vue')).default
-
-        //   const app = createApp(InAppBrowserWarning, {
-        //     onContinue: async () => {
-        //       try {
-        //         app.unmount()
-        //         document.body.removeChild(container)
-        //         await signInWithRedirect(auth, provider)
-        //       } catch (e) {
-        //         console.error('Redirect failed:', e)
-        //       }
-        //     },
-        //   })
-        //   app.mount(container)
-
-        //   return // Wait until modal resolves
-        // }
-        if (isNative && isInAppBrowser()) {
-          console.warn('In-app browser detected — showing helper modal')
-          const container = document.createElement('div')
-          document.body.appendChild(container)
-
-          const { createApp } = await import('vue')
-          const InAppBrowserHelper = (await import('@/components/InAppBrowserWarning.vue')).default
-
-          const app = createApp(InAppBrowserHelper, {
-            redirectUrl: window.location.href,
-            onContinue: async () => {
-              app.unmount()
-              document.body.removeChild(container)
-              try {
-                await signInWithRedirect(auth, provider)
-              } catch (e) {
-                console.error('Redirect failed:', e)
-              }
-            },
-          })
-          app.mount(container)
-          return
-        }
-
-        // Default attempt: popup; be selective about redirect fallback.
-        let user
-        try {
+        if (!user) {
+          // Popup only on web. Redirect is not used in browsers because the
+          // return trip through /login is unreliable with storage partitioning.
           user = await signInWithGoogle()
-        } catch (popupErr) {
-          const code = String(popupErr?.code || '')
-          const msg = String(popupErr?.message || '')
-          const popupBlocked = code === 'auth/popup-blocked' || code === 'auth/cancelled-popup-request'
-          const ua = navigator.userAgent || ''
-          const isIOS = /iP(hone|ad|od)/i.test(ua)
-          const isSafari = /safari/i.test(ua) && !/crios|fxios|edgios|chrome/i.test(ua)
-          const isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone
-          const shouldTryRedirect = popupBlocked || isStandalone || (isIOS && isSafari)
-
-          if (shouldTryRedirect && isNative) {
-            console.warn('[Auth] Popup sign-in blocked/unavailable; trying redirect instead', { code, msg })
-            try {
-              await signInWithRedirect(auth, provider)
-              return
-            } catch (redirErr) {
-              console.error('[Auth] Redirect sign-in also failed', redirErr)
-              throw redirErr
-            }
-          }
-
-          // Do not auto-redirect for other failures (e.g., storage partitioning).
-          // Surface the error so the UI can suggest trying a non-private window.
-          throw popupErr
         }
         const profile = await fetchUserProfile(user.uid)
         this.user = {
@@ -1977,6 +1908,7 @@ export const useAuthStore = defineStore('authStore', {
         const alreadyLinked = (current?.providerData || []).some((p) => p?.providerId === 'phone')
 
         let user = null
+        let phoneUser = null
         let resolvedPhoneNumber = ''
         let canonicalized = false
         if (current && !alreadyLinked) {
@@ -1989,7 +1921,19 @@ export const useAuthStore = defineStore('authStore', {
             user = linkRes?.user || current
           } catch (err) {
             const code = String(err?.code || '')
-            if (
+            // Returning user on an anonymous guest session: the number belongs
+            // to their real account, so sign into it with the verified credential.
+            const existingCredential =
+              current?.isAnonymous === true && code === 'auth/credential-already-in-use'
+                ? PhoneAuthProvider.credentialFromError(err)
+                : null
+            if (existingCredential) {
+              console.warn('[Auth] Guest link conflict; signing into existing phone account', {
+                guestUid: current.uid,
+              })
+              directPhoneSignIn = true
+              phoneUser = (await signInWithCredential(auth, existingCredential))?.user || null
+            } else if (
               code === 'auth/credential-already-in-use' ||
               code === 'auth/account-exists-with-different-credential'
             ) {
@@ -1998,17 +1942,23 @@ export const useAuthStore = defineStore('authStore', {
               )
               conflict.code = 'auth/identity-conflict'
               throw conflict
+            } else {
+              throw err
             }
-            throw err
           }
-          resolvedPhoneNumber = user?.phoneNumber || current?.phoneNumber || ''
-          // Persist the verified provider identity without changing the UID.
-          // A conflict is surfaced instead of merging accounts implicitly.
-          await syncVerifiedAuthIdentity(user, 'phone')
-        } else {
+          if (user) {
+            resolvedPhoneNumber = user?.phoneNumber || current?.phoneNumber || ''
+            // Persist the verified provider identity without changing the UID.
+            // A conflict is surfaced instead of merging accounts implicitly.
+            await syncVerifiedAuthIdentity(user, 'phone')
+          }
+        }
+        if (!user) {
           directPhoneSignIn = true
-          const result = await confirmationResult.confirm(otp)
-          const phoneUser = result?.user
+          if (!phoneUser) {
+            const result = await confirmationResult.confirm(otp)
+            phoneUser = result?.user
+          }
           if (!phoneUser?.uid) throw new Error('Phone sign-in failed')
           resolvedPhoneNumber = phoneUser.phoneNumber || ''
 
@@ -2357,11 +2307,18 @@ export const useAuthStore = defineStore('authStore', {
                 code === 'auth/account-exists-with-different-credential'
               )
             if (!canFallbackToSignIn) throw error
-            const conflict = new Error(
-              'That email already belongs to an account. Sign in to that account first so your guest tasks are not lost.',
-            )
-            conflict.code = 'auth/identity-conflict'
-            throw conflict
+            if (current?.isAnonymous !== true) {
+              const conflict = new Error(
+                'That email already belongs to an account. Sign in to that account first so your guest tasks are not lost.',
+              )
+              conflict.code = 'auth/identity-conflict'
+              throw conflict
+            }
+            // Returning user on an anonymous guest session: the email belongs to
+            // their real account, so sign into it instead of blocking login.
+            console.warn('[Auth] Guest link conflict; signing into existing email account', {
+              guestUid: current.uid,
+            })
           }
         }
 
