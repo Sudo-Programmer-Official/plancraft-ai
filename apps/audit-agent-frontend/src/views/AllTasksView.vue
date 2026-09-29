@@ -186,6 +186,7 @@
                 </div>
               </div>
               <div class="flex flex-col items-end gap-2 text-right text-xs text-slate-400">
+                <FocusButton :task="task" />
                 <span>Created {{ createdLabel(task) }}</span>
                 <span class="font-medium text-indigo-200" v-if="task.previousDate">
                   From {{ task.previousDate }}
@@ -206,6 +207,7 @@ import { toLocalDateKey } from '@/utils/dateHelper'
 import { useDayClock } from '@/composables/useDayClock'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { useTasks } from '@/composables/useTasks'
+import FocusButton from '@/components/focus/FocusButton.vue'
 
 const workspaceStore = useWorkspaceStore()
 const { allTasks, refreshAllTasks, getTaskPlannedDate } = useTasks()

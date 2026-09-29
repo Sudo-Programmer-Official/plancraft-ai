@@ -1,1 +1,269 @@
 @import "tailwindcss";
+
+/* PlanCraft Design System colours as utilities (bg-pc-surface, text-pc-text-muted, ...).
+   Values come from src/design/tokens.css and only resolve inside .pc-theme. */
+@theme inline {
+  --color-pc-bg: var(--pc-bg);
+  --color-pc-surface: var(--pc-surface);
+  --color-pc-surface-2: var(--pc-surface-2);
+  --color-pc-border: var(--pc-border);
+  --color-pc-text: var(--pc-text);
+  --color-pc-text-muted: var(--pc-text-muted);
+  --color-pc-text-subtle: var(--pc-text-subtle);
+  --color-pc-accent: var(--pc-accent);
+  --color-pc-accent-text: var(--pc-accent-text);
+  --color-pc-accent-soft: var(--pc-accent-soft);
+  --color-pc-danger: var(--pc-danger);
+  --color-pc-success: var(--pc-success);
+}
+
+/* Public routes share the landing page's light visual language. */
+.marketing-light {
+  color-scheme: light;
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+
+.marketing-light[class*='bg-gradient'],
+.marketing-light.pricing-page-root,
+.marketing-light :where(section, article, header, main, footer, div.rounded-3xl)[class*='bg-gradient'],
+.marketing-light [class*='bg-indigo-950'],
+.marketing-light [class*='bg-purple-950'],
+.marketing-light [class*='bg-black/20'],
+.marketing-light [class*='bg-gray-950'],
+.marketing-light [class*='bg-gray-900'],
+.marketing-light [class*='bg-gray-800'],
+.marketing-light [class*='bg-slate-950'],
+.marketing-light [class*='bg-slate-900'],
+.marketing-light [class*='bg-slate-800'] {
+  background: #f6f7fc !important;
+}
+
+.marketing-light [class*='bg-white/5'],
+.marketing-light [class*='bg-white/8'],
+.marketing-light [class*='bg-white/10'] {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 12px 30px -24px rgba(15, 23, 42, 0.45);
+}
+
+.marketing-light [class*='border-white'],
+.marketing-light [class*='border-gray-'],
+.marketing-light [class*='border-slate-'] {
+  border-color: #e2e8f0 !important;
+}
+
+.marketing-light .text-white,
+.marketing-light [class*='text-slate-100'],
+.marketing-light [class*='text-gray-100'],
+.marketing-light [class*='text-gray-200'] {
+  color: #0f172a !important;
+}
+
+.marketing-light [class*='text-indigo-100'],
+.marketing-light [class*='text-slate-300'],
+.marketing-light [class*='text-gray-300'] {
+  color: #475569 !important;
+}
+
+.marketing-light [class*='text-indigo-200'],
+.marketing-light [class*='text-slate-400'],
+.marketing-light [class*='text-gray-400'] {
+  color: #64748b !important;
+}
+
+.marketing-light [class*='text-indigo-300'] {
+  color: #4f46e5 !important;
+}
+
+.marketing-light [class*='bg-indigo-600'],
+.marketing-light [class*='bg-indigo-500'],
+.marketing-light [class*='bg-purple-600'],
+.marketing-light [class*='bg-fuchsia-600'],
+.marketing-light :where(button, a)[class*='bg-gradient'] {
+  color: #ffffff !important;
+}
+
+.marketing-light :where(button, a)[class*='bg-indigo-'] .text-white,
+.marketing-light :where(button, a)[class*='bg-purple-'] .text-white,
+.marketing-light :where(button, a)[class*='bg-fuchsia-'] .text-white,
+.marketing-light :where(button, a)[class*='bg-gradient'] .text-white {
+  color: #ffffff !important;
+}
+
+.marketing-light :where(input, textarea, select) {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+.marketing-light :where(input, textarea, select)::placeholder {
+  color: #94a3b8 !important;
+}
+
+.marketing-light a:hover {
+  color: #4338ca;
+}
+
+.marketing-light .seo-long-form {
+  background: #f6f7fc !important;
+}
+
+.marketing-light .seo-long-form::after {
+  background: radial-gradient(circle at top, rgba(99, 102, 241, 0.12), transparent 60%);
+}
+
+.marketing-light .prose-invert {
+  --tw-prose-body: #475569;
+  --tw-prose-headings: #0f172a;
+  --tw-prose-links: #4338ca;
+  --tw-prose-bold: #0f172a;
+  --tw-prose-bullets: #6366f1;
+  --tw-prose-counters: #6366f1;
+  --tw-prose-hr: #e2e8f0;
+  --tw-prose-quotes: #334155;
+  --tw-prose-quote-borders: #c7d2fe;
+  --tw-prose-captions: #64748b;
+  --tw-prose-code: #312e81;
+  --tw-prose-pre-code: #e2e8f0;
+  --tw-prose-pre-bg: #0f172a;
+  --tw-prose-th-borders: #cbd5e1;
+  --tw-prose-td-borders: #e2e8f0;
+}
+
+.marketing-light .prose :where(h1, h2, h3, h4, h5, h6) {
+  color: #0f172a !important;
+}
+
+.marketing-light .prose :where(p, li, td, th, strong) {
+  color: #475569 !important;
+}
+
+.marketing-light .prose :where(a) {
+  color: #4338ca !important;
+}
+
+/* Admin, creator, and leader layouts use the same light default. */
+.light-shell {
+  color-scheme: light;
+  background: #f6f7fc !important;
+  color: #0f172a !important;
+}
+
+.light-shell[class*='bg-gradient'],
+.light-shell [class*='bg-gray-950'],
+.light-shell [class*='bg-gray-900'],
+.light-shell [class*='bg-gray-800'],
+.light-shell [class*='bg-slate-950'],
+.light-shell [class*='bg-slate-900'],
+.light-shell [class*='bg-slate-800'] {
+  background: #f6f7fc !important;
+}
+
+.light-shell [class*='bg-white/5'],
+.light-shell [class*='bg-white/10'] {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+.light-shell [class*='border-white'],
+.light-shell [class*='border-gray-'],
+.light-shell [class*='border-slate-'] {
+  border-color: #e2e8f0 !important;
+}
+
+.light-shell [class*='text-white'],
+.light-shell [class*='text-slate-100'],
+.light-shell [class*='text-slate-200'],
+.light-shell [class*='text-gray-100'],
+.light-shell [class*='text-gray-200'] {
+  color: #0f172a !important;
+}
+
+.light-shell [class*='text-slate-300'],
+.light-shell [class*='text-gray-300'] {
+  color: #475569 !important;
+}
+
+.light-shell [class*='text-slate-400'],
+.light-shell [class*='text-gray-400'] {
+  color: #64748b !important;
+}
+
+.light-shell :where(button, a)[class*='bg-gradient'],
+.light-shell :where(button, a)[class*='bg-indigo-'],
+.light-shell :where(button, a)[class*='bg-purple-'],
+.light-shell :where(button, a)[class*='bg-fuchsia-'] {
+  color: #ffffff !important;
+}
+
+.light-shell :where(button, a)[class*='bg-indigo-'] .text-white,
+.light-shell :where(button, a)[class*='bg-purple-'] .text-white,
+.light-shell :where(button, a)[class*='bg-fuchsia-'] .text-white,
+.light-shell :where(button, a)[class*='bg-gradient'] .text-white {
+  color: #ffffff !important;
+}
+
+
+/* Legacy workspace screens inherit the same light canvas while their
+   individual components are migrated to the shared tokens. */
+.app-shell .app-content > [class*='min-h-screen'][class*='bg-'],
+.app-shell .app-content > .app-page-shell,
+.app-shell .app-content > .talk-planner-page,
+.app-shell .app-content > [class*='text-white'],
+.app-shell .app-content > [class*='text-slate-50'] {
+  background: var(--pc-bg) !important;
+  color: var(--pc-text) !important;
+}
+
+.app-shell .app-content [class*='bg-gray-950'],
+.app-shell .app-content [class*='bg-gray-900'],
+.app-shell .app-content [class*='bg-gray-800'],
+.app-shell .app-content [class*='bg-slate-950'],
+.app-shell .app-content [class*='bg-slate-900'],
+.app-shell .app-content [class*='bg-slate-800'],
+.app-shell .app-content [class*='bg-white/5'],
+.app-shell .app-content [class*='bg-white/8'],
+.app-shell .app-content [class*='bg-white/10'] {
+  background: var(--pc-surface) !important;
+  border-color: var(--pc-border) !important;
+}
+
+.app-shell .app-content [class*='border-white'],
+.app-shell .app-content [class*='border-gray-'],
+.app-shell .app-content [class*='border-slate-'] {
+  border-color: var(--pc-border) !important;
+}
+
+.app-shell .app-content :where(h1, h2, h3, h4, h5, h6, p, li, td, th, label, summary).text-white,
+.app-shell .app-content [class*='text-slate-100'],
+.app-shell .app-content [class*='text-slate-200'],
+.app-shell .app-content [class*='text-gray-100'],
+.app-shell .app-content [class*='text-gray-200'] {
+  color: var(--pc-text) !important;
+}
+
+/* Exception: an element that paints its own strong background (badge, pill,
+   chip, the avatar upload label) keeps its white text in light mode. */
+.light-shell [class*='text-white']:is([class*='bg-indigo-5'], [class*='bg-indigo-6'], [class*='bg-indigo-7'], [class*='bg-violet-6'], [class*='bg-purple-6'], [class*='bg-red-5'], [class*='bg-red-6'], [class*='bg-emerald-5'], [class*='bg-emerald-6'], [class*='bg-green-5'], [class*='bg-green-6'], [class*='bg-gradient'], [class*='accent-fill']),
+.app-shell .app-content [class*='text-white']:is([class*='bg-indigo-5'], [class*='bg-indigo-6'], [class*='bg-indigo-7'], [class*='bg-violet-6'], [class*='bg-purple-6'], [class*='bg-red-5'], [class*='bg-red-6'], [class*='bg-emerald-5'], [class*='bg-emerald-6'], [class*='bg-green-5'], [class*='bg-green-6'], [class*='bg-gradient'], [class*='accent-fill']) {
+  color: #ffffff !important;
+}
+
+.app-shell .app-content [class*='text-slate-300'],
+.app-shell .app-content [class*='text-gray-300'],
+.app-shell .app-content [class*='text-indigo-100'] {
+  color: var(--pc-text-muted) !important;
+}
+
+.app-shell .app-content [class*='text-slate-400'],
+.app-shell .app-content [class*='text-gray-400'],
+.app-shell .app-content [class*='text-indigo-200'] {
+  color: var(--pc-text-subtle) !important;
+}
+
+.app-shell .app-content :where(input, textarea, select) {
+  background: var(--pc-surface) !important;
+  border-color: var(--pc-border-strong) !important;
+  color: var(--pc-text) !important;
+}

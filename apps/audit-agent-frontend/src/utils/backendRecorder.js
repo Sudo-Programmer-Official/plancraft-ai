@@ -130,6 +130,9 @@ export async function recordAndSendToBackend(
   if (mimeType) recorderConfig.mimeType = mimeType
 
   const recorder = new RecordRTC(stream, recorderConfig)
+  // Expose the capture stream to the shared recorder so voice activity detection
+  // can observe the same audio without changing the upload/transcription path.
+  recorder.__stream = stream
 
   recorder.startRecording()
 

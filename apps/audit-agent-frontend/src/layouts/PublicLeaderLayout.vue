@@ -1,8 +1,8 @@
 <template>
-  <div class="min-h-screen flex bg-slate-950 text-slate-100">
+  <div class="light-shell min-h-screen flex bg-slate-950 text-slate-900">
     <aside class="w-16 sm:w-20 lg:w-64 bg-slate-900/80 border-r border-slate-800 flex flex-col">
       <div class="px-4 py-4 border-b border-slate-800 flex items-center justify-between">
-        <RouterLink to="/dashboard" class="text-sm text-indigo-100 hover:text-white">← Home</RouterLink>
+        <RouterLink to="/today" class="text-sm text-indigo-100 hover:text-white">← Home</RouterLink>
         <span class="text-xs uppercase tracking-[0.2em] text-slate-400 hidden lg:inline">Leader</span>
       </div>
       <nav class="flex-1 py-4 space-y-2 overflow-y-auto scrollbar-plan">

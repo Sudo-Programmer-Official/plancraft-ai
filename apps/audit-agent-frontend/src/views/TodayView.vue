@@ -40,7 +40,7 @@
           :key="task.id"
           class="bg-gray-900/60 p-3 rounded flex justify-between items-center"
         >
-          <span>{{ task.text }}</span>
+          <span>{{ task.title || task.text }}</span>
           <button @click="toggleComplete(task)" class="text-xs px-2 py-1 rounded bg-green-500">
             {{ task.completed ? 'Done' : 'Mark Done' }}
           </button>
@@ -53,7 +53,7 @@
       <h2 class="text-lg font-semibold mb-3">📋 Other Tasks Today</h2>
       <ul v-if="otherTasks.length" class="space-y-2">
         <li v-for="task in otherTasks" :key="task.id" class="bg-gray-700 p-3 rounded">
-          {{ task.text }}
+          {{ task.title || task.text }}
         </li>
       </ul>
       <p v-else class="text-gray-400 text-sm">No other tasks 🎉</p>

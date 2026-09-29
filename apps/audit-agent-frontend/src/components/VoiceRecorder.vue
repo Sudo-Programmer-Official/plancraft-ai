@@ -3,7 +3,11 @@
     class="voice-controller"
     :class="[
       `voice-controller--${state}`,
-      { 'voice-controller--disabled': props.disabled }
+      `voice-controller--${props.surface}`,
+      {
+        'voice-controller--disabled': props.disabled,
+        'voice-controller--icon-only': props.iconOnly,
+      }
     ]"
   >
     <button
@@ -12,8 +16,9 @@
       :class="{ 'voice-controller__button--recording': state === 'recording' }"
       :aria-pressed="state === 'recording'"
       :aria-label="primaryLabel"
+      :title="primaryLabel"
       :disabled="props.disabled || state === 'transcribing'"
-      @click="handlePrimaryPress"
+      @click.stop="handlePrimaryPress"
     >
       <svg
         v-if="state === 'recording'"
@@ -45,6 +50,7 @@
     </button>
 
     <div
+      v-if="!props.iconOnly"
       class="voice-controller__text"
       :class="{
         'voice-controller__text--active': state === 'recording' || state === 'transcribing',
@@ -97,6 +103,11 @@ import { ElMessage } from 'element-plus'
 
 const props = defineProps({
   disabled: Boolean,
+  // Analytics label for where recording was started (no content is sent).
+  surface: {
+    type: String,
+    default: 'voice_recorder',
+  },
   autoCommit: {
     type: Boolean,
     default: true,
@@ -104,6 +115,22 @@ const props = defineProps({
   resetTrigger: {
     type: Number,
     default: 0,
+  },
+  iconOnly: {
+    type: Boolean,
+    default: false,
+  },
+  silenceTimeoutMs: {
+    type: Number,
+    default: 2800,
+  },
+  speechThreshold: {
+    type: Number,
+    default: 0.02,
+  },
+  silenceAutoStop: {
+    type: Boolean,
+    default: true,
   },
 })
 
@@ -114,8 +141,6 @@ const {
   transcript,
   durationSeconds,
   errorMessage,
-  isRecording,
-  isTranscribing,
   startRecording,
   stopRecording,
   resetRecorder,
@@ -125,6 +150,10 @@ const {
     emit('processing-end')
   },
   logPrefix: '[VoiceRecorder]',
+  surface: props.surface,
+  silenceTimeoutMs: props.silenceTimeoutMs,
+  speechThreshold: props.speechThreshold,
+  enableSilenceAutoStop: props.silenceAutoStop,
 })
 
 const processingMessage = ref('Transcribing your task…')
@@ -150,7 +179,10 @@ async function handlePrimaryPress() {
     if (state.value === 'recording') await stopRecording()
     else await startRecording()
   } catch (error) {
+    const message = error?.message || 'Voice recording could not start. Please try again.'
     console.warn('[VoiceRecorder] primary action failed', error)
+    emit('processing-error', message)
+    ElMessage.error(message)
   }
 }
 
@@ -172,8 +204,9 @@ watch(
       emit('processing-end')
     } else if (val === 'error') {
       emit('processing-end')
-      emit('processing-error')
-      ElMessage.error(errorMessage.value || 'Transcription failed. Try again.')
+      const message = errorMessage.value || 'Voice recording failed. Try again.'
+      emit('processing-error', message)
+      ElMessage.error(message)
     }
   },
 )
@@ -200,24 +233,36 @@ onBeforeUnmount(() => {
   gap: 0.75rem;
   padding: 0.65rem 0.9rem;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--pc-border, #e2e8f0);
+  background: var(--pc-surface, #ffffff);
   transition: border-color 0.2s ease, background 0.2s ease;
   width: 100%;
 }
 
 .voice-controller--recording {
-  border-color: rgba(248, 113, 113, 0.7);
-  background: rgba(248, 113, 113, 0.08);
+  border-color: color-mix(in srgb, var(--pc-danger, #c9302c) 45%, transparent);
+  background: var(--pc-danger-soft, #fff1f2);
 }
 
 .voice-controller--transcribing {
-  border-color: rgba(129, 140, 248, 0.6);
+  border-color: color-mix(in srgb, var(--pc-accent, #4f46e5) 45%, transparent);
 }
 
 .voice-controller--disabled {
   opacity: 0.6;
   pointer-events: none;
+}
+
+.voice-controller--icon-only {
+  width: auto;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+}
+
+.voice-controller--icon-only.voice-controller--recording {
+  border-color: transparent;
+  background: transparent;
 }
 
 .voice-controller__button {
@@ -226,8 +271,8 @@ onBeforeUnmount(() => {
   height: 46px;
   border-radius: 50%;
   border: none;
-  background: radial-gradient(circle at 30% 30%, #5eead4, #2563eb);
-  color: #fefefe;
+  background: var(--pc-accent-fill, linear-gradient(135deg, #4f46e5, #7c3aed));
+  color: var(--pc-on-accent, #ffffff);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -242,12 +287,12 @@ onBeforeUnmount(() => {
 
 .voice-controller__button:not(:disabled):hover {
   transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--pc-accent, #4f46e5) 28%, transparent);
 }
 
 .voice-controller__button--recording {
-  background: radial-gradient(circle at 30% 30%, #fca5a5, #dc2626);
-  box-shadow: 0 0 18px rgba(220, 38, 38, 0.5);
+  background: linear-gradient(135deg, #fb7185, var(--pc-danger, #c9302c));
+  box-shadow: 0 0 18px color-mix(in srgb, var(--pc-danger, #c9302c) 30%, transparent);
 }
 
 .voice-controller__icon {
@@ -266,7 +311,7 @@ onBeforeUnmount(() => {
 .voice-controller__text {
   flex: 1;
   min-width: 0;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--pc-text-muted, #475569);
   font-size: 0.95rem;
   display: flex;
   flex-direction: column;
@@ -302,8 +347,8 @@ onBeforeUnmount(() => {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.35);
-  border-top-color: #a5b4fc;
+  border: 2px solid color-mix(in srgb, var(--pc-accent, #4f46e5) 18%, transparent);
+  border-top-color: var(--pc-accent, #4f46e5);
   animation: spin 1s linear infinite;
 }
 
@@ -315,17 +360,17 @@ onBeforeUnmount(() => {
 
 .voice-controller__time {
   font-weight: 600;
-  color: #fcd34d;
+  color: var(--pc-accent-text, #4338ca);
   margin-left: 0.25rem;
 }
 
 .voice-controller__reset {
   border: none;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--pc-surface-2, #f1f3fa);
   border-radius: 50%;
   width: 36px;
   height: 36px;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--pc-text-muted, #475569);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -334,7 +379,7 @@ onBeforeUnmount(() => {
 }
 
 .voice-controller__reset:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--pc-surface-hover, #eceff8);
 }
 
 .voice-controller__reset-icon {

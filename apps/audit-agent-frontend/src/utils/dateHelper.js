@@ -1,4 +1,5 @@
 // // utils/dateHelper.js
+import { getEffectiveUserTimezone } from '@/utils/userTimezone'
 
 // // Normalize Date → "YYYY-MM-DD" in local timezone
 // export function toLocalDateKey(date = new Date()) {
@@ -22,10 +23,21 @@
 
 // Normalize Date → "YYYY-MM-DD" (local timezone)
 export function toLocalDateKey(date = new Date()) {
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: getEffectiveUserTimezone(),
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(date)
+    const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]))
+    return `${values.year}-${values.month}-${values.day}`
+  } catch {
+    const y = date.getFullYear()
+    const m = String(date.getMonth() + 1).padStart(2, '0')
+    const d = String(date.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
 }
 
 // Parse "YYYY-MM-DD" → Date (local midnight)

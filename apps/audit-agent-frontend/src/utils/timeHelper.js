@@ -1,6 +1,7 @@
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc.js'
 import timezone from 'dayjs/plugin/timezone.js'
+import { getEffectiveUserTimezone } from '@/utils/userTimezone'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -14,7 +15,7 @@ function buildLocalIso(ymd, hhmm) {
     const [hh, mm] = String(hhmm || '00:00').split(':').map(n => parseInt(n, 10))
     if (!y || !m || !d) throw new Error('invalid date parts')
 
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+    const tz = getEffectiveUserTimezone()
     const yStr = String(y).padStart(4, '0')
     const mStr = String(m).padStart(2, '0')
     const dStr = String(d).padStart(2, '0')

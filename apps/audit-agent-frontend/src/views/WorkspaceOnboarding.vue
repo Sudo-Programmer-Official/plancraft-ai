@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-b from-slate-950 via-indigo-950 to-slate-950 text-white">
+  <div class="marketing-light min-h-screen bg-gradient-to-b from-slate-950 via-indigo-950 to-slate-950 text-slate-900">
     <div class="max-w-5xl mx-auto px-4 sm:px-6 py-12 space-y-8">
       <header class="flex items-center justify-between gap-4">
         <div>

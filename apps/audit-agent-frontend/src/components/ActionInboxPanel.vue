@@ -1,30 +1,26 @@
 <template>
-  <section class="rounded-2xl bg-white/6 border border-white/10 p-5 shadow-lg space-y-4 animate-slide-up">
+  <section
+    class="pc-action-inbox-panel rounded-2xl border border-pc-border bg-pc-surface p-5 text-pc-text shadow-lg animate-slide-up space-y-4"
+    :class="{ 'pc-action-inbox-panel--compact': props.compact }"
+  >
     <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
       <div>
-        <p class="text-xs uppercase tracking-[0.25em] text-indigo-300/80">{{ eyebrow }}</p>
+        <p class="text-xs uppercase tracking-[0.25em] text-pc-accent-text">{{ eyebrow }}</p>
         <h3 class="text-lg font-semibold">{{ title }}</h3>
-        <p class="text-sm text-slate-300">
+        <p class="text-sm text-pc-text-muted">
           {{ description }}
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-2 text-xs">
-        <span class="px-3 py-1 rounded-full bg-indigo-500/15 border border-indigo-400/30 text-indigo-100">
+        <span class="px-3 py-1 rounded-full bg-pc-accent-soft border border-pc-border-strong text-pc-accent-text">
           {{ pendingSuggestionsLabel }}
         </span>
-        <button
-          class="px-3 py-2 rounded-lg bg-white/10 border border-white/10 text-slate-100 hover:border-indigo-300/60 transition disabled:opacity-60"
-          :disabled="!hasWorkspace || actionInboxLoading"
-          @click="() => refreshActionInbox({ sync: true, trigger: 'manual_refresh' })"
-        >
-          {{ actionInboxLoading ? 'Refreshing…' : 'Refresh inbox' }}
-        </button>
       </div>
     </div>
 
     <div
       v-if="!hasWorkspace"
-      class="rounded-xl border border-dashed border-white/15 bg-slate-900/35 px-4 py-6 text-sm text-indigo-100/75"
+      class="rounded-xl border border-dashed border-pc-border-strong bg-pc-surface-2 px-4 py-6 text-sm text-pc-text-muted"
     >
       Select a workspace to route confirmed suggestions into tasks.
     </div>
@@ -55,10 +51,10 @@
             <span class="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-white/90">
               {{ formatSuggestionTiming(actionInboxDailyIntent.focus) }}
             </span>
-            <span class="rounded-full border border-fuchsia-300/30 bg-fuchsia-500/10 px-3 py-1 text-fuchsia-100">
+            <span class="rounded-full border border-fuchsia-200 bg-fuchsia-50 px-3 py-1 text-fuchsia-700">
               {{ confidencePercent(actionInboxDailyIntent.focus) }}% confidence
             </span>
-            <span class="rounded-full border border-cyan-300/30 bg-cyan-500/10 px-3 py-1 text-cyan-100">
+            <span class="rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-cyan-700">
               {{ actionInboxDailyIntent.focus.category || 'Other' }}
             </span>
             <span
@@ -69,8 +65,8 @@
             </span>
           </div>
 
-          <div class="rounded-xl border border-white/10 bg-black/20 px-4 py-3">
-            <p class="text-[11px] uppercase tracking-[0.2em] text-fuchsia-100/70">Why this matters today</p>
+          <div class="rounded-xl border border-pc-border bg-pc-surface-2 px-4 py-3">
+            <p class="text-[11px] uppercase tracking-[0.2em] text-pc-accent-text">Why this matters today</p>
             <p class="mt-1 text-sm text-slate-100">
               {{
                 actionInboxDailyIntent.focus.reason ||
@@ -81,7 +77,7 @@
           </div>
         </div>
 
-        <div class="min-w-[220px] rounded-xl border border-white/10 bg-slate-950/35 px-4 py-4">
+        <div class="min-w-[220px] rounded-xl border border-pc-border bg-pc-surface-2 px-4 py-4">
           <p class="text-[11px] uppercase tracking-[0.2em] text-indigo-200/80">Prompt</p>
           <p class="mt-2 text-sm font-medium text-white">{{ actionInboxDailyIntent.prompt }}</p>
           <div v-if="actionInboxDailyIntent.supporting?.length" class="mt-4 space-y-2">
@@ -111,7 +107,7 @@
         <div
           v-for="card in actionInboxInsightCards"
           :key="card.label"
-          class="rounded-xl border border-white/10 bg-slate-950/45 px-4 py-3"
+          class="rounded-xl border border-pc-border bg-pc-surface-2 px-4 py-3"
         >
           <p class="text-[11px] uppercase tracking-[0.22em] text-slate-400">{{ card.label }}</p>
           <p class="mt-2 text-2xl font-semibold text-white">{{ card.value }}</p>
@@ -144,55 +140,62 @@
 
     <div
       v-if="actionInboxLoading && !actionSuggestions.length"
-      class="rounded-xl border border-white/10 bg-slate-900/45 px-4 py-6 text-sm text-slate-300"
+      class="rounded-xl border border-pc-border bg-pc-surface-2 px-4 py-6 text-sm text-pc-text-muted"
     >
       Loading your suggested actions…
     </div>
 
     <div
       v-else-if="!actionSuggestions.length"
-      class="rounded-xl border border-dashed border-white/15 bg-slate-900/35 px-4 py-8 text-center text-sm text-indigo-100/75"
+      class="rounded-xl border border-dashed border-pc-border-strong bg-pc-surface-2 px-4 py-8 text-center text-sm text-pc-text-muted"
     >
       {{ emptyMessage }}
     </div>
 
     <div v-else class="grid gap-3 lg:grid-cols-2">
-      <article
-        v-for="item in actionSuggestions"
-        :key="item.id"
-        class="rounded-2xl border border-white/10 bg-slate-900/55 p-4 space-y-4 shadow-sm"
-      >
+        <article
+          v-for="item in actionSuggestions"
+          :key="item.id"
+          class="pc-suggestion-card rounded-2xl border border-pc-border bg-pc-surface p-4 shadow-sm space-y-3"
+          :class="{ 'pc-suggestion-card--compact': props.compact }"
+        >
         <div class="flex flex-wrap items-start justify-between gap-3">
-          <div class="space-y-2 min-w-0">
+          <div class="min-w-0 flex-1 space-y-2">
             <div class="flex flex-wrap items-center gap-2">
               <span class="text-[11px] px-2 py-1 rounded-full border" :class="confidenceBadgeClass(item.confidence)">
                 {{ confidenceLabel(item.confidence) }}
               </span>
-              <span class="text-[11px] text-slate-400">
+              <span class="text-[11px] text-pc-text-subtle">
                 {{ confidencePercent(item) }}% confidence
               </span>
-              <span class="text-[11px] px-2 py-1 rounded-full border border-white/10 bg-white/5 text-slate-200">
+              <span class="text-[11px] px-2 py-1 rounded-full border border-pc-border bg-pc-surface-2 text-pc-text-muted">
                 {{ item.category || 'Other' }}
               </span>
               <span
                 v-if="item.urgency"
-                class="text-[11px] px-2 py-1 rounded-full border border-amber-300/30 bg-amber-500/10 text-amber-100 capitalize"
+                class="text-[11px] px-2 py-1 rounded-full border border-amber-200 bg-amber-50 text-amber-700 capitalize"
               >
                 {{ item.urgency }} urgency
               </span>
             </div>
             <div>
-              <h4 class="text-base font-semibold text-white">{{ item.displayTitle || item.title }}</h4>
-              <p class="text-sm text-slate-300">
+              <h4 class="text-base font-semibold text-pc-text">{{ item.displayTitle || item.title }}</h4>
+              <p class="line-clamp-2 text-sm text-pc-text-muted">
                 {{ suggestionSummary(item) }}
               </p>
             </div>
-            <div class="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
-              <p class="text-[11px] uppercase tracking-[0.2em] text-slate-400">Why this showed up</p>
-              <p class="mt-1 text-sm text-slate-200">{{ item.reason || item.rationale || suggestionSummary(item) }}</p>
+            <div
+              v-if="!props.compact && (item.reason || item.rationale)"
+              class="rounded-xl border border-pc-border bg-pc-surface-2 px-3 py-2"
+            >
+              <p class="text-[11px] uppercase tracking-[0.2em] text-pc-text-subtle">Why this showed up</p>
+              <p class="mt-1 text-sm text-pc-text-muted">{{ item.reason || item.rationale }}</p>
             </div>
+            <p v-else-if="item.reason || item.rationale" class="pc-suggestion-reason">
+              <span>Why:</span> {{ item.reason || item.rationale }}
+            </p>
           </div>
-          <span class="text-[11px] text-indigo-200/80 shrink-0">
+          <span v-if="!props.compact" class="shrink-0 text-[11px] text-pc-text-subtle">
             Detected from your {{ item.sourceLabel || 'note' }}
           </span>
         </div>
@@ -200,7 +203,7 @@
         <div class="flex flex-wrap gap-2 text-xs">
           <span
             class="px-2.5 py-1 rounded-full border"
-            :class="item.dueDate || item.scheduledTime ? 'border-emerald-300/30 bg-emerald-500/10 text-emerald-100' : 'border-white/10 bg-white/5 text-slate-300'"
+            :class="item.dueDate || item.scheduledTime ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-pc-border bg-pc-surface-2 text-pc-text-muted'"
           >
             {{ formatSuggestionTiming(item) }}
           </span>
@@ -208,27 +211,27 @@
             <span
               v-for="reason in item.reasons || []"
               :key="`${item.id}-${reason}`"
-              class="px-2.5 py-1 rounded-full border border-indigo-300/20 bg-indigo-500/10 text-indigo-100"
+              class="px-2.5 py-1 rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700"
             >
               {{ formatReason(reason) }}
             </span>
             <span
               v-for="field in item.missingFields || []"
               :key="`${item.id}-missing-${field}`"
-              class="px-2.5 py-1 rounded-full border border-amber-300/20 bg-amber-500/10 text-amber-100"
+              class="px-2.5 py-1 rounded-full border border-amber-200 bg-amber-50 text-amber-700"
             >
               Needs {{ formatMissingField(field) }}
             </span>
           </template>
           <span
-            v-if="item.lastSurfacedReason"
+            v-if="item.lastSurfacedReason && !props.compact"
             class="px-2.5 py-1 rounded-full border border-sky-300/20 bg-sky-500/10 text-sky-100"
           >
             Resurfaced: {{ formatSurfacedReason(item.lastSurfacedReason) }}
           </span>
           <span
-            v-if="item.lastNudgedAt"
-            class="px-2.5 py-1 rounded-full border border-fuchsia-300/20 bg-fuchsia-500/10 text-fuchsia-100"
+            v-if="item.lastNudgedAt && !props.compact"
+            class="px-2.5 py-1 rounded-full border border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700"
           >
             Nudged {{ formatRelativeAction(item.lastNudgedAt) }}
           </span>
@@ -236,58 +239,64 @@
 
         <blockquote
           v-if="!props.compact && item.rawPhrase"
-          class="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-slate-200"
+            class="rounded-xl border border-pc-border bg-pc-surface-2 px-3 py-2 text-sm text-pc-text-muted"
         >
           “{{ item.rawPhrase }}”
         </blockquote>
 
         <div
           v-if="!props.compact && item.followUpPrompt"
-          class="rounded-xl border border-amber-300/20 bg-amber-500/10 px-3 py-3 text-sm text-amber-50"
+          class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900"
         >
-          <p class="text-[11px] uppercase tracking-[0.2em] text-amber-100/80">Missing info</p>
+          <p class="text-[11px] uppercase tracking-[0.2em] text-amber-700">Missing info</p>
           <p class="mt-1">{{ item.followUpPrompt }}</p>
         </div>
 
         <div v-if="item.needsDate || needsTimeInput(item)" class="grid gap-3 md:grid-cols-2">
           <div v-if="item.needsDate" class="space-y-1">
-            <label class="text-xs uppercase tracking-[0.2em] text-slate-400">Optional due date</label>
+            <label :class="props.compact ? 'text-[11px] font-semibold text-pc-text-subtle' : 'text-xs uppercase tracking-[0.2em] text-pc-text-subtle'">
+              {{ props.compact ? 'Due date' : 'Optional due date' }}
+            </label>
             <input
               v-model="item.draftDate"
               type="date"
-              class="w-full rounded-xl bg-slate-950/60 border border-slate-800 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+              class="w-full rounded-xl bg-pc-surface border border-pc-border-strong px-3 py-2 text-sm focus:border-pc-accent focus:outline-none"
             />
           </div>
           <div v-if="needsTimeInput(item)" class="space-y-1">
-            <label class="text-xs uppercase tracking-[0.2em] text-slate-400">Optional time</label>
+            <label :class="props.compact ? 'text-[11px] font-semibold text-pc-text-subtle' : 'text-xs uppercase tracking-[0.2em] text-pc-text-subtle'">
+              {{ props.compact ? 'Time' : 'Optional time' }}
+            </label>
             <input
               v-model="item.draftTime"
               type="time"
-              class="w-full rounded-xl bg-slate-950/60 border border-slate-800 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+              class="w-full rounded-xl bg-pc-surface border border-pc-border-strong px-3 py-2 text-sm focus:border-pc-accent focus:outline-none"
             />
           </div>
         </div>
 
         <div v-if="needsDetailsInput(item)" class="space-y-1">
-          <label class="text-xs uppercase tracking-[0.2em] text-slate-400">Add detail</label>
+          <label :class="props.compact ? 'text-[11px] font-semibold text-pc-text-subtle' : 'text-xs uppercase tracking-[0.2em] text-pc-text-subtle'">
+            {{ props.compact ? 'Details' : 'Add detail' }}
+          </label>
           <textarea
             v-model="item.draftDetails"
             rows="2"
-            class="w-full rounded-xl bg-slate-950/60 border border-slate-800 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none resize-none"
-            placeholder="Add context that will make the task easier to complete."
+            class="w-full rounded-xl bg-pc-surface border border-pc-border-strong px-3 py-2 text-sm focus:border-pc-accent focus:outline-none resize-none"
+            :placeholder="props.compact ? 'Add context (optional)' : 'Add context that will make the task easier to complete.'"
           ></textarea>
         </div>
 
         <div class="flex flex-wrap gap-2">
           <button
-            class="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-500 to-fuchsia-500 text-sm font-semibold text-white hover:from-indigo-400 hover:to-fuchsia-400 transition disabled:opacity-60"
+            class="px-4 py-2 rounded-lg bg-[image:var(--pc-accent-fill)] text-sm font-semibold text-white shadow-sm hover:bg-[image:var(--pc-accent-fill-hover)] transition disabled:opacity-60"
             :disabled="suggestionBusyId === item.id"
             @click="confirmSuggestion(item)"
           >
-            {{ suggestionBusyId === item.id ? 'Confirming…' : confirmLabel(item) }}
+            {{ suggestionBusyId === item.id ? 'Saving…' : props.compact ? 'Add task' : confirmLabel(item) }}
           </button>
           <button
-            class="px-4 py-2 rounded-lg bg-white/10 border border-white/10 text-sm font-semibold text-slate-200 hover:border-rose-300/60 hover:text-white transition disabled:opacity-60"
+            class="px-4 py-2 rounded-lg bg-pc-surface-2 border border-pc-border text-sm font-semibold text-pc-text hover:border-pc-accent hover:text-pc-accent-text transition disabled:opacity-60"
             :disabled="suggestionBusyId === item.id"
             @click="ignoreSuggestion(item)"
           >
@@ -305,6 +314,7 @@ import { ElNotification } from 'element-plus'
 import { useAuthStore } from '@/stores/authStore'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { useTasks } from '@/composables/useTasks'
+import { getEffectiveUserTimezone } from '@/utils/userTimezone'
 import {
   confirmActionInboxSuggestion,
   fetchActionInbox,
@@ -563,9 +573,9 @@ function formatPercent(value) {
 
 function confidenceBadgeClass(value) {
   const token = String(value || 'medium').toLowerCase()
-  if (token === 'high') return 'border-emerald-300/40 bg-emerald-500/15 text-emerald-100'
-  if (token === 'low') return 'border-amber-300/40 bg-amber-500/15 text-amber-100'
-  return 'border-indigo-300/40 bg-indigo-500/15 text-indigo-100'
+  if (token === 'high') return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+  if (token === 'low') return 'border-amber-200 bg-amber-50 text-amber-700'
+  return 'border-indigo-200 bg-indigo-50 text-indigo-700'
 }
 
 function formatReason(value) {
@@ -659,11 +669,7 @@ function confirmLabel(item) {
 }
 
 function timezoneGuess() {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-  } catch {
-    return 'UTC'
-  }
+  return getEffectiveUserTimezone()
 }
 
 async function confirmSuggestion(item) {
@@ -710,7 +716,7 @@ async function ignoreSuggestion(item) {
     emitActionInboxUpdated({ trigger: 'ignore' })
     ElNotification({
       title: 'Suggestion ignored',
-      message: 'We removed it for now and will only resurface it later if timing makes it important.',
+      message: 'Suggestion ignored.',
       type: 'success',
     })
   } catch (err) {
@@ -726,6 +732,26 @@ async function ignoreSuggestion(item) {
 </script>
 
 <style scoped>
+.pc-action-inbox-panel--compact {
+  box-shadow: var(--pc-shadow-sm);
+}
+
+.pc-action-inbox-panel--compact :deep(.pc-suggestion-card) {
+  box-shadow: var(--pc-shadow-sm);
+}
+
+.pc-suggestion-reason {
+  margin: 0;
+  color: var(--pc-text-subtle);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.pc-suggestion-reason span {
+  color: var(--pc-text-muted);
+  font-weight: 600;
+}
+
 .animate-slide-up {
   animation: slideUp 0.45s ease;
 }

@@ -245,7 +245,7 @@ function parseAppleUserPayload(rawUser) {
   }
 }
 
-async function createAppleAuthState({ redirect = '/dashboard', platform = 'ios' } = {}) {
+async function createAppleAuthState({ redirect = '/today', platform = 'ios' } = {}) {
   const state = crypto.randomBytes(24).toString('hex')
   const nonce = crypto.randomBytes(16).toString('hex')
   const now = Date.now()
@@ -283,7 +283,7 @@ async function consumeAppleAuthState(state) {
     throw new Error('Apple auth state expired')
   }
   return {
-    redirect: normalizeMobileAuthRedirectPath(String(data.redirect || '/dashboard')),
+    redirect: normalizeMobileAuthRedirectPath(String(data.redirect || '/today')),
     platform: String(data.platform || 'ios'),
     nonce: String(data.nonce || ''),
   }
@@ -327,7 +327,7 @@ async function exchangeAppleCodeForTokens({ code, config }) {
 }
 
 export async function createAppleMobileAuthStart({
-  redirect = '/dashboard',
+  redirect = '/today',
   platform = 'ios',
 } = {}) {
   const config = getAppleAuthConfig()

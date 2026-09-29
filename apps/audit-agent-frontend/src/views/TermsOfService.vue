@@ -1,11 +1,11 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-b from-indigo-900 via-purple-900 to-slate-950 text-slate-100">
+  <div class="marketing-light min-h-screen bg-gradient-to-b from-indigo-900 via-purple-900 to-slate-950 text-slate-900">
     <router-link
       to="/"
       class="absolute top-6 left-6 z-20 flex items-center gap-2 cursor-pointer"
     >
       <img
-        src="/logo-bg-remove.png"
+        src="/plancraft-mark.svg"
         alt="PlanCraftAI Logo"
         class="h-10 w-auto sm:h-12 md:h-14 drop-shadow-lg select-none"
       />

@@ -2,10 +2,10 @@
   <section class="social-panel">
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
       <div>
-        <h2 class="text-lg sm:text-xl font-semibold">🔗 Social Accounts</h2>
-        <p class="text-sm text-indigo-100 mt-1">Connect channels for publishing from PlanCraft.</p>
+        <h2 class="social-panel__title">Social accounts</h2>
+        <p class="social-panel__text">Connect channels for publishing from PlanCraft.</p>
       </div>
-      <div class="text-xs text-slate-300">
+      <div class="social-panel__meta">
         <span v-if="loading">Loading status…</span>
         <span v-else>Updated {{ lastUpdatedLabel }}</span>
       </div>
@@ -295,15 +295,34 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* Matches the Settings panels (design tokens). */
 .social-panel {
   width: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: radial-gradient(120% 120% at 10% 10%, rgba(99, 102, 241, 0.07), rgba(15, 23, 42, 0.75)), rgba(15, 23, 42, 0.6);
-  border-radius: 18px;
-  padding: 1.25rem;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
-  backdrop-filter: blur(10px);
   margin: 0 auto;
+  padding: var(--pc-space-5);
+  border: 1px solid var(--pc-border);
+  border-radius: var(--pc-radius-lg);
+  background: var(--pc-surface);
+  color: var(--pc-text);
+  box-shadow: var(--pc-shadow-sm);
+}
+
+.social-panel__title {
+  margin: 0;
+  color: var(--pc-text);
+  font-size: var(--pc-text-title);
+  font-weight: 600;
+}
+
+.social-panel__text {
+  margin: var(--pc-space-1) 0 0;
+  color: var(--pc-text-muted);
+  font-size: var(--pc-text-small);
+}
+
+.social-panel__meta {
+  color: var(--pc-text-subtle);
+  font-size: var(--pc-text-caption);
 }
 
 .social-grid {
@@ -318,7 +337,7 @@ onMounted(() => {
 
 @media (min-width: 640px) {
   .social-panel {
-    padding: 1.5rem;
+    padding: var(--pc-space-6);
   }
 }
 

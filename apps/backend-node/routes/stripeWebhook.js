@@ -2,6 +2,7 @@
 import Stripe from "stripe"
 import { db } from "../services/firebaseAdmin.js"
 import { recomputeSeatsUsed } from "../services/workspaceService.js"
+import { trackServerEventAsync } from "../services/analyticsService.js"
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY
 const stripe = STRIPE_SECRET_KEY
@@ -131,6 +132,11 @@ export async function stripeWebhookHandler(req, res) {
             sub,
             billingStatus,
           )
+          trackServerEventAsync(uid, 'subscription_started', {
+            provider: 'stripe',
+            scope: 'workspace',
+            plan: session?.metadata?.plan || 'starter',
+          })
           lastMeta = { workspaceId, plan: session?.metadata?.plan, seats: session?.metadata?.seats || session?.metadata?.seatQuantity, billingStatus, reason: "checkout_completed" }
           break
         }
@@ -166,6 +172,12 @@ export async function stripeWebhookHandler(req, res) {
           { merge: true }
         )
         console.log(`[Stripe] Premium plan activated for user ${uid}`)
+        trackServerEventAsync(uid, 'subscription_started', {
+          provider: 'stripe',
+          scope: 'solo',
+          plan: 'premium',
+          billing_interval: session?.metadata?.plan || 'monthly',
+        })
         break
       }
 

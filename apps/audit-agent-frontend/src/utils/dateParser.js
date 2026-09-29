@@ -2,6 +2,7 @@
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
+import { getEffectiveUserTimezone } from '@/utils/userTimezone'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -10,7 +11,7 @@ dayjs.extend(timezone)
 // local date + time strings based on user's timezone.
 export function normalizeParsedDateTime(parsedDateTime, userTz) {
   try {
-    const tz = userTz || (dayjs.tz ? dayjs.tz.guess() : Intl.DateTimeFormat().resolvedOptions().timeZone)
+    const tz = userTz || getEffectiveUserTimezone()
     if (!parsedDateTime) {
       const now = dayjs().tz(tz)
       return { date: now.format('YYYY-MM-DD'), time: '' }
@@ -33,4 +34,3 @@ export function normalizeParsedDateTime(parsedDateTime, userTz) {
     return { date: `${y}-${m}-${d}`, time: '' }
   }
 }
-

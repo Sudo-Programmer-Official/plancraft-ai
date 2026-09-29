@@ -386,11 +386,14 @@ export async function listUserWorkspaces(userId) {
   const snap = await db
     .collection(WORKSPACE_MEMBERS_COLLECTION)
     .where("userId", "==", userId)
-    .where("status", "==", "active")
     .limit(500)
     .get();
 
-  let memberships = snap.docs.map((doc) => normalizeMemberDoc(doc)).filter(Boolean);
+  // Filter status in memory so workspace hydration does not depend on a
+  // composite Firestore index being deployed for userId + status.
+  let memberships = snap.docs
+    .map((doc) => normalizeMemberDoc(doc))
+    .filter((membership) => membership?.status === "active");
 
   // Fast-read mirror fallback
   if (!memberships.length) {
@@ -535,10 +538,11 @@ export async function listWorkspaceMembers(workspaceId) {
   const snap = await db
     .collection(WORKSPACE_MEMBERS_COLLECTION)
     .where("workspaceId", "==", workspaceId)
-    .where("status", "in", ["active", "invited"])
     .limit(500)
     .get();
-  const members = snap.docs.map((doc) => normalizeMemberDoc(doc)).filter(Boolean);
+  const members = snap.docs
+    .map((doc) => normalizeMemberDoc(doc))
+    .filter((member) => ["active", "invited"].includes(member?.status));
   if (!members.length) return [];
 
   const userRefs = members.map((m) => db.collection("users").doc(String(m.userId)));

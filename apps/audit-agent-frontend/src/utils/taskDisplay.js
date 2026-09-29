@@ -1,6 +1,7 @@
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
+import { getEffectiveUserTimezone } from '@/utils/userTimezone'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -17,7 +18,7 @@ function sanitizeText(text = '', limit = 260) {
 
 function formatLocalLabel(event = {}, fallback) {
   if (event.localLabel) return event.localLabel
-  const tz = event.timezone || fallback?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+  const tz = event.timezone || fallback?.timezone || getEffectiveUserTimezone()
   const startIso = fallback?.start || event.startTime
   if (!startIso) return null
   const start = dayjs.utc(startIso).tz(tz)

@@ -190,6 +190,7 @@ import { hasNotificationSetup } from '@/utils/notificationCheck'
 import NotificationPrompt from '@/components/NotificationPrompt.vue'
 import { TASK_CATEGORY_FILTERS, getCategoryIcon, getCategoryColor, resolveCategory } from '@/constants/taskCategories'
 import { describeTaskDetails } from '@/utils/taskDisplay'
+import { getEffectiveUserTimezone } from '@/utils/userTimezone'
 const { tasks, toggleComplete, loadTasksForRange, getTaskPlannedDate } = useTasks()
 const formattedDetails = (task) => describeTaskDetails(task)
 const completionLabel = (task) =>
@@ -259,7 +260,7 @@ async function handleSaveAndSchedule(payload) {
       if (!iso) return
       const prefs = userPrefs.value?.notifications || {}
       try { if (!hasNotificationSetup(prefs)) notifPromptOpen.value = true } catch {}
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+      const tz = getEffectiveUserTimezone()
 
       try {
         const resp = await api.post('/reminders/text', {

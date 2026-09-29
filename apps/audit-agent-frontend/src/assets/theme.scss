@@ -1,41 +1,289 @@
 /* Shared mobile overlay spacing */
 :root {
   --app-mobile-overlay-top-offset: calc(env(safe-area-inset-top, 0px) + 3.5rem);
+  --pc-bg: #f6f7fc;
+  --pc-surface: #ffffff;
+  --pc-surface-2: #f1f3fa;
+  --pc-surface-hover: #eceff8;
+  --pc-border: #e2e8f0;
+  --pc-border-strong: #cbd5e1;
+  --pc-text: #0f172a;
+  --pc-text-muted: #475569;
+  --pc-text-subtle: #64748b;
+  --pc-accent: #4f46e5;
+  --pc-accent-text: #4338ca;
+  --pc-accent-soft: rgba(79, 70, 229, 0.08);
+  --pc-focus-ring: rgba(79, 70, 229, 0.4);
 }
 
-/* === PlanCraftAI Toast Theme === */
+/* === PlanCraftAI feedback theme === */
+.el-notification,
+.el-message {
+  border: 1px solid var(--pc-border) !important;
+  border-radius: var(--pc-radius-lg, 16px) !important;
+  background: var(--pc-surface) !important;
+  color: var(--pc-text) !important;
+  box-shadow: var(--pc-shadow-overlay, 0 16px 40px rgba(15, 23, 42, 0.14)) !important;
+  font-family: var(--pc-font, Inter, ui-sans-serif, system-ui, sans-serif) !important;
+}
+
 .el-notification {
-  border-radius: 0.75rem !important;
-  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 35%, #4c1d95 100%) !important;
-  color: #e2e8f0 !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  box-shadow: 0 0 20px rgba(147, 51, 234, 0.3);
-  backdrop-filter: blur(12px);
-  font-family: 'Inter', 'Poppins', sans-serif;
-  animation: toastSlideIn 0.5s ease forwards;
+  animation: toastSlideIn 0.24s var(--pc-ease, cubic-bezier(0.2, 0, 0, 1)) forwards;
 }
 
 .el-notification__title {
-  color: #c4b5fd !important; /* light purple */
-  font-weight: 600;
+  color: var(--pc-text) !important;
+  font-size: 0.9375rem;
+  font-weight: 700;
 }
 
-.el-notification__content {
-  color: #e2e8f0 !important; /* slate-100 */
-  font-size: 0.9rem;
+.el-notification__content,
+.el-message__content {
+  color: var(--pc-text-muted) !important;
+  font-size: 0.8125rem;
+  line-height: 1.4;
 }
 
-/* Icon glow variants */
-.el-notification--success::before { content: '✨'; margin-right: 0.5rem; }
-.el-notification--info::before    { content: '💡'; margin-right: 0.5rem; }
-.el-notification--error::before   { content: '⚠️'; margin-right: 0.5rem; }
-.el-notification--warning::before { content: '🚧'; margin-right: 0.5rem; }
+.el-notification::before,
+.el-notification--success::before,
+.el-notification--info::before,
+.el-notification--error::before,
+.el-notification--warning::before {
+  content: none !important;
+  display: none !important;
+}
 
-/* Gradient glow for toast border */
 .el-notification__group {
-  border-left: 3px solid transparent;
-  border-image: linear-gradient(180deg, #ec4899, #a855f7) 1;
-  border-image-slice: 1;
+  border-left: 3px solid var(--pc-accent) !important;
+  border-image: none !important;
+}
+
+.el-notification--success .el-notification__group,
+.el-message--success {
+  border-left-color: var(--pc-success) !important;
+}
+
+.el-notification--error .el-notification__group,
+.el-message--error {
+  border-left-color: var(--pc-danger) !important;
+}
+
+.el-notification--warning .el-notification__group,
+.el-message--warning {
+  border-left-color: #d97706 !important;
+}
+
+.el-message {
+  min-width: 0 !important;
+  padding: 0.7rem 1rem !important;
+}
+
+.el-message__icon {
+  margin-right: 0.55rem !important;
+}
+
+.el-notification__closeBtn,
+.el-message__closeBtn {
+  color: var(--pc-text-subtle) !important;
+}
+
+.el-notification__closeBtn:hover,
+.el-message__closeBtn:hover {
+  color: var(--pc-accent) !important;
+}
+
+/* Light is the default application theme. Dark remains available when the
+   explicit data-pc-theme preference is selected. */
+html[data-pc-theme='light'] body,
+html[data-pc-theme='light'] #app {
+  background: var(--pc-bg);
+  color: var(--pc-text);
+}
+
+html[data-pc-theme='light'] .el-notification {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.14);
+}
+
+html[data-pc-theme='light'] .el-notification__title {
+  color: #0f172a !important;
+}
+
+html[data-pc-theme='light'] .el-notification__content {
+  color: #475569 !important;
+}
+
+html[data-pc-theme='light'] .el-dialog {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.18) !important;
+}
+
+html[data-pc-theme='light'] .el-dialog__header,
+html[data-pc-theme='light'] .el-dialog__body,
+html[data-pc-theme='light'] .el-dialog__footer {
+  color: #0f172a !important;
+}
+
+html[data-pc-theme='light'] .el-dialog__title,
+html[data-pc-theme='light'] .el-dialog .text-white,
+html[data-pc-theme='light'] .el-dialog [class*='text-slate-100'],
+html[data-pc-theme='light'] .el-dialog [class*='text-slate-200'] {
+  color: #0f172a !important;
+}
+
+html[data-pc-theme='light'] .task-planner-dialog .planner-card,
+html[data-pc-theme='light'] .task-planner-dialog .planner-advanced-toggle,
+html[data-pc-theme='light'] .setup-prompt__content section {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+html[data-pc-theme='light'] .task-planner-dialog .el-input__wrapper,
+html[data-pc-theme='light'] .task-planner-dialog .el-textarea__inner,
+html[data-pc-theme='light'] .profile-setup-dialog .el-input__wrapper {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: 0 0 0 1px #cbd5e1 inset !important;
+}
+
+html[data-pc-theme='light'] .task-planner-dialog .el-input__inner,
+html[data-pc-theme='light'] .task-planner-dialog .el-textarea__inner,
+html[data-pc-theme='light'] .profile-setup-dialog .el-input__inner {
+  color: #0f172a !important;
+}
+
+html[data-pc-theme='light'] .task-planner-dialog .el-input__inner::placeholder,
+html[data-pc-theme='light'] .task-planner-dialog .el-textarea__inner::placeholder {
+  color: #94a3b8 !important;
+}
+
+html[data-pc-theme='light'] .premium-activation-dialog .premium-activation,
+html[data-pc-theme='light'] .app-lock-offer-dialog.el-dialog,
+html[data-pc-theme='light'] .profile-setup-dialog.el-dialog {
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+
+html[data-pc-theme='light'] .premium-activation__title,
+html[data-pc-theme='light'] .premium-activation__copy,
+html[data-pc-theme='light'] .premium-activation__benefits,
+html[data-pc-theme='light'] .app-lock-offer-dialog .text-white,
+html[data-pc-theme='light'] .profile-setup-dialog .text-white {
+  color: #0f172a !important;
+}
+
+html[data-pc-theme='light'] .premium-activation__secondary,
+html[data-pc-theme='light'] .app-lock-offer-dialog .el-button:not(.el-button--primary) {
+  background: #f1f3fa !important;
+  border-color: #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+html[data-pc-theme='light'] .focus-screen,
+html[data-pc-theme='light'] .app-lock {
+  background: #f6f7fc !important;
+  color: #0f172a !important;
+}
+
+html[data-pc-theme='light'] .focus-panel,
+html[data-pc-theme='light'] .app-lock__panel {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.16) !important;
+}
+
+html[data-pc-theme='light'] .focus-title,
+html[data-pc-theme='light'] .focus-clock,
+html[data-pc-theme='light'] .app-lock__title,
+html[data-pc-theme='light'] .app-lock__subtitle {
+  color: #0f172a !important;
+}
+
+html[data-pc-theme='light'] .focus-chip,
+html[data-pc-theme='light'] .focus-btn--ghost {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+/* Legacy custom screens use component CSS instead of Tailwind utilities. */
+html[data-pc-theme='light'] .dashboard-card,
+html[data-pc-theme='light'] .stat-card,
+html[data-pc-theme='light'] .napkin-list-card,
+html[data-pc-theme='light'] .napkin-detail-card,
+html[data-pc-theme='light'] .talk-planner-wrapper,
+html[data-pc-theme='light'] .chat-input-bar {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08) !important;
+}
+
+html[data-pc-theme='light'] .quick-setup-banner {
+  background: #eef2ff !important;
+  border-color: #c7d2fe !important;
+}
+
+html[data-pc-theme='light'] .now-bar,
+html[data-pc-theme='light'] .napkin-search-box,
+html[data-pc-theme='light'] .napkin-stream-summary,
+html[data-pc-theme='light'] .stat-tile,
+html[data-pc-theme='light'] .chat-input-row,
+html[data-pc-theme='light'] .result-card {
+  background: #f1f3fa !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+html[data-pc-theme='light'] .talk-title,
+html[data-pc-theme='light'] .chat-text,
+html[data-pc-theme='light'] .message-text,
+html[data-pc-theme='light'] .result-header,
+html[data-pc-theme='light'] .result-message,
+html[data-pc-theme='light'] .result-item,
+html[data-pc-theme='light'] .napkin-card-preview,
+html[data-pc-theme='light'] .napkin-detail-body,
+html[data-pc-theme='light'] .stat-card .value {
+  color: #0f172a !important;
+}
+
+html[data-pc-theme='light'] .chat-bubble.assistant {
+  background: #eef2ff !important;
+  border-color: #c7d2fe !important;
+}
+
+html[data-pc-theme='light'] .chat-input {
+  color: #0f172a !important;
+}
+
+html[data-pc-theme='light'] .chat-input::placeholder {
+  color: #94a3b8 !important;
+}
+
+html[data-pc-theme='light'] .voice-toggle,
+html[data-pc-theme='light'] .clear-btn,
+html[data-pc-theme='light'] .voice-replay-btn,
+html[data-pc-theme='light'] .napkin-search-clear,
+html[data-pc-theme='light'] .napkin-load-more-btn,
+html[data-pc-theme='light'] .action-btn,
+html[data-pc-theme='light'] .action-chip {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+html[data-pc-theme='light'] .stat-card header,
+html[data-pc-theme='light'] .stat-card .label,
+html[data-pc-theme='light'] .stat-card .hint,
+html[data-pc-theme='light'] .napkin-stream-summary {
+  color: #64748b !important;
 }
 
 @media (max-width: 768px) {

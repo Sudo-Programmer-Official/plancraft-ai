@@ -3,44 +3,19 @@
     <div class="app-page-frame">
       <header class="app-page-hero flex flex-col items-start gap-3">
         <div class="min-w-0 space-y-2">
-          <p class="app-page-eyebrow">AI Quick Actions</p>
-          <h1 class="app-page-title !text-[clamp(2rem,3vw,2.85rem)]">Napkin</h1>
-          <p v-if="!compactHeroMode" class="app-page-description max-w-2xl text-sm">
-            Drop raw ideas, voice notes, and half-formed tasks. PlanCraft classifies them, routes them, and pushes
-            eligible actions into your inbox automatically.
+          <p class="app-page-eyebrow">Capture</p>
+          <h1 class="app-page-title !text-[clamp(2rem,3vw,2.85rem)]">Capture</h1>
+          <p class="app-page-description max-w-2xl text-sm">
+            Type or say what is on your mind. PlanCraft will help turn it into a task.
           </p>
-          <div v-if="!compactHeroMode" class="flex flex-wrap gap-2 text-xs text-slate-300/80">
-            <span class="rounded-full border border-white/10 bg-slate-950/30 px-3 py-1">Quick add</span>
-            <span class="rounded-full border border-white/10 bg-slate-950/30 px-3 py-1">Voice-ready</span>
-            <span class="rounded-full border border-white/10 bg-slate-950/30 px-3 py-1">Auto-tagged</span>
-          </div>
-          <div v-if="compactHeroMode" class="flex flex-wrap gap-2 text-xs text-slate-200/90">
-            <span class="rounded-full border border-white/10 bg-slate-950/35 px-3 py-1">Captured {{ items.length }}</span>
-            <span class="rounded-full border border-white/10 bg-slate-950/35 px-3 py-1">Converted {{ convertedCount }}</span>
-            <span class="rounded-full border border-white/10 bg-slate-950/35 px-3 py-1">Voice {{ voiceCount }}</span>
-          </div>
-        </div>
-        <div v-if="!compactHeroMode" class="app-page-kpis ml-auto grid w-full grid-cols-2 text-center sm:grid-cols-3 lg:w-auto">
-          <div class="app-page-kpi stat-tile">
-            <p class="stat-label">Captured</p>
-            <p class="stat-value">{{ items.length }}</p>
-          </div>
-          <div class="app-page-kpi stat-tile">
-            <p class="stat-label">Converted</p>
-            <p class="stat-value">{{ convertedCount }}</p>
-          </div>
-          <div class="app-page-kpi stat-tile col-span-2 sm:col-span-1">
-            <p class="stat-label">Voice notes</p>
-            <p class="stat-value">{{ voiceCount }}</p>
-          </div>
         </div>
       </header>
 
       <section class="app-page-section space-y-4">
         <div class="flex flex-col justify-between gap-3 md:flex-row md:items-center">
           <div>
-            <p class="app-page-eyebrow !tracking-[0.25em]">Quick Add</p>
-            <h2 class="text-xl font-semibold">Fast capture with AI routing</h2>
+            <p class="app-page-eyebrow !tracking-[0.25em]">New task</p>
+            <h2 class="text-xl font-semibold">What do you need to get done?</h2>
           </div>
           <div class="flex flex-wrap gap-2">
             <span v-if="classification" class="chip">
@@ -394,6 +369,7 @@ import {
 import { toLocalDateKey } from '@/utils/dateHelper'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { ensureAiConsentOrThrow } from '@/services/aiConsentService'
+import { getEffectiveUserTimezone } from '@/utils/userTimezone'
 
 type RecorderState = 'idle' | 'recording' | 'processing'
 type NapkinActionSource = 'typed' | 'voice'
@@ -493,10 +469,7 @@ const deleteDialogOpen = computed({
   },
 })
 const latestSaved = computed(() => items.value.find((i) => i.id === latestSavedId.value))
-const convertedCount = computed(() => items.value.filter((i) => i.status === 'converted').length)
-const voiceCount = computed(() => items.value.filter((i) => i.audioUrl || i.source === 'voice').length)
 const hasMoreItems = computed(() => hasMoreWorkspace.value || hasMoreLegacy.value)
-const compactHeroMode = computed(() => true)
 
 const formattedTimer = computed(() => {
   const mins = Math.floor(recordingSeconds.value / 60)
@@ -511,6 +484,7 @@ function formatDate(ms: number) {
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
+      timeZone: getEffectiveUserTimezone(),
     }).format(new Date(ms))
   } catch {
     return new Date(ms).toLocaleString()
@@ -518,11 +492,7 @@ function formatDate(ms: number) {
 }
 
 function timezoneGuess() {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-  } catch {
-    return 'UTC'
-  }
+  return getEffectiveUserTimezone()
 }
 
 function routeSuggestion(intent: NapkinIntent) {
@@ -767,8 +737,8 @@ async function saveNapkin() {
     ElNotification({
       title: detectedCount ? 'Inbox updated' : 'Saved',
       message: detectedCount
-        ? `Saved your note and added ${detectedCount} eligible task${detectedCount === 1 ? '' : 's'} to your inbox. Click to open.`
-        : 'Captured on your Napkin',
+        ? `Saved. ${detectedCount} task${detectedCount === 1 ? '' : 's'} added.`
+        : 'Note saved.',
       type: 'success',
       onClick: detectedCount ? () => router.push('/inbox') : undefined,
     })

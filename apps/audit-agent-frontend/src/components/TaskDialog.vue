@@ -141,6 +141,7 @@ const {
     form.value.details = rawText
   },
   logPrefix: '[TaskDialogVoice]',
+  surface: 'task_dialog',
 })
 
 function toggleRecording() {

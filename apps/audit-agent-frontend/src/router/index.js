@@ -85,7 +85,6 @@ export const routes = [
     { path: '/terms', component: Terms },
     { path: '/contact', component: Contact },
     { path: '/pricing', name: 'pricing', component: () => import('@/views/PricingView.vue') },
-    { path: '/help', name: 'help', component: () => import('@/views/HelpView.vue') },
     { path: '/features', name: 'features', component: () => import('@/views/FeaturesView.vue') },
     { path: '/ai-task-planner', name: 'ai-task-planner', component: () => import('@/views/AiTaskPlannerView.vue') },
     { path: '/ai-daily-planner', name: 'ai-daily-planner', component: () => import('@/views/AiDailyPlannerView.vue') },
@@ -169,7 +168,8 @@ export const routes = [
         { path: 'meetings', name: 'meetings', component: () => import('@/views/MeetingsView.vue') },
         { path: 'reminders', name: 'reminders', component: () => import('@/components/RemindersOverview.vue') },
         { path: 'talk-to-planner', name: 'talk-to-planner', component: () => import('@/views/TalkToPlanner.vue') },
-        { path: 'today', name: 'today', component: () => import('@/views/TodayView.vue') },
+        // Home (post-login). Design-system screen; Today renders its own greeting.
+        { path: 'today', name: 'today', component: () => import('@/views/TodayHomeView.vue'), meta: { pcNav: 'today', hideAppHeader: true } },
         { path: 'today/dashboard', name: 'today-dashboard', component: () => import('@/views/TodayView.vue') },
         { path: 'planner', name: 'planner', component: () => import('@/views/PlannerView.vue') },
         { path: 'playbooks', name: 'playbooks', component: () => import('@/views/PlaybooksListView.vue'), meta: { featureFlag: 'PLAYBOOKS' } },
@@ -182,6 +182,7 @@ export const routes = [
         { path: 'goals', name: 'goals', component: () => import('@/views/GoalsView.vue') },
         { path: 'links', name: 'links', component: () => import('@/views/LinksView.vue') },
         { path: 'settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },
+        { path: 'help', name: 'help', component: () => import('@/views/HelpView.vue'), meta: { pcNav: 'help' } },
         { path: 'notification-debug', name: 'notification-debug', component: () => import('@/views/NotificationDebugView.vue') },
         { path: 'subscription', name: 'subscription', component: () => import('@/views/PricingView.vue') },
         { path: 'workspaces', name: 'workspaces', component: () => import('@/views/WorkspacesView.vue') },
@@ -222,6 +223,14 @@ export const routes = [
         { path: 'messages', name: 'leader-messages', component: () => import('@/pages/leader/LeaderMessages.vue') },
       ],
     },
+
+    // Design system preview: dev builds, or when VITE_ENABLE_DESIGN_PREVIEW=1.
+    ...(import.meta.env.DEV || import.meta.env.VITE_ENABLE_DESIGN_PREVIEW === '1'
+      ? [
+          { path: '/design', name: 'design-system', component: () => import('@/views/DesignSystemView.vue') },
+          { path: '/design/reminder', name: 'design-reminder', component: () => import('@/views/DesignReminderPreview.vue') },
+        ]
+      : []),
 
     // ✅ Legacy and misc
     { path: '/privacy-policy', redirect: '/privacy' },
@@ -300,11 +309,16 @@ router.beforeEach(async (to, from, next) => {
 
   // If navigating to login or signup: only redirect away when fully signed-in (not guest)
   if (to.path === '/login' || to.path === '/signup') {
+    // Browser page opened by the native app for sign-in: stay on /login so it
+    // can hand the session back to the app instead of opening the web dashboard.
+    if (to.path === '/login' && typeof to.query?.native_handoff === 'string' && !isNativePackagedApp()) {
+      return next()
+    }
     try {
       const isGuest = authStore?.isGuest === true || authStore?.guest === true || authStore?.user?.mode === 'guest'
       const nextTarget =
         (typeof to.query?.next === 'string' && to.query.next.length && to.query.next) ||
-        '/dashboard'
+        '/today'
       const hasNativeSnapshotSession =
         isIosPackagedApp() &&
         !!authStore?.user?.uid &&
@@ -325,7 +339,7 @@ router.beforeEach(async (to, from, next) => {
         !!authStore?.user?.uid &&
         readNativeIosAuthSnapshot()?.localId === authStore.user.uid
       if (authStore?.user && !isGuest && (getAuth().currentUser || hasNativeSnapshotSession)) {
-        return next('/dashboard')
+        return next('/today')
       }
     } catch {
       /* noop */
@@ -344,7 +358,7 @@ router.beforeEach(async (to, from, next) => {
       if (requiredFeature === 'AUTO_DEPLOY') {
         return next({ path: '/creator/calendar' })
       }
-      return next({ path: '/dashboard' })
+      return next({ path: '/today' })
     }
   }
 
@@ -385,7 +399,7 @@ router.beforeEach(async (to, from, next) => {
   const wantsAdmin = to.meta.requiresAdmin || to.path.startsWith('/admin')
   if (wantsAdmin) {
     if (authStore?.user?.role !== 'admin') {
-      return next({ path: '/dashboard' })
+      return next({ path: '/today' })
     }
   }
 

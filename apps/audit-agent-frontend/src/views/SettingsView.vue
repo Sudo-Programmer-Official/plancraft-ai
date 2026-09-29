@@ -1,91 +1,25 @@
 <template>
-  <div class="app-page-shell text-white">
-    <!-- Header -->
-    <main class="settings-shell app-page-frame space-y-8 sm:space-y-10">
-      <section class="settings-hero-wrap">
-        <transition name="hero-fade" mode="out-in">
-          <header
-            v-if="showSettingsHero"
-            key="full-hero"
-            class="app-page-hero mb-0 text-center settings-hero-content"
-          >
-            <h1 class="text-3xl sm:text-4xl font-bold mb-2 text-white">⚙️ Settings</h1>
-            <p class="app-page-description mx-auto">
-              Manage your notifications, integrations, and account preferences.
-            </p>
-          </header>
-          <div v-else key="compact-hero" class="settings-hero-compact">
-            <p class="settings-hero-compact__title">Settings</p>
-            <p class="settings-hero-compact__subtitle">
-              Notifications, integrations, and account controls
-            </p>
-          </div>
-        </transition>
-        <div class="settings-hero-toggle" v-if="isMobileSettingsView">
+  <div class="settings-page">
+    <main class="settings-shell">
+      <!-- The app header already says "Settings"; this row is the only chrome. -->
+      <nav class="settings-tabs" aria-label="Settings sections">
+        <div class="settings-tabs__list" role="tablist">
           <button
+            v-for="tab in visibleSettingsTabs"
+            :key="tab.id"
             type="button"
-            class="inline-flex items-center justify-center rounded-lg border border-white/15 bg-slate-900/50 px-3 py-1.5 text-xs text-slate-200 hover:border-indigo-300/40"
-            @click="showSettingsHero = !showSettingsHero"
+            role="tab"
+            class="settings-tabs__tab"
+            :aria-selected="activeTab === tab.id"
+            @click="setActiveTab(tab.id)"
           >
-            {{ showSettingsHero ? 'Hide intro' : 'Show intro' }}
+            {{ tab.label }}
           </button>
         </div>
-      </section>
+        <PcMenu :items="moreSettingsMenu" label="More settings" @select="setActiveTab" />
+      </nav>
 
-      <div class="space-y-8 sm:space-y-10">
-        <!-- Settings navigation -->
-        <nav class="settings-panel nav-panel">
-          <div class="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <p class="text-xs uppercase tracking-[0.24em] text-indigo-200/80">Mode</p>
-              <p class="text-sm text-slate-200">
-                {{ showAdvancedSettings ? 'Advanced controls visible' : 'Focused daily settings' }}
-              </p>
-            </div>
-            <button
-              type="button"
-              class="inline-flex items-center justify-center rounded-lg border px-3 py-1.5 text-sm transition"
-              :class="
-                showAdvancedSettings
-                  ? 'border-indigo-300/50 bg-indigo-500/20 text-indigo-100'
-                  : 'border-white/15 bg-slate-900/50 text-slate-200 hover:border-indigo-300/40'
-              "
-              @click="toggleAdvancedSettings"
-            >
-              {{ showAdvancedSettings ? 'Hide advanced' : 'Show advanced' }}
-            </button>
-          </div>
-          <div class="nav-scroll">
-            <div class="nav-grid">
-              <div
-                v-for="group in visibleTabGroups"
-                :key="group.id"
-                class="space-y-2 min-w-[220px]"
-              >
-                <p class="text-xs uppercase tracking-[0.2em] text-slate-300">{{ group.label }}</p>
-                <div class="flex flex-wrap gap-2">
-                  <button
-                    v-for="tab in group.tabs"
-                    :key="tab.id"
-                    type="button"
-                    :class="[
-                      'px-3 py-1.5 rounded-lg text-sm border transition min-w-[140px] text-left',
-                      activeTab === tab.id
-                        ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg'
-                        : 'bg-slate-900/40 border-slate-700 text-slate-200 hover:border-slate-500',
-                    ]"
-                    @click="setActiveTab(tab.id)"
-                  >
-                    <span class="inline-flex items-center gap-2">
-                      <span v-if="tab.icon" aria-hidden="true">{{ tab.icon }}</span>
-                      <span>{{ tab.label }}</span>
-                    </span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </nav>
+      <div class="settings-sections">
 
         <div v-if="activeTab === 'workspace-knowledge'">
           <KnowledgePanel />
@@ -95,24 +29,11 @@
           <ProposalInbox />
         </div>
 
-        <section v-if="activeTab === 'workspace-policies'" class="settings-panel">
-          <h2 class="text-lg sm:text-xl font-semibold mb-2">🛡️ Policies</h2>
-          <p class="text-sm text-indigo-200">
-            Approval and action policies live here. Manage auto-approve/reject rules, admin-only
-            approvals, and two-approver flags.
-          </p>
-          <p class="text-sm text-slate-300 mt-3">
-            Coming soon to UI — policies are already enforced server-side. Ask an admin to adjust
-            workspace policies in the backend for now.
-          </p>
-        </section>
-
         <!-- Plan status and usage -->
         <section v-if="activeTab === 'billing-subscription'" class="settings-panel space-y-4">
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Billing</p>
-              <h2 class="text-lg sm:text-xl font-semibold mb-1">🌟 Subscription & Usage</h2>
+              <h2 class="settings-panel__title">Subscription &amp; usage</h2>
               <p class="text-sm text-indigo-200">
                 {{ billingSectionIntro }}
               </p>
@@ -123,12 +44,6 @@
               >
                 <span class="text-[11px] uppercase tracking-[0.18em] text-indigo-100/80">Plan</span>
                 <strong class="text-white">{{ normalizedPlanLabel }}</strong>
-              </span>
-              <span
-                class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/70 border border-white/10 text-slate-200 text-sm"
-              >
-                <span class="text-[11px] uppercase tracking-[0.18em] text-slate-300">AI today</span>
-                <span>{{ aiUsed }} / {{ aiLimitLabel }}</span>
               </span>
             </div>
           </div>
@@ -148,7 +63,7 @@
                   <button
                     v-if="!isPremium && !isAppleBillingSafeMode"
                     @click="upgradePlan"
-                    class="bg-gradient-to-r from-purple-500 to-pink-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-white shadow-lg hover:from-purple-600 hover:to-pink-700 transition text-sm sm:text-base"
+                    class="bg-[image:var(--pc-accent-fill)] px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-white shadow-sm hover:bg-[image:var(--pc-accent-fill-hover)] transition text-sm sm:text-base"
                   >
                     {{ personalPlanCtaLabel }}
                   </button>
@@ -236,7 +151,7 @@
             </div>
             <div
               v-else
-              class="rounded-2xl border border-indigo-400/30 bg-indigo-900/60 p-4 sm:p-5 space-y-3 shadow-lg"
+              class="rounded-2xl border border-pc-border bg-pc-surface-2 p-4 sm:p-5 space-y-3"
             >
               <div class="flex items-start justify-between gap-3">
                 <div>
@@ -280,7 +195,7 @@
                   </button>
                 </div>
                 <div
-                  class="rounded-xl border border-indigo-300/40 bg-gradient-to-br from-indigo-900/80 via-slate-900 to-indigo-950 p-3 space-y-2 shadow ring-1 ring-indigo-400/30"
+                  class="rounded-xl border border-pc-accent bg-pc-accent-soft p-3 space-y-2 shadow-sm"
                 >
                   <div class="flex items-center justify-between">
                     <h4 class="text-lg font-semibold text-white">Team Pro</h4>
@@ -315,28 +230,11 @@
           </div>
         </section>
 
-        <section v-if="activeTab === 'account-profile'" class="settings-panel">
-          <h2 class="text-lg sm:text-xl font-semibold mb-2">🙋 Profile</h2>
-          <p class="text-sm text-indigo-200">
-            Profile editing lives in your account menu. A dedicated editor will arrive here soon.
-          </p>
-          <p class="text-sm text-slate-300 mt-2">
-            Signed in as: <strong>{{ authStore.user?.email || 'Unknown user' }}</strong>
-          </p>
-        </section>
-
-        <section v-if="activeTab === 'account-preferences'" class="settings-panel">
-          <h2 class="text-lg sm:text-xl font-semibold mb-2">⚙️ Preferences</h2>
-          <p class="text-sm text-indigo-200">
-            Workspace-specific preferences (theme, locale, AI persona) will be managed here soon.
-          </p>
-        </section>
-
         <section v-if="activeTab === 'account-quick-setup'" class="settings-panel space-y-5">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div class="space-y-2">
               <p class="text-xs uppercase tracking-[0.25em] text-indigo-200/80">Setup Assistant</p>
-              <h2 class="text-lg sm:text-xl font-semibold text-white">✨ Quick Setup</h2>
+              <h2 class="settings-panel__title">Quick Setup</h2>
               <p class="text-sm text-indigo-100/85 max-w-2xl">
                 Reopen the onboarding assistant any time to finish reminder channels, timezone, and
                 phone setup.
@@ -344,10 +242,9 @@
             </div>
             <button
               type="button"
-              class="inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-fuchsia-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:from-indigo-400 hover:to-fuchsia-500"
+              class="inline-flex items-center justify-center gap-2 rounded-lg bg-[image:var(--pc-accent-fill)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[image:var(--pc-accent-fill-hover)]"
               @click="openQuickSetupPanel"
             >
-              <span aria-hidden="true">✨</span>
               <span>{{ quickSetupState?.completed ? 'Review setup' : 'Finish setup' }}</span>
             </button>
           </div>
@@ -373,9 +270,9 @@
               </span>
             </div>
 
-            <div class="h-2 overflow-hidden rounded-full bg-white/10">
+            <div class="h-2 overflow-hidden rounded-full bg-pc-surface-2">
               <div
-                class="h-full rounded-full bg-gradient-to-r from-indigo-400 via-violet-500 to-fuchsia-500 transition-all"
+                class="h-full rounded-full bg-[image:var(--pc-accent-fill)] transition-all"
                 :style="{ width: `${quickSetupState?.completionPercent || 0}%` }"
               />
             </div>
@@ -404,7 +301,7 @@
             </p>
             <p
               v-else
-              class="rounded-xl border border-emerald-400/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100"
+              class="rounded-xl border border-emerald-600/25 bg-emerald-500/10 px-4 py-3 text-sm text-pc-success"
             >
               Quick Setup is complete. You can reopen it any time to review or change your setup.
             </p>
@@ -423,7 +320,7 @@
               : '',
           ]"
         >
-          <h2 class="text-lg sm:text-xl font-semibold mb-3">🔔 Notification Preferences</h2>
+          <h2 class="settings-panel__title">Notifications</h2>
           <p class="text-sm text-indigo-200 mb-3">Choose how you’d like to be reminded.</p>
 
           <div class="space-y-2.5">
@@ -811,17 +708,12 @@
           </div>
         </section>
 
-        <section v-if="activeTab === 'account-social'" class="settings-panel">
-          <h2 class="text-lg sm:text-xl font-semibold mb-2">🌐 Social Accounts</h2>
-          <p class="text-sm text-indigo-200 mb-4">
-            Connect and manage social destinations for posting workflows.
-          </p>
-          <SocialIntegrationPanel />
-        </section>
+        <!-- The panel has its own title and description; no wrapper needed. -->
+        <SocialIntegrationPanel v-if="activeTab === 'account-social'" />
 
         <!-- Integrations -->
         <section v-if="activeTab === 'workspace-integrations'" class="settings-panel">
-          <h2 class="text-lg sm:text-xl font-semibold mb-4">🔗 Integrations</h2>
+          <h2 class="settings-panel__title">Integrations</h2>
           <p class="text-sm text-indigo-200 mb-4">
             Connect your favorite platforms to sync tasks and reminders.
           </p>
@@ -1117,77 +1009,10 @@
           </div>
         </section>
 
-        <!-- Account -->
-        <section v-if="activeTab === 'account-profile'" class="settings-panel">
-          <h2 class="text-lg sm:text-xl font-semibold mb-4">👤 Account</h2>
-          <div class="grid grid-cols-1 xl:grid-cols-[0.92fr,1.08fr] gap-4 mb-6">
-            <div class="rounded-2xl border border-white/10 bg-slate-950/40 p-4 space-y-4">
-              <div>
-                <p class="text-xs uppercase tracking-[0.24em] text-slate-300">Legal</p>
-                <h3 class="text-lg font-semibold text-white">
-                  Terms, privacy, and deletion policy
-                </h3>
-                <p class="text-sm text-indigo-100/80 mt-1">
-                  Keep the App Store-required documents one tap away inside the app.
-                </p>
-              </div>
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  class="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-left text-white hover:border-indigo-300/40 hover:bg-slate-900"
-                  @click="openLegalDoc('/terms')"
-                >
-                  Terms of Use
-                </button>
-                <button
-                  type="button"
-                  class="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-left text-white hover:border-indigo-300/40 hover:bg-slate-900"
-                  @click="openLegalDoc('/privacy')"
-                >
-                  Privacy Policy
-                </button>
-                <button
-                  type="button"
-                  class="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-left text-white hover:border-indigo-300/40 hover:bg-slate-900"
-                  @click="openLegalDoc('/delete-account')"
-                >
-                  Deletion Policy
-                </button>
-              </div>
-            </div>
-
-            <div class="rounded-2xl border border-red-400/25 bg-red-500/10 p-4 space-y-4">
-              <div>
-                <p class="text-xs uppercase tracking-[0.24em] text-red-200/80">Danger Zone</p>
-                <h3 class="text-lg font-semibold text-white">Delete account</h3>
-                <p class="text-sm text-red-100/85 mt-1">
-                  Permanently removes your account, tasks, reminders, journal entries, and synced
-                  integrations.
-                </p>
-              </div>
-              <div
-                class="rounded-xl border border-red-300/20 bg-slate-950/30 px-4 py-3 text-sm text-red-50/90 space-y-1"
-              >
-                <p>Your data is deleted, not just deactivated.</p>
-                <p>
-                  Shared workspace access is removed automatically before the account is deleted.
-                </p>
-              </div>
-              <div class="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  class="inline-flex items-center justify-center rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60"
-                  :disabled="deleteAccountLoading"
-                  @click="deleteAccountConfirmOpen = true"
-                >
-                  Delete Account
-                </button>
-                <p class="text-xs text-red-100/75">This action is permanent.</p>
-              </div>
-            </div>
-          </div>
-
-          <div class="profile-identity mb-4">
+        <!-- Profile: the only primary action on this tab is Save changes. -->
+        <section v-if="activeTab === 'account-profile'" class="settings-panel" aria-labelledby="settings-profile-title">
+          <h2 id="settings-profile-title" class="settings-panel__title">Profile</h2>
+          <div class="profile-identity">
             <AvatarUploader
               :url="authStore.user?.photoURL || authStore.user?.avatarUrl"
               :name="profileForm.name || authStore.user?.displayName || authStore.user?.name"
@@ -1196,65 +1021,149 @@
               @updated="onAvatarUpdated"
             />
             <div class="profile-identity-copy">
-              <p class="font-medium">
-                {{ profileForm.name || authStore.user?.displayName || 'Guest User' }}
+              <p class="profile-identity-copy__name">
+                {{ profileForm.name || authStore.user?.displayName || 'PlanCraft user' }}
               </p>
-              <p class="text-sm text-indigo-300">
-                {{ profileForm.email || authStore.user?.email }}
-              </p>
+              <p class="profile-identity-copy__email">{{ profileForm.email || authStore.user?.email }}</p>
             </div>
           </div>
 
-          <div v-if="!profileComplete" class="mb-3 text-yellow-300 text-sm">
-            ⚠️ Your profile is incomplete — add your name to personalize your experience.
+          <p v-if="!profileComplete" class="settings-note">Add your name so PlanCraft can personalize your plans.</p>
+
+          <div class="profile-fields">
+            <label class="settings-field">
+              <span>Name</span>
+              <el-input v-model="profileForm.name" placeholder="Your name" autocomplete="name" clearable />
+            </label>
+            <label class="settings-field">
+              <span>Email</span>
+              <el-input v-model="profileForm.email" placeholder="you@example.com" type="email" autocomplete="email" clearable />
+            </label>
+            <label class="settings-field">
+              <span>Phone <small>(optional)</small></span>
+              <el-input v-model="profileForm.phone" placeholder="+1 650 555 1234" type="tel" autocomplete="tel" clearable />
+            </label>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
-            <el-input v-model="profileForm.name" placeholder="Your name" clearable />
-            <el-input
-              v-model="profileForm.email"
-              placeholder="Email (optional)"
-              type="email"
-              clearable
-            />
-            <el-input
-              v-model="profileForm.phone"
-              placeholder="Phone (optional)"
-              type="tel"
-              clearable
-            />
-          </div>
-          <div
-            v-if="emailNeedsReauth"
-            class="mb-4 text-xs text-yellow-300 bg-yellow-400/10 border border-yellow-300/30 rounded px-3 py-2 flex items-center justify-between gap-3"
-          >
-            <span> Changing your email requires a recent login. Re-authenticate to continue. </span>
-            <el-button size="small" type="primary" @click="reauthenticate"
-              >Re-authenticate</el-button
-            >
-          </div>
-          <div class="flex items-center justify-end gap-3 mb-6">
-            <el-button
-              type="primary"
-              class="bg-gradient-to-r from-indigo-600 to-purple-600"
-              :loading="profileSaving"
-              @click="saveProfile"
-              >Save Changes</el-button
-            >
+          <section class="timezone-settings" aria-labelledby="settings-timezone-title">
+            <div class="timezone-settings__header">
+              <div>
+                <p class="timezone-settings__eyebrow">Time &amp; travel</p>
+                <h3 id="settings-timezone-title" class="timezone-settings__title">
+                  Keep reminders local while you travel
+                </h3>
+                <p class="timezone-settings__copy">
+                  Automatic follows this device’s current timezone. Existing reminders keep the
+                  timezone they were created in.
+                </p>
+              </div>
+              <span class="timezone-settings__status">
+                {{ profileTimezoneMode === TIMEZONE_MODES.AUTO ? 'Automatic' : 'Manual' }}
+              </span>
+            </div>
+
+            <div class="timezone-settings__modes" role="group" aria-label="Timezone behavior">
+              <button
+                type="button"
+                class="timezone-settings__mode"
+                :class="{ 'timezone-settings__mode--active': profileTimezoneMode === TIMEZONE_MODES.AUTO }"
+                @click="useAutomaticTimezone"
+              >
+                <span>Use device timezone</span>
+                <small>Best for travel</small>
+              </button>
+              <button
+                type="button"
+                class="timezone-settings__mode"
+                :class="{ 'timezone-settings__mode--active': profileTimezoneMode === TIMEZONE_MODES.MANUAL }"
+                @click="useManualTimezone"
+              >
+                <span>Choose a timezone</span>
+                <small>Keep one home zone</small>
+              </button>
+            </div>
+
+            <div v-if="profileTimezoneMode === TIMEZONE_MODES.AUTO" class="timezone-settings__current">
+              <div>
+                <span class="timezone-settings__label">Current device timezone</span>
+                <strong>{{ detectedTimezoneLabel }}</strong>
+              </div>
+              <span class="timezone-settings__clock">{{ timezoneClockLabel(detectedTimezone, timezoneNow) }}</span>
+            </div>
+
+            <label v-else class="settings-field timezone-settings__select-field">
+              <span>Home timezone</span>
+              <select v-model="profileTimezone" class="timezone-settings__select" @change="dirty = true">
+                <option v-for="timezone in timezoneOptions" :key="timezone" :value="timezone">
+                  {{ timezoneOptionLabel(timezone, timezoneNow) }}
+                </option>
+              </select>
+              <small>New reminders and planning requests will use this zone.</small>
+            </label>
+
+            <p v-if="deviceTimezoneChanged" class="timezone-settings__travel-note">
+              Your device is currently in {{ detectedTimezoneLabel }}, but reminders are still using
+              your selected home timezone.
+            </p>
+            <p class="timezone-settings__preview">
+              Planning now in <strong>{{ activeProfileTimezoneLabel }}</strong> · {{ activeProfileTimezoneClock }}
+            </p>
+          </section>
+
+          <div v-if="emailNeedsReauth" class="settings-note settings-note--warning">
+            <span>Changing your email needs a recent sign-in.</span>
+            <PcButton size="sm" @click="reauthenticate">Sign in again</PcButton>
           </div>
 
-          <div class="flex flex-col sm:flex-row gap-3 justify-center items-center w-full">
-            <RouterLink
-              to="/help"
-              class="px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base rounded-lg bg-gray-800 hover:bg-gray-700 transition"
-              >💬 Help & Feedback</RouterLink
-            >
-            <button
-              class="px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base rounded-lg bg-red-600 hover:bg-red-700 transition"
-              @click="handleLogout"
-            >
-              Logout
+          <div class="settings-actions">
+            <PcButton variant="primary" :loading="profileSaving" @click="saveProfile">Save changes</PcButton>
+          </div>
+        </section>
+
+        <AppLockSettings v-if="activeTab === 'account-profile'" />
+
+        <!-- Account: links and sign-out as a quiet list. -->
+        <section v-if="activeTab === 'account-profile'" class="settings-panel" aria-labelledby="settings-account-title">
+          <h2 id="settings-account-title" class="settings-panel__title">Account</h2>
+          <div class="settings-list">
+            <RouterLink to="/help" class="settings-row">
+              <CircleHelp :size="18" aria-hidden="true" />
+              <span>Help &amp; feedback</span>
+              <ChevronRight :size="16" class="settings-row__chevron" aria-hidden="true" />
+            </RouterLink>
+            <button type="button" class="settings-row" @click="openLegalDoc('/terms')">
+              <FileText :size="18" aria-hidden="true" />
+              <span>Terms of use</span>
+              <ChevronRight :size="16" class="settings-row__chevron" aria-hidden="true" />
             </button>
+            <button type="button" class="settings-row" @click="openLegalDoc('/privacy')">
+              <ShieldCheck :size="18" aria-hidden="true" />
+              <span>Privacy policy</span>
+              <ChevronRight :size="16" class="settings-row__chevron" aria-hidden="true" />
+            </button>
+            <button type="button" class="settings-row" @click="openLegalDoc('/delete-account')">
+              <FileX :size="18" aria-hidden="true" />
+              <span>Data deletion policy</span>
+              <ChevronRight :size="16" class="settings-row__chevron" aria-hidden="true" />
+            </button>
+            <button type="button" class="settings-row" @click="handleLogout">
+              <LogOut :size="18" aria-hidden="true" />
+              <span>Log out</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- Destructive action last, visually quiet until needed. -->
+        <section v-if="activeTab === 'account-profile'" class="settings-panel settings-panel--danger" aria-labelledby="settings-delete-title">
+          <h2 id="settings-delete-title" class="settings-panel__title">Delete account</h2>
+          <p class="settings-panel__text">
+            Permanently deletes your account, tasks, reminders, journal entries and connected integrations,
+            and removes you from shared workspaces. This can’t be undone.
+          </p>
+          <div class="settings-actions settings-actions--start">
+            <PcButton variant="danger" :disabled="deleteAccountLoading" @click="deleteAccountConfirmOpen = true">
+              Delete account
+            </PcButton>
           </div>
         </section>
       </div>
@@ -1424,6 +1333,7 @@ import {
 import { sendActionInboxDigest } from '@/services/actionInboxService'
 import { createGptLinkCode } from '@/services/gptService'
 import SocialIntegrationPanel from '@/components/settings/SocialIntegrationPanel.vue'
+import AppLockSettings from '@/components/settings/AppLockSettings.vue'
 import { subscribeUserToPush } from '@/services/pwaService'
 import {
   getNativeReminderPermissionStatus,
@@ -1466,6 +1376,16 @@ import {
 } from '@/utils/notificationSound'
 import { deleteAccount as requestAccountDeletion } from '@/services/accountService'
 import {
+  detectDeviceTimezone,
+  isValidTimezone,
+  listSupportedTimezones,
+  persistTimezonePreference,
+  readTimezonePreference,
+  timezoneClockLabel,
+  timezoneOptionLabel,
+  TIMEZONE_MODES,
+} from '@/utils/userTimezone'
+import {
   buildQuickSetupState,
   dispatchQuickSetupUpdated,
   getIncompleteQuickSetupLabels,
@@ -1473,6 +1393,8 @@ import {
   writeQuickSetupState,
 } from '@/utils/quickSetup'
 import dayjs from 'dayjs'
+import { ChevronRight, CircleHelp, FileText, FileX, LogOut, ShieldCheck } from 'lucide-vue-next'
+import { PcButton, PcMenu } from '@/design'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -1501,7 +1423,6 @@ const notificationSoundHelp = computed(() =>
 )
 const settingsViewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1280)
 const isMobileSettingsView = computed(() => settingsViewportWidth.value < 768)
-const showSettingsHero = ref(!isMobileSettingsView.value)
 const isAppleBillingSafeMode = computed(() => detectAppleBillingSafeMode())
 const quickSetupState = computed(() => quickSetupStore.setupState)
 const quickSetupMissingLabels = computed(() => getIncompleteQuickSetupLabels(quickSetupState.value))
@@ -1535,12 +1456,13 @@ function normalizeTab(tab) {
     'workspace-knowledge': 'workspace-knowledge',
     proposals: 'workspace-proposals',
     'workspace-proposals': 'workspace-proposals',
-    policies: 'workspace-policies',
-    'workspace-policies': 'workspace-policies',
+    // Placeholder pages were removed; old links land on Profile.
+    policies: 'account-profile',
+    'workspace-policies': 'account-profile',
     profile: 'account-profile',
     'account-profile': 'account-profile',
-    preferences: 'account-preferences',
-    'account-preferences': 'account-preferences',
+    preferences: 'account-profile',
+    'account-preferences': 'account-profile',
     'quick-setup': 'account-quick-setup',
     quicksetup: 'account-quick-setup',
     'account-quick-setup': 'account-quick-setup',
@@ -1557,62 +1479,32 @@ function normalizeTab(tab) {
   return alias[t] || t
 }
 
-const tabGroups = [
-  {
-    id: 'workspace',
-    label: 'Workspace',
-    tabs: [
-      { id: 'workspace-knowledge', label: 'Knowledge' },
-      { id: 'workspace-proposals', label: 'Impact & Proposals' },
-      { id: 'workspace-policies', label: 'Policies' },
-      { id: 'workspace-integrations', label: 'Integrations' },
-    ],
-  },
-  {
-    id: 'account',
-    label: 'Account',
-    tabs: [
-      { id: 'account-profile', label: 'Profile' },
-      { id: 'account-preferences', label: 'Preferences' },
-      { id: 'account-quick-setup', label: 'Quick Setup', icon: '✨' },
-      { id: 'account-notifications', label: 'Notifications' },
-      { id: 'account-social', label: 'Social' },
-    ],
-  },
-  {
-    id: 'billing',
-    label: 'Billing',
-    tabs: [{ id: 'billing-subscription', label: 'Subscription & Usage' }],
-  },
+// Four everyday sections; the rest sits behind ··· (design rule: everything
+// secondary goes in the overflow menu).
+const SETTINGS_TABS = [
+  { id: 'account-profile', label: 'Profile' },
+  { id: 'account-notifications', label: 'Notifications' },
+  { id: 'workspace-integrations', label: 'Integrations' },
+  { id: 'billing-subscription', label: 'Subscription' },
 ]
-
-const CORE_TAB_IDS = new Set([
-  'account-profile',
-  'account-notifications',
-  'workspace-integrations',
-  'billing-subscription',
-])
-const showAdvancedSettings = ref(false)
-const visibleTabGroups = computed(() =>
-  tabGroups
-    .map((group) => ({
-      ...group,
-      tabs: group.tabs.filter((tab) => showAdvancedSettings.value || CORE_TAB_IDS.has(tab.id)),
-    }))
-    .filter((group) => group.tabs.length),
-)
+const MORE_SETTINGS_TABS = [
+  { id: 'account-quick-setup', label: 'Quick setup' },
+  { id: 'account-social', label: 'Social accounts' },
+  { id: 'workspace-knowledge', label: 'Knowledge' },
+  { id: 'workspace-proposals', label: 'Impact & proposals' },
+]
+const moreSettingsMenu = MORE_SETTINGS_TABS.map((tab) => ({ key: tab.id, label: tab.label }))
 
 const DEFAULT_SETTINGS_TAB = 'account-profile'
-const activeTab = ref(normalizeTab(route.query?.tab) || DEFAULT_SETTINGS_TAB)
-if (!CORE_TAB_IDS.has(activeTab.value)) showAdvancedSettings.value = true
+const KNOWN_TAB_IDS = new Set([...SETTINGS_TABS, ...MORE_SETTINGS_TABS].map((tab) => tab.id))
+const initialTab = normalizeTab(route.query?.tab)
+const activeTab = ref(KNOWN_TAB_IDS.has(initialTab) ? initialTab : DEFAULT_SETTINGS_TAB)
 
-const hasVisibleActiveTab = computed(() =>
-  visibleTabGroups.value.some((group) => group.tabs.some((tab) => tab.id === activeTab.value)),
-)
-
-function toggleAdvancedSettings() {
-  showAdvancedSettings.value = !showAdvancedSettings.value
-}
+// When a ··· section is open, show it as a tab so people can see where they are.
+const visibleSettingsTabs = computed(() => {
+  const extra = MORE_SETTINGS_TABS.find((tab) => tab.id === activeTab.value)
+  return extra ? [...SETTINGS_TABS, extra] : SETTINGS_TABS
+})
 
 watch(
   () => route.query?.tab,
@@ -1630,10 +1522,6 @@ function setActiveTab(id) {
   if (target === 'account-notifications') focusNotifications()
 }
 
-watch(hasVisibleActiveTab, (isVisible) => {
-  if (isVisible) return
-  setActiveTab(DEFAULT_SETTINGS_TAB)
-})
 
 function openQuickSetupPanel() {
   quickSetupStore.refreshQuickSetupState()
@@ -1644,11 +1532,9 @@ function syncSettingsViewport() {
   if (typeof window === 'undefined') return
   settingsViewportWidth.value = window.innerWidth
   if (settingsViewportWidth.value < 768) {
-    if (showSettingsHero.value !== false) showSettingsHero.value = false
     if (showNotificationAdvanced.value !== false) showNotificationAdvanced.value = false
     return
   }
-  if (!showSettingsHero.value) showSettingsHero.value = true
   if (!showNotificationAdvanced.value) showNotificationAdvanced.value = true
 }
 const dirty = ref(false) // tracks unsaved changes
@@ -1681,6 +1567,29 @@ function sanitizeReminderMinutes(value) {
 // Account profile state
 const auth = getAuth()
 const profileForm = reactive({ name: '', email: '', phone: '' })
+const profileTimezoneMode = ref(TIMEZONE_MODES.AUTO)
+const profileTimezone = ref(detectDeviceTimezone())
+const detectedTimezone = ref(detectDeviceTimezone())
+const timezoneNow = ref(new Date())
+const timezoneOptions = computed(() => listSupportedTimezones())
+const activeProfileTimezone = computed(() =>
+  profileTimezoneMode.value === TIMEZONE_MODES.MANUAL ? profileTimezone.value : detectedTimezone.value,
+)
+const activeProfileTimezoneLabel = computed(() =>
+  timezoneOptionLabel(activeProfileTimezone.value, timezoneNow.value),
+)
+const activeProfileTimezoneClock = computed(() =>
+  timezoneClockLabel(activeProfileTimezone.value, timezoneNow.value),
+)
+const detectedTimezoneLabel = computed(() =>
+  timezoneOptionLabel(detectedTimezone.value, timezoneNow.value),
+)
+const deviceTimezoneChanged = computed(
+  () =>
+    profileTimezoneMode.value === TIMEZONE_MODES.MANUAL &&
+    detectedTimezone.value !== profileTimezone.value,
+)
+let timezoneRefreshTimer = null
 const profileSaving = ref(false)
 const emailNeedsReauth = ref(false)
 const profileComplete = ref(true)
@@ -1916,18 +1825,52 @@ function applyProfileFields(user, data = {}) {
   profileForm.email = data?.email || user?.email || ''
   profileForm.phone = data?.phone || user?.phoneNumber || authStore.user?.phone || ''
   profileComplete.value = !!(data?.name || user?.displayName)
+
+  const localPreference = readTimezonePreference()
+  const remoteTimezone = data?.timezone || data?.preferences?.timezone || ''
+  const remoteMode = String(data?.timezoneMode || data?.timezone_mode || '').toLowerCase()
+  const hasLegacyRemoteTimezone = remoteMode === '' && isValidTimezone(remoteTimezone)
+  profileTimezoneMode.value =
+    remoteMode === TIMEZONE_MODES.MANUAL || hasLegacyRemoteTimezone
+      ? TIMEZONE_MODES.MANUAL
+      : localPreference.mode
+  detectedTimezone.value = detectDeviceTimezone()
+  timezoneNow.value = new Date()
+  profileTimezone.value =
+    profileTimezoneMode.value === TIMEZONE_MODES.MANUAL
+      ? (isValidTimezone(remoteTimezone) ? remoteTimezone : localPreference.timezone)
+      : detectedTimezone.value
+  persistTimezonePreference(profileTimezoneMode.value, profileTimezone.value)
+}
+
+function useAutomaticTimezone() {
+  detectedTimezone.value = detectDeviceTimezone()
+  timezoneNow.value = new Date()
+  profileTimezoneMode.value = TIMEZONE_MODES.AUTO
+  profileTimezone.value = detectedTimezone.value
+  dirty.value = true
+}
+
+function useManualTimezone() {
+  detectedTimezone.value = detectDeviceTimezone()
+  timezoneNow.value = new Date()
+  profileTimezoneMode.value = TIMEZONE_MODES.MANUAL
+  if (!isValidTimezone(profileTimezone.value)) profileTimezone.value = detectedTimezone.value
+  dirty.value = true
+}
+
+function refreshDetectedTimezone() {
+  detectedTimezone.value = detectDeviceTimezone()
+  timezoneNow.value = new Date()
+  if (profileTimezoneMode.value === TIMEZONE_MODES.AUTO) {
+    profileTimezone.value = detectedTimezone.value
+  }
 }
 
 function currentQuickSetupTimezone() {
-  try {
-    return (
-      localStorage.getItem('user_timezone') ||
-      Intl.DateTimeFormat().resolvedOptions().timeZone ||
-      'UTC'
-    )
-  } catch {
-    return 'UTC'
-  }
+  return profileTimezoneMode.value === TIMEZONE_MODES.MANUAL
+    ? profileTimezone.value
+    : detectedTimezone.value || detectDeviceTimezone()
 }
 
 function deriveQuickSetupPhone() {
@@ -2083,6 +2026,9 @@ onMounted(async () => {
   try {
     syncSettingsViewport()
     window.addEventListener('resize', syncSettingsViewport, { passive: true })
+    refreshDetectedTimezone()
+    window.addEventListener('focus', refreshDetectedTimezone, { passive: true })
+    timezoneRefreshTimer = setInterval(refreshDetectedTimezone, 60 * 1000)
     // Ensure latest subscription state on entry
     try {
       await refreshPremium()
@@ -2812,7 +2758,18 @@ async function saveProfile() {
       email: profileForm.email || null,
       phone: phoneE164 || null,
       profileComplete: !!(profileForm.name && profileForm.name.trim().length),
+      timezoneMode: profileTimezoneMode.value,
+      timezone:
+        profileTimezoneMode.value === TIMEZONE_MODES.MANUAL
+          ? profileTimezone.value
+          : null,
     })
+    const savedTimezonePreference = persistTimezonePreference(
+      profileTimezoneMode.value,
+      profileTimezoneMode.value === TIMEZONE_MODES.MANUAL
+        ? profileTimezone.value
+        : detectedTimezone.value,
+    )
     try {
       await updateFirebaseProfile(u, { displayName: profileForm.name || '' })
     } catch {
@@ -2836,6 +2793,8 @@ async function saveProfile() {
       displayName: profileForm.name || authStore.user?.displayName || '',
       email: profileForm.email || authStore.user?.email || '',
       phone: phoneE164 || '',
+      timezoneMode: savedTimezonePreference.mode,
+      timezone: savedTimezonePreference.mode === TIMEZONE_MODES.MANUAL ? savedTimezonePreference.timezone : null,
     }
     integrationEndpoints.value.email = profileForm.email || authStore.user?.email || ''
     try {
@@ -3008,8 +2967,13 @@ watch(
 onBeforeUnmount(() => {
   try {
     window.removeEventListener('resize', syncSettingsViewport)
+    window.removeEventListener('focus', refreshDetectedTimezone)
   } catch {
     /* noop */
+  }
+  if (timezoneRefreshTimer) {
+    clearInterval(timezoneRefreshTimer)
+    timezoneRefreshTimer = null
   }
   clearResendCooldown()
   if (gptCopyTimer) {
@@ -3157,119 +3121,216 @@ const premiumEndsOn = computed(() => {
 </script>
 
 <style scoped>
+.settings-page {
+  color: var(--pc-text);
+}
+
 .settings-shell {
-  width: min(1200px, 100%);
+  width: min(880px, 100%);
   margin: 0 auto;
+  padding: var(--pc-space-2) 0 var(--pc-space-10);
 }
 
-.settings-hero-wrap {
-  position: relative;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: linear-gradient(135deg, rgba(79, 70, 229, 0.28), rgba(168, 85, 247, 0.2));
-  border-radius: 18px;
-  padding: 1rem 1rem 0.9rem;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-  backdrop-filter: blur(8px);
+.settings-sections {
+  display: grid;
+  gap: var(--pc-space-5);
 }
 
-.settings-hero-content {
-  padding-bottom: 0.25rem;
-}
-
-.settings-hero-compact {
-  text-align: center;
-  padding: 0.4rem 0 0.2rem;
-}
-
-.settings-hero-compact__title {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: #f8fafc;
-}
-
-.settings-hero-compact__subtitle {
-  margin-top: 0.15rem;
-  font-size: 0.82rem;
-  color: rgba(224, 231, 255, 0.85);
-}
-
-.settings-hero-toggle {
+/* Tabs: one quiet row, active state is the only accent. */
+.settings-tabs {
   display: flex;
-  justify-content: center;
-  margin-top: 0.55rem;
+  align-items: center;
+  gap: var(--pc-space-2);
+  margin-bottom: var(--pc-space-6);
+  border-bottom: 1px solid var(--pc-border);
 }
 
-.hero-fade-enter-active,
-.hero-fade-leave-active {
-  transition:
-    opacity 0.2s ease,
-    transform 0.2s ease;
+.settings-tabs__list {
+  display: flex;
+  flex: 1;
+  gap: var(--pc-space-1);
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
-.hero-fade-enter-from,
-.hero-fade-leave-to {
-  opacity: 0;
-  transform: translateY(-4px);
+.settings-tabs__list::-webkit-scrollbar {
+  display: none;
 }
 
+.settings-tabs__tab {
+  flex-shrink: 0;
+  padding: var(--pc-space-3) var(--pc-space-3);
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  color: var(--pc-text-muted);
+  font-family: var(--pc-font);
+  font-size: var(--pc-text-body);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.settings-tabs__tab:hover {
+  color: var(--pc-text);
+}
+
+.settings-tabs__tab[aria-selected='true'] {
+  border-bottom-color: var(--pc-accent);
+  color: var(--pc-text);
+  font-weight: 600;
+}
+
+/* Panels: light surfaces from the design tokens. */
 .settings-panel {
   width: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background:
-    radial-gradient(120% 120% at 10% 10%, rgba(99, 102, 241, 0.08), rgba(15, 23, 42, 0.8)),
-    rgba(15, 23, 42, 0.6);
-  border-radius: 18px;
-  padding: 1.25rem;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
-  backdrop-filter: blur(10px);
+  padding: var(--pc-space-5);
+  border: 1px solid var(--pc-border);
+  border-radius: var(--pc-radius-lg);
+  background: var(--pc-surface);
+  box-shadow: var(--pc-shadow-sm);
 }
 
-.nav-panel {
-  position: relative;
+.settings-panel__title {
+  margin: 0 0 var(--pc-space-4);
+  color: var(--pc-text);
+  font-size: var(--pc-text-title);
+  font-weight: 600;
 }
 
-.nav-scroll {
-  overflow-x: auto;
-  margin: 0 -0.5rem;
-  padding: 0 0.5rem 0.5rem;
+.settings-panel__text {
+  margin: 0;
+  color: var(--pc-text-muted);
+  line-height: 1.5;
 }
 
-.nav-scroll::-webkit-scrollbar {
-  height: 6px;
+.settings-panel--danger {
+  border-color: color-mix(in srgb, var(--pc-danger) 25%, var(--pc-border));
 }
 
-.nav-scroll::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.14);
-  border-radius: 9999px;
+.settings-panel--danger .settings-panel__title {
+  color: var(--pc-danger);
 }
 
-.nav-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 1rem;
-  min-width: 100%;
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--pc-space-5);
 }
 
-.integration-card {
-  height: 100%;
+.settings-actions--start {
+  justify-content: flex-start;
 }
 
+.settings-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pc-space-3);
+  margin: var(--pc-space-4) 0 0;
+  padding: var(--pc-space-3);
+  border-radius: var(--pc-radius-md);
+  background: var(--pc-accent-soft);
+  color: var(--pc-text);
+  font-size: var(--pc-text-small);
+}
+
+.settings-note--warning {
+  background: color-mix(in srgb, #f59e0b 12%, var(--pc-surface));
+}
+
+/* Profile */
 .profile-identity {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(15, 23, 42, 0.32);
-  border-radius: 1rem;
-  padding: 1rem;
+  gap: var(--pc-space-4);
+  margin-bottom: var(--pc-space-5);
 }
 
 .profile-identity-copy {
   min-width: 0;
 }
 
-.profile-identity-copy p {
+.profile-identity-copy__name {
+  margin: 0;
+  font-size: var(--pc-text-body-lg);
+  font-weight: 600;
   overflow-wrap: anywhere;
+}
+
+.profile-identity-copy__email {
+  margin: var(--pc-space-1) 0 0;
+  color: var(--pc-text-muted);
+  font-size: var(--pc-text-small);
+  overflow-wrap: anywhere;
+}
+
+.profile-fields {
+  display: grid;
+  gap: var(--pc-space-4);
+}
+
+.settings-field {
+  display: grid;
+  gap: var(--pc-space-1);
+  color: var(--pc-text-muted);
+  font-size: var(--pc-text-small);
+  font-weight: 600;
+}
+
+.settings-field small {
+  font-weight: 400;
+}
+
+/* Account list */
+.settings-list {
+  display: grid;
+  margin: 0 calc(-1 * var(--pc-space-2));
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: var(--pc-space-3);
+  min-height: 3rem;
+  padding: 0 var(--pc-space-2);
+  border: none;
+  border-radius: var(--pc-radius-sm);
+  background: none;
+  color: var(--pc-text);
+  font-family: var(--pc-font);
+  font-size: var(--pc-text-body);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.settings-row + .settings-row {
+  border-top: 1px solid var(--pc-border);
+  border-radius: 0;
+}
+
+.settings-row:hover {
+  background: var(--pc-surface-hover);
+}
+
+.settings-row svg {
+  flex-shrink: 0;
+  color: var(--pc-text-muted);
+}
+
+.settings-row span {
+  flex: 1;
+}
+
+.settings-row__chevron {
+  color: var(--pc-text-subtle);
+}
+
+.integration-card {
+  height: 100%;
 }
 
 @media (min-width: 640px) {
@@ -3281,19 +3342,270 @@ const premiumEndsOn = computed(() => {
   .profile-identity-uploader {
     flex-shrink: 0;
   }
+
+  .profile-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
-  .settings-hero-wrap {
-    padding: 0.9rem 0.9rem 0.85rem;
-  }
-
   .settings-panel {
-    padding: 1rem;
+    padding: var(--pc-space-4);
   }
 }
 
-section h2 {
-  color: #f8fafc;
+/*
+ * Legacy colour compatibility for tabs not yet rebuilt (Notifications,
+ * Integrations, Subscription, Quick setup, Social, Knowledge). Their markup
+ * still uses dark-theme utilities; map them to the design tokens so they read
+ * correctly on light (and dark) surfaces. Remove as each tab is migrated.
+ */
+.settings-sections :deep([class*='text-white']:not([class*='bg-indigo-5']):not([class*='bg-indigo-6']):not([class*='bg-red-5']):not([class*='bg-red-6']):not([class*='bg-emerald-5']):not([class*='bg-emerald-6']):not([class*='bg-green-5']):not([class*='bg-green-6']):not([class*='bg-gradient']):not(.el-button)),
+.settings-sections :deep([class*='text-slate-1']),
+.settings-sections :deep([class*='text-slate-2']),
+.settings-sections :deep([class*='text-gray-1']),
+.settings-sections :deep([class*='text-gray-2']),
+.settings-sections :deep([class*='text-indigo-50']) {
+  color: var(--pc-text);
+}
+
+.settings-sections :deep([class*='text-slate-3']),
+.settings-sections :deep([class*='text-slate-4']),
+.settings-sections :deep([class*='text-gray-3']),
+.settings-sections :deep([class*='text-gray-4']),
+.settings-sections :deep([class*='text-indigo-1']),
+.settings-sections :deep([class*='text-indigo-2']),
+.settings-sections :deep([class*='text-purple-2']) {
+  color: var(--pc-text-muted);
+}
+
+.settings-sections :deep([class*='text-indigo-3']),
+.settings-sections :deep([class*='text-sky-2']),
+.settings-sections :deep([class*='text-sky-3']),
+.settings-sections :deep([class*='text-cyan-2']),
+.settings-sections :deep([class*='text-purple-3']),
+.settings-sections :deep([class*='text-fuchsia-2']),
+.settings-sections :deep([class*='text-fuchsia-3']) {
+  color: var(--pc-accent-text);
+}
+
+.settings-sections :deep([class*='text-emerald-2']),
+.settings-sections :deep([class*='text-emerald-3']),
+.settings-sections :deep([class*='text-green-2']),
+.settings-sections :deep([class*='text-green-3']) {
+  color: var(--pc-success);
+}
+
+.settings-sections :deep([class*='text-red-1']),
+.settings-sections :deep([class*='text-red-2']),
+.settings-sections :deep([class*='text-red-3']),
+.settings-sections :deep([class*='text-rose-2']),
+.settings-sections :deep([class*='text-rose-3']) {
+  color: var(--pc-danger);
+}
+
+.settings-sections :deep([class*='text-yellow-2']),
+.settings-sections :deep([class*='text-yellow-3']),
+.settings-sections :deep([class*='text-amber-1']),
+.settings-sections :deep([class*='text-amber-2']),
+.settings-sections :deep([class*='text-amber-3']) {
+  color: #b45309;
+}
+
+.settings-sections :deep([class*='bg-slate-7']),
+.settings-sections :deep([class*='bg-slate-8']),
+.settings-sections :deep([class*='bg-slate-9']),
+.settings-sections :deep([class*='bg-gray-7']),
+.settings-sections :deep([class*='bg-gray-8']),
+.settings-sections :deep([class*='bg-gray-9']),
+.settings-sections :deep([class*='bg-black']) {
+  background-color: var(--pc-surface-2);
+  color: var(--pc-text);
+}
+
+.settings-sections :deep([class*='border-white']),
+.settings-sections :deep([class*='border-slate-6']),
+.settings-sections :deep([class*='border-slate-7']),
+.settings-sections :deep([class*='border-slate-8']),
+.settings-sections :deep([class*='border-gray-6']),
+.settings-sections :deep([class*='border-gray-7']) {
+  border-color: var(--pc-border);
+}
+
+.timezone-settings {
+  display: grid;
+  gap: var(--pc-space-4);
+  margin-top: var(--pc-space-5);
+  padding: var(--pc-space-4);
+  border: 1px solid var(--pc-border);
+  border-radius: var(--pc-radius-lg);
+  background: var(--pc-surface-2);
+}
+
+.timezone-settings__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--pc-space-3);
+}
+
+.timezone-settings__eyebrow {
+  margin: 0 0 var(--pc-space-1);
+  color: var(--pc-accent-text);
+  font-size: var(--pc-text-caption);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.timezone-settings__title {
+  margin: 0;
+  color: var(--pc-text);
+  font-size: var(--pc-text-body-lg);
+  font-weight: 600;
+}
+
+.timezone-settings__copy {
+  max-width: 42rem;
+  margin: var(--pc-space-1) 0 0;
+  color: var(--pc-text-muted);
+  font-size: var(--pc-text-small);
+  line-height: 1.5;
+}
+
+.timezone-settings__status {
+  flex-shrink: 0;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--pc-border-strong);
+  border-radius: var(--pc-radius-full);
+  background: var(--pc-surface);
+  color: var(--pc-accent-text);
+  font-size: var(--pc-text-caption);
+  font-weight: 700;
+}
+
+.timezone-settings__modes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--pc-space-2);
+}
+
+.timezone-settings__mode {
+  display: grid;
+  gap: 0.2rem;
+  padding: var(--pc-space-3);
+  border: 1px solid var(--pc-border);
+  border-radius: var(--pc-radius-md);
+  background: var(--pc-surface);
+  color: var(--pc-text);
+  font-family: var(--pc-font);
+  font-size: var(--pc-text-small);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+}
+
+.timezone-settings__mode small {
+  color: var(--pc-text-subtle);
+  font-size: var(--pc-text-caption);
+  font-weight: 400;
+}
+
+.timezone-settings__mode:hover {
+  border-color: var(--pc-border-strong);
+  background: var(--pc-surface-hover);
+}
+
+.timezone-settings__mode--active {
+  border-color: var(--pc-accent);
+  background: var(--pc-accent-soft);
+  box-shadow: 0 0 0 2px var(--pc-accent-soft);
+}
+
+.timezone-settings__current {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pc-space-3);
+  padding: var(--pc-space-3);
+  border: 1px dashed var(--pc-border-strong);
+  border-radius: var(--pc-radius-md);
+  background: var(--pc-surface);
+}
+
+.timezone-settings__current strong,
+.timezone-settings__preview strong {
+  color: var(--pc-text);
+  font-weight: 600;
+}
+
+.timezone-settings__label {
+  display: block;
+  margin-bottom: 0.2rem;
+  color: var(--pc-text-subtle);
+  font-size: var(--pc-text-caption);
+}
+
+.timezone-settings__clock {
+  flex-shrink: 0;
+  color: var(--pc-accent-text);
+  font-size: var(--pc-text-small);
+  font-weight: 600;
+}
+
+.timezone-settings__select-field {
+  color: var(--pc-text-muted);
+}
+
+.timezone-settings__select {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--pc-border-strong);
+  border-radius: var(--pc-radius-md);
+  background: var(--pc-surface);
+  color: var(--pc-text);
+  font: inherit;
+  font-size: var(--pc-text-body);
+  outline: none;
+}
+
+.timezone-settings__select:focus {
+  border-color: var(--pc-accent);
+  box-shadow: 0 0 0 3px var(--pc-focus-ring);
+}
+
+.timezone-settings__travel-note,
+.timezone-settings__preview {
+  margin: 0;
+  color: var(--pc-text-muted);
+  font-size: var(--pc-text-small);
+  line-height: 1.5;
+}
+
+.timezone-settings__travel-note {
+  padding: var(--pc-space-3);
+  border-radius: var(--pc-radius-md);
+  background: color-mix(in srgb, #f59e0b 10%, var(--pc-surface));
+  color: #a16207;
+}
+
+@media (max-width: 520px) {
+  .timezone-settings__header {
+    display: grid;
+  }
+
+  .timezone-settings__status {
+    justify-self: start;
+  }
+
+  .timezone-settings__modes {
+    grid-template-columns: 1fr;
+  }
+
+  .timezone-settings__current {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 </style>

@@ -32,3 +32,19 @@ export async function submitFeedback(payload = {}) {
     return data
   }
 }
+
+/**
+ * Submit feedback from an authenticated app session.
+ * This endpoint stores the full ticket payload for the admin feedback queue.
+ */
+export async function submitAuthenticatedFeedback(payload = {}) {
+  const { data } = await api.post('/feedback', {
+    userId: payload.userId,
+    rating: payload.rating ?? null,
+    type: payload.type || 'general',
+    message: payload.message || '',
+    context: payload.context || {},
+    metadata: payload.metadata || {},
+  })
+  return data
+}

@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-white px-4 py-12">
+  <div class="marketing-light min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-slate-900 px-4 py-12">
     <div class="max-w-3xl mx-auto space-y-10 text-center">
       <div>
         <p class="text-xs uppercase tracking-[0.4em] text-indigo-300 mb-3">PlanCraft GPT</p>

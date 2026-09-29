@@ -3,6 +3,7 @@ import './assets/tailwind.css'
 import './assets/theme.scss'
 import './assets/styles/app-surfaces.css'
 import './assets/styles/scrollbar.css'
+import './design/tokens.css'
 import 'element-plus/dist/index.css'
 
 import { createApp } from 'vue'
@@ -16,13 +17,22 @@ import { useWorkspaceStore } from '@/stores/workspaceStore'
 import VoiceRecorder from '@/components/VoiceRecorder.vue'
 import { createHead } from '@vueuse/head'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
-import { initAnalytics, bindRouter, identifyUser, trackAppOpened, trackSessionEnded, getSessionStartMs } from '@/services/analytics'
+import {
+  initAnalytics,
+  bindRouter,
+  bindNotificationOpenTracking,
+  identifyUser,
+  trackAppOpened,
+  trackSessionEnded,
+  getSessionStartMs,
+} from '@/services/analytics'
 import { handleAuthError } from '@/services/firebaseService'
 import { setupLinkedInTag } from './analytics/linkedin.js'
 import { Capacitor } from '@capacitor/core'
 import { closeNativeAuthBrowser, parseNativeAuthCallbackUrl } from '@/services/mobileAuthHandoffService'
 import { initNativeReminderSync } from '@/services/nativeReminderService'
 import { initNativePushSync } from '@/services/nativePushService'
+import { getEffectiveUserTimezone } from '@/utils/userTimezone'
 
 const isBrowser =
   typeof globalThis.window !== 'undefined' &&
@@ -36,17 +46,7 @@ import timezone from 'dayjs/plugin/timezone'
 dayjs.extend(utc)
 dayjs.extend(timezone)
 try {
-  let guessed = dayjs.tz.guess()
-  // 🧠 Fallback to system Intl if dayjs returns UTC (PWA edge case)
-  if (guessed === 'UTC') {
-    const intlGuess = Intl.DateTimeFormat().resolvedOptions().timeZone
-    if (intlGuess && intlGuess !== 'UTC') guessed = intlGuess
-  }
-
-  // 🧩 Persist timezone in localStorage for consistent reuse
-  if (isBrowser) {
-    localStorage.setItem('user_timezone', guessed)
-  }
+  const guessed = getEffectiveUserTimezone()
   dayjs.tz.setDefault(guessed)
   console.log('[TimeZone] Default set to:', guessed)
 } catch (err) {
@@ -231,10 +231,13 @@ if (isBrowser) {
 }
 
 // Analytics: init only here; identify + App Opened + bindRouter run after auth (so identify runs before any track)
-if (!isNativeApp && isBrowser) {
+// Mixpanel runs on web and in the native apps; the LinkedIn ad tag is web-only.
+if (isBrowser) {
   initAnalytics()
   // LinkedIn Insight Tag (env-driven)
-  try { setupLinkedInTag() } catch {}
+  if (!isNativeApp) {
+    try { setupLinkedInTag() } catch {}
+  }
 }
 
 // 🆕 Restore Google redirect login results (fix for Safari / LinkedIn)
@@ -246,14 +249,9 @@ if (isBrowser) {
   }
 }
 
-// Early Instagram/Facebook/TikTok browser check
-if (isBrowser) {
-  const ua = navigator.userAgent.toLowerCase()
-  const isInApp = /(instagram|fbav|facebook|line|wechat|micromessenger|pinterest|snapchat|tiktok)/i.test(ua)
-  if (isInApp) {
-    window.location.href = '/inapp-fallback.html'
-  }
-}
+// In-app browsers (Instagram, TikTok, ...) are allowed through: only Google
+// OAuth is blocked there, and LoginView handles that with an "Open in browser"
+// prompt. Redirecting every page away lost all social traffic.
 
 // iPad/iOS Safari can occasionally drop input focus on tap.
 // Force-focus editable fields within the same user gesture.
@@ -309,6 +307,36 @@ if (isBrowser) {
   installIosInputFocusPatch()
 }
 
+// Some mobile browsers still treat a rapid second/third tap as a request to
+// zoom even when the app surface uses touch-action: manipulation. Cancel only
+// that gesture on touch-capable devices; desktop double-click behavior remains
+// unchanged.
+function installMobileDoubleTapZoomGuard() {
+  try {
+    const touchCapable =
+      Number(navigator?.maxTouchPoints || 0) > 0 ||
+      window.matchMedia?.('(pointer: coarse)')?.matches
+    if (!touchCapable || typeof document === 'undefined') return
+
+    document.addEventListener(
+      'dblclick',
+      (event) => {
+        const target = event?.target
+        if (target instanceof Element && target.closest('#app')) {
+          event.preventDefault()
+        }
+      },
+      true,
+    )
+  } catch (err) {
+    console.warn('[Double Tap Guard] setup failed', err)
+  }
+}
+
+if (isBrowser) {
+  installMobileDoubleTapZoomGuard()
+}
+
 // 🧭 Keep canonical tag in sync with current route (prevents alternate/redirect warnings)
 if (isBrowser) {
   try {
@@ -352,11 +380,12 @@ async function bootstrapApp() {
   })
 
   // Identify before any track so Mixpanel never sees "User – undefined"
-  if (!isNativeApp) {
+  if (isBrowser) {
     try {
       identifyUser(authStore.user || null)
       getSessionStartMs()
       trackAppOpened(isNativeApp ? 'native' : 'web')
+      bindNotificationOpenTracking()
       bindRouter(router)
       window.addEventListener('beforeunload', () => {
         try { trackSessionEnded() } catch {}
@@ -436,7 +465,7 @@ async function bootstrapApp() {
     try {
       const currentPath = router.currentRoute.value?.fullPath || '/'
       if (authStore.user?.uid && (currentPath === '/' || currentPath.startsWith('/login'))) {
-        await router.replace('/dashboard')
+        await router.replace('/today')
         console.info('[Router] Forced native iOS post-mount redirect', {
           currentRoute: router.currentRoute.value?.fullPath || null,
         })
@@ -491,9 +520,9 @@ async function installNativeAppUrlBridge() {
           )
           console.info('[NativeAuth] Handoff consume success', {
             platform,
-            redirect: result?.redirect || handoff.redirect || '/dashboard',
+            redirect: result?.redirect || handoff.redirect || '/today',
           })
-          await router.replace(result?.redirect || handoff.redirect || '/dashboard')
+          await router.replace(result?.redirect || handoff.redirect || '/today')
           return
         } catch (err) {
           console.error('[NativeAuth] Handoff consume failed', {

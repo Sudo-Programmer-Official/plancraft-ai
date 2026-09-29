@@ -15,6 +15,17 @@ const ACTION_INBOX_NUDGE_CHANNELS = ["email", "pwa", "whatsapp"];
 const ACTION_INBOX_NUDGE_URGENCY = ["important", "urgent_only"];
 const MORNING_CALL_TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
+function normalizeTimezone(value) {
+  const timezone = String(value || "").trim();
+  if (!timezone) return null;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format();
+    return timezone;
+  } catch {
+    return null;
+  }
+}
+
 function clampMinutes(value) {
   const num = Number(value);
   if (!Number.isFinite(num)) return null;
@@ -567,6 +578,24 @@ router.post("/settings/profile", async (req, res) => {
 
     if (profile.profileComplete !== undefined) {
       patch.profileComplete = !!profile.profileComplete;
+    }
+
+    if (profile.timezoneMode !== undefined || profile.timezone !== undefined) {
+      const mode = String(profile.timezoneMode || "auto").trim().toLowerCase();
+      if (!['auto', 'manual'].includes(mode)) {
+        return res.status(400).json({ error: "Invalid timezone mode" });
+      }
+      patch.timezoneMode = mode;
+      if (mode === "manual") {
+        const timezone = normalizeTimezone(profile.timezone);
+        if (!timezone) {
+          return res.status(400).json({ error: "Invalid timezone" });
+        }
+        patch.timezone = timezone;
+      } else {
+        // Automatic mode follows the device; do not freeze the last location.
+        patch.timezone = null;
+      }
     }
 
     await db

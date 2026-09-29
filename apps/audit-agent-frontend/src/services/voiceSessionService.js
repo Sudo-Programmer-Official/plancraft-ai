@@ -1,6 +1,7 @@
 // src/services/voiceSessionService.js
 import api from '@/services/api'
 import { toUTC } from '@/utils/timezone'
+import { getEffectiveUserTimezone } from '@/utils/userTimezone'
 
 const WAKE_UP_PATTERN = /\b(wake me up|wake\s*me\s*up|set an alarm|alarm me|wake up)\b/i
 
@@ -9,7 +10,7 @@ const WAKE_UP_PATTERN = /\b(wake me up|wake\s*me\s*up|set an alarm|alarm me|wake
 // Returns the array of parsed reminders that were submitted.
 export async function handleVoiceSession(transcript, userId, channels = ['whatsapp']) {
   if (!userId) throw new Error('Missing userId')
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+  const tz = getEffectiveUserTimezone()
 
   const res = await api.post('/parse-reminders', { transcript, userId })
   const reminders = Array.isArray(res?.data) ? res.data : []

@@ -4,12 +4,13 @@ import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
 import relativeTime from 'dayjs/plugin/relativeTime'
+import { getEffectiveUserTimezone } from '@/utils/userTimezone'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
 dayjs.extend(relativeTime)
 
-const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+const currentTimezone = () => getEffectiveUserTimezone()
 
 // ------------------------------
 // Safely convert to JS Date
@@ -31,6 +32,7 @@ export function toJsDate(v) {
 // Grouping: Today / Tomorrow / Other
 // ------------------------------
 export function toLocalDayGroup(iso) {
+  const tz = currentTimezone()
   const d = dayjs(toJsDate(iso)).tz(tz)
   const today = dayjs().tz(tz)
   if (d.isSame(today, 'day')) return 'Today'
@@ -45,14 +47,14 @@ export function formatDualTime(iso) {
   const d = toJsDate(iso)
   if (!d) return ''
   const utc = dayjs.utc(d)
-  const local = utc.tz(tz)
+  const local = utc.tz(currentTimezone())
   return `${local.format('ddd, MMM D • h:mm A')} (Your Time) • ${utc.format('HH:mm')} UTC`
 }
 
 export function formatRelative(iso) {
   const d = toJsDate(iso)
   if (!d) return ''
-  return dayjs.utc(d).tz(tz).fromNow()
+  return dayjs.utc(d).tz(currentTimezone()).fromNow()
 }
 // Timezone-safe helpers for building and displaying reminder times.
 // These functions avoid UTC/local mismatches by:
@@ -67,11 +69,7 @@ export function formatRelative(iso) {
 
 /** Return the current user's IANA timezone (e.g., "America/Chicago"). */
 export function getUserTz() {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-  } catch {
-    return 'UTC'
-  }
+  return getEffectiveUserTimezone()
 }
 
 /**

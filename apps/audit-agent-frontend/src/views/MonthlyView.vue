@@ -194,6 +194,7 @@ import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/authStore'
 import { getCategoryIcon, getCategoryColor, resolveCategory } from '@/constants/taskCategories'
 import { describeTaskDetails } from '@/utils/taskDisplay'
+import { getEffectiveUserTimezone } from '@/utils/userTimezone'
 
 const { tasks, toggleComplete, loadTasksForRange, getTaskPlannedDate } = useTasks()
 const formattedDetails = (task) => describeTaskDetails(task)
@@ -280,7 +281,7 @@ async function handleSaveAndSchedule(payload) {
       const iso = resolveReminderIso(payload)
       if (!iso) return
       const prefs = userPrefs.value?.notifications || {}
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+      const tz = getEffectiveUserTimezone()
 
       try {
         const resp = await api.post('/reminders/text', {

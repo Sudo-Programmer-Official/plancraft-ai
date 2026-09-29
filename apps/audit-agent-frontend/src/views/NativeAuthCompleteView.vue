@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-slate-950 text-white flex items-center justify-center px-6">
+  <div class="marketing-light min-h-screen bg-slate-950 text-slate-900 flex items-center justify-center px-6">
     <div class="max-w-md w-full rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl p-8 text-center shadow-2xl">
       <p class="text-sm uppercase tracking-[0.3em] text-indigo-300/80">{{ platformLabel }}</p>
       <h1 class="text-3xl font-semibold mt-3">Opening PlanCraftAI</h1>
@@ -44,7 +44,7 @@ const authStore = useAuthStore()
 
 const code = computed(() => String(route.query.code || ''))
 const redirectTarget = computed(() =>
-  normalizeRedirectPath(String(route.query.redirect || '/dashboard')),
+  normalizeRedirectPath(String(route.query.redirect || '/today')),
 )
 const platform = computed(() => {
   const requested = String(route.query.platform || '').trim().toLowerCase()

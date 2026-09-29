@@ -14,7 +14,7 @@
     <div class="action-row items-baseline flex flex-col sm:flex-row sm:justify-end sm:items-center gap-3 sm:gap-4">
       <!-- Voice Recorder: full width on mobile, shrink to content on desktop -->
       <div class="w-full sm:w-auto sm:flex-none">
-        <VoiceRecorder @transcribed="handleTranscript" class="w-full sm:w-auto" />
+        <VoiceRecorder surface="morning" @transcribed="handleTranscript" class="w-full sm:w-auto" />
       </div>
 
       <!-- Generate button: full width on mobile, auto on desktop, right-aligned -->

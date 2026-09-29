@@ -25,7 +25,7 @@ function safeConsoleLog(message, payload) {
 
 function resolveTimezone(explicitTz) {
   const inferred = explicitTz || getUserTimezone()
-  if (inferred && typeof inferred === 'string' && inferred.includes('/')) return inferred
+  if (inferred && typeof inferred === 'string') return inferred
   try {
     const intlGuess = Intl.DateTimeFormat().resolvedOptions().timeZone
     if (intlGuess) return intlGuess

@@ -4,22 +4,11 @@
       <header class="app-page-hero flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <p class="app-page-eyebrow">Planner</p>
-          <h1 class="app-page-title">Your Tasks</h1>
-          <p class="app-page-description">Today, this week, and upcoming. The same clear rhythm as your dashboard, without the extra visual weight.</p>
+          <h1 class="app-page-title">Planner</h1>
+          <p class="app-page-description">See what is next and choose one thing to move forward.</p>
         </div>
         <div class="app-page-toolbar">
-          <button
-            class="px-4 py-2 rounded-xl bg-slate-950/35 border border-white/10 text-sm text-indigo-50 hover:border-indigo-300/60 transition"
-            @click="refresh"
-          >
-            Refresh
-          </button>
-          <button
-            class="px-4 py-2 rounded-xl bg-gradient-to-r from-fuchsia-500 to-indigo-500 hover:from-fuchsia-400 hover:to-indigo-400 text-sm font-semibold text-white shadow-lg shadow-indigo-950/35 transition"
-            @click="openPlanner"
-          >
-            + New Task
-          </button>
+          <PcButton variant="primary" @click="openPlanner">New task</PcButton>
         </div>
       </header>
 
@@ -118,6 +107,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import TaskPlannerDialog from '@/components/TaskPlannerDialog.vue'
+import { PcButton } from '@/design'
 import { useTasks } from '@/composables/useTasks'
 import { toLocalDateKey } from '@/utils/dateHelper'
 
@@ -215,7 +205,7 @@ function closePlanner() {
   selectedTask.value = null
 }
 
-async function handleSaved(payload) {
+async function handleSaved() {
   // When TaskPlannerDialog emits saved, refresh current view
   await refresh()
   closePlanner()

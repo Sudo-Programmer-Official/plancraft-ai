@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { reactive, ref } from 'vue'
-import { submitFeedback } from '@/services/feedbackService'
+import { submitAuthenticatedFeedback } from '@/services/feedbackService'
 
 const PROMPT_KEY = 'pcai:lastFeedbackPrompt'
 const PROMPT_INTERVAL_MS = 1000 * 60 * 60 * 24 * 3 // 3 days
@@ -57,6 +57,15 @@ export const useFeedbackStore = defineStore('feedback', () => {
     drawerVisible.value = true
   }
 
+  function openSupportTicket(extraContext = {}) {
+    context.value = { ...extraContext, kind: 'support-ticket' }
+    form.type = 'support'
+    form.rating = 0
+    submitSuccess.value = false
+    errorMessage.value = ''
+    drawerVisible.value = true
+  }
+
   function closeDrawer() {
     drawerVisible.value = false
     submitSuccess.value = false
@@ -64,7 +73,8 @@ export const useFeedbackStore = defineStore('feedback', () => {
     form.message = ''
     form.type = 'idea'
     form.allowContact = false
-    form.rating = form.rating || 0
+    form.rating = 0
+    context.value = {}
   }
 
   async function sendFeedback(userId, metadata = {}) {
@@ -76,7 +86,7 @@ export const useFeedbackStore = defineStore('feedback', () => {
     errorMessage.value = ''
     submitSuccess.value = false
     try {
-      await submitFeedback({
+      await submitAuthenticatedFeedback({
         userId,
         rating: form.rating || null,
         type: form.type,
@@ -103,12 +113,14 @@ export const useFeedbackStore = defineStore('feedback', () => {
     submitting,
     submitSuccess,
     errorMessage,
+    context,
     form,
     init,
     dismissPrompt,
     triggerPrompt,
     captureQuickRating,
     openDrawer,
+    openSupportTicket,
     closeDrawer,
     sendFeedback,
   }

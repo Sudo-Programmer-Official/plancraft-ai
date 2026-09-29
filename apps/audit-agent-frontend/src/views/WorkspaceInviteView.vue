@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center px-4 py-10 text-slate-50">
+  <div class="marketing-light min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center px-4 py-10 text-slate-900">
     <div class="w-full max-w-xl rounded-3xl border border-slate-800 bg-slate-900/70 p-6 md:p-8 space-y-5 shadow-2xl shadow-indigo-950/30">
       <p class="text-xs uppercase tracking-[0.3em] text-indigo-300/80">Workspace invite</p>
       <div class="flex items-center gap-3">

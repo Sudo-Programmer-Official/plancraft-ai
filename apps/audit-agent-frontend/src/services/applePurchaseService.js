@@ -1,6 +1,7 @@
 import { registerPlugin } from '@capacitor/core'
 import api from '@/services/api'
 import { isIosPackagedApp } from '@/utils/nativeAuthSupport'
+import { EVENTS, trackEvent } from '@/services/analytics'
 
 const ApplePurchases = registerPlugin('ApplePurchases')
 
@@ -166,6 +167,7 @@ export async function purchaseSoloPremium({ userId }) {
     )
   }
 
+  trackEvent(EVENTS.CHECKOUT_STARTED, { provider: 'apple', scope: 'solo' })
   logInfo('Starting Apple purchase', {
     userId,
     productId: SOLO_PREMIUM_APPLE_PRODUCT_ID,

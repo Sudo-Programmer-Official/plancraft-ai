@@ -157,9 +157,9 @@
             <div class="reminder-card__copy">
               <div class="reminder-card__title-row">
                 <div class="font-semibold text-lg leading-snug text-white">{{ r.task || r.text || 'Reminder' }}</div>
-                <span class="reminder-card__relative">{{ formatRelative(r.scheduledTime) }}</span>
+                <span class="reminder-card__relative">{{ formatRelative(r.scheduledTime, r.timezone) }}</span>
               </div>
-              <div class="reminder-card__time">🕒 {{ formatDualTime(r.scheduledTime) }}</div>
+              <div class="reminder-card__time">🕒 {{ formatDualTime(r.scheduledTime, r.timezone) }}</div>
               <div class="reminder-card__channels">
                 <span
                   v-for="channel in (r.channels || [])"
@@ -221,6 +221,7 @@ import EmptyState from '@/components/EmptyState.vue'
 import { resolveReminderLink } from '@/utils/taskLinks'
 import { resolveTaskMeetingLink } from '@/utils/taskLinks'
 import { toUtcIso } from '@/utils/time'
+import { getEffectiveUserTimezone } from '@/utils/userTimezone'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
 import { fetchTasksBetween, fetchTasksByDate } from '@/services/firebaseService'
@@ -279,7 +280,7 @@ function logTimeBrainReminder(event, payload) {
 async function scrollToCustomDate() {
   filterMode.value = 'Custom'
   const selected = dayjs(customDate.value).format('YYYY-MM-DD')
-  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const zone = getEffectiveUserTimezone()
   logTimeBrainReminder('scroll-to-date', { selected, zone })
 
   for (const [groupLabel, reminders] of Object.entries(groupedReminders.value)) {
@@ -496,10 +497,10 @@ async function loadReminderTasksWindow({ force = false } = {}) {
   return trackedRequest
 }
 
-function formatDualTime(iso) {
+function formatDualTime(iso, timezoneOverride) {
   const d = toJsDate(iso)
   if (!d) return ''
-  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const zone = timezoneOverride || getEffectiveUserTimezone()
   const utcTime = dayjs.utc(d)
   const local = utcTime.clone().tz(zone)
   return `${local.format('ddd, MMM D • h:mm A')} (Your Time) • ${utcTime.format('HH:mm')} UTC`
@@ -512,7 +513,7 @@ function formatRelative(iso) {
 }
 
 const visibleReminders = computed(() => {
-  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const zone = getEffectiveUserTimezone()
   const today = dayjs().tz(zone).startOf('day')
   const horizon = today.add(7, 'day').endOf('day')
   return reminders.value.filter((r) => {
@@ -539,7 +540,7 @@ const visibleReminders = computed(() => {
 })
 
 const groupedReminders = computed(() => {
-  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const zone = getEffectiveUserTimezone()
   const sorted = _.sortBy(visibleReminders.value, (r) => {
     const d = toJsDate(r.scheduledTime)
     return d ? d.getTime() : 0
@@ -571,11 +572,12 @@ function deriveReminderIsoFromTask(task, tz) {
 }
 
 const fallbackTaskReminders = computed(() => {
-  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const zone = getEffectiveUserTimezone()
   const tasks = Array.isArray(reminderTasks.value) ? reminderTasks.value : []
   return tasks
     .map((t) => {
-      const iso = deriveReminderIsoFromTask(t, zone)
+      const taskZone = t?.timezone || zone
+      const iso = deriveReminderIsoFromTask(t, taskZone)
       if (!iso) return null
       const meeting = resolveTaskMeetingLink(t)
       return {
@@ -676,7 +678,7 @@ async function onSnooze(r) {
       scheduledTime: newIso,
       channels: r.channels || ['whatsapp'],
       taskId: r.taskId || null,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        timezone: r?.timezone || getEffectiveUserTimezone(),
     })
     await loadReminders()
   } catch (e) {

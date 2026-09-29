@@ -2,7 +2,7 @@
   <!-- 🔹 Android/Chrome PWA prompt -->
   <transition name="fade-slide">
     <div
-      v-if="visible"
+      v-if="visible && !onAuthScreen"
       class="fixed bottom-6 inset-x-4 bg-indigo-600 text-white rounded-2xl shadow-xl p-4 flex items-center justify-between z-50"
     >
       <div>
@@ -32,7 +32,7 @@
   <!-- 🔹 iOS Safari / Instagram hint -->
   <transition name="fade-slide">
     <div
-      v-if="iosHint"
+      v-if="iosHint && !onAuthScreen"
       class="fixed bottom-6 inset-x-4 bg-slate-800 text-white rounded-xl p-4 text-center shadow-lg z-50"
     >
       <div v-if="isInstagram">
@@ -59,8 +59,17 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue"
+import { ref, onMounted, computed } from "vue"
+import { useRoute } from "vue-router"
 import { isNativePackagedApp } from "@/utils/nativeAuthSupport"
+
+// Keep sign-in screens clear: the banner covered the Google button on iPhone.
+// /design previews the new tab bar, which this banner would also cover.
+const AUTH_SCREENS = ["/login", "/signup", "/app-auth/complete", "/design"]
+const route = useRoute()
+// Also stay off signed-in screens: the banner covered the tab bar's +, and
+// More → Install app offers the same thing there.
+const onAuthScreen = computed(() => AUTH_SCREENS.includes(route.path) || route.meta?.requiresAuth === true)
 
 const visible = ref(false)
 const iosHint = ref(false)

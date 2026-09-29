@@ -1,5 +1,5 @@
 <template>
-  <div class="pricing-page-root">
+  <div class="pricing-page-root marketing-light">
     <template v-if="isAppleBillingSafeMode">
       <div class="max-w-5xl mx-auto px-4 sm:px-6 pt-8 pb-3 sm:py-16">
         <div class="rounded-3xl border border-white/10 bg-gradient-to-br from-slate-900/85 via-indigo-950/80 to-slate-900/85 p-8 sm:p-10 shadow-2xl space-y-8">
@@ -239,7 +239,7 @@ import { ElMessage, ElNotification } from 'element-plus'
 import { useAuthStore } from '@/stores/authStore'
 import { useAccessStore } from '@/stores/accessStore'
 import { createCheckoutSession, cancelSubscription } from '@/services/stripeService'
-import { trackEvent } from '@/services/analytics'
+import { trackEvent, trackMonetizationStep } from '@/services/analytics'
 import ErrorDialog from '@/components/ErrorDialog.vue'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useIsPremium } from '@/composables/useIsPremium'
@@ -327,6 +327,12 @@ function trackSubscriptionFunnel(step, extra = {}) {
     surface: 'subscription_page',
     is_apple_billing_mode: !!isAppleBillingSafeMode,
     is_premium: !!isPremium.value,
+    ...extra,
+  })
+  trackMonetizationStep(step, {
+    surface: 'subscription_page',
+    scope: 'solo',
+    provider: isAppleBillingSafeMode ? 'apple' : 'stripe',
     ...extra,
   })
 }
@@ -422,8 +428,8 @@ async function onUpgrade() {
 
       // Themed info message (aligned with PlanCraftAI UI tone)
       ElNotification({
-        title: '🚀 Upgrade to Premium',
-        message: 'Please sign in first to continue your upgrade ✨',
+        title: 'Sign in required',
+        message: 'Sign in to continue.',
         type: 'info',
         duration: 2800,
         offset: 80,
@@ -522,7 +528,7 @@ onMounted(() => {
     trackSubscriptionFunnel('success', { source: 'query_status_success' })
     trackEvent('upgrade_success')
     try {
-      ElNotification({ title: '🎉 Payment successful', message: 'Premium is now active!', type: 'success', duration: 2600, offset: 80 })
+      ElNotification({ title: 'Payment successful', message: 'Premium is active.', type: 'success', duration: 2600, offset: 80 })
     } catch {
       /* noop */
     }
@@ -558,7 +564,7 @@ onMounted(() => {
   }
   if (isReactivated) {
     try {
-      ElNotification({ title: '🎉 Reactivated', message: 'Welcome back to Premium!', type: 'success', duration: 2400, offset: 80 })
+      ElNotification({ title: 'Premium reactivated', message: 'Your plan is active again.', type: 'success', duration: 2400, offset: 80 })
     } catch {
       /* noop */
     }
@@ -683,17 +689,16 @@ async function refreshPremiumAccess() {
   }
 
   ElMessage.success('Account access refreshed')
-  router.push('/dashboard')
+  router.push('/today')
 }
 </script>
 
 <style scoped>
 .el-notification.glass-toast {
-  background: rgba(30, 15, 60, 0.75);
-  border: 1px solid rgba(138, 92, 246, 0.25);
-  backdrop-filter: blur(12px);
-  color: #e5d4ff;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #0f172a !important;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.14) !important;
 }
 .premium-badge {
   position: absolute;

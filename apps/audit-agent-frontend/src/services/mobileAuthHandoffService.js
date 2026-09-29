@@ -1,7 +1,7 @@
 import api from '@/services/api'
 import { Capacitor } from '@capacitor/core'
 
-const DEFAULT_REDIRECT = '/dashboard'
+const DEFAULT_REDIRECT = '/today'
 export const NATIVE_AUTH_CALLBACK_PATH = '/app-auth/complete'
 export const ANDROID_APP_PACKAGE = 'com.sudoprogrammer.plancraftai'
 

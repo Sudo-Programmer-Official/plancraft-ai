@@ -30,6 +30,14 @@
     <link rel="canonical" href="https://plancraftai.com/" />
     <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml" />
 
+    <!-- Apply the saved design-system theme before first paint (see src/design/useTheme.js). -->
+    <script>
+      try {
+        var pcTheme = localStorage.getItem('pc_theme')
+        document.documentElement.setAttribute('data-pc-theme', pcTheme === 'dark' || pcTheme === 'system' ? pcTheme : 'light')
+      } catch (e) {}
+    </script>
+
     <!-- Icons -->
     <link rel="icon" href="/logo.png" type="image/png" />
     <link rel="apple-touch-icon" href="/logo.png" sizes="512x512" />
@@ -126,9 +134,8 @@
     <style>
       html {
         height: -webkit-fill-available;
-        background:
-          radial-gradient(circle at top, rgba(96, 165, 250, 0.18), transparent 28%),
-          linear-gradient(135deg, #1d1645 0%, #4f2b93 58%, #241d53 100%);
+        background: #f6f7fc;
+        color-scheme: light;
       }
 
       body {
@@ -137,9 +144,8 @@
         min-height: 100vh;
         min-height: 100dvh;
         min-height: -webkit-fill-available;
-        background:
-          radial-gradient(circle at top, rgba(96, 165, 250, 0.18), transparent 28%),
-          linear-gradient(135deg, #1d1645 0%, #4f2b93 58%, #241d53 100%);
+        background: #f6f7fc;
+        color: #0f172a;
         overflow-x: hidden;
       }
 
@@ -148,9 +154,7 @@
         min-height: 100vh;
         min-height: 100dvh;
         min-height: -webkit-fill-available;
-        background:
-          radial-gradient(circle at top, rgba(96, 165, 250, 0.18), transparent 28%),
-          linear-gradient(135deg, #1d1645 0%, #4f2b93 58%, #241d53 100%);
+        background: #f6f7fc;
       }
 
       .pcai-preload {
@@ -160,7 +164,7 @@
         align-items: center;
         justify-content: center;
         padding: 2rem;
-        color: #fff;
+        color: #0f172a;
         text-align: center;
       }
 
@@ -180,7 +184,7 @@
         font-size: 0.85rem;
         letter-spacing: 0.35em;
         text-transform: uppercase;
-        color: rgba(224, 231, 255, 0.76);
+        color: #64748b;
       }
 
       .pcai-preload__title {
@@ -195,7 +199,7 @@
         max-width: 22rem;
         font-size: 1rem;
         line-height: 1.6;
-        color: rgba(224, 231, 255, 0.72);
+        color: #475569;
       }
 
       .pcai-preload__progress {
@@ -204,16 +208,72 @@
         margin: 1.75rem auto 0;
         overflow: hidden;
         border-radius: 999px;
-        background: rgba(255, 255, 255, 0.14);
+        background: #e2e8f0;
       }
 
       .pcai-preload__progress-bar {
         width: 42%;
         height: 100%;
         border-radius: inherit;
-        background: linear-gradient(90deg, rgba(192, 132, 252, 0.95), rgba(96, 165, 250, 0.95));
-        box-shadow: 0 0 18px rgba(96, 165, 250, 0.35);
+        background: linear-gradient(90deg, #a855f7, #6366f1);
+        box-shadow: 0 0 18px rgba(99, 102, 241, 0.25);
         animation: pcai-preload-shimmer 1.4s ease-in-out infinite;
+      }
+
+      html[data-pc-theme='dark'] {
+        background: #111318;
+        color-scheme: dark;
+      }
+
+      html[data-pc-theme='dark'] body,
+      html[data-pc-theme='dark'] #app {
+        background: #111318;
+        color: #eceef1;
+      }
+
+      html[data-pc-theme='dark'] .pcai-preload {
+        color: #eceef1;
+      }
+
+      html[data-pc-theme='dark'] .pcai-preload__eyebrow {
+        color: #8a909b;
+      }
+
+      html[data-pc-theme='dark'] .pcai-preload__subtitle {
+        color: #a3a9b4;
+      }
+
+      html[data-pc-theme='dark'] .pcai-preload__progress {
+        background: #1e222b;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        html[data-pc-theme='system'] {
+          background: #111318;
+          color-scheme: dark;
+        }
+
+        html[data-pc-theme='system'] body,
+        html[data-pc-theme='system'] #app {
+          background: #111318;
+          color: #eceef1;
+        }
+
+        html[data-pc-theme='system'] .pcai-preload {
+          color: #eceef1;
+        }
+
+        html[data-pc-theme='system'] .pcai-preload__eyebrow {
+          color: #8a909b;
+        }
+
+        html[data-pc-theme='system'] .pcai-preload__subtitle {
+          color: #a3a9b4;
+        }
+
+        html[data-pc-theme='system'] .pcai-preload__progress {
+          background: #1e222b;
+        }
       }
 
       @keyframes pcai-preload-shimmer {
@@ -233,7 +293,7 @@
     <div id="app">
       <div class="pcai-preload" aria-hidden="true">
         <div class="pcai-preload__panel">
-          <img src="/logo-bg-remove.png" alt="PlanCraftAI" class="pcai-preload__logo" />
+          <img src="/plancraft-mark.svg" alt="PlanCraftAI" class="pcai-preload__logo" />
           <p class="pcai-preload__eyebrow">PlanCraftAI</p>
           <h1 class="pcai-preload__title">Preparing your workspace...</h1>
           <p class="pcai-preload__subtitle">Syncing your tasks and restoring your flow</p>

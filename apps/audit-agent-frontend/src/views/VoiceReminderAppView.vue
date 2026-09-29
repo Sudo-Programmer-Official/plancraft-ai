@@ -1,65 +1,115 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-b from-slate-950 via-indigo-950/80 to-slate-950 text-white">
-    <section class="px-6 py-20 md:py-28 text-center">
-      <p class="uppercase text-xs tracking-[0.35em] text-indigo-300 mb-3">Voice Reminder App</p>
-      <h1 class="text-4xl md:text-5xl font-extrabold leading-tight max-w-4xl mx-auto">
-        Voice reminder app for spoken tasks, follow-ups, and hands-free reminders
-      </h1>
-      <p class="mt-5 text-lg md:text-xl text-indigo-100 max-w-3xl mx-auto leading-relaxed">
-        PlanCraftAI lets you say the reminder the moment you think of it. Turn spoken tasks into
-        scheduled reminders, pair them with real work, and stop trusting memory to hold everything together.
-      </p>
-      <div class="mt-8 flex flex-col md:flex-row gap-4 justify-center">
-        <RouterLink
-          to="/login"
-          class="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 transition font-semibold"
-        >
-          Start planning free
-        </RouterLink>
-        <RouterLink
-          to="/recurring-reminder-app"
-          class="px-6 py-3 rounded-xl border border-white/30 font-semibold hover:border-white transition"
-        >
-          Explore recurring reminders ->
-        </RouterLink>
+  <div class="marketing-light voice-reminder-page min-h-screen bg-pc-bg text-pc-text">
+    <section class="border-b border-pc-border bg-pc-bg">
+      <div class="mx-auto grid w-full max-w-6xl items-center gap-10 px-4 pb-14 pt-12 sm:px-6 md:pb-20 md:pt-16 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-[0.3em] text-pc-accent-text">Voice reminders</p>
+          <h1 class="mt-4 max-w-xl text-4xl font-semibold tracking-tight text-pc-text sm:text-5xl">
+            Speak it once. Keep it on time.
+          </h1>
+          <p class="mt-5 max-w-xl text-base leading-7 text-pc-text-muted sm:text-lg">
+            Turn a quick voice note into a task with the right time, context, and follow-through. No separate alarm list to maintain.
+          </p>
+          <div class="mt-7 flex flex-col gap-3 sm:flex-row">
+            <RouterLink
+              to="/login"
+              class="inline-flex items-center justify-center rounded-xl bg-[image:var(--pc-accent-fill)] px-5 py-3 text-sm font-semibold text-white shadow-pc-button transition hover:bg-[image:var(--pc-accent-fill-hover)]"
+            >
+              Start planning free
+              <ArrowUpRight :size="16" class="ml-2" aria-hidden="true" />
+            </RouterLink>
+            <RouterLink
+              to="/recurring-reminder-app"
+              class="inline-flex items-center justify-center rounded-xl border border-pc-border-strong bg-pc-surface px-5 py-3 text-sm font-semibold text-pc-text transition hover:border-pc-accent hover:text-pc-accent-text"
+            >
+              Explore recurring reminders
+            </RouterLink>
+          </div>
+          <div class="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs font-medium text-pc-text-subtle">
+            <span class="inline-flex items-center gap-1.5"><Check :size="14" class="text-pc-success" aria-hidden="true" /> Natural language capture</span>
+            <span class="inline-flex items-center gap-1.5"><Check :size="14" class="text-pc-success" aria-hidden="true" /> One-time or recurring</span>
+          </div>
+        </div>
+
+        <div class="voice-reminder-preview rounded-[28px] border border-pc-border bg-pc-surface p-4 shadow-xl sm:p-5">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5">
+              <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-pc-accent-soft text-pc-accent-text">
+                <Mic2 :size="18" :stroke-width="1.8" aria-hidden="true" />
+              </span>
+              <div>
+                <p class="text-sm font-semibold text-pc-text">Quick capture</p>
+                <p class="text-xs text-pc-text-subtle">Voice reminder</p>
+              </div>
+            </div>
+            <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+              <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true"></span>
+              Ready
+            </span>
+          </div>
+
+          <div class="mt-5 rounded-2xl border border-pc-border bg-pc-surface-2 p-4">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-pc-text-subtle">Example reminder</p>
+            <p class="mt-2 text-base font-medium leading-6 text-pc-text" aria-live="polite">“{{ sampleVoiceText }}”</p>
+          </div>
+
+          <div class="mt-3 flex flex-wrap gap-2">
+            <span class="voice-reminder-chip"><Clock3 :size="14" aria-hidden="true" /> Tomorrow · 5:00 PM</span>
+            <span class="voice-reminder-chip"><Repeat2 :size="14" aria-hidden="true" /> One-time</span>
+          </div>
+
+          <div class="mt-5 flex items-center gap-3 rounded-2xl border border-pc-border bg-pc-surface px-3 py-3">
+            <VoiceRecorder
+              icon-only
+              surface="voice_reminder_preview"
+              @transcribed="handleVoiceTranscript"
+            />
+            <div class="min-w-0">
+              <p class="text-sm font-semibold text-pc-text">Tap to speak a reminder</p>
+              <p class="mt-0.5 text-xs leading-5 text-pc-text-muted">PlanCraft will keep the words and the timing together.</p>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
-    <section class="px-6 py-16 bg-white/5">
-      <div class="max-w-6xl mx-auto grid gap-6 md:grid-cols-3">
-        <article
-          v-for="card in reminderCards"
-          :key="card.title"
-          class="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl"
-        >
-          <p class="text-indigo-300 uppercase text-xs font-semibold">{{ card.tag }}</p>
-          <h2 class="text-2xl font-bold mt-2">{{ card.title }}</h2>
-          <p class="text-indigo-100 mt-3 leading-relaxed">{{ card.description }}</p>
-          <ul class="mt-4 space-y-2 text-sm text-indigo-200">
-            <li v-for="point in card.points" :key="point">• {{ point }}</li>
+    <section class="mx-auto w-full max-w-6xl px-4 py-14 sm:px-6 md:py-16">
+      <div class="max-w-2xl">
+        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-pc-accent-text">A calmer workflow</p>
+        <h2 class="mt-3 text-3xl font-semibold tracking-tight text-pc-text">From thought to follow-through in three steps</h2>
+        <p class="mt-3 text-base leading-7 text-pc-text-muted">Capture quickly, add structure automatically, and keep the reminder where the work already lives.</p>
+      </div>
+      <div class="mt-8 grid gap-4 md:grid-cols-3">
+        <article v-for="(card, index) in reminderCards" :key="card.title" class="rounded-3xl border border-pc-border bg-pc-surface p-5 shadow-sm">
+          <div class="flex items-center justify-between gap-3">
+            <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-pc-accent-soft text-sm font-semibold text-pc-accent-text">0{{ index + 1 }}</span>
+            <span class="text-xs font-semibold uppercase tracking-[0.2em] text-pc-text-subtle">{{ card.tag }}</span>
+          </div>
+          <h3 class="mt-5 text-lg font-semibold tracking-tight text-pc-text">{{ card.title }}</h3>
+          <p class="mt-2 text-sm leading-6 text-pc-text-muted">{{ card.description }}</p>
+          <ul class="mt-4 space-y-2 text-sm text-pc-text-muted">
+            <li v-for="point in card.points.slice(0, 2)" :key="point" class="flex items-start gap-2">
+              <Check :size="15" class="mt-0.5 shrink-0 text-pc-accent-text" aria-hidden="true" />
+              <span>{{ point }}</span>
+            </li>
           </ul>
         </article>
       </div>
     </section>
 
-    <section class="px-6 py-16">
-      <div class="max-w-5xl mx-auto">
-        <div class="text-center max-w-3xl mx-auto">
-          <p class="uppercase text-xs tracking-[0.35em] text-indigo-300">Why this ranks</p>
-          <h2 class="mt-4 text-3xl md:text-4xl font-bold">Voice reminders work because capture happens instantly</h2>
-          <p class="mt-4 text-indigo-100 text-lg leading-relaxed">
-            People searching for a voice reminder app usually want speed first. PlanCraftAI handles
-            the reminder, the task behind it, and the timing logic in one place.
-          </p>
-        </div>
-        <div class="mt-10 grid gap-6 md:grid-cols-2">
-          <div
-            v-for="benefit in reminderBenefits"
-            :key="benefit.title"
-            class="rounded-2xl border border-white/10 bg-white/5 p-6"
-          >
-            <h3 class="text-xl font-semibold">{{ benefit.title }}</h3>
-            <p class="mt-3 text-indigo-100 leading-relaxed">{{ benefit.description }}</p>
+    <section class="border-y border-pc-border bg-pc-surface-2">
+      <div class="mx-auto w-full max-w-6xl px-4 py-14 sm:px-6 md:py-16">
+        <div class="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.3em] text-pc-accent-text">Why it works</p>
+            <h2 class="mt-3 text-3xl font-semibold tracking-tight text-pc-text">More useful than a generic alarm</h2>
+            <p class="mt-3 text-base leading-7 text-pc-text-muted">The reminder stays attached to the task, so the next action is clear when the nudge arrives.</p>
+          </div>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <article v-for="benefit in reminderBenefits" :key="benefit.title" class="rounded-2xl border border-pc-border bg-pc-surface p-4 shadow-sm">
+              <h3 class="text-base font-semibold text-pc-text">{{ benefit.title }}</h3>
+              <p class="mt-2 text-sm leading-6 text-pc-text-muted">{{ benefit.description }}</p>
+            </article>
           </div>
         </div>
       </div>
@@ -72,16 +122,16 @@
       :sections="longformSections"
     >
       <template #cta>
-        <div class="flex flex-col md:flex-row gap-4">
+        <div class="flex flex-col gap-3 sm:flex-row">
           <RouterLink
             to="/ai-task-planner"
-            class="flex-1 text-center px-6 py-3 rounded-xl bg-white text-indigo-700 font-semibold hover:bg-slate-100 transition"
+            class="inline-flex flex-1 items-center justify-center rounded-xl bg-[image:var(--pc-accent-fill)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[image:var(--pc-accent-fill-hover)]"
           >
             Pair with the AI task planner
           </RouterLink>
           <RouterLink
             to="/ai-daily-planner"
-            class="flex-1 text-center px-6 py-3 rounded-xl border border-white/20 text-indigo-100 font-semibold hover:border-white transition"
+            class="inline-flex flex-1 items-center justify-center rounded-xl border border-pc-border-strong bg-pc-surface px-5 py-3 text-sm font-semibold text-pc-text transition hover:border-pc-accent hover:text-pc-accent-text"
           >
             Build the daily plan
           </RouterLink>
@@ -89,31 +139,38 @@
       </template>
     </SeoLongForm>
 
-    <section class="px-6 py-16 bg-indigo-950/60">
-      <div class="max-w-5xl mx-auto">
-        <div class="text-center mb-10">
-          <p class="uppercase text-xs tracking-[0.35em] text-indigo-300">FAQ</p>
-          <h2 class="mt-4 text-3xl md:text-4xl font-bold">Voice reminder app questions</h2>
-        </div>
-        <div class="grid gap-6">
+    <section class="mx-auto w-full max-w-5xl px-4 py-14 sm:px-6 md:py-16">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-pc-accent-text">FAQ</p>
+        <h2 class="mt-3 text-3xl font-semibold tracking-tight text-pc-text">Voice reminder questions</h2>
+      </div>
+      <div class="mt-7 grid gap-3">
           <article
             v-for="faq in faqItems"
             :key="faq.question"
-            class="rounded-2xl border border-white/10 bg-white/5 p-6"
+            class="rounded-2xl border border-pc-border bg-pc-surface p-5 shadow-sm"
           >
-            <h3 class="text-xl font-semibold">{{ faq.question }}</h3>
-            <p class="mt-3 text-indigo-100 leading-relaxed">{{ faq.answer }}</p>
+            <h3 class="text-base font-semibold text-pc-text">{{ faq.question }}</h3>
+            <p class="mt-2 text-sm leading-6 text-pc-text-muted">{{ faq.answer }}</p>
           </article>
-        </div>
       </div>
     </section>
   </div>
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import { RouterLink } from 'vue-router'
+import { ArrowUpRight, Check, Clock3, Mic2, Repeat2 } from 'lucide-vue-next'
 import SeoLongForm from '@/components/SeoLongForm.vue'
+import VoiceRecorder from '@/components/VoiceRecorder.vue'
 import { useSeoMeta } from '@/composables/useSeoMeta'
+
+const sampleVoiceText = ref('Remind me to call Sam tomorrow at 5')
+
+function handleVoiceTranscript(text) {
+  if (text?.trim()) sampleVoiceText.value = text.trim()
+}
 
 const reminderCards = [
   {
@@ -271,3 +328,22 @@ useSeoMeta({
   pageLabel: 'Voice Reminder App',
 })
 </script>
+
+<style scoped>
+.voice-reminder-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--pc-border);
+  border-radius: 999px;
+  background: var(--pc-surface-2);
+  padding: 0.4rem 0.65rem;
+  color: var(--pc-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.voice-reminder-chip :deep(svg) {
+  color: var(--pc-accent-text);
+}
+</style>

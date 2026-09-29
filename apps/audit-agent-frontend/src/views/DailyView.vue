@@ -2,8 +2,6 @@
   <div
     class="min-h-screen bg-gradient-to-br from-slate-900 to-indigo-950 px-4 sm:px-6 py-8 text-white overflow-y-auto scrollbar-plan"
   >
-    <GuestBanner :isGuest="authStore.guest" @login="redirectToLogin" />
-
     <!-- Header -->
     <header class="text-center mb-12">
       <h1 class="text-3xl sm:text-4xl font-bold">Today's Tasks</h1>
@@ -21,7 +19,7 @@
           class="w-full p-3 rounded-lg bg-slate-900/40 border border-slate-700 text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-400 mb-4 resize-none"
         ></textarea>
         <div class="action-row flex flex-col sm:flex-row sm:justify-end sm:items-center gap-3 sm:gap-4">
-          <VoiceRecorder @transcribed="handleMorningTranscript" />
+          <VoiceRecorder surface="daily_morning" @transcribed="handleMorningTranscript" />
           <button @click="generateTasks" class="px-4 py-2 rounded-lg text-white font-medium shadow-md bg-gradient-to-r from-emerald-700 via-teal-800 to-cyan-700 hover:from-emerald-800 hover:via-teal-900 hover:to-cyan-800 transition-all duration-300">
             Generate Tasks
           </button>
@@ -41,7 +39,7 @@
         ></textarea>
         <p v-if="enhancedText" class="text-indigo-400 text-sm italic mt-2">✨ Enhanced: {{ enhancedText }}</p>
         <div class="action-row flex flex-col sm:flex-row sm:justify-end sm:items-center gap-3 sm:gap-4 mt-4">
-          <VoiceRecorder @transcribed="handleEveningTranscript" />
+          <VoiceRecorder surface="daily_evening" @transcribed="handleEveningTranscript" />
           <button @click="saveReflection" class="px-4 py-2 rounded-lg text-white font-medium shadow-md bg-gradient-to-r from-emerald-700 via-teal-800 to-cyan-700 hover:from-emerald-800 hover:via-teal-900 hover:to-cyan-800 transition-all duration-300">
             💾 Save Reflection
           </button>
@@ -53,18 +51,15 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useAuthStore } from '@/stores/authStore'
 import { useHead } from '@vueuse/head'
 import { useRoute } from 'vue-router'
 import TaskBoard from '@/components/TaskBoard.vue'
 import VoiceRecorder from '@/components/VoiceRecorder.vue'
-import GuestBanner from '@/components/GuestBanner.vue'
 import { generateTasksFromText, enhanceJournal } from '@/services/aiService'
 import { saveEntryToFirebase } from '@/services/firebaseService'
 import { toLocalDateKey } from '@/utils/dateHelper'
 import { useTasks } from '@/composables/useTasks'
 
-const authStore = useAuthStore()
 const planningInput = ref('')
 const reflectionText = ref('')
 const enhancedText = ref('')
@@ -88,10 +83,6 @@ useHead({
 onMounted(async () => {
   await loadTasks().catch(() => {})
 })
-
-function redirectToLogin() {
-  window.location.href = "/login"
-}
 
 function handleMorningTranscript(text) {
   planningInput.value = text

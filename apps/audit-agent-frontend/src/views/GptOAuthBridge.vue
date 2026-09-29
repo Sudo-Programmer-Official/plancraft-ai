@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-slate-950 text-white flex items-center justify-center px-4">
+  <div class="marketing-light min-h-screen bg-slate-950 text-slate-900 flex items-center justify-center px-4">
     <div class="max-w-md w-full space-y-4 text-center">
       <h1 class="text-2xl font-semibold">Linking PlanCraft AI</h1>
       <p class="text-sm text-slate-300" v-if="!error">

@@ -1,5 +1,5 @@
 <template>
-  <div class="app-root">
+  <div class="app-root pc-theme">
     <RouterView v-slot="{ Component }">
       <transition name="page-fade">
         <component :is="Component" :key="$route.fullPath" />
@@ -9,7 +9,7 @@
     <transition name="startup-fade">
       <div v-if="showStartupOverlay" class="startup-overlay" aria-live="polite" aria-busy="true">
         <div class="startup-overlay__panel">
-          <img src="/logo-bg-remove.png" alt="PlanCraftAI" class="startup-overlay__logo" />
+          <img src="/plancraft-mark.svg" alt="PlanCraftAI" class="startup-overlay__logo" />
           <p class="startup-overlay__eyebrow">PlanCraftAI</p>
           <h1 class="startup-overlay__title">{{ startupOverlayTitle }}</h1>
           <p class="startup-overlay__subtitle">{{ startupOverlaySubtitle }}</p>
@@ -23,6 +23,9 @@
     <AiConsentDialog />
     <InstallPrompt />
     <ConfettiOverlay v-if="confettiVisible" @done="confettiVisible = false" />
+    <FocusSession v-if="focus.isOpen" />
+    <ReminderDueBanner v-if="authStore.user?.uid" />
+    <AppLockScreen />
   </div>
 </template>
 
@@ -32,7 +35,16 @@ import { useRoute } from 'vue-router'
 import { ElNotification } from 'element-plus'
 import AiConsentDialog from '@/components/AiConsentDialog.vue'
 import InstallPrompt from '@/components/InstallPrompt.vue'
+// Side effect: capture the PWA install prompt before any screen asks for it.
+import '@/composables/useInstallApp'
 import ConfettiOverlay from '@/components/ConfettiOverlay.vue'
+import AppLockScreen from '@/components/AppLockScreen.vue'
+import FocusSession from '@/components/focus/FocusSession.vue'
+import ReminderDueBanner from '@/components/ReminderDueBanner.vue'
+import { useAppLockStore } from '@/stores/appLockStore'
+import { useFocusStore } from '@/stores/focusStore'
+import { setAnalyticsContext } from '@/services/analytics'
+import { useAuthStore } from '@/stores/authStore'
 import { useAppReady } from '@/composables/useAppReady'
 import {
   getAiConsentStatus,
@@ -73,6 +85,34 @@ const startupOverlaySubtitle = computed(() => {
   }
 })
 
+const appLock = useAppLockStore()
+const authStore = useAuthStore()
+
+watch(
+  () => ({
+    uid: authStore.user?.uid || null,
+    isGuest: authStore.guest === true || authStore.user?.mode === 'guest',
+    settled: !authStore.bootstrapping,
+  }),
+  (state) => appLock.syncUser(state),
+  { immediate: true },
+)
+
+watch(
+  () => String(authStore.user?.plan || 'free').toLowerCase(),
+  (plan) => setAnalyticsContext({ plan }),
+  { immediate: true },
+)
+
+const focus = useFocusStore()
+watch(
+  () => (authStore.bootstrapping ? undefined : authStore.user?.uid || null),
+  (uid) => {
+    if (uid !== undefined) focus.syncUser(uid)
+  },
+  { immediate: true },
+)
+
 const confettiVisible = ref(false)
 const aiConsentAutoPrompted = ref(false)
 
@@ -83,8 +123,8 @@ function triggerConfetti(count) {
   } catch {}
   try {
     ElNotification({
-      title: 'Streak up! 🔥',
-      message: `You're on a ${count}-day streak. Keep going!`,
+      title: 'Streak up',
+      message: `Day ${count} complete.`,
       type: 'success',
       duration: 2600,
       offset: 80,
@@ -94,6 +134,7 @@ function triggerConfetti(count) {
 
 let streakHandler = null
 onMounted(() => {
+  appLock.init().catch(() => {})
   streakHandler = (e) => {
     const count = e?.detail?.count || 1
     triggerConfetti(count)
@@ -153,6 +194,14 @@ onBeforeUnmount(() => {
 }
 
 .startup-overlay {
+  --startup-bg: #f6f7fc;
+  --startup-glow: rgba(129, 140, 248, 0.16);
+  --startup-text: #0f172a;
+  --startup-muted: #475569;
+  --startup-subtle: #64748b;
+  --startup-track: #e2e8f0;
+  --startup-fill: linear-gradient(90deg, #a855f7, #6366f1);
+  --startup-shadow: rgba(99, 102, 241, 0.25);
   position: fixed;
   inset: 0;
   z-index: 120;
@@ -160,22 +209,22 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   padding: 2rem;
-  background:
-    radial-gradient(circle at top, rgba(96, 165, 250, 0.18), transparent 28%),
-    linear-gradient(135deg, #1d1645 0%, #4f2b93 58%, #241d53 100%);
+  background: var(--startup-bg);
 }
 
 .startup-overlay__panel {
   width: min(100%, 28rem);
   text-align: center;
-  color: #fff;
+  color: var(--startup-text);
 }
 
 .startup-overlay__logo {
   width: 5rem;
   height: 5rem;
   margin: 0 auto 1rem;
-  filter: drop-shadow(0 18px 34px rgba(31, 41, 55, 0.35));
+  display: block;
+  object-fit: contain;
+  filter: drop-shadow(0 12px 24px var(--startup-shadow));
 }
 
 .startup-overlay__eyebrow {
@@ -183,7 +232,7 @@ onBeforeUnmount(() => {
   font-size: 0.85rem;
   letter-spacing: 0.35em;
   text-transform: uppercase;
-  color: rgba(224, 231, 255, 0.76);
+  color: var(--startup-subtle);
 }
 
 .startup-overlay__title {
@@ -191,6 +240,7 @@ onBeforeUnmount(() => {
   font-size: clamp(2rem, 4vw, 2.75rem);
   font-weight: 700;
   line-height: 1.05;
+  color: var(--startup-text);
 }
 
 .startup-overlay__subtitle {
@@ -198,7 +248,7 @@ onBeforeUnmount(() => {
   max-width: 22rem;
   font-size: 1rem;
   line-height: 1.6;
-  color: rgba(224, 231, 255, 0.72);
+  color: var(--startup-muted);
 }
 
 .startup-overlay__progress {
@@ -207,16 +257,40 @@ onBeforeUnmount(() => {
   margin: 1.75rem auto 0;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--startup-track);
 }
 
 .startup-overlay__progress-bar {
   width: 42%;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, rgba(192, 132, 252, 0.95), rgba(96, 165, 250, 0.95));
-  box-shadow: 0 0 18px rgba(96, 165, 250, 0.35);
+  background: var(--startup-fill);
+  box-shadow: 0 0 18px var(--startup-shadow);
   animation: startup-shimmer 1.4s ease-in-out infinite;
+}
+
+:root[data-pc-theme='dark'] .startup-overlay {
+  --startup-bg: #111318;
+  --startup-glow: rgba(124, 108, 242, 0.16);
+  --startup-text: #eceef1;
+  --startup-muted: #a3a9b4;
+  --startup-subtle: #8a909b;
+  --startup-track: #1e222b;
+  --startup-fill: linear-gradient(90deg, #5b4fe0, #7c3aed);
+  --startup-shadow: rgba(0, 0, 0, 0.3);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-pc-theme='system'] .startup-overlay {
+    --startup-bg: #111318;
+    --startup-glow: rgba(124, 108, 242, 0.16);
+    --startup-text: #eceef1;
+    --startup-muted: #a3a9b4;
+    --startup-subtle: #8a909b;
+    --startup-track: #1e222b;
+    --startup-fill: linear-gradient(90deg, #5b4fe0, #7c3aed);
+    --startup-shadow: rgba(0, 0, 0, 0.3);
+  }
 }
 
 @keyframes startup-shimmer {
@@ -230,10 +304,10 @@ onBeforeUnmount(() => {
 
 .pcai-auth-notification {
   width: min(92vw, 26rem) !important;
-  border: 1px solid rgba(129, 140, 248, 0.22) !important;
+  border: 1px solid #e2e8f0 !important;
   border-radius: 1.35rem !important;
-  background: linear-gradient(140deg, rgba(30, 27, 75, 0.96), rgba(91, 33, 182, 0.92)) !important;
-  box-shadow: 0 26px 50px rgba(15, 23, 42, 0.28) !important;
+  background: #ffffff !important;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.14) !important;
 }
 
 .pcai-auth-notification .el-notification__group {
@@ -242,10 +316,9 @@ onBeforeUnmount(() => {
 
 .pcai-auth-notification .el-notification__title {
   margin: 0 0 0.4rem;
-  color: rgba(224, 231, 255, 0.72);
+  color: #0f172a !important;
   font-size: 0.8rem;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
+  font-weight: 700;
 }
 
 .pcai-auth-notification .el-notification__content {
@@ -256,7 +329,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 0.9rem;
-  color: #fff;
+  color: #0f172a;
 }
 
 .pcai-auth-toast__avatar {
@@ -275,12 +348,12 @@ onBeforeUnmount(() => {
 }
 
 .pcai-auth-toast__avatar-image {
-  border: 2px solid rgba(255, 255, 255, 0.18);
+  border: 2px solid var(--pc-accent-soft);
 }
 
 .pcai-auth-toast__avatar-fallback {
-  background: linear-gradient(135deg, rgba(244, 114, 182, 0.95), rgba(96, 165, 250, 0.95));
-  color: #fff;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: #ffffff;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
@@ -289,31 +362,14 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
-.pcai-auth-toast__eyebrow,
-.pcai-auth-toast__title,
-.pcai-auth-toast__subtitle {
+.pcai-auth-toast__title {
   margin: 0;
 }
 
-.pcai-auth-toast__eyebrow {
-  font-size: 0.72rem;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: rgba(224, 231, 255, 0.62);
-}
-
 .pcai-auth-toast__title {
-  margin-top: 0.15rem;
   font-size: 1rem;
   font-weight: 700;
-  color: #fff;
-  word-break: break-word;
-}
-
-.pcai-auth-toast__subtitle {
-  margin-top: 0.15rem;
-  font-size: 0.88rem;
-  color: rgba(224, 231, 255, 0.78);
+  color: #0f172a;
   word-break: break-word;
 }
 </style>

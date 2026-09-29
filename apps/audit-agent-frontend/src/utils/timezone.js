@@ -2,13 +2,14 @@
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
+import { getEffectiveUserTimezone } from '@/utils/userTimezone'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
 
 export function toUTC(localTime, tz) {
   if (!localTime) return null
-  const zone = tz || (Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC')
+  const zone = tz || getEffectiveUserTimezone()
   try {
     // If already ISO with timezone, dayjs will respect it
     const d = dayjs(localTime)
@@ -29,7 +30,7 @@ export function toUTC(localTime, tz) {
 
 export function toLocal(utcTime, tz) {
   if (!utcTime) return ''
-  const zone = tz || (Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC')
+  const zone = tz || getEffectiveUserTimezone()
   try {
     return dayjs.utc(utcTime).tz(zone).format('YYYY-MM-DD hh:mm A')
   } catch {}
@@ -43,4 +44,3 @@ export function toLocal(utcTime, tz) {
     return String(utcTime)
   }
 }
-

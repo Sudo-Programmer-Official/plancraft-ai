@@ -61,6 +61,7 @@ import { resolveTaskMeetingLink } from '@/utils/taskLinks'
 import { getGoogleStatus } from '@/stores/integrationsStore'
 import MeetingCard from '@/components/meeting/MeetingCard.vue'
 import { useAuthStore } from '@/stores/authStore'
+import { getEffectiveUserTimezone } from '@/utils/userTimezone'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -79,7 +80,7 @@ const googleLastSync = computed(() => {
 })
 
 const meetings = computed(() => {
-  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const zone = getEffectiveUserTimezone()
   return (tasks?.value || [])
     .map((t) => {
       const meetingLink = resolveTaskMeetingLink(t)
@@ -109,7 +110,7 @@ const meetings = computed(() => {
 })
 
 const groupedMeetings = computed(() => {
-  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const zone = getEffectiveUserTimezone()
   const today = dayjs().tz(zone).startOf('day')
   const todayEnd = today.endOf('day')
   const upcoming = []

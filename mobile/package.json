@@ -20,6 +20,7 @@
     "@capacitor/core": "^8.2.0",
     "@capacitor/ios": "^8.2.0",
     "@capacitor/push-notifications": "^8.1.1",
-    "@capgo/capacitor-audio-recorder": "^8.0.12"
+    "@capgo/capacitor-audio-recorder": "^8.0.12",
+    "@capgo/capacitor-native-biometric": "^8.7.0"
   }
 }

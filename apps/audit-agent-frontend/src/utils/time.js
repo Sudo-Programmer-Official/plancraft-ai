@@ -1,13 +1,14 @@
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc.js'
 import timezone from 'dayjs/plugin/timezone.js'
+import { getEffectiveUserTimezone } from '@/utils/userTimezone'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
 
 // Get user's local IANA timezone
 export const getUserTimezone = () => {
-  try { return dayjs.tz.guess() } catch { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' }
+  return getEffectiveUserTimezone()
 }
 
 // Convert a local date (YYYY-MM-DD) and HH:mm to a UTC ISO string

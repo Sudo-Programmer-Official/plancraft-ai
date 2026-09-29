@@ -141,6 +141,7 @@ import Stripe from 'stripe'
 import { db } from '../services/firebaseAdmin.js'
 import { requireAuth, ensureUserMatches } from '../middleware/auth.js'
 import { normalizeDate } from '../utils/time.js'
+import { trackServerEventAsync } from '../services/analyticsService.js'
 
 const router = express.Router()
 router.use(requireAuth, ensureUserMatches)
@@ -379,6 +380,15 @@ router.post('/subscription/apple/ingest', async (req, res) => {
       },
       { merge: true },
     )
+
+    if (userData?.plan !== 'premium' && next.plan === 'premium') {
+      trackServerEventAsync(userId, 'subscription_started', {
+        provider: 'apple',
+        scope: 'solo',
+        plan: 'premium',
+        origin: req.body?.origin || null,
+      })
+    }
 
     console.info('[AppleIAP] ingest stored', {
       userId,

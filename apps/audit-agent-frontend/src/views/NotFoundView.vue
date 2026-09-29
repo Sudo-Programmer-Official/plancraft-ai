@@ -1,5 +1,5 @@
 <template>
-  <main class="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center px-6">
+  <main class="marketing-light min-h-screen bg-slate-950 text-slate-900 flex items-center justify-center px-6">
     <section class="max-w-xl w-full rounded-2xl border border-white/10 bg-white/5 p-8 text-center">
       <p class="text-indigo-300 text-sm tracking-wide uppercase">404</p>
       <h1 class="mt-2 text-3xl font-semibold">Page not found</h1>

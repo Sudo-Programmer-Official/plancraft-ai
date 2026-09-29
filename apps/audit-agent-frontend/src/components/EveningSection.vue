@@ -17,7 +17,7 @@
     <div class="action-row flex flex-col sm:flex-row sm:justify-end sm:items-center gap-3 sm:gap-4 mt-4">
       <!-- Voice Recorder: full width on mobile, compact on desktop -->
       <div class="w-full sm:w-auto sm:flex-none">
-        <VoiceRecorder @transcribed="handleTranscript" class="w-full sm:w-auto" />
+        <VoiceRecorder surface="evening" @transcribed="handleTranscript" class="w-full sm:w-auto" />
       </div>
   
       <!-- Save Reflection button: right-aligned on desktop -->

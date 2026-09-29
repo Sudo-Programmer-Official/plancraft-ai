@@ -61,13 +61,14 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { BILLING_WEB_HOST, isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
 import { useAuthStore } from '@/stores/authStore'
 import { useAccessStore } from '@/stores/accessStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
+import { EVENTS, trackEvent } from '@/services/analytics'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -91,7 +92,23 @@ const primaryActionLabel = computed(() => (
   isAppleBillingSafeMode ? 'Upgrade to Solo Premium' : 'Learn about Premium'
 ))
 
+watch(
+  () => props.open,
+  (open) => {
+    if (open) {
+      trackEvent(EVENTS.PAYWALL_VIEWED, {
+        surface: 'feature_limit',
+        feature: props.featureLabel,
+        used: props.used,
+        limit: props.limit,
+      })
+    }
+  },
+  { immediate: true },
+)
+
 async function handlePrimaryAction() {
+  trackEvent(EVENTS.UPGRADE_CLICKED, { surface: 'feature_limit', feature: props.featureLabel })
   emit('close')
   await router.push(isAppleBillingSafeMode ? '/billing/upgrade' : '/subscription')
 }

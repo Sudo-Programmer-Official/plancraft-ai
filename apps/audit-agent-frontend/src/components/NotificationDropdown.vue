@@ -4,46 +4,43 @@
            w-[90vw] sm:w-80
            left-1/2 sm:left-auto sm:right-0
            -translate-x-1/2 sm:translate-x-0
-           bg-gray-900/95 backdrop-blur-lg border border-gray-700 rounded-xl shadow-2xl"
+           rounded-2xl border border-pc-border bg-pc-surface shadow-lg"
   >
     <!-- Header -->
-    <div class="p-3 border-b border-gray-800 flex items-center justify-between">
-      <span class="text-sm font-semibold text-white/90">Notifications</span>
-      <button
-        class="text-xs text-indigo-300 hover:text-indigo-200"
-        @click="$emit('markAllRead')"
-      >
+    <div class="flex items-center justify-between border-b border-pc-border px-4 py-3">
+      <span class="text-sm font-semibold text-pc-text">Notifications</span>
+      <button class="text-xs font-semibold text-pc-accent-text hover:text-pc-accent" @click="$emit('markAllRead')">
         Mark all read
       </button>
     </div>
 
     <!-- States -->
-    <ul v-if="error" class="p-3 text-sm text-amber-300 text-center">
-      ⚠ Unable to load notifications. Please refresh.
+    <ul v-if="error" class="p-4 text-center text-sm text-pc-text-muted">
+      Unable to load updates. Try again.
     </ul>
 
-    <ul v-else-if="!items.length" class="p-3 text-sm text-gray-400 text-center">
-      📭 No new updates
+    <ul v-else-if="!items.length" class="p-4 text-center text-sm text-pc-text-muted">
+      No new updates
     </ul>
 
     <!-- Notification List -->
     <ul
       v-else
-      class="divide-y divide-gray-800 max-h-72 overflow-y-auto text-sm text-gray-300 scrollbar-plan"
+      class="max-h-72 divide-y divide-pc-border overflow-y-auto text-sm text-pc-text-muted scrollbar-plan"
     >
       <li
         v-for="note in items"
         :key="note.id"
-        class="p-3 hover:bg-gray-800/70 transition-colors duration-150"
+        class="p-3 transition-colors duration-150 hover:bg-pc-surface-2"
       >
         <div class="flex items-start justify-between gap-2">
-          <div>
-            <strong class="block text-white">{{ note.title }}</strong>
-            <p class="text-gray-400 leading-snug">{{ note.message || note.description }}</p>
+          <div class="min-w-0">
+            <strong class="block break-words text-pc-text">{{ note.title }}</strong>
+            <p class="break-words leading-snug text-pc-text-muted">{{ note.message || note.description }}</p>
           </div>
           <span
             v-if="note.date"
-            class="text-xs text-gray-500 whitespace-nowrap"
+            class="shrink-0 whitespace-nowrap text-xs text-pc-text-subtle"
           >
             {{ formatDate(note.date) }}
           </span>
@@ -54,7 +51,7 @@
 </template>
 
 <script setup>
-const props = defineProps({
+defineProps({
   items: { type: Array, default: () => [] },
   error: { type: Boolean, default: false },
 })

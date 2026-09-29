@@ -1,298 +1,250 @@
 <template>
-  <div class="login-shell relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-b from-indigo-900 via-purple-900 to-slate-950">
+  <div class="marketing-light login-shell relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-b from-indigo-900 via-purple-900 to-slate-950">
     <div class="absolute inset-0">
       <canvas ref="starsCanvas" class="w-full h-full opacity-70"></canvas>
     </div>
 
-    <div class="relative z-10 w-full px-4 py-12 flex items-center justify-center">
-      <div class="relative w-full max-w-3xl">
+    <div class="login-frame relative z-10 w-full px-4 flex items-center justify-center">
+      <div class="relative w-full max-w-md">
         <div class="login-glow" aria-hidden="true"></div>
-        <div class="login-card relative bg-slate-900/75 backdrop-blur-2xl border border-white/5 rounded-3xl shadow-2xl px-8 py-10 sm:px-12 sm:py-12 text-white animate-fade-in">
-          <div class="flex flex-col items-center text-center gap-5">
-            <img src="/logo-bg-remove.png" alt="PlanCraftAI" class="w-16 h-16 drop-shadow-lg" />
-            <div>
-              <p class="text-sm uppercase tracking-[0.35em] text-indigo-300/80">Welcome back</p>
-              <h1 class="text-3xl sm:text-4xl font-bold mt-2">PlanCraftAI</h1>
-              <p class="text-indigo-100/90 mt-2 text-base">Your AI-powered productivity companion</p>
+        <div class="login-card relative bg-slate-900/75 backdrop-blur-2xl border border-white/5 rounded-3xl shadow-2xl text-white animate-fade-in">
+          <header class="login-header">
+            <img
+              src="/icons/icon-96x96.png"
+              srcset="/icons/icon-96x96.png 1x, /icons/icon-192x192.png 2x"
+              alt=""
+              width="44"
+              height="44"
+              class="login-header__logo"
+            />
+            <div class="login-header__copy">
+              <h1 class="login-header__title">
+                {{ showEmail && isRegisterMode ? 'Create your PlanCraftAI account' : 'Sign in to PlanCraftAI' }}
+              </h1>
+              <p class="login-header__subtitle">
+                {{ isRegisterMode ? 'Create your account to plan with AI, voice, and smart reminders.' : 'Plan your day with AI, voice, and smart reminders.' }}
+              </p>
             </div>
-            <LoginFeatureSlider class="value-props" />
-          </div>
+          </header>
 
           <!-- Off-screen reCAPTCHA anchor (must be mounted in DOM) -->
           <div id="recaptcha-container" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;"></div>
 
-          <div class="mt-10 space-y-5">
-            <div class="auth-methods">
-              <div class="auth-methods__header">
-                <p class="auth-methods__eyebrow">Choose your sign-in method</p>
-                <p class="auth-methods__caption">{{ authMethodsCaption }}</p>
-              </div>
-              <div class="auth-methods__grid">
-                <button
-                  v-if="!isNativeApp"
-                  @click="loginGoogle"
-                  :disabled="authUiBusy"
-                  class="w-full flex items-center justify-center gap-3 bg-white text-gray-900 px-6 py-4 rounded-xl font-semibold shadow-lg hover:-translate-y-0.5 hover:shadow-2xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 disabled:opacity-70"
-                >
-                  <img src="/icons/google-g.svg" alt="Google" class="w-5 h-5" />
-                  Continue with Google
+          <div v-if="appHandoffProvider === 'google'" class="native-auth-banner" role="status">
+            <template v-if="appHandoffSessionEmail">
+              <p>Signed in as <strong>{{ appHandoffSessionEmail }}</strong>.</p>
+              <div class="flex flex-col sm:flex-row gap-2 mt-3">
+                <button type="button" class="auth-action primary" :disabled="authUiBusy" @click="continueExistingSessionToApp">
+                  Continue to the app
                 </button>
-                <button
-                  v-if="isIosApp && appleAuthEnabled"
-                  @click="loginApple"
-                  :disabled="authUiBusy"
-                  class="w-full flex items-center justify-center gap-3 bg-white text-gray-900 px-6 py-4 rounded-xl font-semibold shadow-lg hover:-translate-y-0.5 hover:shadow-2xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 disabled:opacity-70"
-                >
-                  <img src="/icons/apple-logo.svg" alt="Apple" class="w-5 h-5" />
-                  Continue with Apple
-                </button>
-                <button
-                  type="button"
-                  :disabled="authUiBusy"
-                  :class="['auth-mode-card', { 'auth-mode-card--active': showEmail }]"
-                  @click="toggleEmail"
-                  :aria-expanded="showEmail"
-                >
-                  <span class="auth-mode-card__icon">✉️</span>
-                  <span class="auth-mode-card__body">
-                    <span class="auth-mode-card__title">Continue with Email</span>
-                    <span class="auth-mode-card__subtitle">Best for full account access and recovery</span>
-                  </span>
-                  <span class="auth-mode-card__badge">{{ showEmail ? 'Active' : 'Use' }}</span>
-                </button>
-                <button
-                  v-if="showPhoneOtpOption"
-                  type="button"
-                  :disabled="authUiBusy"
-                  :class="['auth-mode-card', { 'auth-mode-card--active': showPhone }]"
-                  @click="togglePhone"
-                  :aria-expanded="showPhone"
-                >
-                  <span class="auth-mode-card__icon">📱</span>
-                  <span class="auth-mode-card__body">
-                    <span class="auth-mode-card__title">Continue with Phone</span>
-                    <span class="auth-mode-card__subtitle">Fast OTP sign-in built for mobile</span>
-                  </span>
-                  <span class="auth-mode-card__badge">{{ showPhone ? (otpSent ? 'Code sent' : 'Active') : 'Use' }}</span>
+                <button type="button" class="auth-action ghost" :disabled="authUiBusy" @click="useAnotherAccountForApp">
+                  Use another account
                 </button>
               </div>
-            </div>
-
-            <transition name="auth-panel-swap" mode="out-in">
-              <div v-if="showEmail" key="email" :class="['auth-panel', { 'auth-panel--shake': emailErrorShake }]">
-                <div class="auth-panel__header">
-                  <div>
-                    <p class="auth-panel__eyebrow">{{ emailPanelEyebrow }}</p>
-                    <h2 class="text-lg font-semibold text-white">{{ emailPanelTitle }}</h2>
-                    <p class="auth-panel__hint">{{ emailPanelHint }}</p>
-                  </div>
-                </div>
-                <div class="auth-panel-switch" role="tablist" aria-label="Email account flow">
-                  <button
-                    type="button"
-                    class="auth-panel-switch__item"
-                    :class="{ 'auth-panel-switch__item--active': !isRegisterMode }"
-                    :disabled="authUiBusy"
-                    :aria-selected="!isRegisterMode"
-                    @click="setEmailAuthMode('signin')"
-                  >
-                    Sign in
-                  </button>
-                  <button
-                    type="button"
-                    class="auth-panel-switch__item"
-                    :class="{ 'auth-panel-switch__item--active': isRegisterMode }"
-                    :disabled="authUiBusy"
-                    :aria-selected="isRegisterMode"
-                    @click="setEmailAuthMode('register')"
-                  >
-                    Create account
-                  </button>
-                </div>
-                <div class="space-y-3">
-                  <input
-                    v-if="isRegisterMode"
-                    ref="displayNameFieldRef"
-                    v-model="registerDisplayName"
-                    type="text"
-                    placeholder="Your name"
-                    autocomplete="name"
-                    :class="['auth-input', { 'auth-input--error': nameErrorActive }]"
-                    @keydown.enter.prevent="onSubmitEmailAuth"
-                  />
-                  <input
-                    ref="emailFieldRef"
-                    v-model="email"
-                    type="email"
-                    placeholder="Email"
-                    autocomplete="email"
-                    :class="['auth-input', { 'auth-input--error': emailErrorActive }]"
-                    @keydown.enter.prevent="onSubmitEmailAuth"
-                  />
-                  <input
-                    ref="passwordFieldRef"
-                    v-model="password"
-                    type="password"
-                    :placeholder="isRegisterMode ? 'Create password' : 'Password'"
-                    :autocomplete="isRegisterMode ? 'new-password' : 'current-password'"
-                    :class="['auth-input', { 'auth-input--error': passwordErrorActive }]"
-                    @keydown.enter.prevent="onSubmitEmailAuth"
-                  />
-                  <input
-                    v-if="isRegisterMode"
-                    ref="confirmPasswordFieldRef"
-                    v-model="confirmPassword"
-                    type="password"
-                    placeholder="Confirm password"
-                    autocomplete="new-password"
-                    :class="['auth-input', { 'auth-input--error': confirmPasswordErrorActive }]"
-                    @keydown.enter.prevent="onSubmitEmailAuth"
-                  />
-                  <p v-if="isRegisterMode" class="auth-help-text">
-                    Use at least 8 characters. We will sign you in and take you straight to your workspace.
-                  </p>
-                  <p v-if="loginErrorMessage" class="auth-error" role="alert">{{ loginErrorMessage }}</p>
-                  <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 text-sm">
-                    <button @click="onSubmitEmailAuth" :disabled="authUiBusy" class="auth-action primary">
-                      {{ emailPrimaryActionLabel }}
-                    </button>
-                    <button @click="toggleEmailAuthMode" :disabled="authUiBusy" class="auth-action ghost">
-                      {{ emailSecondaryActionLabel }}
-                    </button>
-                  </div>
-                  <button
-                    v-if="!isRegisterMode"
-                    @click="onReset"
-                    class="text-xs text-indigo-300 hover:text-indigo-200 transition text-left"
-                  >
-                    Forgot password?
-                  </button>
-                  <div v-if="!isRegisterMode && !isNativeApp" class="pt-3 border-t border-white/10">
-                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between text-sm gap-2">
-                      <span class="text-indigo-100">Or get a magic link</span>
-                      <button @click="onSendMagic" class="auth-action ghost px-4 py-2">
-                        Send Link
-                      </button>
-                    </div>
-                    <p v-if="magicSent" class="text-xs text-green-300 mt-2">Magic link sent! Check your email.</p>
-                  </div>
-                </div>
-              </div>
-
-              <div v-else-if="showPhone" key="phone" class="auth-panel">
-                <div class="auth-panel__header">
-                  <div>
-                    <p class="auth-panel__eyebrow">{{ otpSent ? 'Step 2 of 2' : 'Quick mobile sign-in' }}</p>
-                    <h2 class="text-lg font-semibold text-white">
-                      {{ otpSent ? 'Enter your verification code' : 'Phone OTP' }}
-                    </h2>
-                    <p class="auth-panel__hint">
-                      {{
-                        otpSent
-                          ? 'We sent a one-time code to your phone. Enter it below to finish signing in.'
-                          : 'Use a one-time code for a fast, password-free login on this device.'
-                      }}
-                    </p>
-                  </div>
-                  <button v-if="otpSent" type="button" class="auth-inline-action" @click="resetOtpStep">
-                    Use another number
-                  </button>
-                </div>
-                <div class="space-y-3">
-                  <div
-                    class="auth-field-shell"
-                    @click="focusPhoneField"
-                    @touchstart.passive="focusPhoneField"
-                  >
-                    <span class="auth-field-shell__flag" aria-label="Detected country flag">{{ detectedFlag }}</span>
-                    <input
-                      ref="phoneFieldRef"
-                      v-model="phoneInput"
-                      type="tel"
-                      placeholder="Enter phone e.g. +1 650 555 1234"
-                      class="flex-1 bg-transparent text-white placeholder:text-indigo-200/60 focus:outline-none text-base py-2"
-                      inputmode="tel"
-                      autocomplete="tel"
-                      :readonly="otpSent"
-                      enterkeyhint="send"
-                      @input="onPhoneInput"
-                    />
-                  </div>
-                  <div v-if="otpSent" class="auth-status-row">
-                    <span class="auth-status-pill">Code sent</span>
-                    <span class="text-xs text-indigo-200/70">{{ phoneHint }}</span>
-                  </div>
-                  <p v-else class="text-xs text-indigo-200/70">{{ phoneHint }}</p>
-                  <div v-if="!otpSent">
-                    <button
-                      type="button"
-                      @click="sendOtp"
-                      :disabled="sendingOtp || !normalizedPhone"
-                      class="auth-action primary w-full disabled:opacity-60"
-                    >
-                      {{ sendingOtp ? 'Sending…' : 'Send OTP' }}
-                    </button>
-                  </div>
-                  <div v-else class="space-y-2">
-                    <input
-                      ref="otpFieldRef"
-                      v-model="otp"
-                      type="tel"
-                      inputmode="numeric"
-                      pattern="[0-9]*"
-                      autocomplete="one-time-code"
-                      placeholder="Enter OTP"
-                      class="auth-input"
-                      enterkeyhint="done"
-                      @input="sanitizeOtpInput"
-                      @keydown.enter.prevent="verifyOtp"
-                    />
-                    <button
-                      type="button"
-                      @click="verifyOtp"
-                      :disabled="verifyingOtp || otp.length < 6"
-                      class="auth-action primary w-full disabled:opacity-60"
-                    >
-                      {{ verifyingOtp ? 'Verifying…' : 'Verify & Sign In' }}
-                    </button>
-                    <button
-                      type="button"
-                      class="auth-inline-action w-full"
-                      :disabled="sendingOtp || otpCooldownSeconds > 0"
-                      @click="resendOtp"
-                    >
-                      {{ otpCooldownSeconds > 0 ? `Resend code in ${otpCooldownSeconds}s` : 'Resend code' }}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div v-else key="empty" class="auth-empty-state">
-                <p class="auth-empty-state__title">Pick the path that feels easiest on this device.</p>
-                <p class="auth-empty-state__hint">
-                  Email is best when you want full account recovery. Phone OTP is great when you want a quick mobile sign-in.
-                </p>
-              </div>
-            </transition>
+            </template>
+            <p v-else>Continue with Google below and we will take you back to the PlanCraftAI app.</p>
           </div>
 
-          <div class="mt-10 grid gap-3 sm:grid-cols-3 text-center text-xs sm:text-sm text-indigo-200/80">
-            <div
-              v-for="feature in featureHighlights"
-              :key="feature.label"
-              class="feature-pill flex flex-col items-center gap-1 px-3 py-3 rounded-2xl border border-white/5 bg-white/5"
+          <div class="auth-providers">
+            <button type="button" class="auth-provider" :disabled="authUiBusy" @click="loginGoogle">
+              <img src="/icons/google-g.svg" alt="" class="w-5 h-5" />
+              Continue with Google
+            </button>
+            <button
+              v-if="appleAuthEnabled && (isIosApp || route.query.save_plan === '1')"
+              type="button"
+              class="auth-provider"
+              :disabled="authUiBusy"
+              @click="loginApple"
             >
-              <span class="text-lg">{{ feature.icon }}</span>
-              <p class="font-semibold text-white text-sm">{{ feature.label }}</p>
-              <p class="text-[11px] text-indigo-200/70">{{ feature.desc }}</p>
-            </div>
+              <img src="/icons/apple-logo.svg" alt="" class="w-5 h-5" />
+              Continue with Apple
+            </button>
           </div>
 
-          <p class="text-xs text-indigo-200/80 text-center mt-8">
-            Loved by students, founders, and busy professionals — trusted by 300+ planners.
-          </p>
+          <div class="auth-divider" role="separator"><span>or</span></div>
+
+          <transition name="auth-panel-swap" mode="out-in">
+            <div v-if="showEmail" key="email" :class="['auth-panel--flat', { 'auth-panel--shake': emailErrorShake }]">
+              <div class="auth-panel-switch" role="tablist" aria-label="Email account flow">
+                <button
+                  type="button"
+                  role="tab"
+                  class="auth-panel-switch__item"
+                  :class="{ 'auth-panel-switch__item--active': !isRegisterMode }"
+                  :disabled="authUiBusy"
+                  :aria-selected="!isRegisterMode"
+                  @click="setEmailAuthMode('signin')"
+                >
+                  Sign in
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  class="auth-panel-switch__item"
+                  :class="{ 'auth-panel-switch__item--active': isRegisterMode }"
+                  :disabled="authUiBusy"
+                  :aria-selected="isRegisterMode"
+                  @click="setEmailAuthMode('register')"
+                >
+                  Create account
+                </button>
+              </div>
+              <div class="space-y-3">
+                <input
+                  v-if="isRegisterMode"
+                  ref="displayNameFieldRef"
+                  v-model="registerDisplayName"
+                  type="text"
+                  placeholder="Your name"
+                  autocomplete="name"
+                  :class="['auth-input', { 'auth-input--error': nameErrorActive }]"
+                  @keydown.enter.prevent="onSubmitEmailAuth"
+                />
+                <input
+                  ref="emailFieldRef"
+                  v-model="email"
+                  type="email"
+                  placeholder="Email"
+                  autocomplete="email"
+                  :class="['auth-input', { 'auth-input--error': emailErrorActive }]"
+                  @keydown.enter.prevent="onSubmitEmailAuth"
+                />
+                <input
+                  ref="passwordFieldRef"
+                  v-model="password"
+                  type="password"
+                  :placeholder="isRegisterMode ? 'Create password (8+ characters)' : 'Password'"
+                  :autocomplete="isRegisterMode ? 'new-password' : 'current-password'"
+                  :class="['auth-input', { 'auth-input--error': passwordErrorActive }]"
+                  @keydown.enter.prevent="onSubmitEmailAuth"
+                />
+                <input
+                  v-if="isRegisterMode"
+                  ref="confirmPasswordFieldRef"
+                  v-model="confirmPassword"
+                  type="password"
+                  placeholder="Confirm password"
+                  autocomplete="new-password"
+                  :class="['auth-input', { 'auth-input--error': confirmPasswordErrorActive }]"
+                  @keydown.enter.prevent="onSubmitEmailAuth"
+                />
+                <p v-if="loginErrorMessage" class="auth-error" role="alert">{{ loginErrorMessage }}</p>
+                <button type="button" :disabled="authUiBusy" class="auth-action primary w-full" @click="onSubmitEmailAuth">
+                  {{ emailPrimaryActionLabel }}
+                </button>
+                <div v-if="!isRegisterMode" class="auth-links">
+                  <button type="button" class="auth-link-button" @click="onReset">Forgot password?</button>
+                  <button v-if="!isNativeApp" type="button" class="auth-link-button" @click="onSendMagic">
+                    Email me a sign-in link
+                  </button>
+                </div>
+                <p v-if="magicSent" class="text-xs text-green-300">Sign-in link sent! Check your email.</p>
+              </div>
+            </div>
+
+            <div v-else-if="showPhone" key="phone" class="auth-panel--flat">
+              <div class="auth-phone-header">
+                <p class="text-sm text-indigo-100/85">
+                  {{ otpSent ? 'Enter the 6-digit code we sent to your phone.' : 'We will text you a one-time code. No password needed.' }}
+                </p>
+                <button v-if="otpSent" type="button" class="auth-inline-action" @click="resetOtpStep">
+                  Use another number
+                </button>
+              </div>
+              <div class="space-y-3">
+                <div
+                  class="auth-field-shell"
+                  @click="focusPhoneField"
+                  @touchstart.passive="focusPhoneField"
+                >
+                  <span class="auth-field-shell__flag" aria-label="Detected country flag">{{ detectedFlag }}</span>
+                  <input
+                    ref="phoneFieldRef"
+                    v-model="phoneInput"
+                    type="tel"
+                    placeholder="Enter phone e.g. +1 650 555 1234"
+                    class="flex-1 bg-transparent text-white placeholder:text-indigo-200/60 focus:outline-none text-base py-2"
+                    inputmode="tel"
+                    autocomplete="tel"
+                    :readonly="otpSent"
+                    enterkeyhint="send"
+                    @input="onPhoneInput"
+                  />
+                </div>
+                <div v-if="otpSent" class="auth-status-row">
+                  <span class="auth-status-pill">Code sent</span>
+                  <span class="text-xs text-indigo-200/70">{{ phoneHint }}</span>
+                </div>
+                <p v-else class="text-xs text-indigo-200/70">{{ phoneHint }}</p>
+                <div v-if="!otpSent">
+                  <button
+                    type="button"
+                    @click="sendOtp"
+                    :disabled="sendingOtp || !normalizedPhone"
+                    class="auth-action primary w-full disabled:opacity-60"
+                  >
+                    {{ sendingOtp ? 'Sending…' : 'Send code' }}
+                  </button>
+                </div>
+                <div v-else class="space-y-2">
+                  <input
+                    ref="otpFieldRef"
+                    v-model="otp"
+                    type="tel"
+                    inputmode="numeric"
+                    pattern="[0-9]*"
+                    autocomplete="one-time-code"
+                    placeholder="6-digit code"
+                    class="auth-input"
+                    enterkeyhint="done"
+                    @input="sanitizeOtpInput"
+                    @keydown.enter.prevent="verifyOtp"
+                  />
+                  <button
+                    type="button"
+                    @click="verifyOtp"
+                    :disabled="verifyingOtp || otp.length < 6"
+                    class="auth-action primary w-full disabled:opacity-60"
+                  >
+                    {{ verifyingOtp ? 'Verifying…' : 'Verify & Sign In' }}
+                  </button>
+                  <button
+                    type="button"
+                    class="auth-inline-action w-full"
+                    :disabled="sendingOtp || otpCooldownSeconds > 0"
+                    @click="resendOtp"
+                  >
+                    {{ otpCooldownSeconds > 0 ? `Resend code in ${otpCooldownSeconds}s` : 'Resend code' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </transition>
+
+          <div v-if="showPhoneOtpOption" class="auth-mode-switch">
+            <button
+              type="button"
+              class="auth-link-button"
+              :disabled="authUiBusy"
+              @click="showPhone ? toggleEmail() : togglePhone()"
+            >
+              {{ showPhone ? 'Use email instead' : 'Use phone number instead' }}
+            </button>
+          </div>
 
           <GoogleAuthDiagnostic v-if="!isNativeApp" class="mt-6" />
+        </div>
+
+        <div class="login-highlights grid gap-3 grid-cols-3 text-center text-xs text-indigo-200/80">
+          <div
+            v-for="feature in featureHighlights"
+            :key="feature.label"
+            class="feature-pill flex flex-col items-center gap-1 px-2 py-3 rounded-2xl border border-white/5"
+          >
+            <span class="text-lg" aria-hidden="true">{{ feature.icon }}</span>
+            <p class="font-semibold text-white text-xs sm:text-sm">{{ feature.label }}</p>
+          </div>
         </div>
         <InAppBrowserWarning
           v-if="showInAppWarning"
@@ -310,7 +262,6 @@ import { ref, onMounted, onBeforeUnmount, computed, nextTick, watch } from "vue"
 import { useRouter, useRoute } from "vue-router"
 import { useAuthStore } from "@/stores/authStore"
 import { useFeatureFlagsStore } from '@/stores/featureFlagsStore'
-import LoginFeatureSlider from '@/components/LoginFeatureSlider.vue'
 import { useStarfield } from '@/composables/useStarfield'
 import { useSeoMeta } from '@/composables/useSeoMeta'
 import { Capacitor } from '@capacitor/core'
@@ -334,9 +285,9 @@ useSeoMeta({
   noindex: true,
 })
 const featureHighlights = [
-  { icon: '🧠', label: 'Smart AI Task Planning', desc: 'Guided next steps' },
-  { icon: '🔔', label: 'Auto Reminders', desc: 'Call · Text · WhatsApp · Email' },
-  { icon: '📅', label: 'Calendar Sync', desc: 'Google + Outlook ready' },
+  { icon: '🧠', label: 'AI task planning' },
+  { icon: '🔔', label: 'Smart reminders' },
+  { icon: '📅', label: 'Calendar sync' },
 ]
 
 if (route.query.guestFromLanding === '1') {
@@ -350,12 +301,12 @@ if (route.query.guestFromLanding === '1') {
 }
 
 import { trackLinkedInConversion } from '@/utils/ads'
-import { RecaptchaVerifier } from 'firebase/auth'
+import { RecaptchaVerifier, signOut } from 'firebase/auth'
 import { auth } from '@/firebase/init'
 import { ElMessage } from 'element-plus'
 import { parsePhoneNumberFromString } from 'libphonenumber-js'
 import { sendMagicLink, completeMagicLinkSignIn } from '@/services/authService'
-import { trackSignupCompleted } from '@/services/analytics'
+import { trackSignupCompleted, trackSignupStarted, trackSignInCompleted } from '@/services/analytics'
 import GoogleAuthDiagnostic from '@/components/GoogleAuthDiagnostic.vue'
 import InAppBrowserWarning from '@/components/InAppBrowserWarning.vue'
 import { isInAppBrowser } from '@/utils/inAppBrowser'
@@ -424,12 +375,19 @@ function openInAppBrowserWarning() {
 
 async function loginGoogle() {
   try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_SIGNIN_CLICK) } catch {}
+  trackSignupStarted('google')
+  if (isNativeApp.value) {
+    // Google OAuth cannot run inside the app WebView; sign in on the web in
+    // the system browser and hand the session back via the app link.
+    await launchProviderAuthInBrowser('google')
+    return
+  }
   if (isInAppBrowser()) {
     openInAppBrowserWarning()
     return
   }
   try {
-    await authStore.loginWithGoogle()
+    await authStore.loginWithGoogle({ preferRedirect: appHandoffProvider.value === 'google' })
     if (authStore.user) await redirectAfterLogin()
   } catch (err) {
     console.warn('Google login failed', err)
@@ -461,6 +419,7 @@ async function loginGoogle() {
 
 async function loginApple() {
   try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_SIGNIN_CLICK) } catch {}
+  trackSignupStarted('apple')
   try {
     await authStore.loginWithApple()
     if (authStore.user) await redirectAfterLogin()
@@ -491,7 +450,8 @@ watch(
 )
 
 // Email auth
-const activeAuthMode = ref(null)
+// Email is the default panel; phone replaces it when chosen.
+const activeAuthMode = ref('email')
 const showEmail = computed(() => activeAuthMode.value === 'email')
 const showPhoneOtpOption = computed(() => !(isNativeApp.value && isIosApp.value))
 const showPhone = computed(() => showPhoneOtpOption.value && activeAuthMode.value === 'phone')
@@ -516,25 +476,10 @@ const emailSubmitting = ref(false)
 const authUiBusy = computed(
   () => emailSubmitting.value || authStore.bootstrapping || authStore.authenticating || authStore.logoutPending,
 )
-const emailPanelEyebrow = computed(() => (isRegisterMode.value ? 'Create your account' : 'Secure email access'))
-const emailPanelTitle = computed(() => (isRegisterMode.value ? 'Create account' : 'Email access'))
-const emailPanelHint = computed(() => (
-  isRegisterMode.value
-    ? 'Create your account with email and password, then continue straight into your workspace.'
-    : 'Use your email and password to restore your workspace, reminders, and account settings.'
-))
 const emailPrimaryActionLabel = computed(() => {
   if (!emailSubmitting.value) return isRegisterMode.value ? 'Create account' : 'Sign In'
   return isRegisterMode.value ? 'Creating your account...' : 'Signing you in...'
 })
-const emailSecondaryActionLabel = computed(() => (
-  isRegisterMode.value ? 'Already have an account?' : 'Need an account?'
-))
-const authMethodsCaption = computed(() => (
-  showPhoneOtpOption.value
-    ? 'Email is best for full account access. Phone is fastest when you want a quick code on mobile.'
-    : 'Use email or Apple sign-in in the iPhone app. Phone OTP is hidden here.'
-))
 
 function clearEmailAuthErrorState() {
   loginErrorMessage.value = ''
@@ -583,10 +528,6 @@ function setEmailAuthMode(mode, { focus = true } = {}) {
   if (focus && showEmail.value) {
     nextTick(() => focusPrimaryEmailAuthField())
   }
-}
-
-function toggleEmailAuthMode() {
-  setEmailAuthMode(isRegisterMode.value ? 'signin' : 'register')
 }
 
 function setActiveAuthMode(mode, { focus = true } = {}) {
@@ -749,6 +690,7 @@ async function onLoginEmail() {
   emailSubmitting.value = true
   try {
     try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_SIGNIN_CLICK) } catch {}
+    trackSignupStarted('email', 'login')
     await authStore.loginWithEmail(email.value, password.value)
     if (authStore.user) await redirectAfterLogin()
   } catch (e) {
@@ -798,6 +740,7 @@ async function onRegister() {
   emailSubmitting.value = true
   try {
     try { trackLinkedInConversion(import.meta.env.VITE_LI_CONV_SIGNIN_CLICK) } catch {}
+    trackSignupStarted('email', 'register')
     await authStore.registerEmail(email.value, password.value, { displayName: registerDisplayName.value })
     if (authStore.user) await redirectAfterLogin()
   } catch (e) {
@@ -1136,7 +1079,7 @@ function resolvePostLoginRedirectTarget() {
     }
   } catch {}
 
-  return '/dashboard'
+  return '/today'
 }
 
 function readNativeBrowserHandoffIntent() {
@@ -1155,7 +1098,7 @@ function readNativeBrowserHandoffIntent() {
       route.query.native_redirect ||
       route.query.redirect ||
       localStorage.getItem('postLoginRedirect') ||
-      '/dashboard',
+      '/today',
     )
 
     return {
@@ -1221,29 +1164,54 @@ async function maybeReturnToNativeAppAfterLogin(target) {
   }
 }
 
-async function launchPhoneAuthInBrowser() {
+async function launchProviderAuthInBrowser(provider) {
   const redirectTarget = resolvePostLoginRedirectTarget()
+  const platform = isIosApp.value ? 'ios' : 'android'
   try {
     try {
       localStorage.setItem('postLoginRedirect', redirectTarget)
     } catch {}
 
     const url = new URL('/login', `${SITE_URL}/`)
-    url.searchParams.set('phone', '1')
+    if (provider === 'phone') url.searchParams.set('phone', '1')
     url.searchParams.set('redirect', redirectTarget)
-    url.searchParams.set('native_handoff', 'ios-phone')
-    url.searchParams.set('native_provider', 'phone')
+    url.searchParams.set('native_handoff', `${platform}-${provider}`)
+    url.searchParams.set('native_provider', provider)
     url.searchParams.set('native_redirect', redirectTarget)
 
     await launchNativeAuthRoute(url.toString())
-    ElMessage.info('Opening secure phone verification in your browser.')
   } catch (error) {
-    console.error('[OTP] Failed to launch browser handoff', {
+    console.error('[Auth] Failed to launch browser sign-in', {
+      provider,
       message: error?.message || String(error),
       redirect: redirectTarget,
     })
-    ElMessage.error('Could not open browser-based phone verification. Please try email sign-in.')
+    ElMessage.error('Could not open the browser to sign in. Please try email sign-in.')
   }
+}
+
+// Set on the web page the native app opens for browser-based sign-in.
+const appHandoffProvider = computed(() => {
+  if (isNativeApp.value) return ''
+  return String(route.query.native_provider || '').trim().toLowerCase()
+})
+
+const appHandoffSessionEmail = computed(() => {
+  if (!appHandoffProvider.value || !authStore.user?.uid) return ''
+  if (authStore.guest === true || authStore.user?.mode === 'guest') return ''
+  return authStore.user.email || authStore.user.displayName || 'your account'
+})
+
+async function continueExistingSessionToApp() {
+  await redirectAfterLogin()
+}
+
+async function useAnotherAccountForApp() {
+  // authStore.logout() reloads a bare /login and would drop the handoff params.
+  try {
+    await signOut(auth)
+  } catch {}
+  authStore.resetAuth()
 }
 
 async function sendOtp({ resend = false } = {}) {
@@ -1252,6 +1220,7 @@ async function sendOtp({ resend = false } = {}) {
   try {
     sendingOtp.value = true
     if (resend) resetRecaptcha()
+    else trackSignupStarted('phone')
     const verifier = await ensureRecaptcha(resend)
     if (!verifier) throw new Error('reCAPTCHA not ready. Please try again.')
     const formatted = normalizedPhone.value
@@ -1319,6 +1288,13 @@ async function verifyOtp() {
 
 async function redirectAfterLogin() {
   const target = resolvePostLoginRedirectTarget()
+
+  if (route.query.save_plan === '1') {
+    trackSignInCompleted({
+      source: 'save_plan_prompt',
+      method: String(route.query.auth_method || 'unknown'),
+    })
+  }
 
   try {
     console.info('[Auth] Redirecting after login', {
@@ -1421,8 +1397,8 @@ onBeforeUnmount(() => {
 
 .login-shell {
   overflow-y: auto;
-  padding-top: max(3rem, env(safe-area-inset-top));
-  padding-bottom: max(2rem, env(safe-area-inset-bottom));
+  padding-top: max(1.5rem, calc(env(safe-area-inset-top) + 0.75rem));
+  padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
   -webkit-overflow-scrolling: touch;
 }
 
@@ -1433,153 +1409,158 @@ onBeforeUnmount(() => {
 .login-card {
   position: relative;
   z-index: 1;
-  width: min(100%, 760px);
-}
-
-.value-props {
-  animation: fade-in 1s ease forwards;
-  width: min(100%, 560px);
-}
-
-.auth-methods {
+  width: 100%;
+  padding: 1.75rem 2rem;
   display: grid;
-  gap: 1rem;
+  gap: 1.1rem;
 }
 
-.auth-methods__header {
-  display: grid;
-  gap: 0.35rem;
-}
-
-.auth-methods__eyebrow {
-  margin: 0;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.24em;
-  text-transform: uppercase;
-  color: rgba(191, 219, 254, 0.72);
-}
-
-.auth-methods__caption {
-  margin: 0;
-  color: rgba(199, 210, 254, 0.72);
-  line-height: 1.6;
-}
-
-.auth-methods__grid {
-  display: grid;
+.login-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 0.85rem;
 }
 
-.auth-mode-card {
-  display: flex;
-  align-items: center;
-  gap: 0.95rem;
+.login-header__logo {
+  width: 2.75rem;
+  height: 2.75rem;
+  flex-shrink: 0;
+  margin-top: 0;
+  border-radius: 0.45rem;
+  filter: drop-shadow(0 5px 12px rgba(31, 41, 55, 0.22));
+}
+
+.login-header__copy {
   width: 100%;
-  padding: 1rem 1.1rem;
-  border-radius: 1.25rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(15, 23, 42, 0.56);
-  color: #fff;
-  text-align: left;
-  transition: transform 0.22s ease, border-color 0.22s ease, background 0.22s ease, box-shadow 0.22s ease;
 }
 
-.auth-mode-card:hover:not(:disabled) {
-  transform: translateY(-1px);
-  border-color: rgba(165, 180, 252, 0.4);
+.login-header__title {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 700;
+  line-height: 1.25;
 }
 
-.auth-mode-card--active {
-  border-color: rgba(192, 132, 252, 0.55);
-  background:
-    linear-gradient(135deg, rgba(168, 85, 247, 0.18), rgba(99, 102, 241, 0.12)),
-    rgba(15, 23, 42, 0.72);
-  box-shadow: 0 14px 40px rgba(76, 29, 149, 0.22);
+.login-header__subtitle {
+  margin: 0.2rem 0 0;
+  font-size: 0.9rem;
+  color: rgba(224, 231, 255, 0.78);
 }
 
-.auth-mode-card__icon {
-  display: inline-flex;
+.auth-providers {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.auth-provider {
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: 2.8rem;
-  height: 2.8rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  font-size: 1.15rem;
-  flex-shrink: 0;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 3rem;
+  border-radius: 0.9rem;
+  background: #fff;
+  color: #111827;
+  font-weight: 600;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.auth-mode-card__body {
-  display: grid;
-  gap: 0.2rem;
-  flex: 1;
-  min-width: 0;
+.auth-provider:hover:not(:disabled) {
+  transform: translateY(-1px);
 }
 
-.auth-mode-card__title {
-  font-size: 1rem;
-  font-weight: 700;
-  line-height: 1.3;
+.auth-provider:focus-visible {
+  outline: 2px solid #c084fc;
+  outline-offset: 2px;
 }
 
-.auth-mode-card__subtitle {
-  color: rgba(199, 210, 254, 0.72);
-  font-size: 0.88rem;
-  line-height: 1.45;
+.auth-provider:disabled {
+  opacity: 0.7;
 }
 
-.auth-mode-card__badge {
-  padding: 0.35rem 0.7rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(224, 231, 255, 0.92);
-  font-size: 0.78rem;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.auth-panel {
-  margin-top: 1rem;
-  padding: 1.25rem;
-  border-radius: 1.25rem;
-  background: rgba(15, 23, 42, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
-}
-
-.auth-panel__header {
+.auth-divider {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.auth-panel__eyebrow {
-  margin: 0 0 0.35rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.22em;
+  align-items: center;
+  gap: 0.75rem;
+  color: rgba(199, 210, 254, 0.6);
+  font-size: 0.8rem;
   text-transform: uppercase;
-  color: rgba(196, 181, 253, 0.8);
+  letter-spacing: 0.2em;
 }
 
-.auth-panel__hint {
-  margin: 0.35rem 0 0;
-  color: rgba(199, 210, 254, 0.72);
-  line-height: 1.55;
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
 }
+
+.auth-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.auth-link-button {
+  background: none;
+  border: none;
+  padding: 0.25rem 0;
+  font-size: 0.85rem;
+  color: rgb(165, 180, 252);
+  text-decoration: underline;
+  text-decoration-color: rgba(165, 180, 252, 0.35);
+  text-underline-offset: 3px;
+}
+
+.auth-link-button:hover:not(:disabled) {
+  color: #e0e7ff;
+}
+
+.auth-mode-switch {
+  text-align: center;
+}
+
+.auth-phone-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.login-highlights {
+  margin-top: 1rem;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 .auth-panel-switch {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.35rem;
-  padding: 0.35rem;
+  padding: 0;
   margin-bottom: 1rem;
-  border-radius: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(15, 23, 42, 0.45);
 }
 
 .auth-panel-switch__item {
@@ -1668,12 +1649,6 @@ onBeforeUnmount(() => {
   line-height: 1.4;
 }
 
-.auth-help-text {
-  margin: -0.1rem 0 0;
-  color: rgba(196, 181, 253, 0.82);
-  font-size: 0.82rem;
-  line-height: 1.5;
-}
 
 .auth-action {
   display: inline-flex;
@@ -1717,26 +1692,8 @@ onBeforeUnmount(() => {
   color: #c7d2fe;
 }
 
-.auth-empty-state {
-  margin-top: 1rem;
-  padding: 1.2rem 1.25rem;
-  border-radius: 1.2rem;
-  border: 1px dashed rgba(165, 180, 252, 0.26);
-  background: rgba(15, 23, 42, 0.36);
-  text-align: center;
-}
 
-.auth-empty-state__title {
-  margin: 0;
-  color: #fff;
-  font-weight: 600;
-}
 
-.auth-empty-state__hint {
-  margin: 0.5rem 0 0;
-  color: rgba(199, 210, 254, 0.72);
-  line-height: 1.55;
-}
 
 .auth-inline-action {
   display: inline-flex;
@@ -1808,6 +1765,139 @@ onBeforeUnmount(() => {
   border-radius: 1.25rem;
 }
 
+/* Keep authentication aligned with the light marketing surface. The login
+   controls used to inherit translucent dark-theme colors, which made the
+   subtitle, tabs, links, and helper text look disabled on the light canvas. */
+.marketing-light.login-shell {
+  color-scheme: light;
+  background: #f6f7fc !important;
+  color: #0f172a !important;
+}
+
+.marketing-light.login-shell .login-glow {
+  background: radial-gradient(circle at 50% 50%, rgba(129, 140, 248, 0.2), transparent 65%);
+  opacity: 0.7;
+}
+
+.marketing-light.login-shell .login-card {
+  background: rgba(255, 255, 255, 0.94) !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+  box-shadow: 0 24px 70px -36px rgba(15, 23, 42, 0.45);
+}
+
+.marketing-light.login-shell .login-header__title,
+.marketing-light.login-shell .login-header__subtitle,
+.marketing-light.login-shell .auth-phone-header p,
+.marketing-light.login-shell .login-highlights,
+.marketing-light.login-shell .feature-pill p {
+  opacity: 1;
+}
+
+.marketing-light.login-shell .login-header__title,
+.marketing-light.login-shell .feature-pill p {
+  color: #0f172a !important;
+}
+
+.marketing-light.login-shell .login-header__subtitle,
+.marketing-light.login-shell .auth-divider,
+.marketing-light.login-shell .auth-phone-header p,
+.marketing-light.login-shell .login-highlights,
+.marketing-light.login-shell .auth-status-row .text-xs,
+.marketing-light.login-shell .auth-phone-header + .space-y-3 > p {
+  color: #64748b !important;
+}
+
+.marketing-light.login-shell .auth-provider {
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 12px 28px -22px rgba(15, 23, 42, 0.5);
+}
+
+.marketing-light.login-shell .auth-divider::before,
+.marketing-light.login-shell .auth-divider::after {
+  background: #e2e8f0;
+}
+
+.marketing-light.login-shell .auth-panel-switch {
+  background: transparent;
+  border: 0;
+}
+
+.marketing-light.login-shell .auth-panel-switch__item {
+  color: #64748b !important;
+}
+
+.marketing-light.login-shell .auth-panel-switch__item:hover:not(:disabled) {
+  color: #312e81 !important;
+}
+
+.marketing-light.login-shell .auth-panel-switch__item--active {
+  color: #4338ca !important;
+  background: #eef2ff;
+  box-shadow: inset 0 0 0 1px #c7d2fe;
+}
+
+.marketing-light.login-shell .auth-input,
+.marketing-light.login-shell .auth-field-shell {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+.marketing-light.login-shell .auth-input::placeholder,
+.marketing-light.login-shell .auth-field-shell input::placeholder {
+  color: #94a3b8 !important;
+}
+
+.marketing-light.login-shell .auth-input:focus,
+.marketing-light.login-shell .auth-field-shell:focus-within {
+  border-color: #818cf8 !important;
+  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.16);
+}
+
+.marketing-light.login-shell .auth-link-button,
+.marketing-light.login-shell .auth-link {
+  color: #4f46e5 !important;
+  text-decoration-color: #c7d2fe;
+}
+
+.marketing-light.login-shell .auth-link-button:hover:not(:disabled),
+.marketing-light.login-shell .auth-link:hover {
+  color: #312e81 !important;
+}
+
+.marketing-light.login-shell .auth-inline-action {
+  background: #eef2ff;
+  color: #4338ca !important;
+}
+
+.marketing-light.login-shell .auth-inline-action:hover {
+  background: #e0e7ff;
+}
+
+.marketing-light.login-shell .auth-action.ghost {
+  background: #f8fafc;
+  color: #475569 !important;
+  border-color: #e2e8f0;
+}
+
+.marketing-light.login-shell .auth-status-pill {
+  background: #ecfdf5;
+  color: #047857 !important;
+}
+
+.marketing-light.login-shell .feature-pill {
+  background: #ffffff;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 12px 28px -26px rgba(15, 23, 42, 0.5);
+}
+
+.marketing-light.login-shell .native-auth-banner {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+}
+
 .native-auth-banner {
   margin-top: 0.75rem;
   padding: 0.85rem 1rem;
@@ -1857,50 +1947,24 @@ onBeforeUnmount(() => {
   border-radius: 12px;
 }
 
-@media (min-width: 640px) {
-  .auth-methods__grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 640px) {
   .login-shell {
     align-items: flex-start;
   }
 
   .login-card {
-    padding: 1.5rem 1.15rem;
-    border-radius: 1.75rem;
+    padding: 1.25rem 1.1rem;
+    border-radius: 1.5rem;
+    gap: 0.95rem;
   }
 
-  .auth-methods__caption {
-    font-size: 0.92rem;
-  }
-
-  .auth-mode-card {
-    align-items: flex-start;
-    padding: 0.95rem;
-  }
-
-  .auth-mode-card__badge {
-    align-self: center;
-  }
-
-  .auth-panel {
-    padding: 1rem;
-  }
-
-  .auth-panel__header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .auth-inline-action {
-    width: 100%;
+  .login-header__title {
+    font-size: 1.2rem;
   }
 
   .auth-panel-switch {
-    padding: 0.3rem;
+    padding: 0;
+    margin-bottom: 0.75rem;
   }
 }
 </style>

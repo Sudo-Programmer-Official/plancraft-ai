@@ -1,6 +1,49 @@
 // src/services/analytics.js
 import mixpanel from 'mixpanel-browser'
+import { Capacitor } from '@capacitor/core'
 import { auth } from '@/firebase/init'
+
+// Canonical product-funnel events (snake_case). Some older Title Case events
+// ('App Opened', 'Task Created', 'Task Completed', 'Signup Completed',
+// subscription_funnel_*) still fire alongside these so existing reports keep
+// working; build new funnels on these names.
+//
+// Server-side (backend-node/services/analyticsService.js): reminder_created,
+// reminder_delivered, subscription_started.
+export const EVENTS = Object.freeze({
+  APP_OPEN: 'app_open',
+  LANDING_VIEW: 'landing_view',
+  SIGNUP_STARTED: 'signup_started',
+  SIGNUP_COMPLETED: 'signup_completed',
+  ONBOARDING_STARTED: 'onboarding_started',
+  ONBOARDING_COMPLETED: 'onboarding_completed',
+  ONBOARDING_SKIPPED: 'onboarding_skipped',
+  TASK_CREATED: 'task_created',
+  TASK_COMPLETED: 'task_completed',
+  VOICE_STARTED: 'voice_started',
+  VOICE_TASK_CREATED: 'voice_task_created',
+  REMINDER_OPENED: 'reminder_opened',
+  FOCUS_STARTED: 'focus_started',
+  FOCUS_COMPLETED: 'focus_completed',
+  PAYWALL_VIEWED: 'paywall_viewed',
+  UPGRADE_CLICKED: 'upgrade_clicked',
+  CHECKOUT_STARTED: 'checkout_started',
+  FIRST_CAPTURE_STARTED: 'first_capture_started',
+  SAVE_PLAN_PROMPT_SHOWN: 'save_plan_prompt_shown',
+  SAVE_PLAN_PROMPT_ACTION: 'save_plan_prompt_action',
+  SIGN_IN_COMPLETED: 'sign_in_completed',
+})
+
+// Never send user content or contact details to analytics. Callers should only
+// pass ids, enums, counts and flags; this is the safety net.
+const BLOCKED_PROP_KEYS = new Set([
+  'title', 'text', 'task', 'tasktitle', 'details', 'notes', 'description', 'content',
+  'message', 'body', 'transcript', 'query', 'prompt', 'email', 'phone', 'phonenumber',
+  'name', 'displayname', 'address', 'location', 'idea', 'label',
+])
+const MAX_PROP_STRING_LENGTH = 100
+const SIGNUP_WINDOW_MS = 15 * 60 * 1000
+const GUEST_UID_PREFIX = 'analytics_guest_uid'
 
 let initialized = false
 const ONCE_PREFIX = 'analytics_once'
@@ -30,6 +73,94 @@ export function initAnalytics(options = {}) {
     ...options,
   })
   initialized = true
+  registerBaseContext()
+  capturePendingNotificationOpen()
+}
+
+// Web push: the service worker opens the app with ?pc_notif=... (see
+// public/sw-push.js). Read and strip it at startup, then track it once the
+// user is identified via bindNotificationOpenTracking().
+let pendingNotificationOpen = null
+function capturePendingNotificationOpen() {
+  try {
+    const url = new URL(window.location.href)
+    const type = url.searchParams.get('pc_notif')
+    if (!type) return
+    pendingNotificationOpen = {
+      type,
+      reminderType: url.searchParams.get('pc_rtype') || null,
+      taskId: url.searchParams.get('pc_task') ? '1' : null,
+    }
+    ;['pc_notif', 'pc_rtype', 'pc_task'].forEach((key) => url.searchParams.delete(key))
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
+  } catch {
+    /* noop */
+  }
+}
+
+let notificationTrackingBound = false
+export function bindNotificationOpenTracking() {
+  if (notificationTrackingBound || typeof window === 'undefined') return
+  notificationTrackingBound = true
+  if (pendingNotificationOpen) {
+    trackNotificationOpened(pendingNotificationOpen, 'web_push')
+    pendingNotificationOpen = null
+  }
+  try {
+    navigator.serviceWorker?.addEventListener('message', (event) => {
+      if (event?.data?.type === 'pc-notification-opened') {
+        trackNotificationOpened(event.data.data || {}, 'web_push')
+      }
+    })
+  } catch {
+    /* noop */
+  }
+}
+
+export function getAnalyticsPlatform() {
+  try {
+    const platform = Capacitor?.getPlatform?.()
+    if (platform === 'ios' || platform === 'android') return platform
+  } catch {
+    /* noop */
+  }
+  return 'web'
+}
+
+function registerBaseContext() {
+  try {
+    const platform = getAnalyticsPlatform()
+    mixpanel.register({
+      platform,
+      is_native: platform !== 'web',
+      app_version: import.meta.env?.VITE_APP_VERSION || '1.0',
+    })
+  } catch (e) {
+    console.warn('[analytics] register context error:', e)
+  }
+}
+
+/** Super properties attached to every later event, e.g. { plan: 'premium' }. */
+export function setAnalyticsContext(props = {}) {
+  if (typeof window === 'undefined') return
+  safeInit()
+  try {
+    mixpanel.register(sanitizeProps(props))
+  } catch (e) {
+    console.warn('[analytics] setAnalyticsContext error:', e)
+  }
+}
+
+export function sanitizeProps(props = {}) {
+  const out = {}
+  for (const [key, value] of Object.entries(props || {})) {
+    if (BLOCKED_PROP_KEYS.has(key.toLowerCase().replace(/[_\-\s]/g, ''))) continue
+    if (value === undefined || typeof value === 'function') continue
+    if (typeof value === 'string' && value.length > MAX_PROP_STRING_LENGTH) continue
+    if (value && typeof value === 'object' && !Array.isArray(value)) continue
+    out[key] = value
+  }
+  return out
 }
 
 export function identifyUser(user) {
@@ -37,19 +168,18 @@ export function identifyUser(user) {
   try {
     if (user && user.uid) {
       mixpanel.identify(user.uid)
-      const traits = {
-        $name: user.displayName || 'User',
-        isGuest: resolveGuestState(user),
-      }
-      if (user.email) traits.$email = user.email
+      const isGuest = resolveGuestState(user)
+      // No name/email/phone on analytics profiles; the uid is enough to join.
+      const traits = { isGuest }
       if (user.mode) traits.authMode = user.mode
       mixpanel.people?.set?.(traits)
+      detectSignupCompleted(user, isGuest)
     } else {
       let anonId =
         localStorage.getItem('anonId') || `guest_${Date.now()}`
       localStorage.setItem('anonId', anonId)
       mixpanel.identify(anonId)
-      mixpanel.people?.set?.({ $name: 'Guest', isGuest: true })
+      mixpanel.people?.set?.({ isGuest: true })
     }
   } catch (e) {
     console.warn('[analytics] identifyUser error:', e)
@@ -59,7 +189,7 @@ export function identifyUser(user) {
 export function trackEvent(name, props = {}) {
   safeInit()
   try {
-    mixpanel.track(name, props)
+    mixpanel.track(name, sanitizeProps(props))
   } catch (e) {
     console.warn('[analytics] trackEvent error:', e)
   }
@@ -99,16 +229,137 @@ export function trackAppOpened(platform = 'web') {
     version: import.meta.env?.VITE_APP_VERSION || '1.0',
   }
   trackEvent('App Opened', payload)
+  trackEvent(EVENTS.APP_OPEN)
   trackFirstReturnSession(payload)
 }
 
-/** Call when user completes signup (redirect, email, native handoff, guest). */
+/**
+ * Legacy 'Signup Completed' (fires on sign-in too, see `registration`).
+ * The funnel event signup_completed is detected in identifyUser().
+ */
 export function trackSignupCompleted(props = {}) {
-  const payload = { platform: 'web', ...props }
+  const payload = { platform: getAnalyticsPlatform(), ...props }
   trackEvent('Signup Completed', payload)
   if (props?.registration === true) {
     rememberSignupPendingReturn(payload)
   }
+}
+
+/** User picked a sign-in/sign-up method. intent: 'login' | 'register' | 'unknown'. */
+export function trackSignupStarted(method, intent = 'unknown') {
+  trackEvent(EVENTS.SIGNUP_STARTED, { method, intent })
+}
+
+function resolveAuthMethod(firebaseUser, fallback) {
+  const providerId = String(firebaseUser?.providerData?.[0]?.providerId || '').toLowerCase()
+  if (providerId.includes('google')) return 'google'
+  if (providerId.includes('apple')) return 'apple'
+  if (providerId === 'password') return 'email'
+  if (providerId === 'phone') return 'phone'
+  return fallback || 'unknown'
+}
+
+// Fires signup_completed once per account, for every sign-in method and for
+// guests converting to a real account. A fixed time + $insert_id lets Mixpanel
+// dedupe it when the same signup is seen on two devices (native app handing
+// sign-in off to the system browser).
+function detectSignupCompleted(user, isGuest) {
+  const storage = safeLocalStorage()
+  const guestKey = `${GUEST_UID_PREFIX}:${user.uid}`
+  if (isGuest) {
+    try {
+      storage?.setItem(guestKey, '1')
+    } catch {
+      /* noop */
+    }
+    return
+  }
+
+  const firebaseUser = auth?.currentUser?.uid === user.uid ? auth.currentUser : null
+  if (!firebaseUser) return
+  const createdMs = Date.parse(firebaseUser.metadata?.creationTime || '')
+  const convertedFromGuest = !!storage?.getItem?.(guestKey)
+  const isNewAccount = Number.isFinite(createdMs) && Date.now() - createdMs < SIGNUP_WINDOW_MS
+  if (!isNewAccount && !convertedFromGuest) return
+
+  const tracked = trackEventOnce(
+    EVENTS.SIGNUP_COMPLETED,
+    {
+      method: resolveAuthMethod(firebaseUser, user.mode),
+      converted_from_guest: convertedFromGuest,
+      ...(Number.isFinite(createdMs) ? { time: Math.floor(createdMs / 1000) } : {}),
+      $insert_id: `su-${user.uid}`.slice(0, 36),
+    },
+    { key: 'signup_completed', identity: `uid:${user.uid}` },
+  )
+  if (tracked) {
+    try {
+      storage?.removeItem(guestKey)
+    } catch {
+      /* noop */
+    }
+  }
+}
+
+export function trackOnboarding(step, props = {}) {
+  const name = {
+    started: EVENTS.ONBOARDING_STARTED,
+    completed: EVENTS.ONBOARDING_COMPLETED,
+    skipped: EVENTS.ONBOARDING_SKIPPED,
+  }[step]
+  if (name) trackEvent(name, props)
+}
+
+/** Buckets a task's `source` into how the user created it. */
+export function classifyTaskCreationMethod(source) {
+  const s = String(source || '').toLowerCase()
+  if (!s || s === 'manual') return 'manual'
+  if (/(voice|speech|talk|transcri|napkin)/.test(s)) return 'voice'
+  if (/calendar/.test(s)) return 'calendar'
+  if (/(vision|upload|paste|import)/.test(s)) return 'import'
+  if (/(ai|gpt|plan|generate|suggest|nlp|prompt|inbox|knowledge|template)/.test(s)) return 'ai'
+  return 'other'
+}
+
+export function trackTaskCreated(props = {}) {
+  const method = classifyTaskCreationMethod(props.source)
+  trackEvent(EVENTS.TASK_CREATED, { ...props, method })
+  if (method === 'voice') trackEvent(EVENTS.VOICE_TASK_CREATED, props)
+}
+
+export function trackVoiceStarted(surface) {
+  trackEvent(EVENTS.VOICE_STARTED, { surface: surface || 'unknown' })
+}
+
+export function trackVoiceAutoStopped(props = {}) {
+  trackEvent('voice_auto_stopped', props)
+}
+
+export function trackVoiceManualStopped(props = {}) {
+  trackEvent('voice_manual_stopped', props)
+}
+
+/** A notification was tapped/clicked. `data` is the push payload's data object. */
+export function trackNotificationOpened(data = {}, via = 'unknown') {
+  const type = String(data?.type || '').toLowerCase().replace(/_/g, '-')
+  if (type !== 'reminder-due' && !data?.reminderId) return
+  trackEvent(EVENTS.REMINDER_OPENED, {
+    via,
+    reminder_type: data?.reminderType || null,
+    has_task: !!data?.taskId,
+  })
+}
+
+// Maps the existing subscription_funnel_* steps onto the canonical funnel.
+// Purchases are tracked server-side as subscription_started.
+const MONETIZATION_STEPS = {
+  page_view: EVENTS.PAYWALL_VIEWED,
+  cta_click: EVENTS.UPGRADE_CLICKED,
+  checkout_redirect: EVENTS.CHECKOUT_STARTED,
+}
+export function trackMonetizationStep(step, props = {}) {
+  const name = MONETIZATION_STEPS[step]
+  if (name) trackEvent(name, props)
 }
 
 /** Call when user closes app or leaves tab; session_length in seconds. */
@@ -130,6 +381,22 @@ export function trackAISuggestionAccepted(props = {}) {
 
 export function trackFirstTaskCreated(props = {}) {
   return trackEventOnce('first_task_created', props, { key: 'first_task_created' })
+}
+
+export function trackFirstCaptureStarted(props = {}) {
+  return trackEventOnce(EVENTS.FIRST_CAPTURE_STARTED, props, { key: 'first_capture_started' })
+}
+
+export function trackSavePlanPromptShown(props = {}) {
+  trackEvent(EVENTS.SAVE_PLAN_PROMPT_SHOWN, props)
+}
+
+export function trackSavePlanPromptAction(props = {}) {
+  trackEvent(EVENTS.SAVE_PLAN_PROMPT_ACTION, props)
+}
+
+export function trackSignInCompleted(props = {}) {
+  trackEvent(EVENTS.SIGN_IN_COMPLETED, props)
 }
 
 export function trackFirstVoiceTaskCreated(props = {}) {
@@ -194,7 +461,8 @@ export function bindRouter(router) {
   try {
     trackPageView(safePath())
     router.beforeEach((to, _from, next) => {
-      trackPageView(to.fullPath || to.path)
+      // Path only: query strings can carry emails, tokens or search text.
+      trackPageView(to.path)
       next()
     })
   } catch (e) {
@@ -359,8 +627,14 @@ export const Analytics = {
   trackSessionEnded,
   trackAISuggestionAccepted,
   trackFirstTaskCreated,
+  trackFirstCaptureStarted,
+  trackSavePlanPromptShown,
+  trackSavePlanPromptAction,
+  trackSignInCompleted,
   trackFirstVoiceTaskCreated,
   trackFirstVoiceCapture,
+  trackVoiceAutoStopped,
+  trackVoiceManualStopped,
   trackFirstReminderChannelSaved,
   trackCalendarConnectStarted,
   trackCalendarConnected,

@@ -4,6 +4,7 @@ import { watch } from 'vue'
 import api from '@/services/api'
 import { registerNativePushToken } from '@/services/settingsService'
 import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
+import { trackNotificationOpened } from '@/services/analytics'
 
 const PENDING_TOKEN_KEY = 'nativePush.pendingToken'
 const PENDING_PLATFORM_KEY = 'nativePush.pendingPlatform'
@@ -179,6 +180,7 @@ async function installNativePushListeners(authStore) {
   })
 
   await PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
+    trackNotificationOpened(notification?.notification?.data || {}, 'native_push')
     try {
       window.dispatchEvent(new CustomEvent('native-push-action-performed', { detail: notification }))
     } catch {

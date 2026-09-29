@@ -3,6 +3,7 @@ import axios from 'axios'
 import { auth } from '@/firebase/init'
 import { getAppToken } from '@/services/appTokenService'
 import { readNativeIosAuthSnapshot } from '@/utils/authStorage'
+import { getEffectiveUserTimezone } from '@/utils/userTimezone'
 
 // Base API points to Vite proxy '/api' in dev
 // Prefer VITE_API_BASE_ROOT; if missing but VITE_API_BASE_URL is set (e.g. to /api/ai),
@@ -104,12 +105,7 @@ api.interceptors.request.use(async (config) => {
     } catch {}
     // 🕒 Include user timezone (handles mobile/PWA drift)
     try {
-      let tz = localStorage.getItem('user_timezone')
-      if (!tz || tz === 'UTC') {
-        tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-        localStorage.setItem('user_timezone', tz)
-      }
-      config.headers['x-user-tz'] = tz
+      config.headers['x-user-tz'] = getEffectiveUserTimezone()
     } catch {
       config.headers['x-user-tz'] = 'UTC'
     }

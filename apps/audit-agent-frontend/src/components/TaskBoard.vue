@@ -92,6 +92,7 @@
                       {{ meetingLink(task).label }}
                     </a>
                     <span class="text-xs text-slate-400">{{ task.date }}</span>
+                    <FocusButton :task="task" />
                     <button
                       @click.stop="openDialog(task)"
                       class="text-slate-400 text-sm hover:text-slate-200"
@@ -216,13 +217,15 @@ import { ref, onMounted, watch, computed } from 'vue'
 import { useTasks } from '@/composables/useTasks'
 import { addTaskToFirebase, updateTaskInFirebase } from '@/services/firebaseService'
 import TaskPlannerDialog from './TaskPlannerDialog.vue'
+import FocusButton from './focus/FocusButton.vue'
 import { toLocalDateKey } from '@/utils/dateHelper'
 import { useAuthStore } from '@/stores/authStore'
 import { getReminderStatus, scheduleReminder } from '@/services/reminderService'
 import api from '@/services/api'
 import { getPreferences as getUserPreferences } from '@/services/settingsService'
 import { TASK_CATEGORY_FILTERS, getCategoryIcon, getCategoryColor, resolveCategory } from '@/constants/taskCategories'
-import { resolveReminderIso } from '@/utils/timeHelper.js'
+import { buildLocalIso, resolveReminderIso } from '@/utils/timeHelper.js'
+import { ElMessage } from 'element-plus'
 import { resolveTaskMeetingLink } from '@/utils/taskLinks'
 import { describeTaskDetails } from '@/utils/taskDisplay'
 
@@ -356,7 +359,10 @@ function meetingLink(task) {
 function formattedReminderTime(task) {
   if (!task?.reminderTime) return null
   try {
-    const iso = resolveReminderIso(task.date, task.reminderTime, task.timezone || 'UTC')
+    // resolveReminderIso takes a task object; with positional args it returned
+    // null and this rendered the 1970 epoch time.
+    const iso = resolveReminderIso(task)
+    if (!iso) return task.reminderTime
     return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
   } catch (err) {
     console.warn('reminder-time-change', err)
@@ -397,15 +403,17 @@ async function handleReminderSave() {
   if (!reminderTask.value || !authStore?.user?.uid) return
   reminderLoading.value = true
   try {
-    const iso = resolveReminderIso(reminderTask.value.date, reminderTime.value, reminderTask.value.timezone || 'UTC')
-    await scheduleReminder({
-      userId: authStore.user.uid,
-      taskId: reminderTask.value.id,
-      reminderTime: iso,
-      timezone: reminderTask.value.timezone || 'UTC',
-      channels: userPrefs.value?.notifications?.channels || [],
-    })
-    reminderActiveByTask.value = { ...reminderActiveByTask.value, [reminderTask.value.id]: true }
+    const task = reminderTask.value
+    const iso = buildLocalIso(task.date, reminderTime.value)
+    // scheduleReminder is positional (userId, taskId, text, isoUtc, prefs); it
+    // was called with one object, so every save failed as "missing fields".
+    const prefs = (await getUserPreferences(authStore.user.uid).catch(() => ({})))?.notifications || {}
+    const result = await scheduleReminder(authStore.user.uid, task.id, task.title, iso, prefs)
+    if (result?.ok === false) {
+      ElMessage.warning('Couldn’t schedule the reminder. Please try again.')
+      return
+    }
+    reminderActiveByTask.value = { ...reminderActiveByTask.value, [task.id]: true }
     showReminderDialog.value = false
   } catch (error) {
     console.warn('schedule reminder failed', error?.message || error)

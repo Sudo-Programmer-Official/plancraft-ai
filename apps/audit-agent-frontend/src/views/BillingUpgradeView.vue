@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-b from-indigo-950 via-slate-950 to-slate-950 text-white">
+  <div class="marketing-light min-h-screen bg-gradient-to-b from-indigo-950 via-slate-950 to-slate-950 text-slate-900">
     <div class="max-w-3xl mx-auto px-4 sm:px-6 py-12 space-y-6">
       <template v-if="isAppleBillingSafeMode">
         <header class="space-y-2">
@@ -207,7 +207,7 @@ import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
 import AppleSoloPremiumCard from '@/components/AppleSoloPremiumCard.vue'
-import { trackEvent } from '@/services/analytics'
+import { trackEvent, trackMonetizationStep } from '@/services/analytics'
 
 const route = useRoute()
 const router = useRouter()
@@ -261,6 +261,14 @@ function trackBillingUpgradeFunnel(step, extra = {}) {
     plan: plan.value || null,
     seats: Number(seats.value || 0),
     is_owner: !!isOwner.value,
+    ...extra,
+  })
+  trackMonetizationStep(step, {
+    surface: 'billing_upgrade',
+    scope: 'workspace',
+    provider: 'stripe',
+    target_plan: plan.value || null,
+    seats: Number(seats.value || 0),
     ...extra,
   })
 }
@@ -359,7 +367,7 @@ function goBack() {
   } catch {
     /* noop */
   }
-  router.push('/dashboard')
+  router.push('/today')
 }
 
 async function refreshAccess() {

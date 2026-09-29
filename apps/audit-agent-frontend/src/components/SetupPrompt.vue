@@ -256,6 +256,7 @@ import { useAuthFlags } from '@/composables/useAuthFlags'
 import { useAuthStore } from '@/stores/authStore'
 import { guessCountryFromLocale, normalizePhone } from '@/utils/phoneUtils'
 import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
+import { getEffectiveUserTimezone, persistTimezonePreference, TIMEZONE_MODES } from '@/utils/userTimezone'
 import {
   buildQuickSetupState,
   clearQuickSetupSnooze,
@@ -450,7 +451,7 @@ async function loadSetup() {
   saveError.value = ''
   try {
     const stored = readQuickSetupState()
-    const guessedTz = localStorage.getItem('user_timezone') || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+    const guessedTz = getEffectiveUserTimezone()
     tz.value = stored?.timezone || guessedTz || 'UTC'
     reminderPhone.value = stored?.phone || ''
     applyChannels(stored?.channels?.length ? stored.channels : ['email'])
@@ -548,7 +549,7 @@ async function ensureSetupLoaded(force = false) {
 
 function confirmTimezone() {
   try {
-    localStorage.setItem('user_timezone', tz.value)
+    persistTimezonePreference(TIMEZONE_MODES.MANUAL, tz.value)
   } catch {
     /* noop */
   }

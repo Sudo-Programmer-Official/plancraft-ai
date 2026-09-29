@@ -24,6 +24,7 @@ import { updateStreakOnEntry } from '@/services/streakService'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { clearStoredAuthArtifacts, readNativeIosAuthSnapshot } from '@/utils/authStorage'
 import { isIosPackagedApp } from '@/utils/nativeAuthSupport'
+import { getEffectiveUserTimezone } from '@/utils/userTimezone'
 import {
   computeNextRecurringDate,
   computeReminderScheduleIso,
@@ -164,8 +165,7 @@ export async function ensureRecurringNextTask(task) {
   const timezoneHint =
     (typeof task?.timezone === 'string' && task.timezone.trim()) ||
     (typeof task?.metadata?.timezone === 'string' && task.metadata.timezone.trim()) ||
-    Intl.DateTimeFormat().resolvedOptions().timeZone ||
-    'UTC'
+    getEffectiveUserTimezone()
   const reminderOffsetDays = normalizeReminderOffsetDays(task?.reminderOffsetDays, { fallback: 0 }) || 0
   const reminderTime = typeof task?.reminderTime === 'string' && task.reminderTime.trim()
     ? task.reminderTime.trim()

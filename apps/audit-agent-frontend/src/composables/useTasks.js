@@ -1,7 +1,13 @@
 // src/composables/useTasks.js
 import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { trackEvent, trackFirstTaskCreated, trackFirstVoiceTaskCreated } from '@/services/analytics'
+import {
+  EVENTS,
+  trackEvent,
+  trackFirstTaskCreated,
+  trackFirstVoiceTaskCreated,
+  trackTaskCreated,
+} from '@/services/analytics'
 import { useAuthStore } from '@/stores/authStore'
 import { toLocalDateKey } from '@/utils/dateHelper'
 import {
@@ -484,6 +490,11 @@ export function useTasks() {
           task_type: normalized?.category || 'Uncategorized',
           guest: !!authStore?.isGuest,
         })
+        trackTaskCreated({
+          source: taskSource,
+          task_type: normalized?.category || 'Uncategorized',
+          guest: !!authStore?.isGuest,
+        })
       } catch (e) {
         console.warn('analytics: Task Created track failed', e)
       }
@@ -533,6 +544,7 @@ export function useTasks() {
           const hour = new Date().getHours()
           const completion_time = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
           trackEvent('Task Completed', { taskId: task.id, completion_time })
+          trackEvent(EVENTS.TASK_COMPLETED, { completion_time, task_type: task.category || 'Uncategorized' })
         } catch (e) {
           console.warn('analytics: Task Completed track failed', e)
         }
@@ -647,7 +659,10 @@ export function useTasks() {
   }
 
   /**
-   * ♻️ Auto-roll unfinished tasks forward once per day per user/workspace
+   * Record that rollover was checked without changing task dates.
+   *
+   * Older unfinished tasks belong in backlog review, not Today. Keep this
+   * function for existing callers, but make the check deliberately inert.
    */
   async function ensureDailyRollover() {
     const userId = authStore?.user?.uid || null
@@ -670,10 +685,6 @@ export function useTasks() {
     }
 
     try {
-      const stale = await fetchUnfinishedTasksBefore(today)
-      if (stale.length) {
-        await moveTasks(stale, today, { rolledOver: true, status: 'pending', completed: false })
-      }
       try {
         localStorage.setItem(storageKey, today)
       } catch {

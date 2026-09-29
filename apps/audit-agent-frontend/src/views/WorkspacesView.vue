@@ -1,6 +1,92 @@
 <template>
   <div class="app-page-shell w-full max-w-full min-w-0 overflow-x-hidden box-border">
     <div class="app-page-frame w-full max-w-full min-w-0">
+      <div class="workspace-switcher">
+        <header class="workspace-switcher__header">
+          <div class="workspace-switcher__heading">
+            <p class="workspace-switcher__eyebrow">Workspace</p>
+            <h1>Workspaces</h1>
+            <p>Keep projects, tasks, and AI context organized separately.</p>
+          </div>
+          <PcButton variant="primary" :icon="Plus" @click="openCreate">New workspace</PcButton>
+        </header>
+
+        <div class="workspace-switcher__toolbar">
+          <label class="workspace-search">
+            <span class="sr-only">Search workspaces</span>
+            <input v-model="workspaceSearch" type="search" placeholder="Search workspaces…" />
+          </label>
+          <div class="workspace-filters" role="group" aria-label="Workspace type">
+            <button
+              v-for="filter in workspaceFilters"
+              :key="filter.value"
+              type="button"
+              :class="{ 'workspace-filter--active': workspaceFilter === filter.value }"
+              @click="workspaceFilter = filter.value"
+            >
+              {{ filter.label }}
+            </button>
+          </div>
+        </div>
+
+        <div v-if="!filteredWorkspaces.length && workspaceStore.loading" class="workspace-empty-state">
+          Loading your workspaces…
+        </div>
+        <div v-else-if="!filteredWorkspaces.length" class="workspace-empty-state">
+          <h2>{{ workspaceSearch || workspaceFilter !== 'all' ? 'No matching workspaces' : 'No workspaces yet' }}</h2>
+          <p>
+            {{ workspaceSearch || workspaceFilter !== 'all'
+              ? 'Try another search or filter.'
+              : 'Create your first workspace to keep a new area of work separate.' }}
+          </p>
+          <PcButton v-if="!workspaceSearch && workspaceFilter === 'all'" variant="primary" @click="openCreate">
+            Create workspace
+          </PcButton>
+        </div>
+
+        <div v-else class="workspace-grid">
+          <article
+            v-for="ws in filteredWorkspaces"
+            :key="ws.id"
+            class="workspace-card"
+            :class="{ 'workspace-card--active': activeWorkspaceId === ws.id }"
+            role="button"
+            tabindex="0"
+            @click="openWorkspace(ws)"
+            @keydown.enter.prevent="openWorkspace(ws)"
+            @keydown.space.prevent="openWorkspace(ws)"
+          >
+            <div class="workspace-card__header">
+              <div class="workspace-card__identity">
+                <span class="workspace-card__icon" aria-hidden="true">{{ ws.icon || '📦' }}</span>
+                <div class="workspace-card__name-wrap">
+                  <h2>{{ ws.name }}</h2>
+                  <p>{{ typeLabel(ws.workspaceType) }}</p>
+                </div>
+              </div>
+              <div class="workspace-card__actions" @click.stop>
+                <span v-if="activeWorkspaceId === ws.id" class="workspace-card__active">Active</span>
+                <PcMenu
+                  :items="workspaceMenuItems(ws)"
+                  :label="`More actions for ${ws.name}`"
+                  @select="handleWorkspaceMenu($event, ws)"
+                />
+              </div>
+            </div>
+
+            <p class="workspace-card__description">
+              {{ ws.description || 'Separate tasks, drafts, and AI memory for this focus area.' }}
+            </p>
+
+            <div class="workspace-card__meta">
+              <span>Opened {{ formatDate(ws.lastOpenedAt || ws.updatedAt || ws.createdAt) }}</span>
+              <span class="workspace-card__open">Open →</span>
+            </div>
+          </article>
+        </div>
+      </div>
+
+      <div v-if="false">
       <header class="app-page-hero flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 w-full max-w-full min-w-0">
         <div class="space-y-2 min-w-0">
           <p class="app-page-eyebrow">Workspaces</p>
@@ -313,7 +399,85 @@
           </div>
         </div>
       </section>
+      </div>
     </div>
+
+    <el-dialog
+      v-model="membersOpen"
+      width="560px"
+      :close-on-click-modal="false"
+      class="workspace-dialog"
+      modal-class="workspace-dialog-overlay"
+      :style="dialogChrome"
+    >
+      <template #header>
+        <div class="workspace-dialog-heading">
+          <p>Members</p>
+          <h3>{{ activeWorkspace?.name || 'Workspace' }}</h3>
+        </div>
+      </template>
+
+      <div class="workspace-members-dialog">
+        <div v-if="membersError" class="workspace-dialog-alert workspace-dialog-alert--error">{{ membersError }}</div>
+        <div v-else-if="membersLoading" class="workspace-dialog-loading">Loading members…</div>
+        <div v-else class="workspace-members-list">
+          <div v-for="member in members" :key="member.userId" class="workspace-member-row">
+            <div class="workspace-member-row__identity">
+              <span>{{ (member.name || member.email || 'M').slice(0, 2) }}</span>
+              <div>
+                <strong>{{ member.name || member.email || 'Member' }}</strong>
+                <small>{{ member.email || 'No email on file' }}</small>
+              </div>
+            </div>
+            <div class="workspace-member-row__actions">
+              <span class="workspace-role">{{ roleLabel(member.role) }}</span>
+              <template v-if="canManageMembers && member.userId !== currentUserId">
+                <select
+                  :disabled="memberBusy[member.userId]"
+                  :value="member.role"
+                  aria-label="Member role"
+                  @change="changeRole(member, $event.target.value)"
+                >
+                  <option value="viewer">Viewer</option>
+                  <option value="editor">Editor</option>
+                  <option value="admin">Admin</option>
+                </select>
+                <button type="button" :disabled="memberBusy[member.userId]" @click="removeWorkspaceMember(member)">
+                  Remove
+                </button>
+              </template>
+            </div>
+          </div>
+          <p v-if="!members.length" class="workspace-dialog-muted">No members yet. Invite teammates to collaborate.</p>
+        </div>
+
+        <div v-if="canManageMembers" class="workspace-pending-invites">
+          <div class="workspace-pending-invites__header">
+            <strong>Pending invites</strong>
+            <span>{{ invites.length }}</span>
+          </div>
+          <p v-if="!invites.length" class="workspace-dialog-muted">No pending invites.</p>
+          <div v-for="invite in invites" :key="invite.id" class="workspace-invite-row">
+            <span>{{ invite.email }}</span>
+            <small>{{ roleLabel(invite.role) }} · {{ formatDate(invite.expires_at || invite.expiresAt) }}</small>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="workspace-dialog-footer">
+          <PcButton variant="secondary" @click="membersOpen = false">Done</PcButton>
+          <PcButton
+            v-if="canManageMembers"
+            variant="primary"
+            :disabled="!canInvite"
+            @click="membersOpen = false; openInviteModal(activeWorkspace)"
+          >
+            Share workspace
+          </PcButton>
+        </div>
+      </template>
+    </el-dialog>
 
     <el-dialog
       v-model="createOpen"
@@ -497,10 +661,13 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { useAuthStore } from '@/stores/authStore'
+import { PcButton, PcMenu } from '@/design'
+import { Pencil, Plus, Share2, Settings2, Users } from 'lucide-vue-next'
 import {
   fetchWorkspaceMembers,
   removeMember,
@@ -512,16 +679,17 @@ import { copyText } from '@/utils/nativeUi'
 
 const workspaceStore = useWorkspaceStore()
 const authStore = useAuthStore()
+const router = useRouter()
 const createOpen = ref(false)
+const membersOpen = ref(false)
 const saving = ref(false)
 const editingId = ref(null)
 const dialogChrome = Object.freeze({
-  background: 'linear-gradient(145deg, #1e1b4b, #312e81, #4c1d95)',
-  color: '#e2e8f0',
-  borderRadius: '0.5rem',
-  boxShadow: '0 8px 30px rgba(0,0,0,0.6)',
-  border: '1px solid rgba(255,255,255,0.08)',
-  backdropFilter: 'blur(12px)',
+  background: 'var(--pc-surface)',
+  color: 'var(--pc-text)',
+  borderRadius: 'var(--pc-radius-lg)',
+  boxShadow: 'var(--pc-shadow-overlay)',
+  border: '1px solid var(--pc-border)',
 })
 const form = reactive({
   name: '',
@@ -561,11 +729,35 @@ const workspaceTypes = [
 const workspaces = computed(() => workspaceStore.workspaces || [])
 const activeWorkspaceId = computed(() => workspaceStore.activeWorkspaceId)
 const activeWorkspace = computed(() => workspaceStore.activeWorkspace || {})
+const workspaceSearch = ref('')
+const workspaceFilter = ref('all')
+const workspaceFilters = [
+  { value: 'all', label: 'All' },
+  { value: 'personal', label: 'Personal' },
+  { value: 'team', label: 'Team' },
+]
+const filteredWorkspaces = computed(() => {
+  const query = workspaceSearch.value.trim().toLowerCase()
+  return workspaces.value.filter((workspace) => {
+    const type = String(workspace?.workspaceType || '').toLowerCase()
+    const matchesFilter =
+      workspaceFilter.value === 'all' ||
+      (workspaceFilter.value === 'personal' && type === 'personal') ||
+      (workspaceFilter.value === 'team' && type !== 'personal')
+    if (!matchesFilter) return false
+    if (!query) return true
+    return [workspace?.name, workspace?.description, typeLabel(workspace?.workspaceType)]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(query))
+  })
+})
 const canSave = computed(() => !!form.name && form.name.trim().length > 1)
 const activeRole = computed(() => workspaceStore.activeWorkspaceRole || 'viewer')
 const canManageMembers = computed(() => ['admin', 'owner'].includes(activeRole.value))
 const canInvite = computed(() => canUseFeature(activeWorkspace.value, activeRole.value, 'invites'))
 const currentUserId = computed(() => authStore?.user?.uid || null)
+// Retained for the legacy capability path while the mode controls are no longer
+// part of the workspace switcher surface.
 const canEditModes = computed(() => ['admin', 'owner'].includes(activeRole.value))
 const modeForm = reactive({ creator: false, leader: false })
 const modesDirty = ref(false)
@@ -574,6 +766,28 @@ const modesSaving = ref(false)
 function typeLabel(value) {
   const found = workspaceTypes.find((t) => t.value === value)
   return found ? found.label : 'Personal'
+}
+
+function isPersonalWorkspace(workspace) {
+  return String(workspace?.workspaceType || '').toLowerCase() === 'personal'
+}
+
+function canManageWorkspace(workspace) {
+  return ['admin', 'owner'].includes(String(workspace?.role || '').toLowerCase())
+}
+
+function workspaceMenuItems(workspace) {
+  const items = [
+    { key: 'settings', label: 'Workspace settings', icon: Settings2 },
+    { key: 'rename', label: 'Rename workspace', icon: Pencil },
+  ]
+  if (!isPersonalWorkspace(workspace) && canManageWorkspace(workspace)) {
+    items.push(
+      { key: 'members', label: 'Manage members', icon: Users },
+      { key: 'share', label: 'Share workspace', icon: Share2 },
+    )
+  }
+  return items
 }
 
 function normalizeInvites(list = []) {
@@ -596,40 +810,6 @@ function normalizeInvites(list = []) {
 onMounted(() => {
   workspaceStore.init()
 })
-
-watch(
-  () => workspaceStore.activeWorkspaceId,
-  (id) => {
-    if (!id) {
-      members.value = []
-      invites.value = []
-      modeForm.creator = false
-      modeForm.leader = false
-      modesDirty.value = false
-      return
-    }
-    loadMembers(id)
-    const settings = activeWorkspace.value?.settings || {}
-    modeForm.creator = !!settings.creatorModeEnabled
-    modeForm.leader = !!settings.leaderModeEnabled
-    modesDirty.value = false
-  },
-  { immediate: true },
-)
-
-watch(
-  () => activeRole.value,
-  (role) => {
-    if (!workspaces.value.length) return
-    if (['admin', 'owner'].includes(role) && activeWorkspaceId.value) {
-      loadMembers(activeWorkspaceId.value)
-    } else if (!['admin', 'owner'].includes(role)) {
-      members.value = []
-      invites.value = []
-      membersError.value = role ? 'Only admins/owners can view members for this workspace.' : ''
-    }
-  },
-)
 
 function openCreate() {
   editingId.value = null
@@ -722,13 +902,17 @@ async function loadMembers(id = null) {
   }
 }
 
-function openInviteModal(ws = null) {
+async function openInviteModal(ws = null) {
+  if (ws?.id && ws.id !== activeWorkspaceId.value) {
+    await switchWorkspace(ws.id, { announce: false })
+  }
   if (!['admin', 'owner'].includes(activeRole.value)) {
     ElMessage.error('Only admins can invite members')
     return
   }
-  if (ws?.id && ws.id !== activeWorkspaceId.value) {
-    switchWorkspace(ws.id)
+  if (!canInvite.value) {
+    ElMessage.warning('Sharing is not available for this workspace yet.')
+    return
   }
   inviteForm.email = ''
   inviteForm.role = 'editor'
@@ -841,16 +1025,46 @@ function formatDate(value) {
   try {
     if (!value) return 'Just now'
     const date = typeof value?.toDate === 'function' ? value.toDate() : new Date(value)
+    if (Number.isNaN(date.getTime())) return 'Just now'
+    const today = new Date()
+    const isToday = date.toDateString() === today.toDateString()
+    if (isToday) return 'today'
     return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
   } catch {
     return 'Just now'
   }
 }
 
-async function switchWorkspace(id) {
+async function switchWorkspace(id, { announce = true } = {}) {
   if (!id) return
   await workspaceStore.setActive(id)
-  ElMessage.success('Switched workspace')
+  if (announce) ElMessage.success('Switched workspace')
+}
+
+async function openWorkspace(workspace) {
+  if (!workspace?.id) return
+  await switchWorkspace(workspace.id, { announce: false })
+  if (router.currentRoute.value.path !== '/today') {
+    await router.push('/today')
+  }
+}
+
+async function openMembersModal(workspace) {
+  if (!workspace?.id || !canManageWorkspace(workspace)) return
+  await switchWorkspace(workspace.id, { announce: false })
+  membersError.value = ''
+  membersOpen.value = true
+  await loadMembers(workspace.id)
+}
+
+function handleWorkspaceMenu(action, workspace) {
+  if (action === 'settings' || action === 'rename') {
+    editWorkspace(workspace)
+  } else if (action === 'members') {
+    openMembersModal(workspace)
+  } else if (action === 'share') {
+    openInviteModal(workspace)
+  }
 }
 
 function editWorkspace(ws) {
@@ -867,7 +1081,9 @@ function editWorkspace(ws) {
 async function refresh() {
   try {
     await workspaceStore.refresh()
-  } catch {}
+  } catch {
+    /* Legacy hidden action; workspace init handles the visible page state. */
+  }
 }
 
 function workspaceCardClass(ws) {
@@ -894,6 +1110,391 @@ function roleLabel(role) {
 </script>
 
 <style scoped>
+.workspace-switcher {
+  width: 100%;
+  color: var(--pc-text);
+}
+
+.workspace-switcher__header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--pc-space-6);
+  margin-bottom: var(--pc-space-6);
+}
+
+.workspace-switcher__heading h1 {
+  margin: 0.2rem 0 0;
+  color: var(--pc-text);
+  font-size: clamp(1.8rem, 3vw, 2.45rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+
+.workspace-switcher__heading p:last-child {
+  margin: 0.5rem 0 0;
+  color: var(--pc-text-muted);
+  font-size: var(--pc-text-body);
+}
+
+.workspace-switcher__eyebrow {
+  margin: 0;
+  color: var(--pc-accent-text);
+  font-size: var(--pc-text-caption);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.workspace-switcher__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pc-space-4);
+  margin-bottom: var(--pc-space-5);
+}
+
+.workspace-search {
+  display: block;
+  width: min(100%, 24rem);
+}
+
+.workspace-search input {
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0 var(--pc-space-4);
+  border: 1px solid var(--pc-border);
+  border-radius: var(--pc-radius-md);
+  background: var(--pc-surface);
+  color: var(--pc-text);
+  font: inherit;
+  outline: none;
+}
+
+.workspace-search input::placeholder {
+  color: var(--pc-text-subtle);
+}
+
+.workspace-search input:focus {
+  border-color: var(--pc-accent);
+  box-shadow: 0 0 0 3px var(--pc-focus-ring);
+}
+
+.workspace-filters {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  border: 1px solid var(--pc-border);
+  border-radius: var(--pc-radius-full);
+  background: var(--pc-surface-2);
+}
+
+.workspace-filters button {
+  min-height: 2rem;
+  padding: 0 var(--pc-space-3);
+  border: 0;
+  border-radius: var(--pc-radius-full);
+  background: transparent;
+  color: var(--pc-text-muted);
+  font: inherit;
+  font-size: var(--pc-text-small);
+  cursor: pointer;
+}
+
+.workspace-filters button:hover,
+.workspace-filters button:focus-visible,
+.workspace-filter--active {
+  background: var(--pc-surface);
+  color: var(--pc-accent-text) !important;
+  outline: none;
+}
+
+.workspace-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--pc-space-4);
+}
+
+.workspace-card {
+  display: flex;
+  min-height: 13rem;
+  flex-direction: column;
+  gap: var(--pc-space-4);
+  padding: var(--pc-space-5);
+  border: 1px solid var(--pc-border);
+  border-radius: var(--pc-radius-lg);
+  background: var(--pc-surface);
+  box-shadow: var(--pc-shadow-sm);
+  color: var(--pc-text);
+  cursor: pointer;
+  transition: border-color var(--pc-duration-fast) var(--pc-ease), box-shadow var(--pc-duration-fast) var(--pc-ease), transform var(--pc-duration-fast) var(--pc-ease);
+}
+
+.workspace-card:hover,
+.workspace-card:focus-visible {
+  border-color: var(--pc-border-strong);
+  box-shadow: var(--pc-shadow-overlay);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.workspace-card--active {
+  border-color: color-mix(in srgb, var(--pc-accent) 48%, var(--pc-border));
+  box-shadow: 0 0 0 3px var(--pc-accent-soft), var(--pc-shadow-sm);
+}
+
+.workspace-card__header,
+.workspace-card__identity,
+.workspace-card__actions,
+.workspace-card__meta {
+  display: flex;
+  align-items: center;
+}
+
+.workspace-card__header {
+  justify-content: space-between;
+  gap: var(--pc-space-3);
+}
+
+.workspace-card__identity {
+  min-width: 0;
+  gap: var(--pc-space-3);
+}
+
+.workspace-card__icon {
+  display: inline-flex;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: 0 0 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--pc-border);
+  border-radius: var(--pc-radius-md);
+  background: var(--pc-surface-2);
+  font-size: 1.35rem;
+}
+
+.workspace-card--active .workspace-card__icon {
+  border-color: var(--pc-accent-soft);
+  background: var(--pc-accent-soft);
+}
+
+.workspace-card__name-wrap {
+  min-width: 0;
+}
+
+.workspace-card__name-wrap h2 {
+  margin: 0;
+  overflow: hidden;
+  color: var(--pc-text);
+  font-size: 1rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-card__name-wrap p {
+  margin: 0.25rem 0 0;
+  color: var(--pc-text-muted);
+  font-size: var(--pc-text-small);
+}
+
+.workspace-card__actions {
+  flex: 0 0 auto;
+  gap: 0.25rem;
+}
+
+.workspace-card__active {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--pc-accent) 28%, var(--pc-border));
+  border-radius: var(--pc-radius-full);
+  background: var(--pc-accent-soft);
+  color: var(--pc-accent-text);
+  font-size: var(--pc-text-caption);
+  font-weight: 700;
+}
+
+.workspace-card__description {
+  display: -webkit-box;
+  min-height: 2.7rem;
+  margin: 0;
+  overflow: hidden;
+  color: var(--pc-text-muted);
+  font-size: var(--pc-text-body);
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.workspace-card__meta {
+  justify-content: space-between;
+  gap: var(--pc-space-3);
+  margin-top: auto;
+  padding-top: var(--pc-space-3);
+  border-top: 1px solid var(--pc-border);
+  color: var(--pc-text-subtle);
+  font-size: var(--pc-text-small);
+}
+
+.workspace-card__open {
+  color: var(--pc-accent-text);
+  font-weight: 700;
+}
+
+.workspace-empty-state {
+  display: grid;
+  justify-items: start;
+  gap: 0.65rem;
+  padding: var(--pc-space-6);
+  border: 1px dashed var(--pc-border-strong);
+  border-radius: var(--pc-radius-lg);
+  background: var(--pc-surface);
+  color: var(--pc-text-muted);
+}
+
+.workspace-empty-state h2,
+.workspace-empty-state p {
+  margin: 0;
+}
+
+.workspace-empty-state h2 {
+  color: var(--pc-text);
+  font-size: 1rem;
+}
+
+.workspace-switcher :deep(.pc-button) {
+  flex: 0 0 auto;
+}
+
+.workspace-dialog-heading p {
+  margin: 0;
+  color: var(--pc-accent-text);
+  font-size: var(--pc-text-caption);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.workspace-dialog-heading h3 {
+  margin: 0.25rem 0 0;
+  color: var(--pc-text);
+  font-size: 1.15rem;
+}
+
+.workspace-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--pc-space-3);
+}
+
+.workspace-dialog-alert,
+.workspace-dialog-loading,
+.workspace-dialog-muted {
+  color: var(--pc-text-muted);
+  font-size: var(--pc-text-small);
+}
+
+.workspace-dialog-alert--error {
+  color: var(--pc-danger);
+}
+
+.workspace-members-dialog,
+.workspace-members-list,
+.workspace-pending-invites {
+  display: grid;
+  gap: var(--pc-space-3);
+}
+
+.workspace-member-row,
+.workspace-invite-row,
+.workspace-pending-invites {
+  padding: var(--pc-space-3);
+  border: 1px solid var(--pc-border);
+  border-radius: var(--pc-radius-md);
+  background: var(--pc-surface-2);
+}
+
+.workspace-member-row,
+.workspace-invite-row,
+.workspace-pending-invites__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pc-space-3);
+}
+
+.workspace-member-row__identity,
+.workspace-member-row__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--pc-space-3);
+  min-width: 0;
+}
+
+.workspace-member-row__identity > span {
+  display: inline-flex;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: 0 0 2.25rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--pc-radius-full);
+  background: var(--pc-accent-soft);
+  color: var(--pc-accent-text);
+  font-size: var(--pc-text-small);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.workspace-member-row__identity div,
+.workspace-invite-row {
+  min-width: 0;
+}
+
+.workspace-member-row__identity strong,
+.workspace-member-row__identity small,
+.workspace-invite-row span,
+.workspace-invite-row small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-member-row__identity small,
+.workspace-invite-row small {
+  margin-top: 0.2rem;
+  color: var(--pc-text-subtle);
+  font-size: var(--pc-text-caption);
+}
+
+.workspace-role {
+  color: var(--pc-text-muted);
+  font-size: var(--pc-text-caption);
+}
+
+.workspace-member-row__actions select,
+.workspace-member-row__actions button {
+  min-height: 2rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--pc-border);
+  border-radius: var(--pc-radius-sm);
+  background: var(--pc-surface);
+  color: var(--pc-text);
+  font: inherit;
+  font-size: var(--pc-text-caption);
+}
+
+.workspace-member-row__actions button:hover {
+  border-color: var(--pc-danger);
+  color: var(--pc-danger);
+}
+
+.workspace-pending-invites__header span {
+  color: var(--pc-text-subtle);
+  font-size: var(--pc-text-caption);
+}
+
 :global(.workspace-dialog .el-overlay-dialog) {
   display: flex;
   align-items: center;
@@ -902,23 +1503,22 @@ function roleLabel(role) {
 }
 
 :global(.workspace-dialog .el-dialog) {
-  background: linear-gradient(145deg, #1e1b4b, #312e81, #4c1d95);
-  color: #e2e8f0;
-  border-radius: 0.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(12px);
+  background: var(--pc-surface);
+  color: var(--pc-text);
+  border-radius: var(--pc-radius-lg);
+  border: 1px solid var(--pc-border);
+  box-shadow: var(--pc-shadow-overlay);
 }
 
 :global(.workspace-dialog .el-dialog__header) {
   margin: 0;
   padding: 18px 22px 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--pc-border);
 }
 
 :global(.workspace-dialog .el-dialog__title) {
   letter-spacing: 0.08em;
-  color: #c7d2fe;
+  color: var(--pc-accent-text);
   font-weight: 700;
   font-size: 0.85rem;
 }
@@ -929,7 +1529,7 @@ function roleLabel(role) {
 }
 
 :global(.workspace-dialog .el-dialog__headerbtn .el-dialog__close) {
-  color: #cbd5e1;
+  color: var(--pc-text-muted);
 }
 
 :global(.workspace-dialog .el-dialog__body) {
@@ -942,9 +1542,9 @@ function roleLabel(role) {
 :global(.workspace-dialog .el-input__wrapper),
 :global(.workspace-dialog .el-input__inner),
 :global(.workspace-dialog .el-textarea__inner) {
-  background-color: #0f172a !important;
-  border: 1px solid rgba(148, 163, 184, 0.25) !important;
-  color: #e5e7eb !important;
+  background-color: var(--pc-surface-2) !important;
+  border: 1px solid var(--pc-border) !important;
+  color: var(--pc-text) !important;
   box-shadow: none !important;
 }
 
@@ -952,16 +1552,60 @@ function roleLabel(role) {
 :global(.workspace-dialog textarea::placeholder),
 :global(.workspace-dialog .el-input__inner::placeholder),
 :global(.workspace-dialog .el-textarea__inner::placeholder) {
-  color: rgba(148, 163, 184, 0.7) !important;
+  color: var(--pc-text-subtle) !important;
 }
 
 :global(.workspace-dialog .el-dialog__footer) {
   padding: 12px 22px 18px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--pc-border);
 }
 
 :global(.workspace-dialog-overlay) {
-  background-color: rgba(8, 15, 31, 0.78);
+  background-color: var(--pc-scrim);
   backdrop-filter: blur(6px);
+}
+
+@media (max-width: 900px) {
+  .workspace-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .workspace-switcher__header,
+  .workspace-switcher__toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .workspace-switcher :deep(.pc-button) {
+    width: 100%;
+  }
+
+  .workspace-search {
+    width: 100%;
+  }
+
+  .workspace-filters {
+    width: 100%;
+  }
+
+  .workspace-filters button {
+    flex: 1 1 0;
+  }
+
+  .workspace-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workspace-member-row,
+  .workspace-member-row__actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .workspace-member-row__actions {
+    width: 100%;
+  }
 }
 </style>

@@ -4,6 +4,7 @@ import { auth } from '@/firebase/init'
 import { getAppToken } from '@/services/appTokenService'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { ensureAiConsentOrThrow } from '@/services/aiConsentService'
+import { getEffectiveUserTimezone } from '@/utils/userTimezone'
 
 type Service = 'growth' | 'goals' | 'posting' | 'creator' | 'nlp'
 
@@ -102,12 +103,7 @@ export async function buildAuthHeaders(opts: AuthHeaderOptions = {}) {
     }
     // Do not override env app token; cached app token is only used if env missing (handled above)
     try {
-      let tz = localStorage.getItem('user_timezone')
-      if (!tz) {
-        tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-        localStorage.setItem('user_timezone', tz)
-      }
-      headers['x-user-tz'] = tz || 'UTC'
+      headers['x-user-tz'] = getEffectiveUserTimezone()
     } catch {
       headers['x-user-tz'] = 'UTC'
     }

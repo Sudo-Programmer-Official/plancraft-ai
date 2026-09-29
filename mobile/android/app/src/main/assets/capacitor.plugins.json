@@ -14,5 +14,9 @@
 	{
 		"pkg": "@capgo/capacitor-audio-recorder",
 		"classpath": "app.capgo.audiorecorder.CapacitorAudioRecorderPlugin"
+	},
+	{
+		"pkg": "@capgo/capacitor-native-biometric",
+		"classpath": "ee.forgr.biometric.NativeBiometric"
 	}
 ]

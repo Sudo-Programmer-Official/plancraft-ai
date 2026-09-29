@@ -8,6 +8,11 @@ import {
 import api from '@/services/api'
 import { recordAndSendToBackend } from '@/utils/backendRecorder'
 import { ensureAiConsentOrThrow } from '@/services/aiConsentService'
+import {
+  trackVoiceAutoStopped,
+  trackVoiceManualStopped,
+  trackVoiceStarted,
+} from '@/services/analytics'
 
 const MAX_DURATION_MS = 60_000
 const STOP_FALLBACK_MS = 1_800
@@ -16,6 +21,10 @@ const MINIMUM_AUDIO_BYTES = 1_024
 const MINIMUM_RECORDING_SECONDS = 1
 const MINIMUM_RECORDING_MS = 900
 const MEDIARECORDER_TIMESLICE_MS = 250
+const DEFAULT_SILENCE_TIMEOUT_MS = 2_800
+const DEFAULT_SPEECH_THRESHOLD = 0.02
+const SPEECH_CONFIRMATION_MS = 120
+const VAD_POLL_INTERVAL_MS = 80
 const MIME_CANDIDATES = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4', 'audio/webm']
 const BASE64_DECODE_CHUNK_SIZE = 8_192
 
@@ -194,13 +203,24 @@ function pickMimeType() {
       return MIME_CANDIDATES[0]
     }
     return MIME_CANDIDATES.find((m) => MediaRecorder.isTypeSupported(m)) || MIME_CANDIDATES[0]
-  } catch (_) {
+  } catch {
     return MIME_CANDIDATES[0]
   }
 }
 
 export function useAudioRecorder(options = {}) {
-  const { onTranscription, autoStopMs = MAX_DURATION_MS, logPrefix = '[VoiceRecorder]' } = options
+  const {
+    onTranscription,
+    autoStopMs = MAX_DURATION_MS,
+    logPrefix = '[VoiceRecorder]',
+    surface = 'unknown',
+    silenceTimeoutMs = DEFAULT_SILENCE_TIMEOUT_MS,
+    speechThreshold = DEFAULT_SPEECH_THRESHOLD,
+    enableSilenceAutoStop = true,
+  } = options
+
+  const resolvedSilenceTimeoutMs = Math.max(250, Number(silenceTimeoutMs) || DEFAULT_SILENCE_TIMEOUT_MS)
+  const resolvedSpeechThreshold = Math.max(0.001, Number(speechThreshold) || DEFAULT_SPEECH_THRESHOLD)
 
   const state = ref('idle') // idle | recording | transcribing | done | error
   const transcript = ref('')
@@ -229,6 +249,159 @@ export function useAudioRecorder(options = {}) {
   let nativeStopEventReject = null
   let recordingStartedAt = 0
   let recordingStoppedAt = 0
+  let silenceTimeoutId = null
+  let vadPollId = null
+  let silenceDetector = null
+  let silenceDetectionRequest = 0
+  let speechDetected = false
+  let speechStartedAt = 0
+  let lastSpeechAt = 0
+  let silenceStartedAt = 0
+
+  const stopSilenceDetection = () => {
+    silenceDetectionRequest += 1
+    if (silenceTimeoutId) {
+      clearTimeout(silenceTimeoutId)
+      silenceTimeoutId = null
+    }
+    if (vadPollId) {
+      clearInterval(vadPollId)
+      vadPollId = null
+    }
+    if (silenceDetector) {
+      try {
+        silenceDetector.source?.disconnect?.()
+        silenceDetector.analyser?.disconnect?.()
+      } catch { /* ignore audio graph cleanup errors */ }
+      try {
+        silenceDetector.context?.close?.()
+      } catch { /* ignore audio context cleanup errors */ }
+      if (silenceDetector.observationStream) {
+        try {
+          silenceDetector.observationStream.getTracks().forEach((track) => track.stop())
+        } catch { /* ignore observation stream cleanup errors */ }
+      }
+    }
+    silenceDetector = null
+    speechDetected = false
+    speechStartedAt = 0
+    lastSpeechAt = 0
+    silenceStartedAt = 0
+  }
+
+  const getSilenceDurationMs = () => {
+    if (!speechDetected || !lastSpeechAt) return 0
+    const end = recordingStoppedAt || Date.now()
+    return Math.max(0, end - lastSpeechAt)
+  }
+
+  const scheduleSilenceStop = () => {
+    if (!silenceDetector || !speechDetected || !isRecording.value || silenceTimeoutId) return
+    const silentForMs = Math.max(0, Date.now() - lastSpeechAt)
+    const remainingMs = Math.max(0, resolvedSilenceTimeoutMs - silentForMs)
+    silenceTimeoutId = window.setTimeout(() => {
+      silenceTimeoutId = null
+      if (!silenceDetector || !speechDetected || !isRecording.value) return
+      const currentSilenceMs = Math.max(0, Date.now() - lastSpeechAt)
+      if (currentSilenceMs >= resolvedSilenceTimeoutMs) {
+        stopRecording('silence')
+      } else {
+        scheduleSilenceStop()
+      }
+    }, remainingMs)
+  }
+
+  const sampleSilence = () => {
+    if (!silenceDetector || !isRecording.value) return
+    const { analyser, samples } = silenceDetector
+    analyser.getByteTimeDomainData(samples)
+    let sum = 0
+    for (let index = 0; index < samples.length; index += 1) {
+      const normalized = (samples[index] - 128) / 128
+      sum += normalized * normalized
+    }
+    const rms = Math.sqrt(sum / samples.length)
+    const now = Date.now()
+
+    if (!speechDetected) {
+      if (rms >= resolvedSpeechThreshold) {
+        if (!speechStartedAt) speechStartedAt = now
+        if (now - speechStartedAt >= SPEECH_CONFIRMATION_MS) {
+          speechDetected = true
+          lastSpeechAt = now
+          silenceStartedAt = 0
+        }
+      } else {
+        speechStartedAt = 0
+      }
+      return
+    }
+
+    if (rms >= resolvedSpeechThreshold) {
+      lastSpeechAt = now
+      silenceStartedAt = 0
+      if (silenceTimeoutId) {
+        clearTimeout(silenceTimeoutId)
+        silenceTimeoutId = null
+      }
+      return
+    }
+
+    if (!silenceStartedAt) silenceStartedAt = now
+    scheduleSilenceStop()
+  }
+
+  const startSilenceDetection = async (captureStream = null, { requestStream = false } = {}) => {
+    if (!enableSilenceAutoStop || typeof window === 'undefined') return
+    const AudioContextConstructor = window.AudioContext || window.webkitAudioContext
+    if (!AudioContextConstructor) return
+
+    const requestId = silenceDetectionRequest
+    let observationStream = null
+    const audioStream = captureStream || (requestStream
+      ? await navigator.mediaDevices?.getUserMedia?.({ audio: true })
+      : null)
+    if (!audioStream || requestId !== silenceDetectionRequest || !isRecording.value) {
+      if (!captureStream && audioStream) {
+        try {
+          audioStream.getTracks().forEach((track) => track.stop())
+        } catch { /* ignore observation stream cleanup errors */ }
+      }
+      return
+    }
+    if (!captureStream) observationStream = audioStream
+
+    try {
+      const context = new AudioContextConstructor()
+      await context.resume?.()
+      if (requestId !== silenceDetectionRequest || !isRecording.value) {
+        await context.close?.()
+        observationStream?.getTracks().forEach((track) => track.stop())
+        return
+      }
+      const source = context.createMediaStreamSource(audioStream)
+      const analyser = context.createAnalyser()
+      analyser.fftSize = 2048
+      analyser.smoothingTimeConstant = 0.1
+      source.connect(analyser)
+      silenceDetector = {
+        context,
+        source,
+        analyser,
+        samples: new Uint8Array(analyser.fftSize),
+        observationStream,
+      }
+      vadPollId = window.setInterval(sampleSilence, VAD_POLL_INTERVAL_MS)
+      sampleSilence()
+    } catch (error) {
+      console.warn(`${logPrefix} silence detection unavailable`, formatRecorderError(error))
+      if (observationStream) {
+        try {
+          observationStream.getTracks().forEach((track) => track.stop())
+        } catch { /* ignore observation stream cleanup errors */ }
+      }
+    }
+  }
 
   const clearTimers = (resetDuration = false) => {
     if (tickId) {
@@ -243,13 +416,17 @@ export function useAudioRecorder(options = {}) {
       clearTimeout(stopTimeoutId)
       stopTimeoutId = null
     }
+    if (silenceTimeoutId) {
+      clearTimeout(silenceTimeoutId)
+      silenceTimeoutId = null
+    }
     if (resetDuration) durationSeconds.value = 0
   }
 
   const stopStreams = () => {
     try {
       if (stream) stream.getTracks().forEach((t) => t.stop())
-    } catch (_) {}
+    } catch { /* ignore stream cleanup errors */ }
     stream = null
   }
 
@@ -261,7 +438,7 @@ export function useAudioRecorder(options = {}) {
         if (onStop) mediaRecorder.removeEventListener('stop', onStop)
         if (onError) mediaRecorder.removeEventListener('error', onError)
       }
-    } catch (_) {}
+    } catch { /* ignore recorder listener cleanup errors */ }
     mediaRecorder = null
     backendRecorder = null
     nativeRecorderActive = false
@@ -310,10 +487,10 @@ export function useAudioRecorder(options = {}) {
   const removeNativeRecorderListeners = async () => {
     try {
       await nativeStopListenerHandle?.remove?.()
-    } catch (_) {}
+    } catch { /* ignore native listener cleanup errors */ }
     try {
       await nativeErrorListenerHandle?.remove?.()
-    } catch (_) {}
+    } catch { /* ignore native listener cleanup errors */ }
     nativeStopListenerHandle = null
     nativeErrorListenerHandle = null
     clearNativeStopEvent()
@@ -372,6 +549,7 @@ export function useAudioRecorder(options = {}) {
   }
 
   const cleanup = (resetTranscript = false) => {
+    stopSilenceDetection()
     clearTimers(false)
     stopStreams()
     if (nativeRecorderActive && !nativeStopPending) {
@@ -399,6 +577,22 @@ export function useAudioRecorder(options = {}) {
     if (!recordingStartedAt) return Math.max(0, Number(durationSeconds.value || 0) * 1000)
     const stoppedAt = recordingStoppedAt || Date.now()
     return Math.max(0, stoppedAt - recordingStartedAt)
+  }
+
+  const trackRecordingStopped = (reason) => {
+    const payload = {
+      surface: surface || 'unknown',
+      recording_duration_ms: Math.round(getElapsedRecordingMs()),
+      silence_duration_ms: Math.round(getSilenceDurationMs()),
+    }
+    if (reason === 'user') {
+      trackVoiceManualStopped(payload)
+      return
+    }
+    trackVoiceAutoStopped({
+      ...payload,
+      reason: reason === 'silence' ? 'silence' : 'max_duration',
+    })
   }
 
   const setRecorderError = (err, fallbackMessage = 'Voice recording failed') => {
@@ -599,6 +793,9 @@ export function useAudioRecorder(options = {}) {
     })
     tickId = window.setInterval(() => (durationSeconds.value += 1), 1000)
     if (autoStopMs > 0) autoStopId = window.setTimeout(() => stopRecording('auto'), autoStopMs)
+    startSilenceDetection(null, { requestStream: true }).catch((error) => {
+      console.warn(`${logPrefix} native silence detection unavailable`, formatRecorderError(error))
+    })
   }
 
   const startFallbackRecorder = async () => {
@@ -615,6 +812,9 @@ export function useAudioRecorder(options = {}) {
     markRecordingStarted()
     tickId = window.setInterval(() => (durationSeconds.value += 1), 1000)
     if (autoStopMs > 0) autoStopId = window.setTimeout(() => stopRecording('auto'), autoStopMs)
+    startSilenceDetection(backendRecorder?.__stream).catch((error) => {
+      console.warn(`${logPrefix} fallback silence detection unavailable`, formatRecorderError(error))
+    })
   }
 
   const startBrowserRecording = async () => {
@@ -651,6 +851,9 @@ export function useAudioRecorder(options = {}) {
     })
     tickId = window.setInterval(() => (durationSeconds.value += 1), 1000)
     if (autoStopMs > 0) autoStopId = window.setTimeout(() => stopRecording('auto'), autoStopMs)
+    startSilenceDetection(stream).catch((error) => {
+      console.warn(`${logPrefix} browser silence detection unavailable`, formatRecorderError(error))
+    })
   }
 
   const startRecording = async () => {
@@ -661,6 +864,7 @@ export function useAudioRecorder(options = {}) {
     errorMessage.value = ''
     stopRequested = false
     stopHandled = false
+    trackVoiceStarted(surface)
     const platform = getPlatformName()
     const nativePreferred = prefersNativeAudioRecorder()
 
@@ -731,6 +935,7 @@ export function useAudioRecorder(options = {}) {
   const finalize = async (trigger) => {
     if (stopHandled) return
     stopHandled = true
+    stopSilenceDetection()
     clearTimers()
     stopStreams()
 
@@ -793,6 +998,8 @@ export function useAudioRecorder(options = {}) {
     if (!isRecording.value && state.value !== 'recording') return
     stopRequested = true
     markRecordingStopped()
+    trackRecordingStopped(reason)
+    stopSilenceDetection()
     state.value = 'transcribing'
     clearTimers()
     console.log(`${logPrefix} stop requested ${stringifyLogPayload({ reason })}`)
@@ -829,7 +1036,7 @@ export function useAudioRecorder(options = {}) {
         if (mediaRecorder.state !== 'inactive') {
           try {
             if (typeof mediaRecorder.requestData === 'function') mediaRecorder.requestData()
-          } catch (_) {}
+          } catch { /* ignore recorder flush errors */ }
           mediaRecorder.stop()
           stopTimeoutId = window.setTimeout(() => finalize('timeout'), STOP_FALLBACK_MS)
         } else {

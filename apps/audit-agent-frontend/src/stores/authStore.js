@@ -51,6 +51,8 @@ import {
 } from '@/utils/authStorage'
 import { normalizePhone } from '@/utils/phoneUtils'
 import { isInAppBrowser } from '@/utils/inAppBrowser'
+import { getEffectiveUserTimezone, persistTimezonePreference } from '@/utils/userTimezone'
+import { clearAppLockPrefs } from '@/services/appLockService'
 import {
   buildNativeAuthCallbackUrl,
   buildNativeAuthFallbackSchemeUrl,
@@ -90,7 +92,7 @@ function readNativeAuthHandoffIntent() {
       url.searchParams.get('native_redirect') ||
       localStorage.getItem('postLoginRedirect') ||
       url.searchParams.get('redirect') ||
-      '/dashboard',
+      '/today',
     )
     if (!rawMode || !provider) return null
 
@@ -212,14 +214,6 @@ function getNotificationPrimaryLabel(user = {}) {
   )
 }
 
-function getNotificationSecondaryLabel(user = {}) {
-  return (
-    String(user?.email || '').trim() ||
-    String(user?.phone || '').trim() ||
-    'Workspace synced and ready to go.'
-  )
-}
-
 function getNotificationInitials(user = {}) {
   const source = getNotificationPrimaryLabel(user)
   const parts = source
@@ -250,16 +244,14 @@ function buildSignedInNotificationMessage(user = {}) {
   return h('div', { class: 'pcai-auth-toast' }, [
     h('div', { class: 'pcai-auth-toast__avatar' }, [avatarNode]),
     h('div', { class: 'pcai-auth-toast__body' }, [
-      h('p', { class: 'pcai-auth-toast__eyebrow' }, 'Welcome back'),
       h('p', { class: 'pcai-auth-toast__title' }, getNotificationPrimaryLabel(user)),
-      h('p', { class: 'pcai-auth-toast__subtitle' }, getNotificationSecondaryLabel(user)),
     ]),
   ])
 }
 
 function notifySignedIn(user = {}, options = {}) {
   ElNotification({
-    title: String(options?.title || 'Signed in'),
+    title: String(options?.title || 'Welcome back'),
     message: buildSignedInNotificationMessage(user),
     customClass: 'pcai-auth-notification',
     duration: Number.isFinite(options?.duration) ? options.duration : 1500,
@@ -849,14 +841,25 @@ function kickOffPostLoginHydration(store, { platform = 'web', source = 'login' }
         store?.user?.phone ||
         ''
 
+      const savedTimezone =
+        profile?.timezone || profile?.preferences?.timezone || store?.user?.preferences?.timezone || ''
+      const savedTimezoneMode = String(
+        profile?.timezoneMode || profile?.timezone_mode || store?.user?.timezoneMode || '',
+      ).toLowerCase()
+      const resolvedTimezone =
+        savedTimezone && (savedTimezoneMode === 'manual' || !savedTimezoneMode)
+          ? savedTimezone
+          : getEffectiveUserTimezone()
+
+      if (savedTimezoneMode === 'manual' || savedTimezoneMode === 'auto') {
+        persistTimezonePreference(savedTimezoneMode, resolvedTimezone)
+      } else if (savedTimezone) {
+        // Preserve a timezone saved by older profiles until the user changes it.
+        persistTimezonePreference('manual', resolvedTimezone)
+      }
+
       const nextState = quickSetupModule.buildQuickSetupState({
-        timezone:
-          profile?.timezone ||
-          profile?.preferences?.timezone ||
-          store?.user?.preferences?.timezone ||
-          localStorage.getItem('user_timezone') ||
-          Intl.DateTimeFormat().resolvedOptions().timeZone ||
-          'UTC',
+        timezone: resolvedTimezone || getEffectiveUserTimezone(),
         channels,
         phone,
         pushGranted: false,
@@ -1373,8 +1376,8 @@ export const useAuthStore = defineStore('authStore', {
           }
         } catch {}
         ElNotification({
-          title: 'Welcome ✨',
-          message: 'Using guest mode. You can upgrade anytime.',
+          title: 'Welcome',
+          message: 'Your planning space is ready.',
           type: 'success',
           duration: 2200,
           offset: 80,
@@ -1385,8 +1388,11 @@ export const useAuthStore = defineStore('authStore', {
       }
     },
 
-    // Web-only Google Login
-    async loginWithGoogle() {
+    // Web-only Google Login. `preferRedirect` is used on the browser page the
+    // native app opens for Google sign-in: a full-page redirect is more
+    // reliable than a popup in SFSafariViewController / Custom Tabs, and
+    // checkRedirectResult() hands the session back to the app afterwards.
+    async loginWithGoogle({ preferRedirect = false } = {}) {
       if (isNativePackagedApp()) {
         const err = new Error(getNativeAuthRestriction('google'))
         err.code = 'auth/native-google-unsupported'
@@ -1403,6 +1409,17 @@ export const useAuthStore = defineStore('authStore', {
       provider.setCustomParameters({ prompt: 'select_account' })
       const current = auth.currentUser
       const alreadyLinked = (current?.providerData || []).some((p) => p?.providerId === 'google.com')
+
+      if (preferRedirect && !current) {
+        this.setAuthenticating(true)
+        try {
+          await signInWithRedirect(auth, provider)
+        } catch (err) {
+          this.setAuthenticating(false)
+          throw err
+        }
+        return
+      }
 
       this.setAuthenticating(true)
       this.loading = true
@@ -1559,7 +1576,7 @@ export const useAuthStore = defineStore('authStore', {
                 return null
               }
             })() ||
-            '/dashboard',
+            '/today',
           )
           const shouldUseServerDrivenFlow =
             !current &&
@@ -1804,7 +1821,7 @@ export const useAuthStore = defineStore('authStore', {
             }
             // 3) default
             if (window.location.pathname === '/login') {
-              window.location.replace('/dashboard')
+              window.location.replace('/today')
             }
           } catch {}
         }
@@ -1813,7 +1830,7 @@ export const useAuthStore = defineStore('authStore', {
       }
     },
 
-    async completeNativeAuthHandoff(code, redirectTarget = '/dashboard') {
+    async completeNativeAuthHandoff(code, redirectTarget = '/today') {
       this.setAuthenticating(true)
       this.loading = true
       try {
@@ -1862,12 +1879,12 @@ export const useAuthStore = defineStore('authStore', {
           provider: handoff?.provider || 'unknown',
           platform: handoff?.platform || 'unknown',
           redirect: normalizeRedirectPath(
-            redirectTarget || handoff?.redirect || localStorage.getItem('postLoginRedirect') || '/dashboard',
+            redirectTarget || handoff?.redirect || localStorage.getItem('postLoginRedirect') || '/today',
           ),
         })
         return {
           redirect: normalizeRedirectPath(
-            redirectTarget || handoff?.redirect || localStorage.getItem('postLoginRedirect') || '/dashboard',
+            redirectTarget || handoff?.redirect || localStorage.getItem('postLoginRedirect') || '/today',
           ),
         }
       } catch (error) {
@@ -2695,6 +2712,8 @@ export const useAuthStore = defineStore('authStore', {
     async logout() {
       this.setAuthenticating(false)
       this.logoutPending = true
+      // Biometric app lock belongs to this session; the next sign-in starts fresh.
+      clearAppLockPrefs()
       try {
         if (isNativePackagedApp() && this.user?.uid) {
           try {
@@ -2713,7 +2732,7 @@ export const useAuthStore = defineStore('authStore', {
         console.warn('Sign-out failed:', e)
       } finally {
         ElNotification({
-          title: 'Signed out 👋',
+          title: 'Signed out',
           message: 'You have successfully logged out.',
           type: 'info',
           duration: 1600,

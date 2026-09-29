@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-b from-indigo-950 via-slate-950 to-slate-950 text-white">
+  <div class="marketing-light min-h-screen bg-gradient-to-b from-indigo-950 via-slate-950 to-slate-950 text-slate-900">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 py-12 space-y-8">
       <header class="space-y-2">
         <p class="text-xs uppercase tracking-[0.35em] text-indigo-300">Feedback</p>

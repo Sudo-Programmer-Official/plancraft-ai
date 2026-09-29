@@ -4,6 +4,7 @@
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc.js'
 import timezone from 'dayjs/plugin/timezone.js'
+import { getEffectiveUserTimezone } from '@/utils/userTimezone'
 dayjs.extend(utc)
 dayjs.extend(timezone)
 
@@ -41,13 +42,9 @@ dayjs.extend(timezone)
 //   return true
 // }
 
-// Get user's timezone, defaulting to 'America/Chicago' if not available
+// Get the user's effective timezone, honoring the Settings preference.
 export function getUserTimezone() {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone
-  } catch {
-    return 'America/Chicago'
-  }
+  return getEffectiveUserTimezone()
 }
 
 export function formatLocalTime(date, tz) {

@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-slate-950 text-white p-6">
+  <div class="marketing-light min-h-screen flex items-center justify-center bg-slate-950 text-slate-900 p-6">
     <div class="max-w-md w-full space-y-4 bg-slate-900/70 border border-white/10 rounded-xl p-6 shadow-xl">
       <div class="text-3xl">⚠️ LinkedIn connection failed</div>
       <p class="text-slate-200 text-sm">

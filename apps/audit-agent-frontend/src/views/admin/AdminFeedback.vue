@@ -2,8 +2,8 @@
   <div class="space-y-4">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
-        <h2 class="text-2xl font-bold">User Feedback</h2>
-        <p class="text-sm text-indigo-200">Recent submissions from the feedback collection.</p>
+        <h2 class="text-2xl font-bold">Feedback & support queue</h2>
+        <p class="text-sm text-indigo-200">Review product feedback and support tickets from the app.</p>
       </div>
       <div class="flex items-center gap-2">
         <select
@@ -56,7 +56,7 @@
             <td class="px-3 py-3">
               <div class="inline-flex items-center gap-2 mb-1">
                 <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs bg-purple-500/20 text-purple-100 uppercase tracking-wide">
-                  {{ item.type }}
+                  {{ formatType(item) }}
                 </span>
                 <span v-if="item.rating" class="text-amber-200 text-xs">Rating: {{ item.rating }}/5</span>
                 <span v-else class="text-slate-500 text-xs">-</span>
@@ -139,6 +139,11 @@ function formatMeta(obj) {
   } catch {
     return ''
   }
+}
+
+function formatType(item) {
+  if (item?.type === 'support' || item?.context?.kind === 'support-ticket') return 'Support ticket'
+  return String(item?.type || 'general').replace(/(^|[-_])([a-z])/g, (_, prefix, letter) => `${prefix ? ' ' : ''}${letter.toUpperCase()}`)
 }
 
 async function fetchFeedback(cursor = null) {

@@ -14,7 +14,8 @@
     "lint": "eslint . --fix",
     "format": "prettier --write src/",
     "test:tz": "node scripts/test-timezones.mjs",
-    "tw:init": "tailwindcss init -p"
+    "tw:init": "tailwindcss init -p",
+    "marketing:images": "node scripts/optimize-marketing-screenshots.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",
@@ -23,6 +24,7 @@
     "@capacitor/core": "^8.2.0",
     "@capacitor/push-notifications": "^8.1.1",
     "@capgo/capacitor-audio-recorder": "^8.0.12",
+    "@capgo/capacitor-native-biometric": "^8.7.0",
     "@dataconnect/generated": "file:src/dataconnect-generated",
     "@element-plus/icons-vue": "^2.3.1",
     "@fontsource/poppins": "^5.2.6",
@@ -45,6 +47,7 @@
     "jspdf": "^3.0.1",
     "jszip": "^3.10.1",
     "libphonenumber-js": "^1.12.24",
+    "lucide-vue-next": "^1.0.0",
     "markdown-it": "^14.1.0",
     "mixpanel-browser": "^2.70.0",
     "pinia": "^3.0.1",
@@ -73,7 +76,7 @@
     "husky": "^9.1.7",
     "postcss": "^8.5.4",
     "prettier": "3.5.3",
-    "sharp": "^0.34.4",
+    "sharp": "^0.34.5",
     "vite": "^6.2.4",
     "vite-plugin-pwa": "^1.0.3",
     "vite-plugin-vue-devtools": "^7.7.2",

@@ -12,6 +12,7 @@ import { send as sendWhatsApp } from "./integrations/whatsappProvider.js";
 import { notifyReminderDue } from "./notificationService.js";
 import { formatLocalTime } from "../utils/timezone.js";
 import { extractTime } from "../utils/timeParser.js";
+import { trackServerEventAsync } from "./analyticsService.js";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -520,6 +521,12 @@ export async function createReminderFromText(
   });
   const ref = await db.collection("reminders").add(reminder);
   console.log(`[ReminderService:${logSource}] Stored docId =`, ref.id);
+  trackServerEventAsync(reminder.userId, "reminder_created", {
+    source: logSource,
+    reminder_type: reminder.type || null,
+    channels: reminder.channels,
+    has_task: !!reminder.taskId,
+  });
   await queueReminder({ id: ref.id, ...reminder });
 
   // Confirmation via WhatsApp (template + fallback)
@@ -668,8 +675,9 @@ export async function sendReminder(reminder) {
     link: meetingLink || eventLink || null,
   };
 
+  let deliveries = null;
   try {
-    await notifyReminderDue(userId, [reminderPayload], {
+    deliveries = await notifyReminderDue(userId, [reminderPayload], {
       limitTo,
       includeVoice,
       whatsappTemplate: normalizedChannels.includes("whatsapp")
@@ -718,7 +726,32 @@ export async function sendReminder(reminder) {
         { sentAt: new Date(), status: "sent", dispatchingAt: null },
         { merge: true },
       );
+    trackReminderDelivered(userId, {
+      deliveries,
+      source,
+      reminderType,
+      channels: normalizedChannels,
+      scheduledDate,
+    });
   }
+}
+
+function trackReminderDelivered(userId, { deliveries, source, reminderType, channels, scheduledDate }) {
+  const results = Array.isArray(deliveries) ? deliveries : [];
+  const deliveredCount = results.filter(
+    (r) => r && !r.skipped && !r.error && r.success !== false && r.ok !== false,
+  ).length;
+  trackServerEventAsync(userId, "reminder_delivered", {
+    status: deliveredCount > 0 ? "sent" : "failed",
+    delivered_channel_count: deliveredCount,
+    attempted_channel_count: results.length,
+    channels,
+    source,
+    reminder_type: reminderType || null,
+    delay_seconds: scheduledDate
+      ? Math.round((Date.now() - scheduledDate.getTime()) / 1000)
+      : null,
+  });
 }
 
 // ---------------------------------------------

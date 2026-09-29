@@ -97,6 +97,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { driver } from 'driver.js'
 import 'driver.js/dist/driver.css'
+import { trackOnboarding } from '@/services/analytics'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -164,6 +165,7 @@ watch(
   () => props.modelValue,
   (visible) => {
     if (visible) {
+      trackOnboarding('started', { step_count: props.steps.length })
       phase.value = 'intro'
       activeIndex.value = 0
       updateViewport()
@@ -309,17 +311,20 @@ function goPrev() {
 }
 
 function finishTour() {
+  trackOnboarding('completed', { step_count: props.steps.length })
   emit('finished')
   console.log('[Onboarding] finished')
   closeTour()
 }
 
 function handleSkip() {
+  trackOnboarding('skipped', { reason: 'skip', at_step: phase.value === 'steps' ? activeIndex.value + 1 : 0 })
   emit('skipped')
   closeTour()
 }
 
 function handleShowLater() {
+  trackOnboarding('skipped', { reason: 'later', at_step: phase.value === 'steps' ? activeIndex.value + 1 : 0 })
   emit('later')
   closeTour()
 }

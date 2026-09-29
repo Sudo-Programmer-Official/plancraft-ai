@@ -9,6 +9,7 @@ import dayjs from '../utils/dayjs.js'
 import utc from 'dayjs/plugin/utc.js'
 import timezone from 'dayjs/plugin/timezone.js'
 import { requireAuth, ensureUserMatches } from "../middleware/auth.js"
+import { trackServerEventAsync } from "../services/analyticsService.js"
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -315,6 +316,12 @@ async function handleBatchRequest(req, res) {
 
         const ref = await db.collection('reminders').add(reminderDoc)
         queueReminder({ id: ref.id, ...reminderDoc })
+        trackServerEventAsync(payload.userId, 'reminder_created', {
+          source: 'batch',
+          reminder_type: payload.type || null,
+          channels: payload.channels,
+          has_task: !!payload.taskId,
+        })
 
         // Mirror reminderTime to task document for UI freshness
         try {

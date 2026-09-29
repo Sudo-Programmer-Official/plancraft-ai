@@ -2,24 +2,16 @@
   <Teleport to="body">
     <el-dialog
       v-model="internalOpen"
-      :title="task ? `✏️ Edit Task` : `📅 Plan for ${formattedDate}`"
+      :title="task ? `✏️ Edit Task` : props.compact ? 'Create your first plan' : `📅 Plan for ${formattedDate}`"
       :width="dialogWidth"
       class="task-planner-dialog"
       modal-class="planner-overlay"
       destroy-on-close
       :lock-scroll="false"
-      :style="{
-        background: 'linear-gradient(145deg, #1e1b4b, #312e81, #4c1d95)',
-        color: '#e2e8f0',
-        borderRadius: '0.5rem',
-        boxShadow: '0 8px 30px rgba(0,0,0,0.6)',
-        border: '1px solid rgba(255,255,255,0.08)',
-        backdropFilter: 'blur(12px)',
-      }"
       @close="closeDialog"
     >
       <div class="planner-stack planner-stack--mobile-order">
-        <section v-show="showAdvancedSections" class="planner-card section-date">
+          <section v-show="showAdvancedSections" class="planner-card section-date">
           <div class="card-heading">
             <div>
               <p class="card-eyebrow">Plan basics</p>
@@ -89,15 +81,15 @@
         <section class="planner-card section-task">
           <div class="card-heading">
             <div>
-              <p class="card-eyebrow">Task idea</p>
-              <h3 class="card-title">What should we plan?</h3>
+              <p class="card-eyebrow">{{ props.compact ? 'First step' : 'Task idea' }}</p>
+              <h3 class="card-title">{{ props.compact ? 'What do you need to get done?' : 'What should we plan?' }}</h3>
             </div>
           </div>
           <el-input
             v-model="input"
             type="textarea"
             :rows="textareaRows"
-            placeholder="Speak or type your task..."
+            :placeholder="props.compact ? 'Type anything…' : 'Speak or type your task...'"
             resize="none"
             class="task-textarea"
           />
@@ -137,13 +129,14 @@
                   :title="plannerVoiceButtonLabel"
                 >
                   <VoiceRecorder
+                    surface="task_planner"
                     :autoCommit="true"
+                    icon-only
                     :disabled="loading"
                     :reset-trigger="plannerVoiceReset"
                     @transcribed="handleTranscript"
                     @state-change="onPlannerVoiceStateChange"
                   />
-                  <span class="mic-visual" aria-hidden="true"></span>
                 </div>
               </div>
             </div>
@@ -361,6 +354,8 @@
           <div class="planner-voice">
             <label class="field-label">Add via voice</label>
             <VoiceRecorder
+              surface="task_planner"
+              :icon-only="true"
               :disabled="props.readonly"
               :reset-trigger="detailsVoiceReset"
               @transcribed="appendDetails"
@@ -418,7 +413,7 @@
 
 <script setup>
 /* ---------------- Core Imports ---------------- */
-import { ref, computed, watch, onBeforeUnmount, onMounted } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, onMounted, nextTick } from 'vue'
 import { ElNotification, ElMessage } from 'element-plus'
 import VoiceRecorder from '@/components/VoiceRecorder.vue'
 import NotificationPrompt from '@/components/NotificationPrompt.vue'
@@ -504,6 +499,9 @@ const props = defineProps({
   readonly: Boolean,
   lockDate: Boolean,
   disableReminder: Boolean,
+  compact: { type: Boolean, default: false },
+  initialInput: { type: String, default: '' },
+  autoGenerate: { type: Boolean, default: false },
 })
 const emit = defineEmits(['close', 'saved'])
 
@@ -554,8 +552,14 @@ watch(internalOpen, (val) => {
   if (!val) emit('close')
 })
 onBeforeUnmount(() => setBodyScrollLocked(false))
-onMounted(() => {
+onMounted(async () => {
   if (internalOpen.value) setBodyScrollLocked(true)
+  if (props.autoGenerate && internalOpen.value && !task.value && props.initialInput?.trim()) {
+    await ensureReminderPreferences(true)
+    resetNewTaskState()
+    await nextTick()
+    await generateTasks()
+  }
 })
 const channelOptionIds = channelOptions.map((o) => o.id)
 
@@ -798,7 +802,7 @@ const generateButtonLabel = computed(() => {
   if (generationMode.value === 'imageAnalyzing') return 'Analyzing image…'
   if (loading.value) return 'Generating…'
   if (pendingGeneratedTasks.value.length) return 'Review Tasks'
-  return 'Generate Tasks'
+  return props.compact ? 'Plan it ✨' : 'Generate Tasks'
 })
 const generateState = computed(() => {
   if (pendingGeneratedTasks.value.length) return 'review'
@@ -957,7 +961,9 @@ const dialogWidth = computed(() => (screenWidth.value < 768 ? '92vw' : '520px'))
 const isMobile = computed(() => screenWidth.value < 768)
 const textareaRows = computed(() => (isMobile.value ? 2 : 3))
 const showAdvancedOnMobile = ref(false)
-const showAdvancedSections = computed(() => !isMobile.value || showAdvancedOnMobile.value)
+const showAdvancedSections = computed(() =>
+  !props.compact && (!isMobile.value || showAdvancedOnMobile.value),
+)
 
 /* ---------------- Watchers ---------------- */
 watch(
@@ -970,10 +976,14 @@ watch(
       return
     }
     await ensureReminderPreferences(true)
-    await ensureNotificationPrompt()
+    if (!props.compact) await ensureNotificationPrompt()
     showAdvancedOnMobile.value = !!props.editMode
     if (!task.value) {
       resetNewTaskState()
+    }
+    if (props.autoGenerate && !task.value && props.initialInput?.trim()) {
+      await nextTick()
+      await generateTasks()
     }
   },
 )
@@ -1090,7 +1100,7 @@ async function ensureNotificationPrompt() {
 
 function resetNewTaskState() {
   logTimeBrainDialog('reset-new-task-state', { reason: 'create-mode' })
-  assignText(input, '')
+  assignText(input, props.initialInput)
   assignText(details, '')
   assignText(link, '')
   reminderTime.value = ''
@@ -1216,7 +1226,7 @@ async function tryPrefillReminder(task) {
     if (!st || (before && before !== reminderTime.value)) return
 
     const iso = typeof st === 'string' ? st : st.toISOString?.() || String(st)
-    const userTz = task?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
+    const userTz = task?.timezone || getUserTimezone()
     applyReminderIso(iso, { allowDateChange: false, timezoneOverride: userTz })
   } catch (err) {
     console.warn('Prefill reminder failed', err)
@@ -1230,7 +1240,7 @@ function buildLocalIso(ymd, hhmm) {
   let tz =
     typeof tzCandidate === 'string' && tzCandidate.includes('/')
       ? tzCandidate
-      : Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+      : getUserTimezone()
   return toUtcIso(String(ymd || ''), String(hhmm || '00:00'), tz)
 }
 
@@ -1242,7 +1252,7 @@ function applyReminderIso(isoInput, options = {}) {
     const tz =
       typeof tzCandidate === 'string' && tzCandidate.includes('/')
         ? tzCandidate
-        : Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+        : getUserTimezone()
     const sourceValue = (() => {
       if (!isoInput && isoInput !== 0) return null
       if (typeof isoInput?.toDate === 'function') {
@@ -1358,7 +1368,7 @@ async function inferReminderTimeFromInput() {
     const tz =
       typeof tzCandidate === 'string' && tzCandidate.includes('/')
         ? tzCandidate
-        : Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+        : getUserTimezone()
 
     const isRelativeHint = RELATIVE_HINT_PATTERN.test(raw)
     const now = new Date()
@@ -1534,7 +1544,7 @@ async function generateTasks() {
   const tz =
     typeof tzCandidate === 'string' && tzCandidate.includes('/')
       ? tzCandidate
-      : Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+      : getUserTimezone()
 
   const contextTasks = collectContextTasks(selectedDate.value, tz)
   const lastTaskEnd = computeLastTaskEndIso(contextTasks, tz)
@@ -1858,7 +1868,7 @@ async function save() {
   const reminderTimezone =
     typeof tzCandidate === 'string' && tzCandidate.includes('/')
       ? tzCandidate
-      : Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+      : getUserTimezone()
   const baseIso = reminderToSave
     ? computeReminderScheduleIso({
         date: dateToSave,
@@ -1909,7 +1919,7 @@ function enforceFutureReminder(iso, { allowDateChange = true } = {}) {
     const tz =
       typeof tzCandidate === 'string' && tzCandidate.includes('/')
         ? tzCandidate
-        : Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+        : getUserTimezone()
 
     const local = dayjs(iso).tz(tz)
     if (!local.isValid()) return iso
@@ -1942,7 +1952,7 @@ function coerceFutureReminderIso(isoInput, { timezoneOverride } = {}) {
     const tz =
       typeof tzCandidate === 'string' && tzCandidate.includes('/')
         ? tzCandidate
-        : Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+        : getUserTimezone()
 
     const local = dayjs(isoInput).tz(tz)
     if (!local.isValid()) return isoInput
@@ -2016,7 +2026,7 @@ async function resolveVoiceTaskIntent(rawValue) {
     const tz =
       typeof tzCandidate === 'string' && tzCandidate.includes('/')
         ? tzCandidate
-        : Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+        : getUserTimezone()
     const result = await generateTasksFromText(rawValue, {
       planDate: selectedDate.value,
       timezone: tz,
@@ -2363,6 +2373,8 @@ function appendDetails(result = {}) {
 }
 
 .mic-btn {
+  width: 52px;
+  height: 52px;
   border: none;
   padding: 0;
   background: transparent;
@@ -2464,6 +2476,35 @@ function appendDetails(result = {}) {
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 4a8 8 0 1 0 7.75 10h-2.1A6 6 0 1 1 12 6v2.2l3.4-3.2L12 1.8V4Z'/%3E%3C/svg%3E")
     center / 18px 18px no-repeat;
   animation: mic-icon-spin 0.9s linear infinite;
+}
+
+/* Keep the real recorder button visible and clickable in the compact dialog. */
+.mic-btn :deep(.voice-controller) {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  opacity: 1;
+  pointer-events: auto;
+  justify-content: center;
+}
+
+.mic-btn :deep(.voice-controller__button) {
+  width: 46px;
+  height: 46px;
+}
+
+.mic-btn :deep(.voice-controller__text),
+.mic-btn :deep(.voice-controller__reset) {
+  display: none;
+}
+
+.mic-visual {
+  display: none;
 }
 
 @keyframes mic-pulse {
@@ -3538,5 +3579,205 @@ function appendDetails(result = {}) {
   justify-content: flex-end;
   gap: 0.5rem;
   margin-top: 0.75rem;
+}
+
+/* Keep the planner aligned with the shared light PlanCraft surface. The
+   older planner styles above are intentionally retained for layout, while
+   this final layer owns the current application theme. */
+.planner-overlay {
+  background: rgba(15, 23, 42, 0.32) !important;
+  backdrop-filter: blur(8px);
+}
+
+.el-dialog.task-planner-dialog {
+  background: var(--pc-surface, #ffffff) !important;
+  color: var(--pc-text, #0f172a) !important;
+  border: 1px solid var(--pc-border, #e2e8f0) !important;
+  border-radius: 1.25rem !important;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.18) !important;
+  backdrop-filter: none !important;
+}
+
+.task-planner-dialog .el-dialog__header {
+  background: var(--pc-surface, #ffffff);
+  border-bottom-color: var(--pc-border, #e2e8f0);
+}
+
+.task-planner-dialog .el-dialog__title,
+.task-planner-dialog .el-dialog__header .el-dialog__title {
+  color: var(--pc-text, #0f172a) !important;
+}
+
+.task-planner-dialog .el-dialog__headerbtn {
+  background: var(--pc-surface-2, #f1f3fa) !important;
+  border-color: var(--pc-border, #e2e8f0) !important;
+}
+
+.task-planner-dialog .el-dialog__headerbtn:hover {
+  background: var(--pc-surface-hover, #eceff8) !important;
+  border-color: var(--pc-border-strong, #cbd5e1) !important;
+}
+
+.task-planner-dialog .el-dialog__headerbtn .el-dialog__close {
+  color: var(--pc-text-muted, #475569) !important;
+}
+
+.task-planner-dialog .planner-card {
+  background: var(--pc-surface, #ffffff) !important;
+  border-color: var(--pc-border, #e2e8f0) !important;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06) !important;
+}
+
+.task-planner-dialog .card-eyebrow,
+.task-planner-dialog .field-label,
+.task-planner-dialog .voice-title {
+  color: var(--pc-accent-text, #4338ca) !important;
+}
+
+.task-planner-dialog .card-title {
+  color: var(--pc-text, #0f172a) !important;
+}
+
+.task-planner-dialog .card-subtitle,
+.task-planner-dialog .field-help,
+.task-planner-dialog .datetime-hint,
+.task-planner-dialog .repeat-custom-inline__suffix,
+.task-planner-dialog .voice-hint,
+.task-planner-dialog .attachment-status,
+.task-planner-dialog .generated-preview__details {
+  color: var(--pc-text-muted, #475569) !important;
+}
+
+.task-planner-dialog .card-toggle,
+.task-planner-dialog .planner-advanced-toggle,
+.task-planner-dialog .save-draft-btn,
+.task-planner-dialog .reminder-toggle,
+.task-planner-dialog .channel-icon,
+.task-planner-dialog .attachment-chip,
+.task-planner-dialog .generated-preview__item {
+  background: var(--pc-surface-2, #f1f3fa) !important;
+  border-color: var(--pc-border, #e2e8f0) !important;
+  color: var(--pc-text, #0f172a) !important;
+  box-shadow: none !important;
+}
+
+.task-planner-dialog .card-toggle:hover,
+.task-planner-dialog .planner-advanced-toggle:hover,
+.task-planner-dialog .save-draft-btn:hover:not(:disabled) {
+  background: var(--pc-surface-hover, #eceff8) !important;
+  border-color: var(--pc-border-strong, #cbd5e1) !important;
+}
+
+.task-planner-dialog .repeat-preset {
+  background: var(--pc-surface-2, #f1f3fa) !important;
+  border-color: var(--pc-border, #e2e8f0) !important;
+  color: var(--pc-text-muted, #475569) !important;
+}
+
+.task-planner-dialog .repeat-preset:hover:not(:disabled),
+.task-planner-dialog .repeat-preset--active {
+  background: var(--pc-accent-soft, rgba(79, 70, 229, 0.08)) !important;
+  border-color: var(--pc-accent, #4f46e5) !important;
+  color: var(--pc-accent-text, #4338ca) !important;
+}
+
+.task-planner-dialog .task-textarea .el-textarea__inner,
+.task-planner-dialog .el-input__inner,
+.task-planner-dialog .el-textarea__inner {
+  background: var(--pc-bg, #f6f7fc) !important;
+  color: var(--pc-text, #0f172a) !important;
+  border-color: var(--pc-border-strong, #cbd5e1) !important;
+}
+
+.task-planner-dialog .el-input__inner::placeholder,
+.task-planner-dialog .el-textarea__inner::placeholder {
+  color: var(--pc-text-subtle, #64748b) !important;
+}
+
+.task-planner-dialog .el-input__wrapper,
+.task-planner-dialog .el-select__wrapper {
+  background: var(--pc-bg, #f6f7fc) !important;
+  border-color: var(--pc-border-strong, #cbd5e1) !important;
+  box-shadow: none !important;
+}
+
+.task-planner-dialog .el-input__wrapper:hover,
+.task-planner-dialog .el-select__wrapper:hover,
+.task-planner-dialog .el-input__wrapper.is-focus,
+.task-planner-dialog .el-select__wrapper.is-focused {
+  background: var(--pc-surface, #ffffff) !important;
+  border-color: var(--pc-accent, #4f46e5) !important;
+  box-shadow: 0 0 0 3px var(--pc-focus-ring, rgba(79, 70, 229, 0.18)) !important;
+}
+
+.task-planner-dialog .el-select__selected-item,
+.task-planner-dialog .el-select__placeholder,
+.task-planner-dialog .el-select__caret,
+.task-planner-dialog .el-input-number .el-input__inner {
+  color: var(--pc-text, #0f172a) !important;
+}
+
+.task-planner-dialog .generate-btn {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed) !important;
+  border-color: transparent !important;
+  color: #ffffff !important;
+  box-shadow: 0 12px 28px rgba(79, 70, 229, 0.2) !important;
+}
+
+.task-planner-dialog .generate-btn:disabled {
+  background: var(--pc-surface-2, #f1f3fa) !important;
+  border-color: var(--pc-border, #e2e8f0) !important;
+  color: var(--pc-text-subtle, #64748b) !important;
+  box-shadow: none !important;
+}
+
+.task-planner-dialog .planner-cancel-btn {
+  background: var(--pc-surface-2, #f1f3fa) !important;
+  border-color: var(--pc-border-strong, #cbd5e1) !important;
+  color: var(--pc-text, #0f172a) !important;
+  box-shadow: none !important;
+}
+
+.task-planner-dialog .planner-cancel-btn:hover {
+  background: var(--pc-surface-hover, #eceff8) !important;
+  border-color: var(--pc-accent, #4f46e5) !important;
+  color: var(--pc-text, #0f172a) !important;
+}
+
+.task-planner-dialog .section-divider,
+.task-planner-dialog .el-dialog__footer {
+  border-color: var(--pc-border, #e2e8f0) !important;
+}
+
+.task-planner-dialog .channel-icon--active {
+  background: var(--pc-accent-soft, rgba(79, 70, 229, 0.08)) !important;
+  border-color: var(--pc-accent, #4f46e5) !important;
+  color: var(--pc-accent-text, #4338ca) !important;
+}
+
+.task-planner-dialog .attachment-thumb {
+  border-color: var(--pc-border, #e2e8f0) !important;
+}
+
+.task-planner-dialog .attachment-chip__pdf,
+.task-planner-dialog .generated-preview__title,
+.task-planner-dialog .generated-preview__badge,
+.task-planner-dialog .attachment-remove {
+  color: var(--pc-text, #0f172a) !important;
+}
+
+.task-planner-dialog .mic-btn :deep(.voice-controller__button) {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed) !important;
+  border-color: transparent !important;
+  color: #ffffff !important;
+  box-shadow: 0 10px 22px rgba(79, 70, 229, 0.2) !important;
+}
+
+.task-planner-dialog .el-dialog__body::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.3);
+}
+
+.task-planner-dialog .el-dialog__body {
+  scrollbar-color: rgba(100, 116, 139, 0.35) transparent;
 }
 </style>

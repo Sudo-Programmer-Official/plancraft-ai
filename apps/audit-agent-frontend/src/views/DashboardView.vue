@@ -5,10 +5,8 @@
   </div>
   <main
     v-else
-    class="min-h-screen w-full min-w-0 max-w-7xl mx-auto overflow-x-hidden px-2 py-6 pb-12 transition-colors sm:px-4 md:px-6 flex flex-col gap-6 lg:gap-8"
+    class="today-dashboard min-h-screen w-full min-w-0 max-w-5xl mx-auto overflow-x-hidden px-4 py-4 pb-8 transition-colors sm:px-5 md:px-6 flex flex-col gap-5 lg:gap-7"
   >
-    <GuestBanner :isGuest="authStore.guest" class="order-1" @login="redirectToLogin" />
-
     <OnboardingTour
       v-model="onboardingTourVisible"
       :steps="onboardingSteps"
@@ -19,7 +17,7 @@
     />
 
     <section
-      v-if="showQuickSetupBanner"
+      v-if="false && showQuickSetupBanner"
       class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-2"
     >
       <div class="dashboard-card quick-setup-banner flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -43,166 +41,60 @@
       </div>
     </section>
 
-    <!-- Tier 1 · Overview -->
-    <section class="space-y-4 order-3">
-      <div class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4">
-        <div class="dashboard-card greeting-card max-w-full min-w-0 space-y-4">
-          <div>
-            <p class="text-xs sm:text-sm uppercase tracking-widest text-indigo-300/80">
-              Your companion workspace
-            </p>
-            <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
-              <div class="greeting-headline-wrapper flex-1 min-w-0">
-                <transition name="greeting-fade" mode="out-in">
-                  <h1
-                    class="text-2xl sm:text-3xl font-semibold text-slate-100 w-full leading-tight"
-                    :key="greetingHeadline"
-                  >
-                    {{ greetingHeadline }}
-                  </h1>
-                </transition>
-              </div>
-              <span
-                v-if="dailyTasks.length"
-                class="text-indigo-200/90 text-sm sm:text-base sm:whitespace-nowrap"
-              >
-                Let’s craft an intentional day.
-              </span>
-            </div>
+    <!-- Tier 1 · Today context -->
+    <section class="today-intro-section dashboard-section order-1">
+      <div class="today-intro">
+        <div class="min-w-0">
+          <p class="today-eyebrow">Today</p>
+          <div class="greeting-headline-wrapper">
+            <transition name="greeting-fade" mode="out-in">
+              <h1 class="today-intro__title" :key="greetingHeadline">
+                {{ greetingHeadline }}
+              </h1>
+            </transition>
           </div>
+          <p class="today-intro__summary">
+            {{ dailyTasks.length }} task{{ dailyTasks.length === 1 ? '' : 's' }} today
+            <span aria-hidden="true">·</span>
+            Pick one and make progress.
+          </p>
+        </div>
 
-          <div class="insight-wrapper">
-            <transition-group name="slide" tag="div">
-              <div
-                v-if="currentInsight"
-                :key="currentInsight"
-                class="text-indigo-200/90 text-sm sm:text-base max-w-2xl leading-relaxed"
-              >
-                {{ currentInsight }}
-              </div>
-            </transition-group>
-          </div>
-
-          <div
-            class="now-bar max-w-full min-w-0 rounded-xl bg-indigo-900/40 border border-indigo-700/40 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
-          >
-            <div class="flex min-w-0 items-center gap-2 text-slate-200">
-              <span class="text-xl">🕐</span>
-              <span class="font-medium text-sm sm:text-base">Current Focus</span>
-            </div>
-            <div class="min-w-0 break-words text-indigo-200 text-sm sm:text-base font-medium">
-              {{ currentFocusTask?.title || "All caught up — take a mindful pause." }}
-            </div>
-          </div>
+        <div v-if="activeFocusTask" class="today-active-focus">
+          <span class="today-active-focus__label">
+            Focusing now<span v-if="focus.phase === 'running' && focus.remainingMs != null"> · {{ formatFocusRemaining(focus.remainingMs) }} remaining</span>
+          </span>
+          <span class="today-active-focus__task">{{ activeFocusTask.title }}</span>
+        </div>
+        <div v-else-if="nextUpTask" class="today-next-up">
+          <span class="today-next-up__label">Next up</span>
+          <span class="today-next-up__task">{{ nextUpTask.title }}</span>
+          <span class="today-next-up__meta">{{ taskPreviewMeta(nextUpTask) }}</span>
         </div>
       </div>
-
     </section>
 
-    <div
-      v-if="showCarryoverBanner || showReminderPlanBanner || reactivateEligible"
-      class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-4"
-    >
-      <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-        <div
-          v-if="showCarryoverBanner"
-          class="move-card move-card--full flex flex-col justify-between p-4 rounded-2xl bg-gradient-to-b from-[#431f64] to-[#291642] shadow-lg text-white space-y-3"
-        >
-          <div class="text-content">
-            <p class="text-xl font-semibold">
-              {{ carryoverCount }} unfinished task{{ carryoverCount === 1 ? '' : 's' }} from yesterday.
-            </p>
-            <p class="text-sm text-gray-300 mt-1">
-              Move a few forward so today starts lighter.
-            </p>
-          </div>
-
-          <div class="flex flex-col sm:flex-row gap-2">
-            <button
-              type="button"
-              class="flex-1 py-2 rounded-lg move-primary-btn font-semibold text-white transition"
-              @click="applyCarryover(Math.min(3, carryoverCount))"
-            >
-              Move {{ Math.min(3, carryoverCount) }}
-            </button>
-            <button
-              type="button"
-              class="flex-1 py-2 rounded-lg move-secondary-btn font-semibold text-white transition"
-              @click="applyCarryover('all')"
-            >
-              Move All
-            </button>
-            <button
-              type="button"
-              class="px-4 py-2 rounded-lg border border-gray-500 font-semibold text-gray-300 hover:bg-gray-800 transition"
-              @click="ignoreCarryover()"
-            >
-              Ignore
-            </button>
-          </div>
-        </div>
-
-        <div
-          v-if="showReminderPlanBanner"
-          class="dashboard-banner bg-indigo-600/10 border-indigo-500/40 text-indigo-100 flex items-center justify-between gap-3"
-        >
-          <div class="flex items-center gap-2">
-            <span class="text-xl">🚀</span>
-            <div class="space-y-1">
-              <p class="text-sm sm:text-base">
-                {{ reminderPlanBannerText }}
-              </p>
-              <p
-                v-if="isAppleBillingSafeMode && isReminderLimitReached"
-                class="text-xs text-indigo-100/75"
-              >
-                Upgrade to Solo Premium here, or refresh access if this account already belongs to a paid workspace.
-              </p>
-            </div>
-          </div>
-          <button
-            v-if="!isGuest.value"
-            @click="goToUpgrade"
-            class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold"
-          >
-            {{ reminderPlanBannerCta }}
-          </button>
-          <RouterLink
-            v-else
-            to="/login"
-            class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold"
-          >
-            🔑 Sign in
-          </RouterLink>
-        </div>
-
-        <div
-          v-if="reactivateEligible"
-          class="dashboard-banner bg-yellow-500/10 border-yellow-400/30 text-yellow-50 flex items-start gap-3"
-        >
-          <span class="text-xl">🔁</span>
-          <div class="flex-1 space-y-1">
-            <p class="font-medium text-sm sm:text-base">
-              Premium until {{ cancelAtFmt }}
-              <span v-if="daysLeft > 0">
-                ({{ daysLeft }} day{{ daysLeft === 1 ? '' : 's' }} left)
-              </span>
-            </p>
-            <p class="text-xs sm:text-sm opacity-80">
-              Reactivate instantly to keep all pro automations and reminders.
-            </p>
-          </div>
-          <button
-            @click="onReactivate"
-            class="px-3 py-1.5 rounded-lg bg-black/30 hover:bg-black/45 text-yellow-50 text-xs font-semibold"
-          >
-            Reactivate
-          </button>
-        </div>
+    <section v-if="showCarryoverBanner" class="backlog-review dashboard-section order-4">
+      <div class="backlog-review__copy">
+        <p class="backlog-review__eyebrow">PlanCraft noticed</p>
+        <h2>
+          {{ carryoverCount }} older task{{ carryoverCount === 1 ? '' : 's' }} need attention.
+        </h2>
+        <p>I can help clean them up.</p>
       </div>
-    </div>
+      <div class="backlog-review__actions">
+        <RouterLink to="/inbox" class="backlog-review__primary">Review backlog</RouterLink>
+        <details class="backlog-review__menu">
+          <summary aria-label="More backlog actions">···</summary>
+          <div class="backlog-review__menu-popover">
+            <RouterLink to="/tasks">Open all tasks</RouterLink>
+            <button type="button" @click="ignoreCarryover">Hide for today</button>
+          </div>
+        </details>
+      </div>
+    </section>
 
-    <section v-if="!isMobileDashboard" class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-6">
+    <section v-if="false && !isMobileDashboard" class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-6">
       <div class="dashboard-card flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div class="space-y-1">
           <p class="text-[11px] uppercase tracking-[0.3em] text-indigo-200/80">Layout</p>
@@ -234,7 +126,7 @@
       </div>
     </section>
 
-    <section v-if="isMobileDashboard" class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-6">
+    <section v-if="false && isMobileDashboard" class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-6">
       <div class="dashboard-card flex items-center justify-between gap-3">
         <div class="space-y-1">
           <p class="text-[11px] uppercase tracking-[0.3em] text-indigo-200/80">Workspace Modules</p>
@@ -255,10 +147,11 @@
     <!-- Tier 2 · Workspaces -->
     <div
       v-if="showDaily"
+      id="focus"
       class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-3"
     >
         <div
-          class="dashboard-card daily-card max-w-full min-w-0 space-y-5"
+          class="dashboard-card daily-card today-workspace max-w-full min-w-0 space-y-5"
           data-onboarding="today-focus"
           :class="{ 'daily-card--fullscreen': isTodayFullscreen }"
         >
@@ -271,7 +164,7 @@
                   aria-label="Choose date"
                   @click="openFocusDatePicker"
                 >
-                  <span class="text-lg leading-none" aria-hidden="true">📅</span>
+                    <span class="text-xs font-medium" aria-hidden="true">Date</span>
                 </button>
                 <div class="focus-date-main">
                   <div class="focus-date-pill flex w-full sm:w-auto flex-1 sm:flex-none items-center gap-1 rounded-xl bg-slate-800/60 border border-slate-700/50 px-1 py-0.5 min-w-0">
@@ -333,7 +226,7 @@
                 class="daily-card__plan-btn inline-flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg text-white bg-gradient-to-r from-pink-500 to-indigo-600 hover:from-pink-600 hover:to-indigo-700 shadow-md transition"
               >
                 <span class="text-base">＋</span>
-                <span class="whitespace-nowrap">Plan New Task</span>
+                <span class="whitespace-nowrap">Add task</span>
               </button>
             </div>
           </div>
@@ -364,29 +257,15 @@
               :class="[
                 'category-filter-chip flex-shrink-0 px-3 py-1.5 rounded-lg font-medium text-xs transition-all duration-300 ease-in-out',
                 dashboardCategory === category
-                  ? 'bg-indigo-700 text-white shadow-[0_0_14px_rgba(99,102,241,0.5)]'
-                  : 'bg-slate-800/70 text-slate-300 hover:bg-slate-700/80',
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'bg-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-800',
               ]"
             >
-              <span class="mr-1 text-base leading-none">{{ categoryIcon(category) }}</span>
               {{ category }}
             </button>
           </div>
 
-          <div class="space-y-3">
-            <div class="progress-card bg-slate-900/50 border border-slate-700/40 rounded-xl px-4 py-3">
-              <div class="flex items-center justify-between text-xs sm:text-sm text-slate-300 mb-2">
-                <span>Completion</span>
-                <span>{{ dailyProgress }}%</span>
-              </div>
-              <div class="h-2 rounded-full bg-slate-800 overflow-hidden">
-                <div
-                  class="h-full rounded-full bg-gradient-to-r from-indigo-400 via-indigo-500 to-emerald-400 transition-all"
-                  :style="{ width: `${dailyProgress}%` }"
-                ></div>
-              </div>
-            </div>
-
+          <div>
             <div
               ref="dailyList"
               class="today-list overflow-y-auto max-h-[60vh] md:max-h-64 scrollbar-plan rounded-2xl pr-1"
@@ -411,84 +290,100 @@
                     <span class="dashboard-task-skeleton-action" aria-hidden="true" />
                   </div>
                 </div>
-                <ul v-else-if="filteredDaily.length" :key="focusSelectedDate" class="space-y-2 text-sm">
-                  <li
-                    v-for="task in filteredDaily"
-                    :key="task.id"
-                  :class="[
-                    'flex max-w-full min-w-0 items-center justify-between gap-3 p-3 rounded-xl transition border',
-                    activeTaskId === task.id
-                      ? 'bg-indigo-900/60 border-indigo-400/70 shadow-[0_0_12px_rgba(99,102,241,0.35)]'
-                      : 'bg-slate-900/70 border-slate-800/80 hover:border-indigo-500/40',
-                  ]"
+                <transition-group
+                  v-else-if="visibleDaily.length"
+                  :key="focusSelectedDate"
+                  name="today-task"
+                  tag="ul"
+                  class="today-task-list space-y-2 text-sm"
                 >
-                  <div class="flex min-w-0 flex-1 items-start gap-3">
-                    <input
-                      type="checkbox"
-                      :checked="task.completed"
-                      @change="() => toggleComplete(task)"
-                      class="mt-0.5 w-4 h-4 cursor-pointer accent-indigo-500"
-                    />
-                    <div class="min-w-0 flex-1 space-y-1">
-                      <div class="flex flex-wrap items-center gap-2">
-                        <span
-                          class="min-w-0 break-words font-medium"
-                          :class="{ 'line-through text-slate-500': task.completed, 'text-slate-100': !task.completed }"
+                  <li
+                    v-for="task in visibleDaily"
+                    :key="task.id"
+                    class="today-task-row"
+                    :class="{
+                      'today-task-row--active': activeTaskId === task.id,
+                      'today-task-row--completed': task.completed,
+                    }"
+                  >
+                  <div class="today-task-row__main">
+                    <button
+                      type="button"
+                      class="today-completion-ring"
+                      :class="{ 'today-completion-ring--completed': task.completed }"
+                      :aria-label="`${task.completed ? 'Mark' : 'Complete'} ${task.title}`"
+                      @click.stop="toggleComplete(task)"
+                    >
+                      <span aria-hidden="true">{{ task.completed ? '✓' : '' }}</span>
+                    </button>
+                    <div class="today-task-row__content">
+                      <div class="today-task-row__title-line">
+                        <button
+                          type="button"
+                          class="today-task-title"
+                          :class="{ 'today-task-title--completed': task.completed }"
+                          @click.stop="openDialog(task)"
                         >
                           {{ task.title }}
-                        </span>
+                        </button>
                         <div
-                          class="task-category-pill inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/80 text-[11px] font-medium shadow-sm"
+                          class="task-category-pill today-task-category"
                           :class="categoryColor(task.category)"
                         >
-                          <span class="leading-none">{{ categoryIcon(task.category) }}</span>
                           <span>{{ categoryLabel(task.category) }}</span>
                         </div>
                       </div>
-                      <div class="flex flex-wrap items-center gap-2 text-xs text-slate-400">
-                        <small>{{ task.date }}</small>
+                      <div class="today-task-meta">
+                        <span>{{ task.date === todayKeyRef ? 'Today' : task.date }}</span>
+                        <span v-if="focusRecommendation(task)" class="today-task-duration">
+                          ~{{ focusRecommendation(task).minutes }} min
+                        </span>
+                        <span v-if="activeTaskId === task.id && focus.phase === 'running'" class="today-task-focus-status">
+                          Focusing · {{ focus.remainingMs == null ? 'Open-ended' : formatFocusRemaining(focus.remainingMs) }} remaining
+                        </span>
                         <a
                           v-if="taskMeetingLink(task)"
                           :href="taskMeetingLink(task).url"
                           target="_blank"
                           rel="noopener noreferrer"
-                          class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-700/80 text-white hover:bg-emerald-800 transition text-[11px]"
+                          class="today-task-link"
                           :title="taskMeetingLink(task).label"
                         >
-                          🔗 {{ taskMeetingLink(task).label }}
+                          {{ taskMeetingLink(task).label }}
                         </a>
                       </div>
                     </div>
                   </div>
-                  <div class="flex shrink-0 items-center gap-2">
-                    <button
-                      v-if="!task.completed"
-                      @click.stop="markTaskActive(task)"
-                      class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold border transition"
-                      :class="activeTaskId === task.id ? 'border-indigo-400 bg-indigo-900/60 text-indigo-100' : 'border-slate-600 bg-slate-800/70 text-slate-200 hover:border-indigo-400 hover:text-white'"
-                    >
-                      <span class="text-xs">{{ activeTaskId === task.id ? '▶ Active' : 'Start' }}</span>
-                    </button>
+                  <div class="today-task-row__actions">
+                    <FocusButton
+                      v-if="!task.completed && focusRecommendation(task)"
+                      :task="task"
+                      :recommended-minutes="focusRecommendation(task).minutes"
+                      :auto-start="true"
+                      @started="handleFocusStarted"
+                    />
                     <button
                       v-if="reminderActiveByTask[task.id]"
                       @click.stop="onReminderClick(task)"
-                      class="text-yellow-400 hover:opacity-80 text-lg"
+                      class="today-task-reminder"
                       title="Reminder active — click to manage"
                     >
-                      🔔
+                      <span aria-hidden="true">•</span>
+                      <span class="sr-only">Reminder active</span>
                     </button>
-                    <button
-                      @click.stop="openDialog(task)"
-                      class="text-slate-300 hover:text-indigo-300 text-sm"
-                      title="Edit Task"
-                    >
-                      ✏️
-                    </button>
+                    <TaskOptionsMenu
+                      :task="task"
+                      class="today-task-options"
+                      :show-focus="!task.completed"
+                      @edit="openDialog"
+                      @toggle="toggleComplete"
+                      @start-focus="startFocusFromMenu"
+                    />
                   </div>
                 </li>
-              </ul>
+                </transition-group>
               <ul v-else :key="`empty-${focusSelectedDate}`" class="space-y-2 text-sm text-slate-400 text-center py-6">
-                <li>{{ dashboardCategory === 'All' ? 'No tasks for this day.' : 'No tasks in this category.' }}</li>
+                <li>{{ emptyDailyMessage }}</li>
               </ul>
               </transition>
             </div>
@@ -505,6 +400,24 @@
           />
         </div>
       </div>
+
+    <section v-if="isFocusToday && tomorrowTaskCount" class="tomorrow-preview dashboard-section order-5">
+      <div class="tomorrow-preview__header">
+        <div>
+          <p class="tomorrow-preview__eyebrow">Tomorrow</p>
+          <p class="tomorrow-preview__summary">
+            {{ tomorrowTaskCount }} task{{ tomorrowTaskCount === 1 ? '' : 's' }} planned
+          </p>
+        </div>
+        <RouterLink to="/tasks" class="tomorrow-preview__link">View →</RouterLink>
+      </div>
+      <ul class="tomorrow-preview__list" aria-label="Tomorrow's tasks">
+        <li v-for="task in tomorrowTasks" :key="task.id">
+          <span class="tomorrow-preview__task">{{ task.title }}</span>
+          <span class="tomorrow-preview__meta">{{ taskPreviewMeta(task) }}</span>
+        </li>
+      </ul>
+    </section>
 
     <div
       v-if="showAllTasks && showOptionalModules"
@@ -718,7 +631,7 @@
         </div>
       </div>
 
-    <section class="space-y-4 lg:space-y-5 order-7">
+    <section v-if="showOptionalModules" class="space-y-4 lg:space-y-5 order-7">
         <div
           v-if="showWeekly && showOptionalModules"
           class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4"
@@ -1160,7 +1073,7 @@
         </div>
       </div>
 
-  <div class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4">
+  <div v-if="false" class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4">
         <div class="dashboard-card report-card space-y-4">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="flex items-center gap-2">
@@ -1266,7 +1179,7 @@
     </section>
 
     <!-- Tier 4 · AI Quick Actions -->
-    <section class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-9">
+    <section v-if="false" class="dashboard-section w-full overflow-hidden max-w-full px-2 sm:px-4 order-9">
       <div class="dashboard-card flex flex-col items-center gap-4 text-center">
         <h3 class="text-base sm:text-lg font-semibold text-slate-100">✨ AI Quick Actions</h3>
         <p class="text-xs sm:text-sm text-indigo-200/80 max-w-2xl">
@@ -1300,6 +1213,16 @@
       </div>
     </section>
 
+    <transition name="completion-toast">
+      <div v-if="completionToast" class="completion-toast" role="status" aria-live="polite">
+        <span class="completion-toast__message">
+          <span class="completion-toast__check" aria-hidden="true">✓</span>
+          {{ completionToast.title }} completed
+        </span>
+        <button type="button" class="completion-toast__undo" @click="undoCompletion">Undo</button>
+      </div>
+    </transition>
+
   </main>
 </template>
 
@@ -1310,23 +1233,22 @@ import { auth } from '@/firebase/init'
 import { onAuthStateChanged } from 'firebase/auth'
 import { toLocalDateKey, parseLocalDateKey } from '@/utils/dateHelper'
 import { summarizeTasks } from '@/services/aiService'
-import GuestBanner from '@/components/GuestBanner.vue'
 import OnboardingTour from '@/components/OnboardingTour.vue'
 import { useAuthStore } from '@/stores/authStore'
 import { useAccessStore } from '@/stores/accessStore'
 import TaskPlannerDialog from '@/components/TaskPlannerDialog.vue'
+import FocusButton from '@/components/focus/FocusButton.vue'
+import TaskOptionsMenu from '@/components/TaskOptionsMenu.vue'
+import { useFocusStore } from '@/stores/focusStore'
 import { useTasks } from '@/composables/useTasks'
 import { addTaskToFirebase, updateTaskInFirebase, fetchEntries } from '@/services/firebaseService'
 import QuickLinksCard from '@/components/QuickLinksCard.vue'
-import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useQuickSetupStore } from '@/stores/quickSetupStore'
-import { reactivateSubscription } from '@/services/stripeService'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
 import { useAuthFlags } from '@/composables/useAuthFlags'
 import { useDayClock } from '@/composables/useDayClock'
-import { trackLinkedInConversion } from '@/utils/ads'
 import { trackGuestDashboardLoaded } from '@/services/analytics'
 import { getReminderStatus, scheduleReminder } from '@/services/reminderService'
 import { listReports, generateReport } from '@/services/reportsService'
@@ -1343,7 +1265,7 @@ import { subscribeToNapkinItems } from '@/services/napkinService'
 import { fetchDashboardPreferences, saveDashboardPreferences } from '@/services/dashboardPreferencesService'
 import { getGoogleStatus, triggerGoogleSyncNow } from '@/stores/integrationsStore'
 import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
-import { isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
+import { getEffectiveUserTimezone } from '@/utils/userTimezone'
 import {
   getIncompleteQuickSetupLabels,
   isQuickSetupSnoozed,
@@ -1383,26 +1305,9 @@ const isPersonalActiveWorkspace = computed(() => {
   return String(workspace?.name || '').trim().toLowerCase() === 'personal'
 })
 const routerNav = useRouter()
-const subStore = useSubscriptionStore()
 const isFirstVisit = computed(() => isGuest.value && authStore?.user?.firstVisitInitialized !== true)
 const guestDashboardTracked = ref(false)
 const firstVisitSeeding = ref(false)
-
-const daysLeft = computed(() => {
-  const d = subStore.subscription?.cancelAt
-  return d ? Math.max(0, dayjs(d).diff(dayjs(), 'day')) : 0
-})
-const reactivateEligible = computed(() => {
-  const status = String(subStore.subscription?.status || '').toLowerCase()
-  const hasCancelAt = !!subStore.subscription?.cancelAt
-  if (!hasCancelAt) return false
-  const remaining = daysLeft.value
-  if (remaining > 7) return false
-  return status === 'canceled' || status === 'active'
-})
-const cancelAtFmt = computed(() =>
-  subStore.subscription?.cancelAt ? dayjs(subStore.subscription.cancelAt).format('MMM D, YYYY') : ''
-)
 
 // UI toggles
 const dashboardCardOptions = [
@@ -1422,7 +1327,10 @@ const cardVisibility = ref(new Set(allCardKeys))
 const dashboardViewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1280)
 const isMobileDashboard = computed(() => dashboardViewportWidth.value < 768)
 const mobileModulesExpanded = ref(false)
-const showOptionalModules = computed(() => !isMobileDashboard.value || mobileModulesExpanded.value)
+// Today is intentionally an execution surface. Reporting, inventory, journal,
+// reminders, and workspace modules keep their own routes instead of competing
+// with the next task here.
+const showOptionalModules = computed(() => false)
 let savePrefsTimer = null
 let lastPrefsRequestId = 0
 
@@ -1571,7 +1479,7 @@ watch(
   { immediate: true }
 )
 
-const showDaily = computed(() => cardVisibility.value.has('daily'))
+const showDaily = computed(() => true)
 const showQuickLinks = computed(() => cardVisibility.value.has('quickLinks'))
 const showWeekly = computed(() => cardVisibility.value.has('weekly'))
 const showMonthly = computed(() => cardVisibility.value.has('monthly'))
@@ -1582,7 +1490,6 @@ const showNapkin = computed(() => cardVisibility.value.has('napkin'))
 
 // Usage meter (free plan)
 const usage = ref({ used: 0, limit: 0, plan: '' })
-const isAppleBillingSafeMode = detectAppleBillingSafeMode()
 const googleStatus = ref({ connected: false, accounts: [] })
 const googleLoading = ref(false)
 const googleSyncing = ref(false)
@@ -1608,36 +1515,6 @@ async function fetchUsage() {
     /* noop */
   }
 }
-
-const isFreeReminderPlan = computed(() => usage.value.plan === 'free' && !isPremium.value)
-const reminderNearLimitThreshold = computed(() => {
-  const limit = Number(usage.value.limit || 0)
-  if (!Number.isFinite(limit) || limit <= 0) return Infinity
-  return Math.max(limit - 1, Math.ceil(limit * 0.8))
-})
-const isReminderLimitReached = computed(() => {
-  const limit = Number(usage.value.limit || 0)
-  if (!Number.isFinite(limit) || limit <= 0) return false
-  return Number(usage.value.used || 0) >= limit
-})
-const isReminderNearLimit = computed(() => {
-  const limit = Number(usage.value.limit || 0)
-  if (!Number.isFinite(limit) || limit <= 0) return false
-  return Number(usage.value.used || 0) >= reminderNearLimitThreshold.value
-})
-const showReminderPlanBanner = computed(() => isFreeReminderPlan.value && isReminderNearLimit.value)
-const reminderPlanBannerText = computed(() => {
-  if (!showReminderPlanBanner.value) return ''
-  const used = Number(usage.value.used || 0)
-  const limit = Number(usage.value.limit || 0)
-  if (isReminderLimitReached.value) {
-    return `You’ve reached your free reminder limit for today (${limit}).`
-  }
-  return `You’ve used ${used}/${limit} reminders on the Free plan.`
-})
-const reminderPlanBannerCta = computed(() => (
-  isAppleBillingSafeMode ? 'Upgrade to Premium' : 'Upgrade'
-))
 
 async function loadGoogleStatus() {
   if (!authStore?.user?.uid) return
@@ -1679,20 +1556,6 @@ function goToMeetings() {
     routerNav.push('/meetings')
   } catch (e) {
     console.warn(e)
-  }
-}
-
-function goToUpgrade() {
-  try {
-    trackLinkedInConversion(import.meta.env.VITE_LI_CONV_UPGRADE_CLICK)
-  } catch {
-    /* noop */
-  }
-  try {
-    if (isGuest.value) return routerNav.push('/login')
-    routerNav.push(isAppleBillingSafeMode ? '/billing/upgrade' : '/pricing')
-  } catch {
-    /* noop */
   }
 }
 
@@ -1774,12 +1637,17 @@ watch(
 )
 
 /* -------------- Tasks + Journal state -------------- */
-const { allTasks, moveTasks, refreshAllTasks, mergeTasksLocally, toggleComplete: toggleTaskComplete } = useTasks()
+const { allTasks, refreshAllTasks, mergeTasksLocally, toggleComplete: toggleTaskComplete } = useTasks()
 const aiSummary = ref(null)
 const dailyTasks = ref([])
 const weeklyTasks = ref([])
 const monthlyTasks = ref([])
 const activeTaskId = ref(null)
+const focus = useFocusStore()
+const recentlyCompletedTaskIds = ref(new Set())
+const completionToast = ref(null)
+let completionToastTimer = null
+const completionRemovalTimers = new Map()
 const showPlanner = ref(false)
 const isTodayFullscreen = ref(false)
 const selectedTask = ref(null)
@@ -1914,7 +1782,7 @@ const displayName = computed(() => {
 })
 
 const greetingHeadline = computed(() => {
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+  const tz = getEffectiveUserTimezone()
   const hour = dayjs(dayClockNow.value).tz(tz).hour()
   let prefix = 'Good evening'
   if (hour < 4) prefix = 'Rest well'
@@ -2091,13 +1959,6 @@ const sortedDaily = computed(() =>
   )
 )
 
-const dailyProgress = computed(() => {
-  const total = dailyTasks.value.length
-  if (!total) return 0
-  const completed = dailyTasks.value.filter((t) => t.completed).length
-  return Math.round((completed / total) * 100)
-})
-
 const weeklyProgress = computed(() => {
   const total = weeklyTasks.value.length
   if (!total) return 0
@@ -2113,9 +1974,27 @@ const currentFocusTask = computed(() => {
   return monthlyTasks.value.find((t) => !t.completed) || null
 })
 
+const activeFocusTask = computed(() => {
+  if (!activeTaskId.value) return null
+  const pool = [...dailyTasks.value, ...weeklyTasks.value, ...monthlyTasks.value]
+  return pool.find((task) => task?.id === activeTaskId.value && !task.completed) || null
+})
+
+const nextUpTask = computed(() => sortedDaily.value.find((task) => !task.completed) || null)
+
 const filteredDaily = computed(() => {
   if (dashboardCategory.value === 'All') return sortedDaily.value
   return sortedDaily.value.filter((task) => resolveCategory(task?.category) === dashboardCategory.value)
+})
+
+const visibleDaily = computed(() =>
+  filteredDaily.value.filter((task) => !task.completed || recentlyCompletedTaskIds.value.has(task.id)),
+)
+
+const emptyDailyMessage = computed(() => {
+  if (dashboardCategory.value !== 'All') return 'No tasks in this category.'
+  if (dailyTasks.value.length && dailyTasks.value.every((task) => task.completed)) return 'All done for today.'
+  return 'No tasks for this day.'
 })
 
 const activeTaskExists = computed(() => {
@@ -2124,6 +2003,18 @@ const activeTaskExists = computed(() => {
   const pool = [...dailyTasks.value, ...weeklyTasks.value, ...monthlyTasks.value]
   return pool.some((t) => t?.id === id)
 })
+
+watch(
+  () => [focus.phase, focus.session?.taskId],
+  ([phase, taskId]) => {
+    if (phase === 'running' && taskId) {
+      activeTaskId.value = taskId
+    } else if (activeTaskId.value && activeTaskId.value === taskId) {
+      activeTaskId.value = null
+    }
+  },
+  { immediate: true },
+)
 
 const filteredWeeklyPreview = computed(() => {
   const base =
@@ -2151,6 +2042,96 @@ function categoryColor(value) {
 function categoryLabel(value) {
   return resolveCategory(value)
 }
+
+const FOCUS_MINUTES = [15, 25, 45, 60]
+const FOCUS_POSITIVE_PATTERN = /\b(write|design|study|prepare|code|research|review|build|read|analy[sz]e|draft|plan|implement|debug|learn|practice|work on|finish|complete)\b/i
+const FOCUS_NEGATIVE_PATTERN = /\b(call|buy|pick up|pickup|take medication|attend|meeting|send|text|message|wake up|leave home|drop off|appointment)\b/i
+
+function readTaskDurationMinutes(task) {
+  const candidates = [
+    task?.estimatedDuration,
+    task?.estimated_duration,
+    task?.durationMinutes,
+    task?.duration_minutes,
+    task?.plannedMinutes,
+    task?.focusMinutes,
+  ]
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'number' && Number.isFinite(candidate) && candidate > 0 && candidate <= 240) {
+      return candidate
+    }
+    const value = String(candidate || '').trim().toLowerCase()
+    if (!value) continue
+    const match = value.match(/(\d+(?:\.\d+)?)\s*(hours?|hrs?|h|minutes?|mins?|m)?/i)
+    if (!match) continue
+    const amount = Number(match[1])
+    if (!Number.isFinite(amount) || amount <= 0) continue
+    const unit = match[2] || 'm'
+    const minutes = /h/i.test(unit) && !/m/i.test(unit) ? amount * 60 : amount
+    if (minutes > 0 && minutes <= 240) return minutes
+  }
+
+  return null
+}
+
+function normalizeFocusMinutes(value) {
+  const minutes = Number(value)
+  if (!Number.isFinite(minutes) || minutes <= 0) return 25
+  return FOCUS_MINUTES.reduce((closest, option) =>
+    Math.abs(option - minutes) < Math.abs(closest - minutes) ? option : closest,
+  FOCUS_MINUTES[0])
+}
+
+function focusRecommendation(task) {
+  if (!task || task.completed) return null
+
+  const explicit = task.requires_deep_work ?? task.requiresDeepWork ?? task.focusable ?? task.focusRecommended
+  if (explicit === false) return null
+
+  const text = [task.title, task.details, task.notes, task.task_type, task.actionability, task.category]
+    .filter(Boolean)
+    .join(' ')
+  const hasPositiveCue = FOCUS_POSITIVE_PATTERN.test(text)
+  const hasNegativeCue = FOCUS_NEGATIVE_PATTERN.test(text)
+  const duration = readTaskDurationMinutes(task)
+  const hasDeepWorkSignal = explicit === true || task.actionability === 'deep_work' || task.actionability === 'sustained'
+  const category = resolveCategory(task.category)
+  const workCategory = ['Work', 'Learning', 'Project', 'Career'].includes(category)
+
+  if (hasNegativeCue && !hasDeepWorkSignal && !hasPositiveCue) return null
+  if (!hasPositiveCue && !duration && !hasDeepWorkSignal && !workCategory) return null
+
+  return {
+    minutes: normalizeFocusMinutes(duration || (hasDeepWorkSignal ? 45 : 25)),
+  }
+}
+
+function taskPreviewMeta(task) {
+  const parts = []
+  const category = categoryLabel(task?.category)
+  if (category && category !== 'Uncategorized') parts.push(category)
+  const recommendation = focusRecommendation(task)
+  if (recommendation) parts.push(`~${recommendation.minutes} min`)
+  return parts.join(' · ') || 'Open task'
+}
+
+function startFocusFromMenu(task) {
+  if (!task || task.completed) return
+  focus.open(task, authStore.user?.uid)
+}
+
+function handleFocusStarted(task) {
+  if (focus.phase === 'running' && task?.id) activeTaskId.value = task.id
+}
+
+function formatFocusRemaining(ms) {
+  const totalSeconds = Math.max(0, Math.ceil(Number(ms || 0) / 1000))
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}
+
 function formatNapkinDate(ms) {
   try {
     return dayjs(ms).format('MMM D, h:mm A')
@@ -2159,10 +2140,75 @@ function formatNapkinDate(ms) {
   }
 }
 
+function scheduleCompletedRowRemoval(task) {
+  const taskId = task?.id
+  if (!taskId) return
+  const previousTimer = completionRemovalTimers.get(taskId)
+  if (previousTimer) clearTimeout(previousTimer)
+  const timer = setTimeout(() => {
+    const next = new Set(recentlyCompletedTaskIds.value)
+    next.delete(taskId)
+    recentlyCompletedTaskIds.value = next
+    completionRemovalTimers.delete(taskId)
+  }, 700)
+  completionRemovalTimers.set(taskId, timer)
+}
+
+function showCompletionToast(task) {
+  if (completionToastTimer) clearTimeout(completionToastTimer)
+  completionToast.value = {
+    id: task.id,
+    title: String(task.title || 'Task').trim(),
+  }
+  completionToastTimer = setTimeout(() => {
+    completionToast.value = null
+    completionToastTimer = null
+  }, 5000)
+}
+
+async function undoCompletion() {
+  const toast = completionToast.value
+  if (!toast) return
+  if (completionToastTimer) clearTimeout(completionToastTimer)
+  completionToast.value = null
+  completionToastTimer = null
+
+  const task = allTasks.value.find((entry) => entry?.id === toast.id)
+  if (!task?.completed) return
+  await toggleTaskComplete(task)
+  const next = new Set(recentlyCompletedTaskIds.value)
+  next.delete(task.id)
+  recentlyCompletedTaskIds.value = next
+}
+
 async function toggleComplete(task) {
   const wasCompleted = !!task?.completed
+  if (!wasCompleted && task?.id) {
+    const next = new Set(recentlyCompletedTaskIds.value)
+    next.add(task.id)
+    recentlyCompletedTaskIds.value = next
+  }
   await toggleTaskComplete(task)
-  if (!wasCompleted && task?.completed && activeTaskId.value === task.id) activeTaskId.value = null
+  if (!task) return
+
+  if (!wasCompleted && task.completed) {
+    if (activeTaskId.value === task.id) activeTaskId.value = null
+    scheduleCompletedRowRemoval(task)
+    showCompletionToast(task)
+  } else if (!wasCompleted && !task.completed) {
+    const next = new Set(recentlyCompletedTaskIds.value)
+    next.delete(task.id)
+    recentlyCompletedTaskIds.value = next
+  } else if (wasCompleted && !task.completed) {
+    const next = new Set(recentlyCompletedTaskIds.value)
+    next.delete(task.id)
+    recentlyCompletedTaskIds.value = next
+    if (completionToast.value?.id === task.id) {
+      completionToast.value = null
+      if (completionToastTimer) clearTimeout(completionToastTimer)
+      completionToastTimer = null
+    }
+  }
 }
 
 function rotateInsightsOnce() {
@@ -2222,6 +2268,23 @@ function buildRotatingInsights() {
 const allWorkspaceTasksRef = ref([])
 const focusSelectedDate = ref(todayKeyRef.value)
 const showFocusDatePicker = ref(false)
+
+const tomorrowKey = computed(() => {
+  const date = parseLocalDateKey(todayKeyRef.value)
+  date.setDate(date.getDate() + 1)
+  return toLocalDateKey(date)
+})
+
+const tomorrowTasks = computed(() =>
+  allWorkspaceTasksRef.value
+    .filter((task) => task.date === tomorrowKey.value && !task.completed)
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+    .slice(0, 3),
+)
+
+const tomorrowTaskCount = computed(() =>
+  allWorkspaceTasksRef.value.filter((task) => task.date === tomorrowKey.value && !task.completed).length,
+)
 
 watch(
   focusSelectedDate,
@@ -2323,11 +2386,6 @@ function goToProgress() {
   routerNav.push('/reports')
 }
 
-function markTaskActive(task) {
-  if (!task || task.completed) return
-  activeTaskId.value = task.id === activeTaskId.value ? null : task.id
-}
-
 watch(
   () => [dailyTasks.value, weeklyTasks.value, monthlyTasks.value].map((list) => list.map((t) => t.id).join(',')).join(';'),
   () => {
@@ -2389,7 +2447,7 @@ onMounted(async () => {
     const nudged = localStorage.getItem('streak_nudge_today') === todayKey
     if (hours >= 22 && !hasToday && !nudged) {
       ElNotification({
-        title: 'Keep the streak alive ✨',
+        title: 'Keep the streak alive',
         message: 'Log a quick reflection before midnight to maintain your streak.',
         type: 'info',
         duration: 5000,
@@ -2815,6 +2873,9 @@ onUnmounted(() => {
   detachNapkinListener()
   if (insightIntervalId.value) clearInterval(insightIntervalId.value)
   if (aiSummaryDebounceTimer) clearTimeout(aiSummaryDebounceTimer)
+  if (completionToastTimer) clearTimeout(completionToastTimer)
+  completionRemovalTimers.forEach((timer) => clearTimeout(timer))
+  completionRemovalTimers.clear()
   if (onboardingTimer) {
     clearTimeout(onboardingTimer)
     onboardingTimer = null
@@ -2832,66 +2893,6 @@ onBeforeUnmount(() => {
     /* noop */
   }
 })
-
-async function redirectToLogin() {
-  window.location.href = '/login?redirect=/dashboard'
-}
-
-async function onReactivate() {
-  try {
-    const uid = authStore?.user?.uid
-    if (!uid) return redirectToLogin()
-    const url = await reactivateSubscription(uid)
-    window.location.href = url
-  } catch (error) {
-    console.error('Reactivate failed', error)
-  }
-}
-
-async function applyCarryover(limit = 3) {
-  if (!authStore?.user?.uid) {
-    return redirectToLogin()
-  }
-  if (isGuest.value) {
-    ElMessage({ type: 'warning', message: 'Sign in to move tasks forward.', duration: 2000 })
-    return
-  }
-  try {
-    const candidates = carryoverCandidates.value
-    if (!candidates.length) {
-      ElMessage({ message: 'All unfinished tasks are already in Today.', type: 'info', duration: 1600 })
-      return
-    }
-    const normalizedLimit =
-      limit === 'all' ? candidates.length : Math.max(1, Number(limit) || 1)
-    const selection = candidates.slice(0, normalizedLimit)
-    const todayKey = toLocalDateKey(new Date())
-    await moveTasks(
-      selection.map((t) => ({ id: t.id, previousDate: t.previousDate || t.date })),
-      todayKey,
-      { rolledOver: true, status: 'pending', completed: false },
-    )
-    await refreshAllTasks(true)
-    const movedAll = selection.length === candidates.length
-    if (movedAll) carryoverDismissedToday.value = true
-    ElMessage({
-      message: movedAll
-        ? 'All unfinished tasks moved to today ✅'
-        : `${selection.length} task${selection.length === 1 ? '' : 's'} moved to today ✅`,
-      type: 'success',
-      duration: 1600,
-    })
-  } catch (error) {
-    const msg = error?.response?.data || error?.message || ''
-    const perm = typeof error?.code === 'string' && error.code.includes('permission')
-    console.warn('applyCarryover failed', msg)
-    ElMessage({
-      type: perm ? 'warning' : 'error',
-      message: perm ? 'You do not have permission to move tasks in this workspace.' : 'Could not move tasks right now.',
-      duration: 2400,
-    })
-  }
-}
 
 async function ignoreCarryover() {
   try {
@@ -3012,7 +3013,7 @@ async function handleSaveAndSchedule(payload) {
             voice_call: normalizedChannels.includes('voice_call'),
           }
         : userPrefs.value?.notifications || {}
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+      const tz = getEffectiveUserTimezone()
       try {
         const resp = await api.post('/reminders/text', {
           userId: uid,
@@ -3783,6 +3784,742 @@ onUnmounted(() => {
 }
 .move-secondary-btn:hover {
   filter: brightness(1.05);
+}
+
+.today-dashboard {
+  --pc-page: var(--pc-bg, #f7f8fc);
+  --pc-muted: var(--pc-text-muted, #64748b);
+  --pc-primary: var(--pc-accent, #4f46e5);
+  --pc-primary-strong: var(--pc-accent-hover, #4338ca);
+  --pc-primary-soft: var(--pc-accent-soft, #eef2ff);
+  --pc-surface-muted: var(--pc-surface-2, #f8fafc);
+  background: var(--pc-page, #f7f8fc);
+  color: var(--pc-text, #111827);
+}
+
+.today-dashboard .dashboard-section {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.today-dashboard .dashboard-card {
+  background: var(--pc-surface, #ffffff);
+  border: 1px solid var(--pc-border, #e5e7eb);
+  border-radius: 1.125rem;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+  color: var(--pc-text, #111827);
+}
+
+.today-intro {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.25rem;
+  min-width: 0;
+  padding: 0.25rem 0 0.5rem;
+}
+
+.today-eyebrow {
+  margin: 0 0 0.35rem;
+  color: var(--pc-muted, #64748b);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.today-intro__title {
+  margin: 0;
+  color: var(--pc-text, #111827);
+  font-size: clamp(1.55rem, 4vw, 2.15rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+}
+
+.today-intro__summary {
+  margin: 0.55rem 0 0;
+  color: var(--pc-muted, #64748b);
+  font-size: 0.95rem;
+}
+
+.today-next-up,
+.backlog-review,
+.tomorrow-preview {
+  border: 1px solid var(--pc-border, #e5e7eb);
+  border-radius: 0.9rem;
+  background: var(--pc-surface, #ffffff);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+}
+
+.today-next-up {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  max-width: 28rem;
+  padding: 0.65rem 0.8rem;
+}
+
+.today-next-up__label,
+.backlog-review__eyebrow,
+.tomorrow-preview__eyebrow {
+  color: var(--pc-primary, #4f46e5);
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.today-next-up__task {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--pc-text, #111827);
+  font-size: 0.84rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.today-next-up__meta {
+  flex: 0 0 auto;
+  color: var(--pc-muted, #64748b);
+  font-size: 0.72rem;
+}
+
+.backlog-review {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.95rem 1rem;
+}
+
+.backlog-review__copy {
+  min-width: 0;
+}
+
+.backlog-review__copy h2 {
+  margin: 0.15rem 0 0;
+  color: var(--pc-text, #111827);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.backlog-review__copy p:last-child {
+  margin: 0.18rem 0 0;
+  color: var(--pc-muted, #64748b);
+  font-size: 0.78rem;
+}
+
+.backlog-review__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex: 0 0 auto;
+}
+
+.backlog-review__primary,
+.tomorrow-preview__link {
+  color: var(--pc-primary, #4f46e5);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.backlog-review__primary:hover,
+.tomorrow-preview__link:hover {
+  color: var(--pc-primary-strong, #4338ca);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.backlog-review__menu {
+  position: relative;
+}
+
+.backlog-review__menu summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.55rem;
+  color: var(--pc-muted, #64748b);
+  cursor: pointer;
+  list-style: none;
+}
+
+.backlog-review__menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.backlog-review__menu summary:hover,
+.backlog-review__menu[open] summary {
+  background: var(--pc-surface-muted, #f1f5f9);
+  color: var(--pc-primary, #4f46e5);
+}
+
+.backlog-review__menu-popover {
+  position: absolute;
+  right: 0;
+  z-index: 5;
+  display: grid;
+  min-width: 9.5rem;
+  margin-top: 0.35rem;
+  overflow: hidden;
+  border: 1px solid var(--pc-border, #e5e7eb);
+  border-radius: 0.7rem;
+  background: var(--pc-surface, #ffffff);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
+}
+
+.backlog-review__menu-popover a,
+.backlog-review__menu-popover button {
+  padding: 0.6rem 0.75rem;
+  border: 0;
+  background: transparent;
+  color: var(--pc-text, #334155);
+  font-size: 0.76rem;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.backlog-review__menu-popover a:hover,
+.backlog-review__menu-popover button:hover {
+  background: var(--pc-surface-muted, #f8fafc);
+  color: var(--pc-primary, #4f46e5);
+}
+
+.tomorrow-preview {
+  padding: 0.95rem 1rem;
+}
+
+.tomorrow-preview__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.tomorrow-preview__summary {
+  margin: 0.18rem 0 0;
+  color: var(--pc-muted, #64748b);
+  font-size: 0.78rem;
+}
+
+.tomorrow-preview__list {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0.8rem 0 0;
+  padding: 0.7rem 0 0;
+  border-top: 1px solid var(--pc-border, #e5e7eb);
+  list-style: none;
+}
+
+.tomorrow-preview__list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.tomorrow-preview__task {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--pc-text, #334155);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tomorrow-preview__meta {
+  flex: 0 0 auto;
+  color: var(--pc-muted, #64748b);
+  font-size: 0.7rem;
+}
+
+.today-active-focus {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  max-width: 17rem;
+  padding: 0.7rem 0.9rem;
+  border-left: 3px solid var(--pc-primary, #4f46e5);
+  background: var(--pc-primary-soft, #eef2ff);
+  border-radius: 0.25rem 0.75rem 0.75rem 0.25rem;
+}
+
+.today-active-focus__label {
+  color: var(--pc-primary, #4f46e5);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.today-active-focus__task {
+  overflow: hidden;
+  color: var(--pc-text, #111827);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.today-workspace {
+  padding: 0;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.today-workspace .daily-card__header {
+  padding-bottom: 0.15rem;
+}
+
+.today-workspace .focus-date-pill {
+  border-color: var(--pc-border, #e5e7eb);
+  background: var(--pc-surface, #ffffff);
+  color: var(--pc-text, #111827);
+}
+
+.today-workspace .focus-date-pill button,
+.today-workspace .focus-date-pill span {
+  color: var(--pc-text, #111827);
+}
+
+.today-workspace .focus-date-pill button:hover {
+  background: var(--pc-surface-muted, #f1f5f9);
+}
+
+.today-workspace .jump-today-btn {
+  color: var(--pc-primary, #4f46e5);
+}
+
+.today-workspace .daily-card__plan-btn {
+  min-height: 2.5rem;
+  flex: 0 0 auto;
+  width: auto;
+  border-radius: 0.75rem;
+  background: var(--pc-primary, #4f46e5);
+  box-shadow: 0 8px 18px rgba(79, 70, 229, 0.18);
+}
+
+.today-workspace .daily-card__plan-btn:hover {
+  background: var(--pc-primary-strong, #4338ca);
+}
+
+.today-workspace .category-filter-strip {
+  min-height: auto;
+  padding: 0.25rem 0 0.15rem;
+  border-bottom: 1px solid var(--pc-border, #e5e7eb);
+}
+
+.today-workspace .category-filter-chip {
+  min-height: 2.1rem;
+  border-radius: 999px;
+}
+
+.today-workspace .progress-card {
+  border-color: var(--pc-border, #e5e7eb);
+  background: var(--pc-surface-muted, #f8fafc);
+}
+
+.today-workspace .progress-card,
+.today-workspace .progress-card span {
+  color: var(--pc-muted, #64748b);
+}
+
+.today-workspace .progress-card .bg-slate-800 {
+  background: #e2e8f0;
+}
+
+.today-task-list {
+  margin: 0;
+}
+
+.today-task-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.9rem;
+  min-width: 0;
+  padding: 0.8rem 0;
+  border-bottom: 1px solid var(--pc-border, #e5e7eb);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.today-task-row:last-child {
+  border-bottom: 0;
+}
+
+.today-task-row--active {
+  margin-inline: -0.65rem;
+  padding-inline: 0.65rem;
+  border-radius: 0.75rem;
+  background: var(--pc-primary-soft, #eef2ff);
+  border-bottom-color: transparent;
+}
+
+.today-task-row__main {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.today-task-row__content {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.today-task-row__title-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.today-task-title {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--pc-text, #111827);
+  font-size: 0.95rem;
+  font-weight: 650;
+  line-height: 1.35;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.today-task-title:hover {
+  color: var(--pc-primary, #4f46e5);
+}
+
+.today-task-title--completed {
+  color: var(--pc-muted, #64748b);
+  text-decoration: line-through;
+}
+
+.today-task-check {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex: 0 0 auto;
+  margin-top: 0.15rem;
+  accent-color: var(--pc-primary, #4f46e5);
+  cursor: pointer;
+}
+
+.today-task-category {
+  min-height: 1.45rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--pc-border, #e5e7eb) !important;
+  border-radius: 999px;
+  background: var(--pc-surface-muted, #f8fafc) !important;
+  color: var(--pc-muted, #64748b) !important;
+  font-size: 0.68rem;
+  box-shadow: none !important;
+}
+
+.today-task-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 0.25rem;
+  color: var(--pc-muted, #64748b);
+  font-size: 0.75rem;
+}
+
+.today-task-link {
+  color: var(--pc-primary, #4f46e5);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.today-task-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 0 0 auto;
+}
+
+.today-task-row__actions > button:first-child {
+  border-color: rgba(79, 70, 229, 0.24);
+  background: var(--pc-primary-soft, #eef2ff);
+  color: var(--pc-primary, #4f46e5);
+}
+
+.today-task-row__actions > button:first-child:hover {
+  border-color: rgba(79, 70, 229, 0.46);
+  background: #e0e7ff;
+}
+
+.today-task-overflow,
+.today-task-reminder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0.55rem;
+  background: transparent;
+  color: var(--pc-muted, #64748b);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.today-task-overflow:hover,
+.today-task-reminder:hover {
+  background: var(--pc-surface-muted, #f1f5f9);
+  color: var(--pc-primary, #4f46e5);
+}
+
+.today-dashboard .today-list:not(.today-list--fullscreen) {
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
+}
+
+.today-dashboard .dashboard-task-skeleton-card {
+  border-color: var(--pc-border, #e5e7eb);
+  background: var(--pc-surface, #ffffff);
+}
+
+.today-dashboard .daily-card--fullscreen {
+  background: var(--pc-page, #f7f8fc);
+  color: var(--pc-text, #111827);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
+}
+
+@media (max-width: 640px) {
+  .today-intro {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.8rem;
+    padding-top: 0;
+  }
+
+  .today-active-focus {
+    width: 100%;
+    max-width: none;
+  }
+
+  .today-next-up {
+    width: 100%;
+    max-width: none;
+  }
+
+  .backlog-review {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .backlog-review__actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .today-workspace .daily-card__actions {
+    width: auto;
+    flex-wrap: nowrap;
+  }
+
+  .today-workspace .daily-card__plan-btn {
+    width: auto;
+  }
+
+  .today-workspace .today-fullscreen-btn--inline {
+    display: inline-flex;
+  }
+
+  .today-workspace .progress-card {
+    display: none;
+  }
+
+  .today-task-row {
+    align-items: flex-start;
+  }
+
+  .today-task-row__actions {
+    gap: 0.15rem;
+  }
+
+  .today-task-row__actions > button:first-child {
+    min-height: 2rem;
+    padding-inline: 0.55rem;
+  }
+}
+
+.today-completion-ring {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.45rem;
+  height: 1.45rem;
+  flex: 0 0 1.45rem;
+  margin-top: 0.05rem;
+  padding: 0;
+  border: 2px solid #cbd5e1;
+  border-radius: 999px;
+  background: transparent;
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.25s ease, box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+.today-completion-ring:hover,
+.today-completion-ring:focus-visible {
+  border-color: var(--pc-primary, #4f46e5);
+  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.12);
+  outline: none;
+}
+
+.today-completion-ring:active {
+  transform: scale(0.9);
+}
+
+.today-completion-ring--completed {
+  border-color: var(--pc-primary, #4f46e5);
+  background: var(--pc-primary, #4f46e5);
+  animation: completion-ring-fill 0.35s ease-out;
+}
+
+.today-task-row--completed {
+  opacity: 0.68;
+}
+
+.today-task-duration {
+  color: var(--pc-primary, #4f46e5);
+  font-weight: 600;
+}
+
+.today-task-focus-status {
+  color: var(--pc-primary, #4f46e5);
+  font-weight: 700;
+}
+
+.today-task-enter-active,
+.today-task-leave-active {
+  overflow: hidden;
+  transition: opacity 0.3s ease, transform 0.3s ease, max-height 0.3s ease, padding 0.3s ease;
+}
+
+.today-task-enter-from,
+.today-task-leave-to {
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  opacity: 0;
+  transform: translateY(-5px) scale(0.98);
+}
+
+.today-task-move {
+  transition: transform 0.3s ease;
+}
+
+.completion-toast {
+  position: fixed;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  left: max(1rem, env(safe-area-inset-left));
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: min(24rem, calc(100vw - 2rem));
+  margin-inline: auto;
+  padding: 0.8rem 0.9rem 0.8rem 1rem;
+  border: 1px solid rgba(79, 70, 229, 0.18);
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.16);
+  color: var(--pc-text, #111827);
+  backdrop-filter: blur(12px);
+}
+
+.completion-toast__message {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.5rem;
+  overflow: hidden;
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.completion-toast__check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.2rem;
+  height: 1.2rem;
+  flex: 0 0 1.2rem;
+  border-radius: 999px;
+  background: var(--pc-primary, #4f46e5);
+  color: #ffffff;
+  font-size: 0.72rem;
+}
+
+.completion-toast__undo {
+  flex: 0 0 auto;
+  padding: 0.35rem 0.45rem;
+  border: 0;
+  background: transparent;
+  color: var(--pc-primary, #4f46e5);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.completion-toast__undo:hover {
+  color: var(--pc-primary-strong, #4338ca);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.completion-toast-enter-active,
+.completion-toast-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.completion-toast-enter-from,
+.completion-toast-leave-to {
+  opacity: 0;
+  transform: translateY(0.5rem);
+}
+
+@keyframes completion-ring-fill {
+  0% {
+    transform: scale(0.84);
+    box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.3);
+  }
+  65% {
+    transform: scale(1.08);
+    box-shadow: 0 0 0 5px rgba(79, 70, 229, 0.08);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(79, 70, 229, 0);
+  }
 }
 
 

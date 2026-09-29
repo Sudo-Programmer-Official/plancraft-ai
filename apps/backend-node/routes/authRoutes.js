@@ -36,7 +36,7 @@ function readBodyOrQuery(req, key) {
   return req?.query?.[key]
 }
 
-function normalizeMobileAuthRedirectPath(target, fallback = '/dashboard') {
+function normalizeMobileAuthRedirectPath(target, fallback = '/today') {
   if (typeof target !== 'string') return fallback
   const trimmed = target.trim()
   if (!trimmed) return fallback
@@ -342,7 +342,7 @@ async function handleAppleCallback(req, res) {
       email: result?.resolvedUser?.email || null,
       providerLinked: result?.resolvedUser?.providerLinked === true,
       source: result?.resolvedUser?.source || 'unknown',
-      redirect: result?.handoff?.redirect || result?.authState?.redirect || '/dashboard',
+      redirect: result?.handoff?.redirect || result?.authState?.redirect || '/today',
       platform: result?.handoff?.platform || result?.authState?.platform || 'ios',
       handoffCode: !!result?.handoff?.code,
     })

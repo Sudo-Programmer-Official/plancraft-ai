@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-b from-slate-950 via-indigo-950/70 to-black text-white">
+  <div class="marketing-light min-h-screen bg-gradient-to-b from-slate-950 via-indigo-950/70 to-black text-white">
     <section class="px-6 py-20 md:py-28 text-center">
       <p class="uppercase text-xs tracking-[0.35em] text-indigo-300 mb-3">Google Calendar Sync</p>
       <h1 class="text-4xl md:text-5xl font-extrabold leading-tight max-w-4xl mx-auto">

@@ -37,6 +37,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>PlanCraftAI uses the camera to capture images for tasks, feedback, and profile photos.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>PlanCraftAI uses Face ID to unlock the app so only you can see your plans and journal.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>PlanCraftAI needs microphone access to record voice tasks and transcribe them into plans.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

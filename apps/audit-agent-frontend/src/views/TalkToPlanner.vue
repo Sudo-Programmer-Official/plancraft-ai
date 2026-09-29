@@ -3,8 +3,8 @@
     <section class="talk-planner-wrapper">
       <header class="talk-header">
         <h2 class="talk-title">
-          <span class="text-pink-400">🧠</span>
-          Talk to Planner
+          <img src="/plancraft-mark.svg" alt="" class="talk-title-mark" />
+          <span>Planner</span>
         </h2>
         <div class="header-actions">
           <button
@@ -247,11 +247,17 @@
 
     <footer
       class="chat-input-dock"
-      :class="{ 'chat-input-dock--recording': micActive }"
+      :class="{
+        'chat-input-dock--recording': micState === MIC_STATES.listening,
+        'chat-input-dock--processing': micState === MIC_STATES.processing,
+      }"
     >
       <div
         class="chat-input-bar"
-        :class="{ 'chat-input-bar--recording': micActive }"
+        :class="{
+          'chat-input-bar--recording': micState === MIC_STATES.listening,
+          'chat-input-bar--processing': micState === MIC_STATES.processing,
+        }"
       >
         <div class="chat-input-row">
           <button
@@ -268,7 +274,12 @@
             :aria-label="micButtonLabel"
             @click="handleMicButton"
           >
-            <span class="mic-visual" aria-hidden="true"></span>
+            <span
+              v-if="micState === MIC_STATES.processing"
+              class="mic-processing-spinner"
+              aria-hidden="true"
+            ></span>
+            <span v-else class="mic-visual" aria-hidden="true"></span>
           </button>
           <textarea
             ref="chatInputRef"
@@ -324,6 +335,7 @@ import { ElMessage } from 'element-plus'
 import { trackEvent, trackAISuggestionAccepted, trackFirstVoiceCapture } from '@/services/analytics'
 import { auth } from '@/firebase/init'
 import { getAppToken } from '@/services/appTokenService'
+import { getEffectiveUserTimezone } from '@/utils/userTimezone'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
@@ -404,6 +416,7 @@ const {
   resetRecorder: resetPlannerRecording,
 } = useAudioRecorder({
   logPrefix: '[TalkToPlanner][VoiceRecorder]',
+  surface: 'talk_to_planner',
   onTranscription: async (text) => {
     const cleaned = String(text || '').trim()
     if (!cleaned) return
@@ -411,7 +424,9 @@ const {
     try {
       trackEvent('Voice Transcribed', { length: cleaned.length, surface: 'talk_to_planner' })
       trackFirstVoiceCapture({ surface: 'talk_to_planner' })
-    } catch (_) {}
+    } catch {
+      /* Analytics failures should not interrupt transcription. */
+    }
     await nextTick()
     syncComposerHeight()
     try {
@@ -452,7 +467,9 @@ async function ensureVoicePlaybackUnlocked() {
           unlockAudio.pause()
           unlockAudio.removeAttribute('src')
           unlockAudio.load()
-        } catch {}
+        } catch {
+          /* Best effort cleanup for browsers with limited media support. */
+        }
         unlockAudio.removeEventListener('ended', handleSuccess)
         unlockAudio.removeEventListener('error', handleFailure)
       }
@@ -493,7 +510,9 @@ function resolveApiOrigin(source) {
     if (typeof window !== 'undefined') {
       return new URL(source, window.location.origin).origin
     }
-  } catch {}
+  } catch {
+    /* Invalid API configuration falls back to the current origin. */
+  }
   return null
 }
 
@@ -518,7 +537,9 @@ async function buildVoiceAuthHeaders() {
     if (auth?.currentUser) {
       token = await auth.currentUser.getIdToken()
     }
-  } catch {}
+  } catch {
+    /* Token lookup is best effort; the request can still use other headers. */
+  }
   if (!token) {
     token = authStore?.token || localStorage.getItem('token') || null
   }
@@ -529,20 +550,19 @@ async function buildVoiceAuthHeaders() {
     if (user.email) headers['x-user-email'] = user.email
     if (user.uid) headers['x-user-id'] = user.uid
     if (user.role) headers['x-user-role'] = user.role
-  } catch {}
+  } catch {
+    /* Stored user metadata is optional. */
+  }
 
   try {
     const appTok = getAppToken()
     if (appTok) headers['x-app-token'] = appTok
-  } catch {}
+  } catch {
+    /* App token support is optional. */
+  }
 
   try {
-    let tz = localStorage.getItem('user_timezone')
-    if (!tz || tz === 'UTC') {
-      tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-      localStorage.setItem('user_timezone', tz)
-    }
-    headers['x-user-tz'] = tz
+    headers['x-user-tz'] = getEffectiveUserTimezone()
   } catch {
     headers['x-user-tz'] = 'UTC'
   }
@@ -581,7 +601,9 @@ function revokeAudioBlob(audio) {
   if (audio && audio.__objectUrl) {
     try {
       URL.revokeObjectURL(audio.__objectUrl)
-    } catch {}
+    } catch {
+      /* Object URL cleanup is best effort. */
+    }
     audio.__objectUrl = null
   }
 }
@@ -899,8 +921,7 @@ async function sendQuery(forcedInput = null) {
 
   try {
     const history = historyForRequest(userMessageId)
-    const timezoneGuess =
-      Intl.DateTimeFormat?.().resolvedOptions?.().timeZone || dayjs.tz?.guess?.() || 'UTC'
+    const timezoneGuess = getEffectiveUserTimezone()
     const response = await queryPlannerAssistant(query, {
       userId: userId.value,
       history,
@@ -1017,6 +1038,7 @@ function formatMessageText(text, sender) {
 }
 
 function runAction(_message, action) {
+  void _message
   if (!action) return
   if (action.status === 'pending') {
     ElMessage.info('This action needs a bit more detail. Let the assistant know how to proceed.')
@@ -1027,7 +1049,9 @@ function runAction(_message, action) {
       suggestion_type: action.type || 'planner_action',
       label: action.label || undefined,
     })
-  } catch (_) {}
+  } catch {
+    /* Analytics failures should not block the planner action. */
+  }
   if (action.message) {
     ElMessage.info(action.message)
   }
@@ -1041,6 +1065,7 @@ function formatDateLabel(value, options = {}) {
       const formatter = new Intl.DateTimeFormat(undefined, {
         month: 'short',
         day: 'numeric',
+        timeZone: options.timezone || getEffectiveUserTimezone(),
         ...(options.includeTime
           ? { hour: '2-digit', minute: '2-digit' }
           : {}),
@@ -1090,7 +1115,7 @@ function formatResultMessage(action = {}) {
   if (type === 'schedule_reminder') {
     const payload = action?.payload || {}
     const iso = payload.scheduledTime || payload.when || null
-    const tz = payload.timezone || payload.tz || (dayjs.tz && dayjs.tz.guess ? dayjs.tz.guess() : 'UTC')
+    const tz = payload.timezone || payload.tz || getEffectiveUserTimezone()
     const reminderLabel = payload.text || payload.title || payload.name || 'Reminder'
     if (iso && dayjs(iso).isValid()) {
       const local = dayjs.utc(iso).tz(tz)
@@ -1690,6 +1715,11 @@ onMounted(() => {
   box-shadow: 0 0 18px rgba(168, 85, 247, 0.4);
 }
 
+.chat-input-bar--processing {
+  border-color: var(--pc-accent, #4f46e5);
+  box-shadow: 0 0 0 3px var(--pc-accent-soft, rgba(79, 70, 229, 0.08));
+}
+
 .chat-input-row {
   display: flex;
   align-items: flex-end;
@@ -1801,6 +1831,22 @@ onMounted(() => {
 .mic-btn.active {
   border-color: rgba(167, 139, 250, 0.75);
   box-shadow: 0 0 0 6px rgba(99, 102, 241, 0.16), 0 12px 28px rgba(99, 102, 241, 0.36);
+}
+
+.mic-btn--processing {
+  border-color: var(--pc-accent, #4f46e5);
+  background: var(--pc-accent-soft, rgba(79, 70, 229, 0.08));
+  color: var(--pc-accent, #4f46e5);
+  box-shadow: 0 0 0 4px var(--pc-accent-soft, rgba(79, 70, 229, 0.08));
+}
+
+.mic-processing-spinner {
+  width: 1.1rem;
+  height: 1.1rem;
+  border: 2px solid rgba(79, 70, 229, 0.2);
+  border-top-color: var(--pc-accent, #4f46e5);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
 }
 
 .mic-visual {
@@ -2065,6 +2111,317 @@ onMounted(() => {
 @media (max-width: 640px) {
   .chat-input-row {
     width: 100%;
+  }
+}
+
+/* Keep the planner conversation in the same light product shell as the rest
+ * of the migrated app. The old purple surface made this screen feel detached
+ * and also amplified the empty state on small screens. */
+.talk-planner-page {
+  background: var(--pc-bg);
+  color: var(--pc-text);
+  padding: 0;
+  gap: 0;
+}
+
+.talk-planner-wrapper {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding: 0 1rem;
+  background: var(--pc-bg);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--pc-text);
+}
+
+.talk-header {
+  padding: 0.85rem 0;
+  margin: 0;
+  border-bottom: 1px solid var(--pc-border);
+}
+
+.talk-title {
+  gap: 0.55rem;
+  color: var(--pc-text);
+  font-size: var(--pc-text-title);
+  letter-spacing: -0.01em;
+}
+
+.talk-title-mark {
+  width: 1.8rem;
+  height: 1.8rem;
+  object-fit: contain;
+}
+
+.voice-toggle,
+.clear-btn {
+  width: 2.6rem;
+  height: 2.6rem;
+  border-color: var(--pc-border-strong);
+  background: var(--pc-surface);
+  color: var(--pc-text-muted);
+  box-shadow: var(--pc-shadow-sm);
+}
+
+.voice-toggle:hover,
+.clear-btn:hover {
+  background: var(--pc-surface-hover);
+  color: var(--pc-text);
+  transform: none;
+}
+
+.voice-toggle.active {
+  border-color: var(--pc-accent);
+  background: var(--pc-accent-soft);
+  color: var(--pc-accent-text);
+  box-shadow: 0 0 0 3px var(--pc-accent-soft);
+}
+
+.listening-toast {
+  margin-top: 0.65rem;
+  margin-bottom: 0;
+  border-color: var(--pc-border);
+  background: var(--pc-accent-soft);
+  color: var(--pc-accent-text);
+  box-shadow: none;
+}
+
+.chat-body {
+  padding: 1rem 0.15rem 0.75rem;
+}
+
+.chat-stream {
+  width: 100%;
+  max-width: 48rem;
+  margin: 0 auto;
+  gap: 0.75rem;
+}
+
+.chat-bubble {
+  max-width: min(88%, 680px);
+  padding: 0.8rem 0.9rem;
+  border-color: var(--pc-border);
+  background: var(--pc-surface);
+  color: var(--pc-text);
+  box-shadow: var(--pc-shadow-sm);
+  backdrop-filter: none;
+}
+
+.chat-bubble.assistant {
+  background: var(--pc-surface);
+  border-color: var(--pc-border);
+}
+
+.chat-bubble.assistant::before {
+  display: none;
+}
+
+.chat-bubble.user {
+  background: var(--pc-accent-fill);
+  border-color: transparent;
+  color: var(--pc-on-accent);
+}
+
+.chat-text,
+.chat-bubble.user .chat-text {
+  color: var(--pc-text);
+}
+
+.chat-bubble.user .chat-text {
+  color: var(--pc-on-accent);
+}
+
+.message-text {
+  font-size: var(--pc-text-body);
+  line-height: 1.5;
+}
+
+.message-text--assistant {
+  color: var(--pc-text);
+  line-height: 1.5;
+}
+
+.voice-replay-btn {
+  flex: 0 0 auto;
+  border-color: var(--pc-border-strong);
+  background: var(--pc-surface-2);
+  color: var(--pc-accent-text);
+}
+
+.voice-replay-btn:hover {
+  background: var(--pc-surface-hover);
+  border-color: var(--pc-accent);
+  transform: none;
+}
+
+.result-card {
+  background: var(--pc-surface-2);
+  border-color: var(--pc-border);
+  border-left-color: var(--pc-accent);
+  box-shadow: none;
+}
+
+.result-card.result-error {
+  border-left-color: var(--pc-danger);
+}
+
+.result-card.result-pending,
+.result-card.result-ignored {
+  border-left-color: #d97706;
+}
+
+.result-header,
+.result-title {
+  color: var(--pc-text);
+}
+
+.result-status-icon {
+  background: var(--pc-surface);
+}
+
+.result-message,
+.result-item {
+  color: var(--pc-text-muted);
+}
+
+.action-chip {
+  border-color: var(--pc-border-strong);
+  background: var(--pc-accent-soft);
+  color: var(--pc-accent-text);
+}
+
+.action-chip:hover {
+  background: var(--pc-surface-hover);
+  border-color: var(--pc-accent);
+}
+
+.typing-dots span {
+  background: var(--pc-accent);
+}
+
+.chat-input-dock {
+  max-width: none;
+  width: 100%;
+  padding: 0.75rem 0 max(0.75rem, var(--talk-safe-bottom));
+  border-top: 1px solid var(--pc-border);
+  background: var(--pc-surface);
+}
+
+.chat-input-bar {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.chat-input-bar--recording {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.chat-input-row {
+  min-height: 3.5rem;
+  padding: 0.45rem;
+  align-items: center;
+  border-color: var(--pc-border-strong);
+  border-radius: 1rem;
+  background: var(--pc-surface-2);
+  box-shadow: none;
+}
+
+.chat-input {
+  min-height: 1.4rem;
+  color: var(--pc-text);
+  font-size: var(--pc-text-body);
+}
+
+.chat-input::placeholder {
+  color: var(--pc-text-subtle);
+}
+
+.mic-btn,
+.send-btn {
+  width: 2.6rem;
+  height: 2.6rem;
+  min-width: 2.6rem;
+  border-radius: var(--pc-radius-full);
+  box-shadow: none;
+}
+
+.mic-btn {
+  border-color: var(--pc-border-strong);
+  background: var(--pc-accent-soft);
+  color: var(--pc-accent-text);
+}
+
+.mic-btn:hover {
+  background: var(--pc-surface-hover);
+  box-shadow: none;
+  transform: none;
+}
+
+.mic-btn.active {
+  border-color: var(--pc-accent);
+  box-shadow: 0 0 0 4px var(--pc-accent-soft);
+}
+
+.mic-btn--processing {
+  border-color: var(--pc-accent);
+  background: var(--pc-accent-soft);
+  color: var(--pc-accent);
+  box-shadow: 0 0 0 4px var(--pc-accent-soft);
+}
+
+.mic-btn:not(.mic-btn--recording) .mic-visual::before {
+  background: var(--pc-accent);
+}
+
+.send-btn {
+  border-color: transparent;
+  background: var(--pc-accent-fill);
+  color: var(--pc-on-accent);
+}
+
+.send-btn:hover {
+  background: var(--pc-accent-fill-hover);
+  color: var(--pc-on-accent);
+  transform: none;
+}
+
+@media (max-width: 640px) {
+  .talk-planner-wrapper {
+    padding: 0 0.75rem;
+  }
+
+  .talk-header {
+    padding: 0.7rem 0;
+  }
+
+  .talk-title {
+    font-size: 1.15rem;
+  }
+
+  .talk-title-mark {
+    width: 1.65rem;
+    height: 1.65rem;
+  }
+
+  .chat-body {
+    padding-top: 0.75rem;
+  }
+
+  .chat-bubble {
+    max-width: 94%;
+  }
+
+  .chat-input-dock {
+    padding-top: 0.65rem;
   }
 }
 </style>

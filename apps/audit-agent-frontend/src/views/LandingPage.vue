@@ -1,966 +1,494 @@
 <template>
-  <div
-    class="landing-shell relative min-h-screen flex flex-col text-gray-800 dark:text-slate-100 overflow-hidden"
-  >
-    <!-- Animated Star Background -->
-    <div
-      class="absolute inset-0 -z-10 bg-gradient-to-b from-indigo-900 via-purple-900 to-slate-950"
-    >
-      <div class="absolute inset-0" ref="stars"></div>
-    </div>
+  <div class="lp">
+    <!-- Nav -->
+    <header class="lp-nav">
+      <div class="lp-container lp-nav__inner">
+        <RouterLink to="/" class="lp-brand" aria-label="PlanCraftAI home">
+          <img
+            src="/icons/icon-96x96.png"
+            srcset="/icons/icon-96x96.png 1x, /icons/icon-192x192.png 2x"
+            alt=""
+            width="36"
+            height="36"
+            class="lp-brand__icon"
+          />
+          <span class="lp-brand__name">PlanCraftAI</span>
+        </RouterLink>
 
-    <!-- Hero -->
-    <section
-      class="landing-hero relative py-32 md:py-40 bg-gradient-to-b from-indigo-900 via-purple-900 to-slate-950 overflow-hidden"
-    >
-      <div class="landing-brand absolute top-6 left-6 z-20 flex items-center gap-2">
-        <img
-          src="/logo-bg-remove.png"
-          alt="PlanCraftAI Logo"
-          class="h-10 w-auto sm:h-12 md:h-14 drop-shadow-lg select-none"
-        />
-        <span class="text-lg sm:text-xl md:text-2xl font-bold text-white tracking-tight"
-          >PlanCraftAI</span
-        >
-      </div>
+        <nav class="lp-nav__links" aria-label="Primary">
+          <a href="#features">Features</a>
+          <a href="#how-it-works">How it works</a>
+          <a href="#focus">Focus</a>
+          <a href="#pricing">Pricing</a>
+          <a href="#faq">FAQ</a>
+        </nav>
 
-      <canvas ref="starsCanvas" class="absolute inset-0 w-full h-full z-0"></canvas>
-
-      <div
-        class="relative z-10 max-w-5xl mx-auto px-6 text-center flex flex-col items-center gap-7 md:gap-9"
-      >
-        <div class="flex flex-wrap justify-center gap-2 md:gap-3">
-          <span
-            v-for="chip in heroSearchChips"
-            :key="chip"
-            class="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs md:text-sm font-semibold uppercase tracking-[0.18em] text-indigo-100 backdrop-blur-xl"
-          >
-            {{ chip }}
-          </span>
-        </div>
-        <div class="flex flex-col gap-4 md:gap-5">
-          <h1
-            id="hero-title"
-            class="text-5xl md:text-7xl font-extrabold tracking-tight text-white drop-shadow-lg leading-[1.05]"
-            data-aos="fade-up"
-          >
-            AI Task Planner with Voice Reminders
-          </h1>
-          <p
-            class="text-xl md:text-3xl font-semibold text-white/90 max-w-4xl mx-auto leading-snug"
-            data-aos="fade-up"
-            data-aos-delay="120"
-          >
-            Plan your day, speak tasks, and never forget anything again.
-          </p>
-          <p
-            class="text-lg md:text-2xl text-indigo-100 max-w-3xl mx-auto leading-relaxed md:leading-[1.7]"
-            data-aos="fade-up"
-            data-aos-delay="150"
-          >
-            Turn voice notes into tasks, sync your calendar, and get smart reminders powered by AI.
-            PlanCraftAI works as an AI daily planner for solo users and a shared planning workspace
-            for teams.
-          </p>
-        </div>
-        <div
-          class="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center w-full max-w-2xl"
-          data-aos="zoom-in"
-          data-aos-delay="250"
-        >
-          <el-button
-            type="primary"
-            size="large"
-            class="primary-team-cta hero-cta w-full sm:w-auto !px-8 !py-3.5 !rounded-2xl font-semibold"
-            @click="startGuestPlanner('hero')"
-            >
-            <span>Start Planning Free</span>
-            </el-button
-          >
-          <el-button
-            size="large"
-            plain
-            class="solo-cta hero-cta w-full sm:w-auto !px-6 !py-3 !rounded-xl font-semibold"
-            @click="startTeamWorkspace"
-            >
-            <span>Create Team Workspace</span>
-            </el-button
-          >
-        </div>
-        <div class="flex flex-col gap-2 text-indigo-100/90 leading-relaxed max-w-2xl mx-auto">
-          <p
-            class="text-sm md:text-base font-semibold uppercase tracking-[0.24em] text-indigo-200"
-            data-aos="fade-up"
-            data-aos-delay="300"
-          >
-            No credit card needed
-          </p>
-          <p
-            class="text-base md:text-lg text-indigo-100"
-            data-aos="fade-up"
-            data-aos-delay="320"
-          >
-            Built for founders, operators, creators, and small teams who are tired of losing tasks
-            after meetings, voice notes, and busy days.
-          </p>
-          <div
-            class="flex flex-wrap justify-center gap-3 pt-3"
-            data-aos="fade-up"
-            data-aos-delay="340"
-          >
-            <a
-              v-for="platform in appPlatforms"
-              :key="platform.key"
-              :href="platform.href"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="hero-store-pill"
-            >
-              <span class="text-base" aria-hidden="true">{{ platform.icon }}</span>
-              <span>{{ platform.heroLabel }}</span>
-            </a>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section
-      id="install"
-      class="py-16 md:py-20 bg-gradient-to-b from-slate-950 via-slate-950 to-indigo-950/70 text-white"
-    >
-      <div class="max-w-6xl mx-auto px-6">
-        <div class="relative overflow-hidden rounded-[32px] border border-white/10 bg-white/[0.06] p-8 md:p-10 shadow-2xl backdrop-blur-2xl">
-          <div class="absolute inset-0 opacity-90">
-            <div class="absolute -left-16 top-0 h-48 w-48 rounded-full bg-cyan-400/10 blur-3xl"></div>
-            <div class="absolute right-0 top-10 h-56 w-56 rounded-full bg-fuchsia-500/10 blur-3xl"></div>
-            <div class="absolute bottom-0 left-1/3 h-48 w-48 rounded-full bg-indigo-400/10 blur-3xl"></div>
-          </div>
-          <div class="relative grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
-            <div class="max-w-xl">
-              <p class="text-xs font-semibold uppercase tracking-[0.35em] text-cyan-200">Now live</p>
-              <h2 class="mt-4 text-3xl md:text-5xl font-bold leading-tight">
-                Try PlanCraft AI on iPhone, Android, or the web
-              </h2>
-              <p class="mt-5 text-base md:text-lg text-indigo-100/90 leading-relaxed">
-                Install the app from the store you already trust, or open PlanCraft AI on the web.
-                Your planner, reminders, and account stay in one system across every screen.
-              </p>
-              <div class="mt-7 grid gap-3 sm:grid-cols-3">
-                <div
-                  v-for="point in appAvailabilityPoints"
-                  :key="point.label"
-                  class="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 shadow-lg"
-                >
-                  <p class="text-xs uppercase tracking-[0.25em] text-indigo-300">{{ point.label }}</p>
-                  <p class="mt-2 text-sm text-white/90 leading-relaxed">{{ point.value }}</p>
-                </div>
-              </div>
-            </div>
-
-            <div class="grid gap-4 md:grid-cols-3">
-              <a
-                v-for="platform in appPlatforms"
-                :key="`${platform.key}-card`"
-                :href="platform.href"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="app-launch-card rounded-3xl border border-white/10 bg-slate-950/60 p-6 text-left shadow-[0_18px_50px_rgba(15,23,42,0.45)] backdrop-blur-xl"
-                :style="{ '--platform-accent': platform.accent }"
-              >
-                <div class="flex items-start justify-between gap-4">
-                  <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-2xl shadow-inner">
-                    <span aria-hidden="true">{{ platform.icon }}</span>
-                  </div>
-                  <span class="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-indigo-100">
-                    {{ platform.badge }}
-                  </span>
-                </div>
-                <h3 class="mt-6 text-2xl font-semibold text-white">{{ platform.title }}</h3>
-                <p class="mt-3 text-sm leading-relaxed text-indigo-100/85">
-                  {{ platform.description }}
-                </p>
-                <div class="mt-6 flex items-center justify-between text-sm font-semibold text-white">
-                  <span>{{ platform.cta }}</span>
-                  <span aria-hidden="true">↗</span>
-                </div>
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="py-16 md:py-20 bg-slate-950 text-white">
-      <div class="max-w-6xl mx-auto px-6 grid gap-6 lg:grid-cols-2">
-        <article class="rounded-3xl border border-rose-300/20 bg-rose-500/10 p-8 backdrop-blur-xl shadow-xl">
-          <p class="uppercase text-xs tracking-[0.35em] text-rose-200">The problem</p>
-          <h2 class="mt-3 text-3xl md:text-4xl font-bold">Stop juggling tasks in your head</h2>
-          <ul class="mt-6 space-y-4 text-base text-rose-50/90 leading-relaxed">
-            <li v-for="problem in problemBullets" :key="problem">• {{ problem }}</li>
-          </ul>
-        </article>
-        <article class="rounded-3xl border border-emerald-300/20 bg-emerald-500/10 p-8 backdrop-blur-xl shadow-xl">
-          <p class="uppercase text-xs tracking-[0.35em] text-emerald-200">The fix</p>
-          <h2 class="mt-3 text-3xl md:text-4xl font-bold">PlanCraftAI fixes this</h2>
-          <ul class="mt-6 space-y-4 text-base text-emerald-50/90 leading-relaxed">
-            <li v-for="solution in solutionBullets" :key="solution">• {{ solution }}</li>
-          </ul>
-        </article>
-      </div>
-    </section>
-
-    <section class="py-16 md:py-20 bg-gradient-to-b from-slate-950 to-indigo-950/70 text-white">
-      <div class="max-w-6xl mx-auto px-6">
-        <div class="text-center max-w-3xl mx-auto">
-          <p class="uppercase text-xs tracking-[0.35em] text-indigo-300">How it feels</p>
-          <h2 class="mt-3 text-3xl md:text-4xl font-bold">A voice command becomes a real plan</h2>
-          <p class="mt-4 text-indigo-100 text-lg leading-relaxed">
-            People do not switch because a planner looks calm. They switch when it stops things
-            from slipping through the cracks.
-          </p>
-        </div>
-        <div class="mt-10 grid gap-6 lg:grid-cols-[1.2fr_1fr] items-start">
-          <div class="rounded-3xl border border-white/10 bg-white/5 p-7 md:p-8 shadow-2xl backdrop-blur-xl">
-            <p class="uppercase text-xs tracking-[0.35em] text-indigo-300">Example input</p>
-            <div class="mt-5 rounded-2xl border border-indigo-300/20 bg-slate-950/70 p-6">
-              <p class="text-sm text-indigo-200 mb-3">Voice note</p>
-              <p class="text-2xl md:text-3xl font-semibold text-white leading-snug">
-                “Remind me to call John tomorrow at 5.”
-              </p>
-            </div>
-            <div class="mt-6 grid gap-4 md:grid-cols-3">
-              <div
-                v-for="demo in voiceDemoSteps"
-                :key="demo.title"
-                class="rounded-2xl border border-white/10 bg-white/5 p-5 text-left"
-              >
-                <p class="text-2xl">{{ demo.emoji }}</p>
-                <h3 class="mt-3 font-semibold text-lg">{{ demo.title }}</h3>
-                <p class="mt-2 text-sm text-indigo-100/90 leading-relaxed">{{ demo.desc }}</p>
-              </div>
-            </div>
-          </div>
-          <div class="rounded-3xl border border-white/10 bg-gradient-to-br from-indigo-600/20 via-purple-600/10 to-slate-950 p-7 shadow-xl">
-            <p class="uppercase text-xs tracking-[0.35em] text-indigo-300">Why people convert</p>
-            <div class="mt-5 space-y-4">
-              <div
-                v-for="hook in conversionHooks"
-                :key="hook.title"
-                class="rounded-2xl border border-white/10 bg-white/5 p-5"
-              >
-                <h3 class="font-semibold text-lg text-white">{{ hook.title }}</h3>
-                <p class="mt-2 text-sm text-indigo-100/90 leading-relaxed">{{ hook.desc }}</p>
-              </div>
-            </div>
-            <p class="mt-6 text-sm text-indigo-200">
-              Join early users building calmer productivity systems without relying on memory alone.
-            </p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <TestimonialsSection :testimonials="testimonialCards" />
-
-    <!-- Workspaces for Teams -->
-    <section
-      id="teams"
-      class="relative py-16 md:py-20 bg-gradient-to-b from-slate-950 via-indigo-950/80 to-slate-950 text-white overflow-hidden"
-    >
-      <div class="absolute inset-0 opacity-20">
-        <div class="absolute -top-24 -left-24 w-72 h-72 bg-indigo-500/30 rounded-full blur-3xl"></div>
-        <div class="absolute -bottom-24 -right-32 w-80 h-80 bg-purple-500/25 rounded-full blur-3xl"></div>
-      </div>
-      <div class="relative max-w-6xl mx-auto px-6">
-        <div class="text-center max-w-3xl mx-auto mb-10">
-          <p class="uppercase text-xs tracking-[0.35em] text-indigo-300">Workspaces</p>
-          <h2 class="mt-3 text-3xl md:text-4xl font-bold">Workspaces for Teams</h2>
-          <p class="mt-4 text-indigo-200 text-lg">
-            Built for startups and small teams to plan together, stay aligned, and let Voice AI
-            handle the nudges.
-          </p>
-        </div>
-        <div class="grid gap-6 md:grid-cols-3">
-          <div
-            v-for="point in teamHighlights"
-            :key="point.title"
-            class="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl shadow-lg"
-          >
-            <div class="text-3xl mb-3">{{ point.emoji }}</div>
-            <h3 class="text-xl font-semibold mb-2">{{ point.title }}</h3>
-            <p class="text-indigo-100/90 text-sm leading-relaxed">{{ point.desc }}</p>
-          </div>
-        </div>
-        <div class="mt-10 flex flex-col sm:flex-row justify-center items-center gap-4 text-center">
-          <el-button type="primary" size="large" class="!px-6 !py-3 !rounded-xl" @click="startTeamWorkspace">
-            Create a Workspace
-          </el-button>
-          <button
-            type="button"
-            class="text-indigo-200 hover:text-white underline decoration-indigo-300/70"
-            @click="scrollToTeamPricing"
-          >
-            {{ teamFeaturesCtaLabel }}
+        <div class="lp-nav__actions">
+          <RouterLink to="/login" class="lp-nav__signin">Sign in</RouterLink>
+          <button type="button" class="lp-btn lp-btn--primary lp-btn--sm" @click="startGuestPlanner('nav')">
+            Start free
           </button>
         </div>
-        <p class="mt-3 text-sm text-indigo-200/80 text-center">
-          No credit card required · Set up in under 2 minutes
-        </p>
       </div>
-    </section>
+    </header>
 
-    <SeoLongForm
-      eyebrow="Guides"
-      title="How PlanCraftAI helps you capture tasks, plan the day, and follow through"
-      :intro="longformIntro"
-      :sections="longformSections"
-    >
-      <template #cta>
-        <div class="flex flex-col md:flex-row gap-4 mt-6">
-          <RouterLink
-            to="/blog"
-            class="flex-1 text-center px-6 py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-500 transition"
-          >
-            Read more AI productivity guides
-          </RouterLink>
-          <RouterLink
-            to="/voice-planning"
-            class="flex-1 text-center px-6 py-3 rounded-xl border border-indigo-400/60 text-indigo-100 font-semibold hover:border-white/80 transition"
-          >
-            Try voice planning →
-          </RouterLink>
-        </div>
-      </template>
-    </SeoLongForm>
-
-    <!-- FAQ -->
-    <section id="faq" class="py-20 bg-slate-950/90 text-white">
-      <div class="max-w-5xl mx-auto px-6">
-        <div class="text-center mb-12">
-          <p class="uppercase text-xs tracking-[0.35em] text-indigo-400">People also ask</p>
-          <h2 class="mt-3 text-3xl md:text-4xl font-bold">PlanCraft AI FAQ</h2>
-          <p class="mt-4 text-indigo-200">
-            Clear answers for common searches around AI task managers, journaling assistants, and
-            calendar-aware reminders.
-          </p>
-        </div>
-        <div class="grid gap-6">
-          <article
-            v-for="faq in faqs"
-            :key="faq.question"
-            class="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 text-left shadow-lg"
-          >
-            <h3 class="text-xl font-semibold mb-3">{{ faq.question }}</h3>
-            <p class="text-indigo-100/90 leading-relaxed">
-              {{ faq.answer }}
+    <main>
+      <!-- Hero -->
+      <section class="lp-hero">
+        <div class="lp-container lp-hero__grid">
+          <div class="lp-hero__copy">
+            <p class="lp-chip">
+              <span>Your thoughts</span>
+              <ArrowRight :size="14" aria-hidden="true" />
+              <span>A clear plan</span>
+              <Sparkles :size="14" aria-hidden="true" class="lp-chip__spark" />
             </p>
-          </article>
-        </div>
-      </div>
-    </section>
+            <h1 id="hero-title" class="lp-hero__title">
+              Say what you need to do.
+              <span class="lp-gradient-text">PlanCraft</span> turns it into a plan.
+            </h1>
+            <p class="lp-hero__lede">
+              Speak naturally. PlanCraft creates the tasks, understands when they need to happen, and
+              reminds you when it's time. So you can focus on what matters.
+            </p>
 
-    <!-- Deep Links -->
-    <section class="py-12 bg-gradient-to-r from-indigo-900/70 via-purple-900/60 to-slate-950/80">
-      <div class="max-w-5xl mx-auto px-6">
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <p class="uppercase text-xs tracking-[0.35em] text-indigo-300">Keep exploring</p>
-            <h2 class="text-2xl font-semibold text-white mt-2">Popular PlanCraft AI paths</h2>
-          </div>
-          <p class="text-indigo-200 text-sm md:text-base">
-            These internal links help Google crawl every niche use case.
-          </p>
-        </div>
-        <div class="mt-6 grid gap-4 md:grid-cols-2">
-          <RouterLink
-            v-for="link in seoLinks"
-            :key="link.to"
-            :to="link.to"
-            class="rounded-2xl border border-white/10 bg-white/5 text-white px-5 py-4 flex items-center justify-between hover:border-white/60 transition"
-          >
-            <span>{{ link.label }}</span>
-            <span aria-hidden="true" class="text-indigo-200">↗</span>
-          </RouterLink>
-        </div>
-      </div>
-    </section>
-
-    <!-- Features -->
-    <section
-      id="features"
-      class="py-20 bg-gradient-to-b from-violet-900/30 to-indigo-950/50 text-center"
-    >
-      <div class="max-w-7xl mx-auto px-6">
-        <h2 class="text-4xl md:text-5xl font-extrabold text-white drop-shadow mb-4">
-          Why people switch to PlanCraftAI
-        </h2>
-        <p class="text-indigo-200 mb-16 text-lg">
-          Forget less, capture faster, and follow through more often.
-        </p>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div
-            v-for="f in features"
-            :key="f.title"
-            class="group relative rounded-2xl bg-white/5 backdrop-blur-xl p-8 border border-white/10 shadow-lg hover:-translate-y-2 transition-all hover:shadow-indigo-500/40"
-          >
-            <div
-              class="absolute inset-0 rounded-2xl bg-gradient-to-r from-indigo-500/20 via-purple-500/20 to-pink-500/20 opacity-0 group-hover:opacity-100 blur-xl transition"
-            ></div>
-            <div
-              class="relative w-16 h-16 mx-auto flex items-center justify-center rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 text-3xl shadow-md"
-            >
-              {{ f.emoji }}
+            <div class="lp-hero__ctas">
+              <button type="button" class="lp-btn lp-btn--primary lp-btn--lg" @click="startGuestPlanner('hero')">
+                Start planning free
+                <ArrowRight :size="18" aria-hidden="true" />
+              </button>
+              <StoreBadges v-if="showStoreBadges" location="hero" />
             </div>
-            <h3 class="relative mt-6 text-xl font-semibold text-white">{{ f.title }}</h3>
-            <p class="relative mt-3 text-indigo-200 text-sm leading-relaxed">{{ f.desc }}</p>
+
+            <ul class="lp-trust" aria-label="Highlights">
+              <li v-for="item in trustPoints" :key="item">
+                <CircleCheck :size="16" aria-hidden="true" class="lp-i" />
+                {{ item }}
+              </li>
+            </ul>
           </div>
-        </div>
-      </div>
-    </section>
 
-    <!-- Use Cases -->
-    <section id="use-cases" class="py-20 bg-slate-950 text-white">
-      <div class="max-w-6xl mx-auto px-6">
-        <div class="text-center max-w-3xl mx-auto mb-14">
-          <p class="uppercase text-xs tracking-[0.35em] text-indigo-300">Use cases</p>
-          <h2 class="mt-3 text-3xl md:text-4xl font-bold">
-            Search-intent pages for the workflows people actually want
-          </h2>
-          <p class="mt-4 text-indigo-200">
-            Target the workflows people search for most: AI daily planning, voice task creation,
-            Google Calendar integration, and reminders that stay connected to real tasks.
-          </p>
-        </div>
-        <div class="grid gap-8 md:grid-cols-2">
-          <article
-            v-for="useCase in useCases"
-            :key="useCase.title"
-            class="rounded-3xl border border-white/10 bg-gradient-to-br from-white/5 via-indigo-900/20 to-slate-900/60 p-8 backdrop-blur-xl shadow-xl hover:border-indigo-400/40 transition-all"
-          >
-            <div class="text-4xl mb-4">{{ useCase.emoji }}</div>
-            <h3 class="text-2xl font-semibold">{{ useCase.title }}</h3>
-            <p class="mt-3 text-indigo-100/90">{{ useCase.desc }}</p>
-            <RouterLink
-              :to="useCase.href"
-              class="inline-flex items-center gap-2 mt-6 text-indigo-200 hover:text-white font-semibold"
-            >
-              {{ useCase.ctaLabel }}
-              <span aria-hidden="true">↗</span>
-            </RouterLink>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <!-- Daily Flow -->
-    <section id="flow" class="py-20 bg-slate-900/60 text-center">
-      <div class="max-w-7xl mx-auto px-6">
-        <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">From capture to follow-through</h2>
-        <p class="text-indigo-200 mb-12">A simple sequence that keeps work moving instead of slipping.</p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-          <div
-            v-for="s in steps"
-            :key="s.title"
-            class="rounded-xl bg-white/10 backdrop-blur-md shadow p-6 border border-white/10 hover:scale-105 transition"
-          >
-            <div class="text-4xl">{{ s.emoji }}</div>
-            <h3 class="mt-4 font-semibold text-lg text-white">{{ s.title }}</h3>
-            <p class="mt-1 text-sm text-indigo-200">{{ s.desc }}</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Blog Preview -->
-    <section
-      id="latest-blogs"
-      class="py-20 bg-gradient-to-b from-indigo-950/80 to-slate-950/90 text-center"
-    >
-      <div class="max-w-7xl mx-auto px-6">
-        <div class="flex items-center justify-between mb-8">
-          <h2 class="text-3xl md:text-4xl font-bold text-white">From the Journal</h2>
-          <RouterLink to="/blog" class="text-indigo-300 hover:text-indigo-200 underline text-sm"
-            >View all →</RouterLink
-          >
-        </div>
-        <div
-          class="flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scroll-smooth scrollbar-hide justify-center"
-        >
-          <article
-            v-for="b in latestBlogs"
-            :key="b.slug || b.id"
-            class="snap-start flex-shrink-0 w-80 rounded-2xl bg-gradient-to-br from-slate-900/80 via-indigo-950/80 to-purple-950/80 text-indigo-100 border border-indigo-700/30 shadow-[0_0_20px_rgba(79,70,229,0.2)] hover:shadow-[0_0_25px_rgba(139,92,246,0.4)] transition-transform hover:scale-[1.02] duration-300 overflow-hidden"
-          >
-            <img
-              :src="b.coverImage || getFallbackImage(b.title)"
-              :alt="b.title"
-              class="w-full h-40 object-cover rounded-t-2xl border-b border-indigo-800/20"
-              loading="lazy"
-              decoding="async"
-              fetchpriority="low"
+          <div class="lp-hero__device">
+            <div class="lp-hero__glow" aria-hidden="true"></div>
+            <ScreenshotSlot
+              name="today"
+              label="Today"
+              alt="PlanCraftAI live task creation flow from voice capture to a planned task"
+              :sequence="['today', 'voice-capture', 'task-created']"
+              :sequence-interval="4200"
+              sizes="(min-width: 1024px) 320px, 70vw"
+              eager
+              class="lp-hero__phone"
             />
+          </div>
+        </div>
+      </section>
 
-            <div class="p-5 text-left">
-              <h3 class="text-lg font-semibold text-white leading-snug line-clamp-2">
-                {{ b.title }}
+      <!-- How it works -->
+      <section id="how-it-works" class="lp-section">
+        <div class="lp-container">
+          <header class="lp-heading">
+            <p class="lp-eyebrow">How it works</p>
+            <h2>From a thought to real progress.</h2>
+            <p>Turn your ideas into a plan in seconds.</p>
+          </header>
+
+          <ol class="lp-steps">
+            <li v-for="(step, index) in howItWorks" :key="step.shot" class="lp-step">
+              <ScreenshotSlot
+                :name="step.shot"
+                :label="step.label"
+                :alt="step.alt"
+                frame="phone"
+                sizes="(min-width: 1024px) 240px, 68vw"
+              />
+              <div class="lp-step__body">
+                <span class="lp-step__num" aria-hidden="true">{{ index + 1 }}</span>
+                <div>
+                  <h3>{{ step.title }}</h3>
+                  <p>{{ step.desc }}</p>
+                </div>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- Features -->
+      <section id="features" class="lp-section lp-section--tint">
+        <div class="lp-container">
+          <header class="lp-heading">
+            <p class="lp-eyebrow">Everything you need</p>
+            <h2>A complete system to get things done.</h2>
+            <p>Capture, plan, focus, and follow through, with AI by your side.</p>
+          </header>
+
+          <ul class="lp-features">
+            <li v-for="feature in featureGrid" :key="feature.title" class="lp-feature">
+              <span class="lp-feature__icon" :class="`lp-feature__icon--${feature.tone}`" aria-hidden="true">
+                <component :is="feature.icon" :size="24" :stroke-width="2" />
+              </span>
+              <h3>
+                {{ feature.title }}
+                <span v-if="feature.soon" class="lp-pill">Soon</span>
               </h3>
-              <p class="text-sm text-indigo-200 mt-2 line-clamp-3">
-                {{ b.summary || b.excerpt }}
-              </p>
-              <div class="flex items-center justify-between mt-3 text-xs text-indigo-400">
-                <span>{{ formatDate(b.created_at || b.createdAt) }}</span>
-                <RouterLink
-                  :to="`/blog/${b.slug || b.id}`"
-                  class="text-indigo-400 hover:text-indigo-300 font-medium"
-                >
-                  Read →
-                </RouterLink>
-              </div>
-            </div>
-          </article>
+              <p>{{ feature.desc }}</p>
+            </li>
+          </ul>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- Why We Built -->
-    <section class="py-20 bg-slate-950/80 text-center">
-      <div class="max-w-3xl mx-auto px-6">
-        <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">Why We Built PlanCraftAI</h2>
-        <p class="text-indigo-200 leading-relaxed text-lg">
-          Modern work breaks down when people keep tasks in their head and reminders across too many
-          tools. We built PlanCraftAI to capture work quickly, make daily priorities obvious, and
-          keep follow-ups from getting lost.
-        </p>
-      </div>
-    </section>
-
-    <section
-      id="plans"
-      class="py-24 bg-gradient-to-b from-indigo-950/70 via-purple-950/60 to-slate-950/80 text-center"
-    >
-      <div class="max-w-6xl mx-auto px-6">
-        <h2 class="text-4xl md:text-5xl font-bold text-white mb-4">
-          {{ isAppleBillingSafeMode ? '✨ Premium Access' : '✨ Choose Your Flow' }}
-        </h2>
-        <p class="text-indigo-200 mb-12 text-lg">
-          {{ isAppleBillingSafeMode ? 'Solo Premium is available via Apple In-App Purchase at $2.99/month. Team plans are managed by workspace owners on web.' : 'Simple plans for people who want to stop forgetting tasks and keep work moving.' }}
-        </p>
-
-        <template v-if="isAppleBillingSafeMode">
-          <div class="max-w-5xl mx-auto rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl p-8 md:p-10 text-left shadow-2xl">
-            <div class="grid gap-6 md:grid-cols-2">
-              <div class="space-y-4">
-                <p class="text-sm uppercase tracking-[0.35em] text-indigo-300">Premium features</p>
-                <ul class="space-y-3 text-sm text-indigo-100/90">
-                  <li>Unlimited reminders and AI summaries</li>
-                  <li>Voice journaling and richer insights</li>
-                  <li>Calendar, WhatsApp, and shared workspace features</li>
-                </ul>
-              </div>
-              <div class="space-y-4">
-                <p class="text-sm uppercase tracking-[0.35em] text-indigo-300">Solo Premium</p>
-                <p class="text-indigo-100/85">
-                  Sign in with the account you want to upgrade to Solo Premium, or restore and
-                  refresh access if this account already belongs to a paid workspace.
-                </p>
-                <div class="flex flex-wrap gap-3">
-                  <RouterLink
-                    :to="billingRoutePath"
-                    class="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 font-semibold text-indigo-700 hover:bg-slate-100 transition shadow-md"
-                  >
-                    Upgrade to Solo Premium
-                  </RouterLink>
-                  <button
-                    type="button"
-                    class="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/5 px-5 py-3 font-semibold text-white hover:border-indigo-300/40 transition"
-                    @click="startSoloFlow"
-                  >
-                    Continue with your account
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </template>
-
-        <div v-else class="space-y-6 max-w-5xl mx-auto">
-          <p class="text-sm uppercase tracking-[0.35em] text-indigo-300">Solo plans</p>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-8 justify-center items-stretch">
-            <!-- Free Plan -->
-            <div
-              class="relative flex flex-col justify-between bg-white/10 backdrop-blur-xl rounded-2xl shadow-xl p-8 border border-indigo-400/20 hover:-translate-y-2 transition-all hover:shadow-indigo-500/30"
-            >
-              <div
-                class="absolute top-0 right-0 bg-indigo-500 text-white text-xs font-semibold px-3 py-1 rounded-bl-lg"
-              >
-                Free
-              </div>
-              <div>
-                <h3 class="text-2xl font-semibold text-white mb-3">🌿 Solo Free</h3>
-                <p class="text-indigo-200 text-sm mb-6">
-                  Start capturing tasks, planning the day, and building follow-through for free.
-                </p>
-                <ul class="space-y-3 text-left text-sm text-indigo-100 mb-6">
-                  <li>✅ Create & manage tasks</li>
-                  <li>✅ Daily journaling prompts</li>
-                  <li>✅ Limited AI insights</li>
-                  <li>✅ Local reminders</li>
-                </ul>
-              </div>
-              <div class="mt-auto">
-                <div class="text-3xl font-bold text-white mb-4">Free</div>
-                <button
-                  type="button"
-                  class="inline-block w-full px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition shadow-lg shadow-indigo-800/40"
-                  @click="startGuestPlanner('solo_plan')"
-                >
-                  Get Started
-                </button>
-              </div>
-            </div>
-
-            <!-- Premium Plan -->
-            <div
-              class="relative flex flex-col justify-between bg-gradient-to-br from-indigo-500 via-purple-600 to-pink-600 rounded-2xl shadow-xl p-8 border border-white/20 hover:-translate-y-2 transition-all hover:shadow-pink-600/40"
-              style="background: linear-gradient(135deg, #4338ca 0%, #6d28d9 40%, #db2777 100%)"
-            >
-              <div
-                class="absolute top-0 right-0 bg-yellow-400 text-black text-xs font-semibold px-3 py-1 rounded-bl-lg shadow-sm"
-              >
-                Most Popular
-              </div>
-              <div>
-                <h3 class="text-2xl font-semibold text-white mb-3">🚀 Solo Premium</h3>
-                <p class="text-indigo-100 text-sm mb-6">
-                  Unlock smarter reminders, richer planning, and faster follow-through.
-                </p>
-                <ul class="space-y-3 text-left text-sm mb-6 text-white/95">
-                  <li>💎 Unlimited reminders & AI summaries</li>
-                  <li>💎 Voice journaling & insights</li>
-                  <li>💎 Calendar & WhatsApp integration</li>
-                  <li>💎 Priority support & early access</li>
-                </ul>
-              </div>
-              <div class="mt-auto">
-                <div class="text-3xl font-bold mb-4">
-                  $2<span class="text-sm text-indigo-100">/month</span>
-                </div>
-                <RouterLink
-                  :to="billingRoutePath"
-                  class="inline-block w-full px-6 py-3 rounded-xl bg-white text-indigo-700 font-semibold hover:bg-slate-100 transition shadow-md"
-                >
-                  💎 Explore Premium
-                </RouterLink>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <section id="team-pricing" class="mt-14 max-w-6xl mx-auto space-y-4 text-left">
-          <template v-if="isAppleBillingSafeMode">
-            <div class="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl p-8 shadow-xl">
-              <p class="text-sm uppercase tracking-[0.35em] text-indigo-300">Team workspace features</p>
-              <h3 class="mt-3 text-3xl font-semibold text-white">Workspaces for Teams</h3>
-              <p class="mt-3 text-indigo-200 max-w-2xl">
-                Team plans are managed by workspace owners on web. Paid workspace access still syncs
-                into the iPhone app after sign-in.
+      <!-- Focus -->
+      <section id="focus" class="lp-section lp-section--flush">
+        <div class="lp-container">
+          <div class="lp-focus">
+            <div class="lp-focus__copy">
+              <p class="lp-eyebrow lp-eyebrow--dark">Focus mode</p>
+              <h2>Lock in and make progress.</h2>
+              <p>
+                Start a focus session on any task. PlanCraft clears everything else off the screen so
+                it's just you and the one thing that matters.
               </p>
-              <ul class="mt-6 grid gap-3 md:grid-cols-2 text-sm text-indigo-100/90">
-                <li>Shared tasks and workspace context</li>
-                <li>Role-based access for owners, admins, editors, and viewers</li>
-                <li>Voice AI reminders and follow-ups</li>
-                <li>Workspace creation and team setup</li>
+              <ul class="lp-focus__durations" aria-label="Session lengths">
+                <li v-for="mins in focusDurations" :key="mins" :class="{ 'is-default': mins === 25 }">{{ mins }} min</li>
+                <li>Open-ended</li>
               </ul>
             </div>
-          </template>
-          <template v-else>
-            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+
+            <div class="lp-focus__device">
+              <ScreenshotSlot
+                name="focus"
+                label="Focus"
+                alt="PlanCraftAI focus session with a countdown timer for one task"
+                sizes="(min-width: 1024px) 260px, 60vw"
+              />
+            </div>
+
+            <ul class="lp-focus__list">
+              <li v-for="point in focusPoints" :key="point">
+                <CircleCheck :size="18" aria-hidden="true" class="lp-i" />
+                {{ point }}
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- AI help (coming soon) -->
+      <section class="lp-section">
+        <div class="lp-container lp-ai">
+          <div class="lp-ai__device">
+            <ScreenshotSlot
+              name="today"
+              label="AI help preview"
+              alt="PlanCraftAI app preview showing planned tasks"
+              sizes="(min-width: 1024px) 280px, 60vw"
+            />
+          </div>
+
+          <div class="lp-ai__copy">
+            <p class="lp-eyebrow">
+              <Sparkles :size="13" aria-hidden="true" />
+              AI assistance · Coming soon
+            </p>
+            <h2>Get help the moment you're stuck.</h2>
+            <p>
+              Tap Help on any task and PlanCraft works from what it already knows about it: breaking it
+              down, suggesting where to start, or setting up a focus session.
+            </p>
+            <div class="lp-ai__prompt" aria-hidden="true">
+              <span>“Prepare for my system design interview”</span>
+              <span class="lp-ai__prompt-go"><ArrowRight :size="16" /></span>
+            </div>
+          </div>
+
+          <ul class="lp-ai__actions" aria-label="Example AI actions">
+            <li v-for="action in aiActions" :key="action.label">
+              <span class="lp-ai__action-icon" :class="`lp-feature__icon--${action.tone}`" aria-hidden="true">
+                <component :is="action.icon" :size="16" />
+              </span>
+              {{ action.label }}
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Privacy -->
+      <section class="lp-section lp-section--tight">
+        <div class="lp-container">
+          <div class="lp-privacy">
+            <div class="lp-privacy__lead">
+              <span class="lp-privacy__icon" aria-hidden="true"><Lock :size="22" /></span>
               <div>
-                <p class="text-sm uppercase tracking-[0.35em] text-indigo-300">Teams pricing</p>
-                <h3 class="text-3xl font-semibold text-white">Workspaces for Teams</h3>
-                <p class="text-indigo-200 max-w-2xl">
-                  Seat-based plans built for small teams that need shared tasks, team roles, and Voice
-                  AI reminders that keep projects moving.
+                <h2>Your data, your control.</h2>
+                <p>You decide what PlanCraft can access and connect.</p>
+              </div>
+            </div>
+            <ul class="lp-privacy__items">
+              <li v-for="item in privacyPoints" :key="item.label">
+                <component :is="item.icon" :size="20" aria-hidden="true" class="lp-i" />
+                <span>{{ item.label }}</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- Pricing -->
+      <section id="pricing" class="lp-section">
+        <div class="lp-container">
+          <header class="lp-heading">
+            <p class="lp-eyebrow">Simple pricing</p>
+            <h2>Start free. Upgrade when you need more.</h2>
+          </header>
+
+          <div class="lp-pricing">
+            <article class="lp-plan">
+              <div class="lp-plan__head">
+                <div>
+                  <h3>Free</h3>
+                  <p>Everything you need to get started.</p>
+                </div>
+                <p class="lp-plan__price"><span>$0</span></p>
+              </div>
+              <ul class="lp-plan__list">
+                <li v-for="item in freePlan" :key="item">
+                  <span class="lp-plan__check" aria-hidden="true"><Check :size="12" :stroke-width="3" /></span>{{ item }}
+                </li>
+              </ul>
+              <button type="button" class="lp-btn lp-btn--outline" @click="startGuestPlanner('pricing_free')">
+                Get started
+              </button>
+            </article>
+
+            <article class="lp-plan lp-plan--featured">
+              <div class="lp-plan__head">
+                <div>
+                  <h3>Solo Premium</h3>
+                  <p>More AI, reminders and integrations.</p>
+                </div>
+                <p class="lp-plan__price">
+                  <span>{{ premiumPrice }}</span><small>/ month</small>
                 </p>
               </div>
-              <button
-                class="px-5 py-3 rounded-xl bg-white text-indigo-700 font-semibold hover:bg-slate-100 transition shadow-md"
-                @click="startTeamWorkspace"
-              >
-                Create Workspace
-              </button>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <article
-                v-for="plan in teamPlans"
-                :key="plan.name"
-                class="rounded-2xl border border-indigo-500/25 bg-slate-900/70 backdrop-blur-xl p-6 shadow-lg hover:-translate-y-1 transition"
-                :class="plan.featured ? 'ring-2 ring-indigo-400/50 bg-gradient-to-br from-indigo-900/80 via-slate-900 to-indigo-950' : ''"
-              >
-                <div class="flex items-center justify-between mb-3">
-                  <h4 class="text-2xl font-semibold text-white">{{ plan.name }}</h4>
-                  <span
-                    class="text-[11px] px-2 py-1 rounded-full bg-indigo-500/20 text-indigo-100 border border-indigo-400/40"
-                  >
-                    Team
-                  </span>
-                </div>
-                <div class="flex items-baseline gap-2">
-                  <span class="text-3xl font-bold text-white">{{ plan.price }}</span>
-                  <span class="text-sm text-indigo-200">/seat/month</span>
-                </div>
-                <p class="text-sm text-indigo-200 mt-1">{{ plan.minSeats }}</p>
-                <ul class="mt-4 space-y-2 text-sm text-indigo-100/90">
-                  <li v-for="item in plan.features" :key="item">✅ {{ item }}</li>
-                </ul>
-                <div v-if="plan.note" class="mt-3 text-xs text-amber-200 flex items-center gap-1">
-                  <span>⚠️</span>
-                  <span>{{ plan.note }}</span>
-                </div>
-                <button
-                  class="mt-6 w-full px-4 py-3 rounded-xl font-semibold shadow-lg transition"
-                  :class="plan.featured ? 'bg-white text-indigo-800 hover:bg-slate-100' : 'bg-indigo-600 text-white hover:bg-indigo-500'"
-                  @click="startTeamWorkspace"
-                >
-                  Create Workspace
-                </button>
-              </article>
-            </div>
-            <p class="text-sm text-indigo-200">
-              Seats = people you invite to collaborate in a workspace. You only pay for active teammates, not viewers or guests.
-            </p>
-            <p class="text-sm text-indigo-200">Change seats anytime. Billing adjusts automatically.</p>
-          </template>
-        </section>
+              <ul class="lp-plan__list">
+                <li v-for="item in premiumPlan" :key="item">
+                  <span class="lp-plan__check" aria-hidden="true"><Check :size="12" :stroke-width="3" /></span>{{ item }}
+                </li>
+              </ul>
+              <RouterLink :to="billingRoutePath" class="lp-btn lp-btn--primary">Upgrade to Premium</RouterLink>
+            </article>
+          </div>
 
-        <div
-          class="mt-10 rounded-2xl border border-indigo-400/25 bg-indigo-500/10 p-6 max-w-3xl mx-auto text-left shadow-lg"
-        >
-          <div class="flex items-start gap-3">
-            <div class="h-10 w-10 rounded-full bg-white/10 flex items-center justify-center text-lg">🛡️</div>
-            <div>
-              <p class="text-lg font-semibold text-white">Billing you can trust</p>
-              <p class="text-sm text-indigo-100 mt-1">
-                No hidden fees. Cancel anytime. Change seats anytime. Billing adjusts automatically. No long-term contracts.
-              </p>
+          <p class="lp-pricing__note">
+            <template v-if="isAppleBillingSafeMode">Solo Premium is billed through the App Store.</template>
+            <template v-else>
+              $2.99/month when purchased in the iPhone app. Planning with a team?
+              <RouterLink to="/pricing#teams">See workspace plans</RouterLink>.
+            </template>
+          </p>
+        </div>
+      </section>
+
+      <!-- FAQ -->
+      <section id="faq" class="lp-section lp-section--tint">
+        <div class="lp-container lp-container--narrow">
+          <header class="lp-heading">
+            <p class="lp-eyebrow">FAQ</p>
+            <h2>Questions, answered.</h2>
+          </header>
+          <div class="lp-faq">
+            <details v-for="faq in faqs" :key="faq.question">
+              <summary>{{ faq.question }}</summary>
+              <p>{{ faq.answer }}</p>
+            </details>
+          </div>
+
+          <nav class="lp-explore" aria-label="Explore PlanCraftAI">
+            <h2>Explore PlanCraftAI</h2>
+            <ul>
+              <li v-for="link in exploreLinks" :key="link.to">
+                <RouterLink :to="link.to">{{ link.label }}</RouterLink>
+              </li>
+            </ul>
+          </nav>
+        </div>
+      </section>
+
+      <!-- Final CTA -->
+      <section id="install" class="lp-section lp-section--flush">
+        <div class="lp-container">
+          <div class="lp-cta">
+            <div class="lp-cta__brand">
+              <img src="/icons/icon-96x96.png" srcset="/icons/icon-96x96.png 1x, /icons/icon-192x192.png 2x" alt="" width="56" height="56" loading="lazy" />
+              <div>
+                <p class="lp-cta__name">PlanCraftAI</p>
+                <p class="lp-cta__tag">Capture. Plan. Focus. Get it done.</p>
+              </div>
+            </div>
+            <div class="lp-cta__copy">
+              <h2>Stop carrying your entire day in your head.</h2>
+              <p>Start free today and turn your thoughts into real progress.</p>
+            </div>
+            <div class="lp-cta__actions">
+              <StoreBadges v-if="showStoreBadges" location="footer_cta" lazy />
+              <button v-else type="button" class="lp-btn lp-btn--light" @click="startGuestPlanner('footer_cta')">
+                Start planning free
+              </button>
             </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </main>
 
-    <!-- CTA -->
-    <section id="cta" class="py-20 bg-gradient-to-b from-slate-900/60 to-slate-950/80 text-center">
-      <div class="max-w-3xl mx-auto px-6" data-aos="zoom-in">
-        <h2 class="text-3xl md:text-4xl font-bold text-white">Ready to stop losing tasks?</h2>
-        <p class="mt-3 text-indigo-200 leading-relaxed">
-          Start free as an AI daily planner for yourself, or create a workspace and bring your team
-          into the same reminder and planning flow.
-        </p>
-        <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-          <el-button type="primary" size="large" class="!px-7 !py-3 !rounded-xl" @click="startTeamWorkspace">
-            🤝 Create a Workspace
-          </el-button>
-          <el-button size="large" plain class="!rounded-xl" @click="continueAsGuest">🌿 Start Solo</el-button>
-        </div>
-        <p class="mt-4 text-sm text-indigo-200/90">
-          No credit card required. Invite your team when ready.
-        </p>
-      </div>
-    </section>
-
-    <!-- Footer -->
-    <footer
-      class="landing-footer py-8 text-center text-sm text-indigo-300 bg-slate-950 border-t border-indigo-500/10"
-    >
-      <div class="max-w-7xl mx-auto px-6">
-        <p class="text-indigo-200 mb-2">Built to help solo users and teams capture work and follow through.</p>
-        <p class="flex flex-col sm:flex-row justify-center items-center gap-2">
-          <span
-            >© {{ new Date().getFullYear() }} <strong>Sudo Programmer Inc.</strong> — Crafted with
-            care 💜</span
-          >
-          <span>• <strong>PlanCraftAI</strong></span>
-        </p>
-        <div class="mt-3 space-x-4">
-          <RouterLink to="/blog" class="hover:underline">Blog</RouterLink>
-          <RouterLink to="/privacy" class="hover:underline">Privacy</RouterLink>
-          <RouterLink to="/terms" class="hover:underline">Terms</RouterLink>
-          <RouterLink to="/contact" class="hover:underline">Contact</RouterLink>
-        </div>
-        <div class="mt-5 flex flex-wrap justify-center gap-3">
-          <a
-            v-for="platform in appPlatforms"
-            :key="`${platform.key}-footer`"
-            :href="platform.href"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="footer-store-link"
-          >
-            {{ platform.footerLabel }}
-          </a>
-        </div>
+    <footer class="lp-footer">
+      <div class="lp-container lp-footer__inner">
+        <p>© {{ currentYear }} Sudo Programmer Inc. · PlanCraftAI</p>
+        <nav aria-label="Footer">
+          <RouterLink to="/blog">Blog</RouterLink>
+          <RouterLink to="/features">Features</RouterLink>
+          <RouterLink to="/privacy">Privacy</RouterLink>
+          <RouterLink to="/terms">Terms</RouterLink>
+          <RouterLink to="/contact">Contact</RouterLink>
+        </nav>
       </div>
     </footer>
   </div>
 </template>
 
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, markRaw, onMounted, ref } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
-import SeoLongForm from '@/components/SeoLongForm.vue'
-import { useStarfield } from '@/composables/useStarfield'
-import TestimonialsSection from '@/components/TestimonialsSection.vue'
+import {
+  ArrowRight,
+  Bell,
+  CalendarDays,
+  Check,
+  CircleCheck,
+  KeyRound,
+  ListChecks,
+  Lock,
+  Mic,
+  PenLine,
+  Plug,
+  ScanFace,
+  Search,
+  Sparkles,
+  Timer,
+  Trash2,
+} from 'lucide-vue-next'
+import ScreenshotSlot from '@/components/marketing/ScreenshotSlot.vue'
+import StoreBadges from '@/components/marketing/StoreBadges.vue'
 import { useSeoMeta } from '@/composables/useSeoMeta'
-import { trackGuestStartFromLanding } from '@/services/analytics'
+import { EVENTS, trackEvent, trackGuestStartFromLanding } from '@/services/analytics'
 import { useAuthStore } from '@/stores/authStore'
 import { isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
+import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
+import { ANDROID_APP_URL, IOS_APP_URL } from '@/constants/appStores'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const isAppleBillingSafeMode = computed(() => detectAppleBillingSafeMode())
 const billingRoutePath = computed(() => (isAppleBillingSafeMode.value ? '/billing/upgrade' : '/pricing'))
-const teamFeaturesCtaLabel = computed(() => (isAppleBillingSafeMode.value ? 'See team workspace features' : 'See team pricing & features'))
+const premiumPrice = computed(() => (isAppleBillingSafeMode.value ? '$2.99' : '$2'))
+// Store badges make no sense inside the installed app itself.
+const showStoreBadges = ref(true)
+const currentYear = new Date().getFullYear()
 
-const heroSearchChips = ['AI daily planner', 'Voice task manager', 'Smart reminders']
+const trustPoints = ['No credit card needed', 'Web, iPhone and Android', 'Cancel anytime']
 
-const problemBullets = [
-  'Forgetting tasks after meetings, walks, and voice notes?',
-  'Too many tools, but no clear picture of what matters today?',
-  'Typing and organizing tasks feels like another job?',
-]
-
-const solutionBullets = [
-  'Speak once and get clean tasks created instantly.',
-  'Let AI prioritize your day around meetings, deadlines, and real energy.',
-  'Use smart reminders and recaps so important work does not disappear.',
-]
-
-const voiceDemoSteps = [
+const howItWorks = [
   {
-    emoji: '✅',
-    title: 'Task created',
-    desc: 'PlanCraftAI turns the request into a clean task instead of leaving it as a loose note.',
+    shot: 'voice-capture',
+    label: 'Voice capture',
+    alt: 'PlanCraftAI capture sheet asking “What do you need to do?” with a microphone button',
+    title: 'Speak naturally',
+    desc: '“Remind me tomorrow at 8 AM to finish the design system.”',
   },
   {
-    emoji: '⏰',
-    title: 'Reminder scheduled',
-    desc: 'The reminder is placed for tomorrow at 5 so you do not need a second app or follow-up step.',
+    shot: 'task-created',
+    label: 'Task created',
+    alt: 'A PlanCraftAI task with its time, category, reminder and Focus and Help me actions',
+    title: 'PlanCraft understands',
+    desc: 'AI turns your words into a task with the right time, context and reminder.',
   },
   {
-    emoji: '📅',
-    title: 'Calendar-aware',
-    desc: 'The planner can fit the task into your day and keep the timing visible alongside meetings.',
+    shot: 'reminder',
+    label: 'Reminder',
+    alt: 'A PlanCraftAI reminder for “Finish design system” at 2:00 PM with Focus and Snooze buttons',
+    title: 'Get reminded',
+    desc: 'Push notifications, WhatsApp or a call, right when it’s time.',
   },
 ]
 
-const conversionHooks = [
-  {
-    title: 'Capture before you forget',
-    desc: 'Voice-first input is faster than opening three apps and hoping you remember later.',
-  },
-  {
-    title: 'See what today actually needs',
-    desc: 'The AI daily planner helps you focus on the next few important tasks, not an endless list.',
-  },
-  {
-    title: 'Follow-through without nagging',
-    desc: 'Reminders, recaps, and gentle nudges keep work moving without creating more noise.',
-  },
+const featureGrid = [
+  { icon: markRaw(Mic), tone: 'violet', title: 'Voice capture', desc: 'Turn speech into tasks instantly.' },
+  { icon: markRaw(Sparkles), tone: 'blue', title: 'AI planning', desc: 'Break work down and plan a realistic day.' },
+  { icon: markRaw(Bell), tone: 'amber', title: 'Smart reminders', desc: 'Get nudged at the right time, on the right channel.' },
+  { icon: markRaw(CalendarDays), tone: 'sky', title: 'Calendar sync', desc: 'Fit tasks around your real schedule.' },
+  { icon: markRaw(Timer), tone: 'green', title: 'Focus mode', desc: 'Stay on one task and build real progress.' },
+  { icon: markRaw(Search), tone: 'pink', title: 'AI actions', desc: 'Research and next steps for any task.', soon: true },
 ]
 
-const teamHighlights = [
-  {
-    emoji: '🧠',
-    title: 'Shared AI-powered workspace',
-    desc: 'Keep tasks, drafts, and AI context in one shared hub so your team can pick up right where you left off.',
-  },
-  {
-    emoji: '🛡️',
-    title: 'Role-based collaboration',
-    desc: 'Owner, Admin, Editor, or Viewer — invite teammates with just the right access for calm, controlled execution.',
-  },
-  {
-    emoji: '🎙️',
-    title: 'Voice AI reminders + follow-ups',
-    desc: 'Speak, and it’s done. Voice AI nudges the team, summarizes progress, and keeps projects moving.',
-  },
+const focusDurations = [15, 25, 45, 60]
+const focusPoints = [
+  'One task, full screen',
+  'Navigation and badges out of the way',
+  'Keeps time even if you switch apps',
+  'Finish, take a break, or keep going',
 ]
 
-const features = [
-  {
-    emoji: '🎙️',
-    title: 'Speak tasks naturally',
-    desc: 'Use PlanCraftAI as a voice task manager that turns spoken notes into clean tasks, dates, and follow-ups.',
-  },
-  {
-    emoji: '📅',
-    title: 'Let AI plan your day',
-    desc: 'Build a realistic agenda with calendar-aware priorities instead of sorting through a flat backlog.',
-  },
-  {
-    emoji: '⏰',
-    title: 'Get reminders that follow through',
-    desc: 'Smart reminders, recaps, and recurring nudges keep promises visible without turning into notification spam.',
-  },
+const aiActions = [
+  { icon: markRaw(ListChecks), tone: 'violet', label: 'Break it into steps' },
+  { icon: markRaw(Search), tone: 'green', label: 'Find useful resources' },
+  { icon: markRaw(PenLine), tone: 'blue', label: 'Create practice questions' },
+  { icon: markRaw(Timer), tone: 'amber', label: 'Schedule a focus session' },
 ]
 
-const teamPlans = [
-  {
-    name: 'Team Starter',
-    price: '$6',
-    minSeats: 'Minimum 3 seats',
-    features: [
-      'Workspaces with shared tasks',
-      'Invite teammates to collaborate',
-      'Role-based access (Owner/Admin/Editor/Viewer)',
-      'Shared tasks, notes, and context',
-      'Voice AI reminders & follow-ups',
-    ],
-  },
-  {
-    name: 'Team Pro',
-    price: '$10',
-    minSeats: 'Minimum 3 seats',
-    features: [
-      'Everything in Team Starter',
-      'Advanced permissions & admin controls (Coming Soon)',
-      'Priority support for teams',
-    ],
-    featured: true,
-    note: 'Advanced permissions and admin controls ship next — add teammates now and upgrade automatically.',
-  },
+const privacyPoints = [
+  { icon: markRaw(Plug), label: 'Connect only what you choose' },
+  { icon: markRaw(ScanFace), label: 'Face ID and fingerprint app lock' },
+  { icon: markRaw(KeyRound), label: 'Encrypted in transit' },
+  { icon: markRaw(Trash2), label: 'Delete your account anytime' },
 ]
+
+// Mirrors the plan comparison on /pricing.
+const freePlan = ['Unlimited journaling', 'Basic AI (10 insights a month)', 'Focus sessions', 'Web, iPhone and Android apps']
+const premiumPlan = ['Unlimited AI insights', 'Smart reminders', 'Calendar and WhatsApp integration', 'Priority support']
 
 const useCases = [
   {
-    emoji: '🧠',
     title: 'AI Daily Planning',
     desc: 'Start with a clear schedule built around priorities, meetings, and realistic time blocks.',
     href: '/ai-daily-planner',
-    ctaLabel: 'See the AI daily planner',
   },
   {
-    emoji: '🎤',
     title: 'Voice Task Creation',
     desc: 'Speak naturally, then let PlanCraftAI turn the input into structured tasks, due dates, and reminders.',
     href: '/ai-task-planner',
-    ctaLabel: 'See voice task capture',
   },
   {
-    emoji: '📆',
     title: 'Google Calendar Integration',
     desc: 'Sync meetings, block focus time, and get AI-prepared recaps linked to your calendar.',
     href: '/google-calendar-integration',
-    ctaLabel: 'Connect Google Calendar',
   },
   {
-    emoji: '⏰',
     title: 'Voice Reminder App',
     desc: 'Create reminders from spoken input and follow up across push, WhatsApp, or recap-style nudges.',
     href: '/voice-reminder-app',
-    ctaLabel: 'Explore voice reminders',
   },
+]
+
+const exploreLinks = [
+  { label: 'All PlanCraft AI features', to: '/features' },
+  { label: 'AI task planner for voice capture', to: '/ai-task-planner' },
+  { label: 'AI daily planner for realistic schedules', to: '/ai-daily-planner' },
+  { label: 'Voice planning and journaling', to: '/voice-planning' },
+  { label: 'Voice reminder app for spoken follow-ups', to: '/voice-reminder-app' },
+  { label: 'Recurring reminder app for habits and routines', to: '/recurring-reminder-app' },
+  { label: 'AI reminders that feel human', to: '/ai-reminders' },
+  { label: 'Google Calendar sync walkthrough', to: '/google-calendar-integration' },
+  { label: 'Guides on AI productivity and goals', to: '/blog' },
 ]
 
 const faqs = [
@@ -984,162 +512,15 @@ const faqs = [
     answer:
       'Yes. You can sync Google Calendar, place tasks around meetings, and keep prep reminders tied to the schedule you already work from.',
   },
-]
-
-const longformIntro =
-  'People searching for an AI task planner or AI daily planner are not looking for vague calm. They want a system that captures tasks fast, helps prioritize the day, and makes sure nothing important gets missed.'
-const longformSections = [
   {
-    eyebrow: 'Capture',
-    heading: 'Speak tasks before they disappear',
-    description:
-      'PlanCraftAI is strongest when work starts as a thought, a meeting note, or a fast voice memo. Spoken input becomes structured tasks without a cleanup session afterward.',
-    bullets: [
-      'Turn rough speech into clear task names',
-      'Pull dates and reminders out of natural language',
-      'Keep capture friction low when the day is moving fast',
-    ],
-    ctaText: 'See the AI task planner',
-    ctaHref: '/ai-task-planner',
-  },
-  {
-    eyebrow: 'Prioritize',
-    heading: 'Use AI to build a day you can actually finish',
-    description:
-      'A planner is only useful when it helps you choose. PlanCraftAI looks at your tasks and schedule so today feels realistic instead of overloaded.',
-    bullets: [
-      'Balance priorities against meetings and time blocks',
-      'Highlight the next few actions that matter most',
-      'Create a calmer daily plan without losing urgency',
-    ],
-    ctaText: 'Explore AI daily planning',
-    ctaHref: '/ai-daily-planner',
-  },
-  {
-    eyebrow: 'Follow through',
-    heading: 'Let smart reminders keep promises visible',
-    description:
-      'The missing piece in most planners is follow-through. PlanCraftAI pairs tasks with reminders, recaps, and repeat schedules so work does not vanish after capture.',
-    bullets: [
-      'Voice reminders for tasks you capture on the go',
-      'Recurring reminders for routines and repeat commitments',
-      'Recaps that help you reset instead of re-open every app',
-    ],
-    ctaText: 'See the voice reminder app',
-    ctaHref: '/voice-reminder-app',
-  },
-]
-
-const seoLinks = [
-  { label: 'All PlanCraft AI features', to: '/features' },
-  { label: 'AI task planner for voice capture', to: '/ai-task-planner' },
-  { label: 'AI daily planner for realistic schedules', to: '/ai-daily-planner' },
-  { label: 'Voice planning and journaling', to: '/voice-planning' },
-  { label: 'Voice reminder app for spoken follow-ups', to: '/voice-reminder-app' },
-  { label: 'Recurring reminder app for habits and routines', to: '/recurring-reminder-app' },
-  { label: 'AI reminders that feel human', to: '/ai-reminders' },
-  { label: 'Google Calendar sync walkthrough', to: '/google-calendar-integration' },
-  { label: 'Guides on AI productivity & goals', to: '/blog' },
-]
-
-const steps = [
-  { emoji: '🌤️', title: 'Morning Plan', desc: 'Set your focus with clarity and intention.' },
-  { emoji: '🎧', title: 'Midday Log', desc: 'Drop a quick voice note to capture progress.' },
-  {
-    emoji: '🌙',
-    title: 'Evening Reflection',
-    desc: 'Wind down with a gentle, thoughtful summary.',
-  },
-  { emoji: '📈', title: 'Growth Stats', desc: 'See patterns emerge and celebrate small wins.' },
-]
-
-const testimonialCards = [
-  {
-    name: 'Ananya M.',
-    role: 'Founder, health tech',
-    quote: 'I stopped losing follow-ups after calls because I can just speak them and move on.',
-    avatar: 'https://i.pravatar.cc/150?img=47',
-    status: 'approved',
-  },
-  {
-    name: 'Michael L.',
-    role: 'Ops lead, 12-person team',
-    quote: 'The team workspace finally gives us one place for tasks, reminders, and who owns what.',
-    avatar: 'https://i.pravatar.cc/150?img=48',
-    status: 'approved',
-  },
-  {
-    name: 'Ravi K.',
-    role: 'Product, creator tools',
-    quote: 'It feels like an AI daily planner that understands real life instead of demanding perfect input.',
-    avatar: 'https://i.pravatar.cc/150?img=49',
-    status: 'approved',
-    audio: null,
+    question: 'Can I try PlanCraftAI without creating an account?',
+    answer:
+      'Yes. Start planning right away and create tasks before making an account. When you want your plan saved and synced across devices, sign in and everything you created comes with you.',
   },
 ]
 
 const SITE_URL = (import.meta.env.VITE_SITE_URL && String(import.meta.env.VITE_SITE_URL)) || 'https://plancraftai.com'
 const BASE_URL = SITE_URL.endsWith('/') ? SITE_URL.slice(0, -1) : SITE_URL
-const IOS_APP_URL = 'https://apps.apple.com/app/plancraft-ai/id6760917305'
-const ANDROID_APP_URL = 'https://play.google.com/store/apps/details?id=com.sudoprogrammer.plancraftai&pcampaignid=web_share'
-const WEB_APP_URL = BASE_URL
-const appPlatforms = [
-  {
-    key: 'ios',
-    icon: '🍎',
-    badge: 'iPhone + iPad',
-    heroLabel: 'iOS App',
-    footerLabel: 'iOS Download',
-    title: 'iOS',
-    description:
-      'Install PlanCraft AI from the App Store for fast capture, native reminders, and Apple billing for Solo Premium.',
-    cta: 'Open App Store',
-    href: IOS_APP_URL,
-    accent: 'rgba(125, 211, 252, 0.34)',
-  },
-  {
-    key: 'android',
-    icon: '🤖',
-    badge: 'Phones + tablets',
-    heroLabel: 'Android App',
-    footerLabel: 'Android Download',
-    title: 'Android',
-    description:
-      'Get PlanCraft AI on Google Play and keep your planner, voice notes, and reminder flows close at hand on Android.',
-    cta: 'Open Google Play',
-    href: ANDROID_APP_URL,
-    accent: 'rgba(74, 222, 128, 0.34)',
-  },
-  {
-    key: 'web',
-    icon: '🌐',
-    badge: 'Desktop + mobile',
-    heroLabel: 'Web App',
-    footerLabel: 'Open Web App',
-    title: 'Web',
-    description:
-      'Use PlanCraft AI instantly in the browser at plancraftai.com for team setup, planning, and cross-device access.',
-    cta: 'Open Web App',
-    href: WEB_APP_URL,
-    accent: 'rgba(196, 181, 253, 0.34)',
-  },
-]
-const appAvailabilityPoints = [
-  { label: 'Download', value: 'Available in the App Store and on Google Play today.' },
-  { label: 'Sync', value: 'Use the same account across mobile and web without starting over.' },
-  { label: 'Share', value: 'Send teammates to the web app while keeping your own mobile workflow.' },
-]
-const featureList = Array.from(
-  new Set([
-    ...features.map((f) => f.title),
-    ...useCases.map((c) => c.title),
-    'AI daily planner',
-    'Voice reminder app',
-    'Workspaces for Teams',
-    'Voice AI reminders for teams',
-    'Role-based collaboration',
-  ]),
-)
 
 const structuredData = [
   {
@@ -1149,13 +530,13 @@ const structuredData = [
     applicationCategory: 'ProductivityApplication',
     applicationSubCategory: 'TaskManagementApplication',
     operatingSystem: 'Web, iOS, Android',
-    featureList,
+    featureList: [...featureGrid.filter((f) => !f.soon).map((f) => f.title), ...useCases.map((c) => c.title)],
     url: BASE_URL,
     installUrl: `${BASE_URL}/#install`,
-    sameAs: appPlatforms.map((platform) => platform.href),
+    sameAs: [IOS_APP_URL, ANDROID_APP_URL],
     screenshot: `${BASE_URL}/plancraftai-post-one.png`,
     description:
-      'PlanCraftAI is an AI task planner and voice reminder app with AI daily planning, calendar sync, recurring reminders, and shared workspaces for teams.',
+      'PlanCraftAI is an AI task planner and voice reminder app with AI daily planning, calendar sync, focus sessions, and smart reminders.',
     offers: {
       '@type': 'Offer',
       price: '0.00',
@@ -1169,10 +550,7 @@ const structuredData = [
     mainEntity: faqs.map((faq) => ({
       '@type': 'Question',
       name: faq.question,
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: faq.answer,
-      },
+      acceptedAnswer: { '@type': 'Answer', text: faq.answer },
     })),
   },
   {
@@ -1192,324 +570,1036 @@ const structuredData = [
 useSeoMeta({
   title: 'PlanCraftAI | AI Task Planner, AI Daily Planner, and Voice Reminder App',
   description:
-    'Use PlanCraftAI as an AI task planner and voice reminder app. Speak tasks, plan your day, sync your calendar, and get smart reminders that keep work from slipping.',
+    'Say what you need to do and PlanCraftAI turns it into a plan. Speak tasks, plan your day, focus on one thing, and get smart reminders that keep work from slipping.',
   keywords: [
     'PlanCraft AI',
     'AI task planner',
     'AI daily planner',
     'voice reminder app',
     'voice task manager',
+    'focus timer',
     'recurring reminder app',
     'AI productivity app',
     'AI reminders',
-    'Workspaces for teams',
-    'voice AI reminders for teams',
-    'team workspace roles',
     'Google Calendar integration',
   ],
   structuredData,
   pageLabel: 'Landing',
 })
 
-function startSoloFlow() {
-  if (typeof localStorage !== 'undefined') {
-    try {
-      localStorage.setItem('postLoginRedirect', '/dashboard')
-    } catch {
-      /* noop */
-    }
-  }
-
-  const isGuest = authStore?.isGuest === true || authStore?.guest === true || authStore?.user?.mode === 'guest'
-  if (authStore?.user?.uid && !isGuest) {
-    return router.push('/dashboard')
-  }
-  router.push({ path: '/login', query: { redirect: '/dashboard' } })
-}
-
 function startGuestPlanner(entry = 'landing') {
-  const hasSession = !!authStore?.user?.uid
-  if (hasSession) {
-    router.push('/dashboard')
+  if (authStore?.user?.uid) {
+    router.push('/today')
     return
   }
-
   try {
-    trackGuestStartFromLanding({
-      entry,
-    })
+    trackGuestStartFromLanding({ entry })
   } catch {
     /* analytics optional */
   }
-  router.push({
-    path: '/signup',
-    query: {
-      guest: '1',
-      guestFromLanding: '1',
-    },
-  })
-}
-
-function scrollToTeamPricing() {
-  if (typeof document !== 'undefined') {
-    const el = document.getElementById('team-pricing')
-    if (el?.scrollIntoView) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      return
-    }
-  }
-  router.push(billingRoutePath.value)
-}
-
-function startTeamWorkspace(plan = 'starter') {
-  if (typeof localStorage !== 'undefined') {
-    try {
-      localStorage.setItem('postLoginRedirect', `/workspaces/new?plan=${plan}`)
-    } catch {
-      /* noop */
-    }
-  }
-
-  const isGuest = authStore?.isGuest === true || authStore?.guest === true || authStore?.user?.mode === 'guest'
-  if (authStore?.user?.uid && !isGuest) {
-    return router.push({ path: '/workspaces/new', query: { plan } })
-  }
-  router.push({ path: '/signup', query: { mode: 'team', plan, next: '/workspaces/new' } })
-}
-
-function continueAsGuest() {
-  startGuestPlanner('solo_cta')
-}
-
-const stars = ref(null)
-const starsCanvas = ref(null)
-useStarfield(starsCanvas, { minSpeed: 0.5, maxSpeed: 1.5 })
-const latestBlogs = ref([])
-
-async function loadLatestBlogs() {
-  try {
-    const blogService = await import('@/services/blogService')
-    const svc = blogService.default || blogService
-    const fn = svc.getAllBlogs || svc.listBlogs || svc.fetchBlogs
-    const blogs = fn ? await fn(true) : []
-    latestBlogs.value = (blogs || []).slice(0, 5)
-  } catch (e) {
-    console.error(e)
-  }
-}
-
-function formatDate(date) {
-  try {
-    if (!date) return ''
-    const d = date?.toDate ? date.toDate() : new Date(date)
-    if (isNaN(d)) return ''
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  } catch {
-    return ''
-  }
-}
-
-function getFallbackImage(title = '') {
-  try {
-    const initials = (title?.charAt(0) || 'P').toUpperCase()
-    const colors = ['#6366F1', '#8B5CF6', '#EC4899']
-    const bg = colors[Math.floor(Math.random() * colors.length)]
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&background=${bg.slice(1)}&color=fff&size=512`
-  } catch {
-    return '/default-blog-cover.svg'
-  }
+  router.push({ path: '/signup', query: { guest: '1', guestFromLanding: '1' } })
 }
 
 onMounted(() => {
-  loadLatestBlogs()
+  showStoreBadges.value = !isNativePackagedApp()
+  trackEvent(EVENTS.LANDING_VIEW)
 })
 </script>
 
 <style scoped>
-.landing-shell {
-  --safe-area-top: env(safe-area-inset-top, 0px);
-  --safe-area-right: env(safe-area-inset-right, 0px);
-  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
-  --safe-area-left: env(safe-area-inset-left, 0px);
+.lp {
+  --ink: #0f172a;
+  --muted: #475569;
+  --subtle: #64748b;
+  --line: #e2e8f0;
+  --surface: #ffffff;
+  --tint: #f6f7fc;
+  --brand: #4f46e5;
+  --brand-strong: #4338ca;
+  --brand-soft: #eef2ff;
+  --violet: #7c3aed;
+  --dark: #13112b;
+
   min-height: 100vh;
-  min-height: 100dvh;
-  padding-left: var(--safe-area-left);
-  padding-right: var(--safe-area-right);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
-.landing-hero {
-  padding-top: calc(var(--safe-area-top) + 8rem);
+.lp-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 max(16px, env(safe-area-inset-left)) 0 max(16px, env(safe-area-inset-right));
 }
 
-.landing-brand {
-  top: calc(var(--safe-area-top) + 1.5rem);
-  left: calc(var(--safe-area-left) + 1.5rem);
-}
-
-.landing-footer {
-  padding-bottom: calc(2rem + var(--safe-area-bottom));
-}
-
-.star {
-  position: absolute;
-  width: 2px;
-  height: 2px;
-  background: white;
-  border-radius: 50%;
-  opacity: 0.8;
-  animation: twinkle infinite alternate;
-}
-@keyframes twinkle {
-  from {
-    opacity: 0.3;
-    transform: scale(0.8);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1.2);
+@media (min-width: 768px) {
+  .lp-container {
+    padding: 0 32px;
   }
 }
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
-}
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+
+.lp-container--narrow {
+  max-width: 820px;
 }
 
-.primary-team-cta {
-  background: #4f46e5 !important; /* indigo-600 to match create workspace */
-  color: #ffffff !important;
-  border: 1px solid #4338ca !important;
-  box-shadow: 0 12px 32px rgba(67, 56, 202, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.06);
-  letter-spacing: 0.02em;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+/* ---------- Buttons ---------- */
+.lp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-decoration: none;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-.primary-team-cta:hover {
-  background: #6366f1 !important; /* indigo-500 */
-  box-shadow: 0 16px 38px rgba(99, 102, 241, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.08);
-  transform: translateY(-1px);
-}
-
-.primary-team-cta:active {
-  transform: translateY(0);
-  background: #4338ca !important;
-  box-shadow: 0 6px 16px rgba(67, 56, 202, 0.3);
-}
-
-.primary-team-cta:focus-visible {
-  outline: 2px solid #c7d2fe;
+.lp-btn:focus-visible {
+  outline: 2px solid var(--brand);
   outline-offset: 3px;
 }
 
-.solo-cta {
-  background: transparent !important;
-  color: #e2e8f0 !important;
-  border: 1px solid rgba(226, 232, 240, 0.65) !important;
-  box-shadow: none;
-  letter-spacing: 0.02em;
-  transition: transform 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
+.lp-btn--primary {
+  background: linear-gradient(135deg, var(--brand) 0%, var(--violet) 100%);
+  color: #fff;
+  box-shadow: 0 10px 24px -10px rgba(79, 70, 229, 0.7);
 }
 
-.solo-cta:hover {
-  background: rgba(226, 232, 240, 0.08) !important;
-  border-color: rgba(226, 232, 240, 0.9) !important;
+.lp-btn--primary:hover {
   transform: translateY(-1px);
+  box-shadow: 0 14px 28px -12px rgba(79, 70, 229, 0.8);
 }
 
-.hero-store-pill {
+.lp-btn--outline {
+  background: transparent;
+  color: var(--brand-strong);
+  border-color: #c7d2fe;
+}
+
+.lp-btn--outline:hover {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.lp-btn--light {
+  background: #fff;
+  color: var(--brand-strong);
+}
+
+.lp-btn--sm {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 999px;
+  font-size: 0.875rem;
+}
+
+.lp-btn--lg {
+  min-height: 52px;
+  padding: 0 24px;
+  font-size: 1rem;
+}
+
+/* ---------- Nav ---------- */
+.lp-nav {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  padding-top: env(safe-area-inset-top);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: saturate(180%) blur(14px);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.7);
+}
+
+.lp-nav__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: 64px;
+}
+
+.lp-brand {
   display: inline-flex;
   align-items: center;
-  gap: 0.55rem;
-  padding: 0.85rem 1.05rem;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(15, 23, 42, 0.34);
-  color: #eef2ff;
+  gap: 10px;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.lp-brand__icon {
+  border-radius: 9px;
+}
+
+.lp-brand__name {
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: -0.01em;
+}
+
+.lp-nav__links {
+  display: none;
+  gap: 28px;
+}
+
+.lp-nav__links a {
+  color: var(--muted);
   font-size: 0.9rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.22);
-  transition: transform 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
+  font-weight: 500;
+  text-decoration: none;
 }
 
-.hero-store-pill:hover {
-  transform: translateY(-1px);
-  border-color: rgba(199, 210, 254, 0.5);
-  background: rgba(30, 41, 59, 0.68);
+.lp-nav__links a:hover {
+  color: var(--ink);
 }
 
-.hero-cta {
-  display: inline-flex !important;
+.lp-nav__actions {
+  display: flex;
   align-items: center;
+  gap: 16px;
+}
+
+.lp-nav__signin {
+  display: none;
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+@media (min-width: 900px) {
+  .lp-nav__links {
+    display: flex;
+  }
+}
+
+@media (min-width: 480px) {
+  .lp-nav__signin {
+    display: inline;
+  }
+}
+
+/* ---------- Hero ---------- */
+.lp-hero {
+  position: relative;
+  padding: 48px 0 56px;
+  background:
+    radial-gradient(60% 60% at 85% 20%, rgba(167, 139, 250, 0.22), transparent 70%),
+    radial-gradient(50% 50% at 0% 0%, rgba(199, 210, 254, 0.45), transparent 70%),
+    linear-gradient(180deg, #f8f8ff 0%, #ffffff 100%);
+}
+
+.lp-hero__grid {
+  display: grid;
+  gap: 48px;
+  align-items: center;
+}
+
+@media (min-width: 1024px) {
+  .lp-hero {
+    padding: 72px 0 88px;
+  }
+
+  .lp-hero__grid {
+    grid-template-columns: 1.15fr 0.85fr;
+  }
+}
+
+.lp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 20px;
+  padding: 6px 14px;
+  border: 1px solid #ddd6fe;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.lp-chip__spark {
+  color: var(--violet);
+}
+
+.lp-hero__title {
+  margin: 0;
+  font-size: clamp(2.3rem, 5.4vw, 3.7rem);
+  line-height: 1.06;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+
+.lp-gradient-text {
+  background: linear-gradient(135deg, var(--brand) 0%, var(--violet) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.lp-hero__lede {
+  max-width: 34rem;
+  margin: 20px 0 0;
+  color: var(--muted);
+  font-size: clamp(1rem, 1.6vw, 1.15rem);
+  line-height: 1.65;
+}
+
+.lp-hero__ctas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 16px;
+  margin-top: 32px;
+}
+
+.lp-trust {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  margin: 28px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--subtle);
+  font-size: 0.85rem;
+}
+
+.lp-trust li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lp-trust .lp-i {
+  flex: none;
+  color: var(--brand);
+}
+
+.lp-hero__device {
+  position: relative;
+  display: flex;
   justify-content: center;
-  gap: 0.85rem;
 }
 
-.cta-icon {
+.lp-hero__glow {
+  position: absolute;
+  inset: 8% 5%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(124, 58, 237, 0.35), transparent);
+  filter: blur(30px);
+}
+
+.lp-hero__phone {
+  position: relative;
+  width: min(300px, 72vw);
+  transform: rotate(-3deg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lp-hero__phone {
+    animation: lp-float 7s ease-in-out infinite;
+  }
+}
+
+@keyframes lp-float {
+  0%,
+  100% {
+    transform: rotate(-3deg) translateY(0);
+  }
+  50% {
+    transform: rotate(-3deg) translateY(-8px);
+  }
+}
+
+/* ---------- Sections ---------- */
+.lp-section {
+  padding: 72px 0;
+}
+
+.lp-section--tint {
+  background: var(--tint);
+}
+
+.lp-section--tight {
+  padding: 24px 0;
+}
+
+.lp-section--flush {
+  padding: 24px 0;
+}
+
+.lp-heading {
+  max-width: 40rem;
+  margin: 0 auto 44px;
+  text-align: center;
+}
+
+.lp-heading h2,
+.lp-focus h2,
+.lp-ai h2 {
+  margin: 0;
+  font-size: clamp(1.7rem, 3.4vw, 2.3rem);
+  line-height: 1.15;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+}
+
+.lp-heading > p:not(.lp-eyebrow) {
+  margin: 12px 0 0;
+  color: var(--muted);
   font-size: 1.05rem;
-  opacity: 0.92;
-  line-height: 1;
-  transform: translateY(-0.5px);
-  margin-right: 2px;
 }
 
-.primary-team-cta .cta-icon {
+.lp-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 14px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--brand-soft);
+  color: var(--brand-strong);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.lp-eyebrow--dark {
+  background: rgba(255, 255, 255, 0.1);
+  color: #c7d2fe;
+}
+
+.lp-pill {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fce7f3;
+  color: #be185d;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+/* ---------- How it works ---------- */
+.lp-steps {
+  display: grid;
+  gap: 32px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 900px) {
+  .lp-steps {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 28px;
+  }
+}
+
+.lp-step__body {
+  display: flex;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.lp-step > .shot {
+  width: min(240px, 68vw);
+  margin: 0 auto;
+}
+
+.lp-step__num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.lp-step h3 {
+  margin: 2px 0 6px;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.lp-step p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.93rem;
+  line-height: 1.55;
+}
+
+/* ---------- Features ---------- */
+.lp-features {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 28px 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  text-align: center;
+}
+
+@media (min-width: 768px) {
+  .lp-features {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1100px) {
+  .lp-features {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+
+.lp-feature h3 {
+  margin: 14px 0 6px;
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+
+.lp-feature p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.lp-feature__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+}
+
+.lp-feature__icon--violet { background: #ede9fe; color: #6d28d9; }
+.lp-feature__icon--blue { background: #e0e7ff; color: #4338ca; }
+.lp-feature__icon--amber { background: #ffedd5; color: #c2410c; }
+.lp-feature__icon--sky { background: #e0f2fe; color: #0369a1; }
+.lp-feature__icon--green { background: #dcfce7; color: #15803d; }
+.lp-feature__icon--pink { background: #fce7f3; color: #be185d; }
+
+/* ---------- Focus ---------- */
+.lp-focus {
+  display: grid;
+  gap: 36px;
+  align-items: center;
+  padding: 40px 24px;
+  border-radius: 28px;
+  background:
+    radial-gradient(70% 90% at 50% 100%, rgba(124, 58, 237, 0.45), transparent 70%),
+    linear-gradient(135deg, #16143a 0%, #1e1b4b 50%, #13112b 100%);
+  color: #fff;
+}
+
+@media (min-width: 1024px) {
+  .lp-focus {
+    grid-template-columns: 1.1fr 0.8fr 1fr;
+    padding: 48px 56px;
+  }
+}
+
+.lp-focus__copy p:not(.lp-eyebrow) {
+  margin: 14px 0 0;
+  color: #c7d2fe;
+  line-height: 1.6;
+}
+
+.lp-focus__durations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lp-focus__durations li {
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 0.85rem;
+  font-weight: 600;
   color: #e0e7ff;
 }
 
-.solo-cta .cta-icon {
-  color: #e2e8f0;
+.lp-focus__durations li.is-default {
+  background: linear-gradient(135deg, var(--brand) 0%, var(--violet) 100%);
+  border-color: transparent;
+  color: #fff;
 }
 
-.app-launch-card {
-  position: relative;
-  overflow: hidden;
-  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.app-launch-card::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  background: radial-gradient(circle at top left, var(--platform-accent), transparent 48%);
-  opacity: 0.95;
-  pointer-events: none;
-}
-
-.app-launch-card > * {
-  position: relative;
-  z-index: 1;
-}
-
-.app-launch-card:hover {
-  transform: translateY(-4px);
-  border-color: rgba(255, 255, 255, 0.22);
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.55);
-}
-
-.footer-store-link {
-  display: inline-flex;
-  align-items: center;
+.lp-focus__device {
+  display: flex;
   justify-content: center;
-  min-width: 132px;
-  padding: 0.75rem 1rem;
+}
+
+.lp-focus__device > * {
+  width: min(250px, 64vw);
+}
+
+.lp-focus__list,
+.lp-plan__list {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lp-focus__list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #e0e7ff;
+  font-size: 0.95rem;
+}
+
+.lp-focus__list .lp-i {
+  flex: none;
+  color: #a78bfa;
+}
+
+/* ---------- AI ---------- */
+.lp-ai {
+  display: grid;
+  gap: 36px;
+  align-items: center;
+}
+
+@media (min-width: 1024px) {
+  .lp-ai {
+    grid-template-columns: 0.7fr 1.3fr 0.9fr;
+    gap: 48px;
+  }
+}
+
+.lp-ai__device {
+  display: flex;
+  justify-content: center;
+}
+
+.lp-ai__device > * {
+  width: min(250px, 64vw);
+}
+
+.lp-ai__copy p:not(.lp-eyebrow) {
+  margin: 14px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.lp-ai__prompt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 24px;
+  padding: 8px 8px 8px 18px;
+  border: 1px solid var(--line);
   border-radius: 999px;
-  border: 1px solid rgba(129, 140, 248, 0.24);
-  background: rgba(255, 255, 255, 0.04);
-  color: #c7d2fe;
+  background: var(--tint);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.lp-ai__prompt-go {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--brand);
+  color: #fff;
+}
+
+.lp-ai__actions {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lp-ai__actions li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 6px 16px -12px rgba(15, 23, 42, 0.3);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.lp-ai__action-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+}
+
+/* ---------- Privacy ---------- */
+.lp-privacy {
+  display: grid;
+  gap: 24px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--tint);
+}
+
+@media (min-width: 1024px) {
+  .lp-privacy {
+    grid-template-columns: 1fr 1.6fr;
+    align-items: center;
+    padding: 24px 32px;
+  }
+}
+
+.lp-privacy__lead {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.lp-privacy__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--brand);
+  color: #fff;
+}
+
+.lp-privacy h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.lp-privacy__lead p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.lp-privacy__items {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 768px) {
+  .lp-privacy__items {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.lp-privacy__items li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.lp-privacy__items .lp-i {
+  color: var(--ink);
+}
+
+/* ---------- Pricing ---------- */
+.lp-pricing {
+  display: grid;
+  gap: 20px;
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+@media (min-width: 768px) {
+  .lp-pricing {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.lp-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: #fff;
+}
+
+.lp-plan--featured {
+  border: 2px solid #a5b4fc;
+  box-shadow: 0 24px 48px -28px rgba(79, 70, 229, 0.55);
+}
+
+.lp-plan__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.lp-plan h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.lp-plan__head p {
+  margin: 4px 0 0;
+  color: var(--subtle);
+  font-size: 0.85rem;
+}
+
+.lp-plan__price {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.lp-plan__price span {
+  font-size: 2.3rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.lp-plan__price small {
+  margin-left: 4px;
+  color: var(--subtle);
+  font-size: 0.85rem;
+}
+
+.lp-plan__list {
+  flex: 1;
+  gap: 10px;
+}
+
+.lp-plan__list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.92rem;
+  color: var(--ink);
+}
+
+.lp-plan__check {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.lp-pricing__note {
+  margin: 20px auto 0;
+  max-width: 920px;
+  text-align: center;
+  color: var(--subtle);
+  font-size: 0.85rem;
+}
+
+.lp-pricing__note a {
+  color: var(--brand-strong);
   font-weight: 600;
-  transition: border-color 0.18s ease, color 0.18s ease, background-color 0.18s ease;
 }
 
-.footer-store-link:hover {
-  border-color: rgba(224, 231, 255, 0.35);
-  background: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
+/* ---------- FAQ ---------- */
+.lp-faq {
+  display: grid;
+  gap: 12px;
 }
 
-#team-pricing {
-  scroll-margin-top: 96px;
+.lp-faq details {
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.lp-faq summary {
+  cursor: pointer;
+  font-weight: 600;
+  list-style: none;
+}
+
+.lp-faq summary::-webkit-details-marker {
+  display: none;
+}
+
+.lp-faq summary::after {
+  content: '+';
+  float: right;
+  color: var(--brand);
+  font-weight: 700;
+}
+
+.lp-faq details[open] summary::after {
+  content: '–';
+}
+
+.lp-faq p {
+  margin: 12px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.lp-explore {
+  margin-top: 48px;
+}
+
+.lp-explore h2 {
+  margin: 0 0 16px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.lp-explore ul {
+  display: grid;
+  gap: 10px 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 640px) {
+  .lp-explore ul {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.lp-explore a {
+  color: var(--brand-strong);
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.lp-explore a:hover {
+  text-decoration: underline;
+}
+
+/* ---------- Final CTA ---------- */
+.lp-cta {
+  display: grid;
+  gap: 24px;
+  align-items: center;
+  margin: 24px 0 8px;
+  padding: 32px 24px;
+  border-radius: 24px;
+  background:
+    radial-gradient(60% 120% at 100% 0%, rgba(124, 58, 237, 0.5), transparent 70%),
+    linear-gradient(135deg, #1e1b4b 0%, #312e81 60%, #4c1d95 100%);
+  color: #fff;
+}
+
+@media (min-width: 1024px) {
+  .lp-cta {
+    grid-template-columns: auto 1fr auto;
+    gap: 40px;
+    padding: 28px 40px;
+  }
+}
+
+.lp-cta__brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.lp-cta__brand img {
+  border-radius: 14px;
+}
+
+.lp-cta__name {
+  margin: 0;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.lp-cta__tag {
+  margin: 2px 0 0;
+  color: #c7d2fe;
+  font-size: 0.85rem;
+}
+
+.lp-cta__copy h2 {
+  margin: 0;
+  font-size: clamp(1.3rem, 2.4vw, 1.7rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.lp-cta__copy p {
+  margin: 6px 0 0;
+  color: #c7d2fe;
+}
+
+/* ---------- Footer ---------- */
+.lp-footer {
+  padding: 28px 0 calc(28px + env(safe-area-inset-bottom));
+  color: var(--subtle);
+  font-size: 0.85rem;
+}
+
+.lp-footer__inner {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px 24px;
+}
+
+.lp-footer p {
+  margin: 0;
+}
+
+.lp-footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+
+.lp-footer a {
+  color: var(--subtle);
+  text-decoration: none;
+}
+
+.lp-footer a:hover {
+  color: var(--ink);
 }
 </style>
