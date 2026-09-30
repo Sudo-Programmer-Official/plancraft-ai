@@ -2098,6 +2098,10 @@ function applyParsedTask(parsed, rawValue) {
 async function handleTranscript(result = {}) {
   const rawValue = extractTranscriptText(result)
   if (!rawValue) return
+  // Show the words as soon as transcription returns. Intent parsing can make
+  // a second request for dates/reminders, but it should not hide the transcript
+  // while that enrichment is still running.
+  assignText(input, rawValue)
   const parsed = await resolveVoiceTaskIntent(rawValue)
   applyParsedTask(parsed, rawValue)
   console.log('Parsed task intent:', parsed)

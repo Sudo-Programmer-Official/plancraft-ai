@@ -1348,8 +1348,17 @@ export const useAuthStore = defineStore('authStore', {
       this.setAuthenticating(true)
       this.loading = true
       try {
-        const user = await signInAsGuest()
-        const profile = await fetchUserProfile(user.uid)
+        const user = await withTimeout(signInAsGuest(), 12000, 'guest sign-in')
+        // Guest onboarding should not be held hostage by a profile/API request.
+        // This is especially important in the native webview, where the web API
+        // may not be reachable yet even though Firebase auth succeeded.
+        const profile = isNativePackagedApp()
+          ? { role: 'user', mode: 'guest' }
+          : await withFallback(fetchUserProfile(user.uid), {
+              ms: 8000,
+              label: 'guest profile fetch',
+              fallback: () => ({ role: 'user', mode: 'guest' }),
+            })
         this.user = {
           uid: user.uid,
           displayName: user.displayName,
@@ -1363,7 +1372,11 @@ export const useAuthStore = defineStore('authStore', {
           createdAt: profile?.createdAt || Date.now(),
         }
         this.guest = true
-        this.token = await user.getIdToken()
+        this.token = await withFallback(user.getIdToken(), {
+          ms: 8000,
+          label: 'guest token fetch',
+          fallback: () => '',
+        })
         localStorage.setItem('user', JSON.stringify(this.user))
         localStorage.setItem('token', this.token)
         try {

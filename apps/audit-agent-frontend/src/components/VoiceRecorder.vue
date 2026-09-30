@@ -15,13 +15,15 @@
       class="voice-controller__button"
       :class="{ 'voice-controller__button--recording': state === 'recording' }"
       :aria-pressed="state === 'recording'"
+      :aria-busy="state === 'transcribing'"
       :aria-label="primaryLabel"
       :title="primaryLabel"
       :disabled="props.disabled || state === 'transcribing'"
       @click.stop="handlePrimaryPress"
     >
+      <span v-if="state === 'transcribing'" class="voice-controller__button-spinner" aria-hidden="true"></span>
       <svg
-        v-if="state === 'recording'"
+        v-else-if="state === 'recording'"
         class="voice-controller__icon"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -30,14 +32,7 @@
       >
         <rect x="8" y="8" width="8" height="8" rx="2" />
       </svg>
-      <svg
-        v-else
-        class="voice-controller__icon"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        stroke-width="1.6"
-        fill="none"
-      >
+      <svg v-else class="voice-controller__icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6" fill="none">
         <path
           stroke-linecap="round"
           d="M12 15.5a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v5.5a3 3 0 0 0 3 3Z"
@@ -293,6 +288,21 @@ onBeforeUnmount(() => {
 .voice-controller__button--recording {
   background: linear-gradient(135deg, #fb7185, var(--pc-danger, #c9302c));
   box-shadow: 0 0 18px color-mix(in srgb, var(--pc-danger, #c9302c) 30%, transparent);
+}
+
+.voice-controller--transcribing .voice-controller__button {
+  opacity: 1;
+  background: linear-gradient(135deg, #6366f1, #7c3aed);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--pc-accent, #4f46e5) 16%, transparent);
+}
+
+.voice-controller__button-spinner {
+  width: 22px;
+  height: 22px;
+  border: 2.5px solid rgba(255, 255, 255, 0.35);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
 }
 
 .voice-controller__icon {

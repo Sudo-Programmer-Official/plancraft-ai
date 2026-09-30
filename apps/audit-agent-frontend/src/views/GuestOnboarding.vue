@@ -1,6 +1,6 @@
 <template>
   <div class="marketing-light guest-start min-h-screen bg-gradient-to-br from-indigo-950 via-slate-950 to-purple-950 text-slate-900">
-    <main class="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-5 py-6 sm:px-8 sm:py-8">
+    <main class="guest-start__main mx-auto flex min-h-screen w-full max-w-5xl flex-col px-5 py-6 sm:px-8 sm:py-8">
       <header class="flex items-center justify-between gap-4">
         <RouterLink to="/" class="flex items-center gap-3" aria-label="PlanCraftAI home">
           <img src="/icons/icon-96x96.png" alt="" width="40" height="40" class="rounded-xl" />
@@ -11,12 +11,31 @@
         </RouterLink>
       </header>
 
-      <section v-if="!ready" class="flex flex-1 items-center justify-center py-16">
+      <section v-if="!ready && !errorMessage" class="flex flex-1 items-center justify-center py-16">
         <div class="max-w-md text-center">
           <div class="mx-auto mb-5 h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-indigo-300" />
           <h1 class="text-2xl font-semibold">Getting PlanCraft ready…</h1>
           <p class="mt-3 text-sm leading-6 text-indigo-100/70">Your planning space will be ready in a moment.</p>
-          <p v-if="errorMessage" class="mt-5 text-sm text-rose-300">{{ errorMessage }}</p>
+        </div>
+      </section>
+
+      <section v-else-if="errorMessage" class="flex flex-1 items-center justify-center py-16">
+        <div class="max-w-md text-center">
+          <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-rose-100 text-xl text-rose-600">!</div>
+          <h1 class="mt-5 text-2xl font-semibold">PlanCraft could not start</h1>
+          <p class="mt-3 text-sm leading-6 text-slate-600">{{ errorMessage }}</p>
+          <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <button
+              type="button"
+              class="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500"
+              @click="preparePlanningSpace"
+            >
+              Try again
+            </button>
+            <RouterLink to="/login" class="rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+              Sign in
+            </RouterLink>
+          </div>
         </div>
       </section>
 
@@ -175,6 +194,7 @@ const isGuestSession = computed(() =>
 )
 
 async function preparePlanningSpace() {
+  errorMessage.value = ''
   try {
     if (authStore.user?.uid && !isGuestSession.value) {
       await router.replace('/today')
@@ -236,6 +256,12 @@ onMounted(() => {
 <style scoped>
 .guest-start {
   isolation: isolate;
+}
+
+.guest-start__main {
+  box-sizing: border-box;
+  padding-top: max(1.5rem, calc(env(safe-area-inset-top, 0px) + 1rem));
+  padding-bottom: max(1.5rem, calc(env(safe-area-inset-bottom, 0px) + 1rem));
 }
 
 .capture-card {
