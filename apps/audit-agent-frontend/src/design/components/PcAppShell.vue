@@ -92,8 +92,11 @@ function onMoreUpgrade() {
 .pc-shell {
   display: flex;
   width: 100%;
+  height: 100%;
+  max-height: 100dvh;
   min-width: 0;
   min-height: 100dvh;
+  overflow: hidden;
   background: var(--pc-bg);
 }
 
@@ -123,16 +126,20 @@ function onMoreUpgrade() {
 
 .pc-shell__main {
   flex: 1;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
   padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
   outline: none;
 }
 
 @media (min-width: 768px) {
   .pc-shell {
-    height: 100%;
-    max-height: 100dvh;
-    overflow: hidden;
+    min-height: 0;
   }
 
   .pc-shell__sidebar {
@@ -140,12 +147,7 @@ function onMoreUpgrade() {
   }
 
   .pc-shell__main {
-    display: flex;
     padding-bottom: var(--pc-space-12);
-    height: 100%;
-    min-height: 0;
-    overflow: hidden;
-    flex-direction: column;
   }
 }
 </style>
