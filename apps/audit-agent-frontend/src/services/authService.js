@@ -49,7 +49,7 @@ export async function signInAsGuest() {
     isGuest: true,
     firstVisitInitialized: false,
     profileComplete: false,
-  });
+  }, { merge: true });
   return user;
 }
 

@@ -342,7 +342,7 @@ router.post('/split-tasks', async (req, res) => {
     }
     // Plan enforcement and usage increment
     try {
-      const userId = req.user?.uid || req.headers['x-user-id']
+      const userId = req.user?.uid
       if (userId) {
         const ok = await checkUserPlanUsage(String(userId), 'ai')
         if (!ok?.ok) {

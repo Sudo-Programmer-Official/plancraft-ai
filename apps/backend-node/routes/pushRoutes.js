@@ -1,12 +1,14 @@
 import express from 'express'
 import { db } from '../services/firebaseAdmin.js'
+import { requireAuth, ensureUserMatches } from '../middleware/auth.js'
 
 const router = express.Router()
 
-router.post('/register', async (req, res) => {
+router.post('/register', requireAuth, ensureUserMatches, async (req, res) => {
   try {
-    const { userId, endpoint, keys } = req.body || {}
-    if (!userId || !endpoint) return res.status(400).json({ ok: false, error: 'Missing fields' })
+    const { endpoint, keys } = req.body || {}
+    const userId = String(req.user.uid)
+    if (!endpoint) return res.status(400).json({ ok: false, error: 'Missing fields' })
 
     const subId = Buffer.from(String(endpoint)).toString('base64').slice(0, 100)
     const userRef = db.collection('users').doc(String(userId))

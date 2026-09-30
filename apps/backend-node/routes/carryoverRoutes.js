@@ -1,14 +1,17 @@
 import express from 'express'
 import { db } from '../services/firebaseAdmin.js'
+import { requireAuth, ensureUserMatches } from '../middleware/auth.js'
 
 const router = express.Router()
+
+// Guard explicitly: do not rely on routers mounted earlier under /api.
+router.use('/carryover', requireAuth, ensureUserMatches)
 
 // POST /api/carryover/apply { userId, limit? }
 router.post('/carryover/apply', async (req, res) => {
   try {
-    const userId = req.body?.userId || req.headers['x-user-id']
+    const userId = String(req.user.uid)
     const limit = parseInt(req.body?.limit, 10) || 0 // 0 = no limit
-    if (!userId) return res.status(400).json({ success: false, error: 'userId required' })
 
     const snap = await db
       .collection('tasks')
@@ -49,8 +52,7 @@ router.post('/carryover/apply', async (req, res) => {
 // POST /api/carryover/ignore { userId }
 router.post('/carryover/ignore', async (req, res) => {
   try {
-    const userId = req.body?.userId || req.headers['x-user-id']
-    if (!userId) return res.status(400).json({ success: false, error: 'userId required' })
+    const userId = String(req.user.uid)
     const snap = await db
       .collection('tasks')
       .where('userId', '==', userId)

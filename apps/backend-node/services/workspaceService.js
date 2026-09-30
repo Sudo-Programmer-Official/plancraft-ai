@@ -467,7 +467,22 @@ export async function listUserWorkspaces(userId) {
     if (!legacySnap.empty) {
       const batch = db.batch();
       const now = new Date();
-      legacySnap.forEach((doc) => {
+      const existingWorkspaceSnaps = await db.getAll(
+        ...legacySnap.docs.map((doc) => db.collection(WORKSPACE_COLLECTION).doc(doc.id)),
+      );
+      let migrated = 0;
+      legacySnap.docs.forEach((doc, index) => {
+        // User-scoped legacy docs used to be client-writable, so one must never
+        // claim a top-level workspace that already exists under another owner.
+        const existing = existingWorkspaceSnaps[index];
+        if (existing?.exists && String(existing.data()?.ownerId || "") !== String(userId)) {
+          console.warn("[workspaceService] skipped legacy workspace migration for existing workspace", {
+            userId,
+            workspaceId: doc.id,
+          });
+          return;
+        }
+        migrated += 1;
         const data = doc.data() || {};
         const wsRef = db.collection(WORKSPACE_COLLECTION).doc(doc.id);
         batch.set(
@@ -501,9 +516,11 @@ export async function listUserWorkspaces(userId) {
           { merge: true },
         );
       });
-      await batch.commit();
-      // Recurse once to load migrated memberships
-      return await listUserWorkspaces(userId);
+      if (migrated) {
+        await batch.commit();
+        // Recurse once to load migrated memberships
+        return await listUserWorkspaces(userId);
+      }
     }
   }
 

@@ -282,6 +282,10 @@ app.use("/api/auth", authRoutes)
 app.get("/", (req, res) => res.send("Backend is live!"));
 app.get("/health", (req, res) => res.status(200).send("OK"));
 
+// Twilio webhooks carry X-Twilio-Signature, not a Firebase token, so mount them
+// before the /api routers that apply requireAuth to everything after them.
+app.use("/api/twilio", twilioRoutes);
+
 // Feature routes
 app.use("/api/ai", aiRoutes);
 // Back-compat: allow calling AI endpoints under /api as well
@@ -308,7 +312,6 @@ app.use("/api", parseRemindersRoutes);
 app.use("/api", testRoutes);
 app.use("/api", knowledgeRoutes);
 app.use("/api/blogs", blogRoutes);
-app.use("/api/twilio", twilioRoutes);
 app.use("/api/planner", plannerRoutes);
 app.use("/api/talk", talkToPlannerRoutes);
 app.use("/api/tasks", taskRoutes);

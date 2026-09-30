@@ -7,6 +7,7 @@
     "dev": "nodemon index.js",
     "start": "node index.js",
     "test": "node --test test/*.test.js",
+    "test:security": "firebase emulators:exec --config test/emulator/firebase.json --only firestore,auth --project demo-plancraft-api 'node --test test/emulator/*.test.js'",
     "postinstall": "rm -rf node_modules/pdf-parse/test",
     "migrate:locations": "node jobs/locationMigration.js",
     "migrate:napkin-audio-urls": "node jobs/migrateNapkinAudioUrls.js"

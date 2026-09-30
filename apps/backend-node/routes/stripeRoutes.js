@@ -2,6 +2,7 @@
 import express from 'express'
 import Stripe from 'stripe'
 import { db } from '../services/firebaseAdmin.js'
+import { requireAuth, ensureUserMatches } from '../middleware/auth.js'
 
 const router = express.Router()
 
@@ -12,11 +13,11 @@ const stripe = STRIPE_SECRET_KEY
   : null
 
 // POST /api/create-checkout-session
-router.post('/create-checkout-session', async (req, res) => {
+router.post('/create-checkout-session', requireAuth, ensureUserMatches, async (req, res) => {
   try {
-    const { userId, plan, successUrl, cancelUrl } = req.body || {}
-
-    if (!userId) return res.status(400).json({ error: 'User must be logged in to upgrade' })
+    const { plan, successUrl, cancelUrl } = req.body || {}
+    // The webhook upgrades metadata.userId, so it must be the verified caller.
+    const userId = String(req.user.uid)
     if (!plan) return res.status(400).json({ error: 'Missing plan' })
 
     // Dynamically resolve plan → Stripe Price ID (with aliases)

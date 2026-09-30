@@ -1,5 +1,6 @@
 import express from 'express'
 import { requireAuth, ensureUserMatches } from '../middleware/auth.js'
+import { requireTwilioSignature } from '../middleware/twilioSignature.js'
 import { sendSMS, sendSMSForUser, makeCall, makeCallForUser } from '../services/twilioService.js'
 import { generateVoice } from '../services/ttsService.js'
 import { db } from '../services/firebaseAdmin.js'
@@ -50,7 +51,7 @@ router.post('/make-call', requireAuth, ensureUserMatches, async (req, res) => {
 
 export default router
 
-// --- Inbound Webhooks (no auth) ---
+// --- Inbound Webhooks (Twilio-signed, no user auth) ---
 
 // POST (or GET) /api/twilio/voice-response
 // Returns simple TwiML for configured number voice handler
@@ -94,7 +95,7 @@ function buildPlayResponse(audioUrl, fallbackText) {
   )
 }
 
-router.all('/voice-response', async (req, res) => {
+router.all('/voice-response', requireTwilioSignature, async (req, res) => {
   const rawMessage =
     (req.body && (req.body.message || req.body.Body)) ||
     req.query.message ||
@@ -120,7 +121,7 @@ router.all('/voice-response', async (req, res) => {
 })
 
 // POST /api/twilio/incoming-sms
-router.post('/incoming-sms', async (req, res) => {
+router.post('/incoming-sms', requireTwilioSignature, async (req, res) => {
   try {
     const from = String(req.body?.From || '')
     const body = String(req.body?.Body || '').trim()
@@ -184,7 +185,7 @@ router.post('/incoming-sms', async (req, res) => {
 })
 
 // POST /api/twilio/call-status
-router.post('/call-status', async (req, res) => {
+router.post('/call-status', requireTwilioSignature, async (req, res) => {
   try {
     const status = String(req.body?.CallStatus || '').toLowerCase()
     const callSid = String(req.body?.CallSid || '')

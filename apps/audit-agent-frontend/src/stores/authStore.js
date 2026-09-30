@@ -33,7 +33,7 @@ import {
 import { auth, db } from '@/firebase/init'
 import { identifyUser, trackEvent, trackSignupCompleted } from '@/services/analytics'
 import { getUsageStatus } from '@/services/planService'
-import { doc, updateDoc, setDoc, onSnapshot } from 'firebase/firestore'
+import { doc, setDoc, onSnapshot } from 'firebase/firestore'
 import { ElNotification } from 'element-plus'
 import { clearAppToken } from '@/services/appTokenService'
 import { storeAppTokenData } from '@/services/appTokenService'
@@ -1040,11 +1040,7 @@ export const useAuthStore = defineStore('authStore', {
             usage: access ? { today: access.today || {}, ...access.usage } : this.user?.usage,
           }
           try { localStorage.setItem('user', JSON.stringify(this.user)) } catch {}
-          try {
-            if (resolvedPlan) {
-              await updateDoc(doc(db, 'users', uid), { plan: resolvedPlan })
-            }
-          } catch {}
+          // `plan` is server-controlled; the client only mirrors it locally.
           return { user: this.user, refreshed: !!(status || access) }
         })()
 

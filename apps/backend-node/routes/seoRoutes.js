@@ -1,4 +1,5 @@
 import express from 'express'
+import crypto from 'crypto'
 import { generateSitemapDocument, generateRobotsDocument, pingSearchEngines, getSitemapBaseUrl } from '../services/seoService.js'
 
 const router = express.Router()
@@ -27,11 +28,18 @@ router.get('/robots.txt', (_req, res) => {
 
 router.post('/api/seo/ping', async (req, res) => {
   try {
-    const secret = process.env.SEO_PING_TOKEN
-    if (secret && req.headers['x-seo-secret'] !== secret) {
+    // Fail closed: without a configured token the endpoint is disabled.
+    const secret = String(process.env.SEO_PING_TOKEN || '')
+    const provided = String(req.headers['x-seo-secret'] || '')
+    const matches =
+      secret.length > 0 &&
+      provided.length === secret.length &&
+      crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(secret))
+    if (!matches) {
       return res.status(403).json({ success: false, error: 'Forbidden' })
     }
-    const sitemapUrl = req.body?.sitemapUrl || `${getSitemapBaseUrl()}/sitemap.xml`
+    // Only ever ping our own sitemap; never forward a caller-supplied URL.
+    const sitemapUrl = `${getSitemapBaseUrl()}/sitemap.xml`
     const results = await pingSearchEngines(sitemapUrl)
     return res.json({ success: true, sitemapUrl, results })
   } catch (err) {

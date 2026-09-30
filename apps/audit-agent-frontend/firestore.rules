@@ -51,11 +51,28 @@ service cloud.firestore {
         && data.userId == request.auth.uid;
     }
 
+    // Profile fields the client may write on its own user document. Anything
+    // else (role, plan, planLimits, entitlements, billing, authProviders,
+    // canonicalUserId, ...) is server-controlled and written via the Admin SDK.
+    function userEditableFields() {
+      return [
+        'email', 'name', 'phone', 'avatarUrl', 'mode',
+        'profileComplete', 'createdAt', 'updatedAt', 'lastLoginAt',
+        'fcmToken', 'fcmTokenUpdatedAt',
+        'isGuest', 'firstVisitInitialized', 'starterTasksSeededAt', 'starterSource',
+      ];
+    }
+
     // Users & Preferences
     match /users/{uid} {
       allow read: if isUser(uid) || isAdmin();
-      allow create: if isUser(uid);
-      allow update: if isUser(uid) || isAdmin();
+      allow create: if isUser(uid)
+        && request.resource.data.keys().hasOnly(userEditableFields());
+      allow update: if isAdmin()
+        || (
+          isUser(uid)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(userEditableFields())
+        );
       allow delete: if isAdmin();
     }
 
@@ -200,9 +217,12 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
-    // Legacy user-scoped workspace docs
+    // Legacy user-scoped workspace docs. Read-only for clients: the backend's
+    // legacy migration (listUserWorkspaces) promotes these into real
+    // workspaces/memberships, so client writes here would grant access.
     match /users/{uid}/workspaces/{workspaceId} {
-      allow read, create, update, delete: if isUser(uid) || isAdmin();
+      allow read: if isUser(uid) || isAdmin();
+      allow create, update, delete: if isAdmin();
     }
 
     // Workspace Members

@@ -19,7 +19,7 @@ router.post("/vision/upload", requireAuth, upload.single("file"), async (req, re
       return res.status(400).json({ error: "No file provided" });
     }
 
-    const userId = req.user?.uid || req.headers["x-user-id"] || "anon";
+    const userId = req.user?.uid || "anon";
     const mime = req.file.mimetype || "application/octet-stream";
     const original = req.file.originalname || "upload";
     const ext = path.extname(original) || ".bin";
