@@ -6,7 +6,21 @@ dotenv.config()
 const CATEGORY_LIST = ["Work", "Health", "Learning", "Personal", "Finance", "Routine", "Other"]
 const DEFAULT_MODEL = process.env.OPENAI_CATEGORY_MODEL || "gpt-4o-mini"
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null
+
+const LOCAL_CATEGORY_RULES = [
+  ["Health", /\b(?:dentist|doctor|clinic|health|medicine|medication|gym|workout|run|exercise)\b/i],
+  ["Finance", /\b(?:bank|bill|budget|tax|pay|payment|invoice|expense|finance)\b/i],
+  ["Learning", /\b(?:learn|study|course|class|lecture|read|research|practice|exam)\b/i],
+  ["Work", /\b(?:work|project|meeting|client|interview|job|office|aws|deploy|code|email|report)\b/i],
+  ["Routine", /\b(?:clean|cook|laundry|shop|groceries|sleep|morning|shower|home)\b/i],
+  ["Personal", /\b(?:family|friend|birthday|旅行|travel|appointment|call mom|call dad)\b/i],
+]
+
+function inferLocalCategory(title, details = "") {
+  const text = `${title} ${details}`
+  return LOCAL_CATEGORY_RULES.find(([, pattern]) => pattern.test(text))?.[0] || "Other"
+}
 
 /**
  * Infer a high-level category for a task using OpenAI.
@@ -18,6 +32,11 @@ export async function inferCategory(title, details = "") {
 
   if (!safeTitle) return "Other"
 
+  const localCategory = inferLocalCategory(safeTitle, safeDetails)
+  if (localCategory !== "Other" || process.env.ENABLE_AI_CATEGORY_FALLBACK !== "1") {
+    return localCategory
+  }
+
   const prompt = [
     `Classify the following task into one of these categories: ${CATEGORY_LIST.join(", ")}.`,
     `Task: "${safeTitle}"`,
@@ -26,6 +45,7 @@ export async function inferCategory(title, details = "") {
   prompt.push("Return only the category name.")
 
   try {
+    if (!openai) return "Other"
     const startedAt = Date.now()
     const res = await openai.chat.completions.create({
       model: DEFAULT_MODEL,
@@ -39,7 +59,6 @@ export async function inferCategory(title, details = "") {
     try {
       // eslint-disable-next-line no-console
       console.log("[TimeBrain][Category] inferCategory", {
-        title: safeTitle,
         category: normalized,
         model: DEFAULT_MODEL,
         ms: elapsed,
@@ -51,7 +70,6 @@ export async function inferCategory(title, details = "") {
     try {
       // eslint-disable-next-line no-console
       console.warn("[TimeBrain][Category] inferCategory:error", {
-        title: safeTitle,
         message: err?.message || err,
       })
     } catch {}

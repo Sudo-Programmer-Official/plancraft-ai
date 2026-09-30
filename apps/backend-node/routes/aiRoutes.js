@@ -316,7 +316,6 @@ router.post('/split-tasks', async (req, res) => {
     const {
       text,
       maxItems = 6,
-      context = '',
       timeContext = null,
       now: clientNow,
       attachments = [],
@@ -383,12 +382,18 @@ router.post('/split-tasks', async (req, res) => {
     }
 
     let reminderFromText = null
+    let taskParser = null
+    let taskProvider = null
+    let taskModel = null
     if (text && typeof text === 'string') {
-      const result = await splitTasks(text, { maxItems, context, timeContext })
+      const result = await splitTasks(text, { maxItems, timezone: tz, now: nowIso })
       if (!result || !Array.isArray(result.tasks)) {
         return res.status(502).json({ error: 'Upstream returned unexpected format.' })
       }
       reminderFromText = result?.reminderTime ?? null
+      taskParser = result?.parser || null
+      taskProvider = result?.provider || null
+      taskModel = result?.model || null
       combinedTasks.push(
         ...result.tasks.map((t) => ({
           ...t,
@@ -410,12 +415,15 @@ router.post('/split-tasks', async (req, res) => {
         context: typeof t.context === 'string' ? t.context : 'planning',
         priority: Number.isFinite(t.priority) ? t.priority : Math.min(i + 1, 3),
         scheduledTime: typeof t.scheduledTime === 'string' ? t.scheduledTime : null,
+        date: typeof t.date === 'string' ? t.date : typeof t.dueDate === 'string' ? t.dueDate : null,
         timeHint: typeof t.timeHint === 'string' ? t.timeHint : null,
         relation: ['after_previous', 'same_time_previous', 'independent'].includes(String(t.relation || '').toLowerCase())
           ? String(t.relation).toLowerCase()
           : 'independent',
         gapMinutes: Number.isFinite(t.gapMinutes) ? Math.max(0, Math.min(Number(t.gapMinutes), 120)) : 15,
         source: t.source || (firstAttachment ? 'image' : 'text'),
+        confidence: Number.isFinite(Number(t.confidence)) ? Number(t.confidence) : null,
+        parser: taskParser,
         metadata: t.metadata || (firstAttachment ? { attachmentUrl: firstAttachment.url } : {}),
         attachments: Array.isArray(t.attachments) ? t.attachments : firstAttachment ? [firstAttachment] : [],
       }))
@@ -426,10 +434,7 @@ router.post('/split-tasks', async (req, res) => {
           category = await inferCategory(task.title, task.details)
         } catch (err) {
           try {
-            console.warn('[TimeBrain][Category] assign:error', {
-              title: task.title,
-              message: err?.message || err,
-            })
+            console.warn('[TimeBrain][Category] assign:error', { message: err?.message || err })
           } catch {}
         }
         return { ...task, category }
@@ -438,12 +443,14 @@ router.post('/split-tasks', async (req, res) => {
     try {
       console.log('[TimeFlow] /split-tasks normalized', {
         count: tasks.length,
-        sample: tasks[0] || null,
+        parser: taskParser,
+        provider: taskProvider,
+        model: taskModel,
       })
     } catch {}
     // Attempt time extraction from the same input (non-fatal)
     if (!reminderTime && reminderFromText) reminderTime = reminderFromText
-    if (!reminderTime && text) {
+    if (!reminderTime && text && process.env.ENABLE_AI_TIME_FALLBACK === '1') {
       try { reminderTime = await extractReminderTime(text, { nowISO: nowIso, timezone: tz, timeContext }) } catch {}
     }
     res.json({ tasks, reminderTime })

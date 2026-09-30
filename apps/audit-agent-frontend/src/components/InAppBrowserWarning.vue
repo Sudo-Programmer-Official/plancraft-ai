@@ -34,12 +34,14 @@
         <button
           type="button"
           @click="copyLink"
+          :disabled="copying"
           :class="chromeIntentUrl
             ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700'
             : 'bg-indigo-600 hover:bg-indigo-700 text-white'"
           class="flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm w-full transition-all"
         >
-          <span v-if="!copied">📋 Copy link</span>
+          <span v-if="copying">Copying…</span>
+          <span v-else-if="!copied">📋 Copy link</span>
           <span v-else>✅ Link copied!</span>
         </button>
 
@@ -60,8 +62,11 @@
         </button>
       </div>
 
-      <div v-if="copied" class="text-[11px] text-slate-500 pt-2">
+      <div v-if="copied" class="text-[11px] text-slate-500 pt-2" aria-live="polite">
         You can now paste this link in Safari or Chrome to continue.
+      </div>
+      <div v-else-if="copyError" class="text-[11px] text-rose-600 pt-2" role="alert">
+        {{ copyError }}
       </div>
     </div>
   </div>
@@ -73,7 +78,10 @@ import { isAndroidDevice, buildChromeIntentUrl } from '@/utils/inAppBrowser'
 
 const props = defineProps({
   onContinue: { type: Function, default: null },
-  redirectUrl: { type: String, default: window.location.href }
+  redirectUrl: {
+    type: String,
+    default: () => (typeof window !== 'undefined' ? window.location.href : '')
+  }
 })
 
 const emit = defineEmits(['close'])
@@ -87,16 +95,36 @@ const chromeIntentUrl = computed(() => {
   }
 })
 const copied = ref(false)
+const copying = ref(false)
+const copyError = ref('')
 
-function copyLink() {
+async function copyLink() {
+  if (copying.value) return
+  copying.value = true
+  copyError.value = ''
   try {
-    navigator.clipboard.writeText(props.redirectUrl)
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(props.redirectUrl)
+    } else {
+      const helper = document.createElement('textarea')
+      helper.value = props.redirectUrl
+      helper.setAttribute('readonly', '')
+      helper.style.position = 'fixed'
+      helper.style.opacity = '0'
+      document.body.appendChild(helper)
+      helper.select()
+      const copiedWithFallback = document.execCommand('copy')
+      helper.remove()
+      if (!copiedWithFallback) throw new Error('copy unavailable')
+    }
     copied.value = true
-    setTimeout(() => {
+    window.setTimeout(() => {
       copied.value = false
     }, 2500)
-  } catch (e) {
-    alert('Copy failed — please long-press and copy manually.')
+  } catch {
+    copyError.value = 'Copy failed — long-press the address below to copy it manually.'
+  } finally {
+    copying.value = false
   }
 }
 

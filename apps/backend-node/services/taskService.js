@@ -295,6 +295,7 @@ export async function scheduleTaskReminder(userId, task, payload = {}, options =
         scheduledTime: iso,
         timezone,
         taskId: task.id || payload.id || null,
+        workspaceId: task.workspaceId || payload.workspaceId || options.workspaceId || null,
         source: options.source || "task_create",
         now: options.clientNow,
         context: options.context || payload.context || null,

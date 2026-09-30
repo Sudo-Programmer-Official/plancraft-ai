@@ -110,6 +110,7 @@ import TaskPlannerDialog from '@/components/TaskPlannerDialog.vue'
 import { PcButton } from '@/design'
 import { useTasks } from '@/composables/useTasks'
 import { toLocalDateKey } from '@/utils/dateHelper'
+import { updateTaskInFirebase } from '@/services/firebaseService'
 
 const modes = [
   { label: 'Today', value: 'today' },
@@ -205,10 +206,18 @@ function closePlanner() {
   selectedTask.value = null
 }
 
-async function handleSaved() {
-  // When TaskPlannerDialog emits saved, refresh current view
-  await refresh()
-  closePlanner()
+async function handleSaved(savedTask = null) {
+  try {
+    // TaskPlannerDialog is intentionally presentational on save. Persist the
+    // emitted edit here so the Planner screen cannot silently discard changes.
+    if (savedTask?.id) {
+      await updateTaskInFirebase(savedTask)
+    }
+    await refresh()
+    closePlanner()
+  } catch (err) {
+    console.warn('[Planner] save failed', err?.message || err)
+  }
 }
 
 onMounted(refresh)

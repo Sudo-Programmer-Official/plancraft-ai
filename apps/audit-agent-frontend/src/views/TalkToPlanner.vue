@@ -69,6 +69,20 @@
       </transition>
 
       <div ref="chatContainer" class="chat-body scrollbar-plan">
+        <div v-if="messages.length === 1 && !assistantThinking" class="planner-quick-start" aria-label="Planner suggestions">
+          <p class="planner-quick-start__label">Try asking</p>
+          <div class="planner-quick-start__actions">
+            <button type="button" @click="sendQuery('What should I focus on today?')">
+              Focus for today
+            </button>
+            <button type="button" @click="sendQuery('Show my open tasks')">
+              Show open tasks
+            </button>
+            <button type="button" @click="sendQuery('Create a task to review my priorities tomorrow')">
+              Create a task
+            </button>
+          </div>
+        </div>
         <TransitionGroup name="fade-up" tag="div" class="chat-stream">
         <div
           v-for="message in messages"
@@ -144,22 +158,47 @@
                   <span class="result-title">{{ result.label }}</span>
                 </header>
 
-                <p v-if="result.message" class="result-message">
+                <p
+                  v-if="result.message && !resultTasks(result).length"
+                  class="result-message"
+                >
                   {{ result.message }}
                 </p>
 
-                <ul
-                  v-if="result.type === 'get_tasks' && result.payload?.tasks?.length"
-                  class="result-list"
-                >
-                  <li
-                    v-for="task in result.payload.tasks"
+                <div v-if="resultTasks(result).length" class="result-task-list">
+                  <article
+                    v-for="task in resultTasks(result)"
                     :key="task.id || task.title"
-                    class="result-item"
+                    class="result-task"
                   >
-                    {{ describeTaskItem(task) }}
-                  </li>
-                </ul>
+                    <button
+                      type="button"
+                      class="result-task__check"
+                      :class="{ 'result-task__check--done': task.completed }"
+                      :disabled="isTaskBusy(task)"
+                      :aria-label="task.completed ? `Reopen ${task.title}` : `Complete ${task.title}`"
+                      @click="toggleResultTask(task)"
+                    >
+                      <span v-if="isTaskBusy(task)" class="loader loader--tiny loader--dark"></span>
+                      <span v-else>{{ task.completed ? '✓' : '' }}</span>
+                    </button>
+                    <div class="result-task__content">
+                      <span class="result-task__title" :class="{ 'result-task__title--done': task.completed }">
+                        {{ task.title || task.text || 'Untitled task' }}
+                      </span>
+                      <span class="result-task__meta">{{ describeTaskItem(task) }}</span>
+                    </div>
+                    <button
+                      v-if="task.id"
+                      type="button"
+                      class="result-task__edit"
+                      :disabled="isTaskBusy(task)"
+                      @click="openTaskEditor(task)"
+                    >
+                      Edit
+                    </button>
+                  </article>
+                </div>
 
                 <ul
                   v-else-if="result.type === 'get_reminders' && result.payload?.reminders?.length"
@@ -171,18 +210,6 @@
                     class="result-item"
                   >
                     {{ describeReminderItem(reminder) }}
-                  </li>
-                </ul>
-                <ul
-                  v-else-if="result.payload?.createdTasks?.length"
-                  class="result-list"
-                >
-                  <li
-                    v-for="task in result.payload.createdTasks"
-                    :key="task.id || task.title"
-                    class="result-item"
-                  >
-                    {{ describeTaskItem(task) }}
                   </li>
                 </ul>
                 <ul
@@ -323,6 +350,16 @@
         </div>
       </div>
     </footer>
+
+    <TaskPlannerDialog
+      v-if="editingTask"
+      :open="!!editingTask"
+      :task="editingTask"
+      :date="editingTask.date"
+      edit-mode
+      @close="editingTask = null"
+      @saved="handleEditedTaskSaved"
+    />
   </div>
 </template>
 
@@ -341,11 +378,15 @@ import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
 import { useSeoMeta } from '@/composables/useSeoMeta'
 import { useAudioRecorder } from '@/composables/useAudioRecorder'
+import TaskPlannerDialog from '@/components/TaskPlannerDialog.vue'
+import { updateTaskInFirebase } from '@/services/firebaseService'
+import { useWorkspaceStore } from '@/stores/workspaceStore'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
 
 const authStore = useAuthStore()
+const workspaceStore = useWorkspaceStore()
 
 useSeoMeta({
   title: 'Talk to PlanCraft AI | Conversational Task Manager & Voice Assistant',
@@ -357,6 +398,8 @@ useSeoMeta({
 })
 
 const assistantThinking = ref(false)
+const editingTask = ref(null)
+const taskBusyIds = ref({})
 const inputText = ref('')
 const chatContainer = ref(null)
 const chatInputRef = ref(null)
@@ -898,7 +941,7 @@ function historyForRequest(excludeId) {
 async function sendQuery(forcedInput = null) {
   const rawInput = forcedInput != null ? forcedInput : inputText.value
   const query = String(rawInput || '').trim()
-  if (!query) {
+  if (!query || assistantThinking.value) {
     return
   }
   if (!userId.value) {
@@ -1014,6 +1057,101 @@ function normalizeResults(actions) {
   })
 }
 
+function resultTasks(result = {}) {
+  const payload = result?.payload || {}
+  if (result?.type === 'get_tasks' && Array.isArray(payload.tasks)) return payload.tasks
+  if (Array.isArray(payload.createdTasks)) return payload.createdTasks
+  return []
+}
+
+function taskControlId(task = {}) {
+  return task?.id ? String(task.id) : `${task?.title || task?.text || 'task'}:${task?.date || ''}`
+}
+
+function isTaskBusy(task) {
+  return Boolean(taskBusyIds.value[taskControlId(task)])
+}
+
+function setTaskBusy(task, busy) {
+  const id = taskControlId(task)
+  taskBusyIds.value = { ...taskBusyIds.value, [id]: busy }
+}
+
+function updateTaskReferences(updatedTask) {
+  if (!updatedTask?.id) return
+  for (const message of messages.value) {
+    for (const result of message.results || []) {
+      const payload = result?.payload || {}
+      for (const list of [payload.tasks, payload.createdTasks]) {
+        if (!Array.isArray(list)) continue
+        const match = list.find((task) => String(task?.id || '') === String(updatedTask.id))
+        if (match) Object.assign(match, updatedTask)
+      }
+    }
+  }
+}
+
+async function toggleResultTask(task) {
+  if (!task?.id || isTaskBusy(task)) return
+  const workspaceId = workspaceStore.activeWorkspaceId
+  if (!workspaceId) {
+    ElMessage.error('Select a workspace before changing a task.')
+    return
+  }
+
+  const nextCompleted = !task.completed
+  setTaskBusy(task, true)
+  try {
+    const updated = {
+      ...task,
+      workspaceId,
+      completed: nextCompleted,
+      completedAt: nextCompleted ? new Date().toISOString() : null,
+    }
+    await updateTaskInFirebase(updated)
+    updateTaskReferences(updated)
+    try {
+      window.dispatchEvent(new CustomEvent('tasks:refresh-request'))
+    } catch {
+      /* Best effort: the task mutation already succeeded. */
+    }
+    ElMessage.success(nextCompleted ? 'Task completed' : 'Task reopened')
+  } catch (err) {
+    ElMessage.error(err?.message || 'Could not update that task.')
+  } finally {
+    setTaskBusy(task, false)
+  }
+}
+
+function openTaskEditor(task) {
+  if (!task?.id) return
+  editingTask.value = {
+    ...task,
+    workspaceId: task.workspaceId || workspaceStore.activeWorkspaceId || null,
+  }
+}
+
+async function handleEditedTaskSaved(savedTask) {
+  if (!savedTask?.id) return
+  const nextTask = {
+    ...editingTask.value,
+    ...savedTask,
+    workspaceId: savedTask.workspaceId || editingTask.value?.workspaceId || workspaceStore.activeWorkspaceId || null,
+  }
+  try {
+    await updateTaskInFirebase(nextTask)
+    updateTaskReferences(nextTask)
+    try {
+      window.dispatchEvent(new CustomEvent('tasks:refresh-request'))
+    } catch {
+      /* Best effort: the task mutation already succeeded. */
+    }
+    ElMessage.success('Task updated')
+  } catch (err) {
+    ElMessage.error(err?.message || 'Could not update that task.')
+  }
+}
+
 function prettifyActionType(type) {
   return String(type || '')
     .replace(/[_-]+/g, ' ')
@@ -1052,7 +1190,9 @@ function runAction(_message, action) {
   } catch {
     /* Analytics failures should not block the planner action. */
   }
-  if (action.message) {
+  if (action.status === 'suggestion' && action.label) {
+    sendQuery(action.label)
+  } else if (action.message) {
     ElMessage.info(action.message)
   }
 }
@@ -1350,6 +1490,11 @@ onMounted(() => {
   border-width: 2px;
 }
 
+.loader--dark {
+  border-color: var(--pc-border-strong);
+  border-top-color: var(--pc-accent);
+}
+
 .clear-btn {
   font-size: 1.05rem;
 }
@@ -1634,6 +1779,138 @@ onMounted(() => {
   display: grid;
   gap: 0.35rem;
   list-style: disc;
+}
+
+.planner-quick-start {
+  width: 100%;
+  max-width: 48rem;
+  margin: 0 auto 0.9rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--pc-border);
+  border-radius: var(--pc-radius-lg, 1rem);
+  background: var(--pc-surface-2);
+}
+
+.planner-quick-start__label {
+  margin: 0 0 0.55rem;
+  color: var(--pc-text-subtle);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.planner-quick-start__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.planner-quick-start__actions button {
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--pc-border-strong);
+  border-radius: 999px;
+  background: var(--pc-surface);
+  color: var(--pc-text);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.planner-quick-start__actions button:hover {
+  border-color: var(--pc-accent);
+  background: var(--pc-accent-soft);
+  color: var(--pc-accent-text);
+}
+
+.result-task-list {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.65rem;
+}
+
+.result-task {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+  padding: 0.5rem;
+  border: 1px solid var(--pc-border);
+  border-radius: 0.75rem;
+  background: var(--pc-surface);
+}
+
+.result-task__check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 1.55rem;
+  height: 1.55rem;
+  border: 1px solid var(--pc-border-strong);
+  border-radius: 0.5rem;
+  background: var(--pc-surface-2);
+  color: var(--pc-on-accent);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.result-task__check--done {
+  border-color: var(--pc-accent);
+  background: var(--pc-accent-fill);
+}
+
+.result-task__check:disabled,
+.result-task__edit:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.result-task__content {
+  display: grid;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 0.1rem;
+}
+
+.result-task__title,
+.result-task__meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.result-task__title {
+  color: var(--pc-text);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.result-task__title--done {
+  color: var(--pc-text-subtle);
+  text-decoration: line-through;
+}
+
+.result-task__meta {
+  color: var(--pc-text-subtle);
+  font-size: 0.72rem;
+}
+
+.result-task__edit {
+  flex: 0 0 auto;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--pc-border-strong);
+  border-radius: 0.55rem;
+  background: transparent;
+  color: var(--pc-accent-text);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.result-task__edit:hover {
+  background: var(--pc-accent-soft);
 }
 
 .result-item {

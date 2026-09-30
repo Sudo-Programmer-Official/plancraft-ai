@@ -3,7 +3,7 @@ import utc from "dayjs/plugin/utc.js";
 import timezone from "dayjs/plugin/timezone.js";
 import { db } from "./firebaseAdmin.js";
 import { handleTextReminder } from "./textHandler.js";
-import { advanceRecurringTask, createTask } from "./taskService.js";
+import { advanceRecurringTask, createTask, scheduleTaskReminder } from "./taskService.js";
 import { recordCompletion } from "./habitService.js";
 import { extractReminderTime as extractReminderTimeAI } from "./openaiService.js";
 import { formatLocalTime } from "../utils/timezone.js";
@@ -321,15 +321,19 @@ function asIso(value) {
   }
 }
 
-async function fetchRecentTasks(uid, limit = 14) {
+async function fetchRecentTasks(uid, limit = 14, workspaceId = null) {
   const tasks = [];
   try {
-    const snap = await db
-      .collection("tasks")
-      .where("userId", "==", String(uid))
-      .orderBy("updatedAt", "desc")
-      .limit(limit)
-      .get();
+    let query = db.collection("tasks");
+    if (workspaceId) {
+      // Keep the assistant scoped to the workspace the user is currently
+      // operating in. Sorting in memory avoids requiring a new composite index
+      // for every workspace migration state.
+      query = query.where("workspaceId", "==", String(workspaceId));
+    } else {
+      query = query.where("userId", "==", String(uid));
+    }
+    const snap = await query.limit(limit).get();
 
     snap.forEach((doc) => {
       const data = doc.data() || {};
@@ -340,10 +344,17 @@ async function fetchRecentTasks(uid, limit = 14) {
         completed: !!data.completed,
         category: data.category || "Uncategorized",
         reminderTime: data.reminderTime || null,
+        scheduledTime: data.scheduledTime || null,
         priority: data.priority || null,
         goalId: data.goalId || null,
+        workspaceId: data.workspaceId || null,
         updatedAt: asIso(data.updatedAt) || asIso(data.createdAt),
       });
+    });
+    tasks.sort((a, b) => {
+      const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+      const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+      return bTime - aTime;
     });
     return tasks;
   } catch (err) {
@@ -351,11 +362,13 @@ async function fetchRecentTasks(uid, limit = 14) {
   }
 
   try {
-    const snap = await db
-      .collection("tasks")
-      .where("userId", "==", String(uid))
-      .limit(limit)
-      .get();
+    let query = db.collection("tasks");
+    if (workspaceId) {
+      query = query.where("workspaceId", "==", String(workspaceId));
+    } else {
+      query = query.where("userId", "==", String(uid));
+    }
+    const snap = await query.limit(limit).get();
     snap.forEach((doc) => {
       const data = doc.data() || {};
       tasks.push({
@@ -365,7 +378,9 @@ async function fetchRecentTasks(uid, limit = 14) {
         completed: !!data.completed,
         category: data.category || "Uncategorized",
         reminderTime: data.reminderTime || null,
+        scheduledTime: data.scheduledTime || null,
         priority: data.priority || null,
+        workspaceId: data.workspaceId || null,
         updatedAt: asIso(data.updatedAt) || asIso(data.createdAt),
       });
     });
@@ -380,14 +395,11 @@ async function fetchRecentTasks(uid, limit = 14) {
   return tasks.slice(0, limit);
 }
 
-async function fetchUpcomingReminders(uid, limit = 10) {
+async function fetchUpcomingReminders(uid, limit = 10, workspaceId = null) {
   try {
-    const snap = await db
-      .collection("reminders")
-      .where("userId", "==", String(uid))
-      .orderBy("scheduledTime", "asc")
-      .limit(limit)
-      .get();
+    let query = db.collection("reminders").where("userId", "==", String(uid));
+    if (workspaceId) query = query.where("workspaceId", "==", String(workspaceId));
+    const snap = await query.limit(limit).get();
 
     const reminders = [];
     snap.forEach((doc) => {
@@ -399,17 +411,17 @@ async function fetchUpcomingReminders(uid, limit = 10) {
         status: data.status || "scheduled",
         channels: data.channels || [],
         taskId: data.taskId || null,
+        workspaceId: data.workspaceId || null,
       });
     });
+    reminders.sort((a, b) => new Date(a.scheduledTime || 0) - new Date(b.scheduledTime || 0));
     return reminders;
   } catch (err) {
     console.warn("[PlannerAssistant] fetchUpcomingReminders failed", err?.message || err);
     try {
-      const fallback = await db
-        .collection("reminders")
-        .where("userId", "==", String(uid))
-        .limit(limit)
-        .get();
+      let query = db.collection("reminders").where("userId", "==", String(uid));
+      if (workspaceId) query = query.where("workspaceId", "==", String(workspaceId));
+      const fallback = await query.limit(limit).get();
       const reminders = [];
       fallback.forEach((doc) => {
         const data = doc.data() || {};
@@ -420,6 +432,7 @@ async function fetchUpcomingReminders(uid, limit = 10) {
           status: data.status || "scheduled",
           channels: data.channels || [],
           taskId: data.taskId || null,
+          workspaceId: data.workspaceId || null,
         });
       });
       reminders.sort((a, b) => {
@@ -649,6 +662,8 @@ async function lookupTask(uid, payload = {}, context = {}) {
     null;
 
   const tasks = Array.isArray(context?.tasks) ? context.tasks : [];
+  const expectedWorkspaceId =
+    context?.workspaceId || context?.profile?.activeWorkspaceId || context?.runtime?.workspaceId || null;
   if (id) {
     const fromContext = tasks.find((task) => String(task.id) === id);
     if (fromContext) return fromContext;
@@ -656,7 +671,8 @@ async function lookupTask(uid, payload = {}, context = {}) {
       const snap = await db.collection("tasks").doc(id).get();
       if (snap.exists) {
         const data = snap.data() || {};
-        if (!data.userId || String(data.userId) !== String(uid)) return null;
+        if (expectedWorkspaceId && String(data.workspaceId || "") !== String(expectedWorkspaceId)) return null;
+        if (!expectedWorkspaceId && (!data.userId || String(data.userId) !== String(uid))) return null;
         return {
           id,
           title: data.title || "",
@@ -664,7 +680,9 @@ async function lookupTask(uid, payload = {}, context = {}) {
           completed: !!data.completed,
           category: data.category || "Uncategorized",
           reminderTime: data.reminderTime || null,
+          scheduledTime: data.scheduledTime || null,
           priority: data.priority || null,
+          workspaceId: data.workspaceId || null,
         };
       }
     } catch (err) {
@@ -850,6 +868,69 @@ async function updateTaskForUser(uid, payload = {}, context = {}) {
     };
   }
 
+  const reminderChanged = [
+    "date",
+    "reminderTime",
+    "scheduledTime",
+    "reminderChannels",
+    "channels",
+    "deliveryChannels",
+  ].some((key) => Object.prototype.hasOwnProperty.call(updates, key));
+  if (reminderChanged) {
+    try {
+      const reminderQuery = await db
+        .collection("reminders")
+        .where("userId", "==", String(uid))
+        .where("taskId", "==", String(task.id))
+        .where("status", "==", "scheduled")
+        .get();
+      if (!reminderQuery.empty) {
+        const batch = db.batch();
+        reminderQuery.forEach((reminderDoc) => {
+          batch.update(reminderDoc.ref, { status: "canceled", sentAt: new Date() });
+        });
+        await batch.commit();
+      }
+
+      const nextTask = {
+        ...task,
+        ...updates,
+        id: task.id,
+        workspaceId:
+          task.workspaceId ||
+          context?.workspaceId ||
+          context?.runtime?.workspaceId ||
+          context?.profile?.activeWorkspaceId ||
+          null,
+      };
+      const reminderTask = { ...nextTask };
+      // If the AI changed the date/time fields without sending an absolute
+      // scheduledTime, derive the new reminder from the new local date/time
+      // instead of reusing the previous absolute timestamp.
+      if (
+        (Object.prototype.hasOwnProperty.call(updates, "date") ||
+          Object.prototype.hasOwnProperty.call(updates, "reminderTime")) &&
+        !Object.prototype.hasOwnProperty.call(updates, "scheduledTime")
+      ) {
+        reminderTask.scheduledTime = null;
+      }
+      await scheduleTaskReminder(uid, reminderTask, reminderTask, {
+        source: "planner-assistant-update",
+        timezone:
+          context?.runtime?.clientTimezone ||
+          context?.profile?.timezone ||
+          context?.profile?.tz ||
+          task?.timezone ||
+          DEFAULT_TIMEZONE,
+        workspaceId: nextTask.workspaceId,
+      });
+    } catch (reminderErr) {
+      // The task mutation is already durable; report the reminder issue without
+      // turning a successful task update into a false failure.
+      console.warn("[PlannerAssistant] reminder sync skipped", reminderErr?.message || reminderErr);
+    }
+  }
+
   const summary = describeUpdates(updates);
 
   if (updates.completed === true && !wasCompleted && completedAt) {
@@ -909,9 +990,9 @@ async function getTasksForUser(uid, payload = {}, context = {}) {
   const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 15) : 5;
   const dateFilter = toYMD(payload.date || payload.dueDate || payload.forDate);
 
-  let tasks = Array.isArray(context?.tasks) && context.tasks.length
+  let tasks = Array.isArray(context?.tasks)
     ? context.tasks.slice()
-    : await fetchRecentTasks(uid, 20);
+    : await fetchRecentTasks(uid, 20, context?.workspaceId || context?.runtime?.workspaceId || null);
 
   if (statusFilter === "open") {
     tasks = tasks.filter((task) => !task.completed);
@@ -1026,10 +1107,9 @@ async function getRemindersForUser(uid, payload = {}, context = {}) {
   const limitRaw = Number(payload.limit) || 5;
   const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 15) : 5;
 
-  let reminders =
-    Array.isArray(context?.reminders) && context.reminders.length
-      ? context.reminders.slice()
-      : await fetchUpcomingReminders(uid, 20);
+  let reminders = Array.isArray(context?.reminders)
+    ? context.reminders.slice()
+    : await fetchUpcomingReminders(uid, 20, context?.workspaceId || context?.runtime?.workspaceId || null);
 
   if (payload.status) {
     const statusToken = normalizeTitleToken(payload.status);
@@ -1054,11 +1134,12 @@ async function getRemindersForUser(uid, payload = {}, context = {}) {
   };
 }
 
-export async function buildUserContext(uid) {
+export async function buildUserContext(uid, options = {}) {
+  const workspaceId = options?.workspaceId || null;
   const [profileSnap, tasks, reminders, reports, notes, meetings] = await Promise.all([
     db.collection("users").doc(String(uid)).get(),
-    fetchRecentTasks(uid),
-    fetchUpcomingReminders(uid),
+    fetchRecentTasks(uid, 14, workspaceId),
+    fetchUpcomingReminders(uid, 10, workspaceId),
     fetchRecentReports(uid),
     fetchRecentNotes(uid),
     listEventsForWindow(uid, "google_calendar", {
@@ -1085,6 +1166,7 @@ export async function buildUserContext(uid) {
       email: profile.email || null,
       plan: profile.plan || profile.subscriptionPlan || null,
       timezone: profile.timezone || profile.tz || null,
+      activeWorkspaceId: workspaceId,
       preferences: profile.preferences || {},
       secureDocs: profile.secureDocs || [],
     },
@@ -1095,6 +1177,7 @@ export async function buildUserContext(uid) {
       openTasks: tasks.length - completedCount,
       categoryTotals,
     },
+    workspaceId,
     tasks,
     reminders,
     reports,
@@ -1396,6 +1479,12 @@ async function scheduleReminderFromAction(uid, payload = {}, context = {}) {
       scheduledTime,
       timezone: timezoneId,
       taskId: payload.taskId || null,
+      workspaceId:
+        payload.workspaceId ||
+        context?.workspaceId ||
+        context?.runtime?.workspaceId ||
+        context?.profile?.activeWorkspaceId ||
+        null,
     });
     const friendlyTime = formatLocalTime(scheduledTime, timezoneId) || scheduledTime;
     const displayTimezone = timezoneId ? ` (${timezoneId})` : "";
@@ -1419,9 +1508,26 @@ async function scheduleReminderFromAction(uid, payload = {}, context = {}) {
 export async function executePlannerActions(uid, actions = [], context = {}) {
   if (!Array.isArray(actions) || !actions.length) return [];
   const results = [];
+  const mutatingTypes = new Set([
+    "create_task",
+    "create_goal",
+    "schedule_reminder",
+    "complete_task",
+    "update_task",
+  ]);
+  const workspaceRole = String(context?.runtime?.workspaceRole || context?.workspaceRole || "").toLowerCase();
   for (const raw of actions.slice(0, 5)) {
     try {
       const type = String(raw?.type || raw?.name || "").toLowerCase();
+      if (workspaceRole === "viewer" && mutatingTypes.has(type)) {
+        results.push({
+          status: "error",
+          type,
+          payload: raw?.payload || raw,
+          message: "You have view-only access in this workspace, so I left that change unapplied.",
+        });
+        continue;
+      }
       if (type === "create_task") {
         results.push(await createTaskFromAction(uid, raw?.payload || raw, context));
       } else if (type === "create_goal") {

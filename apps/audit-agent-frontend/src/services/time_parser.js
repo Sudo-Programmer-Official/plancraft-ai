@@ -70,6 +70,16 @@ function deriveFallbackIso(planDate, tz, hour = 9, minute = 0) {
   }
 }
 
+function normalizeDateOnly(value, tz) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value.trim())) return null
+  try {
+    const parsed = dayjs.tz(`${value.trim()}T00:00:00`, tz)
+    return parsed.isValid() ? parsed.format('YYYY-MM-DD') : null
+  } catch {
+    return null
+  }
+}
+
 function buildRefinementQuestion(task, context) {
   const base = [
     `We interpret the task "${task.title}" as happening ${task.timeHint || 'soon'}.`,
@@ -103,6 +113,7 @@ export function normalizeTemporalTasks(rawItems = [], context = {}) {
       item.parsedTimeLocal || item.parsed_time_local || item.scheduledTime || item.scheduled_time,
       timezoneId
     )
+    const date = normalizeDateOnly(item.date || item.dueDate || item.due_date, timezoneId)
     const gapMinutes = normalizeGapMinutes(item.gapMinutes ?? item.gap_minutes)
     const relation = normalizeRelation(item.relation ?? item.timeRelation ?? item.time_relation)
     const timeHint = normalizeTimeHint(item.timeHint ?? item.time_hint ?? item.hint)
@@ -132,6 +143,7 @@ export function normalizeTemporalTasks(rawItems = [], context = {}) {
       attachments,
       source,
       parsedTimeLocal: parsedLocal,
+      date,
       sourceIndex: index,
       category,
       meta: {
@@ -140,7 +152,10 @@ export function normalizeTemporalTasks(rawItems = [], context = {}) {
       },
     }
 
-    if (!task.parsedTimeLocal && planDate) {
+    if (!task.parsedTimeLocal && date) {
+      task.parsedTimeLocal = deriveFallbackIso(date, timezoneId)
+      task.meta.reason = 'fallback_task_date_anchor'
+    } else if (!task.parsedTimeLocal && planDate) {
       task.parsedTimeLocal = deriveFallbackIso(planDate, timezoneId)
       task.meta.reason = 'fallback_plan_date_anchor'
     }

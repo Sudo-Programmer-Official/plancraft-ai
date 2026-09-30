@@ -154,9 +154,7 @@ export async function generateTasksFromText(text, options = {}) {
   const payload = {
     text: trimmed,
     timezone: contextBundle.context.timezone,
-    context: contextBundle.serialized,
     maxItems: maxItems ?? 6,
-    timeContext: contextBundle.context,
     now: contextBundle.context.now,
   }
   if (planDate) payload.planDate = planDate

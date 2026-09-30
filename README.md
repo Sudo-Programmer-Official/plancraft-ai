@@ -123,6 +123,19 @@ ALLOW_DEV_ANY_ORIGIN=1
 OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-4o-mini
 OPENAI_TRANSCRIBE_MODEL=gpt-4o-mini-transcribe
+# Optional task-parser providers. Task parsing is local-first and does not
+# use OpenAI unless it is explicitly added to AI_TASK_PROVIDER_ORDER.
+# Review each provider's data-use policy before enabling free-tier routing.
+AI_TASK_PROVIDER_ORDER=gemini,groq,openrouter
+AI_TASK_PROVIDER_TIMEOUT_MS=15000
+GEMINI_API_KEY=
+GEMINI_TASK_MODEL=gemini-2.5-flash-lite
+GROQ_API_KEY=
+GROQ_TASK_MODEL=openai/gpt-oss-20b
+OPENROUTER_API_KEY=
+OPENROUTER_TASK_MODEL=openrouter/free
+ENABLE_AI_CATEGORY_FALLBACK=0
+ENABLE_AI_TIME_FALLBACK=0
 GOALS_SERVICE_URL=http://localhost:4502/api/goals
 APP_JWT_SECRET=replace-me
 GPT_ACTION_CLIENT_ID=plancraft-gpt

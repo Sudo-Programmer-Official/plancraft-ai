@@ -4,9 +4,10 @@ import dotenv from "dotenv";
 import dayjs from '../utils/dayjs.js'
 import utc from 'dayjs/plugin/utc.js'
 import timezone from 'dayjs/plugin/timezone.js'
+import { routeTaskParse } from './aiProviderRouter.js'
 dotenv.config();
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 dayjs.extend(utc)
 dayjs.extend(timezone)
 
@@ -46,6 +47,9 @@ function tryParseTasks(jsonText = "") {
 }
 
 export async function chatWithFallback({ messages, temperature = 0.7, modelList, timeoutMs = 60000 }) {
+  if (!openai) {
+    throw new Error("OPENAI_API_KEY is not configured")
+  }
   const models = modelList && modelList.length ? modelList : [DEFAULT_MODEL, ...FALLBACK_MODELS];
   let lastErr;
   for (const model of models) {
@@ -400,112 +404,8 @@ Return only the improved response.
   return chatWithFallback({ messages: [{ role: "user", content: prompt }], temperature: 0.4 });
 }
 
-export async function splitTasks(input, { maxItems = 6, context = "", timeContext = null } = {}) {
-  const system = {
-    role: "system",
-    content:
-      "You are a productivity coach. Convert free-form notes into a strict list of short, actionable tasks."
-  };
-
-const schema = `
-Return ONLY valid JSON in this format:
-{
-  "tasks": [
-    {
-      "title": "Action verb + recognizable outcome (max 12 words)",
-      "displayTitle": "User-friendly phrasing that preserves key context such as place, person, class, or deliverable when needed",
-      "rawPhrase": "Exact snippet from the user input that inspired this task",
-      "details": "Specifics or success criteria",
-      "estimate_minutes": 15,
-      "energy": "low|medium|high",
-      "context": "home|work|computer|phone|errand|meeting|deep-work|planning",
-      "priority": 1,
-      "scheduledTime": "2025-11-02T15:30" | null,
-      "timeHint": "Describe timing in user's words" | null,
-      "relation": "after_previous|same_time_previous|independent",
-      "gapMinutes": 15
-    }
-  ]
-}`;
-
-  const rules = `
-Rules:
-- At most ${maxItems} tasks.
-- Each task must start with a verb (e.g., Write, Review, Prepare, Go).
-- Titles MUST include both the intent and the key noun, plus any essential disambiguating context such as destination, person, class, or deliverable when dropping it would make the task unclear later.
-- Good title examples:
-  - "Tomorrow I have to go to college to print the slide" -> "Go to college to print slides"
-  - "Talk to Professor Rao about the thesis outline" -> "Talk to Professor Rao about thesis outline"
-  - "Pick up the charger from Rahul's desk" -> "Pick up charger from Rahul's desk"
-- Never output a generic verb alone ("Go", "Set", "Do"); expand it using the surrounding noun phrase.
-- Populate displayTitle with the polished, user-friendly text you would show in the UI. It should still make sense when the user sees it tomorrow, so do not compress it into 2-3 vague words.
-- Populate rawPhrase with the exact fragment from the user input so downstream systems can learn user language.
-- No sequence words like "First", "Second", "Lastly".
-- No reflections like "I feel grateful" or "Today is tough".
-- Each task should represent one follow-through item. Prefer 10-60 minute scope, but keep necessary travel/location context when it is part of recognizing the task.
-- Do not include duplicates or vague filler sentences.
-- Treat meta commands like "set a reminder" or "remember to" as part of the underlying action; do not output separate tasks that only restate the reminder mechanic unless the user explicitly asks for that as a standalone deliverable.
-- If the user needs to go somewhere to do the task, keep both the destination and the action in the title instead of shortening it to only the final verb phrase.
-- If the note implies a specific time (e.g., "at 3:15 PM", "after dinner", "tonight at 8"), set scheduledTime using YYYY-MM-DDTHH:mm (assume the user's current day unless otherwise specified) and copy the original phrase into timeHint.
-- If timing is relative (e.g., "after class", "then go to the gym"), set relation to "after_previous" and provide a reasonable gapMinutes (default 15 unless another break is implied). If it should start together with the prior task (e.g., "stretch while watching lecture"), use "same_time_previous".
-- When timing is unspecified, use relation "independent" and set scheduledTime/timeHint to null.
-- Remove duplicates: if two candidate tasks would resolve to the same normalized idea (e.g., "Set reminder to call Mom" and "Call Mom"), choose the clearer one.
-- Keep gapMinutes between 5 and 60 minutes when relation is "after_previous".
-`;
-
-  const contextBlock = (() => {
-    if (typeof context === 'string' && context.trim()) return context.trim()
-    if (timeContext) {
-      try { return JSON.stringify(timeContext, null, 2) } catch { return String(timeContext) }
-    }
-    return ""
-  })()
-
-  const user = {
-    role: "user",
-    content: [
-      contextBlock ? `Temporal Context:\n${contextBlock}` : '',
-      `User notes:\n"""${input}"""`,
-      schema,
-      rules,
-    ].filter(Boolean).join('\n\n'),
-  };
-
-  const content = await chatWithFallback({
-    messages: [system, user],
-    temperature: 0.2,
-  });
-
-  // 🔹 Sanitize output before parsing
-  let cleaned = content.trim();
-
-  // Strip ```json ... ``` fences if present
-  cleaned = cleaned.replace(/^```json\s*/i, "").replace(/```$/i, "").trim();
-
-  // Extra fallback: if multiple JSON objects exist, extract the first {...}
-  if (!cleaned.startsWith("{")) {
-    const match = cleaned.match(/\{[\s\S]*\}/);
-    if (match) {
-      cleaned = match[0];
-    }
-  }
-
-  let parsed;
-  try {
-    parsed = JSON.parse(cleaned);
-  } catch (err) {
-    console.error("❌ Failed to parse AI JSON:", cleaned);
-    throw err;
-  }
-
-  try {
-    console.log("[TimeFlow] splitTasks: raw parsed payload", {
-      count: Array.isArray(parsed?.tasks) ? parsed.tasks.length : 0,
-      sample: Array.isArray(parsed?.tasks) && parsed.tasks.length ? parsed.tasks[0] : null,
-    });
-  } catch {}
-
-  return parsed;
+export async function splitTasks(input, { maxItems = 6, timezone = "UTC", now = null } = {}) {
+  return routeTaskParse({ input, maxItems, timezone, now })
 }
 
 // ✨ Extract reminder time from natural language text

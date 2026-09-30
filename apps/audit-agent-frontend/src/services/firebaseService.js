@@ -865,6 +865,30 @@ export async function updateTaskInFirebase(task) {
 
     await withTimeout(request, 8000, 'task completion api fallback')
   }
+
+  const reminderChanged = [
+    'date',
+    'reminderTime',
+    'scheduledTime',
+    'reminderChannels',
+    'deliveryChannels',
+    'channels',
+    'timezone',
+  ].some((key) => Object.prototype.hasOwnProperty.call(updates, key))
+  if (reminderChanged) {
+    try {
+      await api.post('/reminders/cancel', { userId: user.uid, taskId: id })
+      const nextTask = { ...task, ...updates, id, workspaceId: normalizedWsId || activeWorkspaceId || null }
+      if (nextTask.reminderTime || nextTask.scheduledTime) {
+        await syncTaskNotification(user.uid, id, nextTask)
+      }
+    } catch (err) {
+      // A task edit remains successful even if notification delivery is
+      // temporarily unavailable; the next edit/resync can repair it.
+      console.warn('[TaskSync] reminder resync failed', err?.response?.data || err?.message || err)
+    }
+  }
+
   dispatchTaskRefresh({
     reason: 'task-updated',
     taskId: id,

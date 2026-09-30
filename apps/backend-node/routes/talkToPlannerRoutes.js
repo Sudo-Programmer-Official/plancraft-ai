@@ -24,7 +24,7 @@ const selectWorkspaceId = (req) =>
 
 router.post(
   "/chat",
-  requireWorkspaceRole(["viewer", "editor", "admin"], { workspaceIdSelector: selectWorkspaceId }),
+  requireWorkspaceRole(["viewer", "editor", "admin", "owner"], { workspaceIdSelector: selectWorkspaceId }),
   async (req, res) => {
   try {
     const {
@@ -49,7 +49,7 @@ router.post(
         ? clientNow
         : new Date().toISOString();
     const [initialContext, historyMessages] = await Promise.all([
-      buildUserContext(userId),
+      buildUserContext(userId, { workspaceId }),
       Promise.resolve(
         Array.isArray(history)
           ? history.slice(-10).map((item) => ({
@@ -80,6 +80,7 @@ router.post(
         inputMode: inputMode || null,
         voiceSnippet: voicePreview || null,
         workspaceId,
+        workspaceRole: req.workspaceRole || null,
       },
       workspaceId,
     };
@@ -170,7 +171,7 @@ Only include the JSON block when an action is required. Use IDs from the context
 
     if (shouldRefreshContext) {
       try {
-        const refreshed = await buildUserContext(userId);
+        const refreshed = await buildUserContext(userId, { workspaceId });
         context = {
           ...refreshed,
           profile: {

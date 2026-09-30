@@ -500,6 +500,7 @@ export async function createReminderFromText(
     status: "scheduled",
     sentAt: null,
     taskId: options?.taskId || null,
+    workspaceId: options?.workspaceId || null,
     timezone: tzForUser,
     source: options?.source || reminderType || "reminder",
     type: reminderType || null,
