@@ -975,13 +975,27 @@ async function sendQuery(forcedInput = null) {
     const executedActions = Array.isArray(response.actions) ? response.actions : []
     const suggestionsSource =
       (response.raw && response.raw.suggestions) || response.suggestions || []
+    const normalizedResults = normalizeResults(executedActions)
+    const canonicalMutationTypes = new Set([
+      'create_task',
+      'create_goal',
+      'update_task',
+      'complete_task',
+      'schedule_reminder',
+    ])
+    const hasCanonicalMutationResult = executedActions.some((action) => {
+      const type = String(action?.type || action?.name || '').toLowerCase()
+      return action?.status === 'completed' &&
+        canonicalMutationTypes.has(type) &&
+        normalizedResults.some((result) => result.type === type && result.message)
+    })
 
     const assistantMessage = {
       id: `assistant-${Date.now()}-${messageSeed.value++}`,
       sender: 'assistant',
-      text: sanitizeAssistantText(response.reply),
+      text: hasCanonicalMutationResult ? '' : sanitizeAssistantText(response.reply),
       actions: normalizeActions(suggestionsSource),
-      results: normalizeResults(executedActions),
+      results: normalizedResults,
       intent: response.intent || null,
       meta: response.contextSummary || null,
       raw: response.raw || null,
@@ -2399,11 +2413,24 @@ onMounted(() => {
   color: var(--pc-text);
   padding: 0;
   gap: 0;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
 }
 
 .talk-planner-wrapper {
   max-width: none;
   width: 100%;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  height: auto;
+  overflow: hidden;
   margin: 0;
   padding: 0 1rem;
   background: var(--pc-bg);
@@ -2466,6 +2493,8 @@ onMounted(() => {
 }
 
 .chat-body {
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 1rem 0.15rem 0.75rem;
 }
 
@@ -2579,6 +2608,7 @@ onMounted(() => {
 }
 
 .chat-input-dock {
+  flex: 0 0 auto;
   max-width: none;
   width: 100%;
   padding: 0.75rem 0 max(0.75rem, var(--talk-safe-bottom));

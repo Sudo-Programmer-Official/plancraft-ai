@@ -559,9 +559,11 @@ export function useTasks() {
           }
         }
       }
+      return true
     } catch (err) {
       console.error('Failed to toggle complete:', err)
       task.completed = !task.completed // rollback on error
+      return false
     }
   }
 

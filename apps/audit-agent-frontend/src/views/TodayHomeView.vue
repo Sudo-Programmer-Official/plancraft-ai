@@ -48,36 +48,53 @@
     </div>
 
     <template v-else>
-      <div class="today__list">
+      <TransitionGroup name="today-task" tag="div" class="today__list">
         <PcTaskRow
           v-for="task in openTasks"
           :key="task.id"
           :title="task.title || 'Untitled task'"
-          :time="formatTime(task)"
-          :meta="metaFor(task)"
+          :meta="rowMetaFor(task)"
           :done="false"
           @toggle="complete(task)"
           @open="openTask(task)"
         >
           <template #action>
-            <PcButton size="sm" :icon="Play" @click="startFocus(task)">Focus</PcButton>
+            <span class="today__row-menu" @click.stop="trackTaskOverflow(task)">
+              <PcMenu :items="taskMenu" label="Task management" @select="(key) => onMenu(key, task)" />
+            </span>
           </template>
         </PcTaskRow>
-      </div>
+      </TransitionGroup>
 
       <PcButton variant="ghost" :icon="Plus" class="today__add" @click="openCapture">Add task</PcButton>
 
       <div v-if="doneTasks.length" class="today__done">
-        <h3 class="today__done-title">Done · {{ doneTasks.length }}</h3>
-        <PcTaskRow
-          v-for="task in doneTasks"
-          :key="task.id"
-          :title="task.title || 'Untitled task'"
-          :time="formatTime(task)"
-          done
-          @toggle="complete(task)"
-          @open="openTask(task)"
-        />
+        <button
+          type="button"
+          class="today__done-toggle"
+          :aria-expanded="showCompleted"
+          @click="showCompleted = !showCompleted"
+        >
+          <span>✓ {{ doneTasks.length }} completed</span>
+          <ChevronDown :size="17" :class="{ 'today__done-chevron--open': showCompleted }" aria-hidden="true" />
+        </button>
+        <div v-if="showCompleted" class="today__done-list">
+          <PcTaskRow
+            v-for="task in doneTasks"
+            :key="task.id"
+            :title="task.title || 'Untitled task'"
+            :meta="rowMetaFor(task)"
+            done
+            @toggle="complete(task)"
+            @open="openTask(task)"
+          >
+            <template #action>
+              <span class="today__row-menu" @click.stop="trackTaskOverflow(task)">
+                <PcMenu :items="taskMenu" label="Task management" @select="(key) => onMenu(key, task)" />
+              </span>
+            </template>
+          </PcTaskRow>
+        </div>
       </div>
 
       <section class="today__assistant" aria-label="PlanCraft suggestion">
@@ -100,7 +117,7 @@
       @update:open="(open) => !open && closeTask()"
     >
       <template #actions>
-        <PcMenu :items="taskMenu" @select="onMenu" />
+        <PcMenu :items="taskMenu" @select="onSheetMenu" />
       </template>
 
       <form v-if="activeTask && editing" class="today__edit" @submit.prevent="saveEdit">
@@ -111,6 +128,10 @@
         <label class="today__field">
           <span>Notes</span>
           <textarea v-model="draft.details" rows="4" class="today__input"></textarea>
+        </label>
+        <label class="today__field">
+          <span>Date</span>
+          <input v-model="draft.date" type="date" class="today__input" />
         </label>
         <label class="today__field">
           <span>Reminder time</span>
@@ -124,21 +145,70 @@
       </form>
 
       <div v-else-if="activeTask" class="today__detail">
-        <p v-if="metaFor(activeTask)" class="today__tag">{{ metaFor(activeTask) }}</p>
+        <p v-if="rowMetaFor(activeTask)" class="today__tag">{{ rowMetaFor(activeTask) }}</p>
         <template v-if="!activeTask.completed">
-          <p class="today__prompt"><Sparkles :size="16" aria-hidden="true" /> What would you like to do?</p>
-          <div class="today__detail-actions">
-            <PcButton variant="primary" size="lg" block :icon="Play" @click="startFocus(activeTask)">Focus</PcButton>
-            <PcButton size="lg" block :icon="Sparkles" :loading="helping" @click="helpMe(activeTask)">Help me</PcButton>
+          <p class="today__prompt"><Sparkles :size="16" aria-hidden="true" /> How can PlanCraft help?</p>
+          <div class="today__suggestions">
+            <button
+              v-for="action in taskActionSuggestions"
+              :key="action.key"
+              type="button"
+              class="today__suggestion"
+              :disabled="helping"
+              :aria-busy="helping && helpActionKey === action.key"
+              @click="selectTaskAction(action.key)"
+            >
+              <component :is="action.icon" :size="18" aria-hidden="true" />
+              <span class="today__suggestion-copy">
+                <strong>{{ action.label }}</strong>
+                <small>{{ action.description }}</small>
+              </span>
+              <span class="today__suggestion-arrow" aria-hidden="true">→</span>
+            </button>
+          </div>
+          <div class="today__focus-action">
+            <PcButton variant="ghost" block :icon="Play" @click="startFocus(activeTask)">Focus 25 min</PcButton>
           </div>
           <div v-if="helpSteps.length || helpError" class="today__help" aria-live="polite">
-            <p v-if="helpSteps.length" class="today__help-title">Here’s how I’d approach it</p>
+            <p v-if="helpSteps.length" class="today__help-title">
+              {{ helpActionKey === 'help_prepare' ? 'A practical next step' : 'Suggested steps' }}
+            </p>
             <ol v-if="helpSteps.length">
               <li v-for="(step, index) in helpSteps" :key="index">{{ step }}</li>
             </ol>
             <p v-if="helpError" class="today__error" role="alert">{{ helpError }}</p>
+            <div v-if="helpSteps.length" class="today__help-footer">
+              <PcButton
+                size="sm"
+                variant="primary"
+                :loading="applyingSteps"
+                :disabled="helpApplied"
+                @click="applyHelpSteps(activeTask)"
+              >
+                {{ helpApplied ? 'Added as subtasks' : 'Add as subtasks' }}
+              </PcButton>
+              <small>Nothing changes until you apply them.</small>
+            </div>
+            <PcButton v-if="helpError && !helping" size="sm" variant="ghost" @click="retryHelp">
+              Try again
+            </PcButton>
           </div>
         </template>
+        <section v-if="activeTaskChildren.length" class="today__subtasks" aria-label="Subtasks">
+          <div class="today__subtasks-heading">
+            <span>Subtasks</span>
+            <small>{{ activeTaskChildren.filter((task) => task.completed).length }}/{{ activeTaskChildren.length }}</small>
+          </div>
+          <PcTaskRow
+            v-for="child in activeTaskChildren"
+            :key="child.id"
+            :title="child.title || 'Untitled subtask'"
+            :meta="rowMetaFor(child)"
+            :done="!!child.completed"
+            @toggle="complete(child)"
+            @open="openTask(child)"
+          />
+        </section>
         <dl class="today__facts">
           <div>
             <dt>Notes</dt>
@@ -157,14 +227,21 @@
         </PcButton>
       </template>
     </PcSheet>
+
+    <Transition name="today-undo">
+      <div v-if="undoState" class="today__undo" role="status" aria-live="polite">
+        <span>Task completed</span>
+        <button type="button" :disabled="undoing" :aria-busy="undoing" @click="undoCompletion">Undo</button>
+      </div>
+    </Transition>
   </section>
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, markRaw, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { BellRing, CalendarArrowUp, ChevronRight, CircleCheck, Copy, Mic2, Pencil, Play, Plus, RotateCcw, Sparkles, Trash2 } from 'lucide-vue-next'
+import { Archive, BellRing, CalendarArrowUp, ChevronDown, ChevronRight, CircleCheck, Copy, ListChecks, Mic2, Pencil, Play, Plus, RotateCcw, Sparkles, Trash2 } from 'lucide-vue-next'
 import { PcButton, PcMenu, PcSheet, PcTaskRow } from '@/design'
 import UserAvatar from '@/components/UserAvatar.vue'
 import { useTasks } from '@/composables/useTasks'
@@ -176,13 +253,10 @@ import { useFocusStore } from '@/stores/focusStore'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { askWorkspaceSummary } from '@/services/workspaceAiService'
 import { updateTaskInFirebase } from '@/services/firebaseService'
-import { scheduleReminder } from '@/services/reminderService'
-import { getPreferences } from '@/services/settingsService'
-import api from '@/services/api'
 import { useQuickSetupStore } from '@/stores/quickSetupStore'
-import { buildLocalIso } from '@/utils/timeHelper.js'
 import { toLocalDateKey } from '@/utils/dateHelper'
 import { getEffectiveUserTimezone } from '@/utils/userTimezone'
+import { EVENTS, trackEvent } from '@/services/analytics'
 
 const { openCapture } = useCaptureSheet()
 const router = useRouter()
@@ -199,13 +273,20 @@ const loading = ref(true)
 const activeTaskId = ref(null)
 const editing = ref(false)
 const saving = ref(false)
-const draft = reactive({ title: '', details: '', time: '' })
+const draft = reactive({ title: '', details: '', date: '', time: '' })
 const helping = ref(false)
+const helpActionKey = ref('')
 const helpSteps = ref([])
 const helpError = ref('')
+const helpApplied = ref(false)
+const applyingSteps = ref(false)
 const planning = ref(false)
 const planLines = ref([])
 const planError = ref('')
+const showCompleted = ref(false)
+const undoState = ref(null)
+const undoing = ref(false)
+let undoTimer = null
 
 const todayKey = computed(() => toLocalDateKey(now.value))
 const firstName = computed(() => String(authStore.user?.displayName || authStore.user?.name || '').trim().split(/\s+/)[0] || '')
@@ -220,7 +301,9 @@ const todayLabel = computed(() => new Intl.DateTimeFormat(undefined, {
 const planLabel = computed(() => (hour.value < 12 ? 'Plan my day' : hour.value < 18 ? 'Plan my afternoon' : 'Plan my evening'))
 
 // Read from the shared store so Focus completions and other screens stay in sync.
-const todayTasks = computed(() => allTasks.value.filter((task) => getTaskPlannedDate(task) === todayKey.value))
+const todayTasks = computed(() => allTasks.value.filter((task) =>
+  getTaskPlannedDate(task) === todayKey.value && !task.archived && !task.parentTaskId,
+))
 const byTime = (a, b) => String(a.reminderTime || '99:99').localeCompare(String(b.reminderTime || '99:99'))
 const openTasks = computed(() => todayTasks.value.filter((task) => !task.completed).sort(byTime))
 const doneTasks = computed(() => todayTasks.value.filter((task) => task.completed).sort(byTime))
@@ -229,6 +312,13 @@ const showSetupNudge = computed(
   () => authStore.guest !== true && authStore.user?.mode !== 'guest' && quickSetupStore.setupState?.completed !== true,
 )
 const activeTask = computed(() => allTasks.value.find((task) => task.id === activeTaskId.value) || null)
+const activeTaskChildren = computed(() => {
+  if (!activeTask.value) return []
+  return allTasks.value
+    .filter((task) => task.parentTaskId === activeTask.value.id && !task.archived)
+    .sort(byTime)
+})
+const taskActionSuggestions = computed(() => suggestionsForTask(activeTask.value))
 const assistantLine = computed(() => {
   const left = openTasks.value.length
   if (!left) return 'Everything for today is done. Nice work.'
@@ -237,16 +327,24 @@ const assistantLine = computed(() => {
 
 const taskMenu = [
   { key: 'edit', label: 'Edit', icon: Pencil },
+  { key: 'reschedule', label: 'Reschedule', icon: CalendarArrowUp },
   { key: 'tomorrow', label: 'Move to tomorrow', icon: CalendarArrowUp },
   { key: 'duplicate', label: 'Duplicate', icon: Copy },
+  { key: 'archive', label: 'Archive', icon: Archive },
   { key: 'delete', label: 'Delete', icon: Trash2, danger: true, dividerBefore: true },
 ]
 
 function formatTime(task) {
-  const match = /^(\d{1,2}):(\d{2})/.exec(String(task?.reminderTime || ''))
-  if (!match) return ''
-  const date = new Date()
-  date.setHours(Number(match[1]), Number(match[2]), 0, 0)
+  const raw = String(task?.reminderTime || task?.scheduledTime || '')
+  const match = /^(\d{1,2}):(\d{2})/.exec(raw)
+  let date
+  if (match) {
+    date = new Date()
+    date.setHours(Number(match[1]), Number(match[2]), 0, 0)
+  } else {
+    date = new Date(raw)
+    if (Number.isNaN(date.getTime())) return ''
+  }
   return new Intl.DateTimeFormat(undefined, {
     hour: 'numeric',
     minute: '2-digit',
@@ -254,10 +352,8 @@ function formatTime(task) {
   }).format(date)
 }
 
-function metaFor(task) {
-  // Catch-all buckets carry no information on Today.
-  const category = String(task?.category || '').trim()
-  return category && !['Uncategorized', 'Other'].includes(category) ? category : ''
+function rowMetaFor(task) {
+  return formatTime(task)
 }
 
 function sheetSubtitle(task) {
@@ -268,18 +364,66 @@ function sheetSubtitle(task) {
 function openTask(task) {
   activeTaskId.value = task.id
   editing.value = false
+  helpActionKey.value = ''
   helpSteps.value = []
   helpError.value = ''
+  helpApplied.value = false
+  trackEvent(EVENTS.TASK_OPENED, {
+    surface: 'today',
+    completed: !!task.completed,
+    task_intent: taskIntent(task),
+    has_reminder: !!formatTime(task),
+  })
+}
+
+function trackTaskOverflow(task) {
+  trackEvent(EVENTS.TASK_OVERFLOW_OPENED, {
+    surface: 'today',
+    completed: !!task.completed,
+    task_intent: taskIntent(task),
+  })
 }
 
 function closeTask() {
   activeTaskId.value = null
   editing.value = false
+  helpActionKey.value = ''
 }
 
 async function complete(task, fromSheet = false) {
-  await toggleComplete(task)
+  const wasCompleted = !!task.completed
+  const changed = await toggleComplete(task)
+  if (!changed) {
+    ElMessage.error('Could not update the task. Please try again.')
+    return
+  }
+  if (!wasCompleted && task.completed) showCompletionUndo(task)
   if (fromSheet && task.completed) closeTask()
+}
+
+function showCompletionUndo(task) {
+  if (undoTimer) clearTimeout(undoTimer)
+  undoState.value = { taskId: task.id }
+  undoTimer = setTimeout(() => {
+    undoState.value = null
+    undoTimer = null
+  }, 5000)
+}
+
+async function undoCompletion() {
+  const taskId = undoState.value?.taskId
+  const task = allTasks.value.find((entry) => entry.id === taskId)
+  if (!task || undoing.value) return
+  undoing.value = true
+  const changed = await toggleComplete(task)
+  undoing.value = false
+  if (changed && !task.completed) {
+    if (undoTimer) clearTimeout(undoTimer)
+    undoState.value = null
+    undoTimer = null
+  } else if (!changed) {
+    ElMessage.error('Could not undo completion. Please try again.')
+  }
 }
 
 function startFocus(task) {
@@ -291,21 +435,156 @@ function startFocus(task) {
   closeTask()
 }
 
-async function helpMe(task) {
+function taskIntent(task) {
+  const text = `${task?.title || ''} ${task?.details || ''}`.toLowerCase()
+  if (/\b(call|email|text|message|contact|dentist|doctor|appointment)\b/.test(text)) return 'communication'
+  if (/\b(interview|exam|study|prepare|project|build|launch|write|research|plan|review)\b/.test(text)) return 'planning'
+  if (/\b(buy|shop|pick up|drop off|grocery|errand|return)\b/.test(text)) return 'errand'
+  if (/\b(gym|workout|run|walk|sleep|meditat|health)\b/.test(text)) return 'wellbeing'
+  return 'general'
+}
+
+function suggestionsForTask(task) {
+  if (!task || task.completed) return []
+  const intent = taskIntent(task)
+  const hasReminder = !!formatTime(task)
+  const ai = (key, label, description, icon = Sparkles) => ({ key, label, description, icon: markRaw(icon) })
+  const reminder = { key: 'set_reminder', label: 'Set reminder', description: 'Choose when PlanCraft should nudge you.', icon: markRaw(BellRing) }
+
+  if (intent === 'communication') {
+    return [
+      ai('help_prepare', 'Help me prepare', 'Suggest one practical next step.'),
+      ...(hasReminder ? [] : [reminder]),
+    ]
+  }
+
+  if (intent === 'planning') {
+    return [
+      ai('get_started', 'Get me started', 'Give me a clear first move.'),
+      ai('break_steps', 'Break into steps', 'Turn this into a short checklist.', ListChecks),
+      ai('make_plan', 'Make a plan', 'Shape the work around your time.'),
+    ]
+  }
+
+  return [
+    ai('get_started', 'Get me started', 'Give me a clear first move.'),
+    ...(hasReminder ? [] : [reminder]),
+  ]
+}
+
+function beginEditing(task, mode = 'edit') {
+  if (!task) return
+  if (activeTaskId.value !== task.id) openTask(task)
+  draft.title = task.title || ''
+  draft.details = task.details || ''
+  draft.date = getTaskPlannedDate(task) || todayKey.value
+  draft.time = /^\d{1,2}:\d{2}/.test(String(task.reminderTime || '')) ? String(task.reminderTime).slice(0, 5) : ''
+  editing.value = true
+  if (mode === 'reschedule') helpError.value = ''
+}
+
+function selectTaskAction(actionKey) {
+  const task = activeTask.value
+  if (!task) return
+  if (actionKey === 'set_reminder') {
+    beginEditing(task, 'reschedule')
+    return
+  }
+  runAiAction(task, actionKey)
+}
+
+async function runAiAction(task, actionKey) {
   const workspaceId = workspaceStore.activeWorkspaceId
   helping.value = true
+  helpActionKey.value = actionKey
   helpError.value = ''
+  helpSteps.value = []
+  helpApplied.value = false
+  const intent = taskIntent(task)
+  trackEvent(EVENTS.AI_HELP_SELECTED, {
+    surface: 'today_task_sheet',
+    action: actionKey,
+    task_intent: intent,
+  })
+
+  const question = (() => {
+    if (actionKey === 'help_prepare') {
+      return `Suggest exactly one practical next step for this task. Reply with one short actionable line and nothing else.\nTask: ${task.title}\nNotes: ${task.details || 'none'}`
+    }
+    if (actionKey === 'make_plan') {
+      return `Create a short actionable plan for this task in 3 to 5 steps. Reply with one step per line and nothing else. Do not add filler.\nTask: ${task.title}\nNotes: ${task.details || 'none'}`
+    }
+    if (actionKey === 'break_steps') {
+      return `Break this task into 3 to 5 short, concrete steps. Reply with one step per line and nothing else. Do not add filler.\nTask: ${task.title}\nNotes: ${task.details || 'none'}`
+    }
+    return `Give me exactly 3 short lines: first, the immediate action; then 2 supporting steps. Reply with one step per line and nothing else.\nTask: ${task.title}\nNotes: ${task.details || 'none'}`
+  })()
+
   try {
     const { answer } = await askWorkspaceSummary({
       workspaceId,
-      question: `Break this task into 3 to 5 short, concrete steps. Reply with one step per line and nothing else.\nTask: ${task.title}\nNotes: ${task.details || 'none'}`,
+      question,
     })
     helpSteps.value = toLines(answer).slice(0, 5)
     if (!helpSteps.value.length) helpError.value = 'I couldn’t come up with steps for this one. Try adding a note.'
+    trackEvent(EVENTS.AI_HELP_COMPLETED, {
+      surface: 'today_task_sheet',
+      action: actionKey,
+      task_intent: intent,
+      result_count: helpSteps.value.length,
+      status: helpSteps.value.length ? 'success' : 'empty',
+    })
   } catch {
-    helpError.value = 'Help isn’t available right now. Please try again.'
+    helpError.value = 'AI help is unavailable right now. Your task is safe—try again in a moment.'
+    trackEvent(EVENTS.AI_HELP_COMPLETED, {
+      surface: 'today_task_sheet',
+      action: actionKey,
+      task_intent: intent,
+      result_count: 0,
+      status: 'error',
+    })
   } finally {
     helping.value = false
+  }
+}
+
+function retryHelp() {
+  if (activeTask.value && helpActionKey.value) runAiAction(activeTask.value, helpActionKey.value)
+}
+
+async function applyHelpSteps(task) {
+  if (!task || !helpSteps.value.length || helpApplied.value) return
+  applyingSteps.value = true
+  let applied = 0
+  const existing = new Set(activeTaskChildren.value.map((child) => String(child.title || '').toLowerCase()))
+  try {
+    for (const step of helpSteps.value) {
+      const title = String(step || '').trim()
+      if (!title || existing.has(title.toLowerCase())) continue
+      await addTask({
+        title,
+        details: '',
+        category: task.category,
+        date: getTaskPlannedDate(task) || todayKey.value,
+        source: 'ai_steps_applied',
+        parentTaskId: task.id,
+        parentTaskTitle: task.title,
+      })
+      existing.add(title.toLowerCase())
+      applied += 1
+    }
+    helpApplied.value = true
+    trackEvent(EVENTS.AI_STEPS_APPLIED, {
+      surface: 'today_task_sheet',
+      task_intent: taskIntent(task),
+      step_count: applied,
+      source_action: helpActionKey.value,
+    })
+    ElMessage.success(applied ? `Added ${applied} subtask${applied === 1 ? '' : 's'}` : 'Those subtasks already exist')
+  } catch {
+    helpError.value = 'I couldn’t add all of those subtasks. Please try again.'
+  } finally {
+    applyingSteps.value = false
   }
 }
 
@@ -338,23 +617,49 @@ function toLines(text) {
     .filter(Boolean)
 }
 
-async function onMenu(key) {
-  const task = activeTask.value
+function onSheetMenu(key) {
+  if (activeTask.value) trackTaskOverflow(activeTask.value)
+  onMenu(key, activeTask.value)
+}
+
+async function onMenu(key, taskOverride = null) {
+  const task = taskOverride || activeTask.value
   if (!task) return
   if (key === 'edit') {
-    draft.title = task.title || ''
-    draft.details = task.details || ''
-    draft.time = /^\d{1,2}:\d{2}/.test(String(task.reminderTime || '')) ? String(task.reminderTime).slice(0, 5) : ''
-    editing.value = true
+    beginEditing(task)
+  } else if (key === 'reschedule') {
+    beginEditing(task, 'reschedule')
   } else if (key === 'tomorrow') {
     const tomorrow = new Date(now.value)
     tomorrow.setDate(tomorrow.getDate() + 1)
-    await moveTasks([task], toLocalDateKey(tomorrow))
-    closeTask()
-    ElMessage.success('Moved to tomorrow')
+    const targetDate = toLocalDateKey(tomorrow)
+    try {
+      await moveTasks([task], targetDate)
+      if (task.reminderTime || task.scheduledTime) {
+        await updateTaskInFirebase({ ...task, date: targetDate, scheduledTime: null })
+      }
+      closeTask()
+      ElMessage.success('Moved to tomorrow')
+    } catch {
+      ElMessage.error('Could not move the task. Please try again.')
+    }
   } else if (key === 'duplicate') {
-    await addTask({ title: task.title, details: task.details || '', category: task.category, date: todayKey.value, source: 'today_duplicate' })
-    ElMessage.success('Duplicated')
+    try {
+      await addTask({ title: task.title, details: task.details || '', category: task.category, date: todayKey.value, source: 'today_duplicate' })
+      ElMessage.success('Duplicated')
+    } catch {
+      ElMessage.error('Could not duplicate the task. Please try again.')
+    }
+  } else if (key === 'archive') {
+    try {
+      const updated = { ...task, archived: true }
+      await updateTaskInFirebase(updated)
+      mergeTasksLocally([updated])
+      closeTask()
+      ElMessage.success('Archived')
+    } catch {
+      ElMessage.error('Could not archive the task. Please try again.')
+    }
   } else if (key === 'delete') {
     try {
       await ElMessageBox.confirm(`Delete “${task.title}”? This can’t be undone.`, 'Delete task', {
@@ -365,53 +670,41 @@ async function onMenu(key) {
     } catch {
       return
     }
-    await deleteTask(task)
-    closeTask()
-    ElMessage.success('Deleted')
+    try {
+      await deleteTask(task)
+      closeTask()
+      ElMessage.success('Deleted')
+    } catch {
+      ElMessage.error('Could not delete the task. Please try again.')
+    }
   }
 }
 
 async function saveEdit() {
   const task = activeTask.value
   if (!task || !draft.title.trim()) return
+  const nextDate = draft.date || getTaskPlannedDate(task) || todayKey.value
   const nextTime = draft.time || null
   const timeChanged = nextTime !== (String(task.reminderTime || '').slice(0, 5) || null)
+  const dateChanged = nextDate !== (getTaskPlannedDate(task) || todayKey.value)
   saving.value = true
   try {
     const updated = {
       ...task,
       title: draft.title.trim(),
       details: draft.details,
+      date: nextDate,
       reminderTime: nextTime,
-      // A stored scheduledTime wins over date + reminderTime, so drop it when the time changes.
-      ...(timeChanged ? { scheduledTime: null } : {}),
+      // A stored scheduledTime wins over date + reminderTime, so drop it when either changes.
+      ...(timeChanged || dateChanged ? { scheduledTime: null } : {}),
     }
     await updateTaskInFirebase(updated)
     mergeTasksLocally([updated])
     editing.value = false
-    if (timeChanged) await syncReminder(updated)
   } catch {
     ElMessage.error('Could not save changes. Please try again.')
   } finally {
     saving.value = false
-  }
-}
-
-// Same flow as TaskDialog: schedule with the user's channels, or cancel.
-async function syncReminder(task) {
-  const uid = authStore.user?.uid
-  if (!uid || !task?.id) return
-  try {
-    if (task.reminderTime) {
-      const iso = buildLocalIso(task.date, task.reminderTime)
-      const prefs = (await getPreferences(uid).catch(() => ({})))?.notifications || {}
-      const result = await scheduleReminder(uid, task.id, task.title, iso, prefs)
-      if (result?.ok === false) ElMessage.warning('Saved, but the reminder couldn’t be updated. Try again later.')
-    } else {
-      await api.post('/reminders/cancel', { userId: uid, taskId: task.id })
-    }
-  } catch {
-    ElMessage.warning('Saved, but the reminder couldn’t be updated. Try again later.')
   }
 }
 
@@ -422,10 +715,17 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+onBeforeUnmount(() => {
+  if (undoTimer) clearTimeout(undoTimer)
+})
 </script>
 
 <style scoped>
 .today {
+  box-sizing: border-box;
+  min-height: 100%;
+  width: 100%;
   max-width: 40rem;
   margin: 0 auto;
   padding: 0 var(--pc-space-4) var(--pc-space-6);
@@ -558,9 +858,26 @@ onMounted(async () => {
 }
 
 .today__list {
+  position: relative;
   display: grid;
   gap: var(--pc-space-1);
   margin: 0 calc(-1 * var(--pc-space-2));
+}
+
+.today-task-enter-active,
+.today-task-leave-active {
+  transition: opacity var(--pc-duration) var(--pc-ease), transform var(--pc-duration) var(--pc-ease);
+}
+
+.today-task-enter-from,
+.today-task-leave-to {
+  opacity: 0;
+  transform: translateY(-0.25rem);
+}
+
+.today-task-leave-active {
+  position: absolute;
+  width: 100%;
 }
 
 .today__add {
@@ -619,11 +936,38 @@ onMounted(async () => {
   margin-top: var(--pc-space-8);
 }
 
-.today__done-title {
-  margin: 0 0 var(--pc-space-2);
+.today__done-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pc-space-2);
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--pc-text-subtle);
+  font: inherit;
   font-size: var(--pc-text-small);
   font-weight: 600;
+  cursor: pointer;
+}
+
+.today__done-toggle:hover {
+  color: var(--pc-text);
+}
+
+.today__done-toggle:focus-visible {
+  outline: 2px solid var(--pc-focus-ring);
+  outline-offset: 3px;
+  border-radius: var(--pc-radius-sm);
+}
+
+.today__done-chevron--open {
+  transform: rotate(180deg);
+}
+
+.today__done-list {
+  display: grid;
+  gap: var(--pc-space-1);
+  margin-top: var(--pc-space-2);
 }
 
 .today__done :deep(.pc-task-row) {
@@ -692,9 +1036,100 @@ onMounted(async () => {
   color: var(--pc-text-muted);
 }
 
-.today__detail-actions {
+.today__row-menu {
+  display: inline-flex;
+}
+
+.today__suggestions {
   display: grid;
   gap: var(--pc-space-2);
+}
+
+.today__suggestion {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--pc-space-3);
+  width: 100%;
+  padding: var(--pc-space-3);
+  border: 1px solid var(--pc-border);
+  border-radius: var(--pc-radius-md);
+  background: var(--pc-surface);
+  color: var(--pc-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--pc-duration-fast) var(--pc-ease), background-color var(--pc-duration-fast) var(--pc-ease);
+}
+
+.today__suggestion:hover,
+.today__suggestion:focus-visible {
+  border-color: var(--pc-accent);
+  background: var(--pc-accent-soft);
+  outline: none;
+}
+
+.today__suggestion:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.today__suggestion-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.today__suggestion-copy strong {
+  font-size: var(--pc-text-body);
+  font-weight: 600;
+}
+
+.today__suggestion-copy small {
+  color: var(--pc-text-muted);
+  font-size: var(--pc-text-small);
+}
+
+.today__suggestion-arrow {
+  color: var(--pc-accent-text);
+  font-size: 1.25rem;
+}
+
+.today__focus-action {
+  padding-top: var(--pc-space-1);
+}
+
+.today__help-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--pc-space-2);
+  margin-top: var(--pc-space-3);
+}
+
+.today__help-footer small {
+  color: var(--pc-text-muted);
+  font-size: var(--pc-text-caption);
+}
+
+.today__subtasks {
+  display: grid;
+  gap: var(--pc-space-1);
+  padding-top: var(--pc-space-4);
+  border-top: 1px solid var(--pc-border);
+}
+
+.today__subtasks-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  color: var(--pc-text-muted);
+  font-size: var(--pc-text-small);
+  font-weight: 600;
+}
+
+.today__subtasks-heading small {
+  font-weight: 500;
 }
 
 .today__help {
@@ -764,5 +1199,58 @@ onMounted(async () => {
 .today__edit-actions {
   display: flex;
   gap: var(--pc-space-2);
+}
+
+.today__undo {
+  position: fixed;
+  left: 50%;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  z-index: var(--pc-z-menu);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pc-space-3);
+  transform: translateX(-50%);
+  padding: var(--pc-space-2) var(--pc-space-2) var(--pc-space-2) var(--pc-space-3);
+  border: 1px solid var(--pc-border-strong);
+  border-radius: var(--pc-radius-full);
+  background: var(--pc-surface);
+  color: var(--pc-text);
+  box-shadow: var(--pc-shadow-overlay);
+  white-space: nowrap;
+}
+
+.today__undo button {
+  padding: var(--pc-space-1) var(--pc-space-2);
+  border: 0;
+  border-radius: var(--pc-radius-full);
+  background: var(--pc-accent-soft);
+  color: var(--pc-accent-text);
+  font: inherit;
+  font-size: var(--pc-text-small);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.today__undo button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.today-undo-enter-active,
+.today-undo-leave-active {
+  transition: opacity var(--pc-duration-fast) var(--pc-ease), transform var(--pc-duration-fast) var(--pc-ease);
+}
+
+.today-undo-enter-from,
+.today-undo-leave-to {
+  opacity: 0;
+  transform: translate(-50%, 0.5rem);
+}
+
+@media (max-width: 767px) {
+  .today__undo {
+    bottom: calc(5.75rem + env(safe-area-inset-bottom));
+    max-width: calc(100vw - 2rem);
+  }
 }
 </style>

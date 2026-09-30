@@ -29,6 +29,22 @@ const RELATIVE_UNIT_MAP = {
   days: "day",
   d: "day",
 };
+const NUMBER_WORD_MAP = {
+  a: 1,
+  an: 1,
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+};
 const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 
 function extractTimeToken(text) {
@@ -621,27 +637,38 @@ function resolveStatusFilter(token) {
   return "open";
 }
 
+function parseRelativeAmount(value) {
+  const numeric = Number.parseInt(value, 10);
+  if (Number.isFinite(numeric)) return numeric;
+  return NUMBER_WORD_MAP[String(value || "").toLowerCase()] || null;
+}
+
 function deriveRelativeReminderIso(message, timezoneId, baseIso) {
   if (!message) return null;
   const normalized = String(message).toLowerCase();
-  if (!/\b(in|after)\s+\d+/.test(normalized)) return null;
+  const amountPattern = "(?:\\d+|a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)";
+  const unitPattern = "(?:minute|minutes|min|mins|m|hour|hours|hr|hrs|h|day|days|d)";
+  const relativePattern = new RegExp(`\\b(?:in|after)\\s+(${amountPattern})\\s*(${unitPattern})\\b`, "gi");
+  const halfHourPattern = /\b(?:in|after)\s+half\s+an?\s+hour\b/gi;
 
-  const matches = Array.from(
-    normalized.matchAll(/\b(?:in|after)\s+(\d+)\s*(minute|minutes|min|mins|m|hour|hours|hr|hrs|h|day|days|d)\b/g),
-  );
-  if (!matches.length) return null;
+  const matches = Array.from(normalized.matchAll(relativePattern));
+  const halfHourMatches = Array.from(normalized.matchAll(halfHourPattern));
+  if (!matches.length && !halfHourMatches.length) return null;
 
   const tz = timezoneId || DEFAULT_TIMEZONE;
   let base = baseIso ? dayjs(baseIso) : dayjs();
   if (!base.isValid()) base = dayjs();
   let candidate = base.tz(tz);
   matches.forEach((match) => {
-    const amount = Number.parseInt(match[1], 10);
+    const amount = parseRelativeAmount(match[1]);
     const unitToken = match[2];
     const unit = RELATIVE_UNIT_MAP[unitToken] || "minute";
     if (Number.isFinite(amount) && amount > 0) {
       candidate = candidate.add(amount, unit);
     }
+  });
+  halfHourMatches.forEach(() => {
+    candidate = candidate.add(30, "minute");
   });
   if (!candidate.isValid()) return null;
   const baseTz = base.tz(tz);
@@ -649,6 +676,34 @@ function deriveRelativeReminderIso(message, timezoneId, baseIso) {
     candidate = candidate.add(1, "minute");
   }
   return candidate.utc().toISOString();
+}
+
+function extractReminderText(message) {
+  let text = String(message || "")
+    .trim()
+    .replace(/^[\s,]*(?:please|kindly|hey|hi)\s+/i, "");
+
+  text = text
+    .replace(/^(?:can|could|would|will)\s+you\s+/i, "")
+    .replace(/^(?:remind\s+me|set\s+(?:a\s+)?reminder|create\s+(?:a\s+)?reminder|add\s+(?:a\s+)?reminder|nudge\s+me|follow\s+up\s+with\s+me)\s*/i, "")
+    .replace(/^(?:to|that|about|for)\s+/i, "");
+
+  const amountPattern = "(?:\\d+|a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)";
+  const unitPattern = "(?:minute|minutes|min|mins|m|hour|hours|hr|hrs|h|day|days|d)";
+  text = text
+    .replace(new RegExp(`^(?:in|after)\\s+${amountPattern}\\s*${unitPattern}\\s+(?:to\\s+)?`, "i"), "")
+    .replace(/^in\s+half\s+an?\s+hour\s+(?:to\s+)?/i, "")
+    .replace(new RegExp(`\\s+(?:in|after)\\s+${amountPattern}\\s*${unitPattern}\\b`, "i"), "")
+    .replace(/\s+in\s+half\s+an?\s+hour\b/i, "")
+    .replace(/\s+(?:at\s*)?\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/i, "")
+    .replace(/\s+(?:today|tomorrow|tonight)\b/i, "")
+    .replace(/[.!?]+$/, "")
+    .replace(/\s+(?:please|thanks?)$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!text) return "Reminder";
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 async function lookupTask(uid, payload = {}, context = {}) {
@@ -1455,11 +1510,23 @@ async function createGoalFromAction(uid, payload = {}, context = {}) {
 }
 
 async function scheduleReminderFromAction(uid, payload = {}, context = {}) {
-  const text = sanitizeString(payload.text || payload.title || payload.message || "");
-  const scheduledTime = payload.scheduledTime || payload.when || payload.scheduled_at || null;
+  const deterministicReminder = context?.runtime?.lastMessage
+    ? buildDeterministicReminderAction(context.runtime.lastMessage, context)
+    : null;
+  const effectivePayload = deterministicReminder
+    ? {
+        ...payload,
+        ...deterministicReminder.payload,
+      }
+    : payload;
+  const text = sanitizeString(
+    effectivePayload.text || effectivePayload.title || effectivePayload.message || "",
+  );
+  const scheduledTime =
+    effectivePayload.scheduledTime || effectivePayload.when || effectivePayload.scheduled_at || null;
   const timezoneId =
-    payload.timezone ||
-    payload.tz ||
+    effectivePayload.timezone ||
+    effectivePayload.tz ||
     context?.runtime?.clientTimezone ||
     context?.profile?.timezone ||
     context?.summary?.timezone ||
@@ -1469,18 +1536,20 @@ async function scheduleReminderFromAction(uid, payload = {}, context = {}) {
     return {
       status: "error",
       type: "schedule_reminder",
-      payload,
+      payload: effectivePayload,
       message: "Missing text or scheduledTime for reminder",
     };
   }
   try {
-    const channels = Array.isArray(payload.channels) ? payload.channels : undefined;
+    const channels = Array.isArray(effectivePayload.channels)
+      ? effectivePayload.channels
+      : undefined;
     const reminder = await handleTextReminder(text, uid, channels, {
       scheduledTime,
       timezone: timezoneId,
-      taskId: payload.taskId || null,
+      taskId: effectivePayload.taskId || null,
       workspaceId:
-        payload.workspaceId ||
+        effectivePayload.workspaceId ||
         context?.workspaceId ||
         context?.runtime?.workspaceId ||
         context?.profile?.activeWorkspaceId ||
@@ -1491,7 +1560,7 @@ async function scheduleReminderFromAction(uid, payload = {}, context = {}) {
     return {
       status: "completed",
       type: "schedule_reminder",
-      payload,
+      payload: effectivePayload,
       message: `Scheduled reminder “${text}” for ${friendlyTime}${displayTimezone}`,
       reminderId: reminder?.id || null,
     };
@@ -1583,6 +1652,28 @@ export function detectIntentFromMessage(message = "") {
   return null;
 }
 
+export function buildDeterministicReminderAction(message = "", context = {}) {
+  const runtimeTz = context?.runtime?.clientTimezone;
+  const timezoneId =
+    runtimeTz ||
+    context?.profile?.timezone ||
+    context?.summary?.timezone ||
+    context?.profile?.preferences?.timezone ||
+    DEFAULT_TIMEZONE;
+  const nowIso = context?.runtime?.clientNow || new Date().toISOString();
+  const scheduledIso = deriveRelativeReminderIso(message, timezoneId, nowIso);
+  if (!scheduledIso) return null;
+
+  return {
+    type: "schedule_reminder",
+    payload: {
+      text: extractReminderText(message),
+      scheduledTime: scheduledIso,
+      timezone: timezoneId,
+    },
+  };
+}
+
 export async function buildFallbackActionsFromIntent(intent, message = "", context = {}) {
   const lower = String(message || "").toLowerCase();
   const tasks = Array.isArray(context?.tasks) ? context.tasks : [];
@@ -1624,11 +1715,15 @@ export async function buildFallbackActionsFromIntent(intent, message = "", conte
   }
 
   if (intent === "schedule_reminder") {
-    const reminderText = message?.trim() || "Reminder";
-    let scheduledIso = deriveRelativeReminderIso(reminderText, timezoneId, nowIso);
+    const deterministicAction = buildDeterministicReminderAction(message, context);
+    if (deterministicAction) return [deterministicAction];
+
+    const reminderInput = String(message || "").trim() || "Reminder";
+    const reminderText = extractReminderText(reminderInput);
+    let scheduledIso = null;
     if (!scheduledIso) {
       try {
-        scheduledIso = await extractReminderTimeAI(reminderText, {
+        scheduledIso = await extractReminderTimeAI(reminderInput, {
           nowISO: nowIso,
           timezone: timezoneId,
           timeContext: { plan_date: context?.summary?.planDate || context?.summary?.plan_date || null },

@@ -702,6 +702,12 @@ export async function addTaskToFirebase(task, options = {}) {
   if ('scheduledTime' in task) payload.scheduledTime = task.scheduledTime ?? null
   if ('time' in task) payload.time = task.time ?? null
   if ('source' in task) payload.source = task.source || 'manual'
+  if (typeof task?.parentTaskId === 'string' && task.parentTaskId.trim()) {
+    payload.parentTaskId = task.parentTaskId.trim()
+  }
+  if (typeof task?.parentTaskTitle === 'string' && task.parentTaskTitle.trim()) {
+    payload.parentTaskTitle = task.parentTaskTitle.trim().slice(0, 160)
+  }
   if ('type' in task) payload.type = task.type || null
   if ('duration' in task) payload.duration = task.duration
   if ('metadata' in task) payload.metadata = task.metadata

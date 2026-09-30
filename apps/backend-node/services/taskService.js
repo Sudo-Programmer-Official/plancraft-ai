@@ -447,6 +447,8 @@ export async function createTask(userId, payload = {}, options = {}) {
     metadata,
     timezone: payload.timezone || options.timezone || null,
     source: sanitizeString(payload.source || options.origin || "planner-assistant", "planner-assistant"),
+    parentTaskId: sanitizeString(payload.parentTaskId || "", "") || null,
+    parentTaskTitle: sanitizeString(payload.parentTaskTitle || "", "").slice(0, 160) || null,
     repeat,
     reminderOffsetDays,
     reminder,
@@ -503,6 +505,8 @@ export async function createTask(userId, payload = {}, options = {}) {
   if (!doc.timeConfidence && doc.timeConfidence !== 0) delete doc.timeConfidence;
   if (!doc.timeMeta) delete doc.timeMeta;
   if (!doc.type) delete doc.type;
+  if (!doc.parentTaskId) delete doc.parentTaskId;
+  if (!doc.parentTaskTitle) delete doc.parentTaskTitle;
   if (!doc.deliveryChannels) delete doc.deliveryChannels;
   if (!doc.goalId) delete doc.goalId;
   if (!doc.goalTitle) delete doc.goalTitle;

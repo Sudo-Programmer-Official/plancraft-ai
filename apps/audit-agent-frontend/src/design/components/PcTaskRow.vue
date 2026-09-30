@@ -12,15 +12,22 @@
       <Circle v-else :size="22" aria-hidden="true" />
     </button>
 
-    <div class="pc-task-row__body">
+    <div
+      class="pc-task-row__body"
+      role="button"
+      tabindex="0"
+      :aria-label="`Open task: ${title}`"
+      @click="$emit('open')"
+      @keydown.enter="$emit('open')"
+      @keydown.space.prevent="$emit('open')"
+    >
       <div class="pc-task-row__line">
-        <!-- Stretched over the whole row so the row itself opens the task. -->
-        <button type="button" class="pc-task-row__title" @click="$emit('open')">{{ title }}</button>
+        <span class="pc-task-row__title">{{ title }}</span>
         <span v-if="time" class="pc-task-row__time">{{ time }}</span>
       </div>
       <div v-if="meta || $slots.action" class="pc-task-row__line pc-task-row__line--meta">
         <span class="pc-task-row__meta">{{ meta }}</span>
-        <div v-if="$slots.action" class="pc-task-row__action">
+        <div v-if="$slots.action" class="pc-task-row__action" @click.stop>
           <slot name="action" />
         </div>
       </div>
@@ -83,6 +90,13 @@ defineEmits(['toggle', 'open'])
   min-width: 0;
   display: grid;
   gap: var(--pc-space-1);
+  cursor: pointer;
+  border-radius: var(--pc-radius-sm);
+}
+
+.pc-task-row__body:focus-visible {
+  outline: 2px solid var(--pc-focus-ring);
+  outline-offset: 3px;
 }
 
 .pc-task-row__line {
@@ -98,34 +112,13 @@ defineEmits(['toggle', 'open'])
 
 .pc-task-row__title {
   min-width: 0;
-  padding: 0;
-  border: none;
-  background: none;
   color: var(--pc-text);
-  font: inherit;
   font-size: var(--pc-text-body);
   font-weight: 500;
   text-align: left;
-  cursor: pointer;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.pc-task-row__title::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-}
-
-.pc-task-row__title:focus-visible {
-  outline: none;
-}
-
-.pc-task-row__title:focus-visible::after {
-  outline: 2px solid var(--pc-focus-ring);
-  outline-offset: -2px;
 }
 
 .pc-task-row--done .pc-task-row__title {

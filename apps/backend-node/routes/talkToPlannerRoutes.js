@@ -7,6 +7,7 @@ import {
   extractActionsFromText,
   executePlannerActions,
   detectIntentFromMessage,
+  buildDeterministicReminderAction,
   buildFallbackActionsFromIntent,
 } from "../services/plannerAssistantService.js";
 
@@ -102,7 +103,7 @@ Example JSON:
 \`\`\`json
 {"actions":[{"type":"create_task","payload":{"title":"Call client","date":"2025-02-15"}}]}
 \`\`\`
-Only include the JSON block when an action is required. Use IDs from the context when referring to tasks or reminders, prefer concise replies, and ask follow-up questions when details are missing.
+For actionable requests with a concrete date or time, execute immediately and never merely promise to do it. Only ask a follow-up question when a required detail cannot be safely inferred, such as a reminder with no time. Only include the JSON block when an action is required. Use IDs from the context when referring to tasks or reminders, and prefer concise replies.
     `.trim();
 
     const contextSummary = {
@@ -128,15 +129,40 @@ Only include the JSON block when an action is required. Use IDs from the context
       },
     ];
 
-    const rawReply = await chatWithFallback({
-      messages,
-      temperature: 0.3,
-    });
-
-    const { text, actions } = extractActionsFromText(rawReply);
     const intent = detectIntentFromMessage(message);
+    const deterministicReminder =
+      intent === "schedule_reminder" ? buildDeterministicReminderAction(message, context) : null;
+    const rawReply = deterministicReminder
+      ? ""
+      : await chatWithFallback({
+          messages,
+          temperature: 0.3,
+        });
+    const { text, actions } = extractActionsFromText(rawReply);
     let actionQueue = Array.isArray(actions) ? actions.slice(0) : [];
     let usedFallbackActions = false;
+
+    // Relative reminders are safer and faster when resolved locally. This also
+    // repairs an incomplete model action such as { type: "schedule_reminder" }
+    // without making the user repeat an already-complete request.
+    if (intent === "schedule_reminder") {
+      if (deterministicReminder) {
+        actionQueue = [deterministicReminder];
+        usedFallbackActions = true;
+      } else {
+        actionQueue = actionQueue.filter((action) => {
+          const type = String(action?.type || action?.name || "").toLowerCase();
+          if (type !== "schedule_reminder") return true;
+          const payload = action?.payload || action;
+          return Boolean(
+            payload?.text || payload?.title || payload?.message,
+          ) && Boolean(
+            payload?.scheduledTime || payload?.when || payload?.scheduled_at,
+          );
+        });
+      }
+    }
+
     if (!actionQueue.length && intent) {
       actionQueue = await buildFallbackActionsFromIntent(intent, message, context);
       if (actionQueue.length) {
@@ -151,9 +177,19 @@ Only include the JSON block when an action is required. Use IDs from the context
       .filter((item) => item?.message && item.status !== "ignored")
       .map((item) => item.message);
     let replyText = text || rawReply || "";
+    const mutatingActionTypes = new Set([
+      "create_task",
+      "create_goal",
+      "update_task",
+      "complete_task",
+      "schedule_reminder",
+    ]);
+    const hasCompletedMutation = executedActions.some(
+      (item) => item.status === "completed" && mutatingActionTypes.has(String(item.type || "").toLowerCase()),
+    );
     const hasCompletedFallbackAction =
       usedFallbackActions && executedActions.some((item) => item.status === "completed");
-    if (hasCompletedFallbackAction && actionSummaries.length) {
+    if ((hasCompletedFallbackAction || hasCompletedMutation) && actionSummaries.length) {
       replyText = actionSummaries.join("\n");
     } else if (actionSummaries.length) {
       replyText = replyText

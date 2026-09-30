@@ -13,7 +13,11 @@
           aria-modal="true"
           :aria-labelledby="titleId"
           tabindex="-1"
-          :style="dragOffset ? { transform: `translateY(${dragOffset}px)`, transition: 'none' } : null"
+          :style="{
+            ...(dragOffset ? { transform: `translateY(${dragOffset}px)`, transition: 'none' } : {}),
+            '--pc-sheet-keyboard-inset': `${keyboardInset}px`,
+            ...(visibleViewportHeight ? { '--pc-sheet-visible-height': `${visibleViewportHeight}px` } : {}),
+          }"
         >
           <div
             class="pc-sheet__handle"
@@ -65,9 +69,14 @@ const emit = defineEmits(['update:open', 'close'])
 const titleId = `pc-sheet-${useId()}`
 const panelRef = ref(null)
 const dragOffset = ref(0)
+const keyboardInset = ref(0)
+const visibleViewportHeight = ref(null)
 let returnFocusTo = null
 let previousOverflow = ''
 let dragStartY = null
+let viewportResizeHandler = null
+let viewportScrollHandler = null
+let viewportUpdateTimer = null
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -81,6 +90,52 @@ function close() {
 function focusPanel() {
   const first = panelRef.value?.querySelector('[autofocus]')
   ;(first || panelRef.value)?.focus({ preventScroll: true })
+}
+
+function updateVisualViewport() {
+  if (typeof window === 'undefined') return
+  const viewport = window.visualViewport
+  if (!viewport) return
+
+  const layoutHeight = window.innerHeight || document.documentElement.clientHeight || viewport.height
+  const inset = Math.max(0, layoutHeight - viewport.height - Math.max(0, viewport.offsetTop || 0))
+  const keyboardVisible = inset > 80
+  keyboardInset.value = keyboardVisible ? inset : 0
+  visibleViewportHeight.value = keyboardVisible ? Math.max(240, viewport.height * 0.9) : null
+}
+
+function stopVisualViewportTracking() {
+  if (typeof window === 'undefined') return
+  if (viewportResizeHandler) {
+    window.visualViewport?.removeEventListener('resize', viewportResizeHandler)
+    window.removeEventListener('resize', viewportResizeHandler)
+    viewportResizeHandler = null
+  }
+  if (viewportScrollHandler) {
+    window.visualViewport?.removeEventListener('scroll', viewportScrollHandler)
+    viewportScrollHandler = null
+  }
+  if (viewportUpdateTimer) {
+    window.clearTimeout(viewportUpdateTimer)
+    viewportUpdateTimer = null
+  }
+  keyboardInset.value = 0
+  visibleViewportHeight.value = null
+}
+
+function startVisualViewportTracking() {
+  if (typeof window === 'undefined' || !window.visualViewport) return
+  stopVisualViewportTracking()
+  viewportResizeHandler = updateVisualViewport
+  viewportScrollHandler = updateVisualViewport
+  window.visualViewport.addEventListener('resize', viewportResizeHandler, { passive: true })
+  window.visualViewport.addEventListener('scroll', viewportScrollHandler, { passive: true })
+  window.addEventListener('resize', viewportResizeHandler, { passive: true })
+  updateVisualViewport()
+  viewportUpdateTimer = window.setTimeout(() => {
+    viewportUpdateTimer = null
+    updateVisualViewport()
+  }, 350)
 }
 
 // Listens on the document while open: focus can leave the panel (e.g. when a
@@ -135,9 +190,11 @@ watch(
       previousOverflow = document.body.style.overflow
       document.body.style.overflow = 'hidden'
       document.addEventListener('keydown', onKeydown)
+      startVisualViewportTracking()
       await nextTick()
       focusPanel()
     } else {
+      stopVisualViewportTracking()
       document.removeEventListener('keydown', onKeydown)
       document.body.style.overflow = previousOverflow
       returnFocusTo?.focus?.({ preventScroll: true })
@@ -148,6 +205,7 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  stopVisualViewportTracking()
   document.removeEventListener('keydown', onKeydown)
   if (props.open) document.body.style.overflow = previousOverflow
 })
@@ -175,8 +233,8 @@ onBeforeUnmount(() => {
   /* Phones: bottom sheet */
   left: 0;
   right: 0;
-  bottom: 0;
-  max-height: min(90dvh, 44rem);
+  bottom: var(--pc-sheet-keyboard-inset, 0px);
+  max-height: min(var(--pc-sheet-visible-height, 90dvh), 44rem);
   border-radius: var(--pc-radius-xl) var(--pc-radius-xl) 0 0;
   padding-bottom: env(safe-area-inset-bottom);
 }
@@ -205,14 +263,20 @@ onBeforeUnmount(() => {
 }
 
 .pc-sheet__heading {
+  flex: 1;
   min-width: 0;
 }
 
 .pc-sheet__title {
+  display: -webkit-box;
+  overflow: hidden;
   margin: 0;
   font-size: var(--pc-text-title);
   font-weight: 600;
   line-height: 1.3;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .pc-sheet__subtitle {
@@ -246,6 +310,7 @@ onBeforeUnmount(() => {
   .pc-sheet {
     left: auto;
     top: 0;
+    bottom: 0;
     width: min(26rem, 100vw);
     max-height: none;
     border-radius: var(--pc-radius-xl) 0 0 var(--pc-radius-xl);
