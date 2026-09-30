@@ -1802,6 +1802,17 @@ function clearGeneratedPreview() {
 /* ---------------- Save Handler ---------------- */
 async function save() {
   const rawText = getInputText().trim()
+
+  // Keep typed task creation consistent with voice creation. Voice input
+  // already applies parsed dates as the user speaks, but a typed
+  // "tomorrow" must also move the planned date before the task is emitted.
+  if (!props.lockDate && rawText) {
+    const parsedIntent = parseVoiceTaskIntent(rawText, { now: new Date() })
+    if (parsedIntent?.dueDate) {
+      selectedDate.value = normalizeDateInput(parsedIntent.dueDate)
+    }
+  }
+
   const shouldForceRelative =
     !props.disableReminder &&
     setReminder.value &&

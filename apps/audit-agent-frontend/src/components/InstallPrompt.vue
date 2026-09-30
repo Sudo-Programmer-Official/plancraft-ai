@@ -69,7 +69,17 @@ const AUTH_SCREENS = ["/login", "/signup", "/app-auth/complete", "/design"]
 const route = useRoute()
 // Also stay off signed-in screens: the banner covered the tab bar's +, and
 // More → Install app offers the same thing there.
-const onAuthScreen = computed(() => AUTH_SCREENS.includes(route.path) || route.meta?.requiresAuth === true)
+const onAuthScreen = computed(() => {
+  const routeName = String(route.name || '')
+  const query = route.query || {}
+  return (
+    AUTH_SCREENS.includes(route.path) ||
+    ['login', 'signup', 'native-auth-complete'].includes(routeName) ||
+    route.meta?.requiresAuth === true ||
+    typeof query.native_handoff === 'string' ||
+    typeof query.native_provider === 'string'
+  )
+})
 
 const visible = ref(false)
 const iosHint = ref(false)

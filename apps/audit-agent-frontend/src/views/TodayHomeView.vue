@@ -171,8 +171,9 @@
           </div>
           <div v-if="helpSteps.length || helpError" class="today__help" aria-live="polite">
             <p v-if="helpSteps.length" class="today__help-title">
-              {{ helpActionKey === 'help_prepare' ? 'A practical next step' : 'Suggested steps' }}
+              {{ helpIsFallback ? 'Starter steps' : helpActionKey === 'help_prepare' ? 'A practical next step' : 'Suggested steps' }}
             </p>
+            <p v-if="helpIsFallback" class="today__help-note">AI is unavailable for the moment, so these are useful general starting points.</p>
             <ol v-if="helpSteps.length">
               <li v-for="(step, index) in helpSteps" :key="index">{{ step }}</li>
             </ol>
@@ -278,6 +279,7 @@ const helping = ref(false)
 const helpActionKey = ref('')
 const helpSteps = ref([])
 const helpError = ref('')
+const helpIsFallback = ref(false)
 const helpApplied = ref(false)
 const applyingSteps = ref(false)
 const planning = ref(false)
@@ -367,6 +369,7 @@ function openTask(task) {
   helpActionKey.value = ''
   helpSteps.value = []
   helpError.value = ''
+  helpIsFallback.value = false
   helpApplied.value = false
   trackEvent(EVENTS.TASK_OPENED, {
     surface: 'today',
@@ -472,6 +475,30 @@ function suggestionsForTask(task) {
   ]
 }
 
+function fallbackStepsForTask(task, actionKey) {
+  const title = String(task?.title || 'this task').trim()
+  if (actionKey === 'help_prepare') {
+    return [
+      `Define what a successful result looks like for “${title}”.`,
+      'Choose the smallest action you can complete in the next 15 minutes.',
+    ]
+  }
+  if (actionKey === 'make_plan') {
+    return [
+      `Clarify the outcome and key requirements for “${title}”.`,
+      'Prioritize the most important piece of work first.',
+      'Block focused time to complete a first working pass.',
+      'Review the result and capture any follow-up work.',
+    ]
+  }
+  return [
+    `Clarify the outcome and requirements for “${title}”.`,
+    'Break the work into the smallest concrete actions.',
+    'Complete the highest-priority action first.',
+    'Review the result and note any remaining gaps.',
+  ]
+}
+
 function beginEditing(task, mode = 'edit') {
   if (!task) return
   if (activeTaskId.value !== task.id) openTask(task)
@@ -499,6 +526,7 @@ async function runAiAction(task, actionKey) {
   helpActionKey.value = actionKey
   helpError.value = ''
   helpSteps.value = []
+  helpIsFallback.value = false
   helpApplied.value = false
   const intent = taskIntent(task)
   trackEvent(EVENTS.AI_HELP_SELECTED, {
@@ -526,15 +554,19 @@ async function runAiAction(task, actionKey) {
       question,
     })
     helpSteps.value = toLines(answer).slice(0, 5)
-    if (!helpSteps.value.length) helpError.value = 'I couldn’t come up with steps for this one. Try adding a note.'
+    if (!helpSteps.value.length) {
+      helpSteps.value = fallbackStepsForTask(task, actionKey)
+      helpIsFallback.value = true
+    }
     trackEvent(EVENTS.AI_HELP_COMPLETED, {
       surface: 'today_task_sheet',
       action: actionKey,
       task_intent: intent,
       result_count: helpSteps.value.length,
-      status: helpSteps.value.length ? 'success' : 'empty',
+      status: helpIsFallback.value ? 'fallback' : 'success',
     })
   } catch {
+    helpIsFallback.value = false
     helpError.value = 'AI help is unavailable right now. Your task is safe—try again in a moment.'
     trackEvent(EVENTS.AI_HELP_COMPLETED, {
       surface: 'today_task_sheet',

@@ -104,7 +104,7 @@
             </span>
           </div>
 
-          <div v-if="filteredLogs.length" class="mt-5 max-h-[560px] space-y-3 overflow-y-auto pr-1 scrollbar-plan">
+          <div v-if="filteredLogs.length" class="journal-timeline mt-5 space-y-3 pr-1 scrollbar-plan">
             <article
               v-for="log in filteredLogs"
               :key="log.id"
@@ -413,6 +413,18 @@ function computeLongestStreak(list = []) {
 </script>
 
 <style scoped>
+.journal-page {
+  min-height: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+.journal-timeline {
+  max-height: 560px;
+  overflow-y: auto;
+}
+
 .journal-surface {
   border: 1px solid var(--pc-border);
   border-radius: var(--pc-radius-xl);
@@ -530,6 +542,20 @@ function computeLongestStreak(list = []) {
 @media (min-width: 640px) {
   .journal-surface {
     padding: 1.5rem;
+  }
+}
+
+@media (max-width: 639px) {
+  .journal-page {
+    padding-bottom: calc(6.5rem + var(--safe-area-bottom));
+  }
+
+  /* Keep one predictable page scroll on phones instead of trapping long
+     journal histories inside a second nested scroller. */
+  .journal-timeline {
+    max-height: none;
+    overflow-y: visible;
+    padding-right: 0;
   }
 }
 </style>

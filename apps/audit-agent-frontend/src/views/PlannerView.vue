@@ -1,5 +1,5 @@
 <template>
-  <div class="app-page-shell">
+  <div class="app-page-shell planner-page">
     <div class="app-page-frame">
       <header class="app-page-hero flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -124,7 +124,7 @@ const plannerOpen = ref(false)
 const selectedTask = ref(null)
 const plannerDate = ref(toLocalDateKey(new Date()))
 
-const { tasks, loadTasks, loadTasksForRange } = useTasks()
+const { tasks, loadTasks, loadTasksForRange, addTask } = useTasks()
 
 function startOfWeek(date = new Date()) {
   const d = new Date(date)
@@ -168,6 +168,21 @@ function setMode(mode) {
   refresh()
 }
 
+function modeForTaskDate(dateKey) {
+  if (!dateKey) return viewMode.value
+
+  const todayKey = toLocalDateKey(new Date())
+  if (dateKey === todayKey) return 'today'
+
+  const weekStart = startOfWeek(new Date())
+  const weekEnd = new Date(weekStart)
+  weekEnd.setDate(weekEnd.getDate() + 6)
+  const weekStartKey = toLocalDateKey(weekStart)
+  const weekEndKey = toLocalDateKey(weekEnd)
+
+  return dateKey >= weekStartKey && dateKey <= weekEndKey ? 'week' : 'upcoming'
+}
+
 const viewSubtitle = computed(() => {
   if (viewMode.value === 'today') return 'Showing tasks for today'
   if (viewMode.value === 'week') return 'Showing tasks for this week'
@@ -208,11 +223,29 @@ function closePlanner() {
 
 async function handleSaved(savedTask = null) {
   try {
-    // TaskPlannerDialog is intentionally presentational on save. Persist the
-    // emitted edit here so the Planner screen cannot silently discard changes.
-    if (savedTask?.id) {
+    // Generated tasks are persisted by TaskPlannerDialog as a batch. Manual
+    // creates and edits are emitted here so every Planner entry point writes
+    // to the same task store.
+    const savedItems = Array.isArray(savedTask)
+      ? savedTask.filter(Boolean)
+      : savedTask
+        ? [savedTask]
+        : []
+
+    if (Array.isArray(savedTask)) {
+      // Already persisted by TaskPlannerDialog.persistPreparedTasks().
+    } else if (savedTask?.id) {
       await updateTaskInFirebase(savedTask)
+    } else if (savedTask?.title) {
+      await addTask(savedTask)
     }
+
+    // A task created for tomorrow should not appear to disappear just because
+    // the Planner opened on Today. Move to the smallest useful date view after
+    // saving, then load that view from Firebase.
+    const savedDate = savedItems.find((task) => task?.date)?.date
+    if (savedDate) viewMode.value = modeForTaskDate(savedDate)
+
     await refresh()
     closePlanner()
   } catch (err) {
@@ -222,3 +255,17 @@ async function handleSaved(savedTask = null) {
 
 onMounted(refresh)
 </script>
+
+<style scoped>
+.planner-page {
+  min-height: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+@media (max-width: 639px) {
+  .planner-page {
+    padding-bottom: calc(6.5rem + var(--safe-area-bottom));
+  }
+}
+</style>

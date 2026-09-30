@@ -597,7 +597,10 @@ function startGuestPlanner(entry = 'landing') {
   } catch {
     /* analytics optional */
   }
-  router.push({ path: '/signup', query: { guest: '1', guestFromLanding: '1' } })
+  // Start free is an authenticated product entry point. Sending anonymous
+  // visitors through the guest bootstrap first made a failed guest request
+  // surface a second, confusing sign-in step on mobile.
+  router.push({ path: '/login', query: { next: '/today', source: 'landing' } })
 }
 
 onMounted(() => {

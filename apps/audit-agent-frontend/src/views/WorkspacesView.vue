@@ -1,5 +1,5 @@
 <template>
-  <div class="app-page-shell w-full max-w-full min-w-0 overflow-x-hidden box-border">
+  <div class="app-page-shell workspace-page w-full max-w-full min-w-0 overflow-x-hidden box-border">
     <div class="app-page-frame w-full max-w-full min-w-0">
       <div class="workspace-switcher">
         <header class="workspace-switcher__header">
@@ -1110,6 +1110,13 @@ function roleLabel(role) {
 </script>
 
 <style scoped>
+.workspace-page {
+  min-height: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
 .workspace-switcher {
   width: 100%;
   color: var(--pc-text);
@@ -1572,6 +1579,10 @@ function roleLabel(role) {
 }
 
 @media (max-width: 640px) {
+  .workspace-page {
+    padding-bottom: calc(6.5rem + var(--safe-area-bottom));
+  }
+
   .workspace-switcher__header,
   .workspace-switcher__toolbar {
     align-items: stretch;

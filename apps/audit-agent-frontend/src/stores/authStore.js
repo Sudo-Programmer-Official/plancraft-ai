@@ -1062,7 +1062,12 @@ export const useAuthStore = defineStore('authStore', {
       this.bootstrapping = true
       this.authenticating = false
       this.loading = true
-      const bootstrapTimeoutMs = isNativePackagedApp() ? 4000 : 7000
+      const startupPath =
+        typeof window !== 'undefined'
+          ? String(window.location.pathname || '/').replace(/\/+$/, '') || '/'
+          : '/'
+      const isPublicAuthEntry = ['/', '/login', '/signup', '/app-auth/complete'].includes(startupPath)
+      const bootstrapTimeoutMs = isNativePackagedApp() ? 2500 : isPublicAuthEntry ? 2500 : 7000
       const allowCachedSessionFallback = !isIosCapacitorApp()
       const allowNativeIosSnapshotRestore = isIosCapacitorApp()
       let restoredNativeIosSnapshot = false

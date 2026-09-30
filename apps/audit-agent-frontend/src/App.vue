@@ -57,8 +57,8 @@ const { isShellReady, isLoggingOut, hasAuthenticatedSession, startupStage } = us
 
 const showStartupOverlay = computed(() => {
   if (isLoggingOut.value) return false
-  if (startupStage.value === 'bootstrapping') return true
   if (!route.meta?.requiresAuth) return false
+  if (startupStage.value === 'bootstrapping') return true
   if (!hasAuthenticatedSession.value) return false
   return !isShellReady.value
 })

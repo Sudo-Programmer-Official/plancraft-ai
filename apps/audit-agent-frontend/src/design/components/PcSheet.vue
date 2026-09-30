@@ -234,6 +234,7 @@ onBeforeUnmount(() => {
   left: 0;
   right: 0;
   bottom: var(--pc-sheet-keyboard-inset, 0px);
+  height: min(var(--pc-sheet-visible-height, 90dvh), 44rem);
   max-height: min(var(--pc-sheet-visible-height, 90dvh), 44rem);
   border-radius: var(--pc-radius-xl) var(--pc-radius-xl) 0 0;
   padding-bottom: env(safe-area-inset-bottom);
@@ -293,15 +294,21 @@ onBeforeUnmount(() => {
 }
 
 .pc-sheet__body {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 0 var(--pc-space-5) var(--pc-space-5);
+  -webkit-overflow-scrolling: touch;
+  scroll-padding-bottom: calc(var(--pc-space-5) + env(safe-area-inset-bottom));
+  padding: 0 var(--pc-space-5) calc(var(--pc-space-5) + env(safe-area-inset-bottom));
 }
 
 .pc-sheet__footer {
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 1;
   padding: var(--pc-space-3) var(--pc-space-5) var(--pc-space-4);
+  background: var(--pc-surface);
   border-top: 1px solid var(--pc-border);
 }
 
@@ -312,6 +319,7 @@ onBeforeUnmount(() => {
     top: 0;
     bottom: 0;
     width: min(26rem, 100vw);
+    height: auto;
     max-height: none;
     border-radius: var(--pc-radius-xl) 0 0 var(--pc-radius-xl);
     padding-bottom: 0;

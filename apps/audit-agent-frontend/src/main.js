@@ -361,10 +361,26 @@ if (isBrowser) {
 
 // Mount app
 async function bootstrapApp() {
-  try {
-    await featureFlagsStore.ensureLoaded()
-  } catch (err) {
-    console.warn('[FeatureFlags] Startup load failed; continuing with defaults', err?.message || err)
+  const startupPath =
+    typeof window !== 'undefined'
+      ? String(window.location.pathname || '/').replace(/\/+$/, '') || '/'
+      : '/'
+  const isPublicStartup = ['/', '/login', '/signup', '/app-auth/complete'].includes(startupPath)
+  const featureFlagsLoad = featureFlagsStore.ensureLoaded()
+
+  if (isPublicStartup) {
+    // Public entry screens should render without waiting on a non-critical
+    // feature-flag request. The store still resolves in the background for
+    // auth controls that need remote configuration.
+    featureFlagsLoad.catch((err) => {
+      console.warn('[FeatureFlags] Background load failed; continuing with defaults', err?.message || err)
+    })
+  } else {
+    try {
+      await featureFlagsLoad
+    } catch (err) {
+      console.warn('[FeatureFlags] Startup load failed; continuing with defaults', err?.message || err)
+    }
   }
 
   console.info('[Startup] before auth init')
