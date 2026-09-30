@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildDeterministicReminderAction } from "../services/plannerAssistantService.js";
+import {
+  applyRelativeTimingToAction,
+  buildDeterministicReminderAction,
+} from "../services/plannerAssistantService.js";
 
 const context = {
   runtime: {
@@ -27,6 +30,28 @@ test("supports reminders phrased with the time before the action", () => {
 
   assert.equal(action?.payload?.text, "Call Mom");
   assert.equal(action?.payload?.scheduledTime, "2026-09-30T02:50:00.000Z");
+});
+
+test("resolves a natural relative request from the client timezone", () => {
+  const action = buildDeterministicReminderAction("Go to bed in 30 minutes", context);
+
+  assert.equal(action?.payload?.scheduledTime, "2026-09-30T02:50:00.000Z");
+  assert.deepEqual(
+    applyRelativeTimingToAction(
+      { type: "create_task", payload: { title: "Go to bed", date: "2026-09-29", reminderTime: "21:41" } },
+      action,
+    ),
+    {
+      type: "create_task",
+      payload: {
+        title: "Go to bed",
+        date: "2026-09-29",
+        reminderTime: "22:50",
+        scheduledTime: "2026-09-30T02:50:00.000Z",
+        timezone: "America/New_York",
+      },
+    },
+  );
 });
 
 test("leaves reminders without a resolvable time for clarification", () => {

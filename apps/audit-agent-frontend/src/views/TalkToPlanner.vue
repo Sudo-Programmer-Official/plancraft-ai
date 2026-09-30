@@ -1004,11 +1004,34 @@ async function sendQuery(forcedInput = null) {
 
     const taskChangingTypes = new Set(['create_task', 'update_task', 'complete_task'])
     const touchedTasks = executedActions.some((action) =>
-      taskChangingTypes.has(String(action?.type || '').toLowerCase()),
+      taskChangingTypes.has(String(action?.type || action?.name || '').toLowerCase()),
     )
     if (touchedTasks) {
       try {
-        window.dispatchEvent(new CustomEvent('tasks:refresh-request'))
+        const refreshedTasks = executedActions.flatMap((action) => {
+          const type = String(action?.type || action?.name || '').toLowerCase()
+          if (type !== 'create_task') return []
+          const payload = action?.payload || {}
+          const created = Array.isArray(payload.createdTasks)
+            ? payload.createdTasks
+            : payload.id
+              ? [payload]
+              : []
+          return created
+            .filter((task) => task?.id)
+            .map((task) => ({
+              ...task,
+              workspaceId: task.workspaceId || workspaceStore.activeWorkspaceId || null,
+            }))
+        })
+        window.dispatchEvent(new CustomEvent('tasks:refresh-request', {
+          detail: {
+            reason: 'planner-action',
+            workspaceId: workspaceStore.activeWorkspaceId || null,
+            tasks: refreshedTasks,
+            refresh: true,
+          },
+        }))
       } catch (err) {
         console.warn('[TalkToPlanner] failed to dispatch task refresh', err?.message || err)
       }

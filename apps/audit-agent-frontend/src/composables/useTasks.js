@@ -301,8 +301,16 @@ export function useTasks() {
     return nextScopedTasks
   }
 
-  async function refreshAllTasks() {
-    if (refreshPromise) return refreshPromise
+  async function refreshAllTasks({ force = false } = {}) {
+    if (refreshPromise) {
+      if (!force) return refreshPromise
+      try {
+        await refreshPromise
+      } catch {
+        /* The forced refresh below gets a fresh read after the prior attempt. */
+      }
+      if (refreshPromise) return refreshAllTasks({ force: true })
+    }
     refreshPromise = (async () => {
       // Prefer a single fetch of all tasks for the workspace; fall back to today if needed.
       // If both reads fail on mobile, keep the current in-memory task cache instead of
@@ -718,7 +726,19 @@ export function useTasks() {
           if (removeTaskLocally(detail.taskId, detail.workspaceId)) return
         }
 
-        if (incomingTasks.length && mergeTasksLocally(incomingTasks)) return
+        if (incomingTasks.length && mergeTasksLocally(incomingTasks)) {
+          if (detail?.refresh === true) {
+            refreshAllTasks({ force: true })
+              .then(() => {
+                // Keep the just-created task visible even if the server read races
+                // with Firestore's index becoming queryable.
+                mergeTasksLocally(incomingTasks)
+                syncFiltered()
+              })
+              .catch((err) => console.warn('[useTasks] post-mutation refresh failed', err?.message || err))
+          }
+          return
+        }
 
         refreshAllTasks()
           .then(() => syncFiltered())

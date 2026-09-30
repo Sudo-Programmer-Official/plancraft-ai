@@ -51,7 +51,7 @@ import {
 } from '@/utils/authStorage'
 import { normalizePhone } from '@/utils/phoneUtils'
 import { isInAppBrowser } from '@/utils/inAppBrowser'
-import { getEffectiveUserTimezone, persistTimezonePreference } from '@/utils/userTimezone'
+import { detectDeviceTimezone, getEffectiveUserTimezone, persistTimezonePreference } from '@/utils/userTimezone'
 import { clearAppLockPrefs } from '@/services/appLockService'
 import {
   buildNativeAuthCallbackUrl,
@@ -847,15 +847,18 @@ function kickOffPostLoginHydration(store, { platform = 'web', source = 'login' }
         profile?.timezoneMode || profile?.timezone_mode || store?.user?.timezoneMode || '',
       ).toLowerCase()
       const resolvedTimezone =
-        savedTimezone && (savedTimezoneMode === 'manual' || !savedTimezoneMode)
+        savedTimezone && savedTimezoneMode === 'manual'
           ? savedTimezone
-          : getEffectiveUserTimezone()
+          : savedTimezoneMode === 'auto'
+            ? getEffectiveUserTimezone()
+            : detectDeviceTimezone()
 
       if (savedTimezoneMode === 'manual' || savedTimezoneMode === 'auto') {
         persistTimezonePreference(savedTimezoneMode, resolvedTimezone)
       } else if (savedTimezone) {
-        // Preserve a timezone saved by older profiles until the user changes it.
-        persistTimezonePreference('manual', resolvedTimezone)
+        // Legacy profiles did not store a mode. Keep them device-driven unless
+        // the user explicitly selected manual in the new settings UI.
+        persistTimezonePreference('auto', resolvedTimezone)
       }
 
       const nextState = quickSetupModule.buildQuickSetupState({

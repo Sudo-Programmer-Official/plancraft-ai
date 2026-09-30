@@ -337,21 +337,36 @@ const taskMenu = [
 ]
 
 function formatTime(task) {
-  const raw = String(task?.reminderTime || task?.scheduledTime || '')
-  const match = /^(\d{1,2}):(\d{2})/.exec(raw)
-  let date
-  if (match) {
-    date = new Date()
-    date.setHours(Number(match[1]), Number(match[2]), 0, 0)
-  } else {
-    date = new Date(raw)
-    if (Number.isNaN(date.getTime())) return ''
+  const timezone = getEffectiveUserTimezone()
+  const scheduledValue = task?.scheduledTime
+  const scheduled = scheduledValue?.toDate
+    ? scheduledValue.toDate()
+    : scheduledValue
+      ? new Date(scheduledValue)
+      : null
+  if (scheduled && !Number.isNaN(scheduled.getTime())) {
+    return new Intl.DateTimeFormat(undefined, {
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZone: timezone,
+    }).format(scheduled)
   }
-  return new Intl.DateTimeFormat(undefined, {
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone: getEffectiveUserTimezone(),
-  }).format(date)
+
+  // reminderTime is a local wall-clock value (HH:mm), not a UTC timestamp.
+  // Preserve those clock fields instead of constructing a Date in the device
+  // timezone and then converting them a second time.
+  const raw = String(task?.reminderTime || '')
+  const match = /^(\d{1,2}):(\d{2})/.exec(raw)
+  if (match) {
+    const wallClock = new Date(Date.UTC(1970, 0, 1, Number(match[1]), Number(match[2]), 0, 0))
+    return new Intl.DateTimeFormat(undefined, {
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZone: 'UTC',
+    }).format(wallClock)
+  }
+
+  return ''
 }
 
 function rowMetaFor(task) {

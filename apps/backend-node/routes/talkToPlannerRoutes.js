@@ -7,6 +7,7 @@ import {
   extractActionsFromText,
   executePlannerActions,
   detectIntentFromMessage,
+  applyRelativeTimingToAction,
   buildDeterministicReminderAction,
   buildFallbackActionsFromIntent,
 } from "../services/plannerAssistantService.js";
@@ -61,8 +62,11 @@ router.post(
       ),
     ]);
 
+    const headerTimezone =
+      typeof req.headers?.["x-user-tz"] === "string" ? req.headers["x-user-tz"].trim() : "";
     const timezoneOverride =
       (typeof clientTimezone === "string" && clientTimezone.trim()) ||
+      headerTimezone ||
       initialContext?.profile?.timezone ||
       initialContext?.profile?.tz ||
       "UTC";
@@ -130,8 +134,9 @@ For actionable requests with a concrete date or time, execute immediately and ne
     ];
 
     const intent = detectIntentFromMessage(message);
+    const relativeReminder = buildDeterministicReminderAction(message, context);
     const deterministicReminder =
-      intent === "schedule_reminder" ? buildDeterministicReminderAction(message, context) : null;
+      intent === "schedule_reminder" ? relativeReminder : null;
     const rawReply = deterministicReminder
       ? ""
       : await chatWithFallback({
@@ -169,6 +174,26 @@ For actionable requests with a concrete date or time, execute immediately and ne
         usedFallbackActions = true;
       }
     }
+
+    // Always resolve relative time from the client clock. This covers natural
+    // requests such as “go to bed in 30 minutes”, even when the model returns
+    // a create_task action instead of a schedule_reminder action.
+    if (relativeReminder) {
+      const hasTaskAction = actionQueue.some(
+        (action) => String(action?.type || action?.name || "").toLowerCase() === "create_task",
+      );
+      const hasReminderAction = actionQueue.some(
+        (action) => String(action?.type || action?.name || "").toLowerCase() === "schedule_reminder",
+      );
+
+      if (hasTaskAction || hasReminderAction) {
+        actionQueue = actionQueue.map((action) => applyRelativeTimingToAction(action, relativeReminder));
+      } else if (!actionQueue.length) {
+        actionQueue = [relativeReminder];
+        usedFallbackActions = true;
+      }
+    }
+
     const executedActions = await executePlannerActions(userId, actionQueue, context);
     const primaryAction =
       executedActions.find((a) => a.status === "completed") || executedActions[0] || null;

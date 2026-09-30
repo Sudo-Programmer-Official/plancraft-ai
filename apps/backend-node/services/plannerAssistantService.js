@@ -1409,8 +1409,19 @@ async function createTaskFromAction(uid, payload = {}, context = {}) {
             {
               id: task.id,
               title: task.title,
+              details: task.details || '',
               date: task.date,
               reminderTime: task.reminderTime,
+              scheduledTime: task.scheduledTime || null,
+              completed: !!task.completed,
+              category: task.category || 'Uncategorized',
+              workspaceId:
+                task.workspaceId ||
+                payload.workspaceId ||
+                context?.workspaceId ||
+                context?.runtime?.workspaceId ||
+                context?.profile?.activeWorkspaceId ||
+                null,
               link: task.link || null,
             },
           ],
@@ -1432,8 +1443,19 @@ async function createTaskFromAction(uid, payload = {}, context = {}) {
         createdTasks: created.map((task) => ({
           id: task.id,
           title: task.title,
+          details: task.details || '',
           date: task.date,
           reminderTime: task.reminderTime,
+          scheduledTime: task.scheduledTime || null,
+          completed: !!task.completed,
+          category: task.category || 'Uncategorized',
+          workspaceId:
+            task.workspaceId ||
+            payload.workspaceId ||
+            context?.workspaceId ||
+            context?.runtime?.workspaceId ||
+            context?.profile?.activeWorkspaceId ||
+            null,
           link: task.link || null,
         })),
       },
@@ -1672,6 +1694,47 @@ export function buildDeterministicReminderAction(message = "", context = {}) {
       timezone: timezoneId,
     },
   };
+}
+
+/**
+ * Apply a relative time resolved from the client clock to a model action.
+ * Model-generated wall-clock values are not reliable for relative requests;
+ * the client instant and IANA timezone are the source of truth.
+ */
+export function applyRelativeTimingToAction(action, reminderAction) {
+  if (!action || !reminderAction?.payload?.scheduledTime) return action;
+
+  const type = String(action?.type || action?.name || "").toLowerCase();
+  if (type !== "create_task" && type !== "schedule_reminder") return action;
+
+  const sourcePayload =
+    action?.payload && typeof action.payload === "object" ? action.payload : action;
+  const timezoneId = reminderAction.payload.timezone || DEFAULT_TIMEZONE;
+  const scheduledTime = reminderAction.payload.scheduledTime;
+
+  try {
+    const local = dayjs.utc(scheduledTime).tz(timezoneId);
+    if (!local.isValid()) return action;
+
+    const timing =
+      type === "create_task"
+        ? {
+            date: local.format("YYYY-MM-DD"),
+            reminderTime: local.format("HH:mm"),
+            scheduledTime,
+            timezone: timezoneId,
+          }
+        : { scheduledTime, timezone: timezoneId };
+
+    const nextPayload = { ...sourcePayload, ...timing };
+    if (type === "create_task" && Array.isArray(sourcePayload.tasks)) {
+      nextPayload.tasks = sourcePayload.tasks.map((task) => ({ ...task, ...timing }));
+    }
+
+    return { ...action, payload: nextPayload };
+  } catch {
+    return action;
+  }
 }
 
 export async function buildFallbackActionsFromIntent(intent, message = "", context = {}) {

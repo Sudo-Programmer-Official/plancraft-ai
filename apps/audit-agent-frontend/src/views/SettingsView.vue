@@ -1831,9 +1831,13 @@ function applyProfileFields(user, data = {}) {
   const remoteMode = String(data?.timezoneMode || data?.timezone_mode || '').toLowerCase()
   const hasLegacyRemoteTimezone = remoteMode === '' && isValidTimezone(remoteTimezone)
   profileTimezoneMode.value =
-    remoteMode === TIMEZONE_MODES.MANUAL || hasLegacyRemoteTimezone
+    remoteMode === TIMEZONE_MODES.MANUAL
       ? TIMEZONE_MODES.MANUAL
-      : localPreference.mode
+      : remoteMode === TIMEZONE_MODES.AUTO
+        ? TIMEZONE_MODES.AUTO
+        : hasLegacyRemoteTimezone
+          ? TIMEZONE_MODES.AUTO
+          : localPreference.mode
   detectedTimezone.value = detectDeviceTimezone()
   timezoneNow.value = new Date()
   profileTimezone.value =
