@@ -4,7 +4,7 @@
       v-model="internalOpen"
       :title="task ? `✏️ Edit Task` : props.compact ? 'Create your first plan' : `📅 Plan for ${formattedDate}`"
       :width="dialogWidth"
-      class="task-planner-dialog"
+      class="task-planner-dialog pc-theme"
       modal-class="planner-overlay"
       destroy-on-close
       :lock-scroll="false"
@@ -380,28 +380,36 @@
 
       <!-- Footer Slot -->
       <template #footer>
-        <div v-if="props.editMode" class="flex flex-col sm:flex-row gap-3 w-full">
-          <el-button
+        <div v-if="props.editMode" class="planner-footer-actions">
+          <PcButton
+            variant="secondary"
+            size="md"
+            block
+            class="planner-footer__button"
             @click="closeDialog"
-            class="planner-cancel-btn flex-1 px-4 py-2 rounded-lg font-medium"
           >
             Cancel
-          </el-button>
-          <el-button
-            type="primary"
+          </PcButton>
+          <PcButton
+            variant="primary"
+            size="md"
+            block
+            class="planner-footer__button planner-footer__button--primary"
             @click="save"
-            class="flex-1 px-4 ml-0-custom py-2 rounded-lg text-white font-medium shadow-md bg-gradient-to-r from-emerald-700 via-teal-800 to-cyan-700 hover:from-emerald-800 hover:via-teal-900 hover:to-cyan-800 transition-all duration-300"
           >
             {{ props.task ? 'Update Task' : 'Save Task' }}
-          </el-button>
+          </PcButton>
         </div>
         <div v-else-if="isMobile" class="w-full">
-          <el-button
+          <PcButton
+            variant="secondary"
+            size="md"
+            block
             @click="closeDialog"
-            class="planner-cancel-btn planner-mobile-cancel-btn w-full ml-0-custom"
+            class="planner-footer__button"
           >
             Cancel
-          </el-button>
+          </PcButton>
         </div>
       </template>
     </el-dialog>
@@ -417,6 +425,7 @@ import { ref, computed, watch, onBeforeUnmount, onMounted, nextTick } from 'vue'
 import { ElNotification, ElMessage } from 'element-plus'
 import VoiceRecorder from '@/components/VoiceRecorder.vue'
 import NotificationPrompt from '@/components/NotificationPrompt.vue'
+import { PcButton } from '@/design'
 import { useAuthStore } from '@/stores/authStore'
 import { useAccessStore } from '@/stores/accessStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
@@ -2144,8 +2153,27 @@ function appendDetails(result = {}) {
 :deep(.el-dialog__header .el-dialog__title) {
   color: #ffffff !important;
 }
-.ml-0-custom {
-  margin-left: 0 !important;
+.planner-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.planner-footer__button {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+@media (max-width: 639px) {
+  .planner-footer-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .planner-footer__button {
+    width: 100%;
+  }
 }
 /* Dark-theme friendly date input */
 :deep(.el-date-editor .el-input__wrapper) {
@@ -3296,30 +3324,6 @@ function appendDetails(result = {}) {
   opacity: 0.5;
 }
 
-.task-planner-dialog .planner-cancel-btn {
-  border: 1px solid rgba(248, 113, 113, 0.45);
-  background: linear-gradient(135deg, rgba(127, 29, 29, 0.9), rgba(153, 27, 27, 0.8));
-  color: #fee2e2;
-  font-weight: 700;
-  box-shadow: 0 10px 24px rgba(127, 29, 29, 0.25);
-}
-
-.task-planner-dialog .planner-cancel-btn:hover {
-  border-color: rgba(252, 165, 165, 0.7);
-  background: linear-gradient(135deg, rgba(153, 27, 27, 0.96), rgba(185, 28, 28, 0.88));
-  color: #fff1f2;
-}
-
-.task-planner-dialog .planner-mobile-cancel-btn {
-  width: 100%;
-  min-height: 2.85rem;
-  border-radius: 0.9rem;
-  font-size: 0.95rem;
-}
-
-.task-planner-dialog .planner-mobile-cancel-btn:hover {
-  color: #fff1f2;
-}
 /* TaskPlannerDialog.vue or global theme file */
 
 /* Date picker dropdown (popper) */
@@ -3744,19 +3748,6 @@ function appendDetails(result = {}) {
   border-color: var(--pc-border, #e2e8f0) !important;
   color: var(--pc-text-subtle, #64748b) !important;
   box-shadow: none !important;
-}
-
-.task-planner-dialog .planner-cancel-btn {
-  background: var(--pc-surface-2, #f1f3fa) !important;
-  border-color: var(--pc-border-strong, #cbd5e1) !important;
-  color: var(--pc-text, #0f172a) !important;
-  box-shadow: none !important;
-}
-
-.task-planner-dialog .planner-cancel-btn:hover {
-  background: var(--pc-surface-hover, #eceff8) !important;
-  border-color: var(--pc-accent, #4f46e5) !important;
-  color: var(--pc-text, #0f172a) !important;
 }
 
 .task-planner-dialog .section-divider,

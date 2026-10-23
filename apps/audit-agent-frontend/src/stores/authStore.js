@@ -51,7 +51,7 @@ import {
 } from '@/utils/authStorage'
 import { normalizePhone } from '@/utils/phoneUtils'
 import { isInAppBrowser } from '@/utils/inAppBrowser'
-import { detectDeviceTimezone, getEffectiveUserTimezone, persistTimezonePreference } from '@/utils/userTimezone'
+import { detectDeviceTimezone, persistTimezonePreference } from '@/utils/userTimezone'
 import { clearAppLockPrefs } from '@/services/appLockService'
 import {
   buildNativeAuthCallbackUrl,
@@ -846,12 +846,9 @@ function kickOffPostLoginHydration(store, { platform = 'web', source = 'login' }
       const savedTimezoneMode = String(
         profile?.timezoneMode || profile?.timezone_mode || store?.user?.timezoneMode || '',
       ).toLowerCase()
-      const resolvedTimezone =
-        savedTimezone && savedTimezoneMode === 'manual'
-          ? savedTimezone
-          : savedTimezoneMode === 'auto'
-            ? getEffectiveUserTimezone()
-            : detectDeviceTimezone()
+      const resolvedTimezone = savedTimezone && savedTimezoneMode === 'manual'
+        ? savedTimezone
+        : detectDeviceTimezone()
 
       if (savedTimezoneMode === 'manual' || savedTimezoneMode === 'auto') {
         persistTimezonePreference(savedTimezoneMode, resolvedTimezone)
@@ -862,7 +859,8 @@ function kickOffPostLoginHydration(store, { platform = 'web', source = 'login' }
       }
 
       const nextState = quickSetupModule.buildQuickSetupState({
-        timezone: resolvedTimezone || getEffectiveUserTimezone(),
+        timezone: resolvedTimezone || detectDeviceTimezone(),
+        timezoneMode: savedTimezoneMode === 'manual' ? 'manual' : 'auto',
         channels,
         phone,
         pushGranted: false,

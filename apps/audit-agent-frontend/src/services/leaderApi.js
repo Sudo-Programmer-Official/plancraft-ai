@@ -14,24 +14,18 @@ async function authedHeaders() {
     if (envAppToken) headers['x-app-token'] = envAppToken
     const cached = getAppToken()
     if (cached) headers['x-app-token'] = cached
-  } catch {}
+  } catch {
+    // Continue without optional auth headers; the API will return the proper auth error.
+  }
   return headers
 }
 
 function getNlpBase() {
+  const apiRoot = import.meta.env.VITE_API_BASE_ROOT
+  if (apiRoot) return `${apiRoot.replace(/\/+$/, '')}/nlp`
+
   const direct = import.meta.env.VITE_NLP_API_BASE
-  if (direct) {
-    if (typeof window !== 'undefined' && /^https?:\/\//i.test(direct)) {
-      try {
-        if (new URL(direct).origin !== window.location.origin) {
-          return '/api/nlp'
-        }
-      } catch {
-        return '/api/nlp'
-      }
-    }
-    return direct.replace(/\/+$/, '')
-  }
+  if (direct) return direct.replace(/\/+$/, '')
   return '/api/nlp'
 }
 

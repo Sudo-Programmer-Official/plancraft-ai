@@ -75,6 +75,43 @@ export function readTimezonePreference() {
 }
 
 /**
+ * Resolve a profile timezone while keeping legacy profiles device-driven.
+ * A manual profile must have a valid IANA timezone; otherwise we fall back to
+ * the existing local preference or the current device timezone.
+ */
+export function resolveTimezonePreference({
+  remoteTimezone = '',
+  remoteMode = '',
+  localPreference = readTimezonePreference(),
+  detectedTimezone = detectDeviceTimezone(),
+} = {}) {
+  const normalizedRemoteMode = String(remoteMode || '').trim().toLowerCase()
+  const validRemoteTimezone = isValidTimezone(remoteTimezone)
+  const localMode = localPreference?.mode === TIMEZONE_MODES.MANUAL
+    ? TIMEZONE_MODES.MANUAL
+    : TIMEZONE_MODES.AUTO
+
+  const mode = normalizedRemoteMode === TIMEZONE_MODES.MANUAL
+    ? TIMEZONE_MODES.MANUAL
+    : normalizedRemoteMode === TIMEZONE_MODES.AUTO
+      ? TIMEZONE_MODES.AUTO
+      : validRemoteTimezone
+        ? TIMEZONE_MODES.AUTO
+        : localMode
+
+  const localTimezone = isValidTimezone(localPreference?.timezone)
+    ? localPreference.timezone
+    : detectedTimezone
+
+  return {
+    mode,
+    timezone: mode === TIMEZONE_MODES.MANUAL
+      ? (validRemoteTimezone ? String(remoteTimezone).trim() : localTimezone)
+      : detectedTimezone,
+  }
+}
+
+/**
  * Resolve the zone used for new requests and newly-created reminders.
  * Automatic mode intentionally re-reads the device zone so travel is reflected
  * without requiring a logout or a manual settings update.

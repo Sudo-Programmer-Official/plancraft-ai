@@ -1381,6 +1381,7 @@ import {
   listSupportedTimezones,
   persistTimezonePreference,
   readTimezonePreference,
+  resolveTimezonePreference,
   timezoneClockLabel,
   timezoneOptionLabel,
   TIMEZONE_MODES,
@@ -1829,21 +1830,15 @@ function applyProfileFields(user, data = {}) {
   const localPreference = readTimezonePreference()
   const remoteTimezone = data?.timezone || data?.preferences?.timezone || ''
   const remoteMode = String(data?.timezoneMode || data?.timezone_mode || '').toLowerCase()
-  const hasLegacyRemoteTimezone = remoteMode === '' && isValidTimezone(remoteTimezone)
-  profileTimezoneMode.value =
-    remoteMode === TIMEZONE_MODES.MANUAL
-      ? TIMEZONE_MODES.MANUAL
-      : remoteMode === TIMEZONE_MODES.AUTO
-        ? TIMEZONE_MODES.AUTO
-        : hasLegacyRemoteTimezone
-          ? TIMEZONE_MODES.AUTO
-          : localPreference.mode
+  const resolvedTimezone = resolveTimezonePreference({
+    remoteTimezone,
+    remoteMode,
+    localPreference,
+  })
+  profileTimezoneMode.value = resolvedTimezone.mode
   detectedTimezone.value = detectDeviceTimezone()
   timezoneNow.value = new Date()
-  profileTimezone.value =
-    profileTimezoneMode.value === TIMEZONE_MODES.MANUAL
-      ? (isValidTimezone(remoteTimezone) ? remoteTimezone : localPreference.timezone)
-      : detectedTimezone.value
+  profileTimezone.value = resolvedTimezone.timezone
   persistTimezonePreference(profileTimezoneMode.value, profileTimezone.value)
 }
 
@@ -1947,6 +1942,7 @@ async function sendTestActionInboxDigest() {
 function syncQuickSetupFromSettings() {
   const nextState = buildQuickSetupState({
     timezone: currentQuickSetupTimezone(),
+    timezoneMode: profileTimezoneMode.value,
     channels: deriveQuickSetupChannels(),
     phone: deriveQuickSetupPhone(),
     pushGranted: !!prefs.pwa,

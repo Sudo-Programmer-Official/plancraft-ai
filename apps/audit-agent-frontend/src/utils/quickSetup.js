@@ -1,3 +1,5 @@
+import { isValidTimezone } from '@/utils/userTimezone'
+
 const QUICK_SETUP_STATE_KEY = 'pcai_quick_setup_state'
 const QUICK_SETUP_SNOOZE_KEY = 'pcai_quick_setup_snooze_until'
 const QUICK_SETUP_DONE_KEY = 'pcai_setup_done'
@@ -25,6 +27,7 @@ export function normalizeQuickSetupChannels(channels) {
 
 export function buildQuickSetupState({
   timezone,
+  timezoneMode,
   channels,
   phone,
   pushGranted,
@@ -33,7 +36,8 @@ export function buildQuickSetupState({
   const normalizedChannels = normalizeQuickSetupChannels(channels)
   const phoneValue = String(phone || '').trim()
   const timezoneValue = String(timezone || '').trim()
-  const timezoneReady = !!timezoneValue && timezoneValue !== 'UTC'
+  const normalizedTimezoneMode = timezoneMode === 'manual' ? 'manual' : 'auto'
+  const timezoneReady = isValidTimezone(timezoneValue)
   const channelsReady = normalizedChannels.length > 0
   const phoneReady = !!phoneValue
   const pushRelevant = true
@@ -66,6 +70,7 @@ export function buildQuickSetupState({
     totalSteps,
     steps,
     timezone: timezoneValue || null,
+    timezoneMode: normalizedTimezoneMode,
     channels: normalizedChannels,
     phone: phoneValue || null,
     pushGranted: pushReady,

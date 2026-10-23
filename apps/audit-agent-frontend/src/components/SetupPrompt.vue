@@ -69,20 +69,50 @@
         <div class="setup-card__header">
           <div>
             <div class="setup-card__title">🌎 Timezone</div>
-            <p class="setup-card__copy">Detected locally and used for reminders, meetings, and daily planning.</p>
+            <p class="setup-card__copy">
+              Use your device timezone while traveling, or keep a home timezone for planning and reminders.
+            </p>
           </div>
           <span class="setup-status" :class="timezoneReady ? 'setup-status--complete' : 'setup-status--pending'">
             {{ timezoneReady ? 'Ready' : 'Needs review' }}
           </span>
         </div>
-        <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div class="setup-prompt__timezone-value">
-            {{ tz }}
-          </div>
-          <el-button size="small" class="!rounded-lg font-semibold" @click="confirmTimezone">
-            Confirm timezone
-          </el-button>
+        <div class="setup-prompt__timezone-modes" role="group" aria-label="Timezone behavior">
+          <button
+            type="button"
+            class="setup-prompt__timezone-mode"
+            :class="{ 'setup-prompt__timezone-mode--active': timezoneMode === TIMEZONE_MODES.AUTO }"
+            @click="selectTimezoneMode(TIMEZONE_MODES.AUTO)"
+          >
+            <span>Use device timezone</span>
+            <small>Best for travel</small>
+          </button>
+          <button
+            type="button"
+            class="setup-prompt__timezone-mode"
+            :class="{ 'setup-prompt__timezone-mode--active': timezoneMode === TIMEZONE_MODES.MANUAL }"
+            @click="selectTimezoneMode(TIMEZONE_MODES.MANUAL)"
+          >
+            <span>Choose a home timezone</span>
+            <small>Keep one home zone</small>
+          </button>
         </div>
+        <div v-if="timezoneMode === TIMEZONE_MODES.AUTO" class="setup-prompt__timezone-current">
+          <div>
+            <span class="setup-prompt__timezone-label">Current device timezone</span>
+            <strong>{{ timezoneOptionLabel(detectedTimezone, timezoneNow) }}</strong>
+          </div>
+          <span class="setup-prompt__timezone-clock">{{ timezoneClockLabel(detectedTimezone, timezoneNow) }}</span>
+        </div>
+        <label v-else class="setup-prompt__timezone-select-field">
+          <span>Home timezone</span>
+          <select v-model="tz" class="setup-prompt__timezone-select" @change="handleManualTimezoneChange">
+            <option v-for="timezone in timezoneOptions" :key="timezone" :value="timezone">
+              {{ timezoneOptionLabel(timezone, timezoneNow) }}
+            </option>
+          </select>
+          <small>New reminders and planning requests will use this zone.</small>
+        </label>
         </section>
 
         <section class="setup-card">
@@ -248,7 +278,17 @@ import { useAuthFlags } from '@/composables/useAuthFlags'
 import { useAuthStore } from '@/stores/authStore'
 import { guessCountryFromLocale, normalizePhone } from '@/utils/phoneUtils'
 import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
-import { getEffectiveUserTimezone, persistTimezonePreference, TIMEZONE_MODES } from '@/utils/userTimezone'
+import {
+  detectDeviceTimezone,
+  isValidTimezone,
+  listSupportedTimezones,
+  persistTimezonePreference,
+  readTimezonePreference,
+  resolveTimezonePreference,
+  timezoneClockLabel,
+  timezoneOptionLabel,
+  TIMEZONE_MODES,
+} from '@/utils/userTimezone'
 import {
   buildQuickSetupState,
   clearQuickSetupSnooze,
@@ -280,6 +320,9 @@ const saveError = ref('')
 const saveSuccess = ref('')
 const dirty = ref(false)
 const tz = ref('UTC')
+const timezoneMode = ref(TIMEZONE_MODES.AUTO)
+const detectedTimezone = ref(detectDeviceTimezone())
+const timezoneNow = ref(new Date())
 const reminderPhone = ref('')
 const pushGranted = ref(false)
 const showLoadingShell = computed(() => loading.value && !contentReady.value)
@@ -297,7 +340,8 @@ const pushReadyCopy = computed(() =>
   isNativePackagedApp() ? 'Device notifications are ready on this device.' : 'Browser push is ready on this device.',
 )
 const pushButtonLabel = computed(() => isNativePackagedApp() ? 'Enable device notifications' : 'Enable push')
-const timezoneReady = computed(() => !!tz.value && tz.value !== 'UTC')
+const timezoneOptions = computed(() => listSupportedTimezones())
+const timezoneReady = computed(() => isValidTimezone(tz.value))
 const channelState = reactive({
   email: true,
   whatsapp: false,
@@ -371,6 +415,7 @@ const reminderCoverage = computed(() => [
 const setupState = computed(() =>
   buildQuickSetupState({
     timezone: tz.value,
+    timezoneMode: timezoneMode.value,
     channels: selectedChannels.value,
     phone: reminderPhone.value,
     pushGranted: pushGranted.value,
@@ -438,13 +483,48 @@ function deriveChannels(notifications = {}) {
   ])
 }
 
+function applyTimezonePreference(preference = {}, { persist = false } = {}) {
+  detectedTimezone.value = detectDeviceTimezone()
+  timezoneNow.value = new Date()
+  timezoneMode.value = preference.mode === TIMEZONE_MODES.MANUAL
+    ? TIMEZONE_MODES.MANUAL
+    : TIMEZONE_MODES.AUTO
+  tz.value = timezoneMode.value === TIMEZONE_MODES.AUTO
+    ? detectedTimezone.value
+    : (isValidTimezone(preference.timezone) ? preference.timezone : detectedTimezone.value)
+
+  if (persist) persistTimezonePreference(timezoneMode.value, tz.value)
+}
+
+function selectTimezoneMode(mode) {
+  detectedTimezone.value = detectDeviceTimezone()
+  timezoneNow.value = new Date()
+  timezoneMode.value = mode === TIMEZONE_MODES.MANUAL ? TIMEZONE_MODES.MANUAL : TIMEZONE_MODES.AUTO
+  if (timezoneMode.value === TIMEZONE_MODES.AUTO) {
+    tz.value = detectedTimezone.value
+  } else if (!isValidTimezone(tz.value)) {
+    tz.value = detectedTimezone.value
+  }
+  markDirty()
+  emitSetupState()
+}
+
+function handleManualTimezoneChange() {
+  timezoneMode.value = TIMEZONE_MODES.MANUAL
+  markDirty()
+  emitSetupState()
+}
+
 async function loadSetup() {
   loading.value = true
   saveError.value = ''
   try {
     const stored = readQuickSetupState()
-    const guessedTz = getEffectiveUserTimezone()
-    tz.value = stored?.timezone || guessedTz || 'UTC'
+    const localPreference = readTimezonePreference()
+    const storedPreference = stored?.timezoneMode
+      ? { mode: stored.timezoneMode, timezone: stored.timezone }
+      : localPreference
+    applyTimezonePreference(storedPreference)
     reminderPhone.value = stored?.phone || ''
     applyChannels(stored?.channels?.length ? stored.channels : ['email'])
     emitSetupState()
@@ -501,6 +581,13 @@ async function loadSetup() {
       }
 
       if (!dirty.value) {
+        const resolvedTimezone = resolveTimezonePreference({
+          remoteTimezone: userData?.timezone || userData?.preferences?.timezone,
+          remoteMode: userData?.timezoneMode || userData?.timezone_mode,
+          localPreference: readTimezonePreference(),
+        })
+        applyTimezonePreference(resolvedTimezone, { persist: true })
+
         const loadedChannels = deriveChannels(prefData?.notifications || {})
         if (loadedChannels.length) applyChannels(loadedChannels)
 
@@ -537,16 +624,6 @@ async function ensureSetupLoaded(force = false) {
   }
   contentReady.value = false
   await loadSetup()
-}
-
-function confirmTimezone() {
-  try {
-    persistTimezonePreference(TIMEZONE_MODES.MANUAL, tz.value)
-  } catch {
-    /* noop */
-  }
-  markDirty()
-  emitSetupState()
 }
 
 function toggleChannel(key, checked) {
@@ -607,7 +684,9 @@ async function persistQuickSetup() {
       : ''
 
     reminderPhone.value = normalizedPhone
-    confirmTimezone()
+    const savedTimezonePreference = persistTimezonePreference(timezoneMode.value, tz.value)
+    timezoneMode.value = savedTimezonePreference.mode
+    tz.value = savedTimezonePreference.timezone
 
     if (userId) {
       const channels = selectedChannels.value
@@ -651,6 +730,8 @@ async function persistQuickSetup() {
       await withTimeout(updateIntegrations(userId, mergedIntegrations), 15000, 'quick setup integrations save')
       const profilePatch = {
         updatedAt: new Date().toISOString(),
+        timezoneMode: timezoneMode.value,
+        timezone: timezoneMode.value === TIMEZONE_MODES.MANUAL ? tz.value : null,
       }
       if (normalizedPhone) {
         profilePatch.phone = normalizedPhone
@@ -665,6 +746,8 @@ async function persistQuickSetup() {
       authStore.user = {
         ...(authStore.user || {}),
         phone: normalizedPhone || null,
+        timezoneMode: timezoneMode.value,
+        timezone: timezoneMode.value === TIMEZONE_MODES.MANUAL ? tz.value : null,
       }
       existingIntegrations.value = mergedIntegrations
       if (deferredProfileSync) {
@@ -700,6 +783,7 @@ async function persistQuickSetup() {
     clearQuickSetupSnooze()
     const nextState = buildQuickSetupState({
       timezone: tz.value,
+      timezoneMode: timezoneMode.value,
       channels: selectedChannels.value,
       phone: reminderPhone.value,
       pushGranted: pushGranted.value,
@@ -1140,6 +1224,126 @@ html[data-pc-theme='dark'] .setup-prompt.el-dialog {
   color: var(--setup-text);
   font-size: 0.875rem;
   font-weight: 600;
+}
+
+.setup-prompt__timezone-modes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.setup-prompt__timezone-mode {
+  display: flex;
+  min-height: 4.1rem;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.2rem;
+  border: 1px solid var(--setup-border);
+  border-radius: 0.8rem;
+  padding: 0.75rem 0.85rem;
+  background: var(--setup-surface-2);
+  color: var(--setup-text);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.setup-prompt__timezone-mode:hover {
+  border-color: var(--setup-border-strong);
+  background: var(--setup-surface-hover);
+}
+
+.setup-prompt__timezone-mode--active {
+  border-color: color-mix(in srgb, var(--setup-accent) 65%, var(--setup-border));
+  background: var(--setup-accent-soft);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--setup-accent) 10%, transparent);
+}
+
+.setup-prompt__timezone-mode span {
+  color: var(--setup-text);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.setup-prompt__timezone-mode small,
+.setup-prompt__timezone-select-field small {
+  color: var(--setup-muted);
+  font-size: 0.7rem;
+  line-height: 1.35;
+}
+
+.setup-prompt__timezone-current,
+.setup-prompt__timezone-select-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.8rem;
+  border: 1px solid var(--setup-border);
+  border-radius: 0.8rem;
+  padding: 0.75rem 0.85rem;
+  background: var(--setup-surface-2);
+}
+
+.setup-prompt__timezone-current > div,
+.setup-prompt__timezone-select-field {
+  min-width: 0;
+}
+
+.setup-prompt__timezone-label,
+.setup-prompt__timezone-select-field > span {
+  display: block;
+  margin-bottom: 0.2rem;
+  color: var(--setup-muted);
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+
+.setup-prompt__timezone-current strong {
+  display: block;
+  overflow: hidden;
+  color: var(--setup-text);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.setup-prompt__timezone-clock {
+  flex: 0 0 auto;
+  color: var(--setup-accent-text);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.setup-prompt__timezone-select-field {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.setup-prompt__timezone-select-field > span {
+  margin-bottom: 0;
+}
+
+.setup-prompt__timezone-select {
+  width: 100%;
+  min-height: 2.6rem;
+  border: 1px solid var(--setup-border-strong);
+  border-radius: 0.65rem;
+  padding: 0.45rem 0.65rem;
+  background: var(--setup-surface);
+  color: var(--setup-text);
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+.setup-prompt__timezone-select:focus {
+  outline: 2px solid color-mix(in srgb, var(--setup-accent) 35%, transparent);
+  outline-offset: 1px;
 }
 
 .setup-prompt.el-dialog .el-input__wrapper {

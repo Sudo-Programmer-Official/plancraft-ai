@@ -14,10 +14,6 @@ type AuthHeaderOptions = {
 
 const normalize = (url?: string | null) => (url ? url.replace(/\/+$/, '') : '')
 
-function isAbsoluteUrl(url: string) {
-  return /^https?:\/\//i.test(url)
-}
-
 function resolveBase(service: Service): string {
   switch (service) {
     case 'growth': {
@@ -49,20 +45,11 @@ function resolveBase(service: Service): string {
       return '/creator-api'
     }
     case 'nlp': {
+      const apiRoot = normalize(import.meta.env.VITE_API_BASE_ROOT as string)
+      if (apiRoot) return `${apiRoot}/nlp`
+
       const direct = normalize(import.meta.env.VITE_NLP_API_BASE as string)
-      if (direct) {
-        if (typeof window !== 'undefined' && isAbsoluteUrl(direct)) {
-          try {
-            const directOrigin = new URL(direct).origin
-            if (directOrigin !== window.location.origin) {
-              return '/api/nlp'
-            }
-          } catch {
-            return '/api/nlp'
-          }
-        }
-        return direct
-      }
+      if (direct) return direct
       return '/api/nlp'
     }
     default:
