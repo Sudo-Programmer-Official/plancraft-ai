@@ -7,20 +7,12 @@
     :close-on-click-modal="false"
     :show-close="true"
     :destroy-on-close="false"
-    :style="{
-      background: 'linear-gradient(145deg, #1e1b4b, #312e81, #4c1d95)',
-      color: '#e2e8f0',
-      borderRadius: '0.75rem',
-      boxShadow: '0 10px 40px rgba(0,0,0,0.6)',
-      border: '1px solid rgba(255,255,255,0.08)',
-      backdropFilter: 'blur(12px)'
-    }"
     @close="handleDialogClose"
   >
     <template #header>
-      <div class="text-center">
-        <h2 class="text-2xl font-bold text-white mb-1">Quick Setup</h2>
-        <p class="text-indigo-200 text-sm leading-snug">
+      <div class="setup-prompt__header">
+        <h2 class="setup-prompt__title">Quick Setup</h2>
+        <p class="setup-prompt__subtitle">
           Set your timezone and reminder channels once. Add a phone only if you want call or WhatsApp backup.
         </p>
       </div>
@@ -34,41 +26,41 @@
         <div class="setup-prompt__skeleton-block setup-prompt__skeleton-block--short" />
       </div>
 
-      <div v-else v-loading="loading && contentReady" class="setup-prompt__content space-y-5 mt-4">
-        <section class="rounded-2xl border border-white/10 bg-slate-950/30 p-4 space-y-3">
+      <div v-else v-loading="loading && contentReady" class="setup-prompt__content">
+        <section class="setup-prompt__progress-card">
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p class="text-xs uppercase tracking-[0.28em] text-indigo-200/80">Progress</p>
-            <p class="text-sm text-slate-200">
+            <p class="setup-prompt__eyebrow">Progress</p>
+            <p class="setup-prompt__progress-count">
               {{ setupState.completedSteps }}/{{ setupState.totalSteps }} setup items complete
             </p>
           </div>
           <span
-            class="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold"
-            :class="setupState.requiredComplete ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200' : 'border-amber-400/40 bg-amber-500/10 text-amber-100'"
+            class="setup-prompt__progress-status"
+            :class="setupState.requiredComplete ? 'setup-prompt__progress-status--complete' : 'setup-prompt__progress-status--pending'"
           >
             {{ setupState.requiredComplete ? 'Core setup complete' : 'Setup in progress' }}
           </span>
         </div>
-        <div class="h-2 overflow-hidden rounded-full bg-white/10">
+        <div class="setup-prompt__progress-track">
           <div class="setup-progress-bar" :style="{ width: `${setupState.completionPercent}%` }" />
         </div>
-        <p v-if="refreshingRemote" class="text-xs text-indigo-200/80">
+        <p v-if="refreshingRemote" class="setup-prompt__sync-copy">
           Syncing your saved setup details...
         </p>
         <div class="flex flex-wrap gap-2">
           <span
             v-for="step in setupState.steps"
             :key="step.key"
-            class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs"
-            :class="step.complete ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200' : 'border-white/10 bg-white/5 text-slate-300'"
+            class="setup-prompt__step"
+            :class="step.complete ? 'setup-prompt__step--complete' : 'setup-prompt__step--pending'"
           >
             <span>{{ step.complete ? '✓' : '•' }}</span>
             <span>{{ step.label }}</span>
-            <span v-if="!step.required" class="text-[10px] uppercase tracking-[0.2em] text-slate-400">Optional</span>
+            <span v-if="!step.required" class="setup-prompt__step-optional">Optional</span>
           </span>
         </div>
-        <p v-if="missingRequiredLabels.length" class="text-xs text-amber-200/90">
+        <p v-if="missingRequiredLabels.length" class="setup-prompt__missing-copy">
           Missing: {{ missingRequiredLabels.join(', ') }}
         </p>
         </section>
@@ -84,7 +76,7 @@
           </span>
         </div>
         <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div class="rounded-xl border border-white/10 bg-slate-950/30 px-4 py-3 text-sm text-indigo-100">
+          <div class="setup-prompt__timezone-value">
             {{ tz }}
           </div>
           <el-button size="small" class="!rounded-lg font-semibold" @click="confirmTimezone">
@@ -113,7 +105,7 @@
             class="w-full"
             @input="markDirty"
           />
-          <p class="text-xs text-slate-400">
+          <p class="setup-prompt__field-help">
             Format as an international number. One phone is applied to your reminder channels by default.
           </p>
         </div>
@@ -143,8 +135,8 @@
               @change="toggleChannel(channel.key, $event.target.checked)"
             />
             <span class="flex-1">
-              <span class="block text-sm font-medium text-white">{{ channel.label }}</span>
-              <span class="block text-xs text-slate-400">{{ channel.copy }}</span>
+              <span class="setup-prompt__channel-label">{{ channel.label }}</span>
+              <span class="setup-prompt__channel-copy">{{ channel.copy }}</span>
             </span>
           </label>
         </div>
@@ -161,11 +153,11 @@
           <div
             v-for="item in reminderCoverage"
             :key="item.key"
-            class="rounded-xl border px-4 py-3"
-            :class="item.enabled ? 'border-emerald-400/30 bg-emerald-500/10' : 'border-white/10 bg-slate-950/30'"
+            class="setup-prompt__coverage-item"
+            :class="item.enabled ? 'setup-prompt__coverage-item--enabled' : 'setup-prompt__coverage-item--disabled'"
           >
-            <p class="text-sm font-medium text-white">{{ item.label }}</p>
-            <p class="mt-1 text-xs" :class="item.enabled ? 'text-emerald-200' : 'text-slate-400'">
+            <p class="setup-prompt__coverage-label">{{ item.label }}</p>
+            <p class="setup-prompt__coverage-copy">
               {{ item.status }}
             </p>
           </div>
@@ -183,7 +175,7 @@
           </span>
         </div>
         <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p class="text-sm text-slate-300">
+          <p class="setup-prompt__push-copy">
             {{ pushGranted ? pushReadyCopy : 'You can skip this and still finish quick setup.' }}
           </p>
           <el-button
@@ -199,10 +191,10 @@
         </div>
         </section>
 
-        <p v-if="saveError" class="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+        <p v-if="saveError" class="setup-prompt__feedback setup-prompt__feedback--error">
           {{ saveError }}
         </p>
-        <p v-else-if="saveSuccess" class="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+        <p v-else-if="saveSuccess" class="setup-prompt__feedback setup-prompt__feedback--success">
           {{ saveSuccess }}
         </p>
       </div>
@@ -212,7 +204,7 @@
       <div class="setup-prompt__footer">
         <span class="setup-prompt__footer-copy">
           You can continue later from the dashboard setup banner or
-          <RouterLink to="/settings?tab=account-quick-setup" class="text-indigo-300 hover:text-indigo-200 underline">
+          <RouterLink to="/settings?tab=account-quick-setup" class="setup-prompt__footer-link">
             Settings → Quick Setup
           </RouterLink>.
         </span>
@@ -803,82 +795,307 @@ watch(
 )
 </script>
 
-<style scoped>
-:deep(.setup-prompt-overlay) {
-  background: rgba(2, 6, 23, 0.72);
-  backdrop-filter: blur(10px);
+<style>
+/* Element Plus teleports the dialog to <body>, so this surface owns its
+   theme values instead of relying on utility classes inherited from the app. */
+.setup-prompt-overlay {
+  background: var(--pc-scrim, rgba(15, 23, 42, 0.35));
+  backdrop-filter: blur(8px);
 }
 
-.setup-prompt :deep(.el-dialog) {
+html[data-pc-theme='dark'] .setup-prompt-overlay {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+@media (prefers-color-scheme: dark) {
+  html[data-pc-theme='system'] .setup-prompt-overlay {
+    background: rgba(0, 0, 0, 0.55);
+  }
+}
+
+.setup-prompt.el-dialog {
+  --setup-surface: var(--pc-surface, #ffffff);
+  --setup-surface-2: var(--pc-surface-2, #f1f3fa);
+  --setup-surface-hover: var(--pc-surface-hover, #eceff8);
+  --setup-border: var(--pc-border, #e2e8f0);
+  --setup-border-strong: var(--pc-border-strong, #cbd5e1);
+  --setup-text: var(--pc-text, #0f172a);
+  --setup-muted: var(--pc-text-muted, #475569);
+  --setup-subtle: var(--pc-text-subtle, #64748b);
+  --setup-accent: var(--pc-accent, #4f46e5);
+  --setup-accent-text: var(--pc-accent-text, #4338ca);
+  --setup-accent-soft: var(--pc-accent-soft, rgba(79, 70, 229, 0.08));
+  --setup-success: var(--pc-success, #15803d);
+  --setup-success-soft: rgba(21, 128, 61, 0.1);
+  --setup-warning: #b45309;
+  --setup-warning-soft: rgba(180, 83, 9, 0.1);
+  --setup-danger: #b42318;
+  --setup-danger-soft: rgba(180, 35, 24, 0.08);
+  --setup-accent-fill: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  --setup-accent-fill-hover: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%);
+  --setup-shadow: 0 24px 70px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.06);
+
   width: min(620px, calc(100vw - 24px));
   max-width: calc(100vw - 24px);
-  background: radial-gradient(circle at top left, #1e1b4b 0%, #312e81 45%, #4c1d95 100%);
-  color: #e2e8f0;
-  border-radius: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(14px);
+  max-height: min(46rem, calc(100dvh - 2rem));
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
-  animation: fadeIn 0.35s ease-out;
+  margin: auto !important;
+  padding: 0;
+  border: 1px solid var(--setup-border) !important;
+  border-radius: 1.25rem;
+  background: var(--setup-surface) !important;
+  color: var(--setup-text) !important;
+  box-shadow: var(--setup-shadow) !important;
+  animation: setupDialogIn 0.24s cubic-bezier(0.2, 0, 0, 1);
 }
 
-.setup-prompt :deep(.el-dialog__header),
-.setup-prompt :deep(.el-dialog__footer) {
-  background: transparent;
-  border: none;
+html[data-pc-theme='dark'] .setup-prompt.el-dialog {
+  --setup-surface: #171a21;
+  --setup-surface-2: #1e222b;
+  --setup-surface-hover: #242935;
+  --setup-border: #262b36;
+  --setup-border-strong: #343a47;
+  --setup-text: #eceef1;
+  --setup-muted: #a3a9b4;
+  --setup-subtle: #8a909b;
+  --setup-accent: #6a58e0;
+  --setup-accent-text: #a79cf8;
+  --setup-accent-soft: rgba(124, 108, 242, 0.16);
+  --setup-success: #4cc38a;
+  --setup-success-soft: rgba(76, 195, 138, 0.14);
+  --setup-warning: #f4c46a;
+  --setup-warning-soft: rgba(244, 196, 106, 0.12);
+  --setup-danger: #f0605d;
+  --setup-danger-soft: rgba(240, 96, 93, 0.12);
+  --setup-accent-fill: linear-gradient(135deg, #5b4fe0 0%, #7c3aed 100%);
+  --setup-accent-fill-hover: linear-gradient(135deg, #4f43d6 0%, #6d28d9 100%);
+  --setup-shadow: 0 24px 70px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-.setup-prompt :deep(.el-dialog__body) {
-  min-height: 24rem;
-  background: radial-gradient(circle at top left, rgba(30, 27, 75, 0.98), rgba(76, 29, 149, 0.9));
+@media (prefers-color-scheme: dark) {
+  html[data-pc-theme='system'] .setup-prompt.el-dialog {
+    --setup-surface: #171a21;
+    --setup-surface-2: #1e222b;
+    --setup-surface-hover: #242935;
+    --setup-border: #262b36;
+    --setup-border-strong: #343a47;
+    --setup-text: #eceef1;
+    --setup-muted: #a3a9b4;
+    --setup-subtle: #8a909b;
+    --setup-accent: #6a58e0;
+    --setup-accent-text: #a79cf8;
+    --setup-accent-soft: rgba(124, 108, 242, 0.16);
+    --setup-success: #4cc38a;
+    --setup-success-soft: rgba(76, 195, 138, 0.14);
+    --setup-warning: #f4c46a;
+    --setup-warning-soft: rgba(244, 196, 106, 0.12);
+    --setup-danger: #f0605d;
+    --setup-danger-soft: rgba(240, 96, 93, 0.12);
+    --setup-accent-fill: linear-gradient(135deg, #5b4fe0 0%, #7c3aed 100%);
+    --setup-accent-fill-hover: linear-gradient(135deg, #4f43d6 0%, #6d28d9 100%);
+    --setup-shadow: 0 24px 70px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
 }
 
-.setup-prompt__shell {
-  min-height: 24rem;
+.setup-prompt.el-dialog .el-dialog__header {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 1.35rem 4.25rem 1.15rem 1.5rem;
+  border-bottom: 1px solid var(--setup-border);
+  background: linear-gradient(180deg, var(--setup-accent-soft), transparent 90%);
+  color: var(--setup-text) !important;
+}
+
+.setup-prompt__header {
+  text-align: left;
+}
+
+.setup-prompt__title {
+  margin: 0;
+  color: var(--setup-text);
+  font-size: 1.75rem;
+  font-weight: 750;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+}
+
+.setup-prompt__subtitle {
+  max-width: 34rem;
+  margin: 0.45rem 0 0;
+  color: var(--setup-muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.setup-prompt.el-dialog .el-dialog__headerbtn {
+  top: 1.1rem;
+  right: 1rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid var(--setup-border);
+  border-radius: 0.7rem;
+  background: var(--setup-surface-2);
+  transition: background-color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.setup-prompt.el-dialog .el-dialog__headerbtn:hover {
+  border-color: var(--setup-border-strong);
+  background: var(--setup-surface-hover);
+  transform: translateY(-1px);
+}
+
+.setup-prompt.el-dialog .el-dialog__headerbtn .el-dialog__close {
+  color: var(--setup-muted);
+  font-size: 1rem;
+}
+
+.setup-prompt.el-dialog .el-dialog__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 1.25rem 1.5rem 1.5rem;
+  background: var(--setup-surface) !important;
+  color: var(--setup-text) !important;
+  scrollbar-color: color-mix(in srgb, var(--setup-subtle) 35%, transparent) transparent;
+}
+
+.setup-prompt.el-dialog .el-dialog__footer {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 1rem 1.5rem 1.25rem;
+  border-top: 1px solid var(--setup-border);
+  background: var(--setup-surface) !important;
+}
+
+.setup-prompt__shell,
+.setup-prompt__content {
+  min-height: 0;
 }
 
 .setup-prompt__content {
-  min-height: 24rem;
-}
-
-.setup-prompt__skeleton {
-  min-height: 24rem;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  padding-top: 1rem;
+  gap: 1.25rem;
 }
 
-.setup-prompt__skeleton-block {
-  height: 5rem;
+.setup-prompt__progress-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  padding: 1.125rem;
+  border: 1px solid color-mix(in srgb, var(--setup-accent) 22%, var(--setup-border)) !important;
   border-radius: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.7), rgba(67, 56, 202, 0.22));
-  box-shadow: inset 0 1px 10px rgba(255, 255, 255, 0.03);
-  animation: setupPulse 1.1s ease-in-out infinite alternate;
+  background: linear-gradient(135deg, var(--setup-accent-soft), var(--setup-surface-2)) !important;
 }
 
-.setup-prompt__skeleton-block--hero {
-  height: 7rem;
+.setup-prompt__eyebrow {
+  margin: 0;
+  color: var(--setup-accent-text);
+  font-size: 0.6875rem;
+  font-weight: 750;
+  letter-spacing: 0.2em;
+  line-height: 1.2;
+  text-transform: uppercase;
 }
 
-.setup-prompt__skeleton-block--short {
-  height: 3.5rem;
+.setup-prompt__progress-count {
+  margin: 0.35rem 0 0;
+  color: var(--setup-text);
+  font-size: 0.9375rem;
+  font-weight: 650;
+}
+
+.setup-prompt__progress-status,
+.setup-status {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  border: 1px solid var(--setup-border);
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  color: var(--setup-muted);
+  font-size: 0.6875rem;
+  font-weight: 750;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.setup-prompt__progress-status--complete,
+.setup-status--complete,
+.setup-prompt__step--complete,
+.setup-prompt__coverage-item--enabled {
+  border-color: color-mix(in srgb, var(--setup-success) 38%, var(--setup-border));
+  background: var(--setup-success-soft);
+  color: var(--setup-success);
+}
+
+.setup-prompt__progress-status--pending,
+.setup-status--pending {
+  border-color: color-mix(in srgb, var(--setup-warning) 38%, var(--setup-border));
+  background: var(--setup-warning-soft);
+  color: var(--setup-warning);
+}
+
+.setup-prompt__progress-track {
+  height: 0.5rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--setup-border);
 }
 
 .setup-progress-bar {
   height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 55%, #ec4899 100%);
+  min-width: 0.5rem;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #4f46e5 0%, #7c3aed 62%, #db2777 100%);
   transition: width 0.25s ease;
 }
 
+.setup-prompt__sync-copy,
+.setup-prompt__missing-copy {
+  margin: 0;
+  color: var(--setup-muted);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.setup-prompt__missing-copy {
+  color: var(--setup-warning);
+}
+
+.setup-prompt__step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid var(--setup-border);
+  border-radius: 999px;
+  padding: 0.4rem 0.7rem;
+  color: var(--setup-muted);
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.setup-prompt__step--pending {
+  background: var(--setup-surface);
+}
+
+.setup-prompt__step-optional {
+  color: var(--setup-subtle);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 .setup-card {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(145deg, rgba(15, 23, 42, 0.55), rgba(49, 46, 129, 0.32));
+  border: 1px solid var(--setup-border);
   border-radius: 1rem;
   padding: 1rem;
-  box-shadow: inset 0 1px 10px rgba(255, 255, 255, 0.03);
+  background: var(--setup-surface);
+  box-shadow: 0 5px 18px rgba(15, 23, 42, 0.045);
 }
 
 .setup-card__header {
@@ -889,55 +1106,162 @@ watch(
 }
 
 .setup-card__title {
-  font-weight: 600;
-  color: #fff;
+  color: var(--setup-text);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.setup-card__copy,
+.setup-prompt__field-help,
+.setup-prompt__channel-copy,
+.setup-prompt__coverage-copy,
+.setup-prompt__push-copy {
+  color: var(--setup-muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
 }
 
 .setup-card__copy {
-  margin-top: 0.25rem;
-  font-size: 0.8rem;
-  line-height: 1.4;
-  color: #cbd5f5;
+  margin: 0.3rem 0 0;
 }
 
-.setup-status {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 0.25rem 0.7rem;
-  font-size: 0.75rem;
+.setup-prompt__field-help,
+.setup-prompt__coverage-copy {
+  margin: 0.35rem 0 0;
+}
+
+.setup-prompt__timezone-value {
+  min-width: 12rem;
+  border: 1px solid var(--setup-border-strong);
+  border-radius: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  background: var(--setup-surface-2);
+  color: var(--setup-text);
+  font-size: 0.875rem;
   font-weight: 600;
-  white-space: nowrap;
 }
 
-.setup-status--complete {
-  border-color: rgba(52, 211, 153, 0.35);
-  background: rgba(16, 185, 129, 0.12);
-  color: #a7f3d0;
+.setup-prompt.el-dialog .el-input__wrapper {
+  min-height: 2.75rem;
+  border-radius: 0.75rem;
+  background: var(--setup-surface-2) !important;
+  box-shadow: inset 0 0 0 1px var(--setup-border-strong) !important;
+  transition: background-color 0.18s ease, box-shadow 0.18s ease;
 }
 
-.setup-status--pending {
-  border-color: rgba(251, 191, 36, 0.25);
-  background: rgba(251, 191, 36, 0.1);
-  color: #fde68a;
+.setup-prompt.el-dialog .el-input__wrapper:hover,
+.setup-prompt.el-dialog .el-input__wrapper.is-focus {
+  background: var(--setup-surface) !important;
+  box-shadow: inset 0 0 0 1px var(--setup-accent), 0 0 0 3px color-mix(in srgb, var(--setup-accent) 16%, transparent) !important;
+}
+
+.setup-prompt.el-dialog .el-input__inner {
+  color: var(--setup-text) !important;
+  font-size: 0.9375rem;
+}
+
+.setup-prompt.el-dialog .el-input__inner::placeholder {
+  color: var(--setup-subtle) !important;
 }
 
 .channel-option {
   display: flex;
   align-items: flex-start;
   gap: 0.75rem;
-  border-radius: 0.9rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(15, 23, 42, 0.36);
-  padding: 0.9rem 1rem;
-  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+  border: 1px solid var(--setup-border);
+  border-radius: 0.85rem;
+  padding: 0.85rem 0.9rem;
+  background: var(--setup-surface-2);
+  transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.channel-option:hover {
+  border-color: var(--setup-border-strong);
+  background: var(--setup-surface-hover);
 }
 
 .channel-option--active {
-  border-color: rgba(129, 140, 248, 0.45);
-  background: rgba(79, 70, 229, 0.18);
-  box-shadow: 0 0 0 1px rgba(129, 140, 248, 0.18);
+  border-color: color-mix(in srgb, var(--setup-accent) 65%, var(--setup-border));
+  background: var(--setup-accent-soft);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--setup-accent) 10%, transparent);
+}
+
+.channel-option input {
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.15rem;
+  accent-color: var(--setup-accent);
+}
+
+.setup-prompt__channel-label,
+.setup-prompt__coverage-label {
+  display: block;
+  color: var(--setup-text);
+  font-size: 0.875rem;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.setup-prompt__coverage-item {
+  min-height: 5rem;
+  border: 1px solid var(--setup-border);
+  border-radius: 0.85rem;
+  padding: 0.85rem;
+  background: var(--setup-surface-2);
+}
+
+.setup-prompt__coverage-item--disabled {
+  color: var(--setup-muted);
+}
+
+.setup-prompt__coverage-item--disabled .setup-prompt__coverage-label {
+  color: var(--setup-muted);
+}
+
+.setup-prompt__feedback {
+  margin: 0;
+  border: 1px solid var(--setup-border);
+  border-radius: 0.8rem;
+  padding: 0.8rem 0.9rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.setup-prompt__feedback--error {
+  border-color: color-mix(in srgb, var(--setup-danger) 35%, var(--setup-border));
+  background: var(--setup-danger-soft);
+  color: var(--setup-danger);
+}
+
+.setup-prompt__feedback--success {
+  border-color: color-mix(in srgb, var(--setup-success) 35%, var(--setup-border));
+  background: var(--setup-success-soft);
+  color: var(--setup-success);
+}
+
+.setup-prompt__skeleton {
+  display: flex;
+  min-height: 24rem;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.setup-prompt__skeleton-block {
+  height: 5rem;
+  border: 1px solid var(--setup-border);
+  border-radius: 1rem;
+  background: linear-gradient(90deg, var(--setup-surface-2), var(--setup-accent-soft), var(--setup-surface-2));
+  background-size: 220% 100%;
+  animation: setupShimmer 1.4s linear infinite;
+}
+
+.setup-prompt__skeleton-block--hero {
+  height: 7rem;
+}
+
+.setup-prompt__skeleton-block--short {
+  height: 3.5rem;
 }
 
 .setup-prompt__footer {
@@ -948,10 +1272,20 @@ watch(
 }
 
 .setup-prompt__footer-copy {
+  color: var(--setup-subtle);
   font-size: 0.75rem;
   line-height: 1.45;
   text-align: center;
-  color: #94a3b8;
+}
+
+.setup-prompt__footer-link {
+  color: var(--setup-accent-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.setup-prompt__footer-link:hover {
+  color: var(--setup-accent);
 }
 
 .setup-prompt__footer-actions {
@@ -965,12 +1299,34 @@ watch(
   width: 100%;
   min-height: 2.75rem;
   margin: 0 !important;
+  border-radius: 0.7rem;
+  font-weight: 700;
 }
 
-.setup-prompt__footer-button--secondary {
-  border-color: rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.96);
-  color: #4338ca;
+.setup-prompt.el-dialog .el-button--primary {
+  border-color: transparent !important;
+  background: var(--setup-accent-fill) !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 18px rgba(79, 70, 229, 0.18);
+}
+
+.setup-prompt.el-dialog .el-button--primary:hover:not(:disabled) {
+  background: var(--setup-accent-fill-hover) !important;
+  transform: translateY(-1px);
+}
+
+.setup-prompt__footer-button--secondary,
+.setup-prompt.el-dialog .el-button:not(.el-button--primary) {
+  border-color: var(--setup-border-strong) !important;
+  background: var(--setup-surface-2) !important;
+  color: var(--setup-text) !important;
+}
+
+.setup-prompt__footer-button--secondary:hover:not(:disabled),
+.setup-prompt.el-dialog .el-button:not(.el-button--primary):hover:not(:disabled) {
+  border-color: var(--setup-accent) !important;
+  background: var(--setup-surface-hover) !important;
+  color: var(--setup-accent-text) !important;
 }
 
 @media (min-width: 640px) {
@@ -999,44 +1355,55 @@ watch(
 }
 
 @media (max-width: 639px) {
-  .setup-prompt :deep(.el-dialog) {
-    margin-top: calc(env(safe-area-inset-top, 0px) + 12px) !important;
-    margin-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px) !important;
-    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px);
+  .setup-prompt.el-dialog {
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 1.5rem);
+    margin-top: calc(env(safe-area-inset-top, 0px) + 0.75rem) !important;
+    margin-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.75rem) !important;
   }
 
-  .setup-prompt :deep(.el-dialog__body) {
-    padding-left: 1rem;
-    padding-right: 1rem;
-    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  .setup-prompt.el-dialog .el-dialog__header {
+    padding: 1.1rem 3.75rem 1rem 1.1rem;
   }
 
-  .setup-prompt :deep(.el-dialog__footer) {
-    padding-top: 0.5rem;
+  .setup-prompt.el-dialog .el-dialog__body {
+    padding: 1rem 1rem 1.25rem;
+  }
+
+  .setup-prompt.el-dialog .el-dialog__footer {
+    padding: 0.85rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .setup-prompt__title {
+    font-size: 1.5rem;
   }
 
   .setup-card__header {
     flex-direction: column;
   }
+
+  .setup-prompt__timezone-value {
+    width: 100%;
+    min-width: 0;
+  }
 }
 
-@keyframes fadeIn {
+@keyframes setupDialogIn {
   from {
     opacity: 0;
-    transform: scale(0.96);
+    transform: translateY(0.5rem) scale(0.985);
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: translateY(0) scale(1);
   }
 }
 
-@keyframes setupPulse {
+@keyframes setupShimmer {
   from {
-    opacity: 0.58;
+    background-position: 200% 0;
   }
   to {
-    opacity: 0.92;
+    background-position: -20% 0;
   }
 }
 </style>
