@@ -1,5 +1,5 @@
 <template>
-  <div class="pricing-page-root marketing-light">
+  <div class="pricing-page-root pricing-page-root--light marketing-light">
     <template v-if="isAppleBillingSafeMode">
       <div class="max-w-5xl mx-auto px-4 sm:px-6 pt-8 pb-3 sm:py-16">
         <div class="rounded-3xl border border-white/10 bg-gradient-to-br from-slate-900/85 via-indigo-950/80 to-slate-900/85 p-8 sm:p-10 shadow-2xl space-y-8">
@@ -61,18 +61,23 @@
     </template>
     <template v-else>
       <div class="mx-auto max-w-5xl px-4 pb-14 pt-6 sm:px-6 sm:pt-8">
-        <section class="rounded-3xl border border-indigo-300/25 bg-gradient-to-br from-slate-900 via-indigo-950/80 to-slate-900 p-6 sm:p-8">
+        <section class="pricing-hero rounded-3xl border border-indigo-300/25 bg-gradient-to-br from-slate-900 via-indigo-950/80 to-slate-900 p-6 sm:p-8">
           <p class="text-xs uppercase tracking-[0.28em] text-indigo-200/90">Solo Premium</p>
           <h1 class="mt-2 text-3xl font-semibold text-white sm:text-4xl">Finish your first reminder loop faster</h1>
           <p class="mt-3 max-w-2xl text-sm text-indigo-100/90 sm:text-base">
             Capture tasks, get nudges, and follow through with less friction.
           </p>
+          <div v-if="!isPremium" class="pricing-benefit-row" aria-label="Solo Premium benefits">
+            <span>Unlimited AI</span>
+            <span>Smart reminders</span>
+            <span>Calendar + WhatsApp</span>
+          </div>
           <div class="mt-5 flex flex-wrap items-center gap-3">
             <button
               v-if="!isPremium"
               :disabled="loading"
               @click="onUpgrade"
-              class="inline-flex min-h-11 items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-semibold text-indigo-900 transition hover:bg-slate-100 disabled:opacity-60"
+              class="pricing-primary-cta inline-flex min-h-11 items-center justify-center rounded-xl px-5 py-3 text-sm transition disabled:opacity-60"
             >
               <span v-if="loading">Redirecting…</span>
               <span v-else>Start Premium — $2/mo</span>
@@ -94,7 +99,7 @@
             </div>
             <button
               type="button"
-              class="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white/90 transition hover:border-indigo-300/50"
+              class="pricing-secondary-cta inline-flex min-h-11 items-center justify-center rounded-xl px-5 py-3 text-sm transition"
               @click="refreshPremiumAccess"
             >
               Refresh Access
@@ -103,27 +108,28 @@
           <p v-if="offerActive && !isPremium" class="mt-3 text-xs text-indigo-100/85">
             Limited offer active: $2/month. Ends in {{ countdown }}.
           </p>
+          <p v-if="!isPremium" class="pricing-checkout-note">Secure checkout · Cancel anytime</p>
         </section>
 
-        <section class="mt-5 rounded-2xl border border-white/10 bg-slate-900/65 p-4 sm:p-5">
+        <section class="pricing-section mt-5 rounded-2xl border border-white/10 bg-slate-900/65 p-4 sm:p-5">
           <details>
-            <summary class="cursor-pointer list-none text-sm font-semibold text-white">Compare plans and features</summary>
+            <summary class="pricing-section__summary cursor-pointer list-none text-sm font-semibold text-white">Compare plans and features</summary>
             <div class="mt-4 grid gap-4 sm:grid-cols-2">
-              <div class="rounded-xl border border-white/10 bg-slate-900/85 p-4">
-                <h3 class="text-base font-semibold text-white">Solo Free</h3>
-                <p class="mt-1 text-2xl font-bold text-white">$0</p>
-                <ul class="mt-3 space-y-1 text-sm text-indigo-100/90">
+              <div class="pricing-plan-card pricing-plan-card--free rounded-xl border border-white/10 bg-slate-900/85 p-4">
+                <h3 class="pricing-plan-card__title text-base font-semibold text-white">Solo Free</h3>
+                <p class="pricing-plan-card__price mt-1 text-2xl font-bold text-white">$0</p>
+                <ul class="pricing-plan-card__features mt-3 space-y-1 text-sm text-indigo-100/90">
                   <li>Unlimited journaling</li>
                   <li>Basic AI (10 insights/mo)</li>
                   <li>No reminders</li>
                   <li>No integrations</li>
                 </ul>
               </div>
-              <div class="relative rounded-xl border border-indigo-300/40 bg-indigo-900/35 p-4">
+              <div class="pricing-plan-card pricing-plan-card--premium relative rounded-xl border border-indigo-300/40 bg-indigo-900/35 p-4">
                 <span class="premium-badge">{{ offerActive ? 'Limited Offer' : 'Most Popular' }}</span>
-                <h3 class="text-base font-semibold text-white">Solo Premium</h3>
-                <p class="mt-1 text-2xl font-bold text-white">$2 / month</p>
-                <ul class="mt-3 space-y-1 text-sm text-indigo-100/90">
+                <h3 class="pricing-plan-card__title text-base font-semibold text-white">Solo Premium</h3>
+                <p class="pricing-plan-card__price mt-1 text-2xl font-bold text-white">$2 / month</p>
+                <ul class="pricing-plan-card__features mt-3 space-y-1 text-sm text-indigo-100/90">
                   <li>Unlimited AI insights</li>
                   <li>Smart reminders</li>
                   <li>Calendar and WhatsApp integration</li>
@@ -134,7 +140,7 @@
           </details>
         </section>
 
-        <section id="teams" class="mt-5 rounded-2xl border border-white/10 bg-slate-900/65 p-4 sm:p-5">
+        <section id="teams" class="pricing-section mt-5 rounded-2xl border border-white/10 bg-slate-900/65 p-4 sm:p-5">
           <details>
             <summary class="cursor-pointer list-none text-sm font-semibold text-white">Team plans and workspace billing</summary>
             <div class="mt-4 space-y-4">
@@ -185,19 +191,19 @@
       </div>
       <div
         v-if="showMobileStickyUpgrade"
-        class="fixed inset-x-0 bottom-0 z-[60] border-t border-white/10 bg-slate-950/95 px-4 py-3 backdrop-blur sm:hidden"
+        class="pricing-mobile-cta fixed inset-x-0 bottom-0 z-[60] border-t border-white/10 bg-slate-950/95 px-4 py-3 backdrop-blur sm:hidden"
       >
         <div class="mx-auto flex max-w-5xl items-center justify-between gap-3">
           <div class="min-w-0">
-            <p class="text-[11px] uppercase tracking-[0.22em] text-indigo-200/80">Solo Premium</p>
-            <p class="truncate text-sm font-semibold text-white">
+            <p class="pricing-mobile-cta__label text-[11px] uppercase tracking-[0.22em] text-indigo-200/80">Solo Premium</p>
+            <p class="pricing-mobile-cta__price truncate text-sm font-semibold text-white">
               {{ offerActive ? '$2/mo limited offer' : '$2/mo' }}
             </p>
           </div>
           <button
             :disabled="loading"
             @click="onUpgrade"
-            class="shrink-0 rounded-lg bg-gradient-to-r from-fuchsia-500 to-indigo-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            class="pricing-primary-cta pricing-primary-cta--compact shrink-0 rounded-lg px-4 py-2 text-sm disabled:opacity-60"
           >
             {{ loading ? 'Redirecting…' : 'Upgrade' }}
           </button>
@@ -694,6 +700,146 @@ async function refreshPremiumAccess() {
 </script>
 
 <style scoped>
+.pricing-page-root.pricing-page-root--light {
+  min-height: 100%;
+  background: #f6f7fc !important;
+  color: #0f172a !important;
+}
+
+.pricing-page-root.pricing-page-root--light .pricing-hero {
+  border-color: #c7d2fe !important;
+  background: linear-gradient(135deg, #ffffff 0%, #eef2ff 100%) !important;
+  color: #0f172a !important;
+  box-shadow: 0 18px 42px rgba(79, 70, 229, 0.1);
+}
+
+.pricing-page-root.pricing-page-root--light .pricing-hero h1,
+.pricing-page-root.pricing-page-root--light .pricing-hero > p {
+  color: #0f172a !important;
+}
+
+.pricing-page-root.pricing-page-root--light .pricing-hero > p:not(.pricing-checkout-note) {
+  color: #475569 !important;
+}
+
+.pricing-benefit-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.pricing-benefit-row span {
+  border: 1px solid #c7d2fe;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.78);
+  color: #3730a3;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.pricing-primary-cta {
+  border: 1px solid rgba(79, 70, 229, 0.35) !important;
+  background: var(--pc-accent-fill) !important;
+  color: #fff !important;
+  font-weight: 800 !important;
+  box-shadow: 0 8px 18px rgba(79, 70, 229, 0.24);
+  transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.pricing-primary-cta:hover:not(:disabled) {
+  background: var(--pc-accent-fill-hover) !important;
+  box-shadow: 0 10px 24px rgba(79, 70, 229, 0.32);
+  transform: translateY(-1px);
+}
+
+.pricing-primary-cta:focus-visible {
+  outline: 3px solid rgba(99, 102, 241, 0.35);
+  outline-offset: 2px;
+}
+
+.pricing-primary-cta--compact {
+  min-height: 2.75rem;
+}
+
+.pricing-secondary-cta {
+  border: 1px solid #cbd5e1 !important;
+  background: #ffffff !important;
+  color: #334155 !important;
+  font-weight: 700 !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+}
+
+.pricing-secondary-cta:hover {
+  border-color: #818cf8 !important;
+  background: #eef2ff !important;
+  color: #3730a3 !important;
+}
+
+.pricing-checkout-note {
+  margin-top: 0.65rem;
+  color: #64748b !important;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.pricing-page-root.pricing-page-root--light .pricing-section {
+  border-color: #e2e8f0 !important;
+  background: #ffffff !important;
+  color: #0f172a !important;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.05);
+}
+
+.pricing-page-root.pricing-page-root--light .pricing-section__summary {
+  color: #0f172a !important;
+}
+
+.pricing-plan-card {
+  color: #0f172a !important;
+}
+
+.pricing-plan-card--free {
+  border-color: #e2e8f0 !important;
+  background: #ffffff !important;
+}
+
+.pricing-plan-card--premium {
+  border-color: #a5b4fc !important;
+  background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%) !important;
+  box-shadow: 0 12px 26px rgba(79, 70, 229, 0.12);
+}
+
+.pricing-plan-card__title,
+.pricing-plan-card__price {
+  color: #0f172a !important;
+}
+
+.pricing-plan-card__features,
+.pricing-plan-card__features li {
+  color: #475569 !important;
+}
+
+.pricing-page-root.pricing-page-root--light .premium-badge {
+  color: #312e81 !important;
+  background: linear-gradient(90deg, #facc15, #fbbf24) !important;
+}
+
+.pricing-mobile-cta {
+  border-top-color: #e2e8f0 !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  box-shadow: 0 -12px 32px rgba(15, 23, 42, 0.12);
+}
+
+.pricing-mobile-cta__label {
+  color: #64748b !important;
+}
+
+.pricing-mobile-cta__price {
+  color: #0f172a !important;
+}
+
 .el-notification.glass-toast {
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;

@@ -188,6 +188,7 @@
                 :to="headerBillingRoute"
                 :class="upgradePillClasses"
                 :title="upgradePillTitle"
+                :aria-label="upgradePillTitle"
                 @click="trackUpgradeClick"
               >
                 {{ upgradePillLabel }}
@@ -942,11 +943,13 @@ const upgradeBannerMessage = computed(() => (
     ? 'You have reached a Free plan limit. Existing premium access syncs automatically if this account already has it outside the app.'
     : '🚀 You\'re on the Free Plan. Upgrade to unlock unlimited AI and reminders.'
 ))
-const upgradePillLabel = computed(() => '🚀 Upgrade')
+const upgradePillLabel = computed(() => (
+  isAppleBillingSafeMode.value ? 'Open Premium' : 'Try Premium · $2/mo'
+))
 const upgradePillTitle = computed(() => (
   isAppleBillingSafeMode.value
     ? 'Open Solo Premium on iPhone or refresh access that already exists on this account.'
-    : 'Upgrade'
+    : 'Try Solo Premium for $2 per month'
 ))
 const showFreePlanHeaderBadge = computed(() => (
   isAppleBillingSafeMode.value && !isPremium.value && !isGuest.value
@@ -956,8 +959,8 @@ const premiumStatusBadgeClasses = 'rounded-full bg-[image:var(--pc-accent-fill)]
 const freePlanBadgeClasses = 'rounded-full border border-pc-border-strong bg-pc-surface px-3 py-1 text-sm font-semibold text-pc-text-muted transition hover:border-pc-accent hover:text-pc-accent-text focus:outline-none focus:ring-2 focus:ring-indigo-400/70'
 const upgradePillClasses = computed(() => (
   isAppleBillingSafeMode.value
-    ? 'rounded-full border border-pc-border-strong bg-pc-surface px-3 py-1 text-sm font-semibold text-pc-text shadow-sm transition hover:bg-pc-surface-hover'
-    : 'bg-[image:var(--pc-accent-fill)] text-white px-3 py-1 rounded-full text-sm font-semibold shadow-sm hover:bg-[image:var(--pc-accent-fill-hover)] transition'
+    ? 'header-upgrade-cta header-upgrade-cta--refresh'
+    : 'header-upgrade-cta'
 ))
 
 function goToLogin() {
@@ -1251,6 +1254,48 @@ body {
   box-sizing: border-box;
   margin: 0;
   padding-top: calc(var(--safe-area-top) + 1rem);
+}
+
+.header-upgrade-cta {
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+  border: 1px solid rgba(129, 140, 248, 0.55);
+  border-radius: 9999px;
+  background: var(--pc-accent-fill);
+  color: #fff !important;
+  padding: 0.5rem 0.875rem;
+  font-size: 0.875rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 8px 18px rgba(79, 70, 229, 0.24);
+  transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.header-upgrade-cta:hover {
+  background: var(--pc-accent-fill-hover);
+  box-shadow: 0 10px 24px rgba(79, 70, 229, 0.32);
+  transform: translateY(-1px);
+}
+
+.header-upgrade-cta:focus-visible {
+  outline: 3px solid rgba(99, 102, 241, 0.35);
+  outline-offset: 2px;
+}
+
+.header-upgrade-cta--refresh {
+  border-color: var(--pc-border-strong);
+  background: var(--pc-surface);
+  color: var(--pc-text) !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
+}
+
+.header-upgrade-cta--refresh:hover {
+  background: var(--pc-surface-hover);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.14);
 }
 
 .app-content {
