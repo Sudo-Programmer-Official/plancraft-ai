@@ -26,7 +26,7 @@
         <div class="lp-nav__actions">
           <RouterLink to="/login" class="lp-nav__signin">Sign in</RouterLink>
           <button type="button" class="lp-btn lp-btn--primary lp-btn--sm" @click="startGuestPlanner('nav')">
-            Start free
+            Try it free
           </button>
         </div>
       </div>
@@ -38,23 +38,22 @@
         <div class="lp-container lp-hero__grid">
           <div class="lp-hero__copy">
             <p class="lp-chip">
-              <span>Your thoughts</span>
+              <span>AI task planner</span>
               <ArrowRight :size="14" aria-hidden="true" />
-              <span>A clear plan</span>
+              <span>A day you can finish</span>
               <Sparkles :size="14" aria-hidden="true" class="lp-chip__spark" />
             </p>
             <h1 id="hero-title" class="lp-hero__title">
-              Say what you need to do.
-              <span class="lp-gradient-text">PlanCraft</span> turns it into a plan.
+              Turn scattered thoughts into a day you can actually finish.
             </h1>
             <p class="lp-hero__lede">
-              Speak naturally. PlanCraft creates the tasks, understands when they need to happen, and
-              reminds you when it's time. So you can focus on what matters.
+              Speak a task, meeting prep, or reminder. PlanCraftAI turns it into a realistic plan around
+              your calendar, then helps you follow through without carrying everything in your head.
             </p>
 
             <div class="lp-hero__ctas">
               <button type="button" class="lp-btn lp-btn--primary lp-btn--lg" @click="startGuestPlanner('hero')">
-                Start planning free
+                Try it free — no credit card
                 <ArrowRight :size="18" aria-hidden="true" />
               </button>
               <StoreBadges v-if="showStoreBadges" location="hero" />
@@ -111,6 +110,27 @@
               </div>
             </li>
           </ol>
+        </div>
+      </section>
+
+      <!-- Use cases -->
+      <section id="use-cases" class="lp-section lp-section--tint">
+        <div class="lp-container">
+          <header class="lp-heading">
+            <p class="lp-eyebrow">Start with the problem you have</p>
+            <h2>One calmer workflow for the moments that derail your day.</h2>
+            <p>Choose a starting point and see how PlanCraftAI fits into the way you already work.</p>
+          </header>
+
+          <div class="lp-use-cases">
+            <article v-for="item in useCases" :key="item.href" class="lp-use-case">
+              <h3>{{ item.title }}</h3>
+              <p>{{ item.desc }}</p>
+              <RouterLink :to="item.href" class="lp-use-case__link">
+                Explore {{ item.title.toLowerCase() }} <ArrowRight :size="15" aria-hidden="true" />
+              </RouterLink>
+            </article>
+          </div>
         </div>
       </section>
 
@@ -174,7 +194,7 @@
         </div>
       </section>
 
-      <!-- AI help (coming soon) -->
+      <!-- AI help -->
       <section class="lp-section">
         <div class="lp-container lp-ai">
           <div class="lp-ai__device">
@@ -189,7 +209,7 @@
           <div class="lp-ai__copy">
             <p class="lp-eyebrow">
               <Sparkles :size="13" aria-hidden="true" />
-              AI assistance · Coming soon
+              AI task help
             </p>
             <h2>Get help the moment you're stuck.</h2>
             <p>
@@ -283,7 +303,7 @@
           <p class="lp-pricing__note">
             <template v-if="isAppleBillingSafeMode">Solo Premium is billed through the App Store.</template>
             <template v-else>
-              $2.99/month when purchased in the iPhone app. Planning with a team?
+              $2/month on the web. Mobile app pricing may vary by store. Planning with a team?
               <RouterLink to="/pricing#teams">See workspace plans</RouterLink>.
             </template>
           </p>
@@ -331,10 +351,10 @@
               <p>Start free today and turn your thoughts into real progress.</p>
             </div>
             <div class="lp-cta__actions">
-              <StoreBadges v-if="showStoreBadges" location="footer_cta" lazy />
-              <button v-else type="button" class="lp-btn lp-btn--light" @click="startGuestPlanner('footer_cta')">
-                Start planning free
+              <button type="button" class="lp-btn lp-btn--light" @click="startGuestPlanner('footer_cta')">
+                Try it free
               </button>
+              <StoreBadges v-if="showStoreBadges" location="footer_cta" lazy />
             </div>
           </div>
         </div>
@@ -427,7 +447,7 @@ const featureGrid = [
   { icon: markRaw(Bell), tone: 'amber', title: 'Smart reminders', desc: 'Get nudged at the right time, on the right channel.' },
   { icon: markRaw(CalendarDays), tone: 'sky', title: 'Calendar sync', desc: 'Fit tasks around your real schedule.' },
   { icon: markRaw(Timer), tone: 'green', title: 'Focus mode', desc: 'Stay on one task and build real progress.' },
-  { icon: markRaw(Search), tone: 'pink', title: 'AI actions', desc: 'Research and next steps for any task.', soon: true },
+  { icon: markRaw(Search), tone: 'pink', title: 'AI task help', desc: 'Research and next steps for any task.' },
 ]
 
 const focusDurations = [15, 25, 45, 60]
@@ -526,17 +546,18 @@ const structuredData = [
   {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
-    name: 'PlanCraft AI',
+    name: 'PlanCraftAI',
     applicationCategory: 'ProductivityApplication',
     applicationSubCategory: 'TaskManagementApplication',
     operatingSystem: 'Web, iOS, Android',
     featureList: [...featureGrid.filter((f) => !f.soon).map((f) => f.title), ...useCases.map((c) => c.title)],
     url: BASE_URL,
+    logo: `${BASE_URL}/logo.png`,
     installUrl: `${BASE_URL}/#install`,
     sameAs: [IOS_APP_URL, ANDROID_APP_URL],
     screenshot: `${BASE_URL}/plancraftai-post-one.png`,
     description:
-      'PlanCraftAI is an AI task planner and voice reminder app with AI daily planning, calendar sync, focus sessions, and smart reminders.',
+      'PlanCraftAI is an AI task planner for voice capture, calendar-aware daily planning, focus sessions, and smart reminders.',
     offers: {
       '@type': 'Offer',
       price: '0.00',
@@ -568,9 +589,9 @@ const structuredData = [
 ]
 
 useSeoMeta({
-  title: 'PlanCraftAI | AI Task Planner, AI Daily Planner, and Voice Reminder App',
+  title: 'PlanCraftAI | AI Task Planner & Voice Reminders',
   description:
-    'Say what you need to do and PlanCraftAI turns it into a plan. Speak tasks, plan your day, focus on one thing, and get smart reminders that keep work from slipping.',
+    'Turn scattered thoughts into a realistic day with PlanCraftAI, an AI task planner for voice capture, calendar-aware planning, and smart reminders.',
   keywords: [
     'PlanCraft AI',
     'AI task planner',
@@ -597,10 +618,12 @@ function startGuestPlanner(entry = 'landing') {
   } catch {
     /* analytics optional */
   }
-  // Start free is an authenticated product entry point. Sending anonymous
-  // visitors through the guest bootstrap first made a failed guest request
-  // surface a second, confusing sign-in step on mobile.
-  router.push({ path: '/login', query: { next: '/today', source: 'landing' } })
+  // Let visitors experience the first plan before asking them to create an
+  // account. GuestOnboarding handles saving the plan after this first win.
+  router.push({
+    path: '/signup',
+    query: { guest: '1', guestFromLanding: '1', source: entry },
+  })
 }
 
 onMounted(() => {
@@ -1047,6 +1070,64 @@ onMounted(() => {
   color: var(--muted);
   font-size: 0.93rem;
   line-height: 1.55;
+}
+
+/* ---------- Use cases ---------- */
+.lp-use-cases {
+  display: grid;
+  gap: 16px;
+}
+
+@media (min-width: 640px) {
+  .lp-use-cases {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .lp-use-cases {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.lp-use-case {
+  display: flex;
+  flex-direction: column;
+  min-height: 210px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: 0 12px 30px -24px rgba(15, 23, 42, 0.5);
+}
+
+.lp-use-case h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 750;
+}
+
+.lp-use-case p {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.lp-use-case__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 20px;
+  color: var(--brand-strong);
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.lp-use-case__link:hover {
+  color: var(--violet);
 }
 
 /* ---------- Features ---------- */
@@ -1571,6 +1652,14 @@ onMounted(() => {
 .lp-cta__copy p {
   margin: 6px 0 0;
   color: #c7d2fe;
+}
+
+.lp-cta__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
 }
 
 /* ---------- Footer ---------- */

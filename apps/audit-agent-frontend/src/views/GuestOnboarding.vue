@@ -157,6 +157,8 @@ import { useAuthStore } from '@/stores/authStore'
 import TaskPlannerDialog from '@/components/TaskPlannerDialog.vue'
 import VoiceRecorder from '@/components/VoiceRecorder.vue'
 import {
+  trackGuestCompletedOnboarding,
+  trackGuestReachedSignup,
   trackFirstCaptureStarted,
   trackFirstTaskCreated,
   trackSavePlanPromptAction,
@@ -202,6 +204,9 @@ async function preparePlanningSpace() {
     }
     if (!authStore.user?.uid) await authStore.loginAsGuest()
     ready.value = true
+    trackGuestReachedSignup({
+      source: route.query.guestFromLanding === '1' ? 'landing' : 'direct',
+    })
     trackFirstCaptureStarted({
       source: route.query.guestFromLanding === '1' ? 'landing' : 'direct',
     })
@@ -222,6 +227,10 @@ function onPlanSaved(tasks = []) {
   starting.value = false
   showPlanner.value = false
   planReady.value = true
+  trackGuestCompletedOnboarding({
+    source: 'first_capture',
+    task_count: tasks.length,
+  })
   trackFirstTaskCreated({ source: 'first_capture', task_count: tasks.length, guest: true })
   trackSavePlanPromptShown({ task_count: tasks.length, source: 'first_capture' })
 }
