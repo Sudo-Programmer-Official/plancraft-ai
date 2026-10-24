@@ -240,7 +240,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElNotification } from 'element-plus'
 import { useAuthStore } from '@/stores/authStore'
 import { useAccessStore } from '@/stores/accessStore'
@@ -258,6 +258,7 @@ import AppleSoloPremiumCard from '@/components/AppleSoloPremiumCard.vue'
 const authStore = useAuthStore()
 const accessStore = useAccessStore()
 const workspaceStore = useWorkspaceStore()
+const route = useRoute()
 const router = useRouter()
 const isAppleBillingSafeMode = detectAppleBillingSafeMode()
 const billingSafeRoute = '/billing/upgrade'
@@ -327,16 +328,22 @@ const isAppleManagedPremium = computed(() => {
 
 const dialogVisible = ref(false)
 const showMobileStickyUpgrade = computed(() => !isAppleBillingSafeMode && !isPremium.value)
+const funnelSource = computed(() => {
+  const source = route.query?.source
+  return typeof source === 'string' && source.trim() ? source.trim().slice(0, 80) : 'direct'
+})
 
 function trackSubscriptionFunnel(step, extra = {}) {
   trackEvent(`subscription_funnel_${step}`, {
     surface: 'subscription_page',
+    source: funnelSource.value,
     is_apple_billing_mode: !!isAppleBillingSafeMode,
     is_premium: !!isPremium.value,
     ...extra,
   })
   trackMonetizationStep(step, {
     surface: 'subscription_page',
+    source: funnelSource.value,
     scope: 'solo',
     provider: isAppleBillingSafeMode ? 'apple' : 'stripe',
     ...extra,

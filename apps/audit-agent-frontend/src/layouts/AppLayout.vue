@@ -208,6 +208,17 @@
             aria-hidden="true"
           ></div>
 
+          <!-- Admin shortcut: only show it after the user's Firestore role is loaded. -->
+          <RouterLink
+            v-if="isAdmin"
+            to="/admin"
+            class="inline-flex items-center gap-1.5 rounded-full border border-amber-300/60 bg-amber-50 px-3 py-1.5 text-sm font-semibold text-amber-800 transition hover:border-amber-400 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-400/70"
+            aria-label="Open admin panel"
+          >
+            <span aria-hidden="true">🛠</span>
+            <span class="hidden sm:inline">Admin</span>
+          </RouterLink>
+
           <!-- User Avatar -->
           <button
             v-if="authStore.isLoggedIn"
@@ -321,6 +332,7 @@ import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
 import { isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
 import { fetchUserProfile } from '@/services/authService'
 import { fetchActionInbox, syncActionInbox } from '@/services/actionInboxService'
+import { EVENTS, trackEvent, trackMonetizationStep } from '@/services/analytics'
 
 const currentUserId = ref(null)
 const viewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1440)
@@ -427,6 +439,7 @@ const { isPremium, isGuest } = useAuthFlags()
 const { isReady, isShellReady, isAuthReady, isWorkspaceHydrated, hasResolvedWorkspace } = useAppReady()
 const authReady = computed(() => !authStore.bootstrapping)
 const showLogoutOverlay = computed(() => authStore.logoutPending === true)
+const isAdmin = computed(() => String(authStore.user?.role || '').toLowerCase() === 'admin')
 
 // --- PlanCraft Design System shell (one navigation for every signed-in page) ---
 const focus = useFocusStore()
@@ -996,9 +1009,26 @@ async function maybeShowPremiumActivation() {
   }
 
   premiumActivationOpen.value = true
+  const funnelContext = {
+    surface: 'task_value_prompt',
+    trigger: 'task_created',
+    scope: 'solo',
+    provider: isAppleBillingSafeMode.value ? 'apple' : 'stripe',
+  }
+  trackEvent('premium_activation_prompt_shown', funnelContext)
+  trackEvent(EVENTS.PAYWALL_VIEWED, funnelContext)
 }
 
 function handlePremiumActivationUpgrade() {
+  const funnelContext = {
+    surface: 'task_value_prompt',
+    trigger: 'task_created',
+    scope: 'solo',
+    provider: isAppleBillingSafeMode.value ? 'apple' : 'stripe',
+    cta: 'start_premium',
+  }
+  trackEvent('premium_activation_prompt_cta_clicked', funnelContext)
+  trackMonetizationStep('cta_click', funnelContext)
   trackUpgradeClick()
   router.push({
     path: billingRoutePath.value,
@@ -1006,7 +1036,13 @@ function handlePremiumActivationUpgrade() {
   }).catch(() => {})
 }
 
-function handlePremiumActivationDismissed() {
+function handlePremiumActivationDismissed(reason = 'not_now') {
+  trackEvent('premium_activation_prompt_dismissed', {
+    surface: 'task_value_prompt',
+    trigger: 'task_created',
+    scope: 'solo',
+    reason,
+  })
   premiumActivationOpen.value = false
 }
 
