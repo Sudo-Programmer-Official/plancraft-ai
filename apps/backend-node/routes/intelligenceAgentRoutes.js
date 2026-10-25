@@ -13,8 +13,6 @@ import {
 
 const router = express.Router()
 
-router.use(requireAuth)
-
 async function requireIntelligenceAccess(req, res, next) {
   try {
     const flags = await getRemoteFeatureFlags()
@@ -36,7 +34,11 @@ async function requireIntelligenceAccess(req, res, next) {
   }
 }
 
-router.use(requireIntelligenceAccess)
+// Scope authentication and the Intelligence premium gate to this router's
+// Intelligence endpoints. This router is mounted at `/api`, so a root-level
+// `router.use(requireIntelligenceAccess)` would incorrectly gate unrelated
+// routes such as `/api/workspaces` and `/api/feature-flags` for free users.
+router.use('/intelligence', requireAuth, requireIntelligenceAccess)
 
 router.get('/intelligence/agents', async (req, res) => {
   try {
