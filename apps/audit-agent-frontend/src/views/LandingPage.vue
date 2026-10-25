@@ -57,7 +57,19 @@
                 Try it free — no credit card
                 <ArrowRight :size="18" aria-hidden="true" />
               </button>
-              <StoreBadges v-if="showStoreBadges" location="hero" />
+              <div class="lp-web-pwa-cta" aria-label="Web app and PWA access">
+                <div class="lp-web-pwa-cta__copy">
+                  <strong>Web app + installable PWA</strong>
+                  <span>Use it in your browser or add it to your home screen.</span>
+                </div>
+                <button v-if="canInstall" type="button" class="lp-btn lp-btn--outline lp-btn--sm" @click="installPwa('hero')">
+                  Install PWA
+                </button>
+                <RouterLink v-else to="/signup?guest=1&source=landing_web" class="lp-btn lp-btn--outline lp-btn--sm">
+                  Open web app
+                </RouterLink>
+                <span v-if="installHint" class="lp-web-pwa-cta__hint" role="status">{{ installHint }}</span>
+              </div>
             </div>
 
             <ul class="lp-trust" aria-label="Highlights">
@@ -339,7 +351,7 @@
           <p class="lp-pricing__note">
             <template v-if="isAppleBillingSafeMode">Solo Premium is billed through the App Store.</template>
             <template v-else>
-              {{ premiumPriceNote }} Mobile app pricing may vary by store. Planning with a team?
+              {{ premiumPriceNote }} Web and PWA access stays in sync across your devices. Planning with a team?
               <RouterLink to="/pricing#teams">See workspace plans</RouterLink>.
             </template>
           </p>
@@ -390,7 +402,18 @@
               <button type="button" class="lp-btn lp-btn--light" @click="startGuestPlanner('footer_cta')">
                 Try it free
               </button>
-              <StoreBadges v-if="showStoreBadges" location="footer_cta" lazy />
+              <div class="lp-web-pwa-cta lp-web-pwa-cta--dark" aria-label="Web app and PWA access">
+                <div class="lp-web-pwa-cta__copy">
+                  <strong>Web app + installable PWA</strong>
+                  <span>No app-store update cycle required.</span>
+                </div>
+                <button v-if="canInstall" type="button" class="lp-btn lp-btn--light lp-btn--sm" @click="installPwa('footer_cta')">
+                  Install PWA
+                </button>
+                <RouterLink v-else to="/signup?guest=1&source=landing_web" class="lp-btn lp-btn--light lp-btn--sm">
+                  Open web app
+                </RouterLink>
+              </div>
             </div>
           </div>
         </div>
@@ -434,12 +457,11 @@ import {
   Trash2,
 } from 'lucide-vue-next'
 import ScreenshotSlot from '@/components/marketing/ScreenshotSlot.vue'
-import StoreBadges from '@/components/marketing/StoreBadges.vue'
 import { useSeoMeta } from '@/composables/useSeoMeta'
 import { EVENTS, trackEvent, trackGuestStartFromLanding } from '@/services/analytics'
 import { useAuthStore } from '@/stores/authStore'
 import { isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
-import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
+import { useInstallApp } from '@/composables/useInstallApp'
 import { ANDROID_APP_URL, IOS_APP_URL } from '@/constants/appStores'
 import {
   FOUNDING_MONTHLY_PRICE,
@@ -450,6 +472,7 @@ import {
 
 const router = useRouter()
 const authStore = useAuthStore()
+const { canInstall, install } = useInstallApp()
 const isAppleBillingSafeMode = computed(() => detectAppleBillingSafeMode())
 const billingRoutePath = computed(() => (isAppleBillingSafeMode.value ? '/billing/upgrade' : '/pricing'))
 const premiumPrice = computed(() => {
@@ -461,8 +484,7 @@ const premiumPriceNote = computed(() => {
   if (FOUNDING_OFFER_CONFIGURED) return `${formatUsd(FOUNDING_MONTHLY_PRICE)}/month founding rate on the web.`
   return `${formatUsd(STANDARD_MONTHLY_PRICE)}/month on the web.`
 })
-// Store badges make no sense inside the installed app itself.
-const showStoreBadges = ref(true)
+const installHint = ref('')
 const currentYear = new Date().getFullYear()
 
 const trustPoints = ['No credit card needed', 'Next actions, not just lists', 'Live research when you ask']
@@ -547,7 +569,7 @@ const privacyPoints = [
 ]
 
 // Mirrors the plan comparison on /pricing.
-const freePlan = ['Unlimited journaling', 'Basic AI (10 insights a month)', 'Focus sessions', 'Web, iPhone and Android apps']
+const freePlan = ['Unlimited journaling', 'Basic AI (10 insights a month)', 'Focus sessions', 'Web app and installable PWA']
 const premiumPlan = ['AI planning plus 30 Intelligence research runs/month', 'Premium Intelligence agents', 'Smart reminders', 'Calendar and WhatsApp integration', 'Priority support']
 
 const useCases = [
@@ -755,8 +777,22 @@ function startGuestPlanner(entry = 'landing') {
   })
 }
 
+async function installPwa(location = 'landing') {
+  installHint.value = ''
+  try {
+    trackEvent('pwa_install_cta_clicked', { location })
+    const result = await install()
+    if (result === 'ios-instructions') {
+      installHint.value = 'In Safari, tap Share → Add to Home Screen.'
+    } else if (result === 'unavailable') {
+      router.push({ path: '/signup', query: { guest: '1', source: 'landing_web' } })
+    }
+  } catch {
+    installHint.value = 'Open this page in Safari or Chrome to install PlanCraftAI.'
+  }
+}
+
 onMounted(() => {
-  showStoreBadges.value = !isNativePackagedApp()
   trackEvent(EVENTS.LANDING_VIEW)
 })
 </script>
@@ -1015,6 +1051,63 @@ onMounted(() => {
   align-items: center;
   gap: 14px 16px;
   margin-top: 32px;
+}
+
+.lp-web-pwa-cta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  max-width: 420px;
+  padding: 10px 12px;
+  border: 1px solid #e0e7ff;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.lp-web-pwa-cta__copy {
+  display: grid;
+  gap: 2px;
+  min-width: 190px;
+}
+
+.lp-web-pwa-cta__copy strong {
+  color: var(--ink);
+  font-size: 0.82rem;
+}
+
+.lp-web-pwa-cta__copy span,
+.lp-web-pwa-cta__hint {
+  color: var(--subtle);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.lp-web-pwa-cta__hint {
+  flex-basis: 100%;
+}
+
+.lp-web-pwa-cta--dark {
+  border-color: rgba(199, 210, 254, 0.35);
+  background: rgba(15, 23, 42, 0.28);
+}
+
+.lp-web-pwa-cta--dark .lp-web-pwa-cta__copy strong {
+  color: #fff;
+}
+
+.lp-web-pwa-cta--dark .lp-web-pwa-cta__copy span {
+  color: #c7d2fe;
+}
+
+@media (max-width: 560px) {
+  .lp-web-pwa-cta {
+    width: 100%;
+  }
+
+  .lp-web-pwa-cta .lp-btn {
+    flex: 1;
+  }
 }
 
 .lp-trust {

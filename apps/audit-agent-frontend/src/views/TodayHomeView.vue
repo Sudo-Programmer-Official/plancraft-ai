@@ -196,7 +196,7 @@
                 <span>Agent</span>
                 <select v-model="taskResearchAgentId" :disabled="taskResearchLoading" class="today__research-select" @focus="loadTaskResearchAgents">
                   <option v-for="agent in taskResearchAgents" :key="agent.id" :value="agent.id">
-                    {{ agent.label || agent.name }}{{ agent.custom ? ' · Mine' : '' }}
+                    {{ agent.label || agent.name }}{{ agent.id === 'general-task-helper' ? ' · Default' : agent.custom ? ' · Mine' : '' }}
                   </option>
                 </select>
               </label>
@@ -355,7 +355,6 @@ import { toLocalDateKey } from '@/utils/dateHelper'
 import { getEffectiveUserTimezone } from '@/utils/userTimezone'
 import { EVENTS, trackEvent } from '@/services/analytics'
 
-const TASK_INTELLIGENCE_PREFERENCES_KEY = 'plancraft-intelligence-preferences'
 const TASK_RESEARCH_CACHE_TTL_MS = 30 * 60 * 1000
 const WORKSPACE_AI_CACHE_TTL_MS = 20 * 60 * 1000
 const intelligenceMarkdown = new MarkdownIt({ html: false, linkify: true, breaks: true })
@@ -495,16 +494,7 @@ function sheetSubtitle(task) {
 }
 
 function preferredTaskResearchAgentId() {
-  if (typeof window === 'undefined') return 'tech-frontier'
-  try {
-    const saved = JSON.parse(localStorage.getItem(TASK_INTELLIGENCE_PREFERENCES_KEY) || '{}')
-    const preferred = saved.activeAgentId && saved.activeAgentId !== 'all'
-      ? saved.activeAgentId
-      : Array.isArray(saved.agentIds) ? saved.agentIds[0] : ''
-    return INTELLIGENCE_AGENTS.some((agent) => agent.id === preferred) ? preferred : 'tech-frontier'
-  } catch {
-    return 'tech-frontier'
-  }
+  return 'general-task-helper'
 }
 
 async function askWorkspaceSummaryEfficient({ workspaceId, question, cacheKey, ttlMs = WORKSPACE_AI_CACHE_TTL_MS }) {

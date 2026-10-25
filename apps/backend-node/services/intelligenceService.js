@@ -15,6 +15,21 @@ const specialistCache = new Map()
 const specialistInflight = new Map()
 
 const AGENT_PROFILES = {
+  'general-task-helper': {
+    id: 'general-task-helper',
+    label: 'General task helper',
+    description: 'Find the current context, resources, and next steps for this task.',
+    searchQuery:
+      'current public information, practical resources, relevant places, people, services, deadlines, and next steps that can help complete the user task described below',
+    instructions: [
+      'Act as a general-purpose task research assistant.',
+      'Use the task title, notes, and user question to determine what information would genuinely unblock progress.',
+      'Return the most useful current facts, links, places, tools, contacts, requirements, or preparation steps for this specific task.',
+      'If the task involves travel or a destination, prioritize current location, route, hours, booking, or access information from reliable public sources.',
+      'If the task is not researchable or current web information would not help, say so and give a practical next action instead.',
+      'Separate confirmed facts from suggestions and clearly call out missing or uncertain information.',
+    ],
+  },
   'tech-news': {
     id: 'tech-news',
     label: 'Tech news',
@@ -266,7 +281,7 @@ export function listIntelligenceAgents() {
 
 export function normalizeAgentIds(value) {
   const normalized = normalizeRequestedAgentIds(value)
-  return normalized.length ? normalized : ['tech-news', 'capital-flows']
+  return normalized.length ? normalized : ['general-task-helper']
 }
 
 function normalizeRequestedAgentIds(value) {
@@ -450,14 +465,19 @@ async function synthesizeBrief(results, { question = '', interests = '', goalCon
     .join('\n\n---\n\n')
 
   const goalMode = Boolean(goalContext?.title)
+  const generalTaskMode = results.some((result) => result.id === 'general-task-helper')
   const frontierMode = results.some((result) => result.id === 'tech-frontier')
   const prompt = [
     goalMode
       ? `Create a concise goal watchlist brief for the PlanCraft goal "${goalContext.title}".`
+      : generalTaskMode
+        ? 'Create a concise, task-specific research answer that helps the user make progress now.'
       : 'Create a concise morning intelligence brief for a tech-focused user.',
     'Use only the specialist research packets below; do not add outside facts.',
     goalMode
       ? 'Lead with the 3 to 5 most important external signals, explain exactly why each matters to this goal, and identify a practical next move only when the evidence supports it.'
+      : generalTaskMode
+        ? 'Lead with the most useful current facts or resources for this task, then give a short ordered list of practical next steps. Do not force a technology or market angle when the task does not need one.'
       : 'Lead with the 3 to 5 most important signals, explain why each matters to a builder or operator, and call out disagreements or low-confidence items.',
     frontierMode
       ? 'For the technology frontier material, include a compact comparison of Company, active project or research, latest evidence and date, strategic edge, and leadership status with confidence. Do not rank companies without evidence and do not present private-roadmap speculation as fact.'

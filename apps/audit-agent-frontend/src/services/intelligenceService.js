@@ -3,6 +3,11 @@ import { nlpClient } from '@/services/leader/http'
 
 export const INTELLIGENCE_AGENTS = [
   {
+    id: 'general-task-helper',
+    label: 'General task helper',
+    description: 'Find the current context, resources, and next steps for this task',
+  },
+  {
     id: 'tech-news',
     label: 'Tech news',
     description: 'What changed in technology today',
