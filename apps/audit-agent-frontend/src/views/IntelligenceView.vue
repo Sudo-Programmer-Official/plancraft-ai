@@ -1,6 +1,6 @@
 <template>
   <div class="intelligence-page min-h-full overflow-y-auto bg-pc-bg text-pc-text">
-    <div class="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+    <div class="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 pb-20 sm:px-6 md:pb-6 lg:px-8 lg:py-8">
       <section class="overflow-hidden rounded-3xl border border-pc-border bg-pc-surface shadow-pc-card">
         <div class="relative p-5 sm:p-8">
           <div class="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-indigo-400/10 blur-3xl" />
@@ -50,7 +50,21 @@
           </nav>
         </div>
 
-        <div class="border-t border-pc-border bg-pc-surface-2/60 p-5 sm:p-6">
+        <details :open="!brief" class="border-t border-pc-border bg-pc-surface-2/60">
+          <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-3.5 sm:px-6">
+            <span class="min-w-0">
+              <span class="eyebrow">Research controls</span>
+              <span class="mt-1 block truncate text-sm font-semibold text-pc-text">
+                {{ activeAgent ? `Focused on ${activeAgent.label}` : 'Tune the combined intelligence brief' }}
+              </span>
+            </span>
+            <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-pc-border bg-pc-surface px-3 py-1.5 text-xs font-semibold text-pc-text-muted">
+              {{ brief ? 'Adjust' : 'Set your angle' }}
+              <ChevronDown :size="14" aria-hidden="true" />
+            </span>
+          </summary>
+
+          <div class="border-t border-pc-border bg-pc-surface-2/60 p-5 sm:p-6">
           <div v-if="activeAgent" class="mb-5 flex flex-col gap-3 rounded-2xl border border-pc-accent-border bg-pc-accent-soft/50 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div class="min-w-0">
               <span class="eyebrow text-pc-accent-text">Agent workspace</span>
@@ -179,7 +193,8 @@
               <RefreshCw :size="13" aria-hidden="true" /> Run agent
             </button>
           </div>
-        </div>
+          </div>
+        </details>
       </section>
 
       <div v-if="error" class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
@@ -195,18 +210,29 @@
           <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p class="eyebrow">Editor’s brief</p>
-              <h2 class="mt-2 text-2xl font-semibold tracking-tight text-pc-text">What deserves your attention</h2>
+              <h2 class="mt-2 text-2xl font-semibold tracking-tight text-pc-text">{{ activeAgent ? activeAgent.label : 'What deserves your attention' }}</h2>
+              <p class="mt-1 text-sm text-pc-text-muted">The clearest, source-backed view of what changed and why it matters.</p>
             </div>
-            <span class="inline-flex items-center gap-1.5 self-start rounded-full border border-pc-border bg-pc-surface-2 px-3 py-1.5 text-xs text-pc-text-muted">
+            <span class="inline-flex items-center gap-1.5 self-start rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
               <span class="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />
-              {{ formatTime(brief.generatedAt) }}
+              Updated {{ formatTime(brief.generatedAt) }}
             </span>
           </div>
+          <div class="mt-5 flex flex-wrap items-center gap-2 text-xs text-pc-text-muted">
+            <span class="rounded-full border border-pc-border bg-pc-surface-2 px-2.5 py-1.5">{{ brief.agents?.length || 0 }} agent{{ brief.agents?.length === 1 ? '' : 's' }}</span>
+            <span class="rounded-full border border-pc-border bg-pc-surface-2 px-2.5 py-1.5">{{ brief.sources?.length || 0 }} citations</span>
+            <span v-if="brief.failures?.length" class="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-amber-700">{{ brief.failures.length }} source gap{{ brief.failures.length === 1 ? '' : 's' }}</span>
+            <span class="ml-auto hidden items-center gap-1.5 text-pc-text-subtle sm:inline-flex"><ShieldCheck :size="14" aria-hidden="true" /> Public sources only</span>
+          </div>
           <div
-            class="mt-5 overflow-hidden text-sm leading-7 text-pc-text transition-[max-height] sm:text-base [&_a]:text-pc-accent-text [&_a]:underline [&_h1]:mb-3 [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:mb-2 [&_h2]:mt-5 [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:mb-2 [&_h3]:mt-4 [&_h3]:text-base [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_p]:mb-3 [&_strong]:font-semibold"
+            class="mt-5 overflow-hidden text-sm leading-7 text-pc-text transition-[max-height] sm:text-base"
             :class="expandedSynthesis ? 'max-h-none' : 'max-h-80'"
-            v-html="renderMarkdown(brief.synthesis)"
-          />
+          >
+            <div
+              class="overflow-x-auto overscroll-x-contain [&_a]:text-pc-accent-text [&_a]:underline [&_h1]:mb-3 [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:mb-2 [&_h2]:mt-5 [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:mb-2 [&_h3]:mt-4 [&_h3]:text-base [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_p]:mb-3 [&_strong]:font-semibold [&_table]:my-4 [&_table]:min-w-[640px] [&_table]:w-full [&_table]:border-collapse [&_th]:border-b [&_th]:border-pc-border [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:text-xs [&_th]:font-semibold [&_th]:text-pc-text-muted [&_td]:border-b [&_td]:border-pc-border [&_td]:px-3 [&_td]:py-3 [&_td]:align-top"
+              v-html="renderMarkdown(brief.synthesis)"
+            />
+          </div>
           <button
             v-if="brief.synthesis?.length > 1200"
             type="button"
@@ -216,6 +242,28 @@
             {{ expandedSynthesis ? 'Show less' : 'Read full brief' }}
             <ChevronDown :size="14" :class="{ 'rotate-180': expandedSynthesis }" aria-hidden="true" />
           </button>
+          <div v-if="brief.sources?.length" class="mt-6 border-t border-pc-border pt-4">
+            <div class="flex items-center justify-between gap-3">
+              <p class="eyebrow">Top references</p>
+              <span class="hidden text-xs text-pc-text-subtle sm:inline">Open the evidence behind this brief</span>
+            </div>
+            <div class="mt-3 flex gap-2 overflow-x-auto pb-1">
+              <a
+                v-for="source in brief.sources.slice(0, 5)"
+                :key="source.url"
+                :href="source.url"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="group flex min-w-[190px] max-w-[260px] shrink-0 items-center gap-2 rounded-xl border border-pc-border bg-pc-surface-2 px-3 py-2.5 text-xs text-pc-text-muted transition hover:border-pc-accent-border hover:bg-pc-accent-soft hover:text-pc-accent-text"
+              >
+                <span class="flex min-w-0 flex-1 flex-col">
+                  <span class="truncate font-semibold text-pc-text">{{ source.title }}</span>
+                  <span class="mt-0.5 truncate text-[11px] text-pc-text-subtle">{{ sourceDomain(source.url) }}</span>
+                </span>
+                <ArrowUpRight :size="14" class="shrink-0 transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden="true" />
+              </a>
+            </div>
+          </div>
         </section>
 
         <section v-if="brief.suggestedTasks?.length" class="rounded-3xl border border-pc-accent-border bg-pc-accent-soft/40 p-5 shadow-pc-card sm:p-6">
@@ -249,7 +297,19 @@
           </div>
         </section>
 
-        <section class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <details class="rounded-3xl border border-pc-border bg-pc-surface p-5 shadow-pc-card sm:p-6">
+          <summary class="flex cursor-pointer list-none items-center justify-between gap-3">
+            <div>
+              <p class="eyebrow">Evidence layer</p>
+              <h2 class="mt-2 text-xl font-semibold text-pc-text">Research packets from each agent</h2>
+              <p class="mt-1 text-sm text-pc-text-muted">Open the underlying findings when you want to inspect the reasoning.</p>
+            </div>
+            <span class="inline-flex shrink-0 items-center gap-2 rounded-full border border-pc-border bg-pc-surface-2 px-3 py-1.5 text-xs font-semibold text-pc-text-muted">
+              {{ brief.agents?.length || 0 }} packets
+              <ChevronDown :size="14" aria-hidden="true" />
+            </span>
+          </summary>
+          <div class="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
           <article
             v-for="agent in brief.agents || []"
             :key="agent.id"
@@ -264,10 +324,14 @@
               <Sparkles :size="20" class="shrink-0 text-pc-accent" aria-hidden="true" />
             </div>
             <div
-              class="mt-5 overflow-hidden text-sm leading-6 text-pc-text-muted transition-[max-height] [&_a]:text-pc-accent-text [&_a]:underline [&_h1]:mb-2 [&_h1]:text-lg [&_h1]:font-semibold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-base [&_h2]:font-semibold [&_h3]:mb-2 [&_h3]:mt-3 [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_p]:mb-2 [&_strong]:font-semibold"
+              class="mt-5 overflow-hidden text-sm leading-6 text-pc-text-muted transition-[max-height]"
               :class="expandedAgents[agent.id] ? 'max-h-none' : 'max-h-72'"
-              v-html="renderMarkdown(agent.text)"
-            />
+            >
+              <div
+                class="overflow-x-auto overscroll-x-contain [&_a]:text-pc-accent-text [&_a]:underline [&_h1]:mb-2 [&_h1]:text-lg [&_h1]:font-semibold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-base [&_h2]:font-semibold [&_h3]:mb-2 [&_h3]:mt-3 [&_h3]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_p]:mb-2 [&_strong]:font-semibold [&_table]:my-3 [&_table]:min-w-[640px] [&_table]:w-full [&_table]:border-collapse [&_th]:border-b [&_th]:border-pc-border [&_th]:px-2 [&_th]:py-2 [&_th]:text-left [&_th]:text-xs [&_th]:font-semibold [&_th]:text-pc-text-muted [&_td]:border-b [&_td]:border-pc-border [&_td]:px-2 [&_td]:py-2 [&_td]:align-top"
+                v-html="renderMarkdown(agent.text)"
+              />
+            </div>
             <button
               v-if="agent.text?.length > 900"
               type="button"
@@ -297,7 +361,8 @@
               </div>
             </details>
           </article>
-        </section>
+          </div>
+        </details>
 
         <details v-if="brief.sources?.length" :open="expandedSources" class="rounded-3xl border border-pc-border bg-pc-surface p-5 shadow-pc-card sm:p-6" @toggle="expandedSources = $event.target.open">
           <summary class="flex cursor-pointer list-none items-center justify-between gap-3">
@@ -332,6 +397,25 @@
         <p class="mx-auto mt-2 max-w-lg text-sm leading-6 text-pc-text-muted">Choose the specialists you want, add your angle, and run a source-backed brief.</p>
         <button type="button" class="mt-5 rounded-xl bg-[image:var(--pc-accent-fill)] px-4 py-2.5 text-sm font-semibold text-white shadow-pc-button" @click="refreshBrief">Run first brief</button>
       </section>
+    </div>
+
+    <div v-if="brief" class="fixed inset-x-0 bottom-0 z-40 border-t border-pc-border bg-pc-surface/95 p-2.5 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-md md:hidden">
+      <form class="mx-auto flex max-w-2xl items-center gap-2" @submit.prevent="refreshBrief">
+        <label class="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-pc-border-strong bg-pc-surface-2 px-3 py-2.5 focus-within:border-pc-accent">
+          <Search :size="16" class="shrink-0 text-pc-text-subtle" aria-hidden="true" />
+          <span class="sr-only">Ask this agent</span>
+          <input
+            v-model="question"
+            type="text"
+            maxlength="500"
+            class="min-w-0 flex-1 bg-transparent text-sm text-pc-text outline-none placeholder:text-pc-text-subtle"
+            :placeholder="activeAgent ? `Ask ${activeAgent.label}…` : 'Ask your intelligence desk…'"
+          />
+        </label>
+        <button type="submit" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[image:var(--pc-accent-fill)] text-white shadow-pc-button disabled:cursor-not-allowed disabled:opacity-50" :disabled="loading" aria-label="Ask this agent">
+          <RefreshCw :size="16" :class="{ 'animate-spin': loading }" aria-hidden="true" />
+        </button>
+      </form>
     </div>
 
     <div
@@ -451,7 +535,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import MarkdownIt from 'markdown-it'
-import { ArrowUpRight, ChevronDown, Pencil, Plus, RefreshCw, Search, SlidersHorizontal, Sparkles, Trash2, X } from 'lucide-vue-next'
+import { ArrowUpRight, ChevronDown, Pencil, Plus, RefreshCw, Search, ShieldCheck, SlidersHorizontal, Sparkles, Trash2, X } from 'lucide-vue-next'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/authStore'
 import { addTaskToFirebase } from '@/services/firebaseService'
@@ -756,6 +840,14 @@ function formatTime(value) {
     return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(new Date(value))
   } catch {
     return 'Just now'
+  }
+}
+
+function sourceDomain(value) {
+  try {
+    return new URL(value).hostname.replace(/^www\./, '')
+  } catch {
+    return 'Reference source'
   }
 }
 
