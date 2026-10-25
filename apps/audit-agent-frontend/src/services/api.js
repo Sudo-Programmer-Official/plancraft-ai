@@ -1,8 +1,9 @@
 // src/services/api.js
 import axios from 'axios'
+import { signOut } from 'firebase/auth'
 import { auth } from '@/firebase/init'
 import { getAppToken } from '@/services/appTokenService'
-import { readNativeIosAuthSnapshot } from '@/utils/authStorage'
+import { clearStoredAuthArtifacts, readNativeIosAuthSnapshot } from '@/utils/authStorage'
 import { getEffectiveUserTimezone } from '@/utils/userTimezone'
 
 // Base API points to Vite proxy '/api' in dev
@@ -59,6 +60,7 @@ function withTimeout(promise, ms = 5000) {
 }
 
 let firebaseTokenRefreshPromise = null
+let sessionExpiryRedirectStarted = false
 
 function tokenExpiryMs(token) {
   try {
@@ -85,6 +87,39 @@ function persistFirebaseToken(token) {
   if (!isUsableBearerToken(token)) return null
   try { localStorage.setItem('token', token) } catch { /* storage is optional */ }
   return token
+}
+
+function isTerminalAuthError(error) {
+  const code = String(error?.code || '').toLowerCase()
+  const message = String(error?.message || '').toLowerCase()
+  return [
+    'auth/id-token-expired',
+    'auth/user-token-expired',
+    'auth/invalid-user-token',
+    'auth/invalid-refresh-token',
+    'auth/user-disabled',
+    'auth/user-not-found',
+  ].includes(code) || /(?:token|session).*(?:expired|revoked|invalid)/i.test(message)
+}
+
+function isAuthRefreshRequest(config) {
+  return /(?:^|\/)auth\/refresh(?:$|\?)/i.test(String(config?.url || ''))
+}
+
+function redirectToLoginForExpiredSession() {
+  if (typeof window === 'undefined' || sessionExpiryRedirectStarted) return
+  if (window.location.pathname === '/login') return
+  sessionExpiryRedirectStarted = true
+
+  const currentPath = `${window.location.pathname || '/'}${window.location.search || ''}${window.location.hash || ''}`
+  try { clearStoredAuthArtifacts() } catch { /* auth cleanup is best effort */ }
+  Promise.resolve(signOut(auth)).catch(() => {}).finally(() => {
+    const query = new URLSearchParams({
+      expired: '1',
+      redirect: currentPath || '/today',
+    })
+    window.location.replace(`/login?${query.toString()}`)
+  })
 }
 
 async function forceRefreshFirebaseToken(user = auth?.currentUser) {
@@ -114,8 +149,9 @@ async function getFirebaseBearerToken(user = auth?.currentUser) {
   }
   try {
     return await forceRefreshFirebaseToken(user)
-  } catch {
+  } catch (error) {
     try { localStorage.removeItem('token') } catch { /* storage is optional */ }
+    if (isTerminalAuthError(error)) redirectToLoginForExpiredSession()
     return null
   }
 }
@@ -204,6 +240,14 @@ api.interceptors.response.use(
           requestConfig.headers.Authorization = `Bearer ${token}`
           return api.request(requestConfig)
         }
+      }
+      if (
+        status === 401 &&
+        requestConfig &&
+        !isAuthRefreshRequest(requestConfig) &&
+        (requestConfig.__firebaseAuthRetried || requestConfig.headers?.Authorization || requestConfig.headers?.authorization)
+      ) {
+        redirectToLoginForExpiredSession()
       }
       if (status === 401) {
         console.error('[API] 401 response', {
