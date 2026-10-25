@@ -58,19 +58,75 @@ function withTimeout(promise, ms = 5000) {
   })
 }
 
+let firebaseTokenRefreshPromise = null
+
+function tokenExpiryMs(token) {
+  try {
+    const payload = String(token || '').split('.')[1]
+    if (!payload) return 0
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
+    const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4)
+    const claims = JSON.parse(atob(padded))
+    const exp = Number(claims?.exp || 0)
+    return Number.isFinite(exp) && exp > 0 ? exp * 1000 : 0
+  } catch {
+    return 0
+  }
+}
+
+function isUsableBearerToken(token, skewMs = 30 * 1000) {
+  const value = String(token || '').trim()
+  if (!value || value.split('.').length < 3) return false
+  const expiresAt = tokenExpiryMs(value)
+  return expiresAt > Date.now() + skewMs
+}
+
+function persistFirebaseToken(token) {
+  if (!isUsableBearerToken(token)) return null
+  try { localStorage.setItem('token', token) } catch { /* storage is optional */ }
+  return token
+}
+
+async function forceRefreshFirebaseToken(user = auth?.currentUser) {
+  if (!user?.getIdToken) return null
+  if (!firebaseTokenRefreshPromise) {
+    firebaseTokenRefreshPromise = withTimeout(user.getIdToken(true), 8000)
+      .then((token) => {
+        const freshToken = persistFirebaseToken(token)
+        if (!freshToken) throw new Error('Firebase returned an unusable ID token')
+        return freshToken
+      })
+      .finally(() => {
+        firebaseTokenRefreshPromise = null
+      })
+  }
+  return firebaseTokenRefreshPromise
+}
+
+async function getFirebaseBearerToken(user = auth?.currentUser) {
+  if (!user?.getIdToken) return null
+  try {
+    const token = await withTimeout(user.getIdToken(), 4500)
+    if (isUsableBearerToken(token)) return persistFirebaseToken(token)
+  } catch {
+    // Force-refresh below. Never fall back to a stale token while Firebase has
+    // a current user, because that causes repeated auth/id-token-expired 401s.
+  }
+  try {
+    return await forceRefreshFirebaseToken(user)
+  } catch {
+    try { localStorage.removeItem('token') } catch { /* storage is optional */ }
+    return null
+  }
+}
+
 // Attach fresh auth token if present
 api.interceptors.request.use(async (config) => {
   try {
     const nativeSnapshot = readNativeIosAuthSnapshot()
     const user = auth?.currentUser
     if (user) {
-      let token = null
-      try {
-        // Avoid hanging requests when Firebase token refresh stalls.
-        token = await withTimeout(user.getIdToken(), 4500)
-      } catch {
-        token = localStorage.getItem('token') || nativeSnapshot?.idToken || null
-      }
+      const token = await getFirebaseBearerToken(user)
       if (token) config.headers.Authorization = `Bearer ${token}`
       // Optional pass-through user context
       if (user.email) config.headers['x-user-email'] = user.email
@@ -82,10 +138,15 @@ api.interceptors.request.use(async (config) => {
           const u = JSON.parse(userStr)
           if (u?.role) config.headers['x-user-role'] = u.role
         }
-      } catch {}
+      } catch { /* cached profile is optional */ }
     } else {
       // fallback to cached token if any
-      const token = localStorage.getItem('token') || nativeSnapshot?.idToken || null
+      let token = null
+      try {
+        const cachedToken = localStorage.getItem('token')
+        token = isUsableBearerToken(cachedToken) ? cachedToken : null
+      } catch { /* cached token is optional */ }
+      if (!token && isUsableBearerToken(nativeSnapshot?.idToken)) token = nativeSnapshot.idToken
       if (token) config.headers.Authorization = `Bearer ${token}`
       const userStr = localStorage.getItem('user')
       if (userStr) {
@@ -102,7 +163,7 @@ api.interceptors.request.use(async (config) => {
     try {
       const appTok = getAppToken()
       if (appTok) config.headers['x-app-token'] = appTok
-    } catch {}
+    } catch { /* app token is optional */ }
     // 🕒 Include user timezone (handles mobile/PWA drift)
     try {
       config.headers['x-user-tz'] = getEffectiveUserTimezone()
@@ -121,8 +182,8 @@ api.interceptors.request.use(async (config) => {
     try {
       const workspaceId = localStorage.getItem('activeWorkspaceId')
       if (workspaceId) config.headers['x-workspace-id'] = workspaceId
-    } catch {}
-  } catch {}
+    } catch { /* workspace context is optional */ }
+  } catch { /* auth headers are best effort */ }
   return config
 })
 
@@ -131,9 +192,19 @@ export default api
 // Global 403 upgrade banner trigger
 api.interceptors.response.use(
   (res) => res,
-  (error) => {
+  async (error) => {
     try {
       const status = error?.response?.status
+      const requestConfig = error?.config
+      if (status === 401 && requestConfig && !requestConfig.__firebaseAuthRetried && auth?.currentUser) {
+        requestConfig.__firebaseAuthRetried = true
+        const token = await forceRefreshFirebaseToken(auth.currentUser).catch(() => null)
+        if (token) {
+          requestConfig.headers = requestConfig.headers || {}
+          requestConfig.headers.Authorization = `Bearer ${token}`
+          return api.request(requestConfig)
+        }
+      }
       if (status === 401) {
         console.error('[API] 401 response', {
           url: error?.config?.baseURL
@@ -155,7 +226,7 @@ api.interceptors.response.use(
         }
         window.dispatchEvent(new CustomEvent('upgrade-required', { detail }))
       }
-    } catch {}
+    } catch { /* upgrade notification is best effort */ }
     return Promise.reject(error)
   },
 )
