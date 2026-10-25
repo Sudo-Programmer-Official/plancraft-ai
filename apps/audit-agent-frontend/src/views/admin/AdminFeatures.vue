@@ -1,6 +1,6 @@
 <template>
   <div class="max-w-5xl space-y-6">
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div class="sticky top-0 z-10 -mx-2 flex flex-col gap-3 bg-slate-950/85 px-2 py-3 backdrop-blur-xl sm:flex-row sm:items-end sm:justify-between">
       <div>
         <p class="text-xs uppercase tracking-[0.35em] text-indigo-300/70">Admin Controls</p>
         <h2 class="mt-2 text-3xl font-bold text-white">Feature Flags</h2>
@@ -9,6 +9,12 @@
         </p>
       </div>
       <div class="flex gap-2">
+        <span
+          v-if="hasUnsavedChanges"
+          class="self-center rounded-full border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200"
+        >
+          Unsaved changes
+        </span>
         <button
           type="button"
           class="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white transition hover:bg-white/10"
@@ -20,7 +26,7 @@
         <button
           type="button"
           class="rounded-xl bg-gradient-to-r from-fuchsia-500 via-purple-500 to-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:scale-[1.02] disabled:opacity-60"
-          :disabled="saving"
+          :disabled="saving || !hasUnsavedChanges"
           @click="save"
         >
           {{ saving ? 'Saving…' : 'Save Flags' }}
@@ -33,6 +39,12 @@
       class="rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100"
     >
       {{ flagsStore.error }}
+    </div>
+    <div
+      v-if="actionError"
+      class="rounded-2xl border border-rose-400/30 bg-rose-500/15 px-4 py-3 text-sm text-rose-100"
+    >
+      {{ actionError }}
     </div>
 
     <div class="grid gap-4 lg:grid-cols-3">
@@ -52,6 +64,7 @@
               type="checkbox"
               class="peer sr-only"
               :disabled="card.locked || saving"
+              :aria-label="`${card.meta.label}: ${card.draft ? 'turn off' : 'turn on'}`"
             />
             <span
               class="relative h-7 w-12 rounded-full bg-white/10 transition peer-checked:bg-gradient-to-r peer-checked:from-fuchsia-500 peer-checked:to-indigo-500 peer-disabled:cursor-not-allowed peer-disabled:opacity-50"
@@ -72,6 +85,12 @@
           </span>
           <span class="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-slate-300">
             Remote: {{ card.remote ? 'ON' : 'OFF' }}
+          </span>
+          <span
+            v-if="card.draft !== card.remote"
+            class="rounded-full border border-amber-400/30 bg-amber-500/10 px-2 py-1 text-amber-200"
+          >
+            Pending: {{ card.draft ? 'ON' : 'OFF' }}
           </span>
           <span
             v-if="card.locked"
@@ -117,15 +136,25 @@ import { useFeatureFlagsStore } from '@/stores/featureFlagsStore'
 const flagsStore = useFeatureFlagsStore()
 const draftFlags = reactive({ ...DEFAULT_REMOTE_FLAGS })
 const saving = ref(false)
+const actionError = ref('')
+
+function remoteFlagValue(key) {
+  return Boolean((flagsStore.remoteFlags || {})[key] ?? DEFAULT_REMOTE_FLAGS[key])
+}
 
 const flagCards = computed(() =>
   flagsStore.FEATURE_FLAG_KEYS.map((key) => ({
     key,
     meta: flagsStore.FEATURE_FLAG_META[key],
-    remote: Boolean((flagsStore.remoteFlags || {})[key] ?? DEFAULT_REMOTE_FLAGS[key]),
+    remote: remoteFlagValue(key),
+    draft: Boolean(draftFlags[key]),
     effective: flagsStore.isEnabled(key),
     locked: flagsStore.hasLocalFlagOverride(key),
   })),
+)
+
+const hasUnsavedChanges = computed(() =>
+  flagsStore.FEATURE_FLAG_KEYS.some((key) => Boolean(draftFlags[key]) !== remoteFlagValue(key)),
 )
 
 const updatedAtLabel = computed(() => {
@@ -153,6 +182,7 @@ watch(
 )
 
 async function reload() {
+  actionError.value = ''
   try {
     await flagsStore.loadFlags({ force: true, admin: true })
     ElMessage.success('Feature flags refreshed')
@@ -162,6 +192,7 @@ async function reload() {
 }
 
 async function save() {
+  actionError.value = ''
   saving.value = true
   try {
     const payload = {}
@@ -171,7 +202,13 @@ async function save() {
     await flagsStore.saveRemoteFlags(payload)
     ElMessage.success('Feature flags updated')
   } catch (err) {
-    ElMessage.error(err?.response?.data?.error || err?.message || 'Failed to save feature flags')
+    const status = err?.response?.status
+    actionError.value = status === 401
+      ? 'Your admin session has expired. Sign in again and retry.'
+      : status === 403
+        ? 'This account is not authorized to change feature flags.'
+        : err?.response?.data?.error || err?.message || 'Failed to save feature flags'
+    ElMessage.error(actionError.value)
   } finally {
     saving.value = false
   }
