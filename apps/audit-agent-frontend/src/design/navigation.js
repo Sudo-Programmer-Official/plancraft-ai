@@ -6,6 +6,7 @@ import {
   CircleHelp,
   FileText,
   Inbox,
+  Newspaper,
   Settings,
   Sparkles,
   Sun,
@@ -34,6 +35,12 @@ export const MORE_GROUPS = [
     items: [
       { key: 'journal', label: 'Journal', icon: BookOpen, to: '/journal' },
       { key: 'insights', label: 'Insights', icon: BarChart3, to: '/reports' },
+    ],
+  },
+  {
+    label: 'Explore',
+    items: [
+      { key: 'intelligence', label: 'Intelligence', icon: Newspaper, to: '/intelligence', featureFlag: 'INTELLIGENCE_DESK' },
     ],
   },
 ]

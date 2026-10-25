@@ -51,7 +51,9 @@ function emitSummarizerTimeoutWarning() {
   lastSummarizerWarningAt = now
   try {
     ElMessage.warning('AI summarizer took too long. Try a shorter selection.')
-  } catch {}
+  } catch {
+    /* noop */
+  }
 }
 
 /**
@@ -192,8 +194,27 @@ export async function generateTasksFromText(text, options = {}) {
     }
   } catch (err) {
     if (err?.code === 'AI_CONSENT_REQUIRED') throw err
-    console.error("❌ Generate Tasks API Error:", err?.response?.data || err.message);
-    throw new Error("Failed to generate tasks. Please try again later.");
+    const status = Number(err?.response?.status || err?.status || 0)
+    const responseError = err?.response?.data?.error
+    const providerMessage = typeof responseError === 'string' ? responseError.trim() : ''
+    const message = providerMessage || (
+      status === 401
+        ? 'Your planning session expired. Please try again.'
+        : status === 403
+          ? 'AI planning is temporarily unavailable for this account.'
+          : /timeout|network|failed to fetch/i.test(String(err?.message || ''))
+            ? 'The planning service took too long to respond. Please try again.'
+            : 'Failed to generate tasks. Please try again later.'
+    )
+    console.error('❌ Generate Tasks API Error:', {
+      status,
+      message: providerMessage || err?.message || 'unknown error',
+    })
+    const wrapped = new Error(message)
+    wrapped.code = err?.code || (status ? `HTTP_${status}` : 'AI_GENERATION_FAILED')
+    wrapped.status = status
+    wrapped.cause = err
+    throw wrapped
   }
 }
 
@@ -215,7 +236,9 @@ function resolveRelativeReminderIso(text, nowAnchor, timezoneGuess) {
         const candidate = dayjs(nowAnchor)
         if (candidate.isValid()) return candidate.tz(timezoneGuess)
       }
-    } catch {}
+    } catch {
+      /* noop */
+    }
     return dayjs().tz(timezoneGuess)
   })()
   if (!base || !base.isValid()) return null
@@ -302,7 +325,9 @@ export async function extractReminderTime(text, options = {}) {
     const normalized = typeof iso === 'string' && iso ? iso : null
     try {
       console.log('[TimeFlow] frontend extractReminderTime', { text: trimmed.slice(0, 80), now: nowAnchor, timezone: timezoneGuess, iso: normalized })
-    } catch {}
+    } catch {
+      /* noop */
+    }
     return normalized
   } catch (err) {
     if (err?.code === 'AI_CONSENT_REQUIRED') throw err

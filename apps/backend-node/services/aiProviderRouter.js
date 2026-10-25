@@ -25,7 +25,9 @@ const PROVIDER_CONFIG = {
   },
 }
 
-const DEFAULT_PROVIDER_ORDER = ["gemini", "groq", "openrouter"]
+// Keep production task parsing on providers with an explicit, predictable model.
+// OpenRouter remains available when deliberately added through AI_TASK_PROVIDER_ORDER.
+const DEFAULT_PROVIDER_ORDER = ["gemini", "groq"]
 
 function providerTimeoutMs() {
   const value = Number(process.env.AI_TASK_PROVIDER_TIMEOUT_MS || 15000)

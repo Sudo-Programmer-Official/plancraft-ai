@@ -168,6 +168,7 @@ export const routes = [
         { path: 'meetings', name: 'meetings', component: () => import('@/views/MeetingsView.vue') },
         { path: 'reminders', name: 'reminders', component: () => import('@/components/RemindersOverview.vue') },
         { path: 'talk-to-planner', name: 'talk-to-planner', component: () => import('@/views/TalkToPlanner.vue') },
+        { path: 'intelligence', name: 'intelligence', component: () => import('@/views/IntelligenceView.vue'), meta: { featureFlag: 'INTELLIGENCE_DESK' } },
         // Home (post-login). Design-system screen; Today renders its own greeting.
         { path: 'today', name: 'today', component: () => import('@/views/TodayHomeView.vue'), meta: { pcNav: 'today', hideAppHeader: true } },
         { path: 'today/dashboard', name: 'today-dashboard', component: () => import('@/views/TodayView.vue') },

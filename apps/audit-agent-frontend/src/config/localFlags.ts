@@ -5,4 +5,5 @@ export const LOCAL_FLAGS = Object.freeze({
   APPLE_AUTH: undefined,
   AUTO_DEPLOY: undefined,
   PLAYBOOKS: undefined,
+  INTELLIGENCE_DESK: undefined,
 })

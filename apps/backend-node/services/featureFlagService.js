@@ -7,6 +7,7 @@ export const DEFAULT_REMOTE_FEATURE_FLAGS = Object.freeze({
   APPLE_AUTH: false,
   AUTO_DEPLOY: false,
   PLAYBOOKS: true,
+  INTELLIGENCE_DESK: false,
 })
 
 function coerceBoolean(value, fallback = false) {

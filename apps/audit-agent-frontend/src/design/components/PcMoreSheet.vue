@@ -10,7 +10,7 @@
         <ChevronRight :size="18" aria-hidden="true" />
       </button>
 
-      <section v-for="group in MORE_GROUPS" :key="group.label" class="pc-more__group" :aria-labelledby="`more-${group.label}`">
+      <section v-for="group in visibleMoreGroups" :key="group.label" class="pc-more__group" :aria-labelledby="`more-${group.label}`">
         <h3 :id="`more-${group.label}`" class="pc-more__heading">{{ group.label }}</h3>
         <button
           v-for="item in group.items"
@@ -56,10 +56,12 @@
 </template>
 
 <script setup>
+import { computed, onMounted } from 'vue'
 import { ChevronRight, Download, Gem } from 'lucide-vue-next'
 import PcSheet from './PcSheet.vue'
 import { ACCOUNT_NAV, MORE_GROUPS } from '../navigation.js'
 import { useTheme } from '../useTheme.js'
+import { useFeatureFlagsStore } from '@/stores/featureFlagsStore'
 
 // Everything that doesn't need to be permanently visible: secondary
 // destinations, Creator/Leader modes, appearance, install and account.
@@ -77,6 +79,17 @@ const THEME_OPTIONS = [
   { value: 'system', label: 'System' },
 ]
 const { preference, setThemePreference } = useTheme()
+const featureFlagsStore = useFeatureFlagsStore()
+const visibleMoreGroups = computed(() => MORE_GROUPS
+  .map((group) => ({
+    ...group,
+    items: group.items.filter((item) => !item.featureFlag || featureFlagsStore.isEnabled(item.featureFlag)),
+  }))
+  .filter((group) => group.items.length))
+
+onMounted(() => {
+  featureFlagsStore.ensureLoaded().catch(() => {})
+})
 </script>
 
 <style scoped>

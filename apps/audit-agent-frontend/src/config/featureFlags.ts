@@ -1,7 +1,7 @@
 import { LOCAL_FLAGS } from './localFlags'
 export { LOCAL_FLAGS } from './localFlags'
 
-export const FEATURE_FLAG_KEYS = ['APPLE_AUTH', 'AUTO_DEPLOY', 'PLAYBOOKS'] as const
+export const FEATURE_FLAG_KEYS = ['APPLE_AUTH', 'AUTO_DEPLOY', 'PLAYBOOKS', 'INTELLIGENCE_DESK'] as const
 export type FeatureFlagKey = (typeof FEATURE_FLAG_KEYS)[number]
 export type FeatureFlagMap = Record<FeatureFlagKey, boolean>
 
@@ -9,6 +9,7 @@ export const DEFAULT_REMOTE_FLAGS: FeatureFlagMap = Object.freeze({
   APPLE_AUTH: false,
   AUTO_DEPLOY: false,
   PLAYBOOKS: true,
+  INTELLIGENCE_DESK: false,
 })
 
 export const FEATURE_FLAG_META: Record<
@@ -29,6 +30,11 @@ export const FEATURE_FLAG_META: Record<
     label: 'Playbooks',
     description: 'Shows the Playbooks navigation and enables the checklist workflow MVP.',
     disabledMessage: 'Playbooks are not enabled for this build yet.',
+  },
+  INTELLIGENCE_DESK: {
+    label: 'Intelligence Desk',
+    description: 'Enables live, source-backed research and goal watchlists.',
+    disabledMessage: 'The Intelligence Desk is not enabled for this build yet.',
   },
 }
 

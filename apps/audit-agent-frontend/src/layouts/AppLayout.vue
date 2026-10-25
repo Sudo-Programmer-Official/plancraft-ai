@@ -933,6 +933,7 @@ const routeTitleOverrides = {
   planner: 'Planner',
   journal: 'Journal',
   reports: 'Insights',
+  intelligence: 'Intelligence',
   settings: 'Settings',
 }
 

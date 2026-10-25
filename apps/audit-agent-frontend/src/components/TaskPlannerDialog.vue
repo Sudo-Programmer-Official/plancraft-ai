@@ -529,6 +529,7 @@ const internalOpen = ref(props.open)
 let previousBodyOverflow = ''
 let bodyScrollLocked = false
 let reminderAutofillGuard = false
+let autoGenerationStarted = false
 
 function setBodyScrollLocked(locked) {
   if (typeof document === 'undefined') return
@@ -561,14 +562,29 @@ watch(internalOpen, (val) => {
   if (!val) emit('close')
 })
 onBeforeUnmount(() => setBodyScrollLocked(false))
+
+async function autoGenerateFirstPlan() {
+  if (
+    autoGenerationStarted ||
+    !props.autoGenerate ||
+    !internalOpen.value ||
+    task.value ||
+    !props.initialInput?.trim()
+  ) return
+
+  // The dialog can enter through both onMounted and the open watcher. Keep the
+  // first-plan request single-flight so one click cannot create competing AI
+  // requests or show a success state alongside an error toast.
+  autoGenerationStarted = true
+  await ensureReminderPreferences(true)
+  resetNewTaskState()
+  await nextTick()
+  await generateTasks()
+}
+
 onMounted(async () => {
   if (internalOpen.value) setBodyScrollLocked(true)
-  if (props.autoGenerate && internalOpen.value && !task.value && props.initialInput?.trim()) {
-    await ensureReminderPreferences(true)
-    resetNewTaskState()
-    await nextTick()
-    await generateTasks()
-  }
+  await autoGenerateFirstPlan()
 })
 const channelOptionIds = channelOptions.map((o) => o.id)
 
@@ -982,6 +998,7 @@ watch(
     if (!val) {
       suppressAutoClose.value = false
       reminderPrefsLoaded.value = false
+      autoGenerationStarted = false
       return
     }
     await ensureReminderPreferences(true)
@@ -990,10 +1007,7 @@ watch(
     if (!task.value) {
       resetNewTaskState()
     }
-    if (props.autoGenerate && !task.value && props.initialInput?.trim()) {
-      await nextTick()
-      await generateTasks()
-    }
+    await autoGenerateFirstPlan()
   },
 )
 watch(
@@ -1744,7 +1758,16 @@ async function generateTasks() {
     await persistPreparedTasks(prepared)
   } catch (err) {
     console.error('Generate failed', err)
-    ElNotification({ title: 'Error', message: 'Task generation failed', type: 'error' })
+    const status = Number(err?.status || err?.response?.status || 0)
+    const message = err?.code === 'AI_CONSENT_REQUIRED'
+      ? 'Allow AI processing to generate a plan.'
+      : err?.message || 'We could not create your plan. Please try again.'
+    ElNotification({
+      title: status === 403 ? 'AI limit reached' : 'Couldn’t create your plan',
+      message,
+      type: 'error',
+      duration: 5200,
+    })
   } finally {
     loading.value = false
     visionStatus.value = ''

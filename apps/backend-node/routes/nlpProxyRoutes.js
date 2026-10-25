@@ -4,6 +4,14 @@ import { requireAuth } from '../middleware/auth.js'
 import { searchWorkspaceKnowledge } from '../services/knowledge/knowledgeService.js'
 import { chatWithFallback } from '../services/openaiService.js'
 import { uploadBufferToStorage } from '../services/firebaseAdmin.js'
+import {
+  buildIntelligenceCacheKey,
+  cacheSharedIntelligenceBrief,
+  createIntelligenceBrief,
+  getSharedCachedIntelligenceBrief,
+} from '../services/intelligenceService.js'
+import { getRemoteFeatureFlags } from '../services/featureFlagService.js'
+import { getIntelligenceAccess, reserveIntelligenceRequest } from '../services/intelligenceUsageService.js'
 
 const router = express.Router()
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -561,6 +569,49 @@ router.post('/orchestrate', async (req, res) => {
   } catch (error) {
     console.error('[NLP] orchestrate failed', error?.message || error)
     return res.status(500).json({ error: error?.message || 'Failed to orchestrate knowledge tasks' })
+  }
+})
+
+router.post('/intelligence/brief', async (req, res) => {
+  try {
+    const featureFlags = await getRemoteFeatureFlags()
+    if (!featureFlags?.flags?.INTELLIGENCE_DESK) {
+      return res.status(404).json({ error: 'Intelligence Desk is not enabled' })
+    }
+    const input = {
+      question: req.body?.question,
+      interests: req.body?.interests,
+      agentIds: req.body?.agentIds,
+      goalContext: req.body?.goalContext,
+    }
+    const access = await getIntelligenceAccess(req.user?.uid)
+    if (!access.ok) {
+      return res.status(403).json({
+        error: 'Intelligence Desk requires a Premium plan',
+        code: 'intelligence_premium_required',
+      })
+    }
+
+    const cacheKey = buildIntelligenceCacheKey(input)
+    const cached = await getSharedCachedIntelligenceBrief(cacheKey)
+    if (cached) return res.json({ success: true, cached: true, ...cached })
+
+    const quota = await reserveIntelligenceRequest(req.user?.uid, { access: access.access })
+    if (!quota.ok) {
+      return res.status(429).json({
+        error: 'Daily Intelligence Desk limit reached. Try again tomorrow.',
+        code: quota.code,
+        details: { used: quota.used, limit: quota.limit, remaining: quota.remaining || 0 },
+      })
+    }
+
+    const result = await createIntelligenceBrief(input)
+    // The response does not need to wait for the shared cache write.
+    void cacheSharedIntelligenceBrief(cacheKey, result)
+    return res.json({ success: true, cached: false, usage: quota, ...result })
+  } catch (error) {
+    console.error('[NLP] intelligence brief failed', error?.message || error)
+    return res.status(500).json({ error: error?.message || 'Failed to create intelligence brief' })
   }
 })
 
