@@ -99,6 +99,7 @@
       @capture="onCaptureSubmit"
       @upgrade="router.push(billingRoutePath)"
       @install="onInstall"
+      @logout="handleShellLogout"
     >
     <div
       class="app-main-pane flex-1 flex min-w-0 min-h-0 flex-col w-full max-w-full overflow-hidden"
@@ -466,6 +467,11 @@ const activeNavKey = computed(() => {
 
 function onShellNavigate(item) {
   if (item?.to && item.to !== route.path) router.push(item.to)
+}
+
+function handleShellLogout() {
+  if (authStore.logoutPending) return
+  authStore.logout()
 }
 
 // Focus from the nav starts on the next open task for today.

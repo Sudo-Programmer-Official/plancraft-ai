@@ -82,8 +82,8 @@
           <div v-if="goals.length" class="mb-5 rounded-2xl border border-pc-accent-border bg-pc-accent-soft/50 p-4">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div class="min-w-0">
-                <span class="eyebrow">Watch a goal</span>
-                <p class="mt-1 text-sm text-pc-text-muted">Research is filtered through the outcome you are trying to move forward.</p>
+                <span class="eyebrow">Optional goal context</span>
+                <p class="mt-1 text-sm text-pc-text-muted">Only choose a goal when this agent’s research directly supports it. Goal context is saved per tab.</p>
               </div>
               <label class="sm:w-80">
                 <span class="sr-only">Choose a goal to watch</span>
@@ -91,6 +91,7 @@
                   v-model="selectedGoalId"
                   class="w-full rounded-xl border border-pc-border-strong bg-pc-surface px-3 py-2.5 text-sm font-medium text-pc-text outline-none focus:border-pc-accent"
                 >
+                  <option value="">No goal context</option>
                   <option v-for="goal in goals" :key="goal.goalId || goal.id" :value="goal.goalId || goal.id">
                     {{ goal.title || 'Untitled goal' }}
                   </option>
@@ -99,9 +100,10 @@
             </div>
             <div v-if="selectedGoal" class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-pc-accent-text">
               <span class="font-semibold">{{ selectedGoal.title }}</span>
-              <span v-if="selectedGoal.targetDate">Target {{ selectedGoal.targetDate }}</span>
+              <span v-if="selectedGoal.targetDate">Target {{ formatGoalTargetDate(selectedGoal.targetDate) }}</span>
               <span v-if="selectedGoal.category">{{ selectedGoal.category }}</span>
             </div>
+            <p v-else class="mt-3 text-xs text-pc-text-subtle">This brief is independent of your planner goals.</p>
           </div>
           <div v-else class="mb-5 rounded-2xl border border-dashed border-pc-border-strong bg-pc-surface px-4 py-3 text-sm text-pc-text-muted">
             Create a goal to turn this desk into a personalized watchlist. You can still explore the wider tech landscape below.
@@ -563,11 +565,13 @@ function loadPreferences() {
       agentIds: Array.isArray(saved.agentIds) && saved.agentIds.length ? saved.agentIds : defaultAgentIds,
       allAgentIds: Array.isArray(saved.allAgentIds) && saved.allAgentIds.length ? saved.allAgentIds : (Array.isArray(saved.agentIds) && saved.agentIds.length ? saved.agentIds : defaultAgentIds),
       interests: typeof saved.interests === 'string' ? saved.interests : '',
-      goalId: typeof saved.goalId === 'string' ? saved.goalId : '',
+      goalContextByAgent: saved.goalContextByAgent && typeof saved.goalContextByAgent === 'object' && !Array.isArray(saved.goalContextByAgent)
+        ? saved.goalContextByAgent
+        : {},
       activeAgentId: typeof saved.activeAgentId === 'string' ? saved.activeAgentId : 'all',
     }
   } catch {
-    return { agentIds: defaultAgentIds, allAgentIds: defaultAgentIds, interests: '', goalId: '', activeAgentId: 'all' }
+    return { agentIds: defaultAgentIds, allAgentIds: defaultAgentIds, interests: '', goalContextByAgent: {}, activeAgentId: 'all' }
   }
 }
 
@@ -580,7 +584,7 @@ const interests = ref(savedPreferences.interests)
 const goals = ref([])
 const customAgents = ref([])
 const customAgentLimit = ref(10)
-const selectedGoalId = ref(savedPreferences.goalId)
+const goalContextByAgent = ref({ ...savedPreferences.goalContextByAgent })
 const question = ref('')
 const brief = ref(null)
 const briefsByTab = ref({})
@@ -604,6 +608,15 @@ const agentForm = reactive({
   prompt: '',
   outputStyle: 'brief',
 })
+const selectedGoalId = computed({
+  get: () => goalContextByAgent.value[activeAgentId.value] || '',
+  set: (value) => {
+    const next = { ...goalContextByAgent.value }
+    if (value) next[activeAgentId.value] = value
+    else delete next[activeAgentId.value]
+    goalContextByAgent.value = next
+  },
+})
 const selectedGoal = computed(() => goals.value.find((goal) => (goal.goalId || goal.id) === selectedGoalId.value) || null)
 const availableAgents = computed(() => [...INTELLIGENCE_AGENTS, ...customAgents.value])
 const intelligenceTabs = computed(() => [
@@ -620,7 +633,7 @@ watch([selectedAgentIds, interests, selectedGoalId, activeAgentId], () => {
       agentIds: selectedAgentIds.value,
       allAgentIds: allDeskAgentIds.value,
       interests: interests.value,
-      goalId: selectedGoalId.value,
+      goalContextByAgent: goalContextByAgent.value,
       activeAgentId: activeAgentId.value,
     }))
   } catch {
@@ -632,8 +645,10 @@ async function loadGoals() {
   if (!authStore.user?.uid) return
   try {
     goals.value = await fetchIntelligenceGoals()
-    const goalIds = goals.value.map((goal) => goal.goalId || goal.id).filter(Boolean)
-    if (!goalIds.includes(selectedGoalId.value)) selectedGoalId.value = goalIds[0] || ''
+    const goalIds = new Set(goals.value.map((goal) => goal.goalId || goal.id).filter(Boolean))
+    goalContextByAgent.value = Object.fromEntries(
+      Object.entries(goalContextByAgent.value).filter(([, goalId]) => goalIds.has(goalId)),
+    )
   } catch (err) {
     // The desk remains useful as an exploration surface if goals are unavailable.
     console.warn('[Intelligence] goals unavailable', err?.message || err)
@@ -840,6 +855,24 @@ function formatTime(value) {
     return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(new Date(value))
   } catch {
     return 'Just now'
+  }
+}
+
+function formatGoalTargetDate(value) {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+  try {
+    const datePart = raw.match(/^\d{4}-\d{2}-\d{2}/)?.[0]
+    const date = new Date(datePart ? `${datePart}T00:00:00Z` : raw)
+    if (Number.isNaN(date.getTime())) return raw
+    return new Intl.DateTimeFormat(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC',
+    }).format(date)
+  } catch {
+    return raw
   }
 }
 

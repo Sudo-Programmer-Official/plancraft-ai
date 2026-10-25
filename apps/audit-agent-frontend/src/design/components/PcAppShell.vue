@@ -26,6 +26,7 @@
       @navigate="onMoreNavigate"
       @upgrade="onMoreUpgrade"
       @install="onMoreInstall"
+      @logout="onMoreLogout"
     />
     <PcCaptureSheet v-model:open="captureOpen" :busy="captureBusy" @submit="$emit('capture', $event)" @voice="$emit('voice')" />
   </div>
@@ -85,6 +86,11 @@ function onMoreInstall() {
 function onMoreUpgrade() {
   moreOpen.value = false
   emit('upgrade')
+}
+
+function onMoreLogout() {
+  moreOpen.value = false
+  emit('logout')
 }
 </script>
 

@@ -51,13 +51,20 @@
           <span>{{ item.label }}</span>
         </button>
       </section>
+
+      <div class="pc-more__logout-area">
+        <button type="button" class="pc-more__logout" @click="$emit('logout')">
+          <LogOut :size="18" aria-hidden="true" />
+          <span>Log out</span>
+        </button>
+      </div>
     </div>
   </PcSheet>
 </template>
 
 <script setup>
 import { computed, onMounted } from 'vue'
-import { ChevronRight, Download, Gem } from 'lucide-vue-next'
+import { ChevronRight, Download, Gem, LogOut } from 'lucide-vue-next'
 import PcSheet from './PcSheet.vue'
 import { ACCOUNT_NAV, MORE_GROUPS } from '../navigation.js'
 import { useTheme } from '../useTheme.js'
@@ -71,7 +78,7 @@ defineProps({
   // Set by the layout when a PWA install prompt (or iOS hint) is available.
   canInstall: { type: Boolean, default: false },
 })
-defineEmits(['update:open', 'navigate', 'upgrade', 'install'])
+defineEmits(['update:open', 'navigate', 'upgrade', 'install', 'logout'])
 
 const THEME_OPTIONS = [
   { value: 'light', label: 'Light' },
@@ -205,5 +212,38 @@ onMounted(() => {
   color: var(--pc-text);
   font-weight: 600;
   box-shadow: var(--pc-shadow-sm);
+}
+
+.pc-more__logout-area {
+  padding-top: var(--pc-space-3);
+  border-top: 1px solid var(--pc-border);
+}
+
+.pc-more__logout {
+  display: flex;
+  align-items: center;
+  gap: var(--pc-space-3);
+  width: 100%;
+  min-height: 2.875rem;
+  padding: 0 var(--pc-space-3);
+  border: 1px solid var(--pc-danger);
+  border-radius: var(--pc-radius-md);
+  background: var(--pc-danger-soft);
+  color: var(--pc-danger);
+  font-family: var(--pc-font);
+  font-size: var(--pc-text-body);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.pc-more__logout:hover {
+  background: var(--pc-danger);
+  color: var(--pc-surface);
+}
+
+.pc-more__logout:active {
+  transform: translateY(1px);
 }
 </style>
