@@ -63,6 +63,20 @@ const AGENT_PROFILES = {
       'Avoid hype-only stories and state when evidence is limited.',
     ],
   },
+  'tech-frontier': {
+    id: 'tech-frontier',
+    label: 'Tech frontier',
+    description: 'Company projects, research, strategy, and leaders.',
+    searchQuery:
+      'latest publicly verifiable technology company activity from the last 30 days: active projects, research programs, product launches, acquisitions, hiring, partnerships, capex, patents, papers, developer releases, and evidence of competitive leadership',
+    instructions: [
+      'Map what named technology companies are actively building, researching, launching, acquiring, hiring for, partnering on, or investing in.',
+      'Prefer concrete projects, products, research programs, papers, patents, filings, earnings commentary, developer activity, and measurable actions over vague predictions.',
+      'Compare who has an edge in the requested capability using evidence such as product availability, benchmarks, customers, distribution, capacity, talent, patents, research quality, funding, or adoption.',
+      'Only describe a company as leading or dominant when the evidence supports that claim. Include the time window, confidence, and what would change the conclusion.',
+      'Use only public information. Never imply access to confidential roadmaps, internal projects, or non-public research.',
+    ],
+  },
 }
 
 function cleanText(value, maxLength = 2000) {
@@ -436,6 +450,7 @@ async function synthesizeBrief(results, { question = '', interests = '', goalCon
     .join('\n\n---\n\n')
 
   const goalMode = Boolean(goalContext?.title)
+  const frontierMode = results.some((result) => result.id === 'tech-frontier')
   const prompt = [
     goalMode
       ? `Create a concise goal watchlist brief for the PlanCraft goal "${goalContext.title}".`
@@ -444,6 +459,9 @@ async function synthesizeBrief(results, { question = '', interests = '', goalCon
     goalMode
       ? 'Lead with the 3 to 5 most important external signals, explain exactly why each matters to this goal, and identify a practical next move only when the evidence supports it.'
       : 'Lead with the 3 to 5 most important signals, explain why each matters to a builder or operator, and call out disagreements or low-confidence items.',
+    frontierMode
+      ? 'For the technology frontier material, include a compact comparison of Company, active project or research, latest evidence and date, strategic edge, and leadership status with confidence. Do not rank companies without evidence and do not present private-roadmap speculation as fact.'
+      : '',
     'For capital flows, describe movement and implications without recommending investments or securities.',
     'Include exact dates when the packets provide them. Keep the answer under 700 words.',
     goalMode

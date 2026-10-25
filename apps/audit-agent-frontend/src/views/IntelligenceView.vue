@@ -30,7 +30,41 @@
           </div>
         </div>
 
+        <div class="border-t border-pc-border bg-pc-surface px-5 sm:px-6">
+          <nav class="flex gap-1 overflow-x-auto py-3" aria-label="Intelligence agents" role="tablist">
+            <button
+              v-for="tab in intelligenceTabs"
+              :key="tab.id"
+              type="button"
+              role="tab"
+              :aria-selected="activeAgentId === tab.id"
+              class="inline-flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold transition"
+              :class="activeAgentId === tab.id ? 'bg-pc-accent-soft text-pc-accent-text' : 'text-pc-text-muted hover:bg-pc-surface-2 hover:text-pc-text'"
+              @click="selectAgentTab(tab.id)"
+            >
+              <span class="h-2 w-2 rounded-full" :class="loading && activeAgentId === tab.id ? 'animate-pulse bg-amber-500' : activeAgentId === tab.id ? 'bg-pc-accent' : 'bg-pc-border-strong'" aria-hidden="true" />
+              <span>{{ tab.label }}</span>
+              <span v-if="tab.custom" class="rounded-full border border-current/20 px-1.5 py-0.5 text-[10px] uppercase tracking-wide opacity-70">Mine</span>
+              <span v-if="tab.schedule?.enabled" class="text-[10px] text-emerald-600" title="Morning email enabled">• AM</span>
+            </button>
+          </nav>
+        </div>
+
         <div class="border-t border-pc-border bg-pc-surface-2/60 p-5 sm:p-6">
+          <div v-if="activeAgent" class="mb-5 flex flex-col gap-3 rounded-2xl border border-pc-accent-border bg-pc-accent-soft/50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="min-w-0">
+              <span class="eyebrow text-pc-accent-text">Agent workspace</span>
+              <h2 class="mt-1 truncate text-lg font-semibold text-pc-text">{{ activeAgent.label }}</h2>
+              <p class="mt-1 text-sm text-pc-text-muted">{{ activeAgent.description }}</p>
+            </div>
+            <div class="flex shrink-0 flex-wrap items-center gap-2 text-xs text-pc-text-muted">
+              <span class="rounded-full border border-pc-border bg-pc-surface px-2.5 py-1">Live web research</span>
+              <span v-if="activeAgent.schedule?.enabled" class="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-emerald-700">Morning email on</span>
+              <button v-if="activeAgent.custom" type="button" class="inline-flex items-center gap-1 rounded-lg border border-pc-border-strong px-2.5 py-1 font-semibold text-pc-text-muted hover:bg-pc-surface" @click="openAgentBuilder(activeAgent)">
+                <Pencil :size="12" aria-hidden="true" /> Edit agent
+              </button>
+            </div>
+          </div>
           <div v-if="goals.length" class="mb-5 rounded-2xl border border-pc-accent-border bg-pc-accent-soft/50 p-4">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div class="min-w-0">
@@ -87,7 +121,7 @@
             </label>
           </div>
 
-          <div class="mt-5">
+          <div v-if="activeAgentId === 'all'" class="mt-5">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div class="flex items-center gap-2">
                 <SlidersHorizontal :size="16" class="text-pc-text-subtle" aria-hidden="true" />
@@ -138,6 +172,12 @@
               </div>
             </div>
             <p class="mt-2 text-xs text-pc-text-subtle">Built-in desks are ready to use. Your desks let you define exactly what the research should watch.</p>
+          </div>
+          <div v-else class="mt-5 flex flex-col gap-3 rounded-2xl border border-dashed border-pc-border-strong bg-pc-surface px-4 py-3 text-sm text-pc-text-muted sm:flex-row sm:items-center sm:justify-between">
+            <span>This tab runs only <strong class="font-semibold text-pc-text">{{ activeAgent?.label }}</strong>. Ask a focused question or refresh the latest public signals.</span>
+            <button type="button" class="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-pc-accent-border px-3 py-1.5 text-xs font-semibold text-pc-accent-text hover:bg-pc-accent-soft" @click="refreshBrief">
+              <RefreshCw :size="13" aria-hidden="true" /> Run agent
+            </button>
           </div>
         </div>
       </section>
@@ -437,17 +477,21 @@ function loadPreferences() {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
     return {
       agentIds: Array.isArray(saved.agentIds) && saved.agentIds.length ? saved.agentIds : defaultAgentIds,
+      allAgentIds: Array.isArray(saved.allAgentIds) && saved.allAgentIds.length ? saved.allAgentIds : (Array.isArray(saved.agentIds) && saved.agentIds.length ? saved.agentIds : defaultAgentIds),
       interests: typeof saved.interests === 'string' ? saved.interests : '',
       goalId: typeof saved.goalId === 'string' ? saved.goalId : '',
+      activeAgentId: typeof saved.activeAgentId === 'string' ? saved.activeAgentId : 'all',
     }
   } catch {
-    return { agentIds: defaultAgentIds, interests: '', goalId: '' }
+    return { agentIds: defaultAgentIds, allAgentIds: defaultAgentIds, interests: '', goalId: '', activeAgentId: 'all' }
   }
 }
 
 const savedPreferences = loadPreferences()
 const authStore = useAuthStore()
-const selectedAgentIds = ref(savedPreferences.agentIds)
+const selectedAgentIds = ref([...savedPreferences.agentIds])
+const allDeskAgentIds = ref([...savedPreferences.allAgentIds])
+const activeAgentId = ref(savedPreferences.activeAgentId || 'all')
 const interests = ref(savedPreferences.interests)
 const goals = ref([])
 const customAgents = ref([])
@@ -455,6 +499,7 @@ const customAgentLimit = ref(10)
 const selectedGoalId = ref(savedPreferences.goalId)
 const question = ref('')
 const brief = ref(null)
+const briefsByTab = ref({})
 const loading = ref(false)
 const error = ref('')
 const addingTaskTitle = ref('')
@@ -477,15 +522,22 @@ const agentForm = reactive({
 })
 const selectedGoal = computed(() => goals.value.find((goal) => (goal.goalId || goal.id) === selectedGoalId.value) || null)
 const availableAgents = computed(() => [...INTELLIGENCE_AGENTS, ...customAgents.value])
+const intelligenceTabs = computed(() => [
+  { id: 'all', label: 'All desks', description: 'A combined view across selected agents.' },
+  ...availableAgents.value,
+])
+const activeAgent = computed(() => availableAgents.value.find((agent) => agent.id === activeAgentId.value) || null)
 const selectedBuiltInAgentIds = computed(() => selectedAgentIds.value.filter((id) => INTELLIGENCE_AGENTS.some((agent) => agent.id === id)))
 const selectedCustomAgentIds = computed(() => selectedAgentIds.value.filter((id) => customAgents.value.some((agent) => agent.id === id)))
 
-watch([selectedAgentIds, interests, selectedGoalId], () => {
+watch([selectedAgentIds, interests, selectedGoalId, activeAgentId], () => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       agentIds: selectedAgentIds.value,
+      allAgentIds: allDeskAgentIds.value,
       interests: interests.value,
       goalId: selectedGoalId.value,
+      activeAgentId: activeAgentId.value,
     }))
   } catch {
     // Preference persistence is optional; the brief still works in private mode.
@@ -511,8 +563,11 @@ async function loadAgents() {
     customAgents.value = result.agents.filter((agent) => agent.custom)
     customAgentLimit.value = result.customLimit || 10
     const availableIds = new Set(result.agents.map((agent) => agent.id))
-    const retained = selectedAgentIds.value.filter((id) => availableIds.has(id)).slice(0, 4)
-    selectedAgentIds.value = retained.length ? retained : [...defaultAgentIds]
+    const retained = allDeskAgentIds.value.filter((id) => availableIds.has(id)).slice(0, 4)
+    const nextAllDeskAgentIds = retained.length ? retained : [...defaultAgentIds]
+    allDeskAgentIds.value = nextAllDeskAgentIds
+    if (activeAgentId.value !== 'all' && !availableIds.has(activeAgentId.value)) activeAgentId.value = 'all'
+    selectedAgentIds.value = activeAgentId.value === 'all' ? nextAllDeskAgentIds : [activeAgentId.value]
   } catch (err) {
     console.warn('[Intelligence] desks unavailable', err?.message || err)
   }
@@ -522,9 +577,25 @@ function toggleAgent(id) {
   if (selectedAgentIds.value.includes(id)) {
     if (selectedAgentIds.value.length === 1) return
     selectedAgentIds.value = selectedAgentIds.value.filter((candidate) => candidate !== id)
+    allDeskAgentIds.value = [...selectedAgentIds.value]
     return
   }
   selectedAgentIds.value = [...selectedAgentIds.value, id].slice(0, 4)
+  allDeskAgentIds.value = [...selectedAgentIds.value]
+}
+
+async function selectAgentTab(id) {
+  if (!id || activeAgentId.value === id) return
+  if (id === 'all') {
+    activeAgentId.value = 'all'
+    selectedAgentIds.value = allDeskAgentIds.value.length ? [...allDeskAgentIds.value] : [...defaultAgentIds]
+  } else {
+    if (activeAgentId.value === 'all') allDeskAgentIds.value = [...selectedAgentIds.value]
+    activeAgentId.value = id
+    selectedAgentIds.value = [id]
+  }
+  brief.value = briefsByTab.value[id] || null
+  await refreshBrief()
 }
 
 function renderMarkdown(value) {
@@ -641,6 +712,7 @@ async function saveAgent() {
         : [agent, ...customAgents.value]
       if (!selectedAgentIds.value.includes(agent.id)) {
         selectedAgentIds.value = [...selectedAgentIds.value, agent.id].slice(0, 4)
+        if (activeAgentId.value === 'all') allDeskAgentIds.value = [...selectedAgentIds.value]
       }
     }
     showAgentBuilder.value = false
@@ -659,7 +731,15 @@ async function removeAgent(agent) {
     await deleteIntelligenceAgent(agent.id)
     customAgents.value = customAgents.value.filter((item) => item.id !== agent.id)
     selectedAgentIds.value = selectedAgentIds.value.filter((id) => id !== agent.id)
-    if (!selectedAgentIds.value.length) selectedAgentIds.value = [...defaultAgentIds]
+    allDeskAgentIds.value = allDeskAgentIds.value.filter((id) => id !== agent.id)
+    if (activeAgentId.value === agent.id) {
+      activeAgentId.value = 'all'
+      selectedAgentIds.value = allDeskAgentIds.value.length ? [...allDeskAgentIds.value] : [...defaultAgentIds]
+    }
+    if (!selectedAgentIds.value.length) {
+      selectedAgentIds.value = [...defaultAgentIds]
+      allDeskAgentIds.value = [...defaultAgentIds]
+    }
     ElMessage.success('Desk deleted')
   } catch (err) {
     ElMessage.error(err?.response?.data?.error || err?.message || 'Could not delete this desk.')
@@ -698,6 +778,7 @@ async function refreshBrief() {
           }
         : null,
     })
+    briefsByTab.value = { ...briefsByTab.value, [activeAgentId.value]: brief.value }
     expandedSynthesis.value = false
     expandedAgents.value = {}
     expandedSources.value = false

@@ -22,6 +22,11 @@ export const INTELLIGENCE_AGENTS = [
     label: 'Startup signals',
     description: 'Launches, funding, and ecosystem shifts',
   },
+  {
+    id: 'tech-frontier',
+    label: 'Tech frontier',
+    description: 'Company projects, research, strategy, and leaders',
+  },
 ]
 
 export const INTELLIGENCE_AGENT_TEMPLATES = [
@@ -51,6 +56,15 @@ export const INTELLIGENCE_AGENT_TEMPLATES = [
     searchFocus: 'regulation, demand, technology shifts, funding, customers, jobs, and emerging risks',
     prompt: 'Research the industry I specify and surface the few developments most likely to matter. Include dates and sources, explain why each item matters, and call out weak or conflicting evidence instead of overstating certainty.',
     outputStyle: 'brief',
+  },
+  {
+    id: 'tech-frontier-radar',
+    label: 'Tech frontier radar',
+    description: 'Map what companies are building, researching, and doing next.',
+    name: 'Tech Frontier Radar',
+    searchFocus: 'public company projects, research programs, product launches, acquisitions, hiring, partnerships, capex, patents, papers, developer activity, competitive edge, and evidence of market leadership across the technology companies or domain I specify',
+    prompt: 'Act as a source-backed technology strategy and company activity analyst. Track the latest publicly verifiable evidence of what the named companies are actively building, researching, launching, acquiring, hiring for, partnering on, or investing in. Identify named projects, products, research programs, papers, patents, developer releases, filings, earnings commentary, and other concrete actions. Compare who appears to have an edge in the requested capability using measurable evidence such as product availability, benchmarks, customers, distribution, capacity, talent, patents, research quality, funding, or adoption. Explain who is leading only when the evidence supports it, state the time window and confidence, separate confirmed facts from inference, call out missing or conflicting information, and never claim access to confidential roadmaps.',
+    outputStyle: 'table',
   },
 ]
 

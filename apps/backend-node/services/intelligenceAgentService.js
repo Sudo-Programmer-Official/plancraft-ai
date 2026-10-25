@@ -250,6 +250,25 @@ export function buildIntelligenceAgentDraft(input = {}) {
     ? `${marketTokens.join(' + ')} Market Watch`
     : `${titleCase(subject || useCase)} Watch`).slice(0, MAX_CUSTOM_AGENT_NAME_LENGTH)
   const outputStyle = INTELLIGENCE_OUTPUT_STYLES.has(input.outputStyle) ? input.outputStyle : 'brief'
+  const frontierMode = /(?:company|companies|competitor|competitors|working on|building|research|project|projects|edge|dominat|leader|lead)/i.test(useCase)
+
+  if (frontierMode && !marketTokens.length) {
+    return {
+      name: 'Tech Frontier Radar',
+      description: `A public-signal radar for ${subject || useCase}.`,
+      searchFocus: `public company projects, research, launches, acquisitions, hiring, partnerships, investment, competitive edge, and leadership signals for ${useCase}`.slice(0, MAX_CUSTOM_AGENT_SEARCH_FOCUS_LENGTH),
+      outputStyle: outputStyle === 'brief' ? 'table' : outputStyle,
+      prompt: [
+        'Act as a source-backed technology strategy and company activity analyst.',
+        `User need: "${useCase}"`,
+        'Use live web search to map the latest publicly verifiable projects, research programs, launches, acquisitions, hiring, partnerships, investment, filings, papers, patents, and developer activity.',
+        'Compare companies using measurable evidence such as product availability, benchmarks, customers, distribution, capacity, talent, research quality, funding, or adoption.',
+        'Explain who appears to have an edge or lead only when evidence supports it; include dates, confidence, conflicting evidence, and what remains unknown.',
+        'Never claim access to confidential roadmaps or invent facts, numbers, dates, projects, rankings, or sources.',
+        `Present the result as a ${outputStyle === 'brief' ? 'table' : outputStyle} that is concise and easy to scan.`,
+      ].join(' '),
+    }
+  }
 
   return {
     name: label,
