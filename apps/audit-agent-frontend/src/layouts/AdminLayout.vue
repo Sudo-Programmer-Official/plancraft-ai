@@ -2,7 +2,7 @@
 // ✅ Replaces previous layout, keeping PlanCraftAI's sidebar, logout, and structure
 
 <template>
-  <div class="light-shell flex min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 text-slate-900">
+  <div class="admin-shell flex min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 text-slate-100">
     <!-- Sidebar -->
     <aside class="hidden md:flex flex-col w-64 h-screen bg-gray-950/70 border-r border-gray-800">
       <div class="p-4 border-b border-gray-800 font-bold text-lg">🛠 Admin Panel</div>
@@ -91,6 +91,10 @@ async function logout() {
 </script>
 
 <style>
+.admin-shell {
+  color-scheme: dark;
+}
+
 .slide-enter-active,.slide-leave-active{ transition: transform .25s ease }
 .slide-enter-from,.slide-leave-to{ transform: translateX(-100%) }
 </style>

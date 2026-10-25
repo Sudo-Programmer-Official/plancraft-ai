@@ -130,8 +130,16 @@ const flagCards = computed(() =>
 
 const updatedAtLabel = computed(() => {
   if (!flagsStore.updatedAt) return 'Never'
-  const d = dayjs(flagsStore.updatedAt)
-  return d.isValid() ? d.format('MMM D, YYYY h:mm A') : String(flagsStore.updatedAt)
+  const value = flagsStore.updatedAt
+  const firestoreSeconds = value?.seconds ?? value?._seconds
+  const firestoreNanoseconds = value?.nanoseconds ?? value?._nanoseconds ?? 0
+  const normalized = typeof value?.toDate === 'function'
+    ? value.toDate()
+    : Number.isFinite(Number(firestoreSeconds))
+      ? new Date(Number(firestoreSeconds) * 1000 + Number(firestoreNanoseconds) / 1e6)
+      : value
+  const d = dayjs(normalized)
+  return d.isValid() ? d.format('MMM D, YYYY h:mm A') : 'Unknown'
 })
 
 watch(
