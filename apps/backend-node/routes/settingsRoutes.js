@@ -10,6 +10,20 @@ import { sendPushNotification } from "../services/notifyService.js";
 const router = express.Router();
 router.use(requireAuth, ensureUserMatches);
 
+// Lightweight session heartbeat used for admin engagement reporting. It only
+// records recency; it does not store page content or request details.
+router.post("/settings/activity", async (req, res) => {
+  try {
+    const uid = String(req?.user?.uid || "");
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+    await db.collection("users").doc(uid).set({ lastActivityAt: new Date() }, { merge: true });
+    return res.json({ success: true, lastActivityAt: new Date().toISOString() });
+  } catch (error) {
+    console.warn("[Activity] heartbeat failed", error?.message || error);
+    return res.status(500).json({ error: "Failed to record activity" });
+  }
+});
+
 const CHANNEL_ALLOW_LIST = ["email", "pwa", "whatsapp", "sms", "voice_call"];
 const ACTION_INBOX_NUDGE_CHANNELS = ["email", "pwa", "whatsapp"];
 const ACTION_INBOX_NUDGE_URGENCY = ["important", "urgent_only"];

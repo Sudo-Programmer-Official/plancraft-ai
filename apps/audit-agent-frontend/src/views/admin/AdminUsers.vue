@@ -34,6 +34,24 @@
       </div>
     </div>
 
+    <section class="grid gap-3 sm:grid-cols-3" aria-label="User activity summary">
+      <article class="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-4">
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200/80">Daily active users</p>
+        <p class="mt-2 text-3xl font-bold text-white">{{ dailyActiveCount }}</p>
+        <p class="mt-1 text-xs text-emerald-100/70">Active in the last 24 hours</p>
+      </article>
+      <article class="rounded-2xl border border-white/10 bg-white/5 p-4">
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300/80">Loaded users</p>
+        <p class="mt-2 text-3xl font-bold text-white">{{ users.length }}</p>
+        <p class="mt-1 text-xs text-slate-400">Current page</p>
+      </article>
+      <article class="rounded-2xl border border-indigo-400/20 bg-indigo-500/10 p-4">
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-200/80">Activity signal</p>
+        <p class="mt-2 text-sm font-semibold text-white">Heartbeat enabled</p>
+        <p class="mt-1 text-xs text-indigo-100/70">Refreshes while users have the app open</p>
+      </article>
+    </section>
+
     <div class="overflow-auto rounded border border-white/10">
       <table class="min-w-full text-sm">
         <thead class="bg-white/5">
@@ -42,6 +60,7 @@
             <th class="px-3 py-2 text-left">Email</th>
             <th class="px-3 py-2 text-left">Role</th>
             <th class="px-3 py-2 text-left">Plan</th>
+            <th class="px-3 py-2 text-left">Activity</th>
             <th class="px-3 py-2 text-left">Override</th>
             <th class="px-3 py-2 text-left">Actions</th>
           </tr>
@@ -62,6 +81,15 @@
                 <option value="premium">premium</option>
                 <option value="team">team</option>
               </select>
+            </td>
+            <td class="px-3 py-2">
+              <div v-if="u.activeToday" class="flex items-center gap-1.5 text-xs font-semibold text-emerald-300">
+                <span class="h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true"></span>
+                Active today
+              </div>
+              <div v-else class="text-xs text-slate-400">
+                {{ u.lastActivityAt ? `Last seen ${formatActivityDate(u.lastActivityAt)}` : 'No recent activity' }}
+              </div>
             </td>
             <td class="px-3 py-2">
               <div v-if="u.accessOverride" class="space-y-1 text-xs text-slate-300">
@@ -317,7 +345,15 @@ function formatCompactDate(value) {
   return date.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+function formatActivityDate(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
 const users = ref([])
+const dailyActiveCount = ref(0)
 const loading = ref(false)
 const nextPage = ref(null)
 const prevStack = ref([])
@@ -343,6 +379,7 @@ async function fetchUsers(cursor = null) {
     const res = await api.get('/admin/users', { params })
     const data = res?.data || {}
     users.value = data.users || []
+    dailyActiveCount.value = Number(data.dailyActiveCount || 0)
     nextPage.value = data.nextPage || null
     currentCursor.value = cursor
   } catch {

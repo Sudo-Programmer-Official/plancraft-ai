@@ -40,7 +40,21 @@ export const MORE_GROUPS = [
   {
     label: 'Explore',
     items: [
-      { key: 'intelligence', label: 'Intelligence', icon: Newspaper, to: '/intelligence', featureFlag: 'INTELLIGENCE_DESK' },
+      {
+        key: 'intelligence',
+        label: 'Intelligence',
+        icon: Newspaper,
+        to: '/intelligence',
+        featureFlag: 'INTELLIGENCE_DESK',
+        premium: true,
+        infoTitle: 'Your live research desk',
+        infoSummary: 'Build focused agents that turn fresh public information into clear, source-backed decisions.',
+        infoBullets: [
+          'Live web research with citations',
+          'Custom agents for companies, markets, and any use case',
+          'Briefs, morning email, and suggested next actions',
+        ],
+      },
     ],
   },
 ]

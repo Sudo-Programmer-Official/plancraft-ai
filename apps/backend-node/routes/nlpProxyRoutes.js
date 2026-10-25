@@ -17,6 +17,12 @@ import { resolveCustomIntelligenceProfiles } from '../services/intelligenceAgent
 const router = express.Router()
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 const IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || 'dall-e-3'
+const WORKSPACE_SUMMARY_CACHE_TTL_MS = Number(process.env.WORKSPACE_SUMMARY_CACHE_TTL_MS) > 0
+  ? Number(process.env.WORKSPACE_SUMMARY_CACHE_TTL_MS)
+  : 5 * 60 * 1000
+const WORKSPACE_SUMMARY_CACHE_MAX_ENTRIES = 250
+const workspaceSummaryCache = new Map()
+const workspaceSummaryInflight = new Map()
 
 function cleanText(value, fallback = '') {
   const text = String(value ?? fallback ?? '').trim()
@@ -131,7 +137,7 @@ async function extractEventDetails(body = {}) {
   }
 }
 
-async function summarizeWorkspace(body = {}) {
+async function generateWorkspaceSummary(body = {}) {
   const workspaceId = cleanText(body.workspaceId || '')
   const question = cleanText(body.question || body.input || body.prompt || '')
   const query = question || 'Summarize the current workspace.'
@@ -174,6 +180,42 @@ async function summarizeWorkspace(body = {}) {
     },
     source: search?.source || 'fallback',
     items: search?.items || [],
+  }
+}
+
+function workspaceSummaryCacheKey(body = {}) {
+  return JSON.stringify({
+    userId: cleanText(body.userId || ''),
+    workspaceId: cleanText(body.workspaceId || ''),
+    question: cleanText(body.question || body.input || body.prompt || '').slice(0, 1200),
+  })
+}
+
+async function summarizeWorkspace(body = {}) {
+  const key = workspaceSummaryCacheKey(body)
+  const cached = workspaceSummaryCache.get(key)
+  if (cached && cached.expiresAt > Date.now()) return { ...cached.value, cached: true }
+  if (cached) workspaceSummaryCache.delete(key)
+
+  const existing = workspaceSummaryInflight.get(key)
+  if (existing) return { ...(await existing), cached: true }
+
+  const request = generateWorkspaceSummary(body).then((value) => {
+    if (workspaceSummaryCache.size >= WORKSPACE_SUMMARY_CACHE_MAX_ENTRIES && !workspaceSummaryCache.has(key)) {
+      const oldestKey = workspaceSummaryCache.keys().next().value
+      if (oldestKey) workspaceSummaryCache.delete(oldestKey)
+    }
+    workspaceSummaryCache.set(key, {
+      value,
+      expiresAt: Date.now() + WORKSPACE_SUMMARY_CACHE_TTL_MS,
+    })
+    return value
+  })
+  workspaceSummaryInflight.set(key, request)
+  try {
+    return { ...(await request), cached: false }
+  } finally {
+    if (workspaceSummaryInflight.get(key) === request) workspaceSummaryInflight.delete(key)
   }
 }
 
@@ -519,7 +561,7 @@ router.post('/ocr', async (req, res) => {
 
 router.post('/workspace/summary', async (req, res) => {
   try {
-    return res.json(await summarizeWorkspace(req.body || {}))
+    return res.json(await summarizeWorkspace({ ...(req.body || {}), userId: req.user?.uid || '' }))
   } catch (error) {
     console.error('[NLP] workspace summary failed', error?.message || error)
     return res.status(500).json({ error: error?.message || 'Failed to summarize workspace' })

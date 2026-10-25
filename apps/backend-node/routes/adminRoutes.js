@@ -14,6 +14,30 @@ import {
 } from '../services/planService.js'
 
 const router = express.Router()
+const ACTIVE_USER_WINDOW_MS = 24 * 60 * 60 * 1000
+
+function coerceDate(value) {
+  if (!value) return null
+  try {
+    const date = typeof value.toDate === 'function' ? value.toDate() : new Date(value)
+    return date && !Number.isNaN(date.getTime()) ? date : null
+  } catch {
+    return null
+  }
+}
+
+function getLastActivity(data = {}) {
+  return coerceDate(data.lastActivityAt || data.last_activity_at || data.lastLoginAt || data.last_login_at)
+}
+
+function isActiveWithinWindow(data = {}, cutoffMs = Date.now() - ACTIVE_USER_WINDOW_MS) {
+  const activity = getLastActivity(data)
+  return !!activity && activity.getTime() >= cutoffMs
+}
+
+function countActiveUsers(docs = [], cutoffMs = Date.now() - ACTIVE_USER_WINDOW_MS) {
+  return docs.reduce((count, doc) => count + (isActiveWithinWindow(doc.data() || {}, cutoffMs) ? 1 : 0), 0)
+}
 
 // Admin: Notifications
 router.get('/notifications', requireAdmin, async (req, res) => {
@@ -103,9 +127,11 @@ router.get('/users', requireAdmin, async (req, res) => {
     const plan = req.query.plan ? String(req.query.plan) : null
     const search = String(req.query.search || '').trim().toLowerCase()
 
+    const activityCutoffMs = Date.now() - ACTIVE_USER_WINDOW_MS
     const mapUser = (doc) => {
       const data = doc.data() || {}
       const accessOverride = sanitizeUserAccessOverride(data?.accessOverride || null)
+      const lastActivity = getLastActivity(data)
       return {
         id: doc.id,
         name: data.name || data.displayName || '',
@@ -115,6 +141,9 @@ router.get('/users', requireAdmin, async (req, res) => {
         accessOverride,
         guest: !!data.guest,
         createdAt: data.createdAt || null,
+        lastLoginAt: coerceDate(data.lastLoginAt || data.last_login_at)?.toISOString() || null,
+        lastActivityAt: lastActivity?.toISOString() || null,
+        activeToday: isActiveWithinWindow(data, activityCutoffMs),
       }
     }
 
@@ -145,7 +174,13 @@ router.get('/users', requireAdmin, async (req, res) => {
       const lastVisible = pageDocs.length && startIndex + pageDocs.length < matchingDocs.length
         ? pageDocs[pageDocs.length - 1].id
         : null
-      return res.json({ users: pageDocs.map(mapUser), nextPage: lastVisible, limit, search })
+      return res.json({
+        users: pageDocs.map(mapUser),
+        nextPage: lastVisible,
+        limit,
+        search,
+        dailyActiveCount: countActiveUsers(allUsersSnap.docs, activityCutoffMs),
+      })
     }
 
     let ref = db.collection('users')
@@ -166,9 +201,16 @@ router.get('/users', requireAdmin, async (req, res) => {
     }
 
     const snap = await ref.limit(limit).get()
+    const activitySnap = await db.collection('users').get()
     const users = snap.docs.map(mapUser)
     const lastVisible = snap.docs.length ? snap.docs[snap.docs.length - 1].id : null
-    return res.json({ users, nextPage: lastVisible, limit, search: '' })
+    return res.json({
+      users,
+      nextPage: lastVisible,
+      limit,
+      search: '',
+      dailyActiveCount: countActiveUsers(activitySnap.docs, activityCutoffMs),
+    })
   } catch (e) {
     console.error('Admin users fetch failed', e)
     // Fallback to demo data in dev
@@ -181,7 +223,8 @@ router.get('/users', requireAdmin, async (req, res) => {
       if (!search) return true
       return `${user.name || ''} ${user.email || ''}`.toLowerCase().includes(search)
     })
-    return res.json({ users, nextPage: null, limit, search })
+    const dailyActiveCount = users.filter((user) => isActiveWithinWindow(user)).length
+    return res.json({ users, nextPage: null, limit, search, dailyActiveCount })
   }
 })
 

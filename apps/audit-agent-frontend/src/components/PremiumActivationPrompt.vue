@@ -19,22 +19,24 @@
           ×
         </button>
       </div>
-      <p class="premium-activation__eyebrow">You’ve found your planning rhythm</p>
-      <h2 class="premium-activation__title">Keep the momentum going</h2>
+      <p class="premium-activation__eyebrow">Limited-time Premium offer</p>
+      <h2 class="premium-activation__title">Turn momentum into intelligent action</h2>
       <p class="premium-activation__copy">
-        Keep turning ideas into a dependable daily system with unlimited AI plans and smart reminders.
+        Build custom research agents, follow live signals, and turn what matters into your next move.
       </p>
 
       <div class="premium-activation__offer" aria-label="Solo Premium pricing">
         <div>
-          <span class="premium-activation__offer-label">Solo Premium</span>
+          <span class="premium-activation__offer-label">50% off</span>
+          <span class="premium-activation__offer-old-price">$4/mo</span>
           <strong>$2/mo</strong>
         </div>
-        <span class="premium-activation__offer-note">Cancel anytime</span>
+        <span class="premium-activation__offer-note">Ends in {{ offerCountdown }}</span>
       </div>
 
       <ul class="premium-activation__benefits">
-        <li>Unlimited AI task plans</li>
+        <li>Unlimited AI task plans and source-backed Intelligence Desk briefs</li>
+        <li>Create agents for companies, markets, technology, or any personal use case</li>
         <li>Smart reminders across your channels</li>
         <li>Calendar and WhatsApp integration</li>
       </ul>
@@ -44,7 +46,7 @@
           Not now
         </button>
         <button type="button" class="premium-activation__primary" @click="upgrade">
-          Start Premium — $2/mo
+          Claim 50% off — $2/mo
         </button>
       </div>
     </div>
@@ -52,7 +54,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -61,7 +63,9 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'upgrade', 'dismissed'])
 const internalOpen = ref(props.modelValue)
 const closingAction = ref('')
+const offerCountdown = ref('03:00:00')
 const dialogWidth = computed(() => (typeof window !== 'undefined' && window.innerWidth < 640 ? 'calc(100% - 32px)' : '440px'))
+let offerTimer = null
 
 watch(() => props.modelValue, (value) => {
   internalOpen.value = value
@@ -89,6 +93,33 @@ function handleClose() {
   emit('update:modelValue', false)
   if (!action) emit('dismissed', 'close')
 }
+
+function startOfferTimer() {
+  try {
+    const key = 'promoExpiresAt'
+    let expiresAt = Number(sessionStorage.getItem(key) || 0)
+    if (!expiresAt || Number.isNaN(expiresAt) || expiresAt <= Date.now()) {
+      expiresAt = Date.now() + 3 * 60 * 60 * 1000
+      sessionStorage.setItem(key, String(expiresAt))
+    }
+    const tick = () => {
+      const secondsLeft = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000))
+      const hours = String(Math.floor(secondsLeft / 3600)).padStart(2, '0')
+      const minutes = String(Math.floor((secondsLeft % 3600) / 60)).padStart(2, '0')
+      const seconds = String(secondsLeft % 60).padStart(2, '0')
+      offerCountdown.value = `${hours}:${minutes}:${seconds}`
+    }
+    tick()
+    offerTimer = window.setInterval(tick, 1000)
+  } catch {
+    offerCountdown.value = '03:00:00'
+  }
+}
+
+onMounted(startOfferTimer)
+onUnmounted(() => {
+  if (offerTimer) window.clearInterval(offerTimer)
+})
 </script>
 
 <style scoped>
@@ -197,6 +228,13 @@ function handleClose() {
   color: #3730a3;
   font-size: 0.8rem;
   font-weight: 700;
+}
+
+.premium-activation__offer-old-price {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: line-through;
 }
 
 .premium-activation__offer strong {

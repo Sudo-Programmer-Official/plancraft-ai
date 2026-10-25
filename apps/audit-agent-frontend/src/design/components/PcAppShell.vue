@@ -51,7 +51,7 @@ defineProps({
   canInstall: { type: Boolean, default: false },
   captureBusy: { type: Boolean, default: false },
 })
-const emit = defineEmits(['navigate', 'focus', 'capture', 'voice', 'upgrade', 'install'])
+const emit = defineEmits(['navigate', 'focus', 'capture', 'voice', 'upgrade', 'install', 'logout'])
 
 // v-model:capture-open lets the layout close capture once the task is saved.
 const captureOpen = defineModel('captureOpen', { type: Boolean, default: false })

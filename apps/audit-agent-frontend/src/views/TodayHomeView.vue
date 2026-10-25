@@ -148,6 +148,18 @@
         <p v-if="rowMetaFor(activeTask)" class="today__tag">{{ rowMetaFor(activeTask) }}</p>
         <template v-if="!activeTask.completed">
           <p class="today__prompt"><Sparkles :size="16" aria-hidden="true" /> How can PlanCraft help?</p>
+          <section v-if="nextTaskAction" class="today__next-action" aria-labelledby="today-next-action-title">
+            <div class="today__next-action-copy">
+              <p class="today__research-eyebrow">Next best move</p>
+              <h3 id="today-next-action-title">{{ nextTaskAction.title }}</h3>
+              <p>{{ nextTaskAction.description }}</p>
+            </div>
+            <button type="button" class="today__next-action-button" @click="runNextTaskAction">
+              <component :is="nextTaskAction.icon" :size="17" aria-hidden="true" />
+              <span>{{ nextTaskAction.cta }}</span>
+              <ArrowUpRight :size="16" aria-hidden="true" />
+            </button>
+          </section>
           <div class="today__suggestions">
             <button
               v-for="action in taskActionSuggestions"
@@ -169,6 +181,86 @@
           <div class="today__focus-action">
             <PcButton variant="ghost" block :icon="Play" @click="startFocus(activeTask)">Focus 25 min</PcButton>
           </div>
+          <section v-if="intelligenceEnabled" class="today__research" aria-labelledby="today-task-research-title">
+            <div class="today__research-head">
+              <div>
+                <p class="today__research-eyebrow"><Sparkles :size="15" aria-hidden="true" /> Live task intelligence</p>
+                <h3 id="today-task-research-title">Bring a current answer into this task</h3>
+                <p>Ask one of your research agents to check fresh public sources. Nothing runs automatically.</p>
+              </div>
+              <span class="today__premium-badge">Premium</span>
+            </div>
+
+            <div v-if="isPremium" class="today__research-controls">
+              <label class="today__research-field">
+                <span>Agent</span>
+                <select v-model="taskResearchAgentId" :disabled="taskResearchLoading" class="today__research-select" @focus="loadTaskResearchAgents">
+                  <option v-for="agent in taskResearchAgents" :key="agent.id" :value="agent.id">
+                    {{ agent.label || agent.name }}{{ agent.custom ? ' · Mine' : '' }}
+                  </option>
+                </select>
+              </label>
+              <label class="today__research-field today__research-field--question">
+                <span>Optional question</span>
+                <input
+                  v-model="taskResearchQuestion"
+                  class="today__research-input"
+                  :disabled="taskResearchLoading"
+                  placeholder="What should I know before I start?"
+                  @keydown.enter.prevent="runTaskResearch"
+                />
+              </label>
+            </div>
+
+            <button
+              type="button"
+              class="today__research-button"
+              :disabled="taskResearchLoading"
+              :aria-busy="taskResearchLoading"
+              @click="runTaskResearch"
+            >
+              <RefreshCw :size="16" :class="{ 'today__research-spin': taskResearchLoading }" aria-hidden="true" />
+              {{ taskResearchLoading ? 'Researching live sources…' : !isPremium ? 'Unlock live research' : taskResearchResult ? 'Refresh live answer' : 'Research this task' }}
+              <ArrowUpRight :size="16" aria-hidden="true" />
+            </button>
+
+            <div v-if="!isPremium" class="today__research-locked">
+              <p>Live, source-backed task research is included with Premium Intelligence.</p>
+              <button type="button" @click="openPremium">Unlock Intelligence · 50% off</button>
+            </div>
+
+            <div v-if="taskResearchError" class="today__research-error" role="alert">
+              {{ taskResearchError }}
+            </div>
+
+            <article v-if="taskResearchResult" class="today__research-result" aria-live="polite">
+              <div class="today__research-result-head">
+                <div>
+                  <p class="today__research-eyebrow">Agent answer</p>
+                  <p class="today__research-result-meta">
+                    {{ taskResearchResult.agentLabel || 'Intelligence agent' }} · {{ taskResearchResult.cached ? 'cached source set' : 'fresh web research' }}
+                  </p>
+                </div>
+                <time v-if="taskResearchResult.generatedAt" :datetime="taskResearchResult.generatedAt">
+                  {{ formatResearchTime(taskResearchResult.generatedAt) }}
+                </time>
+              </div>
+              <div class="today__research-answer" v-html="renderIntelligenceMarkdown(taskResearchResult.synthesis)" />
+              <details v-if="taskResearchResult.sources?.length" class="today__research-sources">
+                <summary>{{ taskResearchResult.sources.length }} cited sources</summary>
+                <a
+                  v-for="source in taskResearchResult.sources"
+                  :key="source.url"
+                  :href="source.url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <span>{{ source.title || sourceDomain(source.url) }}</span>
+                  <ArrowUpRight :size="14" aria-hidden="true" />
+                </a>
+              </details>
+            </article>
+          </section>
           <div v-if="helpSteps.length || helpError" class="today__help" aria-live="polite">
             <p v-if="helpSteps.length" class="today__help-title">
               {{ helpIsFallback ? 'Starter steps' : helpActionKey === 'help_prepare' ? 'A practical next step' : 'Suggested steps' }}
@@ -242,22 +334,31 @@
 import { computed, markRaw, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Archive, BellRing, CalendarArrowUp, ChevronDown, ChevronRight, CircleCheck, Copy, ListChecks, Mic2, Pencil, Play, Plus, RotateCcw, Sparkles, Trash2 } from 'lucide-vue-next'
+import MarkdownIt from 'markdown-it'
+import { Archive, ArrowUpRight, BellRing, CalendarArrowUp, ChevronDown, ChevronRight, CircleCheck, Copy, ListChecks, MapPin, Mic2, Pencil, Play, Plus, RefreshCw, RotateCcw, Sparkles, Trash2 } from 'lucide-vue-next'
 import { PcButton, PcMenu, PcSheet, PcTaskRow } from '@/design'
 import UserAvatar from '@/components/UserAvatar.vue'
 import { useTasks } from '@/composables/useTasks'
 import { useCaptureSheet } from '@/composables/useCaptureSheet'
 import { useDayClock } from '@/composables/useDayClock'
 import { useSeoMeta } from '@/composables/useSeoMeta'
+import { useIsPremium } from '@/composables/useIsPremium'
 import { useAuthStore } from '@/stores/authStore'
 import { useFocusStore } from '@/stores/focusStore'
+import { useFeatureFlagsStore } from '@/stores/featureFlagsStore'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { askWorkspaceSummary } from '@/services/workspaceAiService'
 import { updateTaskInFirebase } from '@/services/firebaseService'
+import { fetchIntelligenceAgents, fetchIntelligenceBrief, INTELLIGENCE_AGENTS } from '@/services/intelligenceService'
 import { useQuickSetupStore } from '@/stores/quickSetupStore'
 import { toLocalDateKey } from '@/utils/dateHelper'
 import { getEffectiveUserTimezone } from '@/utils/userTimezone'
 import { EVENTS, trackEvent } from '@/services/analytics'
+
+const TASK_INTELLIGENCE_PREFERENCES_KEY = 'plancraft-intelligence-preferences'
+const TASK_RESEARCH_CACHE_TTL_MS = 30 * 60 * 1000
+const WORKSPACE_AI_CACHE_TTL_MS = 20 * 60 * 1000
+const intelligenceMarkdown = new MarkdownIt({ html: false, linkify: true, breaks: true })
 
 const { openCapture } = useCaptureSheet()
 const router = useRouter()
@@ -265,8 +366,10 @@ useSeoMeta({ title: 'Today | PlanCraft AI', description: 'Your day in PlanCraft 
 
 const authStore = useAuthStore()
 const focus = useFocusStore()
+const featureFlagsStore = useFeatureFlagsStore()
 const workspaceStore = useWorkspaceStore()
 const quickSetupStore = useQuickSetupStore()
+const { isPremium, refresh: refreshPremium } = useIsPremium()
 const { now } = useDayClock()
 const { allTasks, loadTasksForDate, toggleComplete, addTask, deleteTask, moveTasks, mergeTasksLocally, getTaskPlannedDate } = useTasks()
 
@@ -288,6 +391,16 @@ const planError = ref('')
 const showCompleted = ref(false)
 const undoState = ref(null)
 const undoing = ref(false)
+const taskResearchLoading = ref(false)
+const taskResearchError = ref('')
+const taskResearchQuestion = ref('')
+const taskResearchResult = ref(null)
+const taskResearchAgents = ref([...INTELLIGENCE_AGENTS])
+const taskResearchAgentId = ref(preferredTaskResearchAgentId())
+const workspaceAiCache = new Map()
+const workspaceAiInflight = new Map()
+const taskResearchCache = new Map()
+let taskResearchAgentsLoaded = false
 let undoTimer = null
 
 const todayKey = computed(() => toLocalDateKey(now.value))
@@ -313,7 +426,9 @@ const doneTasks = computed(() => todayTasks.value.filter((task) => task.complete
 const showSetupNudge = computed(
   () => authStore.guest !== true && authStore.user?.mode !== 'guest' && quickSetupStore.setupState?.completed !== true,
 )
+const intelligenceEnabled = computed(() => featureFlagsStore.isEnabled('INTELLIGENCE_DESK'))
 const activeTask = computed(() => allTasks.value.find((task) => task.id === activeTaskId.value) || null)
+const nextTaskAction = computed(() => nextActionForTask(activeTask.value))
 const activeTaskChildren = computed(() => {
   if (!activeTask.value) return []
   return allTasks.value
@@ -321,6 +436,7 @@ const activeTaskChildren = computed(() => {
     .sort(byTime)
 })
 const taskActionSuggestions = computed(() => suggestionsForTask(activeTask.value))
+const taskResearchAgent = computed(() => taskResearchAgents.value.find((agent) => agent.id === taskResearchAgentId.value) || null)
 const assistantLine = computed(() => {
   const left = openTasks.value.length
   if (!left) return 'Everything for today is done. Nice work.'
@@ -378,6 +494,46 @@ function sheetSubtitle(task) {
   return time ? `Today · ${time}` : 'Today'
 }
 
+function preferredTaskResearchAgentId() {
+  if (typeof window === 'undefined') return 'tech-frontier'
+  try {
+    const saved = JSON.parse(localStorage.getItem(TASK_INTELLIGENCE_PREFERENCES_KEY) || '{}')
+    const preferred = saved.activeAgentId && saved.activeAgentId !== 'all'
+      ? saved.activeAgentId
+      : Array.isArray(saved.agentIds) ? saved.agentIds[0] : ''
+    return INTELLIGENCE_AGENTS.some((agent) => agent.id === preferred) ? preferred : 'tech-frontier'
+  } catch {
+    return 'tech-frontier'
+  }
+}
+
+async function askWorkspaceSummaryEfficient({ workspaceId, question, cacheKey, ttlMs = WORKSPACE_AI_CACHE_TTL_MS }) {
+  const key = cacheKey || JSON.stringify({ workspaceId: workspaceId || '', question: question || '' })
+  const cached = workspaceAiCache.get(key)
+  if (cached && cached.expiresAt > Date.now()) {
+    return { ...cached.value, cached: true }
+  }
+  if (cached) workspaceAiCache.delete(key)
+
+  const existing = workspaceAiInflight.get(key)
+  if (existing) return { ...(await existing), cached: true }
+
+  const request = askWorkspaceSummary({ workspaceId, question }).then((value) => {
+    if (workspaceAiCache.size >= 50 && !workspaceAiCache.has(key)) {
+      const oldestKey = workspaceAiCache.keys().next().value
+      if (oldestKey) workspaceAiCache.delete(oldestKey)
+    }
+    workspaceAiCache.set(key, { value, expiresAt: Date.now() + ttlMs })
+    return value
+  })
+  workspaceAiInflight.set(key, request)
+  try {
+    return { ...(await request), cached: false }
+  } finally {
+    if (workspaceAiInflight.get(key) === request) workspaceAiInflight.delete(key)
+  }
+}
+
 function openTask(task) {
   activeTaskId.value = task.id
   editing.value = false
@@ -386,12 +542,163 @@ function openTask(task) {
   helpError.value = ''
   helpIsFallback.value = false
   helpApplied.value = false
+  taskResearchQuestion.value = ''
+  taskResearchResult.value = null
+  taskResearchError.value = ''
   trackEvent(EVENTS.TASK_OPENED, {
     surface: 'today',
     completed: !!task.completed,
     task_intent: taskIntent(task),
     has_reminder: !!formatTime(task),
   })
+}
+
+function renderIntelligenceMarkdown(value) {
+  return intelligenceMarkdown.render(String(value || ''))
+}
+
+function sourceDomain(value) {
+  try {
+    return new URL(value).hostname.replace(/^www\./, '')
+  } catch {
+    return 'Source'
+  }
+}
+
+function formatResearchTime(value) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Just now'
+  return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(date)
+}
+
+function openPremium() {
+  router.push({ path: '/subscription', query: { source: 'task_intelligence' } }).catch(() => {})
+}
+
+async function loadTaskResearchAgents() {
+  if (taskResearchAgentsLoaded) return
+  try {
+    const result = await fetchIntelligenceAgents()
+    const customAgents = result.agents.filter((agent) => agent.custom)
+    taskResearchAgents.value = [...INTELLIGENCE_AGENTS, ...customAgents]
+    taskResearchAgentsLoaded = true
+  } catch (error) {
+    // Built-in agents remain available if the custom-agent list is unavailable.
+    console.warn('[Today] intelligence agents unavailable', error?.message || error)
+  }
+}
+
+async function runTaskResearch() {
+  const task = activeTask.value
+  if (!task || taskResearchLoading.value) return
+
+  taskResearchLoading.value = true
+  await refreshPremium({ minIntervalMs: 15000 })
+  if (!featureFlagsStore.isEnabled('INTELLIGENCE_DESK')) {
+    taskResearchError.value = 'Live task research is not enabled right now.'
+    taskResearchLoading.value = false
+    return
+  }
+  if (!isPremium.value) {
+    openPremium()
+    taskResearchLoading.value = false
+    return
+  }
+
+  await loadTaskResearchAgents()
+  const agent = taskResearchAgent.value || taskResearchAgents.value[0]
+  if (!agent) {
+    taskResearchError.value = 'No intelligence agent is available right now.'
+    taskResearchLoading.value = false
+    return
+  }
+
+  taskResearchError.value = ''
+  const title = String(task.title || 'this task').trim().slice(0, 180)
+  const notes = String(task.details || task.notes || '').trim().slice(0, 180)
+  const userQuestion = taskResearchQuestion.value.trim().slice(0, 220)
+  const question = [
+    userQuestion || 'What current public information could help me make progress on this task?',
+    `Task: ${title}`,
+    `Notes: ${notes || 'none'}`,
+    'Use current public sources, include dates and links, distinguish facts from inference, and say when the evidence is uncertain.',
+  ].join('\n').slice(0, 500)
+  const interests = `${title}${notes ? `; ${notes}` : ''}`.slice(0, 300)
+  const isCustom = Boolean(agent.custom)
+  const researchCacheKey = JSON.stringify({
+    uid: authStore.user?.uid || 'guest',
+    agentId: agent.id,
+    question,
+    interests,
+  })
+
+  trackEvent(EVENTS.INTELLIGENCE_TASK_RESEARCH_STARTED, {
+    surface: 'today_task_sheet',
+    agent_id: agent.id,
+    has_question: Boolean(userQuestion),
+  })
+
+  const cachedResearch = taskResearchCache.get(researchCacheKey)
+  if (cachedResearch && cachedResearch.expiresAt > Date.now()) {
+    taskResearchResult.value = { ...cachedResearch.value, cached: true }
+    trackEvent(EVENTS.INTELLIGENCE_TASK_RESEARCH_COMPLETED, {
+      surface: 'today_task_sheet',
+      agent_id: agent.id,
+      source_count: Array.isArray(taskResearchResult.value?.sources) ? taskResearchResult.value.sources.length : 0,
+      cached: true,
+      status: 'success',
+    })
+    taskResearchLoading.value = false
+    return
+  }
+  if (cachedResearch) taskResearchCache.delete(researchCacheKey)
+
+  try {
+    const result = await fetchIntelligenceBrief({
+      agentIds: isCustom ? [] : [agent.id],
+      customAgentIds: isCustom ? [agent.id] : [],
+      question,
+      interests,
+      // Task research is explicitly user-initiated and does not inherit a goal.
+      goalContext: null,
+    })
+    taskResearchResult.value = { ...result, agentId: agent.id, agentLabel: agent.label || agent.name }
+    taskResearchCache.set(researchCacheKey, {
+      value: taskResearchResult.value,
+      expiresAt: Date.now() + TASK_RESEARCH_CACHE_TTL_MS,
+    })
+    if (taskResearchCache.size > 20) {
+      const oldestKey = taskResearchCache.keys().next().value
+      if (oldestKey && oldestKey !== researchCacheKey) taskResearchCache.delete(oldestKey)
+    }
+    trackEvent(EVENTS.INTELLIGENCE_TASK_RESEARCH_COMPLETED, {
+      surface: 'today_task_sheet',
+      agent_id: agent.id,
+      source_count: Array.isArray(taskResearchResult.value?.sources) ? taskResearchResult.value.sources.length : 0,
+      cached: Boolean(taskResearchResult.value?.cached),
+      status: 'success',
+    })
+  } catch (error) {
+    const status = Number(error?.response?.status || 0)
+    const code = String(error?.response?.data?.code || '').toLowerCase()
+    if (status === 403 || code === 'intelligence_premium_required') {
+      openPremium()
+      taskResearchError.value = 'Live task research is part of Premium Intelligence.'
+    } else if (status === 404) {
+      taskResearchError.value = 'Intelligence is not enabled for this account yet.'
+    } else {
+      taskResearchError.value = error?.response?.data?.error || error?.message || 'Live research is unavailable right now. Try again in a moment.'
+    }
+    trackEvent(EVENTS.INTELLIGENCE_TASK_RESEARCH_COMPLETED, {
+      surface: 'today_task_sheet',
+      agent_id: agent.id,
+      source_count: 0,
+      cached: false,
+      status: 'error',
+    })
+  } finally {
+    taskResearchLoading.value = false
+  }
 }
 
 function trackTaskOverflow(task) {
@@ -460,6 +767,76 @@ function taskIntent(task) {
   if (/\b(buy|shop|pick up|drop off|grocery|errand|return)\b/.test(text)) return 'errand'
   if (/\b(gym|workout|run|walk|sleep|meditat|health)\b/.test(text)) return 'wellbeing'
   return 'general'
+}
+
+function taskLocation(task) {
+  const text = `${task?.title || ''} ${task?.details || ''}`.replace(/\s+/g, ' ').trim()
+  if (!text) return ''
+  const match = text.match(/\b(?:go|drive|travel|head|navigate|visit)\s+(?:to\s+)?(.+?)(?=\s+(?:today|tomorrow|on|at|by|for)\b|$)/i)
+  return String(match?.[1] || '').replace(/[.,;:!?]+$/, '').trim()
+}
+
+function nextActionForTask(task) {
+  if (!task || task.completed) return null
+  const text = `${task.title || ''} ${task.details || ''}`.toLowerCase()
+  const location = taskLocation(task)
+  if (location) {
+    return {
+      type: 'open_map',
+      title: 'Get the route',
+      description: `Open directions to ${location}.`,
+      cta: 'Open Maps',
+      icon: markRaw(MapPin),
+      location,
+    }
+  }
+  if (!formatTime(task) && /\b(call|email|text|message|appointment|doctor|dentist|interview|deadline|submit|renew)\b/.test(text)) {
+    return {
+      type: 'set_reminder',
+      title: 'Put it on the clock',
+      description: 'Choose a time so this important task does not stay in your head.',
+      cta: 'Set reminder',
+      icon: markRaw(BellRing),
+    }
+  }
+  if (/\b(research|prepare|compare|find|learn|investigate|check|latest|news|company|market)\b/.test(text)) {
+    return {
+      type: 'research',
+      title: 'Clear the unknowns',
+      description: 'Ask an intelligence agent for current, source-backed context.',
+      cta: 'Ask Intelligence',
+      icon: markRaw(Sparkles),
+    }
+  }
+  return {
+    type: 'focus',
+    title: 'Start a focused first pass',
+    description: 'Give this task 25 uninterrupted minutes and make visible progress.',
+    cta: 'Start focus',
+    icon: markRaw(Play),
+  }
+}
+
+function runNextTaskAction() {
+  const task = activeTask.value
+  const action = nextTaskAction.value
+  if (!task || !action) return
+  trackEvent(EVENTS.TASK_CAPABILITY_OPENED, {
+    surface: 'today_task_sheet',
+    capability: action.type,
+    task_intent: taskIntent(task),
+  })
+  if (action.type === 'open_map') {
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(action.location)}`
+    const opened = window.open(url, '_blank', 'noopener,noreferrer')
+    if (!opened) window.location.assign(url)
+  } else if (action.type === 'set_reminder') {
+    beginEditing(task, 'reschedule')
+  } else if (action.type === 'research') {
+    runTaskResearch()
+  } else if (action.type === 'focus') {
+    startFocus(task)
+  }
 }
 
 function suggestionsForTask(task) {
@@ -564,9 +941,18 @@ async function runAiAction(task, actionKey) {
   })()
 
   try {
-    const { answer } = await askWorkspaceSummary({
+    const cacheKey = JSON.stringify({
+      type: 'task-help',
+      uid: authStore.user?.uid || 'guest',
+      workspaceId: workspaceId || '',
+      actionKey,
+      title: task.title || '',
+      details: task.details || '',
+    })
+    const { answer, cached } = await askWorkspaceSummaryEfficient({
       workspaceId,
       question,
+      cacheKey,
     })
     helpSteps.value = toLines(answer).slice(0, 5)
     if (!helpSteps.value.length) {
@@ -579,6 +965,7 @@ async function runAiAction(task, actionKey) {
       task_intent: intent,
       result_count: helpSteps.value.length,
       status: helpIsFallback.value ? 'fallback' : 'success',
+      cached: Boolean(cached),
     })
   } catch {
     helpIsFallback.value = false
@@ -638,14 +1025,27 @@ async function applyHelpSteps(task) {
 async function planRestOfDay() {
   planning.value = true
   planError.value = ''
+  const currentTasks = openTasks.value.map((task) => ({
+    id: task.id,
+    title: task.title || '',
+    reminderTime: task.reminderTime || '',
+  }))
+  const question = `It is ${new Intl.DateTimeFormat(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: getEffectiveUserTimezone(),
+  }).format(now.value)}. Plan the rest of my day from my open tasks: suggest an order with rough times. Reply with one short line per step.`
   try {
-    const { answer } = await askWorkspaceSummary({
+    const { answer } = await askWorkspaceSummaryEfficient({
       workspaceId: workspaceStore.activeWorkspaceId,
-      question: `It is ${new Intl.DateTimeFormat(undefined, {
-        hour: 'numeric',
-        minute: '2-digit',
-        timeZone: getEffectiveUserTimezone(),
-      }).format(now.value)}. Plan the rest of my day from my open tasks: suggest an order with rough times. Reply with one short line per step.`,
+      question,
+      cacheKey: JSON.stringify({
+        type: 'plan-day',
+        uid: authStore.user?.uid || 'guest',
+        workspaceId: workspaceStore.activeWorkspaceId || '',
+        tasks: currentTasks,
+      }),
+      ttlMs: 10 * 60 * 1000,
     })
     planLines.value = toLines(answer).slice(0, 6)
     if (!planLines.value.length) planError.value = 'No plan came back. Please try again.'
@@ -756,6 +1156,7 @@ async function saveEdit() {
 }
 
 onMounted(async () => {
+  featureFlagsStore.ensureLoaded().catch(() => {})
   try {
     await loadTasksForDate(todayKey.value)
   } finally {
@@ -1146,6 +1547,301 @@ onBeforeUnmount(() => {
   padding-top: var(--pc-space-1);
 }
 
+.today__next-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pc-space-3);
+  padding: var(--pc-space-3);
+  border: 1px solid var(--pc-accent-border);
+  border-radius: var(--pc-radius-md);
+  background: var(--pc-accent-soft);
+}
+
+.today__next-action-copy {
+  min-width: 0;
+}
+
+.today__next-action-copy h3 {
+  margin: 0.2rem 0 0;
+  font-size: var(--pc-text-body);
+  font-weight: 700;
+}
+
+.today__next-action-copy > p:last-child {
+  margin: 0.25rem 0 0;
+  color: var(--pc-text-muted);
+  font-size: var(--pc-text-small);
+  line-height: 1.4;
+}
+
+.today__next-action-button {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--pc-accent);
+  border-radius: var(--pc-radius-md);
+  background: var(--pc-surface);
+  color: var(--pc-accent-text);
+  font: inherit;
+  font-size: var(--pc-text-small);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.today__next-action-button:hover,
+.today__next-action-button:focus-visible {
+  background: var(--pc-surface-2);
+  outline: none;
+}
+
+.today__research {
+  display: grid;
+  gap: var(--pc-space-3);
+  padding: var(--pc-space-4);
+  border: 1px solid var(--pc-accent-border);
+  border-radius: var(--pc-radius-lg);
+  background: linear-gradient(135deg, var(--pc-accent-soft), var(--pc-surface));
+}
+
+.today__research-head,
+.today__research-result-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--pc-space-3);
+}
+
+.today__research-head h3 {
+  margin: var(--pc-space-1) 0 0;
+  font-size: var(--pc-text-body);
+  font-weight: 700;
+}
+
+.today__research-head p:not(.today__research-eyebrow) {
+  max-width: 34rem;
+  margin: var(--pc-space-1) 0 0;
+  color: var(--pc-text-muted);
+  font-size: var(--pc-text-small);
+  line-height: 1.45;
+}
+
+.today__research-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pc-space-1);
+  margin: 0;
+  color: var(--pc-accent-text);
+  font-size: var(--pc-text-caption);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.today__premium-badge {
+  flex-shrink: 0;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: var(--pc-radius-full);
+  background: rgba(255, 251, 235, 0.9);
+  color: #a16207;
+  font-size: var(--pc-text-caption);
+  font-weight: 700;
+}
+
+.today__research-controls {
+  display: grid;
+  grid-template-columns: minmax(9rem, 0.7fr) minmax(0, 1.3fr);
+  gap: var(--pc-space-2);
+}
+
+.today__research-field {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  color: var(--pc-text-muted);
+  font-size: var(--pc-text-caption);
+  font-weight: 600;
+}
+
+.today__research-select,
+.today__research-input {
+  width: 100%;
+  min-width: 0;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--pc-border-strong);
+  border-radius: var(--pc-radius-md);
+  background: var(--pc-surface);
+  color: var(--pc-text);
+  font: inherit;
+  font-size: var(--pc-text-small);
+  font-weight: 400;
+}
+
+.today__research-select:focus,
+.today__research-input:focus {
+  outline: none;
+  border-color: var(--pc-accent);
+  box-shadow: 0 0 0 3px var(--pc-accent-soft);
+}
+
+.today__research-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--pc-space-2);
+  justify-self: start;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--pc-accent);
+  border-radius: var(--pc-radius-md);
+  background: var(--pc-surface);
+  color: var(--pc-accent-text);
+  font: inherit;
+  font-size: var(--pc-text-small);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.today__research-button:hover,
+.today__research-button:focus-visible {
+  background: var(--pc-accent-soft);
+  outline: none;
+}
+
+.today__research-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.today__research-spin {
+  animation: today-research-spin 1s linear infinite;
+}
+
+@keyframes today-research-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.today__research-locked {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pc-space-2);
+  padding-top: var(--pc-space-1);
+  color: var(--pc-text-muted);
+  font-size: var(--pc-text-caption);
+}
+
+.today__research-locked p {
+  margin: 0;
+}
+
+.today__research-locked button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--pc-accent-text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.today__research-error {
+  padding: var(--pc-space-2) var(--pc-space-3);
+  border-radius: var(--pc-radius-md);
+  background: color-mix(in srgb, var(--pc-danger) 8%, transparent);
+  color: var(--pc-danger);
+  font-size: var(--pc-text-small);
+}
+
+.today__research-result {
+  display: grid;
+  gap: var(--pc-space-3);
+  padding-top: var(--pc-space-3);
+  border-top: 1px solid var(--pc-accent-border);
+}
+
+.today__research-result-meta,
+.today__research-result-head time {
+  margin: 0.2rem 0 0;
+  color: var(--pc-text-muted);
+  font-size: var(--pc-text-caption);
+}
+
+.today__research-result-head time {
+  flex-shrink: 0;
+}
+
+.today__research-answer {
+  color: var(--pc-text);
+  font-size: var(--pc-text-small);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.today__research-answer :deep(p) {
+  margin: 0 0 var(--pc-space-2);
+}
+
+.today__research-answer :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.today__research-answer :deep(h1),
+.today__research-answer :deep(h2),
+.today__research-answer :deep(h3) {
+  margin: var(--pc-space-3) 0 var(--pc-space-1);
+  font-size: var(--pc-text-body);
+  font-weight: 700;
+}
+
+.today__research-answer :deep(ul),
+.today__research-answer :deep(ol) {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0 0 var(--pc-space-2);
+  padding-left: 1.25rem;
+}
+
+.today__research-answer :deep(a) {
+  color: var(--pc-accent-text);
+  text-decoration: underline;
+}
+
+.today__research-sources {
+  padding-top: var(--pc-space-2);
+  border-top: 1px solid var(--pc-border);
+}
+
+.today__research-sources summary {
+  color: var(--pc-accent-text);
+  font-size: var(--pc-text-caption);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.today__research-sources a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pc-space-2);
+  margin-top: var(--pc-space-2);
+  color: var(--pc-accent-text);
+  font-size: var(--pc-text-caption);
+  text-decoration: none;
+}
+
+.today__research-sources a span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .today__help-footer {
   display: flex;
   flex-wrap: wrap;
@@ -1295,6 +1991,23 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 767px) {
+  .today__next-action {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .today__next-action-button {
+    justify-content: center;
+  }
+
+  .today__research-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .today__research-button {
+    width: 100%;
+  }
+
   .today__undo {
     bottom: calc(5.75rem + env(safe-area-inset-bottom));
     max-width: calc(100vw - 2rem);

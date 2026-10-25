@@ -12,17 +12,37 @@
 
       <section v-for="group in visibleMoreGroups" :key="group.label" class="pc-more__group" :aria-labelledby="`more-${group.label}`">
         <h3 :id="`more-${group.label}`" class="pc-more__heading">{{ group.label }}</h3>
-        <button
-          v-for="item in group.items"
-          :key="item.key"
-          type="button"
-          class="pc-more__item"
-          :class="{ 'pc-more__item--mobile-only': item.mobileOnly }"
-          @click="$emit('navigate', item)"
-        >
-          <component :is="item.icon" :size="18" aria-hidden="true" />
-          <span>{{ item.label }}</span>
-        </button>
+        <div v-for="item in group.items" :key="item.key" class="pc-more__item-wrap">
+          <div class="pc-more__item-row">
+            <button
+              type="button"
+              class="pc-more__item"
+              :class="{ 'pc-more__item--mobile-only': item.mobileOnly }"
+              @click="$emit('navigate', item)"
+            >
+              <component :is="item.icon" :size="18" aria-hidden="true" />
+              <span>{{ item.label }}</span>
+              <span v-if="item.premium" class="pc-more__premium-badge">Premium</span>
+            </button>
+            <button
+              v-if="item.infoTitle"
+              type="button"
+              class="pc-more__info"
+              :aria-label="`About ${item.label}`"
+              :aria-expanded="expandedInfoKey === item.key"
+              @click.stop="toggleInfo(item.key)"
+            >
+              <Info :size="16" aria-hidden="true" />
+            </button>
+          </div>
+          <div v-if="expandedInfoKey === item.key" class="pc-more__info-card">
+            <strong>{{ item.infoTitle }}</strong>
+            <p>{{ item.infoSummary }}</p>
+            <ul>
+              <li v-for="bullet in item.infoBullets || []" :key="bullet">{{ bullet }}</li>
+            </ul>
+          </div>
+        </div>
       </section>
 
       <section class="pc-more__group" aria-labelledby="more-app">
@@ -63,8 +83,8 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
-import { ChevronRight, Download, Gem, LogOut } from 'lucide-vue-next'
+import { computed, onMounted, ref } from 'vue'
+import { ChevronRight, Download, Gem, Info, LogOut } from 'lucide-vue-next'
 import PcSheet from './PcSheet.vue'
 import { ACCOUNT_NAV, MORE_GROUPS } from '../navigation.js'
 import { useTheme } from '../useTheme.js'
@@ -87,12 +107,17 @@ const THEME_OPTIONS = [
 ]
 const { preference, setThemePreference } = useTheme()
 const featureFlagsStore = useFeatureFlagsStore()
+const expandedInfoKey = ref('')
 const visibleMoreGroups = computed(() => MORE_GROUPS
   .map((group) => ({
     ...group,
     items: group.items.filter((item) => !item.featureFlag || featureFlagsStore.isEnabled(item.featureFlag)),
   }))
   .filter((group) => group.items.length))
+
+function toggleInfo(key) {
+  expandedInfoKey.value = expandedInfoKey.value === key ? '' : key
+}
 
 onMounted(() => {
   featureFlagsStore.ensureLoaded().catch(() => {})
@@ -164,12 +189,99 @@ onMounted(() => {
   cursor: pointer;
 }
 
+.pc-more__item-row {
+  display: flex;
+  align-items: center;
+  gap: var(--pc-space-1);
+}
+
+.pc-more__item-row .pc-more__item {
+  flex: 1;
+}
+
 .pc-more__item svg {
   color: var(--pc-text-muted);
 }
 
 .pc-more__item:hover {
   background: var(--pc-surface-hover);
+}
+
+.pc-more__premium-badge {
+  margin-left: auto;
+  border: 1px solid var(--pc-accent-border);
+  border-radius: 9999px;
+  background: var(--pc-accent-soft);
+  color: var(--pc-accent-text);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  padding: 0.28rem 0.45rem;
+  text-transform: uppercase;
+}
+
+.pc-more__info {
+  display: inline-flex;
+  width: 2.25rem;
+  height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border: 1px solid transparent;
+  border-radius: 9999px;
+  background: transparent;
+  color: var(--pc-text-subtle);
+  cursor: pointer;
+}
+
+.pc-more__info:hover,
+.pc-more__info:focus-visible {
+  border-color: var(--pc-accent-border);
+  background: var(--pc-accent-soft);
+  color: var(--pc-accent-text);
+  outline: none;
+}
+
+.pc-more__info-card {
+  margin: 0 var(--pc-space-2) var(--pc-space-2) var(--pc-space-2);
+  padding: var(--pc-space-3);
+  border: 1px solid var(--pc-accent-border);
+  border-radius: var(--pc-radius-md);
+  background: var(--pc-accent-soft);
+  color: var(--pc-text-muted);
+  font-size: var(--pc-text-small);
+  line-height: 1.45;
+}
+
+.pc-more__info-card strong {
+  display: block;
+  color: var(--pc-text);
+}
+
+.pc-more__info-card p {
+  margin: var(--pc-space-1) 0 0;
+}
+
+.pc-more__info-card ul {
+  display: grid;
+  gap: 0.25rem;
+  margin: var(--pc-space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pc-more__info-card li {
+  position: relative;
+  padding-left: 1rem;
+}
+
+.pc-more__info-card li::before {
+  position: absolute;
+  left: 0;
+  color: var(--pc-accent);
+  content: '•';
+  font-weight: 800;
 }
 
 @media (min-width: 768px) {

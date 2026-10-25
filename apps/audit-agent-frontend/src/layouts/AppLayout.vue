@@ -328,6 +328,7 @@ import { db } from '@/firebase/init'
 import { doc, setDoc } from 'firebase/firestore'
 import { trackLinkedInConversion } from '@/utils/ads'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
+import api from '@/services/api'
 import { ElMessage, ElNotification } from 'element-plus'
 import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
 import { isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
@@ -424,6 +425,7 @@ onMounted(() => {
 const mobileMenu = ref(false) // mobile drawer toggle
 const showUpgrade = ref(false)
 const premiumActivationOpen = ref(false)
+const premiumActivationTrigger = ref('task_created')
 const planOpen = ref(false)
 const profileSetupOpen = ref(false)
 
@@ -557,8 +559,21 @@ const usesDocumentScrollShell = computed(
 let upgradeHandler = null
 let actionInboxUpdatedHandler = null
 let premiumActivationHandler = null
+let sessionPremiumPromptTimer = null
+let activityHeartbeatTimer = null
 const SUBSCRIPTION_REFRESH_INTERVAL_MS = 5 * 60 * 1000
 const PREMIUM_ACTIVATION_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000
+const ACTIVITY_HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000
+
+async function recordActivity() {
+  const uid = authStore.user?.uid
+  if (!uid || isGuest.value) return
+  try {
+    await api.post('/settings/activity', { userId: uid })
+  } catch {
+    // Activity reporting is best effort and must never interrupt the app.
+  }
+}
 
 function handleQuickSetupUpdated(nextState = null) {
   quickSetupStore.refreshQuickSetupState(nextState)
@@ -996,7 +1011,7 @@ function premiumActivationStorageKey(uid) {
   return `plancraftai:premium-activation:last-shown:${uid}`
 }
 
-async function maybeShowPremiumActivation() {
+async function maybeShowPremiumActivation(trigger = 'task_created') {
   const uid = authStore.user?.uid
   if (!uid || isGuest.value || isPremium.value) return
 
@@ -1015,10 +1030,11 @@ async function maybeShowPremiumActivation() {
     // Continue without a frequency cap if storage is unavailable.
   }
 
+  premiumActivationTrigger.value = trigger
   premiumActivationOpen.value = true
   const funnelContext = {
-    surface: 'task_value_prompt',
-    trigger: 'task_created',
+    surface: trigger === 'session_start' ? 'session_offer' : 'task_value_prompt',
+    trigger,
     scope: 'solo',
     provider: isAppleBillingSafeMode.value ? 'apple' : 'stripe',
   }
@@ -1027,9 +1043,10 @@ async function maybeShowPremiumActivation() {
 }
 
 function handlePremiumActivationUpgrade() {
+  const trigger = premiumActivationTrigger.value
   const funnelContext = {
-    surface: 'task_value_prompt',
-    trigger: 'task_created',
+    surface: trigger === 'session_start' ? 'session_offer' : 'task_value_prompt',
+    trigger,
     scope: 'solo',
     provider: isAppleBillingSafeMode.value ? 'apple' : 'stripe',
     cta: 'start_premium',
@@ -1039,14 +1056,15 @@ function handlePremiumActivationUpgrade() {
   trackUpgradeClick()
   router.push({
     path: billingRoutePath.value,
-    query: { source: 'task-value-prompt' },
+    query: { source: trigger === 'session_start' ? 'session-offer' : 'task-value-prompt' },
   }).catch(() => {})
 }
 
 function handlePremiumActivationDismissed(reason = 'not_now') {
+  const trigger = premiumActivationTrigger.value
   trackEvent('premium_activation_prompt_dismissed', {
-    surface: 'task_value_prompt',
-    trigger: 'task_created',
+    surface: trigger === 'session_start' ? 'session_offer' : 'task_value_prompt',
+    trigger,
     scope: 'solo',
     reason,
   })
@@ -1093,6 +1111,37 @@ watch(
 )
 
 watch(
+  () => authStore.user?.uid,
+  (uid) => {
+    if (sessionPremiumPromptTimer) {
+      clearTimeout(sessionPremiumPromptTimer)
+      sessionPremiumPromptTimer = null
+    }
+    if (!uid) return
+    sessionPremiumPromptTimer = setTimeout(() => {
+      maybeShowPremiumActivation('session_start').catch(() => {})
+    }, 1800)
+  },
+  { immediate: true },
+)
+
+watch(
+  () => [authStore.user?.uid, authStore.token, isGuest.value],
+  ([uid, , guest]) => {
+    if (activityHeartbeatTimer) {
+      clearInterval(activityHeartbeatTimer)
+      activityHeartbeatTimer = null
+    }
+    if (!uid || guest) return
+    recordActivity()
+    activityHeartbeatTimer = setInterval(() => {
+      if (typeof document === 'undefined' || document.visibilityState === 'visible') recordActivity()
+    }, ACTIVITY_HEARTBEAT_INTERVAL_MS)
+  },
+  { immediate: true },
+)
+
+watch(
   () => showsDesktopSidebar.value,
   (isDesktopSidebarVisible) => {
     if (isDesktopSidebarVisible) {
@@ -1103,6 +1152,14 @@ watch(
 
 onUnmounted(() => {
   clearWorkspaceRetryTimer()
+  if (activityHeartbeatTimer) {
+    clearInterval(activityHeartbeatTimer)
+    activityHeartbeatTimer = null
+  }
+  if (sessionPremiumPromptTimer) {
+    clearTimeout(sessionPremiumPromptTimer)
+    sessionPremiumPromptTimer = null
+  }
   if (storageHandler) {
     try {
       window.removeEventListener('storage', storageHandler)

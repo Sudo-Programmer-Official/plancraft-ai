@@ -67,10 +67,22 @@
           <p class="mt-3 max-w-2xl text-sm text-indigo-100/90 sm:text-base">
             Capture tasks, get nudges, and follow through with less friction.
           </p>
-          <div v-if="!isPremium" class="pricing-benefit-row" aria-label="Solo Premium benefits">
-            <span>Unlimited AI</span>
-            <span>Smart reminders</span>
-            <span>Calendar + WhatsApp</span>
+          <div v-if="!isPremium" class="pricing-benefit-card" aria-label="Solo Premium benefits">
+            <p class="pricing-benefit-card__title">Everything you need to keep momentum</p>
+            <ul class="pricing-benefit-card__list">
+              <li>Unlimited AI planning and intelligence briefs</li>
+              <li>Smart reminders across your key channels</li>
+              <li>Calendar, WhatsApp, and voice workflows</li>
+              <li>Priority support and faster access to new capabilities</li>
+            </ul>
+          </div>
+          <div v-if="offerActive && !isPremium" class="pricing-offer-card" aria-label="Limited-time 50 percent off offer">
+            <div>
+              <span class="pricing-offer-card__badge">50% OFF</span>
+              <span class="pricing-offer-card__old-price">$4/mo</span>
+              <strong>$2/mo</strong>
+            </div>
+            <span>Ends in {{ countdown }}</span>
           </div>
           <div class="mt-5 flex flex-wrap items-center gap-3">
             <button
@@ -80,7 +92,7 @@
               class="pricing-primary-cta inline-flex min-h-11 items-center justify-center rounded-xl px-5 py-3 text-sm transition disabled:opacity-60"
             >
               <span v-if="loading">Redirecting…</span>
-              <span v-else>Start Premium — $2/mo</span>
+              <span v-else>{{ offerActive ? (authStore.user?.uid ? 'Claim 50% off — $2/mo' : 'Sign up & claim 50% off') : 'Start Premium — $2/mo' }}</span>
             </button>
             <button
               v-else-if="!isAppleManagedPremium"
@@ -105,9 +117,6 @@
               Refresh Access
             </button>
           </div>
-          <p v-if="offerActive && !isPremium" class="mt-3 text-xs text-indigo-100/85">
-            Limited offer active: $2/month. Ends in {{ countdown }}.
-          </p>
           <p v-if="!isPremium" class="pricing-checkout-note">Secure checkout · Cancel anytime</p>
         </section>
 
@@ -128,11 +137,14 @@
               <div class="pricing-plan-card pricing-plan-card--premium relative rounded-xl border border-indigo-300/40 bg-indigo-900/35 p-4">
                 <span class="premium-badge">{{ offerActive ? 'Limited Offer' : 'Most Popular' }}</span>
                 <h3 class="pricing-plan-card__title text-base font-semibold text-white">Solo Premium</h3>
-                <p class="pricing-plan-card__price mt-1 text-2xl font-bold text-white">$2 / month</p>
+                <p class="pricing-plan-card__price mt-1 text-2xl font-bold text-white">
+                  <span v-if="offerActive" class="pricing-plan-card__old-price">$4</span>
+                  $2 <span class="text-base font-semibold">/ month</span>
+                </p>
                 <ul class="pricing-plan-card__features mt-3 space-y-1 text-sm text-indigo-100/90">
-                  <li>Unlimited AI insights</li>
-                  <li>Smart reminders</li>
-                  <li>Calendar and WhatsApp integration</li>
+                  <li>Unlimited AI planning and Intelligence Desk briefs</li>
+                  <li>Smart reminders across your channels</li>
+                  <li>Calendar, WhatsApp, and voice workflows</li>
                   <li>Priority support</li>
                 </ul>
               </div>
@@ -197,7 +209,7 @@
           <div class="min-w-0">
             <p class="pricing-mobile-cta__label text-[11px] uppercase tracking-[0.22em] text-indigo-200/80">Solo Premium</p>
             <p class="pricing-mobile-cta__price truncate text-sm font-semibold text-white">
-              {{ offerActive ? '$2/mo limited offer' : '$2/mo' }}
+              {{ offerActive ? '50% off · $2/mo' : '$2/mo' }}
             </p>
           </div>
           <button
@@ -205,7 +217,7 @@
             @click="onUpgrade"
             class="pricing-primary-cta pricing-primary-cta--compact shrink-0 rounded-lg px-4 py-2 text-sm disabled:opacity-60"
           >
-            {{ loading ? 'Redirecting…' : 'Upgrade' }}
+            {{ loading ? 'Redirecting…' : offerActive ? 'Claim offer' : 'Upgrade' }}
           </button>
         </div>
       </div>
@@ -440,9 +452,9 @@ async function onUpgrade() {
       }
 
       // Themed info message (aligned with PlanCraftAI UI tone)
-      ElNotification({
-        title: 'Sign in required',
-        message: 'Sign in to continue.',
+        ElNotification({
+          title: 'Create your account',
+          message: 'Sign up or sign in to claim the 50% off offer.',
         type: 'info',
         duration: 2800,
         offset: 80,
@@ -729,22 +741,94 @@ async function refreshPremiumAccess() {
   color: #475569 !important;
 }
 
-.pricing-benefit-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 1rem;
+.pricing-benefit-card {
+  max-width: 42rem;
+  margin-top: 1.25rem;
+  border: 1px solid rgba(199, 210, 254, 0.9);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.78);
+  padding: 0.9rem 1rem;
 }
 
-.pricing-benefit-row span {
-  border: 1px solid #c7d2fe;
-  border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.78);
-  color: #3730a3;
-  padding: 0.35rem 0.65rem;
+.pricing-benefit-card__title {
+  margin: 0;
+  color: #312e81 !important;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.pricing-benefit-card__list,
+.pricing-plan-card__features {
+  display: grid;
+  gap: 0.5rem;
+  list-style: none;
+  padding-left: 0;
+}
+
+.pricing-benefit-card__list {
+  margin: 0.65rem 0 0;
+  color: #475569;
+  font-size: 0.8rem;
+}
+
+.pricing-benefit-card__list li,
+.pricing-plan-card__features li {
+  position: relative;
+  padding-left: 1.35rem;
+}
+
+.pricing-benefit-card__list li::before,
+.pricing-plan-card__features li::before {
+  position: absolute;
+  left: 0;
+  color: #4f46e5;
+  content: '✓';
+  font-weight: 800;
+}
+
+.pricing-offer-card {
+  display: flex;
+  max-width: 42rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.85rem;
+  border: 1px solid #fbbf24;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, #fffbeb, #fef3c7);
+  color: #78350f;
+  padding: 0.75rem 1rem;
   font-size: 0.75rem;
   font-weight: 700;
-  line-height: 1.1;
+}
+
+.pricing-offer-card > div {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+}
+
+.pricing-offer-card__badge {
+  border-radius: 9999px;
+  background: #f59e0b;
+  color: #fff;
+  padding: 0.25rem 0.45rem;
+  font-size: 0.65rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.pricing-offer-card strong {
+  color: #111827;
+  font-size: 1.1rem;
+}
+
+.pricing-offer-card__old-price,
+.pricing-plan-card__old-price {
+  color: #64748b;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: line-through;
 }
 
 .pricing-primary-cta {
