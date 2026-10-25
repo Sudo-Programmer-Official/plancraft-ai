@@ -8,6 +8,7 @@ import { initGoogleCalendarSync } from "../jobs/googleCalendarSyncJob.js"
 import { initSitemapJob } from "../jobs/sitemapJob.js"
 import { initRetentionJob } from "../jobs/retentionJob.js"
 import { initActionInboxScheduler } from "../jobs/actionInboxScheduler.js"
+import { initIntelligenceMorningEmailScheduler } from "../jobs/intelligenceMorningEmail.js"
 
 export async function initScheduler() {
   try {
@@ -50,4 +51,5 @@ export async function initScheduler() {
   try { initSitemapJob() } catch (e) { console.warn('Sitemap job init failed', e) }
   try { initRetentionJob() } catch (e) { console.warn('Retention job init failed', e) }
   try { initActionInboxScheduler() } catch (e) { console.warn('Action inbox scheduler init failed', e) }
+  try { initIntelligenceMorningEmailScheduler() } catch (e) { console.warn('Intelligence morning email scheduler init failed', e) }
 }

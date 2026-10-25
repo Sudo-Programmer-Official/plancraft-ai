@@ -12,6 +12,7 @@ import {
 } from '../services/intelligenceService.js'
 import { getRemoteFeatureFlags } from '../services/featureFlagService.js'
 import { getIntelligenceAccess, reserveIntelligenceRequest } from '../services/intelligenceUsageService.js'
+import { resolveCustomIntelligenceProfiles } from '../services/intelligenceAgentService.js'
 
 const router = express.Router()
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -582,6 +583,7 @@ router.post('/intelligence/brief', async (req, res) => {
       question: req.body?.question,
       interests: req.body?.interests,
       agentIds: req.body?.agentIds,
+      customAgentIds: req.body?.customAgentIds,
       goalContext: req.body?.goalContext,
     }
     const access = await getIntelligenceAccess(req.user?.uid)
@@ -592,7 +594,15 @@ router.post('/intelligence/brief', async (req, res) => {
       })
     }
 
-    const cacheKey = buildIntelligenceCacheKey(input)
+    const customAgents = await resolveCustomIntelligenceProfiles(req.user?.uid, input.customAgentIds)
+    const researchInput = {
+      ...input,
+      customAgents,
+      customAgentIds: customAgents.map((agent) => agent.id),
+      customAgentVersions: customAgents.map((agent) => agent.agentVersion || ''),
+    }
+
+    const cacheKey = buildIntelligenceCacheKey(researchInput)
     const cached = await getSharedCachedIntelligenceBrief(cacheKey)
     if (cached) return res.json({ success: true, cached: true, ...cached })
 
@@ -605,7 +615,7 @@ router.post('/intelligence/brief', async (req, res) => {
       })
     }
 
-    const result = await createIntelligenceBrief(input)
+    const result = await createIntelligenceBrief(researchInput)
     // The response does not need to wait for the shared cache write.
     void cacheSharedIntelligenceBrief(cacheKey, result)
     return res.json({ success: true, cached: false, usage: quota, ...result })

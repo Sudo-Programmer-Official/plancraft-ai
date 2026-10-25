@@ -125,6 +125,8 @@ import playbookRoutes from "./routes/playbookRoutes.js";
 import accountRoutes from "./routes/accountRoutes.js";
 import actionInboxRoutes from "./routes/actionInboxRoutes.js";
 import nlpProxyRoutes from "./routes/nlpProxyRoutes.js";
+import intelligenceGoalRoutes from "./routes/intelligenceGoalRoutes.js";
+import intelligenceAgentRoutes from "./routes/intelligenceAgentRoutes.js";
 
 dotenv.config();
 
@@ -291,6 +293,8 @@ app.use("/api/ai", aiRoutes);
 // Back-compat: allow calling AI endpoints under /api as well
 app.use("/api", aiRoutes);
 app.use("/api/nlp", nlpProxyRoutes);
+app.use("/api", intelligenceGoalRoutes);
+app.use("/api", intelligenceAgentRoutes);
 app.use("/api/action-inbox", actionInboxRoutes);
 app.use("/api/usage", usageRoutes);
 app.use("/api/access", accessRoutes);

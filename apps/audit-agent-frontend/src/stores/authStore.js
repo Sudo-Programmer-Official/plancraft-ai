@@ -1070,6 +1070,25 @@ export const useAuthStore = defineStore('authStore', {
       let restoredNativeIosSnapshot = false
       let bootstrapSettled = false
       let bootstrapTimer = null
+      const authHydrationWaiters = new Set()
+      const notifyAuthHydrated = () => {
+        for (const resolve of authHydrationWaiters) {
+          try { resolve() } catch {}
+        }
+        authHydrationWaiters.clear()
+      }
+      const waitForCurrentAuthHydration = () => {
+        const currentUid = auth.currentUser?.uid || null
+        if (!currentUid || (this.user?.uid === currentUid && this.token)) return Promise.resolve()
+        return new Promise((resolve) => {
+          authHydrationWaiters.add(resolve)
+          const hydratedUid = auth.currentUser?.uid || null
+          if (!hydratedUid || (this.user?.uid === hydratedUid && this.token)) {
+            authHydrationWaiters.delete(resolve)
+            resolve()
+          }
+        })
+      }
       const settleBootstrap = (reason) => {
         if (bootstrapSettled) return
         bootstrapSettled = true
@@ -1160,12 +1179,17 @@ export const useAuthStore = defineStore('authStore', {
         if (allowCachedSessionFallback) {
           const cachedUser = localStorage.getItem('user')
           const cachedToken = localStorage.getItem('token')
-          if (!auth.currentUser && cachedUser && cachedToken) {
-            this.user = JSON.parse(cachedUser)
-            this.token = cachedToken
-            this.guest = false
-            console.log('[Auth] Restored session from local backup')
-            settleBootstrap('local-backup')
+          if (cachedUser && cachedToken && !this.user) {
+            const parsedUser = JSON.parse(cachedUser)
+            const currentUid = auth.currentUser?.uid || null
+            const cachedUid = parsedUser?.uid || null
+            if (!currentUid || !cachedUid || currentUid === cachedUid) {
+              this.user = parsedUser
+              this.token = cachedToken
+              this.guest = false
+              console.log('[Auth] Restored session from local backup')
+              if (!currentUid) settleBootstrap('local-backup')
+            }
           }
         }
       } catch (e) {
@@ -1187,7 +1211,9 @@ export const useAuthStore = defineStore('authStore', {
           settleBootstrap(keepNativeSnapshotSession ? 'auth-state:ios-snapshot' : 'auth-state:none')
           return
         }
-        settleBootstrap('auth-state:user')
+        // Keep bootstrapping until onIdTokenChanged has hydrated the profile
+        // and role. The router must not evaluate an authenticated user as null
+        // during this short Firebase startup window.
       })
 
       onIdTokenChanged(auth, async (user) => {
@@ -1274,6 +1300,8 @@ export const useAuthStore = defineStore('authStore', {
           }
           this.resetAuth()
           settleBootstrap('id-token:error')
+        } finally {
+          notifyAuthHydrated()
         }
       })
 
@@ -1295,6 +1323,16 @@ export const useAuthStore = defineStore('authStore', {
           code: error?.code || null,
         })
       }
+
+      // Firebase may already have a current user while the async token/profile
+      // listener is still running. Do not install the router until that state
+      // is reflected in the Pinia store, otherwise protected routes can
+      // redirect to /login or /today during a normal page refresh.
+      await withFallback(waitForCurrentAuthHydration(), {
+        ms: isNativePackagedApp() ? 4000 : 8000,
+        label: 'initial auth hydration',
+        fallback: null,
+      })
 
       // 🧠 Silent token refresh to keep sessions alive in PWA contexts
       try {

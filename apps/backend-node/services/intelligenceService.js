@@ -185,22 +185,39 @@ async function writeSharedCache(kind, cacheKey, value) {
   }
 }
 
-export function buildIntelligenceCacheKey({ question = '', interests = '', agentIds, goalContext = null } = {}) {
+export function buildIntelligenceCacheKey({
+  question = '',
+  interests = '',
+  agentIds,
+  customAgentIds = [],
+  customAgentVersions = [],
+  goalContext = null,
+} = {}) {
   const normalizedGoal = normalizeGoalContext(goalContext)
   const payload = {
-    version: 1,
+    version: 2,
     question: cleanText(question, MAX_QUESTION_LENGTH).toLowerCase(),
     interests: cleanText(interests, MAX_INTERESTS_LENGTH).toLowerCase(),
-    agentIds: normalizeAgentIds(agentIds).sort(),
+    agentIds: (Array.isArray(agentIds) ? normalizeRequestedAgentIds(agentIds) : normalizeAgentIds(agentIds)).sort(),
+    customAgents: normalizeCustomAgentIds(customAgentIds)
+      .map((id, index) => `${id}:${cleanText(customAgentVersions[index], 120)}`)
+      .sort(),
     goalContext: normalizedGoal,
   }
   return createHash('sha256').update(JSON.stringify(payload)).digest('hex')
 }
 
-export function buildIntelligenceSpecialistCacheKey({ agentId = '', question = '', interests = '', goalContext = null } = {}) {
+export function buildIntelligenceSpecialistCacheKey({
+  agentId = '',
+  agentVersion = '',
+  question = '',
+  interests = '',
+  goalContext = null,
+} = {}) {
   const payload = {
-    version: 1,
+    version: 2,
     agentId: cleanText(agentId, 40),
+    agentVersion: cleanText(agentVersion, 120),
     question: cleanText(question, MAX_QUESTION_LENGTH).toLowerCase(),
     interests: cleanText(interests, MAX_INTERESTS_LENGTH).toLowerCase(),
     goalContext: normalizeGoalContext(goalContext),
@@ -234,12 +251,20 @@ export function listIntelligenceAgents() {
 }
 
 export function normalizeAgentIds(value) {
+  const normalized = normalizeRequestedAgentIds(value)
+  return normalized.length ? normalized : ['tech-news', 'capital-flows']
+}
+
+function normalizeRequestedAgentIds(value) {
   const requested = Array.isArray(value) ? value : []
-  const normalized = unique(requested.map((id) => cleanText(id, 40)))
+  return unique(requested.map((id) => cleanText(id, 40)))
     .filter((id) => AGENT_PROFILES[id])
     .slice(0, MAX_AGENTS)
+}
 
-  return normalized.length ? normalized : ['tech-news', 'capital-flows']
+function normalizeCustomAgentIds(value) {
+  return unique((Array.isArray(value) ? value : []).map((id) => cleanText(id, 80)))
+    .slice(0, MAX_AGENTS)
 }
 
 export function buildAgentQuery(profile, { question = '', interests = '', goalContext = null } = {}) {
@@ -368,6 +393,7 @@ async function runLiveSearch(query, instructions) {
 async function getSpecialistResult({ profile, query, researchContext }) {
   const cacheKey = buildIntelligenceSpecialistCacheKey({
     agentId: profile.id,
+    agentVersion: profile.agentVersion,
     ...researchContext,
   })
   const local = getMemoryCache(specialistCache, cacheKey)
@@ -463,11 +489,22 @@ async function synthesizeBrief(results, { question = '', interests = '', goalCon
   }
 }
 
-export async function createIntelligenceBrief({ question = '', interests = '', agentIds, goalContext: rawGoalContext = null } = {}) {
+export async function createIntelligenceBrief({
+  question = '',
+  interests = '',
+  agentIds,
+  customAgents = [],
+  goalContext: rawGoalContext = null,
+} = {}) {
   const normalizedQuestion = cleanText(question, MAX_QUESTION_LENGTH)
   const normalizedInterests = cleanText(interests, MAX_INTERESTS_LENGTH)
   const goalContext = normalizeGoalContext(rawGoalContext)
-  const profiles = normalizeAgentIds(agentIds).map((id) => AGENT_PROFILES[id])
+  const fixedProfiles = (Array.isArray(agentIds) ? normalizeRequestedAgentIds(agentIds) : normalizeAgentIds(agentIds))
+    .map((id) => AGENT_PROFILES[id])
+  const profiles = [
+    ...fixedProfiles,
+    ...(Array.isArray(customAgents) ? customAgents : []),
+  ].slice(0, MAX_AGENTS)
   const settled = await Promise.allSettled(
     profiles.map(async (profile) => {
       const query = buildAgentQuery(profile, {
@@ -483,6 +520,7 @@ export async function createIntelligenceBrief({ question = '', interests = '', a
           question: normalizedQuestion,
           interests: normalizedInterests,
           goalContext,
+          agentVersion: profile.agentVersion,
         },
       })
       const result = specialist.result
