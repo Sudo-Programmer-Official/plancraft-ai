@@ -153,7 +153,10 @@ export async function createCheckoutSession(plan, userId, options = {}) {
   } catch (err) {
     const serverMsg = err?.response?.data?.error
     console.error('Stripe error:', serverMsg || err?.message)
-    throw new Error(serverMsg || 'Payment service temporarily unavailable')
+    const normalized = new Error(serverMsg || 'Payment service temporarily unavailable')
+    normalized.code = err?.response?.data?.code || err?.code || ''
+    normalized.status = Number(err?.response?.status || 0)
+    throw normalized
   }
 }
 

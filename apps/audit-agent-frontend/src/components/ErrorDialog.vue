@@ -5,32 +5,22 @@
     :title="null"
     :width="dialogWidth"
     class="payment-error-dialog"
-     :style="{
-      background: 'linear-gradient(145deg, #1e1b4b, #312e81, #4c1d95)',
-      color: '#e2e8f0',
-      borderRadius: '0.5rem',
-      boxShadow: '0 8px 30px rgba(0,0,0,0.6)',
-      border: '1px solid rgba(255,255,255,0.08)',
-      backdropFilter: 'blur(12px)'
-    }"
     destroy-on-close
     @close="visible = false"
   >
-    <div class="text-center px-4 py-2">
-      <!-- <el-icon class="text-red-400 text-4xl mb-3">
-        <CircleCloseFilled />
-      </el-icon> -->
-      <h3 class="text-lg font-semibold text-slate-100 mb-2">
+    <div class="payment-error-dialog__content">
+      <div class="payment-error-dialog__icon" aria-hidden="true">×</div>
+      <h3 class="payment-error-dialog__title">
         {{ title }}
       </h3>
-      <p class="text-slate-300 text-sm sm:text-base leading-relaxed">
+      <p class="payment-error-dialog__message">
         {{ message }}
       </p>
     </div>
 
     <template #footer>
-      <div class="flex justify-center gap-3">
-        <el-button class="retry-btn" @click="emitRetry">
+      <div class="payment-error-dialog__footer">
+        <el-button class="retry-btn" type="primary" @click="emitRetry">
           Retry
         </el-button>
         <el-button class="close-btn" @click="visible = false">
@@ -68,43 +58,90 @@ function emitRetry() {
 </script>
 
 <style scoped>
-.payment-error-dialog .el-dialog {
-  background: linear-gradient(145deg, #1e1b4b, #312e81, #4c1d95); /* dark indigo gradient */
-  color: #e2e8f0;
-  border-radius: 1rem;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.6);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(12px);
+.payment-error-dialog {
+  border: 1px solid var(--pc-border, #e2e8f0) !important;
+  border-radius: 1.25rem !important;
+  background: var(--pc-surface, #ffffff) !important;
+  color: var(--pc-text, #0f172a) !important;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.18) !important;
 }
 
-/* Hide default header */
-.payment-error-dialog .el-dialog__header {
+.payment-error-dialog :deep(.el-dialog__header) {
   display: none;
 }
 
-/* Footer buttons */
-.retry-btn {
-  background: linear-gradient(90deg, #9333ea, #ec4899); /* purple → pink */
-  border: none;
-  color: white;
-  font-weight: 600;
-  border-radius: 0.5rem;
-  padding: 0.5rem 1.25rem;
+.payment-error-dialog :deep(.el-dialog__body),
+.payment-error-dialog :deep(.el-dialog__footer) {
+  color: var(--pc-text, #0f172a);
 }
-.retry-btn:hover {
-  opacity: 0.9;
+
+.payment-error-dialog__content {
+  padding: 0.5rem 1rem 0;
+  text-align: center;
+}
+
+.payment-error-dialog__icon {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  margin: 0 auto 0.75rem;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--pc-danger-soft, rgba(201, 48, 44, 0.08));
+  color: var(--pc-danger, #c9302c);
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.payment-error-dialog__title {
+  margin: 0;
+  color: var(--pc-text, #0f172a);
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.payment-error-dialog__message {
+  margin: 0.6rem 0 0;
+  color: var(--pc-text-muted, #475569);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+
+.payment-error-dialog__footer {
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.retry-btn {
+  min-width: 6.5rem;
+  border: 1px solid rgba(79, 70, 229, 0.35) !important;
+  border-radius: 0.75rem !important;
+  background: var(--pc-accent-fill, linear-gradient(135deg, #4f46e5, #7c3aed)) !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+  box-shadow: 0 8px 18px rgba(79, 70, 229, 0.24);
+}
+
+.retry-btn:hover,
+.retry-btn:focus-visible {
+  background: var(--pc-accent-fill-hover, linear-gradient(135deg, #4338ca, #6d28d9)) !important;
 }
 
 .close-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #cbd5e1;
-  font-weight: 500;
-  border-radius: 0.5rem;
-  padding: 0.5rem 1.25rem;
+  min-width: 6.5rem;
+  border: 1px solid var(--pc-border-strong, #cbd5e1) !important;
+  border-radius: 0.75rem !important;
+  background: #fff !important;
+  color: var(--pc-text-muted, #475569) !important;
+  font-weight: 700 !important;
 }
-.close-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-  color: white;
+
+.close-btn:hover,
+.close-btn:focus-visible {
+  border-color: #818cf8 !important;
+  background: var(--pc-accent-soft, rgba(79, 70, 229, 0.08)) !important;
+  color: var(--pc-accent-text, #4338ca) !important;
 }
 </style>

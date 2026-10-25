@@ -248,7 +248,8 @@
   <ErrorDialog
     v-model="errorVisible"
     title="Action Failed"
-    message="❌ We couldn't complete that action. Please try again later."
+    :message="errorMessage"
+    @retry="onUpgrade"
   />
   </div>
 </template>
@@ -332,6 +333,7 @@ useSeoMeta({
 })
 const loading = ref(false)
 const errorVisible = ref(false)
+const errorMessage = ref("We couldn't complete that action. Please try again later.")
 const cancelLoading = ref(false)
 const countdown = ref('03:00:00')
 const offerActive = ref(false)
@@ -494,13 +496,22 @@ async function onUpgrade() {
     }
     trackSubscriptionFunnel('checkout_redirect', { cta: 'solo_upgrade' })
     const url = await createCheckoutSession('monthly', authStore.user?.uid, {
-      foundingOffer: isFoundingOfferActive(),
+      foundingOffer: offerActive.value && isFoundingOfferActive(),
     })
     window.location.href = url
 
   } catch (e) {
     console.error('Upgrade error:', e)
     loading.value = false
+    const code = String(e?.code || e?.response?.data?.code || '').toLowerCase()
+    if (code === 'founding_offer_unavailable' || code === 'founding_offer_not_configured' || /founding offer is no longer available|founding offer is not configured/i.test(String(e?.message || ''))) {
+      // Keep the frontend from advertising a stale promotion when the backend
+      // is the source of truth for offer availability.
+      stopPromoTimer()
+      errorMessage.value = 'The $2 founding rate is temporarily unavailable. You can continue with Premium at $5/month.'
+    } else {
+      errorMessage.value = e?.message || "We couldn't complete that action. Please try again later."
+    }
     errorVisible.value = true
   }
 }
