@@ -561,18 +561,37 @@ let actionInboxUpdatedHandler = null
 let premiumActivationHandler = null
 let sessionPremiumPromptTimer = null
 let activityHeartbeatTimer = null
+let activityHeartbeatInFlight = null
+const activityHeartbeatLastAttemptAt = new Map()
 const SUBSCRIPTION_REFRESH_INTERVAL_MS = 5 * 60 * 1000
 const PREMIUM_ACTIVATION_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000
 const ACTIVITY_HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000
+const ACTIVITY_MIN_INTERVAL_MS = 60 * 1000
 
 async function recordActivity() {
   const uid = authStore.user?.uid
   if (!uid || isGuest.value) return
-  try {
-    await api.post('/settings/activity', { userId: uid })
-  } catch {
-    // Activity reporting is best effort and must never interrupt the app.
-  }
+  if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
+
+  const now = Date.now()
+  const lastAttemptAt = activityHeartbeatLastAttemptAt.get(uid) || 0
+  if (now - lastAttemptAt < ACTIVITY_MIN_INTERVAL_MS) return
+  if (activityHeartbeatInFlight) return activityHeartbeatInFlight
+
+  // Record the attempt before making the request. If the API is unavailable,
+  // remounts or token refreshes must not turn this best-effort signal into a
+  // request loop.
+  activityHeartbeatLastAttemptAt.set(uid, now)
+  activityHeartbeatInFlight = api
+    .post('/settings/activity', { userId: uid })
+    .catch(() => {
+      // Activity reporting is best effort and must never interrupt the app.
+    })
+    .finally(() => {
+      activityHeartbeatInFlight = null
+    })
+
+  return activityHeartbeatInFlight
 }
 
 function handleQuickSetupUpdated(nextState = null) {
@@ -1128,8 +1147,8 @@ watch(
 )
 
 watch(
-  () => [authStore.user?.uid, authStore.token, isGuest.value],
-  ([uid, , guest]) => {
+  () => [authStore.user?.uid, isGuest.value],
+  ([uid, guest]) => {
     if (activityHeartbeatTimer) {
       clearInterval(activityHeartbeatTimer)
       activityHeartbeatTimer = null
@@ -1158,6 +1177,7 @@ onUnmounted(() => {
     clearInterval(activityHeartbeatTimer)
     activityHeartbeatTimer = null
   }
+  activityHeartbeatInFlight = null
   if (sessionPremiumPromptTimer) {
     clearTimeout(sessionPremiumPromptTimer)
     sessionPremiumPromptTimer = null
