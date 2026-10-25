@@ -561,12 +561,32 @@ let actionInboxUpdatedHandler = null
 let premiumActivationHandler = null
 let sessionPremiumPromptTimer = null
 let activityHeartbeatTimer = null
-let activityHeartbeatInFlight = null
+const activityHeartbeatInFlight = new Map()
 const activityHeartbeatLastAttemptAt = new Map()
 const SUBSCRIPTION_REFRESH_INTERVAL_MS = 5 * 60 * 1000
 const PREMIUM_ACTIVATION_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000
 const ACTIVITY_HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000
 const ACTIVITY_MIN_INTERVAL_MS = 60 * 1000
+
+function activityHeartbeatStorageKey(uid) {
+  return `pcai:last-activity-heartbeat:${uid}`
+}
+
+function readActivityHeartbeatLastAttemptAt(uid) {
+  const inMemory = activityHeartbeatLastAttemptAt.get(uid) || 0
+  let persisted = 0
+  try {
+    persisted = Number(localStorage.getItem(activityHeartbeatStorageKey(uid))) || 0
+  } catch { /* local storage is optional */ }
+  return Math.max(inMemory, persisted)
+}
+
+function rememberActivityHeartbeatAttempt(uid, timestamp) {
+  activityHeartbeatLastAttemptAt.set(uid, timestamp)
+  try {
+    localStorage.setItem(activityHeartbeatStorageKey(uid), String(timestamp))
+  } catch { /* local storage is optional */ }
+}
 
 async function recordActivity() {
   const uid = authStore.user?.uid
@@ -574,24 +594,25 @@ async function recordActivity() {
   if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
 
   const now = Date.now()
-  const lastAttemptAt = activityHeartbeatLastAttemptAt.get(uid) || 0
+  const lastAttemptAt = readActivityHeartbeatLastAttemptAt(uid)
   if (now - lastAttemptAt < ACTIVITY_MIN_INTERVAL_MS) return
-  if (activityHeartbeatInFlight) return activityHeartbeatInFlight
+  if (activityHeartbeatInFlight.has(uid)) return activityHeartbeatInFlight.get(uid)
 
   // Record the attempt before making the request. If the API is unavailable,
   // remounts or token refreshes must not turn this best-effort signal into a
   // request loop.
-  activityHeartbeatLastAttemptAt.set(uid, now)
-  activityHeartbeatInFlight = api
+  rememberActivityHeartbeatAttempt(uid, now)
+  const request = api
     .post('/settings/activity', { userId: uid })
     .catch(() => {
       // Activity reporting is best effort and must never interrupt the app.
     })
     .finally(() => {
-      activityHeartbeatInFlight = null
+      activityHeartbeatInFlight.delete(uid)
     })
+  activityHeartbeatInFlight.set(uid, request)
 
-  return activityHeartbeatInFlight
+  return request
 }
 
 function handleQuickSetupUpdated(nextState = null) {
@@ -1177,7 +1198,6 @@ onUnmounted(() => {
     clearInterval(activityHeartbeatTimer)
     activityHeartbeatTimer = null
   }
-  activityHeartbeatInFlight = null
   if (sessionPremiumPromptTimer) {
     clearTimeout(sessionPremiumPromptTimer)
     sessionPremiumPromptTimer = null
