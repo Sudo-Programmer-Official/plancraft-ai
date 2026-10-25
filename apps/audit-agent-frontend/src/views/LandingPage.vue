@@ -339,7 +339,7 @@
           <p class="lp-pricing__note">
             <template v-if="isAppleBillingSafeMode">Solo Premium is billed through the App Store.</template>
             <template v-else>
-              $2/month on the web. Mobile app pricing may vary by store. Planning with a team?
+              {{ premiumPriceNote }} Mobile app pricing may vary by store. Planning with a team?
               <RouterLink to="/pricing#teams">See workspace plans</RouterLink>.
             </template>
           </p>
@@ -441,12 +441,26 @@ import { useAuthStore } from '@/stores/authStore'
 import { isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
 import { isNativePackagedApp } from '@/utils/nativeAuthSupport'
 import { ANDROID_APP_URL, IOS_APP_URL } from '@/constants/appStores'
+import {
+  FOUNDING_MONTHLY_PRICE,
+  FOUNDING_OFFER_CONFIGURED,
+  STANDARD_MONTHLY_PRICE,
+  formatUsd,
+} from '@/services/pricingConfig'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const isAppleBillingSafeMode = computed(() => detectAppleBillingSafeMode())
 const billingRoutePath = computed(() => (isAppleBillingSafeMode.value ? '/billing/upgrade' : '/pricing'))
-const premiumPrice = computed(() => (isAppleBillingSafeMode.value ? '$2.99' : '$2'))
+const premiumPrice = computed(() => {
+  if (isAppleBillingSafeMode.value) return '$2.99'
+  return formatUsd(FOUNDING_OFFER_CONFIGURED ? FOUNDING_MONTHLY_PRICE : STANDARD_MONTHLY_PRICE)
+})
+const premiumPriceNote = computed(() => {
+  if (isAppleBillingSafeMode.value) return 'Solo Premium is billed through the App Store.'
+  if (FOUNDING_OFFER_CONFIGURED) return `${formatUsd(FOUNDING_MONTHLY_PRICE)}/month founding rate on the web.`
+  return `${formatUsd(STANDARD_MONTHLY_PRICE)}/month on the web.`
+})
 // Store badges make no sense inside the installed app itself.
 const showStoreBadges = ref(true)
 const currentYear = new Date().getFullYear()
@@ -534,7 +548,7 @@ const privacyPoints = [
 
 // Mirrors the plan comparison on /pricing.
 const freePlan = ['Unlimited journaling', 'Basic AI (10 insights a month)', 'Focus sessions', 'Web, iPhone and Android apps']
-const premiumPlan = ['Unlimited AI insights', 'Premium Intelligence agents', 'Smart reminders', 'Calendar and WhatsApp integration', 'Priority support']
+const premiumPlan = ['AI planning plus 30 Intelligence research runs/month', 'Premium Intelligence agents', 'Smart reminders', 'Calendar and WhatsApp integration', 'Priority support']
 
 const useCases = [
   {

@@ -43,9 +43,9 @@
               <li class="rounded-xl border border-pc-border bg-white/80 px-3 py-2.5">✓ Morning email and suggested actions</li>
             </ul>
             <button type="button" class="mt-6 inline-flex items-center justify-center rounded-xl bg-[image:var(--pc-accent-fill)] px-5 py-3 text-sm font-semibold text-white shadow-pc-button transition hover:opacity-95" @click="openPremium">
-              Unlock Intelligence — 50% off at $2/mo
+              Unlock Premium Intelligence
             </button>
-            <p class="mt-2 text-xs text-pc-text-subtle">Limited-time offer · cancel anytime</p>
+            <p class="mt-2 text-xs text-pc-text-subtle">30 research runs/month · cancel anytime</p>
           </div>
         </section>
 

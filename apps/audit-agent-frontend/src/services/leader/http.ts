@@ -161,6 +161,9 @@ export const goalsClient = makeClient(resolveBase('goals'))
 export const postingClient = makeClient(resolveBase('posting'))
 export const creatorClient = makeClient(resolveBase('creator'))
 export const nlpClient = makeClient(resolveBase('nlp'))
+// Task help is an enhancement, not a reason to block the task sheet. Keep
+// this client quiet and bounded so the caller can show local fallback steps.
+export const nlpQuietClient = makeClient(resolveBase('nlp'), { timeout: 12000, silent: true })
 
 export function serviceBases() {
   return {

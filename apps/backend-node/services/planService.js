@@ -549,15 +549,16 @@ function buildUsageStatusMap(access) {
 
 export async function getEffectiveAccess(userId, options = {}) {
   const uid = String(userId || '')
-  const accessControl = options?.accessControl || await getAccessControlConfig(options)
-  const userData = options?.userData || await getUserRecord(uid)
+  const [accessControl, userData, dailyUsage, playbookCount] = await Promise.all([
+    options?.accessControl ? Promise.resolve(options.accessControl) : getAccessControlConfig(options),
+    options?.userData ? Promise.resolve(options.userData) : getUserRecord(uid),
+    options?.dailyUsage ? Promise.resolve(options.dailyUsage) : getDailyUsageMap(uid),
+    Number.isFinite(Number(options?.playbookCount))
+      ? Promise.resolve(Number(options.playbookCount))
+      : getPlaybookCount(uid),
+  ])
   const basePlan = resolveBasePlan(userData?.plan, userData?.role)
   const baseDefinition = accessControl?.plans?.[basePlan] || DEFAULT_ACCESS_CONTROL.plans[basePlan] || DEFAULT_ACCESS_CONTROL.plans.free
-  const dailyUsage = options?.dailyUsage || await getDailyUsageMap(uid)
-  const playbookCount =
-    Number.isFinite(Number(options?.playbookCount))
-      ? Number(options.playbookCount)
-      : await getPlaybookCount(uid)
 
   let state = {
     effectivePlan: basePlan,

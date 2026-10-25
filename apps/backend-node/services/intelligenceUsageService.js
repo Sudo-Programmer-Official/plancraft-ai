@@ -2,22 +2,23 @@ import dayjs from '../utils/dayjs.js'
 import { db } from './firebaseAdmin.js'
 import { getEffectiveAccess } from './planService.js'
 
-const DEFAULT_DAILY_LIMIT = 10
+const DEFAULT_MONTHLY_LIMIT = 30
 
-function positiveLimit(value, fallback = DEFAULT_DAILY_LIMIT) {
+function positiveLimit(value, fallback = DEFAULT_MONTHLY_LIMIT) {
   const parsed = Number(value)
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback
 }
 
 function accessResult(access) {
-  const limit = positiveLimit(process.env.INTELLIGENCE_PREMIUM_REQUESTS_PER_DAY)
+  const limit = positiveLimit(process.env.INTELLIGENCE_PREMIUM_REQUESTS_PER_MONTH)
   const premium = access?.isPremium === true
   return {
     ok: premium,
     premium,
     plan: access?.effectivePlan || 'free',
     limit,
-    dateKey: access?.date || dayjs().format('YYYY-MM-DD'),
+    period: 'month',
+    dateKey: dayjs().format('YYYY-MM'),
     access,
   }
 }
@@ -55,7 +56,7 @@ export async function reserveIntelligenceRequest(userId, options = {}) {
     if (used >= eligibility.limit) {
       result = {
         ok: false,
-        code: 'intelligence_daily_limit_reached',
+        code: 'intelligence_monthly_limit_reached',
         used,
         limit: eligibility.limit,
         remaining: 0,

@@ -226,7 +226,7 @@
 
             <div v-if="!isPremium" class="today__research-locked">
               <p>Live, source-backed task research is included with Premium Intelligence.</p>
-              <button type="button" @click="openPremium">Unlock Intelligence · 50% off</button>
+              <button type="button" @click="openPremium">Unlock Premium Intelligence</button>
             </div>
 
             <div v-if="taskResearchError" class="today__research-error" role="alert">
@@ -968,14 +968,17 @@ async function runAiAction(task, actionKey) {
       cached: Boolean(cached),
     })
   } catch {
-    helpIsFallback.value = false
-    helpError.value = 'AI help is unavailable right now. Your task is safe—try again in a moment.'
+    // Task help is optional. Keep the task useful even when the network or
+    // model is slow by falling back to deterministic, local starter steps.
+    helpSteps.value = fallbackStepsForTask(task, actionKey)
+    helpIsFallback.value = true
+    helpError.value = ''
     trackEvent(EVENTS.AI_HELP_COMPLETED, {
       surface: 'today_task_sheet',
       action: actionKey,
       task_intent: intent,
-      result_count: 0,
-      status: 'error',
+      result_count: helpSteps.value.length,
+      status: 'fallback',
     })
   } finally {
     helping.value = false

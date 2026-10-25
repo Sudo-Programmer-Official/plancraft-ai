@@ -1188,6 +1188,17 @@ async function maybeSendActionInboxDigest(
 }
 
 export async function runActionInboxSweep(userId, workspaceId, { trigger = "manual", limit = 24 } = {}) {
+  // App open/resume only needs the current inbox. Resurfacing ignored items
+  // and sending nudges belongs to the scheduled worker; doing it inline here
+  // makes the shell wait on multiple Firestore writes and notification calls.
+  if (["app_open", "app_resume"].includes(trigger)) {
+    return {
+      reopened: 0,
+      nudged: 0,
+      suggestions: await listActionSuggestions(userId, workspaceId, { status: "pending", limit }),
+    };
+  }
+
   const now = new Date();
   const items = await fetchRecentSuggestions(userId, workspaceId, 120);
   const candidates = sortSuggestions(items.filter((item) => shouldResurfaceSuggestion(item, now))).slice(0, limit);

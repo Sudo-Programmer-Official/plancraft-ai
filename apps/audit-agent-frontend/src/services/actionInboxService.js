@@ -36,7 +36,7 @@ export async function syncActionInbox({ workspaceId, trigger = 'app_open', limit
     workspaceId,
     trigger,
     limit,
-  })
+  }, { timeout: 12000 })
   const payload = {
     reopened: Number(res?.data?.reopened) || 0,
     nudged: Number(res?.data?.nudged) || 0,

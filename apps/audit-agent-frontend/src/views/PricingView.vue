@@ -70,17 +70,17 @@
           <div v-if="!isPremium" class="pricing-benefit-card" aria-label="Solo Premium benefits">
             <p class="pricing-benefit-card__title">Everything you need to keep momentum</p>
             <ul class="pricing-benefit-card__list">
-              <li>Unlimited AI planning and intelligence briefs</li>
+              <li>AI planning plus {{ INTELLIGENCE_MONTHLY_RUNS }} Intelligence research runs/month</li>
               <li>Smart reminders across your key channels</li>
               <li>Calendar, WhatsApp, and voice workflows</li>
               <li>Priority support and faster access to new capabilities</li>
             </ul>
           </div>
-          <div v-if="offerActive && !isPremium" class="pricing-offer-card" aria-label="Limited-time 50 percent off offer">
+          <div v-if="offerActive && !isPremium" class="pricing-offer-card" aria-label="Limited-time founding offer">
             <div>
-              <span class="pricing-offer-card__badge">50% OFF</span>
-              <span class="pricing-offer-card__old-price">$4/mo</span>
-              <strong>$2/mo</strong>
+              <span class="pricing-offer-card__badge">FOUNDING RATE</span>
+              <span class="pricing-offer-card__old-price">{{ standardMonthlyPriceLabel }}/mo</span>
+              <strong>{{ foundingMonthlyPriceLabel }}/mo</strong>
             </div>
             <span>Ends in {{ countdown }}</span>
           </div>
@@ -92,7 +92,7 @@
               class="pricing-primary-cta inline-flex min-h-11 items-center justify-center rounded-xl px-5 py-3 text-sm transition disabled:opacity-60"
             >
               <span v-if="loading">Redirecting…</span>
-              <span v-else>{{ offerActive ? (authStore.user?.uid ? 'Claim 50% off — $2/mo' : 'Sign up & claim 50% off') : 'Start Premium — $2/mo' }}</span>
+              <span v-else>{{ offerActive ? (authStore.user?.uid ? `Claim founding rate — ${foundingMonthlyPriceLabel}/mo` : `Sign up & claim ${foundingMonthlyPriceLabel}/mo`) : `Start Premium — ${standardMonthlyPriceLabel}/mo` }}</span>
             </button>
             <button
               v-else-if="!isAppleManagedPremium"
@@ -138,11 +138,13 @@
                 <span class="premium-badge">{{ offerActive ? 'Limited Offer' : 'Most Popular' }}</span>
                 <h3 class="pricing-plan-card__title text-base font-semibold text-white">Solo Premium</h3>
                 <p class="pricing-plan-card__price mt-1 text-2xl font-bold text-white">
-                  <span v-if="offerActive" class="pricing-plan-card__old-price">$4</span>
-                  $2 <span class="text-base font-semibold">/ month</span>
+                  <span v-if="offerActive" class="pricing-plan-card__old-price">{{ standardMonthlyPriceLabel }}</span>
+                  <template v-if="offerActive">{{ foundingMonthlyPriceLabel }}</template>
+                  <template v-else>{{ standardMonthlyPriceLabel }}</template>
+                  <span class="text-base font-semibold">/ month</span>
                 </p>
                 <ul class="pricing-plan-card__features mt-3 space-y-1 text-sm text-indigo-100/90">
-                  <li>Unlimited AI planning and Intelligence Desk briefs</li>
+                  <li>AI planning plus {{ INTELLIGENCE_MONTHLY_RUNS }} Intelligence research runs/month</li>
                   <li>Smart reminders across your channels</li>
                   <li>Calendar, WhatsApp, and voice workflows</li>
                   <li>Priority support</li>
@@ -209,7 +211,7 @@
           <div class="min-w-0">
             <p class="pricing-mobile-cta__label text-[11px] uppercase tracking-[0.22em] text-indigo-200/80">Solo Premium</p>
             <p class="pricing-mobile-cta__price truncate text-sm font-semibold text-white">
-              {{ offerActive ? '50% off · $2/mo' : '$2/mo' }}
+              {{ offerActive ? `Founding rate · ${foundingMonthlyPriceLabel}/mo` : `${standardMonthlyPriceLabel}/mo` }}
             </p>
           </div>
           <button
@@ -217,7 +219,7 @@
             @click="onUpgrade"
             class="pricing-primary-cta pricing-primary-cta--compact shrink-0 rounded-lg px-4 py-2 text-sm disabled:opacity-60"
           >
-            {{ loading ? 'Redirecting…' : offerActive ? 'Claim offer' : 'Upgrade' }}
+            {{ loading ? 'Redirecting…' : offerActive ? 'Claim $2 rate' : 'Upgrade' }}
           </button>
         </div>
       </div>
@@ -266,6 +268,16 @@ import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { useSeoMeta } from '@/composables/useSeoMeta'
 import { isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/billingAccess'
 import AppleSoloPremiumCard from '@/components/AppleSoloPremiumCard.vue'
+import {
+  FOUNDING_MONTHLY_PRICE,
+  FOUNDING_OFFER_CONFIGURED,
+  FOUNDING_OFFER_END_AT,
+  INTELLIGENCE_MONTHLY_RUNS,
+  STANDARD_MONTHLY_PRICE,
+  formatCountdown,
+  formatUsd,
+  isFoundingOfferActive,
+} from '@/services/pricingConfig'
 
 const authStore = useAuthStore()
 const accessStore = useAccessStore()
@@ -274,6 +286,9 @@ const route = useRoute()
 const router = useRouter()
 const isAppleBillingSafeMode = detectAppleBillingSafeMode()
 const billingSafeRoute = '/billing/upgrade'
+const foundingOfferConfigured = FOUNDING_OFFER_CONFIGURED
+const standardMonthlyPriceLabel = formatUsd(STANDARD_MONTHLY_PRICE)
+const foundingMonthlyPriceLabel = formatUsd(FOUNDING_MONTHLY_PRICE)
 useSeoMeta({
   title: isAppleBillingSafeMode ? 'Premium Access | PlanCraft AI' : 'Pricing | PlanCraft AI – Solo & Team Plans with Voice AI',
   description: isAppleBillingSafeMode
@@ -300,7 +315,13 @@ useSeoMeta({
           url: 'https://plancraftai.com/pricing',
           offers: [
             { '@type': 'Offer', name: 'Solo Free', price: '0.00', priceCurrency: 'USD' },
-            { '@type': 'Offer', name: 'Solo Premium', price: '2.00', priceCurrency: 'USD' },
+            {
+              '@type': 'Offer',
+              name: foundingOfferConfigured ? 'Solo Premium founding rate' : 'Solo Premium',
+              price: foundingOfferConfigured ? '2.00' : String(STANDARD_MONTHLY_PRICE.toFixed(2)),
+              priceCurrency: 'USD',
+              ...(foundingOfferConfigured ? { priceValidUntil: new Date(FOUNDING_OFFER_END_AT).toISOString().slice(0, 10) } : {}),
+            },
             { '@type': 'Offer', name: 'Team Starter', price: '6.00', priceCurrency: 'USD' },
           ],
           category: 'Productivity',
@@ -371,35 +392,20 @@ function stopPromoTimer() {
 }
 
 function startPromoTimer() {
-  if (promoTimer || isPremium.value) return
+  if (promoTimer || isPremium.value || !foundingOfferConfigured) return
   try {
-    const key = 'promoExpiresAt'
-    let exp = parseInt(sessionStorage.getItem(key) || '0', 10)
-    if (!exp || Number.isNaN(exp) || exp < Date.now()) {
-      exp = Date.now() + 3 * 60 * 60 * 1000
-      sessionStorage.setItem(key, String(exp))
-    }
     const tick = () => {
       if (isPremium.value) {
         stopPromoTimer()
         return
       }
-      const left = Math.max(0, exp - Date.now())
+      const left = Math.max(0, FOUNDING_OFFER_END_AT - Date.now())
       if (left <= 0) {
         countdown.value = '00:00:00'
         stopPromoTimer()
-        try {
-          sessionStorage.removeItem(key)
-        } catch {
-          /* noop */
-        }
         return
       }
-      const s = Math.floor(left / 1000)
-      const h = String(Math.floor(s / 3600)).padStart(2, '0')
-      const m = String(Math.floor((s % 3600) / 60)).padStart(2, '0')
-      const sec = String(s % 60).padStart(2, '0')
-      countdown.value = `${h}:${m}:${sec}`
+      countdown.value = formatCountdown(left)
       offerActive.value = true
     }
     promoTimer = setInterval(tick, 1000)
@@ -456,7 +462,7 @@ async function onUpgrade() {
       // Themed info message (aligned with PlanCraftAI UI tone)
         ElNotification({
           title: 'Create your account',
-          message: 'Sign up or sign in to claim the 50% off offer.',
+          message: 'Sign up or sign in to claim the founding $2/month rate.',
         type: 'info',
         duration: 2800,
         offset: 80,
@@ -485,7 +491,9 @@ async function onUpgrade() {
       /* noop */
     }
     trackSubscriptionFunnel('checkout_redirect', { cta: 'solo_upgrade' })
-    const url = await createCheckoutSession('monthly', authStore.user?.uid)
+    const url = await createCheckoutSession('monthly', authStore.user?.uid, {
+      foundingOffer: isFoundingOfferActive(),
+    })
     window.location.href = url
 
   } catch (e) {

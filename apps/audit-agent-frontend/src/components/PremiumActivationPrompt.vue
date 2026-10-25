@@ -19,23 +19,30 @@
           ×
         </button>
       </div>
-      <p class="premium-activation__eyebrow">Limited-time Premium offer</p>
+      <p class="premium-activation__eyebrow">{{ FOUNDING_OFFER_CONFIGURED ? 'Founding Premium offer' : 'Premium Intelligence' }}</p>
       <h2 class="premium-activation__title">Turn momentum into intelligent action</h2>
       <p class="premium-activation__copy">
         Build custom research agents, follow live signals, and turn what matters into your next move.
       </p>
 
-      <div class="premium-activation__offer" aria-label="Solo Premium pricing">
+      <div v-if="FOUNDING_OFFER_CONFIGURED" class="premium-activation__offer" aria-label="Solo Premium founding pricing">
         <div>
-          <span class="premium-activation__offer-label">50% off</span>
-          <span class="premium-activation__offer-old-price">$4/mo</span>
-          <strong>$2/mo</strong>
+          <span class="premium-activation__offer-label">Founding rate</span>
+          <span class="premium-activation__offer-old-price">{{ formatUsd(STANDARD_MONTHLY_PRICE) }}/mo</span>
+          <strong>{{ formatUsd(FOUNDING_MONTHLY_PRICE) }}/mo</strong>
         </div>
         <span class="premium-activation__offer-note">Ends in {{ offerCountdown }}</span>
       </div>
+      <div v-else class="premium-activation__offer" aria-label="Solo Premium pricing">
+        <div>
+          <span class="premium-activation__offer-label">Solo Premium</span>
+          <strong>{{ formatUsd(STANDARD_MONTHLY_PRICE) }}/mo</strong>
+        </div>
+        <span class="premium-activation__offer-note">Cancel anytime</span>
+      </div>
 
       <ul class="premium-activation__benefits">
-        <li>Unlimited AI task plans and source-backed Intelligence Desk briefs</li>
+        <li>AI task plans plus 30 source-backed Intelligence research runs/month</li>
         <li>Create agents for companies, markets, technology, or any personal use case</li>
         <li>Smart reminders across your channels</li>
         <li>Calendar and WhatsApp integration</li>
@@ -46,7 +53,7 @@
           Not now
         </button>
         <button type="button" class="premium-activation__primary" @click="upgrade">
-          Claim 50% off — $2/mo
+          {{ FOUNDING_OFFER_CONFIGURED ? `Claim founding rate — ${formatUsd(FOUNDING_MONTHLY_PRICE)}/mo` : `Upgrade to Premium — ${formatUsd(STANDARD_MONTHLY_PRICE)}/mo` }}
         </button>
       </div>
     </div>
@@ -55,6 +62,14 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import {
+  FOUNDING_MONTHLY_PRICE,
+  FOUNDING_OFFER_CONFIGURED,
+  FOUNDING_OFFER_END_AT,
+  STANDARD_MONTHLY_PRICE,
+  formatCountdown,
+  formatUsd,
+} from '@/services/pricingConfig'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -95,24 +110,15 @@ function handleClose() {
 }
 
 function startOfferTimer() {
+  if (!FOUNDING_OFFER_CONFIGURED) return
   try {
-    const key = 'promoExpiresAt'
-    let expiresAt = Number(sessionStorage.getItem(key) || 0)
-    if (!expiresAt || Number.isNaN(expiresAt) || expiresAt <= Date.now()) {
-      expiresAt = Date.now() + 3 * 60 * 60 * 1000
-      sessionStorage.setItem(key, String(expiresAt))
-    }
     const tick = () => {
-      const secondsLeft = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000))
-      const hours = String(Math.floor(secondsLeft / 3600)).padStart(2, '0')
-      const minutes = String(Math.floor((secondsLeft % 3600) / 60)).padStart(2, '0')
-      const seconds = String(secondsLeft % 60).padStart(2, '0')
-      offerCountdown.value = `${hours}:${minutes}:${seconds}`
+      offerCountdown.value = formatCountdown(Math.max(0, FOUNDING_OFFER_END_AT - Date.now()))
     }
     tick()
     offerTimer = window.setInterval(tick, 1000)
   } catch {
-    offerCountdown.value = '03:00:00'
+    offerCountdown.value = '00:00:00'
   }
 }
 

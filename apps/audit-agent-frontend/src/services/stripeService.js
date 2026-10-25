@@ -29,7 +29,9 @@ function loadCacheMap() {
       const parsed = JSON.parse(raw)
       return parsed && typeof parsed === 'object' ? parsed : {}
     }
-  } catch {}
+  } catch {
+    // Cache reads are best effort.
+  }
   return {}
 }
 
@@ -37,7 +39,9 @@ function persistCacheMap(map) {
   if (typeof window === 'undefined' || !window.localStorage) return
   try {
     window.localStorage.setItem(CACHE_KEY, JSON.stringify(map))
-  } catch {}
+  } catch {
+    // Cache writes are best effort.
+  }
 }
 
 function readCachedStatus(userId) {
@@ -59,7 +63,9 @@ function writeCachedStatus(userId, data) {
     const map = loadCacheMap()
     map[userId] = { ts: Date.now(), data }
     persistCacheMap(map)
-  } catch {}
+  } catch {
+    // Cache writes are best effort.
+  }
 }
 
 function normalizeStatus(payload) {
@@ -129,7 +135,7 @@ function isCanceledSubscriptionRequest(err) {
   return code === 'ERR_CANCELED' || /canceled|aborted|aborterror/i.test(message)
 }
 
-export async function createCheckoutSession(plan, userId) {
+export async function createCheckoutSession(plan, userId, options = {}) {
   try {
     const successUrl = window.location.origin + '/subscription?status=success'
     const cancelUrl = window.location.origin + '/subscription?status=cancel'
@@ -137,6 +143,7 @@ export async function createCheckoutSession(plan, userId) {
       plan,
       userId,
       uid: userId,
+      foundingOffer: options?.foundingOffer === true,
       successUrl,
       cancelUrl,
     })

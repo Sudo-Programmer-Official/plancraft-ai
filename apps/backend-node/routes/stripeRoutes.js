@@ -15,7 +15,7 @@ const stripe = STRIPE_SECRET_KEY
 // POST /api/create-checkout-session
 router.post('/create-checkout-session', requireAuth, ensureUserMatches, async (req, res) => {
   try {
-    const { plan, successUrl, cancelUrl } = req.body || {}
+    const { plan, successUrl, cancelUrl, foundingOffer } = req.body || {}
     // The webhook upgrades metadata.userId, so it must be the verified caller.
     const userId = String(req.user.uid)
     if (!plan) return res.status(400).json({ error: 'Missing plan' })
@@ -32,7 +32,22 @@ router.post('/create-checkout-session', requireAuth, ensureUserMatches, async (r
     }
     const envSuffix = aliasMap[planKey] || 'MONTHLY'
     const priceIdKey = `STRIPE_${envSuffix}_PRICE_ID`
-    const priceId = process.env[priceIdKey] || process.env.STRIPE_MONTHLY_PRICE_ID
+    const foundingOfferRequested = foundingOffer === true && envSuffix === 'MONTHLY'
+    const foundingOfferEnabled = ['1', 'true', 'yes', 'on'].includes(String(process.env.STRIPE_FOUNDING_OFFER_ENABLED || '').trim().toLowerCase())
+    const foundingOfferEndAt = Date.parse(String(process.env.STRIPE_FOUNDING_OFFER_END_AT || '').trim())
+    const foundingOfferActive = foundingOfferEnabled && Number.isFinite(foundingOfferEndAt) && foundingOfferEndAt > Date.now()
+
+    if (foundingOfferRequested && !foundingOfferActive) {
+      return res.status(409).json({ error: 'The founding offer is no longer available', code: 'founding_offer_unavailable' })
+    }
+
+    const priceId = foundingOfferRequested
+      ? process.env.STRIPE_FOUNDING_MONTHLY_PRICE_ID
+      : process.env[priceIdKey] || process.env.STRIPE_MONTHLY_PRICE_ID
+
+    if (foundingOfferRequested && !priceId) {
+      return res.status(503).json({ error: 'The founding offer is not configured yet', code: 'founding_offer_not_configured' })
+    }
 
     console.log(`Looking up Stripe price with key: ${priceIdKey}, resolved: ${priceId}`)
     console.log(`Creating checkout session for user ${userId}, plan: ${plan}, priceId: ${priceId}`)
@@ -58,7 +73,7 @@ router.post('/create-checkout-session', requireAuth, ensureUserMatches, async (r
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: successUrl || process.env.STRIPE_SUCCESS_URL,
       cancel_url: cancelUrl || process.env.STRIPE_CANCEL_URL,
-      metadata: { userId, plan: planKey },
+      metadata: { userId, plan: planKey, foundingOffer: foundingOfferRequested ? '1' : '0' },
     })
 
     console.log(`✅ Checkout session created for user ${userId}, plan: ${plan}`)

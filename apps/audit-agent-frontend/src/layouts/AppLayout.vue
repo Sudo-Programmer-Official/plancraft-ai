@@ -766,7 +766,9 @@ async function maybeSyncActionInbox(trigger = 'app_open') {
     return
   }
 
-  const key = `${uid}:${workspaceId}:${trigger}`
+  // App open and resume can fire close together. Treat them as one refresh
+  // window so a reconnect does not issue duplicate Firestore reads.
+  const key = `${uid}:${workspaceId}`
   const now = Date.now()
   if (actionInboxSyncState.busy) return
   if (actionInboxSyncState.key === key && now - actionInboxSyncState.lastAt < ACTION_INBOX_SYNC_INTERVAL_MS) {

@@ -147,7 +147,7 @@ const priceCaption = computed(() => (
 const productTitle = computed(() => product.value?.title || 'Solo Premium')
 const productDescription = computed(() => (
   product.value?.description ||
-  'Unlimited AI insights, reminders, integrations, and priority support for your personal account.'
+  'AI planning plus 30 source-backed Intelligence research runs each month, reminders, integrations, and priority support.'
 ))
 const statusCopy = computed(() => {
   const expiresAt = formatDate(subscriptionSnapshot.value?.expiresAt)

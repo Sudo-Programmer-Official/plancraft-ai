@@ -21,6 +21,9 @@ const WORKSPACE_SUMMARY_CACHE_TTL_MS = Number(process.env.WORKSPACE_SUMMARY_CACH
   ? Number(process.env.WORKSPACE_SUMMARY_CACHE_TTL_MS)
   : 5 * 60 * 1000
 const WORKSPACE_SUMMARY_CACHE_MAX_ENTRIES = 250
+const WORKSPACE_SUMMARY_TIMEOUT_MS = Number(process.env.WORKSPACE_SUMMARY_TIMEOUT_MS) > 0
+  ? Number(process.env.WORKSPACE_SUMMARY_TIMEOUT_MS)
+  : 12000
 const workspaceSummaryCache = new Map()
 const workspaceSummaryInflight = new Map()
 
@@ -168,6 +171,7 @@ async function generateWorkspaceSummary(body = {}) {
       },
     ],
     temperature: 0.3,
+    timeoutMs: WORKSPACE_SUMMARY_TIMEOUT_MS,
   })
 
   return {

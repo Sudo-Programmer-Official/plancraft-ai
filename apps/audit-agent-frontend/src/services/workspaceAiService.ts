@@ -1,4 +1,4 @@
-import { nlpClient } from '@/services/leader/http'
+import { nlpQuietClient } from '@/services/leader/http'
 
 export type WorkspaceSummaryResponse = {
   answer: string
@@ -42,7 +42,7 @@ export type MemoryMatch = {
 
 export async function askWorkspaceSummary(params: SummaryParams = {}): Promise<WorkspaceSummaryResponse> {
   const { workspaceId, question } = params
-  const { data } = await nlpClient.post('/workspace/summary', {
+  const { data } = await nlpQuietClient.post('/workspace/summary', {
     workspaceId: workspaceId || undefined,
     question: question || undefined,
   })

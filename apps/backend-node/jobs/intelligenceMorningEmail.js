@@ -196,8 +196,8 @@ async function createScheduledBrief(userId, agentId) {
 
   const reservation = await reserveIntelligenceRequest(userId, { access: access.access })
   if (!reservation.ok) {
-    const error = new Error(reservation.code === 'intelligence_daily_limit_reached'
-      ? 'Daily Intelligence Desk limit reached'
+    const error = new Error(reservation.code === 'intelligence_monthly_limit_reached'
+      ? 'Monthly Intelligence Desk limit reached'
       : 'Could not reserve Intelligence Desk usage')
     error.code = reservation.code
     throw error
