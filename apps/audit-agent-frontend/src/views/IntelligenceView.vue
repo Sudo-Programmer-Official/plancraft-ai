@@ -12,7 +12,8 @@
                   Live desk
                 </span>
                 <span class="rounded-full border border-pc-border bg-pc-surface-2 px-3 py-1.5 text-xs text-pc-text-muted">Read-only research</span>
-                <span class="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">Premium</span>
+                <span v-if="isPremium" class="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">Premium</span>
+                <span v-else class="rounded-full border border-pc-accent-border bg-pc-accent-soft px-3 py-1.5 text-xs font-semibold text-pc-accent-text">{{ freeRunLabel }}</span>
               </div>
               <h1 class="mt-4 text-3xl font-semibold tracking-tight text-pc-text sm:text-4xl">Your intelligence desk</h1>
               <p class="mt-3 max-w-2xl text-sm leading-6 text-pc-text-muted sm:text-base">
@@ -21,35 +22,35 @@
             </div>
             <button
               type="button"
-              :disabled="loading || !isPremium"
+              :disabled="loading || !canRunIntelligence"
               class="inline-flex items-center justify-center gap-2 rounded-xl bg-[image:var(--pc-accent-fill)] px-4 py-2.5 text-sm font-semibold text-white shadow-pc-button transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
               @click="refreshBrief"
             >
               <RefreshCw :size="16" :class="{ 'animate-spin': loading }" aria-hidden="true" />
-              {{ loading ? 'Researching…' : 'Refresh brief' }}
+              {{ loading ? 'Researching…' : isPremium ? 'Refresh brief' : canRunIntelligence ? 'Use free run' : 'Unlock more runs' }}
             </button>
           </div>
         </div>
 
         <section v-if="!isPremium" class="border-t border-pc-border bg-gradient-to-br from-indigo-50 via-white to-violet-50 p-5 sm:p-7" aria-labelledby="intelligence-premium-title">
           <div class="mx-auto max-w-3xl text-center">
-            <p class="eyebrow text-pc-accent-text">Premium intelligence</p>
-            <h2 id="intelligence-premium-title" class="mt-2 text-2xl font-semibold tracking-tight text-pc-text">Build a research desk for anything you care about.</h2>
-            <p class="mt-3 text-sm leading-6 text-pc-text-muted">Use live public sources to follow companies, markets, technology shifts, or a personal use case—then turn the signal into a clearer next move.</p>
+            <p class="eyebrow text-pc-accent-text">Try Intelligence free</p>
+            <h2 id="intelligence-premium-title" class="mt-2 text-2xl font-semibold tracking-tight text-pc-text">Start with source-backed research.</h2>
+            <p class="mt-3 text-sm leading-6 text-pc-text-muted">Explore built-in desks for markets, technology, and company signals. Upgrade when you want custom agents, scheduled delivery, and more research.</p>
             <ul class="mx-auto mt-5 grid max-w-2xl gap-2 text-left text-sm text-pc-text-muted sm:grid-cols-2">
-              <li class="rounded-xl border border-pc-border bg-white/80 px-3 py-2.5">✓ Live web research with citations</li>
-              <li class="rounded-xl border border-pc-border bg-white/80 px-3 py-2.5">✓ Custom agents from your prompt</li>
+              <li class="rounded-xl border border-pc-border bg-white/80 px-3 py-2.5">✓ 5 built-in research runs this month</li>
+              <li class="rounded-xl border border-pc-border bg-white/80 px-3 py-2.5">✓ Live public sources with citations</li>
               <li class="rounded-xl border border-pc-border bg-white/80 px-3 py-2.5">✓ Company, market, and tech briefs</li>
-              <li class="rounded-xl border border-pc-border bg-white/80 px-3 py-2.5">✓ Morning email and suggested actions</li>
+              <li class="rounded-xl border border-pc-border bg-white/80 px-3 py-2.5">✓ Premium adds custom desks and morning email</li>
             </ul>
-            <button type="button" class="mt-6 inline-flex items-center justify-center rounded-xl bg-[image:var(--pc-accent-fill)] px-5 py-3 text-sm font-semibold text-white shadow-pc-button transition hover:opacity-95" @click="openPremium">
+            <button v-if="!canRunIntelligence" type="button" class="mt-6 inline-flex items-center justify-center rounded-xl bg-[image:var(--pc-accent-fill)] px-5 py-3 text-sm font-semibold text-white shadow-pc-button transition hover:opacity-95" @click="openPremium">
               Unlock Premium Intelligence
             </button>
-            <p class="mt-2 text-xs text-pc-text-subtle">30 research runs/month · cancel anytime</p>
+            <p class="mt-2 text-xs text-pc-text-subtle">{{ freeRunLabel }} · Premium includes 30 runs/month</p>
           </div>
         </section>
 
-        <div v-if="isPremium" class="border-t border-pc-border bg-pc-surface px-5 sm:px-6">
+        <div v-if="canRunIntelligence" class="border-t border-pc-border bg-pc-surface px-5 sm:px-6">
           <nav class="flex gap-1 overflow-x-auto py-3" aria-label="Intelligence agents" role="tablist">
             <button
               v-for="tab in intelligenceTabs"
@@ -69,7 +70,7 @@
           </nav>
         </div>
 
-        <details v-if="isPremium" :open="!brief" class="border-t border-pc-border bg-pc-surface-2/60">
+        <details v-if="canRunIntelligence" :open="!brief" class="border-t border-pc-border bg-pc-surface-2/60">
           <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-3.5 sm:px-6">
             <span class="min-w-0">
               <span class="eyebrow">Research controls</span>
@@ -164,6 +165,7 @@
                 <span class="text-xs text-pc-text-subtle">{{ selectedAgentIds.length }}/4 selected</span>
               </div>
               <button
+                v-if="isPremium"
                 type="button"
                 class="inline-flex items-center gap-1.5 self-start rounded-lg border border-pc-accent-border px-3 py-1.5 text-xs font-semibold text-pc-accent-text transition hover:bg-pc-accent-soft"
                 @click="openAgentBuilder()"
@@ -206,7 +208,7 @@
                 </div>
               </div>
             </div>
-            <p class="mt-2 text-xs text-pc-text-subtle">Built-in desks are ready to use. Your desks let you define exactly what the research should watch.</p>
+            <p class="mt-2 text-xs text-pc-text-subtle">Built-in desks are ready to use. Free runs use one desk at a time; Premium lets you combine desks and create your own.</p>
           </div>
           <div v-else class="mt-5 flex flex-col gap-3 rounded-2xl border border-dashed border-pc-border-strong bg-pc-surface px-4 py-3 text-sm text-pc-text-muted sm:flex-row sm:items-center sm:justify-between">
             <span>This tab runs only <strong class="font-semibold text-pc-text">{{ activeAgent?.label }}</strong>. Ask a focused question or refresh the latest public signals.</span>
@@ -226,7 +228,7 @@
         <div v-for="i in 3" :key="i" class="h-64 animate-pulse rounded-3xl bg-pc-surface-2" />
       </section>
 
-      <template v-if="isPremium && brief">
+      <template v-if="brief">
         <section class="rounded-3xl border border-pc-border bg-pc-surface p-5 shadow-pc-card sm:p-7">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -412,7 +414,7 @@
         </details>
       </template>
 
-      <section v-else-if="isPremium && !loading" class="rounded-3xl border border-dashed border-pc-border-strong bg-pc-surface p-10 text-center shadow-pc-card">
+      <section v-else-if="canRunIntelligence && !loading" class="rounded-3xl border border-dashed border-pc-border-strong bg-pc-surface p-10 text-center shadow-pc-card">
         <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-pc-accent-soft text-2xl">🛰️</div>
         <h2 class="mt-5 text-xl font-semibold text-pc-text">Your live desk is ready</h2>
         <p class="mx-auto mt-2 max-w-lg text-sm leading-6 text-pc-text-muted">Choose the specialists you want, add your angle, and run a source-backed brief.</p>
@@ -569,6 +571,7 @@ import {
   fetchIntelligenceAgents,
   fetchIntelligenceGoals,
   generateIntelligenceAgentDraft,
+  INTELLIGENCE_FREE_RUNS,
   INTELLIGENCE_AGENTS,
   INTELLIGENCE_AGENT_TEMPLATES,
   linkIntelligenceTask,
@@ -613,6 +616,13 @@ const brief = ref(null)
 const briefsByTab = ref({})
 const loading = ref(false)
 const error = ref('')
+const intelligenceUsage = ref({
+  used: 0,
+  limit: INTELLIGENCE_FREE_RUNS,
+  remaining: INTELLIGENCE_FREE_RUNS,
+  period: 'month',
+})
+const intelligenceUsageLoaded = ref(false)
 const addingTaskTitle = ref('')
 const addedTaskTitles = ref([])
 const showAgentBuilder = ref(false)
@@ -649,6 +659,15 @@ const intelligenceTabs = computed(() => [
 const activeAgent = computed(() => availableAgents.value.find((agent) => agent.id === activeAgentId.value) || null)
 const selectedBuiltInAgentIds = computed(() => selectedAgentIds.value.filter((id) => INTELLIGENCE_AGENTS.some((agent) => agent.id === id)))
 const selectedCustomAgentIds = computed(() => selectedAgentIds.value.filter((id) => customAgents.value.some((agent) => agent.id === id)))
+const canRunIntelligence = computed(() => (
+  isPremium.value
+  || !intelligenceUsageLoaded.value
+  || intelligenceUsage.value.remaining > 0
+))
+const freeRunLabel = computed(() => {
+  const remaining = Math.max(Number(intelligenceUsage.value.remaining || 0), 0)
+  return `${remaining} free run${remaining === 1 ? '' : 's'} left this month`
+})
 
 watch([selectedAgentIds, interests, selectedGoalId, activeAgentId], () => {
   try {
@@ -684,18 +703,34 @@ async function loadAgents() {
     const result = await fetchIntelligenceAgents()
     customAgents.value = result.agents.filter((agent) => agent.custom)
     customAgentLimit.value = result.customLimit || 10
+    intelligenceUsage.value = {
+      used: result.usage?.used || 0,
+      limit: result.usage?.limit || (isPremium.value ? 30 : INTELLIGENCE_FREE_RUNS),
+      remaining: result.usage?.remaining ?? (isPremium.value ? 30 : INTELLIGENCE_FREE_RUNS),
+      period: result.usage?.period || 'month',
+    }
+    intelligenceUsageLoaded.value = true
     const availableIds = new Set(result.agents.map((agent) => agent.id))
-    const retained = allDeskAgentIds.value.filter((id) => availableIds.has(id)).slice(0, 4)
-    const nextAllDeskAgentIds = retained.length ? retained : [...defaultAgentIds]
+    const retained = allDeskAgentIds.value.filter((id) => availableIds.has(id)).slice(0, isPremium.value ? 4 : 1)
+    const fallbackAgentIds = defaultAgentIds.slice(0, isPremium.value ? 4 : 1)
+    const nextAllDeskAgentIds = retained.length ? retained : fallbackAgentIds
     allDeskAgentIds.value = nextAllDeskAgentIds
     if (activeAgentId.value !== 'all' && !availableIds.has(activeAgentId.value)) activeAgentId.value = 'all'
     selectedAgentIds.value = activeAgentId.value === 'all' ? nextAllDeskAgentIds : [activeAgentId.value]
   } catch (err) {
     console.warn('[Intelligence] desks unavailable', err?.message || err)
+    intelligenceUsageLoaded.value = true
   }
 }
 
 function toggleAgent(id) {
+  const agent = availableAgents.value.find((item) => item.id === id)
+  if (agent?.custom && !isPremium.value) return openPremium()
+  if (!isPremium.value && !selectedAgentIds.value.includes(id)) {
+    selectedAgentIds.value = [id]
+    allDeskAgentIds.value = [id]
+    return
+  }
   if (selectedAgentIds.value.includes(id)) {
     if (selectedAgentIds.value.length === 1) return
     selectedAgentIds.value = selectedAgentIds.value.filter((candidate) => candidate !== id)
@@ -706,19 +741,20 @@ function toggleAgent(id) {
   allDeskAgentIds.value = [...selectedAgentIds.value]
 }
 
-async function selectAgentTab(id) {
-  if (!isPremium.value) return openPremium()
+function selectAgentTab(id) {
   if (!id || activeAgentId.value === id) return
+  const selected = availableAgents.value.find((agent) => agent.id === id)
+  if (selected?.custom && !isPremium.value) return openPremium()
   if (id === 'all') {
     activeAgentId.value = 'all'
-    selectedAgentIds.value = allDeskAgentIds.value.length ? [...allDeskAgentIds.value] : [...defaultAgentIds]
+    const fallbackAgentIds = defaultAgentIds.slice(0, isPremium.value ? 4 : 1)
+    selectedAgentIds.value = allDeskAgentIds.value.length ? [...allDeskAgentIds.value] : fallbackAgentIds
   } else {
     if (activeAgentId.value === 'all') allDeskAgentIds.value = [...selectedAgentIds.value]
     activeAgentId.value = id
     selectedAgentIds.value = [id]
   }
   brief.value = briefsByTab.value[id] || null
-  await refreshBrief()
 }
 
 function openPremium() {
@@ -754,6 +790,7 @@ function resetAgentForm() {
 }
 
 function openAgentBuilder(agent = null) {
+  if (!isPremium.value) return openPremium()
   agentError.value = ''
   if (agent?.custom) {
     editingAgentId.value = agent.id
@@ -786,6 +823,7 @@ function applyAgentTemplate(template) {
 }
 
 async function generateAgentDraft() {
+  if (!isPremium.value) return openPremium()
   const useCase = agentGoal.value.trim()
   if (useCase.length < 8) {
     agentError.value = 'Describe the job in a few words so the agent has enough direction.'
@@ -810,6 +848,7 @@ function closeAgentBuilder() {
 }
 
 async function saveAgent() {
+  if (!isPremium.value) return openPremium()
   const payload = {
     name: agentForm.name.trim(),
     description: agentForm.description.trim(),
@@ -913,16 +952,17 @@ function sourceDomain(value) {
 }
 
 async function refreshBrief() {
-  if (!isPremium.value) return openPremium()
+  if (!canRunIntelligence.value) return openPremium()
   if (loading.value) return
   loading.value = true
   error.value = ''
   try {
     brief.value = await fetchIntelligenceBrief({
-      agentIds: selectedBuiltInAgentIds.value,
-      customAgentIds: selectedCustomAgentIds.value,
+      agentIds: isPremium.value ? selectedBuiltInAgentIds.value : selectedBuiltInAgentIds.value.slice(0, 1),
+      customAgentIds: isPremium.value ? selectedCustomAgentIds.value : [],
       question: question.value,
       interests: interests.value,
+      surface: 'desk',
       goalContext: selectedGoal.value
         ? {
             title: selectedGoal.value.title,
@@ -932,6 +972,16 @@ async function refreshBrief() {
           }
         : null,
     })
+    if (brief.value?.usage) {
+      intelligenceUsage.value = {
+        ...intelligenceUsage.value,
+        used: Number(brief.value.usage.used || 0),
+        limit: Number(brief.value.usage.limit || intelligenceUsage.value.limit),
+        remaining: Number(brief.value.usage.remaining || 0),
+        period: brief.value.usage.period || intelligenceUsage.value.period,
+      }
+      intelligenceUsageLoaded.value = true
+    }
     briefsByTab.value = { ...briefsByTab.value, [activeAgentId.value]: brief.value }
     expandedSynthesis.value = false
     expandedAgents.value = {}
@@ -993,10 +1043,5 @@ async function addSuggestedTask(task) {
 onMounted(async () => {
   await refreshPremium({ minIntervalMs: 15000 })
   await Promise.all([loadGoals(), loadAgents()])
-  if (isPremium.value) await refreshBrief()
-})
-
-watch(isPremium, (enabled, wasEnabled) => {
-  if (enabled && !wasEnabled && !brief.value) refreshBrief()
 })
 </script>

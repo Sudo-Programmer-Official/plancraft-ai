@@ -22,8 +22,8 @@ async function requireIntelligenceAccess(req, res, next) {
     const access = await getIntelligenceAccess(req.user?.uid)
     if (!access.ok) {
       return res.status(403).json({
-        error: 'Intelligence Desk requires a Premium plan',
-        code: 'intelligence_premium_required',
+        error: 'Free Intelligence access is disabled for this account',
+        code: 'intelligence_free_access_disabled',
       })
     }
     req.intelligenceAccess = access
@@ -34,6 +34,14 @@ async function requireIntelligenceAccess(req, res, next) {
   }
 }
 
+function requirePremiumIntelligenceAccess(req, res, next) {
+  if (req.intelligenceAccess?.premium) return next()
+  return res.status(403).json({
+    error: 'Custom Intelligence desks are available on Premium',
+    code: 'intelligence_premium_required',
+  })
+}
+
 // Scope authentication and the Intelligence premium gate to this router's
 // Intelligence endpoints. This router is mounted at `/api`, so a root-level
 // `router.use(requireIntelligenceAccess)` would incorrectly gate unrelated
@@ -42,10 +50,21 @@ router.use('/intelligence', requireAuth, requireIntelligenceAccess)
 
 router.get('/intelligence/agents', async (req, res) => {
   try {
-    const custom = await listCustomIntelligenceAgents(req.user.uid)
+    const custom = req.intelligenceAccess?.premium
+      ? await listCustomIntelligenceAgents(req.user.uid)
+      : []
     return res.json({
       agents: [...listIntelligenceAgents(), ...custom],
-      customLimit: Number(process.env.INTELLIGENCE_CUSTOM_AGENTS_LIMIT || 10),
+      customLimit: req.intelligenceAccess?.premium
+        ? Number(process.env.INTELLIGENCE_CUSTOM_AGENTS_LIMIT || 10)
+        : 0,
+      premium: req.intelligenceAccess?.premium === true,
+      usage: {
+        used: req.intelligenceAccess?.used || 0,
+        limit: req.intelligenceAccess?.limit || 0,
+        remaining: req.intelligenceAccess?.remaining || 0,
+        period: req.intelligenceAccess?.period || 'month',
+      },
     })
   } catch (error) {
     console.error('[Intelligence] failed to list agents', error?.message || error)
@@ -53,7 +72,7 @@ router.get('/intelligence/agents', async (req, res) => {
   }
 })
 
-router.post('/intelligence/agent-draft', async (req, res) => {
+router.post('/intelligence/agent-draft', requirePremiumIntelligenceAccess, async (req, res) => {
   try {
     return res.json({ draft: buildIntelligenceAgentDraft(req.body || {}) })
   } catch (error) {
@@ -61,7 +80,7 @@ router.post('/intelligence/agent-draft', async (req, res) => {
   }
 })
 
-router.post('/intelligence/agents', async (req, res) => {
+router.post('/intelligence/agents', requirePremiumIntelligenceAccess, async (req, res) => {
   try {
     const agent = await createCustomIntelligenceAgent(req.user.uid, req.body || {})
     return res.status(201).json({ agent })
@@ -71,7 +90,7 @@ router.post('/intelligence/agents', async (req, res) => {
   }
 })
 
-router.patch('/intelligence/agents/:agentId', async (req, res) => {
+router.patch('/intelligence/agents/:agentId', requirePremiumIntelligenceAccess, async (req, res) => {
   try {
     const agent = await updateCustomIntelligenceAgent(req.user.uid, req.params.agentId, req.body || {})
     if (!agent) return res.status(404).json({ error: 'Intelligence desk not found' })
@@ -82,7 +101,7 @@ router.patch('/intelligence/agents/:agentId', async (req, res) => {
   }
 })
 
-router.delete('/intelligence/agents/:agentId', async (req, res) => {
+router.delete('/intelligence/agents/:agentId', requirePremiumIntelligenceAccess, async (req, res) => {
   try {
     const deleted = await deleteCustomIntelligenceAgent(req.user.uid, req.params.agentId)
     if (!deleted) return res.status(404).json({ error: 'Intelligence desk not found' })

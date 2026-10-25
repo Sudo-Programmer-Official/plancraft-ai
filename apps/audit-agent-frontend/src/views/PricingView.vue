@@ -130,6 +130,7 @@
                 <ul class="pricing-plan-card__features mt-3 space-y-1 text-sm text-indigo-100/90">
                   <li>Unlimited journaling</li>
                   <li>Basic AI (10 insights/mo)</li>
+                  <li>{{ INTELLIGENCE_FREE_RUNS }} Intelligence research runs/month</li>
                   <li>No reminders</li>
                   <li>No integrations</li>
                 </ul>
@@ -272,6 +273,7 @@ import {
   FOUNDING_MONTHLY_PRICE,
   FOUNDING_OFFER_CONFIGURED,
   FOUNDING_OFFER_END_AT,
+  INTELLIGENCE_FREE_RUNS,
   INTELLIGENCE_MONTHLY_RUNS,
   STANDARD_MONTHLY_PRICE,
   formatCountdown,

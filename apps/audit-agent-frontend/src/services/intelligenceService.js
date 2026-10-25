@@ -1,5 +1,8 @@
 import api from '@/services/api'
 import { nlpClient } from '@/services/leader/http'
+import { INTELLIGENCE_FREE_RUNS } from '@/services/pricingConfig'
+
+export { INTELLIGENCE_FREE_RUNS }
 
 export const INTELLIGENCE_AGENTS = [
   {
@@ -73,13 +76,14 @@ export const INTELLIGENCE_AGENT_TEMPLATES = [
   },
 ]
 
-export async function fetchIntelligenceBrief({ agentIds, customAgentIds = [], question, interests, goalContext } = {}) {
+export async function fetchIntelligenceBrief({ agentIds, customAgentIds = [], question, interests, goalContext, surface = 'desk' } = {}) {
   const response = await nlpClient.post('/intelligence/brief', {
     agentIds,
     customAgentIds,
     question: String(question || '').trim(),
     interests: String(interests || '').trim(),
     goalContext: goalContext || null,
+    surface,
   })
   return response?.data || {}
 }
@@ -89,6 +93,13 @@ export async function fetchIntelligenceAgents() {
   return {
     agents: Array.isArray(response?.data?.agents) ? response.data.agents : [],
     customLimit: Number(response?.data?.customLimit || 10),
+    premium: response?.data?.premium === true,
+    usage: {
+      used: Number(response?.data?.usage?.used || 0),
+      limit: Number(response?.data?.usage?.limit || 0),
+      remaining: Number(response?.data?.usage?.remaining || 0),
+      period: response?.data?.usage?.period || 'month',
+    },
   }
 }
 

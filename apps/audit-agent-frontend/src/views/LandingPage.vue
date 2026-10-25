@@ -466,6 +466,7 @@ import { ANDROID_APP_URL, IOS_APP_URL } from '@/constants/appStores'
 import {
   FOUNDING_MONTHLY_PRICE,
   FOUNDING_OFFER_CONFIGURED,
+  INTELLIGENCE_FREE_RUNS,
   STANDARD_MONTHLY_PRICE,
   formatUsd,
 } from '@/services/pricingConfig'
@@ -569,7 +570,7 @@ const privacyPoints = [
 ]
 
 // Mirrors the plan comparison on /pricing.
-const freePlan = ['Unlimited journaling', 'Basic AI (10 insights a month)', 'Focus sessions', 'Web app and installable PWA']
+const freePlan = ['Unlimited journaling', 'Basic AI (10 insights a month)', `${INTELLIGENCE_FREE_RUNS} Intelligence research runs/month`, 'Focus sessions', 'Web app and installable PWA']
 const premiumPlan = ['AI planning plus 30 Intelligence research runs/month', 'Premium Intelligence agents', 'Smart reminders', 'Calendar and WhatsApp integration', 'Priority support']
 
 const useCases = [

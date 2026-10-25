@@ -649,6 +649,7 @@ async function runTaskResearch() {
       customAgentIds: isCustom ? [agent.id] : [],
       question,
       interests,
+      surface: 'task',
       // Task research is explicitly user-initiated and does not inherit a goal.
       goalContext: null,
     })

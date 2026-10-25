@@ -1,6 +1,7 @@
 // Matches the existing $5.00 recurring Premium price in Stripe.
 export const STANDARD_MONTHLY_PRICE = 5
 export const FOUNDING_MONTHLY_PRICE = 2
+export const INTELLIGENCE_FREE_RUNS = 5
 export const INTELLIGENCE_MONTHLY_RUNS = 30
 
 function enabled(value) {

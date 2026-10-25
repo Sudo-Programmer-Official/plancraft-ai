@@ -631,13 +631,31 @@ router.post('/intelligence/brief', async (req, res) => {
       agentIds: req.body?.agentIds,
       customAgentIds: req.body?.customAgentIds,
       goalContext: req.body?.goalContext,
+      surface: String(req.body?.surface || 'desk').trim().toLowerCase(),
     }
     const access = await getIntelligenceAccess(req.user?.uid)
     if (!access.ok) {
       return res.status(403).json({
-        error: 'Intelligence Desk requires a Premium plan',
+        error: 'Free Intelligence access is disabled for this account',
+        code: 'intelligence_free_access_disabled',
+      })
+    }
+    if (!access.premium && input.surface === 'task') {
+      return res.status(403).json({
+        error: 'Live task research is part of Premium Intelligence',
         code: 'intelligence_premium_required',
       })
+    }
+    if (!access.premium && Array.isArray(input.customAgentIds) && input.customAgentIds.length) {
+      return res.status(403).json({
+        error: 'Custom Intelligence desks are available on Premium',
+        code: 'intelligence_premium_required',
+      })
+    }
+    // Keep the free trial inexpensive while still making it useful: one built-in
+    // desk per run. Premium users can combine multiple desks in one brief.
+    if (!access.premium && Array.isArray(input.agentIds) && input.agentIds.length > 1) {
+      input.agentIds = input.agentIds.slice(0, 1)
     }
 
     const customAgents = await resolveCustomIntelligenceProfiles(req.user?.uid, input.customAgentIds)
@@ -655,7 +673,7 @@ router.post('/intelligence/brief', async (req, res) => {
     const quota = await reserveIntelligenceRequest(req.user?.uid, { access: access.access })
     if (!quota.ok) {
       return res.status(429).json({
-        error: 'Daily Intelligence Desk limit reached. Try again tomorrow.',
+        error: 'Monthly Intelligence Desk limit reached. Upgrade for more research runs.',
         code: quota.code,
         details: { used: quota.used, limit: quota.limit, remaining: quota.remaining || 0 },
       })
