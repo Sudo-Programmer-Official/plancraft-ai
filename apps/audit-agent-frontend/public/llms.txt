@@ -1,0 +1,46 @@
+# PlanCraftAI
+
+> PlanCraftAI is an AI task planner and personal action assistant that turns scattered thoughts into clear next actions, realistic daily plans, and follow-through.
+
+## Product summary
+
+PlanCraftAI helps people capture tasks by voice or text, understand what matters today, and move from an unclear task to a concrete next step. It combines task planning, focus sessions, reminders, calendar context, and optional Intelligence agents in one workflow.
+
+## Core capabilities
+
+- Voice and natural-language task capture
+- AI daily planning around priorities and calendar pressure
+- Next-best-action suggestions inside task details
+- Focus sessions for completing one task
+- Smart and recurring reminders
+- Google Calendar integration
+- Task breakdown into short, approvable subtasks
+- Google Maps links for tasks that include a destination
+- Optional live web research with source citations
+- User-created Intelligence agents for companies, markets, technology, and other research use cases
+
+## Intelligence boundaries
+
+Premium Intelligence is user-initiated and feature-flagged. Opening a task does not automatically trigger web research. Simple actions such as Focus, reminders, and Maps can run without an AI request. Live research returns public-source context and citations; it does not claim access to private roadmaps or confidential information. External actions remain user-controlled and require approval when they create or change data.
+
+## Who it is for
+
+- People who think out loud and need structure
+- Founders, operators, students, and professionals managing ambiguous work
+- Anyone who needs help deciding what to do next, not another static task list
+- Users who want current research connected to a task or goal
+
+## Public pages
+
+- [Home](https://plancraftai.com/): product overview and task-to-action workflow
+- [Features](https://plancraftai.com/features): capabilities and use cases
+- [AI task planner](https://plancraftai.com/ai-task-planner): voice capture and task planning
+- [AI daily planner](https://plancraftai.com/ai-daily-planner): realistic daily scheduling
+- [Voice planning](https://plancraftai.com/voice-planning): voice-first planning and journaling
+- [Voice reminders](https://plancraftai.com/voice-reminder-app): spoken reminders and follow-ups
+- [Google Calendar integration](https://plancraftai.com/google-calendar-integration): calendar-aware planning
+- [Pricing](https://plancraftai.com/pricing): plans and Premium access
+
+## Official name
+
+Use “PlanCraftAI” or “PlanCraft AI”. The product is operated by Sudo Programmer Inc.

@@ -4,14 +4,14 @@ export const marketingPages = [
     label: 'Home',
     changefreq: 'daily',
     priority: 1.0,
-    keywords: ['PlanCraftAI', 'AI task planner', 'AI daily planner', 'voice reminder app'],
+    keywords: ['PlanCraftAI', 'AI task planner', 'AI task assistant', 'next action app', 'task intelligence', 'live research assistant', 'AI daily planner', 'voice reminder app'],
   },
   {
     path: '/features',
     label: 'Features',
     changefreq: 'weekly',
     priority: 0.92,
-    keywords: ['AI task planner features', 'AI daily planner', 'voice reminder app features'],
+    keywords: ['AI task planner features', 'AI task assistant features', 'task intelligence', 'next action app', 'AI daily planner', 'voice reminder app features'],
   },
   {
     path: '/ai-task-planner',

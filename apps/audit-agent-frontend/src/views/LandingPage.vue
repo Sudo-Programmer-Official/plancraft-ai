@@ -17,6 +17,7 @@
 
         <nav class="lp-nav__links" aria-label="Primary">
           <a href="#features">Features</a>
+          <a href="#intelligence">Intelligence</a>
           <a href="#how-it-works">How it works</a>
           <a href="#focus">Focus</a>
           <a href="#pricing">Pricing</a>
@@ -40,15 +41,15 @@
             <p class="lp-chip">
               <span>AI task planner</span>
               <ArrowRight :size="14" aria-hidden="true" />
-              <span>A day you can finish</span>
+              <span>Next best move</span>
               <Sparkles :size="14" aria-hidden="true" class="lp-chip__spark" />
             </p>
             <h1 id="hero-title" class="lp-hero__title">
               Turn scattered thoughts into a day you can actually finish.
             </h1>
             <p class="lp-hero__lede">
-              Speak a task, meeting prep, or reminder. PlanCraftAI turns it into a realistic plan around
-              your calendar, then helps you follow through without carrying everything in your head.
+              Speak a task, a place you need to go, or a problem you need to solve. PlanCraftAI finds
+              the next best move, fits it into your day, and brings in live research only when it helps.
             </p>
 
             <div class="lp-hero__ctas">
@@ -230,6 +231,41 @@
               {{ action.label }}
             </li>
           </ul>
+        </div>
+      </section>
+
+      <!-- Task intelligence -->
+      <section id="intelligence" class="lp-section lp-section--tint">
+        <div class="lp-container">
+          <header class="lp-heading">
+            <p class="lp-eyebrow">Premium Intelligence</p>
+            <h2>When a task is unclear, PlanCraft helps you move.</h2>
+            <p>
+              Your task becomes the context. PlanCraft suggests a practical next move, opens the right
+              capability, or lets a research agent bring back current, source-backed information.
+            </p>
+          </header>
+
+          <div class="lp-intelligence">
+            <article v-for="card in intelligenceCards" :key="card.title" class="lp-intelligence__card">
+              <span class="lp-intelligence__icon" :class="`lp-feature__icon--${card.tone}`" aria-hidden="true">
+                <component :is="card.icon" :size="22" />
+              </span>
+              <p class="lp-intelligence__tag">{{ card.tag }}</p>
+              <h3>{{ card.title }}</h3>
+              <p>{{ card.desc }}</p>
+            </article>
+          </div>
+
+          <div class="lp-intelligence__note">
+            <div>
+              <strong>Designed to save time, not create more noise.</strong>
+              <span>Simple actions run locally. Live research runs only when you ask, with citations and clear limits.</span>
+            </div>
+            <RouterLink to="/pricing?source=landing_intelligence" class="lp-btn lp-btn--primary">
+              Explore Premium Intelligence <ArrowRight :size="16" aria-hidden="true" />
+            </RouterLink>
+          </div>
         </div>
       </section>
 
@@ -415,7 +451,7 @@ const premiumPrice = computed(() => (isAppleBillingSafeMode.value ? '$2.99' : '$
 const showStoreBadges = ref(true)
 const currentYear = new Date().getFullYear()
 
-const trustPoints = ['No credit card needed', 'Web, iPhone and Android', 'Cancel anytime']
+const trustPoints = ['No credit card needed', 'Next actions, not just lists', 'Live research when you ask']
 
 const howItWorks = [
   {
@@ -465,6 +501,30 @@ const aiActions = [
   { icon: markRaw(Timer), tone: 'amber', label: 'Schedule a focus session' },
 ]
 
+const intelligenceCards = [
+  {
+    icon: markRaw(Sparkles),
+    tone: 'violet',
+    tag: 'Next best move',
+    title: 'Get unstuck in one tap',
+    desc: 'Turn “I need to prepare” into a first action, a short checklist, or a focused work session.',
+  },
+  {
+    icon: markRaw(Search),
+    tone: 'green',
+    tag: 'Live research',
+    title: 'Bring current context to the task',
+    desc: 'Ask a specialist agent to research companies, markets, technology, or any use case you define—with cited sources.',
+  },
+  {
+    icon: markRaw(Plug),
+    tone: 'blue',
+    tag: 'Real-world actions',
+    title: 'Open the capability you need',
+    desc: 'Open directions, set a reminder, start Focus, or prepare the next step. External actions stay under your control.',
+  },
+]
+
 const privacyPoints = [
   { icon: markRaw(Plug), label: 'Connect only what you choose' },
   { icon: markRaw(ScanFace), label: 'Face ID and fingerprint app lock' },
@@ -474,7 +534,7 @@ const privacyPoints = [
 
 // Mirrors the plan comparison on /pricing.
 const freePlan = ['Unlimited journaling', 'Basic AI (10 insights a month)', 'Focus sessions', 'Web, iPhone and Android apps']
-const premiumPlan = ['Unlimited AI insights', 'Smart reminders', 'Calendar and WhatsApp integration', 'Priority support']
+const premiumPlan = ['Unlimited AI insights', 'Premium Intelligence agents', 'Smart reminders', 'Calendar and WhatsApp integration', 'Priority support']
 
 const useCases = [
   {
@@ -497,6 +557,11 @@ const useCases = [
     desc: 'Create reminders from spoken input and follow up across push, WhatsApp, or recap-style nudges.',
     href: '/voice-reminder-app',
   },
+  {
+    title: 'Task Intelligence',
+    desc: 'Get a next best action, live research with citations, and practical context without leaving the task you are trying to finish.',
+    href: '#intelligence',
+  },
 ]
 
 const exploreLinks = [
@@ -508,6 +573,7 @@ const exploreLinks = [
   { label: 'Recurring reminder app for habits and routines', to: '/recurring-reminder-app' },
   { label: 'AI reminders that feel human', to: '/ai-reminders' },
   { label: 'Google Calendar sync walkthrough', to: '/google-calendar-integration' },
+  { label: 'Task Intelligence and live research', to: '#intelligence' },
   { label: 'Guides on AI productivity and goals', to: '/blog' },
 ]
 
@@ -531,6 +597,21 @@ const faqs = [
     question: 'Does PlanCraftAI integrate with Google Calendar?',
     answer:
       'Yes. You can sync Google Calendar, place tasks around meetings, and keep prep reminders tied to the schedule you already work from.',
+  },
+  {
+    question: 'What is task intelligence in PlanCraftAI?',
+    answer:
+      'Task Intelligence uses the task you are already looking at to suggest a practical next move. Depending on the task, PlanCraftAI can help you start a focus session, set a reminder, open directions, break work into steps, or ask a live research agent for current context.',
+  },
+  {
+    question: 'Can PlanCraftAI research a task with current information?',
+    answer:
+      'Yes. Premium Intelligence agents can research public web sources when you ask, return a concise answer with citations, and clearly separate current evidence from interpretation. Research does not run automatically when you open a task.',
+  },
+  {
+    question: 'Can PlanCraftAI take actions for me?',
+    answer:
+      'PlanCraftAI can open helpful capabilities such as Google Maps, Focus, and reminders. External actions stay user-controlled, and integrations that create, send, or change something require your approval.',
   },
   {
     question: 'Can I try PlanCraftAI without creating an account?',
@@ -557,13 +638,40 @@ const structuredData = [
     sameAs: [IOS_APP_URL, ANDROID_APP_URL],
     screenshot: `${BASE_URL}/plancraftai-post-one.png`,
     description:
-      'PlanCraftAI is an AI task planner for voice capture, calendar-aware daily planning, focus sessions, and smart reminders.',
+      'PlanCraftAI is an AI task planner and personal action assistant for voice capture, realistic daily planning, next best actions, live task research, focus sessions, and smart reminders.',
+    audience: {
+      '@type': 'Audience',
+      audienceType: 'People who want to turn tasks into clear next actions and follow-through',
+    },
     offers: {
       '@type': 'Offer',
       price: '0.00',
       priceCurrency: 'USD',
       availability: 'https://schema.org/OnlineOnly',
     },
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'PlanCraftAI',
+    url: BASE_URL,
+    description:
+      'An AI task planner that turns scattered thoughts into next actions, realistic plans, live research, and follow-through.',
+    inLanguage: 'en-US',
+    publisher: { '@type': 'Organization', name: 'Sudo Programmer Inc.', url: BASE_URL },
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'HowTo',
+    name: 'How to turn a task into progress with PlanCraftAI',
+    description: 'Use PlanCraftAI to capture a task, find the next best move, and follow through.',
+    totalTime: 'PT2M',
+    step: howItWorks.map((step, index) => ({
+      '@type': 'HowToStep',
+      position: index + 1,
+      name: step.title,
+      text: step.desc,
+    })),
   },
   {
     '@context': 'https://schema.org',
@@ -589,15 +697,22 @@ const structuredData = [
 ]
 
 useSeoMeta({
-  title: 'PlanCraftAI | AI Task Planner & Voice Reminders',
+  title: 'PlanCraftAI | AI Task Planner, Next Actions & Live Intelligence',
   description:
-    'Turn scattered thoughts into a realistic day with PlanCraftAI, an AI task planner for voice capture, calendar-aware planning, and smart reminders.',
+    'Turn scattered thoughts into next best actions with PlanCraftAI: an AI task planner for voice capture, realistic daily planning, live task research, Google Maps, Focus, and smart reminders.',
   keywords: [
     'PlanCraft AI',
     'AI task planner',
+    'AI task assistant',
+    'next action app',
+    'task intelligence',
+    'AI productivity assistant',
+    'live research assistant',
+    'AI agent for tasks',
     'AI daily planner',
     'voice reminder app',
     'voice task manager',
+    'Google Maps task assistant',
     'focus timer',
     'recurring reminder app',
     'AI productivity app',
@@ -1344,6 +1459,97 @@ onMounted(() => {
   width: 32px;
   height: 32px;
   border-radius: 10px;
+}
+
+/* ---------- Task intelligence ---------- */
+.lp-intelligence {
+  display: grid;
+  gap: 16px;
+}
+
+@media (min-width: 768px) {
+  .lp-intelligence {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.lp-intelligence__card {
+  display: flex;
+  flex-direction: column;
+  min-height: 220px;
+  padding: 24px;
+  border: 1px solid #c7d2fe;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 18px 34px -28px rgba(79, 70, 229, 0.7);
+}
+
+.lp-intelligence__icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+}
+
+.lp-intelligence__tag {
+  margin: 20px 0 0;
+  color: var(--brand-strong);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lp-intelligence__card h3 {
+  margin: 8px 0 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.lp-intelligence__card > p:last-child {
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.lp-intelligence__note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-top: 24px;
+  padding: 20px 24px;
+  border: 1px dashed #a5b4fc;
+  border-radius: 18px;
+  background: rgba(238, 242, 255, 0.75);
+}
+
+.lp-intelligence__note > div {
+  display: grid;
+  gap: 4px;
+}
+
+.lp-intelligence__note strong {
+  font-size: 0.95rem;
+}
+
+.lp-intelligence__note span {
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 767px) {
+  .lp-intelligence__note {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .lp-intelligence__note .lp-btn {
+    width: 100%;
+  }
 }
 
 /* ---------- Privacy ---------- */

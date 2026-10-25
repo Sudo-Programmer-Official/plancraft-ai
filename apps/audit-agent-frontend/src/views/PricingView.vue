@@ -445,7 +445,9 @@ async function onUpgrade() {
       }
       // Store post-login redirect intent
       try {
-        localStorage.setItem('postLoginRedirect', '/subscription?upgrade=1')
+        // Pass the redirect explicitly to LoginView. Keeping the upgrade flag
+        // lets the pricing page resume checkout after authentication.
+        localStorage.removeItem('postLoginRedirect')
         localStorage.setItem('upgradeAfterLogin', '1')
       } catch {
         /* noop */
@@ -463,7 +465,14 @@ async function onUpgrade() {
       })
 
       // Navigate to login page
-      return router.push('/login')
+      return router.push({
+        path: '/login',
+        query: {
+          next: '/subscription?upgrade=1',
+          mode: 'signIn',
+          source: funnelSource.value,
+        },
+      })
     }
 
     // Proceed with checkout

@@ -3,11 +3,11 @@
     <section class="px-6 py-20 md:py-28 text-center">
       <p class="uppercase text-xs tracking-[0.35em] text-indigo-300 mb-4">Product Tour</p>
       <h1 class="text-4xl md:text-5xl font-extrabold leading-tight max-w-4xl mx-auto">
-        AI task planner with voice reminders, daily planning, and calendar-aware execution
+        AI task planner with next actions, live intelligence, voice reminders, and calendar-aware execution
       </h1>
       <p class="mt-5 text-lg md:text-xl text-indigo-100 max-w-3xl mx-auto leading-relaxed">
-        PlanCraftAI helps you speak tasks, sort priorities, and keep work moving with smart
-        reminders. It is built for people who want less remembering and more follow-through.
+        PlanCraftAI helps you speak tasks, find the next best move, research what matters, and keep work
+        moving with smart reminders. It is built for people who want less remembering and more follow-through.
       </p>
       <div class="mt-8 flex flex-col md:flex-row gap-4 justify-center">
         <RouterLink
@@ -145,6 +145,14 @@ const useCaseCards = [
     href: '/voice-reminder-app',
     ctaLabel: 'See voice reminders',
   },
+  {
+    emoji: '✨',
+    title: 'Task Intelligence',
+    description:
+      'Turn a task into a practical next move, open helpful capabilities, or ask a research agent for current, cited context.',
+    href: '/#intelligence',
+    ctaLabel: 'Explore task intelligence',
+  },
 ]
 
 const featureBullets = [
@@ -162,6 +170,11 @@ const featureBullets = [
     tag: 'Goal tracking',
     title: 'Weekly and monthly AI recaps',
     description: 'Understand completion rates, mood trends, and recurring blockers.',
+  },
+  {
+    tag: 'Task intelligence',
+    title: 'Move from “what now?” to a next action',
+    description: 'Get local actions such as Focus, reminders, or Maps, plus optional live research with citations.',
   },
   {
     tag: 'Compassionate reminders',
@@ -207,6 +220,17 @@ const longformSections = [
       'Rich-text journal entries paired with data',
     ],
   },
+  {
+    eyebrow: 'Unblock',
+    heading: 'Bring the right context to the task',
+    description:
+      'Task Intelligence keeps simple actions fast and calls live research only when you ask for current context or a deeper answer.',
+    bullets: [
+      'Suggests a practical next action from the task itself',
+      'Opens Maps, Focus, reminders, and other capabilities when useful',
+      'Returns source-backed research with citations when enabled',
+    ],
+  },
 ]
 
 const SITE_URL = (import.meta.env.VITE_SITE_URL && String(import.meta.env.VITE_SITE_URL)) || 'https://plancraftai.com'
@@ -228,11 +252,15 @@ const structuredData = [
 ]
 
 useSeoMeta({
-  title: 'AI Task Planner Features | Voice Reminders, AI Daily Planning, and Calendar Sync',
+  title: 'AI Task Planner Features | Next Actions, Live Intelligence & Voice Reminders',
   description:
-    'Review PlanCraftAI features for AI daily planning, voice task creation, voice reminders, recurring reminders, and Google Calendar sync.',
+    'Explore PlanCraftAI features for next best actions, live task intelligence, AI daily planning, voice task creation, voice reminders, and Google Calendar sync.',
   keywords: [
     'AI task planner features',
+    'AI task assistant features',
+    'task intelligence',
+    'next best action app',
+    'live research assistant',
     'AI daily planner features',
     'voice reminder app features',
     'Google Calendar sync planner',

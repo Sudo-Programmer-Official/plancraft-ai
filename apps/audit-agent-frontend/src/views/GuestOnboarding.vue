@@ -92,9 +92,14 @@
           <p>Save your tasks and get reminders wherever you use PlanCraftAI.</p>
 
           <div class="guest-success__actions">
-            <button type="button" class="guest-button guest-button--primary" @click="continueToAuth('google')">Continue with Google</button>
-            <button type="button" class="guest-button guest-button--secondary" @click="continueToAuth('apple')">Continue with Apple</button>
-            <button type="button" class="guest-button guest-button--secondary" @click="continueToAuth('email_or_phone')">Email or phone</button>
+            <button type="button" class="guest-button guest-button--primary" :disabled="authBusy" @click="continueToAuth('google')">
+              {{ authBusy && authMethod === 'google' ? 'Connecting…' : 'Continue with Google' }}
+            </button>
+            <button type="button" class="guest-button guest-button--secondary" :disabled="authBusy" @click="continueToAuth('apple')">
+              {{ authBusy && authMethod === 'apple' ? 'Connecting…' : 'Continue with Apple' }}
+            </button>
+            <button type="button" class="guest-button guest-button--secondary" :disabled="authBusy" @click="continueToAuth('email_or_phone')">Email or phone</button>
+            <p v-if="authErrorMessage" class="guest-auth-error" role="alert">{{ authErrorMessage }}</p>
           </div>
 
           <button type="button" class="guest-not-now" @click="continueWithoutSaving">Not now</button>
@@ -155,6 +160,9 @@ const starting = ref(false)
 const showPlanner = ref(false)
 const planReady = ref(false)
 const errorMessage = ref('')
+const authBusy = ref(false)
+const authMethod = ref('')
+const authErrorMessage = ref('')
 
 const isGuestSession = computed(() =>
   authStore?.guest === true || authStore?.isGuest === true || authStore?.user?.mode === 'guest',
@@ -210,16 +218,64 @@ function continueWithoutSaving() {
   router.push('/today')
 }
 
-function continueToAuth(method) {
+async function continueToAuth(method) {
+  if (authBusy.value) return
   trackSavePlanPromptAction({ action: 'authenticate', method })
-  router.push({
-    path: '/login',
-    query: {
-      next: '/today',
-      save_plan: '1',
-      auth_method: method,
-    },
-  })
+  authErrorMessage.value = ''
+
+  // Email and phone need their form/OTP UI. Google and Apple can use the
+  // current click directly, avoiding a second provider-selection step.
+  if (method === 'email_or_phone') {
+    await router.push({
+      path: '/login',
+      query: {
+        next: '/today',
+        save_plan: '1',
+        auth_method: method,
+        mode: 'signIn',
+      },
+    })
+    return
+  }
+
+  authBusy.value = true
+  authMethod.value = method
+  try {
+    if (method === 'google') {
+      await authStore.loginWithGoogle()
+    } else {
+      await authStore.loginWithApple()
+    }
+
+    if (authStore.user?.uid && !isGuestSession.value) {
+      await router.push('/today')
+      return
+    }
+
+    // Native/redirect auth may return before the browser session is hydrated.
+    await router.push({
+      path: '/login',
+      query: {
+        next: '/today',
+        save_plan: '1',
+        auth_method: method,
+        mode: 'signIn',
+      },
+    })
+  } catch (error) {
+    console.warn('[GuestOnboarding] Provider authentication failed', error)
+    const code = String(error?.code || '')
+    if (code === 'auth/in-app-browser') {
+      authErrorMessage.value = 'Google sign-in is blocked inside this app browser. Open PlanCraftAI in your browser or use email or phone.'
+    } else if (code === 'feature-disabled/apple-auth') {
+      authErrorMessage.value = 'Apple sign-in is temporarily unavailable. Use Google, email, or phone instead.'
+    } else {
+      authErrorMessage.value = 'That sign-in did not finish. Please try again or use email or phone.'
+    }
+  } finally {
+    authBusy.value = false
+    authMethod.value = ''
+  }
 }
 
 onMounted(() => {
