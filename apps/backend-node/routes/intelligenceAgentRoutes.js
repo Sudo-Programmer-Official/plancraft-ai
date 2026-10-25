@@ -10,6 +10,10 @@ import {
   listCustomIntelligenceAgents,
   updateCustomIntelligenceAgent,
 } from '../services/intelligenceAgentService.js'
+import {
+  getTaskResearchMemory,
+  saveTaskResearchMemory,
+} from '../services/intelligenceTaskMemoryService.js'
 
 const router = express.Router()
 
@@ -37,7 +41,7 @@ async function requireIntelligenceAccess(req, res, next) {
 function requirePremiumIntelligenceAccess(req, res, next) {
   if (req.intelligenceAccess?.premium) return next()
   return res.status(403).json({
-    error: 'Custom Intelligence desks are available on Premium',
+    error: 'This Intelligence feature is available on Premium',
     code: 'intelligence_premium_required',
   })
 }
@@ -69,6 +73,29 @@ router.get('/intelligence/agents', async (req, res) => {
   } catch (error) {
     console.error('[Intelligence] failed to list agents', error?.message || error)
     return res.status(500).json({ error: 'Could not load intelligence desks' })
+  }
+})
+
+router.get('/intelligence/tasks/:taskId/research', requirePremiumIntelligenceAccess, async (req, res) => {
+  try {
+    const result = await getTaskResearchMemory(req.user.uid, req.params.taskId, {
+      title: req.query?.title,
+      notes: req.query?.notes,
+    })
+    return res.json(result)
+  } catch (error) {
+    console.error('[Intelligence] failed to load task research memory', error?.message || error)
+    return res.status(500).json({ error: 'Could not load saved task research' })
+  }
+})
+
+router.post('/intelligence/tasks/:taskId/research', requirePremiumIntelligenceAccess, async (req, res) => {
+  try {
+    const memory = await saveTaskResearchMemory(req.user.uid, req.params.taskId, req.body || {})
+    return res.status(201).json({ memory })
+  } catch (error) {
+    console.error('[Intelligence] failed to save task research memory', error?.message || error)
+    return res.status(400).json({ error: error?.message || 'Could not save task research' })
   }
 })
 

@@ -3,6 +3,7 @@ import Stripe from "stripe"
 import { db } from "../services/firebaseAdmin.js"
 import { recomputeSeatsUsed } from "../services/workspaceService.js"
 import { trackServerEventAsync } from "../services/analyticsService.js"
+import { notifyStripeSupport } from "../services/stripeSupportNotificationService.js"
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY
 const stripe = STRIPE_SECRET_KEY
@@ -137,6 +138,19 @@ export async function stripeWebhookHandler(req, res) {
             scope: 'workspace',
             plan: session?.metadata?.plan || 'starter',
           })
+          void notifyStripeSupport({
+            outcome: 'success',
+            eventType: event.type,
+            eventId: event.id,
+            userId: session?.metadata?.ownerId || uid,
+            userEmail: session?.customer_details?.email || session?.customer_email,
+            workspaceId,
+            plan: session?.metadata?.plan || 'starter',
+            sessionId: session?.id,
+            customerId: session?.customer,
+            amount: session?.amount_total,
+            currency: session?.currency,
+          })
           lastMeta = { workspaceId, plan: session?.metadata?.plan, seats: session?.metadata?.seats || session?.metadata?.seatQuantity, billingStatus, reason: "checkout_completed" }
           break
         }
@@ -178,6 +192,19 @@ export async function stripeWebhookHandler(req, res) {
           plan: 'premium',
           billing_interval: session?.metadata?.plan || 'monthly',
         })
+        void notifyStripeSupport({
+          outcome: 'success',
+          eventType: event.type,
+          eventId: event.id,
+          userId: uid,
+          userEmail: session?.customer_details?.email || session?.customer_email,
+          plan: 'premium',
+          foundingOffer: session?.metadata?.foundingOffer === '1',
+          sessionId: session?.id,
+          customerId: session?.customer,
+          amount: session?.amount_total,
+          currency: session?.currency,
+        })
         break
       }
 
@@ -198,7 +225,7 @@ export async function stripeWebhookHandler(req, res) {
             )
             lastMeta = { workspaceId: wsId, plan: sub?.metadata?.plan || "starter", seats: sub?.metadata?.seats || sub?.metadata?.seatQuantity, billingStatus: "active", reason: "payment_succeeded" }
           }
-          let uid = sub?.metadata?.userId
+          const uid = sub?.metadata?.userId
           if (uid) {
             await db.collection("users").doc(uid).set(
               {
@@ -232,6 +259,20 @@ export async function stripeWebhookHandler(req, res) {
                 },
               }, { merge: true })
             }
+          }
+          if (invoice.billing_reason !== 'subscription_create') {
+            void notifyStripeSupport({
+              outcome: 'success',
+              eventType: event.type,
+              eventId: event.id,
+              userId: uid,
+              workspaceId: wsId,
+              plan: sub?.metadata?.plan || 'premium',
+              invoiceId: invoice?.id,
+              customerId: invoice?.customer,
+              amount: invoice?.amount_paid || invoice?.amount_due,
+              currency: invoice?.currency,
+            })
           }
         }
         break
@@ -309,6 +350,21 @@ export async function stripeWebhookHandler(req, res) {
       case "customer.subscription.deleted":
       case "invoice.payment_failed": {
         const payload = event.data.object
+        if (event.type === 'invoice.payment_failed') {
+          void notifyStripeSupport({
+            outcome: 'error',
+            eventType: event.type,
+            eventId: event.id,
+            userId: payload?.metadata?.userId,
+            workspaceId: payload?.metadata?.workspaceId,
+            plan: payload?.metadata?.plan || 'premium',
+            invoiceId: payload?.id,
+            customerId: payload?.customer,
+            amount: payload?.amount_due,
+            currency: payload?.currency,
+            error: payload?.last_finalization_error?.message || payload?.last_payment_error?.message || 'Invoice payment failed',
+          })
+        }
         const subId = payload?.id || payload?.subscription
         let uid = payload?.metadata?.userId
         const wsId = payload?.metadata?.workspaceId
@@ -370,6 +426,12 @@ export async function stripeWebhookHandler(req, res) {
     res.json({ received: true })
   } catch (err) {
     console.error("❌ Webhook handler error:", err)
+    void notifyStripeSupport({
+      outcome: 'error',
+      eventType: 'stripe_webhook_processing_failed',
+      eventId: event?.id,
+      error: err?.message || 'Stripe webhook processing failed',
+    })
     res.status(500).send("server error")
   }
 }

@@ -142,6 +142,7 @@ import { db } from '../services/firebaseAdmin.js'
 import { requireAuth, ensureUserMatches } from '../middleware/auth.js'
 import { normalizeDate } from '../utils/time.js'
 import { trackServerEventAsync } from '../services/analyticsService.js'
+import { notifyStripeSupport } from '../services/stripeSupportNotificationService.js'
 
 const router = express.Router()
 router.use(requireAuth, ensureUserMatches)
@@ -439,6 +440,13 @@ router.post('/subscription/checkout', async (req, res) => {
     return res.json({ url: session.url })
   } catch (err) {
     console.error('subscription/checkout error', err)
+    void notifyStripeSupport({
+      outcome: 'error',
+      eventType: 'legacy_subscription_checkout_failed',
+      userId: req.user?.uid || req.body?.userId,
+      userEmail: req.user?.email,
+      error: err?.raw?.message || err?.message || 'Checkout initialization failed',
+    })
     res.status(500).json({ error: 'Checkout initialization failed' })
   }
 })
@@ -615,6 +623,14 @@ router.post('/subscription/reactivate', async (req, res) => {
           requestId: err?.requestId,
           userId,
         })
+        void notifyStripeSupport({
+          outcome: 'error',
+          eventType: 'subscription_reactivate_checkout_failed',
+          userId,
+          userEmail: req.user?.email,
+          plan: planKey,
+          error: err?.raw?.message || err?.message || 'Reactivate checkout failed',
+        })
         const status = err?.statusCode || err?.status || 500
         return res.status(status).json({ error: err?.message || 'Reactivate checkout failed' })
       }
@@ -645,6 +661,14 @@ router.post('/subscription/reactivate', async (req, res) => {
             requestId: checkoutErr?.requestId,
             userId,
           })
+          void notifyStripeSupport({
+            outcome: 'error',
+            eventType: 'subscription_reactivate_fallback_checkout_failed',
+            userId,
+            userEmail: req.user?.email,
+            plan: planKey,
+            error: checkoutErr?.raw?.message || checkoutErr?.message || 'Reactivate checkout failed',
+          })
           const status = checkoutErr?.statusCode || checkoutErr?.status || 500
           return res.status(status).json({ error: checkoutErr?.message || 'Reactivate checkout failed' })
         }
@@ -657,6 +681,14 @@ router.post('/subscription/reactivate', async (req, res) => {
         requestId: err?.requestId,
         subId,
         userId,
+      })
+      void notifyStripeSupport({
+        outcome: 'error',
+        eventType: 'subscription_reactivate_failed',
+        userId,
+        userEmail: req.user?.email,
+        plan: planKey,
+        error: message,
       })
       const status = err?.statusCode || err?.status || 500
       return res.status(status).json({ error: message })
@@ -686,6 +718,13 @@ router.post('/subscription/reactivate', async (req, res) => {
     return res.json({ url: successRedirect })
   } catch (err) {
     console.error('Reactivate error:', err)
+    void notifyStripeSupport({
+      outcome: 'error',
+      eventType: 'subscription_reactivate_failed',
+      userId: req.user?.uid || req.body?.userId || req.body?.uid,
+      userEmail: req.user?.email,
+      error: err?.raw?.message || err?.message || 'Failed to reactivate subscription',
+    })
     res.status(500).json({ error: 'Failed to reactivate subscription' })
   }
 })

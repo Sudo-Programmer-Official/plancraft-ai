@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { requireAuth } from "../middleware/auth.js";
 import { createBillingIntent } from "../services/billingService.js";
 import { getWorkspace } from "../services/workspaceService.js";
+import { notifyStripeSupport } from "../services/stripeSupportNotificationService.js";
 
 const router = express.Router();
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
@@ -68,6 +69,15 @@ router.post("/billing/checkout", requireAuth, async (req, res) => {
       : "starter";
     const priceId = resolveTeamPrice(normalizedPlan);
     if (!priceId) {
+      void notifyStripeSupport({
+        outcome: "error",
+        eventType: "workspace_checkout_price_missing",
+        userId: req.user?.uid,
+        userEmail: req.user?.email,
+        workspaceId,
+        plan: normalizedPlan,
+        error: "Stripe price not configured for this plan",
+      });
       return res.status(400).json({ error: "Stripe price not configured for this plan" });
     }
     const requestedSeats =
@@ -119,6 +129,15 @@ router.post("/billing/checkout", requireAuth, async (req, res) => {
     return res.json({ url: session.url });
   } catch (err) {
     console.error("[BillingRoutes] checkout failed", err?.message || err);
+    void notifyStripeSupport({
+      outcome: "error",
+      eventType: "workspace_checkout_create_failed",
+      userId: req.user?.uid,
+      userEmail: req.user?.email,
+      workspaceId: req.body?.workspaceId,
+      plan: req.body?.plan,
+      error: err?.raw?.message || err?.message || "Failed to start checkout",
+    });
     return res.status(500).json({ error: "Failed to start checkout" });
   }
 });

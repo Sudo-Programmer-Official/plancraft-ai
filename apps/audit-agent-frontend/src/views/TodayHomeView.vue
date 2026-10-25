@@ -194,7 +194,7 @@
             <div v-if="isPremium" class="today__research-controls">
               <label class="today__research-field">
                 <span>Agent</span>
-                <select v-model="taskResearchAgentId" :disabled="taskResearchLoading" class="today__research-select" @focus="loadTaskResearchAgents">
+                <select v-model="taskResearchAgentId" :disabled="taskResearchLoading || taskResearchMemoryLoading" class="today__research-select" @focus="loadTaskResearchAgents">
                   <option v-for="agent in taskResearchAgents" :key="agent.id" :value="agent.id">
                     {{ agent.label || agent.name }}{{ agent.id === 'general-task-helper' ? ' · Default' : agent.custom ? ' · Mine' : '' }}
                   </option>
@@ -205,7 +205,7 @@
                 <input
                   v-model="taskResearchQuestion"
                   class="today__research-input"
-                  :disabled="taskResearchLoading"
+                  :disabled="taskResearchLoading || taskResearchMemoryLoading"
                   placeholder="What should I know before I start?"
                   @keydown.enter.prevent="runTaskResearch"
                 />
@@ -215,12 +215,12 @@
             <button
               type="button"
               class="today__research-button"
-              :disabled="taskResearchLoading"
-              :aria-busy="taskResearchLoading"
+              :disabled="taskResearchLoading || taskResearchMemoryLoading"
+              :aria-busy="taskResearchLoading || taskResearchMemoryLoading"
               @click="runTaskResearch"
             >
-              <RefreshCw :size="16" :class="{ 'today__research-spin': taskResearchLoading }" aria-hidden="true" />
-              {{ taskResearchLoading ? 'Researching live sources…' : !isPremium ? 'Unlock live research' : taskResearchResult ? 'Refresh live answer' : 'Research this task' }}
+              <RefreshCw :size="16" :class="{ 'today__research-spin': taskResearchLoading || taskResearchMemoryLoading }" aria-hidden="true" />
+              {{ taskResearchMemoryLoading ? 'Loading saved answer…' : taskResearchLoading ? 'Researching live sources…' : !isPremium ? 'Unlock live research' : taskResearchResult ? 'Refresh live answer' : 'Research this task' }}
               <ArrowUpRight :size="16" aria-hidden="true" />
             </button>
 
@@ -238,7 +238,7 @@
                 <div>
                   <p class="today__research-eyebrow">Agent answer</p>
                   <p class="today__research-result-meta">
-                    {{ taskResearchResult.agentLabel || 'Intelligence agent' }} · {{ taskResearchResult.cached ? 'cached source set' : 'fresh web research' }}
+                    {{ taskResearchResult.agentLabel || 'Intelligence agent' }} · {{ taskResearchResult.persisted ? 'saved research memory' : taskResearchResult.cached ? 'cached source set' : 'fresh web research' }}
                   </p>
                 </div>
                 <time v-if="taskResearchResult.generatedAt" :datetime="taskResearchResult.generatedAt">
@@ -258,6 +258,18 @@
                   <span>{{ source.title || sourceDomain(source.url) }}</span>
                   <ArrowUpRight :size="14" aria-hidden="true" />
                 </a>
+              </details>
+              <details v-if="taskResearchHistory.length > 1" class="today__research-history">
+                <summary>{{ taskResearchHistory.length - 1 }} earlier answer{{ taskResearchHistory.length - 1 === 1 ? '' : 's' }}</summary>
+                <button
+                  v-for="version in taskResearchHistory.slice(1)"
+                  :key="version.id || version.savedAt"
+                  type="button"
+                  @click="showTaskResearchVersion(version)"
+                >
+                  <span>{{ version.agentLabel || 'Intelligence agent' }}</span>
+                  <time :datetime="version.savedAt || version.generatedAt">{{ formatResearchTime(version.savedAt || version.generatedAt) }}</time>
+                </button>
               </details>
             </article>
           </section>
@@ -349,7 +361,13 @@ import { useFeatureFlagsStore } from '@/stores/featureFlagsStore'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { askWorkspaceSummary } from '@/services/workspaceAiService'
 import { updateTaskInFirebase } from '@/services/firebaseService'
-import { fetchIntelligenceAgents, fetchIntelligenceBrief, INTELLIGENCE_AGENTS } from '@/services/intelligenceService'
+import {
+  fetchIntelligenceAgents,
+  fetchIntelligenceBrief,
+  fetchTaskResearchMemory,
+  saveTaskResearchMemory,
+  INTELLIGENCE_AGENTS,
+} from '@/services/intelligenceService'
 import { useQuickSetupStore } from '@/stores/quickSetupStore'
 import { toLocalDateKey } from '@/utils/dateHelper'
 import { getEffectiveUserTimezone } from '@/utils/userTimezone'
@@ -358,6 +376,11 @@ import { EVENTS, trackEvent } from '@/services/analytics'
 const TASK_RESEARCH_CACHE_TTL_MS = 30 * 60 * 1000
 const WORKSPACE_AI_CACHE_TTL_MS = 20 * 60 * 1000
 const intelligenceMarkdown = new MarkdownIt({ html: false, linkify: true, breaks: true })
+intelligenceMarkdown.renderer.rules.link_open = (tokens, index, options, env, self) => {
+  tokens[index].attrSet('target', '_blank')
+  tokens[index].attrSet('rel', 'noopener noreferrer')
+  return self.renderToken(tokens, index, options)
+}
 
 const { openCapture } = useCaptureSheet()
 const router = useRouter()
@@ -391,9 +414,11 @@ const showCompleted = ref(false)
 const undoState = ref(null)
 const undoing = ref(false)
 const taskResearchLoading = ref(false)
+const taskResearchMemoryLoading = ref(false)
 const taskResearchError = ref('')
 const taskResearchQuestion = ref('')
 const taskResearchResult = ref(null)
+const taskResearchHistory = ref([])
 const taskResearchAgents = ref([...INTELLIGENCE_AGENTS])
 const taskResearchAgentId = ref(preferredTaskResearchAgentId())
 const workspaceAiCache = new Map()
@@ -534,7 +559,10 @@ function openTask(task) {
   helpApplied.value = false
   taskResearchQuestion.value = ''
   taskResearchResult.value = null
+  taskResearchHistory.value = []
   taskResearchError.value = ''
+  taskResearchMemoryLoading.value = false
+  void loadTaskResearchMemory(task)
   trackEvent(EVENTS.TASK_OPENED, {
     surface: 'today',
     completed: !!task.completed,
@@ -578,6 +606,38 @@ async function loadTaskResearchAgents() {
   }
 }
 
+async function loadTaskResearchMemory(task) {
+  if (!task || !intelligenceEnabled.value || !isPremium.value) return
+
+  taskResearchMemoryLoading.value = true
+  try {
+    const title = String(task.title || 'this task').trim().slice(0, 180)
+    const notes = String(task.details || task.notes || '').trim().slice(0, 180)
+    const result = await fetchTaskResearchMemory(task.id, { title, notes })
+    if (activeTaskId.value !== task.id || !result?.memory) return
+
+    const memory = result.memory
+    await loadTaskResearchAgents()
+    if (activeTaskId.value !== task.id) return
+    if (memory.agentId) taskResearchAgentId.value = memory.agentId
+    taskResearchQuestion.value = memory.userQuestion || ''
+    taskResearchResult.value = { ...memory, cached: true, persisted: true }
+    taskResearchHistory.value = Array.isArray(result.history) ? result.history : [memory]
+  } catch (error) {
+    // Saved memory is an optimization. A read failure must not block the task sheet.
+    console.warn('[Today] task research memory unavailable', error?.message || error)
+  } finally {
+    if (activeTaskId.value === task.id) taskResearchMemoryLoading.value = false
+  }
+}
+
+function showTaskResearchVersion(version) {
+  if (!version) return
+  taskResearchResult.value = { ...version, cached: true, persisted: true }
+  if (version.agentId) taskResearchAgentId.value = version.agentId
+  taskResearchQuestion.value = version.userQuestion || ''
+}
+
 async function runTaskResearch() {
   const task = activeTask.value
   if (!task || taskResearchLoading.value) return
@@ -615,6 +675,9 @@ async function runTaskResearch() {
   ].join('\n').slice(0, 500)
   const interests = `${title}${notes ? `; ${notes}` : ''}`.slice(0, 300)
   const isCustom = Boolean(agent.custom)
+  // If an answer is already visible, the user explicitly asked to refresh it.
+  // Do not silently serve the in-memory cache in that case.
+  const forceRefresh = Boolean(taskResearchResult.value)
   const researchCacheKey = JSON.stringify({
     uid: authStore.user?.uid || 'guest',
     agentId: agent.id,
@@ -628,7 +691,7 @@ async function runTaskResearch() {
     has_question: Boolean(userQuestion),
   })
 
-  const cachedResearch = taskResearchCache.get(researchCacheKey)
+  const cachedResearch = forceRefresh ? null : taskResearchCache.get(researchCacheKey)
   if (cachedResearch && cachedResearch.expiresAt > Date.now()) {
     taskResearchResult.value = { ...cachedResearch.value, cached: true }
     trackEvent(EVENTS.INTELLIGENCE_TASK_RESEARCH_COMPLETED, {
@@ -653,7 +716,33 @@ async function runTaskResearch() {
       // Task research is explicitly user-initiated and does not inherit a goal.
       goalContext: null,
     })
-    taskResearchResult.value = { ...result, agentId: agent.id, agentLabel: agent.label || agent.name }
+    const freshResult = { ...result, agentId: agent.id, agentLabel: agent.label || agent.name, persisted: false }
+    taskResearchResult.value = freshResult
+
+    try {
+      const saved = await saveTaskResearchMemory(task.id, {
+        agentId: agent.id,
+        agentLabel: agent.label || agent.name,
+        userQuestion,
+        question,
+        interests,
+        titleSnapshot: title,
+        notesSnapshot: notes,
+        generatedAt: result.generatedAt,
+        synthesis: result.synthesis,
+        sources: result.sources,
+        agents: result.agents,
+        suggestedTasks: result.suggestedTasks,
+      })
+      if (activeTaskId.value === task.id && saved?.memory) {
+        taskResearchResult.value = { ...taskResearchResult.value, ...saved.memory, persisted: true, cached: Boolean(result.cached) }
+        taskResearchHistory.value = [saved.memory, ...taskResearchHistory.value.filter((version) => version.id !== saved.memory.id)].slice(0, 10)
+      }
+    } catch (error) {
+      // Keep the answer visible even if persistence is temporarily unavailable.
+      console.warn('[Today] task research memory save failed', error?.message || error)
+    }
+
     taskResearchCache.set(researchCacheKey, {
       value: taskResearchResult.value,
       expiresAt: Date.now() + TASK_RESEARCH_CACHE_TTL_MS,
@@ -1833,6 +1922,40 @@ onBeforeUnmount(() => {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.today__research-history {
+  padding-top: var(--pc-space-2);
+  border-top: 1px solid var(--pc-border);
+}
+
+.today__research-history summary {
+  color: var(--pc-accent-text);
+  font-size: var(--pc-text-caption);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.today__research-history button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: var(--pc-space-2);
+  margin-top: var(--pc-space-2);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--pc-accent-text);
+  font: inherit;
+  font-size: var(--pc-text-caption);
+  text-align: left;
+  cursor: pointer;
+}
+
+.today__research-history button time {
+  color: var(--pc-text-muted);
   white-space: nowrap;
 }
 

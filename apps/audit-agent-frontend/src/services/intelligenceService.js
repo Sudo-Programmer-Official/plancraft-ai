@@ -88,6 +88,23 @@ export async function fetchIntelligenceBrief({ agentIds, customAgentIds = [], qu
   return response?.data || {}
 }
 
+export async function fetchTaskResearchMemory(taskId, { title = '', notes = '' } = {}) {
+  if (!taskId) throw new Error('fetchTaskResearchMemory requires taskId')
+  const response = await api.get(`/intelligence/tasks/${encodeURIComponent(taskId)}/research`, {
+    params: {
+      title: String(title || '').trim().slice(0, 180),
+      notes: String(notes || '').trim().slice(0, 180),
+    },
+  })
+  return response?.data || { memory: null, history: [] }
+}
+
+export async function saveTaskResearchMemory(taskId, payload = {}) {
+  if (!taskId) throw new Error('saveTaskResearchMemory requires taskId')
+  const response = await api.post(`/intelligence/tasks/${encodeURIComponent(taskId)}/research`, payload)
+  return response?.data || {}
+}
+
 export async function fetchIntelligenceAgents() {
   const response = await api.get('/intelligence/agents')
   return {

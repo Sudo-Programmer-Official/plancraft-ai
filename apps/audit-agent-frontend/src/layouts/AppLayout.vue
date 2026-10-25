@@ -335,6 +335,12 @@ import { isAppleBillingSafeMode as detectAppleBillingSafeMode } from '@/utils/bi
 import { fetchUserProfile } from '@/services/authService'
 import { fetchActionInbox, syncActionInbox } from '@/services/actionInboxService'
 import { EVENTS, trackEvent, trackMonetizationStep } from '@/services/analytics'
+import {
+  FOUNDING_MONTHLY_PRICE,
+  STANDARD_MONTHLY_PRICE,
+  formatUsd,
+  isFoundingOfferActive,
+} from '@/services/pricingConfig'
 
 const currentUserId = ref(null)
 const viewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1440)
@@ -1021,12 +1027,14 @@ const upgradeBannerMessage = computed(() => (
     : '🚀 You\'re on the Free Plan. Upgrade to unlock unlimited AI and reminders.'
 ))
 const upgradePillLabel = computed(() => (
-  isAppleBillingSafeMode.value ? 'Open Premium' : 'Try Premium · $2/mo'
+  isAppleBillingSafeMode.value
+    ? 'Open Premium'
+    : `Try Premium · ${formatUsd(isFoundingOfferActive() ? FOUNDING_MONTHLY_PRICE : STANDARD_MONTHLY_PRICE)}/mo`
 ))
 const upgradePillTitle = computed(() => (
   isAppleBillingSafeMode.value
     ? 'Open Solo Premium on iPhone or refresh access that already exists on this account.'
-    : 'Try Solo Premium for $2 per month'
+    : `Try Solo Premium for ${formatUsd(isFoundingOfferActive() ? FOUNDING_MONTHLY_PRICE : STANDARD_MONTHLY_PRICE)} per month`
 ))
 const showFreePlanHeaderBadge = computed(() => (
   isAppleBillingSafeMode.value && !isPremium.value && !isGuest.value

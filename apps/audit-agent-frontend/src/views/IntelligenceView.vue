@@ -581,6 +581,11 @@ import {
 const STORAGE_KEY = 'plancraft-intelligence-preferences'
 const defaultAgentIds = ['tech-news', 'capital-flows']
 const markdown = new MarkdownIt({ html: false, linkify: true, breaks: true })
+markdown.renderer.rules.link_open = (tokens, index, options, env, self) => {
+  tokens[index].attrSet('target', '_blank')
+  tokens[index].attrSet('rel', 'noopener noreferrer')
+  return self.renderToken(tokens, index, options)
+}
 
 function loadPreferences() {
   try {

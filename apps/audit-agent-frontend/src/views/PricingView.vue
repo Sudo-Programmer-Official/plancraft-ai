@@ -288,7 +288,7 @@ const route = useRoute()
 const router = useRouter()
 const isAppleBillingSafeMode = detectAppleBillingSafeMode()
 const billingSafeRoute = '/billing/upgrade'
-const foundingOfferConfigured = FOUNDING_OFFER_CONFIGURED
+const foundingOfferConfigured = FOUNDING_OFFER_CONFIGURED && FOUNDING_OFFER_END_AT > Date.now()
 const standardMonthlyPriceLabel = formatUsd(STANDARD_MONTHLY_PRICE)
 const foundingMonthlyPriceLabel = formatUsd(FOUNDING_MONTHLY_PRICE)
 useSeoMeta({

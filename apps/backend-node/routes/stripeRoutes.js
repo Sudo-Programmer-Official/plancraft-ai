@@ -3,6 +3,7 @@ import express from 'express'
 import Stripe from 'stripe'
 import { db } from '../services/firebaseAdmin.js'
 import { requireAuth, ensureUserMatches } from '../middleware/auth.js'
+import { notifyStripeSupport } from '../services/stripeSupportNotificationService.js'
 
 const router = express.Router()
 
@@ -14,11 +15,27 @@ const stripe = STRIPE_SECRET_KEY
 
 // POST /api/create-checkout-session
 router.post('/create-checkout-session', requireAuth, ensureUserMatches, async (req, res) => {
+  const reportCheckoutError = (error, extra = {}) => {
+    void notifyStripeSupport({
+      outcome: 'error',
+      eventType: 'checkout_session_create_failed',
+      userId: req.user?.uid,
+      userEmail: req.user?.email,
+      plan: req.body?.plan,
+      foundingOffer: req.body?.foundingOffer === true,
+      error,
+      ...extra,
+    })
+  }
+
   try {
     const { plan, successUrl, cancelUrl, foundingOffer } = req.body || {}
     // The webhook upgrades metadata.userId, so it must be the verified caller.
     const userId = String(req.user.uid)
-    if (!plan) return res.status(400).json({ error: 'Missing plan' })
+    if (!plan) {
+      reportCheckoutError('Missing plan')
+      return res.status(400).json({ error: 'Missing plan' })
+    }
 
     // Dynamically resolve plan → Stripe Price ID (with aliases)
     const planKey = String(plan || 'monthly').toLowerCase()
@@ -38,6 +55,7 @@ router.post('/create-checkout-session', requireAuth, ensureUserMatches, async (r
     const foundingOfferActive = foundingOfferEnabled && Number.isFinite(foundingOfferEndAt) && foundingOfferEndAt > Date.now()
 
     if (foundingOfferRequested && !foundingOfferActive) {
+      reportCheckoutError('The founding offer is no longer available', { eventType: 'founding_offer_unavailable' })
       return res.status(409).json({ error: 'The founding offer is no longer available', code: 'founding_offer_unavailable' })
     }
 
@@ -46,6 +64,7 @@ router.post('/create-checkout-session', requireAuth, ensureUserMatches, async (r
       : process.env[priceIdKey] || process.env.STRIPE_MONTHLY_PRICE_ID
 
     if (foundingOfferRequested && !priceId) {
+      reportCheckoutError('The founding offer is not configured yet', { eventType: 'founding_offer_not_configured' })
       return res.status(503).json({ error: 'The founding offer is not configured yet', code: 'founding_offer_not_configured' })
     }
 
@@ -53,10 +72,12 @@ router.post('/create-checkout-session', requireAuth, ensureUserMatches, async (r
     console.log(`Creating checkout session for user ${userId}, plan: ${plan}, priceId: ${priceId}`)
     if (!priceId) {
       console.error(`❌ No price ID configured. Expected env ${priceIdKey} or STRIPE_MONTHLY_PRICE_ID`)
+      reportCheckoutError(`No price ID configured for ${priceIdKey}`)
       return res.status(400).json({ error: `No price ID configured. Set ${priceIdKey} or STRIPE_MONTHLY_PRICE_ID` })
     }
     if (!/^price_/.test(String(priceId))) {
       console.error('❌ Invalid Stripe price format. Must start with price_')
+      reportCheckoutError('Invalid Stripe price ID')
       return res.status(400).json({ error: 'Invalid Stripe price ID. It should start with "price_"' })
     }
 
@@ -81,6 +102,7 @@ router.post('/create-checkout-session', requireAuth, ensureUserMatches, async (r
   } catch (err) {
     const msg = err?.raw?.message || err?.message || 'Failed to create checkout session'
     console.error('❌ Stripe checkout error:', msg)
+    reportCheckoutError(msg)
     const status = err?.statusCode || 500
     res.status(status).json({ error: msg })
   }
