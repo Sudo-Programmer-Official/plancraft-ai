@@ -2,32 +2,37 @@
   <transition name="fade">
     <div
       v-if="store.promptVisible"
-      class="fixed bottom-6 right-6 z-40 w-72 rounded-2xl border border-white/10 bg-slate-900/95 p-4 text-white shadow-xl backdrop-blur-xl"
+      class="feedback-prompt fixed bottom-6 right-6 z-[45] w-72 rounded-2xl border border-pc-border bg-pc-surface p-4 text-pc-text shadow-pc-card"
     >
-      <div class="flex items-center justify-between text-sm text-slate-300">
+      <div class="flex items-center justify-between text-sm text-pc-text-muted">
         <span>Enjoying PlanCraft?</span>
         <button
-          class="text-xs text-slate-400 hover:text-white"
+          type="button"
+          class="rounded-lg px-1.5 py-1 text-xs text-pc-text-subtle transition hover:bg-pc-surface-2 hover:text-pc-text focus:outline-none focus:ring-2 focus:ring-pc-accent"
+          aria-label="Dismiss feedback prompt"
           @click="store.dismissPrompt"
         >
           ✕
         </button>
       </div>
-      <p class="mt-2 text-sm text-slate-200">
+      <p class="mt-2 text-sm text-pc-text-muted">
         Your feedback keeps the AI sharp. How was this session?
       </p>
       <div class="mt-3 flex items-center justify-between text-xl">
         <button
           v-for="score in scores"
           :key="score.value"
-          class="flex h-10 w-10 items-center justify-center rounded-full text-lg hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-fuchsia-400"
+          type="button"
+          class="flex h-10 w-10 items-center justify-center rounded-full text-lg transition hover:bg-pc-accent-soft focus:outline-none focus:ring-2 focus:ring-pc-accent"
+          :aria-label="`Rate PlanCraft ${score.value} out of 5`"
           @click="handleRating(score.value)"
         >
           {{ score.emoji }}
         </button>
       </div>
       <button
-        class="mt-3 w-full rounded-xl border border-white/20 px-3 py-2 text-xs uppercase tracking-widest text-slate-200 hover:bg-white/10"
+        type="button"
+        class="mt-3 w-full rounded-xl border border-pc-border-strong px-3 py-2 text-xs font-semibold uppercase tracking-widest text-pc-text-muted transition hover:bg-pc-surface-2 hover:text-pc-text focus:outline-none focus:ring-2 focus:ring-pc-accent"
         @click="openDrawer"
       >
         Leave feedback
@@ -68,5 +73,15 @@ function openDrawer() {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* The app tab bar is fixed on phones. Keep the prompt fully above it so the
+   dismiss and rating controls never become untappable. */
+@media (max-width: 767px) {
+  .feedback-prompt {
+    right: 0.75rem;
+    bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
+    width: min(calc(100vw - 1.5rem), 22rem);
+  }
 }
 </style>

@@ -2,9 +2,9 @@
   <transition name="fade">
     <div
       v-if="store.drawerVisible"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/25 px-4 backdrop-blur-sm"
+      class="feedback-drawer-overlay fixed inset-0 z-50 flex items-center justify-center px-4 backdrop-blur-sm"
     >
-      <div class="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-3xl border border-pc-border bg-pc-surface p-6 text-pc-text shadow-2xl sm:p-7">
+      <div class="feedback-drawer-panel max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-3xl border border-pc-border bg-pc-surface p-6 text-pc-text shadow-2xl sm:p-7">
         <div class="flex items-start justify-between">
           <div>
             <p class="text-xs font-semibold uppercase tracking-[0.3em] text-pc-text-subtle">
@@ -14,7 +14,7 @@
               {{ supportMode ? 'Raise a support ticket' : 'How can we improve PlanCraft?' }}
             </h2>
           </div>
-          <button class="text-pc-text-subtle hover:text-pc-text" aria-label="Close" @click="store.closeDrawer">✕</button>
+          <button type="button" class="rounded-lg p-1 text-pc-text-subtle transition hover:bg-pc-surface-2 hover:text-pc-text focus:outline-none focus:ring-2 focus:ring-pc-accent" aria-label="Close feedback form" @click="store.closeDrawer">✕</button>
         </div>
 
         <div class="mt-6 space-y-4 text-sm text-pc-text-muted">
@@ -24,7 +24,9 @@
               <button
                 v-for="value in [1,2,3,4,5]"
                 :key="value"
+                type="button"
                 class="flex-1 rounded-xl border px-2 py-2 text-base transition"
+                :aria-label="`Rate PlanCraft ${value} out of 5`"
                 :class="store.form.rating === value ? 'border-pc-accent bg-pc-accent-soft text-pc-accent-text' : 'border-pc-border bg-pc-surface-2 text-pc-text-muted hover:border-pc-border-strong'"
                 @click="store.form.rating = value"
               >
@@ -63,13 +65,14 @@
           </label>
         </div>
 
-        <p v-if="store.errorMessage" class="mt-3 text-sm text-rose-600">{{ store.errorMessage }}</p>
-        <p v-if="store.submitSuccess" class="mt-3 text-sm text-emerald-600">
+        <p v-if="store.errorMessage" class="mt-3 text-sm text-rose-600" role="alert">{{ store.errorMessage }}</p>
+        <p v-if="store.submitSuccess" class="mt-3 text-sm text-emerald-600" role="status">
           {{ supportMode ? 'Your ticket was sent to the admin queue.' : 'Thanks! We’ll keep building with your note.' }}
         </p>
 
-        <div class="mt-6 flex justify-end gap-3">
+        <div class="feedback-drawer-actions mt-6 flex justify-end gap-3">
           <button
+            type="button"
             class="rounded-xl border border-pc-border px-5 py-2 text-sm font-semibold text-pc-text-muted hover:border-pc-border-strong hover:text-pc-text"
             @click="store.closeDrawer"
             :disabled="store.submitting"
@@ -77,6 +80,7 @@
             Cancel
           </button>
           <button
+            type="button"
             class="rounded-xl bg-[image:var(--pc-accent-fill)] px-6 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[image:var(--pc-accent-fill-hover)] disabled:opacity-60"
             @click="handleSubmit"
             :disabled="store.submitting"
@@ -101,8 +105,13 @@ const route = useRoute()
 const supportMode = computed(() => store.context?.kind === 'support-ticket')
 
 function handleSubmit() {
-  if (supportMode.value && !store.form.message.trim()) {
+  const message = store.form.message.trim()
+  if ((supportMode.value || store.form.type === 'support') && !message) {
     store.errorMessage = 'Please describe the issue before sending the ticket.'
+    return
+  }
+  if (!store.form.rating && !message) {
+    store.errorMessage = 'Choose a rating or add a short note before sending.'
     return
   }
   store.sendFeedback(authStore.user?.uid, { route: route.name || route.path })
@@ -110,6 +119,10 @@ function handleSubmit() {
 </script>
 
 <style scoped>
+.feedback-drawer-overlay {
+  background: var(--pc-scrim);
+}
+
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.2s ease;
@@ -117,5 +130,26 @@ function handleSubmit() {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+@media (max-width: 767px) {
+  .feedback-drawer-overlay {
+    align-items: flex-end;
+    padding: env(safe-area-inset-top, 0px) 0 0;
+  }
+
+  .feedback-drawer-panel {
+    max-height: calc(100svh - env(safe-area-inset-top, 0px) - 0.5rem);
+    border-radius: 1.5rem 1.5rem 0 0;
+    padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .feedback-drawer-actions {
+    flex-direction: column-reverse;
+  }
+
+  .feedback-drawer-actions > button {
+    width: 100%;
+  }
 }
 </style>

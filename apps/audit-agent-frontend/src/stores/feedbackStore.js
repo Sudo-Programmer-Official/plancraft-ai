@@ -26,7 +26,9 @@ export const useFeedbackStore = defineStore('feedback', () => {
     try {
       const lastPrompt = Number(localStorage.getItem(PROMPT_KEY) || 0)
       if (Date.now() - lastPrompt < PROMPT_INTERVAL_MS) return
-    } catch {}
+    } catch {
+      // Feedback prompts still work when local storage is unavailable.
+    }
     promptTimer = setTimeout(() => {
       promptVisible.value = true
       promptTimer = null
@@ -37,7 +39,9 @@ export const useFeedbackStore = defineStore('feedback', () => {
     promptVisible.value = false
     try {
       localStorage.setItem(PROMPT_KEY, Date.now().toString())
-    } catch {}
+    } catch {
+      // Prompt throttling is best-effort in private browsing mode.
+    }
   }
 
   function triggerPrompt(extraContext = {}) {
@@ -45,7 +49,13 @@ export const useFeedbackStore = defineStore('feedback', () => {
     promptVisible.value = true
   }
 
+  function resetSubmissionState() {
+    submitSuccess.value = false
+    errorMessage.value = ''
+  }
+
   function captureQuickRating(value, extraContext = {}) {
+    resetSubmissionState()
     form.rating = value
     context.value = extraContext || {}
     promptVisible.value = false
@@ -53,6 +63,7 @@ export const useFeedbackStore = defineStore('feedback', () => {
   }
 
   function openDrawer(extraContext = {}) {
+    resetSubmissionState()
     context.value = extraContext || {}
     drawerVisible.value = true
   }
@@ -61,8 +72,7 @@ export const useFeedbackStore = defineStore('feedback', () => {
     context.value = { ...extraContext, kind: 'support-ticket' }
     form.type = 'support'
     form.rating = 0
-    submitSuccess.value = false
-    errorMessage.value = ''
+    resetSubmissionState()
     drawerVisible.value = true
   }
 

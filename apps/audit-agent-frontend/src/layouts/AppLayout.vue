@@ -1483,9 +1483,9 @@ body {
   }
 
   .app-shell {
-    height: 100%;
-    max-height: 100dvh;
-    min-height: 0;
+    height: 100svh;
+    max-height: 100svh;
+    min-height: 100svh;
     overflow: hidden;
   }
 

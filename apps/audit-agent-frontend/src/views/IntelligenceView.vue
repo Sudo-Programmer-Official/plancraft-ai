@@ -1,6 +1,6 @@
 <template>
   <div class="intelligence-page min-h-full overflow-y-auto bg-pc-bg text-pc-text">
-    <div class="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 pb-20 sm:px-6 md:pb-6 lg:px-8 lg:py-8">
+    <div class="intelligence-page__content mx-auto w-full max-w-7xl space-y-6 px-4 py-6 pb-20 sm:px-6 md:pb-6 lg:px-8 lg:py-8">
       <section class="overflow-hidden rounded-3xl border border-pc-border bg-pc-surface shadow-pc-card">
         <div class="relative p-5 sm:p-8">
           <div class="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-indigo-400/10 blur-3xl" />
@@ -157,59 +157,69 @@
             </label>
           </div>
 
-          <div v-if="activeAgentId === 'all'" class="mt-5">
-            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div class="flex items-center gap-2">
-                <SlidersHorizontal :size="16" class="text-pc-text-subtle" aria-hidden="true" />
-                <span class="eyebrow">Desks in this brief</span>
-                <span class="text-xs text-pc-text-subtle">{{ selectedAgentIds.length }}/4 selected</span>
-              </div>
-              <button
-                v-if="isPremium"
-                type="button"
-                class="inline-flex items-center gap-1.5 self-start rounded-lg border border-pc-accent-border px-3 py-1.5 text-xs font-semibold text-pc-accent-text transition hover:bg-pc-accent-soft"
-                @click="openAgentBuilder()"
-              >
-                <Plus :size="14" aria-hidden="true" />
-                Create a desk
-              </button>
-            </div>
-            <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              <div
-                v-for="agent in availableAgents"
-                :key="agent.id"
-                class="rounded-xl border px-3 py-3 transition"
-                :class="selectedAgentIds.includes(agent.id)
-                  ? 'border-pc-accent bg-pc-accent-soft text-pc-accent-text'
-                  : 'border-pc-border bg-pc-surface text-pc-text-muted hover:border-pc-border-strong hover:text-pc-text'"
-              >
-                <button type="button" class="w-full text-left" @click="toggleAgent(agent.id)">
-                  <span class="flex items-center justify-between gap-2">
-                    <span class="flex min-w-0 items-center gap-2">
-                      <span class="truncate text-sm font-semibold">{{ agent.label }}</span>
-                      <span v-if="agent.custom" class="rounded-full border border-current/20 px-1.5 py-0.5 text-[10px] uppercase tracking-wide opacity-70">Mine</span>
-                    </span>
-                    <span
-                      class="h-2.5 w-2.5 shrink-0 rounded-full"
-                      :class="selectedAgentIds.includes(agent.id) ? 'bg-pc-accent' : 'bg-pc-border-strong'"
-                      aria-hidden="true"
-                    />
-                  </span>
-                  <span class="mt-1 block text-xs opacity-80">{{ agent.description }}</span>
+          <details v-if="activeAgentId === 'all'" class="mt-5 rounded-2xl border border-pc-border bg-pc-surface">
+            <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5">
+              <span class="flex min-w-0 items-center gap-2">
+                <SlidersHorizontal :size="16" class="shrink-0 text-pc-text-subtle" aria-hidden="true" />
+                <span class="min-w-0">
+                  <span class="block text-sm font-semibold text-pc-text">Choose desks</span>
+                  <span class="mt-0.5 block text-xs text-pc-text-subtle">{{ selectedAgentIds.length }}/4 included in this brief</span>
+                </span>
+              </span>
+              <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-pc-border bg-pc-surface-2 px-2.5 py-1 text-xs font-semibold text-pc-text-muted">
+                Manage
+                <ChevronDown :size="14" aria-hidden="true" />
+              </span>
+            </summary>
+            <div class="border-t border-pc-border px-4 pb-4 pt-3">
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <p class="text-xs text-pc-text-muted">Built-in desks are ready to use. Premium lets you combine desks and create your own.</p>
+                <button
+                  v-if="isPremium"
+                  type="button"
+                  class="inline-flex items-center gap-1.5 self-start rounded-lg border border-pc-accent-border px-3 py-1.5 text-xs font-semibold text-pc-accent-text transition hover:bg-pc-accent-soft"
+                  @click="openAgentBuilder()"
+                >
+                  <Plus :size="14" aria-hidden="true" />
+                  Create a desk
                 </button>
-                <div v-if="agent.custom" class="mt-2 flex items-center gap-3 border-t border-current/10 pt-2">
-                  <span v-if="agent.schedule?.enabled" class="rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Morning email</span>
-                  <button type="button" class="inline-flex items-center gap-1 text-[11px] font-semibold opacity-75 hover:opacity-100" @click.stop="openAgentBuilder(agent)">
-                    <Pencil :size="12" aria-hidden="true" /> Edit
+              </div>
+              <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                <div
+                  v-for="agent in availableAgents"
+                  :key="agent.id"
+                  class="rounded-xl border px-3 py-3 transition"
+                  :class="selectedAgentIds.includes(agent.id)
+                    ? 'border-pc-accent bg-pc-accent-soft text-pc-accent-text'
+                    : 'border-pc-border bg-pc-surface text-pc-text-muted hover:border-pc-border-strong hover:text-pc-text'"
+                >
+                  <button type="button" class="w-full text-left" @click="toggleAgent(agent.id)">
+                    <span class="flex items-center justify-between gap-2">
+                      <span class="flex min-w-0 items-center gap-2">
+                        <span class="truncate text-sm font-semibold">{{ agent.label }}</span>
+                        <span v-if="agent.custom" class="rounded-full border border-current/20 px-1.5 py-0.5 text-[10px] uppercase tracking-wide opacity-70">Mine</span>
+                      </span>
+                      <span
+                        class="h-2.5 w-2.5 shrink-0 rounded-full"
+                        :class="selectedAgentIds.includes(agent.id) ? 'bg-pc-accent' : 'bg-pc-border-strong'"
+                        aria-hidden="true"
+                      />
+                    </span>
+                    <span class="mt-1 block text-xs opacity-80">{{ agent.description }}</span>
                   </button>
-                  <button type="button" class="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 opacity-75 hover:opacity-100" @click.stop="removeAgent(agent)">
-                    <Trash2 :size="12" aria-hidden="true" /> Delete
-                  </button>
+                  <div v-if="agent.custom" class="mt-2 flex items-center gap-3 border-t border-current/10 pt-2">
+                    <span v-if="agent.schedule?.enabled" class="rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Morning email</span>
+                    <button type="button" class="inline-flex items-center gap-1 text-[11px] font-semibold opacity-75 hover:opacity-100" @click.stop="openAgentBuilder(agent)">
+                      <Pencil :size="12" aria-hidden="true" /> Edit
+                    </button>
+                    <button type="button" class="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 opacity-75 hover:opacity-100" @click.stop="removeAgent(agent)">
+                      <Trash2 :size="12" aria-hidden="true" /> Delete
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-            <p class="mt-2 text-xs text-pc-text-subtle">Built-in desks are ready to use. Free runs use one desk at a time; Premium lets you combine desks and create your own.</p>
-          </div>
+          </details>
           <div v-else class="mt-5 flex flex-col gap-3 rounded-2xl border border-dashed border-pc-border-strong bg-pc-surface px-4 py-3 text-sm text-pc-text-muted sm:flex-row sm:items-center sm:justify-between">
             <span>This tab runs only <strong class="font-semibold text-pc-text">{{ activeAgent?.label }}</strong>. Ask a focused question or refresh the latest public signals.</span>
             <button type="button" class="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-pc-accent-border px-3 py-1.5 text-xs font-semibold text-pc-accent-text hover:bg-pc-accent-soft" @click="refreshBrief">
@@ -422,7 +432,7 @@
       </section>
     </div>
 
-    <div v-if="brief" class="fixed inset-x-0 bottom-0 z-40 border-t border-pc-border bg-pc-surface/95 p-2.5 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-md md:hidden">
+    <div v-if="brief" class="intelligence-mobile-ask fixed inset-x-0 bottom-0 z-40 border-t border-pc-border bg-pc-surface/95 p-2.5 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-md md:hidden">
       <form class="mx-auto flex max-w-2xl items-center gap-2" @submit.prevent="refreshBrief">
         <label class="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-pc-border-strong bg-pc-surface-2 px-3 py-2.5 focus-within:border-pc-accent">
           <Search :size="16" class="shrink-0 text-pc-text-subtle" aria-hidden="true" />
@@ -443,13 +453,13 @@
 
     <div
       v-if="showAgentBuilder"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 px-4 py-6 backdrop-blur-sm"
+      class="agent-builder-overlay fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 px-4 py-6 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="agent-builder-title"
       @click.self="closeAgentBuilder"
     >
-      <form class="max-h-full w-full max-w-xl overflow-y-auto rounded-3xl border border-pc-border bg-pc-surface p-5 shadow-2xl sm:p-7" @submit.prevent="saveAgent">
+      <form class="agent-builder-form flex max-h-[calc(100dvh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-3xl border border-pc-border bg-pc-surface p-5 shadow-2xl sm:max-h-[calc(100dvh-3rem)] sm:p-7" @submit.prevent="saveAgent">
         <div class="flex items-start justify-between gap-4">
           <div>
             <p class="eyebrow text-pc-accent-text">Personal desk</p>
@@ -465,7 +475,7 @@
 
         <div v-if="agentError" class="mt-5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm text-rose-700">{{ agentError }}</div>
 
-        <div class="mt-6 space-y-4">
+        <div class="agent-builder-fields mt-6 min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain pr-1">
           <div class="rounded-2xl border border-pc-accent-border bg-pc-accent-soft/50 p-4">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <label class="min-w-0 flex-1">
@@ -478,70 +488,81 @@
             </div>
             <p class="mt-2 text-xs text-pc-text-subtle">This creates an editable setup locally from your use case. It does not run web search or spend research quota.</p>
           </div>
-          <div>
-            <span class="eyebrow">Start from a template</span>
-            <div class="mt-2 grid gap-2 sm:grid-cols-3">
+          <details class="rounded-2xl border border-pc-border bg-pc-surface-2">
+            <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-pc-text">
+              Start from a template
+              <ChevronDown :size="16" class="text-pc-text-subtle" aria-hidden="true" />
+            </summary>
+            <div class="grid gap-2 border-t border-pc-border px-4 pb-4 pt-3 sm:grid-cols-3">
               <button
                 v-for="template in INTELLIGENCE_AGENT_TEMPLATES"
                 :key="template.id"
                 type="button"
-                class="rounded-xl border border-pc-border bg-pc-surface-2 px-3 py-2.5 text-left transition hover:border-pc-accent-border hover:bg-pc-accent-soft"
+                class="rounded-xl border border-pc-border bg-pc-surface px-3 py-2.5 text-left transition hover:border-pc-accent-border hover:bg-pc-accent-soft"
                 @click="applyAgentTemplate(template)"
               >
                 <span class="block text-xs font-semibold text-pc-text">{{ template.label }}</span>
                 <span class="mt-1 block text-[11px] leading-4 text-pc-text-muted">{{ template.description }}</span>
               </button>
             </div>
-          </div>
+          </details>
           <label class="block">
             <span class="eyebrow">Desk name</span>
             <input v-model="agentForm.name" maxlength="80" required type="text" class="mt-2 w-full rounded-xl border border-pc-border-strong bg-pc-surface-2 px-3 py-2.5 text-sm text-pc-text outline-none focus:border-pc-accent" placeholder="e.g. Developer tools radar" />
-          </label>
-          <label class="block">
-            <span class="eyebrow">Short description</span>
-            <input v-model="agentForm.description" maxlength="240" type="text" class="mt-2 w-full rounded-xl border border-pc-border-strong bg-pc-surface-2 px-3 py-2.5 text-sm text-pc-text outline-none focus:border-pc-accent" placeholder="What should this desk help you notice?" />
-          </label>
-          <label class="block">
-            <span class="eyebrow">Search focus</span>
-            <input v-model="agentForm.searchFocus" maxlength="360" type="text" class="mt-2 w-full rounded-xl border border-pc-border-strong bg-pc-surface-2 px-3 py-2.5 text-sm text-pc-text outline-none focus:border-pc-accent" placeholder="e.g. releases, pricing, funding, hiring, customer traction" />
           </label>
           <label class="block">
             <span class="eyebrow">Research prompt</span>
             <textarea v-model="agentForm.prompt" maxlength="1800" required rows="6" class="mt-2 w-full resize-y rounded-xl border border-pc-border-strong bg-pc-surface-2 px-3 py-2.5 text-sm leading-6 text-pc-text outline-none focus:border-pc-accent" placeholder="Act as my developer tools analyst. Track meaningful product launches, pricing changes, adoption signals, and competitive moves. Explain what changed, cite the source, and tell me why it matters for a small SaaS team." />
             <span class="mt-1 block text-xs text-pc-text-subtle">The prompt controls the desk’s point of view—not access to arbitrary tools or private data.</span>
           </label>
-          <label class="block">
-            <span class="eyebrow">Presentation style</span>
-            <select v-model="agentForm.outputStyle" class="mt-2 w-full rounded-xl border border-pc-border-strong bg-pc-surface-2 px-3 py-2.5 text-sm text-pc-text outline-none focus:border-pc-accent">
-              <option value="brief">Editorial brief</option>
-              <option value="table">Decision table</option>
-              <option value="timeline">Timeline</option>
-              <option value="checklist">Action checklist</option>
-            </select>
-          </label>
-          <div class="rounded-2xl border border-pc-border bg-pc-surface-2 p-4">
-            <label class="flex cursor-pointer items-start gap-3">
-              <input v-model="agentForm.scheduleEnabled" type="checkbox" class="mt-1 h-4 w-4 rounded border-pc-border-strong text-pc-accent focus:ring-pc-accent" />
-              <span>
-                <span class="block text-sm font-semibold text-pc-text">Send a morning email</span>
-                <span class="mt-1 block text-xs leading-5 text-pc-text-muted">Email this desk’s title, summary, and reference links every day. Research remains read-only.</span>
-              </span>
-            </label>
-            <div v-if="agentForm.scheduleEnabled" class="mt-4 grid gap-3 sm:grid-cols-2">
-              <label>
-                <span class="eyebrow">Delivery time</span>
-                <input v-model="agentForm.scheduleTime" type="time" class="mt-2 w-full rounded-xl border border-pc-border-strong bg-pc-surface px-3 py-2.5 text-sm text-pc-text outline-none focus:border-pc-accent" />
+          <details class="rounded-2xl border border-pc-border bg-pc-surface-2">
+            <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-pc-text">
+              More options
+              <ChevronDown :size="16" class="text-pc-text-subtle" aria-hidden="true" />
+            </summary>
+            <div class="space-y-4 border-t border-pc-border p-4">
+              <label class="block">
+                <span class="eyebrow">Short description</span>
+                <input v-model="agentForm.description" maxlength="240" type="text" class="mt-2 w-full rounded-xl border border-pc-border-strong bg-pc-surface-2 px-3 py-2.5 text-sm text-pc-text outline-none focus:border-pc-accent" placeholder="What should this desk help you notice?" />
               </label>
-              <label>
-                <span class="eyebrow">Timezone</span>
-                <input v-model="agentForm.scheduleTimezone" type="text" readonly class="mt-2 w-full rounded-xl border border-pc-border bg-pc-surface px-3 py-2.5 text-sm text-pc-text-muted outline-none" />
+              <label class="block">
+                <span class="eyebrow">Search focus</span>
+                <input v-model="agentForm.searchFocus" maxlength="360" type="text" class="mt-2 w-full rounded-xl border border-pc-border-strong bg-pc-surface-2 px-3 py-2.5 text-sm text-pc-text outline-none focus:border-pc-accent" placeholder="e.g. releases, pricing, funding, hiring, customer traction" />
               </label>
+              <label class="block">
+                <span class="eyebrow">Presentation style</span>
+                <select v-model="agentForm.outputStyle" class="mt-2 w-full rounded-xl border border-pc-border-strong bg-pc-surface-2 px-3 py-2.5 text-sm text-pc-text outline-none focus:border-pc-accent">
+                  <option value="brief">Editorial brief</option>
+                  <option value="table">Decision table</option>
+                  <option value="timeline">Timeline</option>
+                  <option value="checklist">Action checklist</option>
+                </select>
+              </label>
+              <div class="rounded-2xl border border-pc-border bg-pc-surface p-4">
+                <label class="flex cursor-pointer items-start gap-3">
+                  <input v-model="agentForm.scheduleEnabled" type="checkbox" class="mt-1 h-4 w-4 rounded border-pc-border-strong text-pc-accent focus:ring-pc-accent" />
+                  <span>
+                    <span class="block text-sm font-semibold text-pc-text">Send a morning email</span>
+                    <span class="mt-1 block text-xs leading-5 text-pc-text-muted">Email this desk’s title, summary, and reference links every day. Research remains read-only.</span>
+                  </span>
+                </label>
+                <div v-if="agentForm.scheduleEnabled" class="mt-4 grid gap-3 sm:grid-cols-2">
+                  <label>
+                    <span class="eyebrow">Delivery time</span>
+                    <input v-model="agentForm.scheduleTime" type="time" class="mt-2 w-full rounded-xl border border-pc-border-strong bg-pc-surface px-3 py-2.5 text-sm text-pc-text outline-none focus:border-pc-accent" />
+                  </label>
+                  <label>
+                    <span class="eyebrow">Timezone</span>
+                    <input v-model="agentForm.scheduleTimezone" type="text" readonly class="mt-2 w-full rounded-xl border border-pc-border bg-pc-surface px-3 py-2.5 text-sm text-pc-text-muted outline-none" />
+                  </label>
+                </div>
+                <p v-if="agentForm.scheduleEnabled" class="mt-3 text-[11px] leading-5 text-pc-text-subtle">Your browser timezone is used so the email arrives at the selected local time. The server must have morning email delivery enabled.</p>
+              </div>
             </div>
-            <p v-if="agentForm.scheduleEnabled" class="mt-3 text-[11px] leading-5 text-pc-text-subtle">Your browser timezone is used so the email arrives at the selected local time. The server must have morning email delivery enabled.</p>
-          </div>
+          </details>
         </div>
 
-        <div class="mt-6 flex items-center justify-between gap-3 border-t border-pc-border pt-5">
+        <div class="mt-4 flex shrink-0 items-center justify-between gap-3 border-t border-pc-border bg-pc-surface pt-4">
           <span class="text-xs text-pc-text-subtle">{{ customAgents.length }}/{{ customAgentLimit }} custom desks</span>
           <div class="flex gap-2">
             <button type="button" class="rounded-xl border border-pc-border-strong px-4 py-2.5 text-sm font-semibold text-pc-text-muted hover:bg-pc-surface-2" @click="closeAgentBuilder">Cancel</button>
@@ -1050,3 +1071,37 @@ onMounted(async () => {
   await Promise.all([loadGoals(), loadAgents()])
 })
 </script>
+
+<style scoped>
+.intelligence-page__content {
+  min-width: 0;
+}
+
+/* The mobile composer sits above the app tab bar. The extra scroll room keeps
+   the last card and feedback actions reachable instead of sitting underneath
+   either fixed layer. */
+@media (max-width: 767px) {
+  .intelligence-page__content {
+    padding-bottom: calc(9rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .intelligence-mobile-ask {
+    bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .agent-builder-overlay {
+    align-items: flex-end;
+    padding: env(safe-area-inset-top, 0px) 0 0;
+  }
+
+  .agent-builder-form {
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px));
+    border-radius: 1.5rem 1.5rem 0 0;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .agent-builder-fields {
+    scrollbar-width: thin;
+  }
+}
+</style>

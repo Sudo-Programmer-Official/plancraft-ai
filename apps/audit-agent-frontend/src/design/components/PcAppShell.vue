@@ -143,6 +143,17 @@ function onMoreLogout() {
   outline: none;
 }
 
+/* Keep the app chrome anchored to the first mobile viewport. `dvh` changes
+   while browser chrome expands/collapses, which makes the tab bar visibly
+   jump until the user scrolls. */
+@media (max-width: 1200px) and (hover: none), (max-width: 767px) {
+  .pc-shell {
+    height: 100svh;
+    max-height: 100svh;
+    min-height: 100svh;
+  }
+}
+
 @media (min-width: 768px) {
   .pc-shell {
     min-height: 0;
