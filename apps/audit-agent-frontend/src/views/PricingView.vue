@@ -444,6 +444,7 @@ async function onUpgrade({ forceStandard = false } = {}) {
     trackSubscriptionFunnel('cta_click', { cta: 'solo_upgrade', target: 'billing_upgrade' })
     return router.push(billingSafeRoute)
   }
+  const useFoundingOffer = !forceStandard && offerActive.value && isFoundingOfferActive()
   try {
     // Check guest or missing auth
     const isGuest = authStore.isGuest === true || authStore.guest === true || authStore.user?.mode === 'guest'
@@ -468,9 +469,9 @@ async function onUpgrade({ forceStandard = false } = {}) {
       // Themed info message (aligned with PlanCraftAI UI tone)
       ElNotification({
         title: 'Create your account',
-        message: forceStandard
-          ? 'Sign up or sign in to start Premium at $5/month.'
-          : 'Sign up or sign in to claim the founding $2/month rate.',
+        message: useFoundingOffer
+          ? 'Sign up or sign in to claim the founding $2/month rate.'
+          : 'Sign up or sign in to start Premium at $5/month.',
         type: 'info',
         duration: 2800,
         offset: 80,
@@ -500,7 +501,7 @@ async function onUpgrade({ forceStandard = false } = {}) {
     }
     trackSubscriptionFunnel('checkout_redirect', { cta: 'solo_upgrade' })
     const url = await createCheckoutSession('monthly', authStore.user?.uid, {
-      foundingOffer: !forceStandard && offerActive.value && isFoundingOfferActive(),
+      foundingOffer: useFoundingOffer,
     })
     window.location.href = url
 
