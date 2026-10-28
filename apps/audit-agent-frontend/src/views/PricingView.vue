@@ -247,9 +247,10 @@
   </el-dialog>
   <ErrorDialog
     v-model="errorVisible"
-    title="Action Failed"
+    :title="foundingOfferUnavailable ? 'Founding rate unavailable' : 'Action Failed'"
     :message="errorMessage"
-    @retry="onUpgrade"
+    :retry-label="foundingOfferUnavailable ? 'Continue with $5/month' : 'Retry'"
+    @retry="handleCheckoutErrorAction"
   />
   </div>
 </template>
@@ -334,6 +335,7 @@ useSeoMeta({
 const loading = ref(false)
 const errorVisible = ref(false)
 const errorMessage = ref("We couldn't complete that action. Please try again later.")
+const foundingOfferUnavailable = ref(false)
 const cancelLoading = ref(false)
 const countdown = ref('03:00:00')
 const offerActive = ref(false)
@@ -437,7 +439,7 @@ function startPromoTimer() {
 //     errorVisible.value = true
 //   }
 // }
-async function onUpgrade() {
+async function onUpgrade({ forceStandard = false } = {}) {
   if (isAppleBillingSafeMode) {
     trackSubscriptionFunnel('cta_click', { cta: 'solo_upgrade', target: 'billing_upgrade' })
     return router.push(billingSafeRoute)
@@ -464,9 +466,11 @@ async function onUpgrade() {
       }
 
       // Themed info message (aligned with PlanCraftAI UI tone)
-        ElNotification({
-          title: 'Create your account',
-          message: 'Sign up or sign in to claim the founding $2/month rate.',
+      ElNotification({
+        title: 'Create your account',
+        message: forceStandard
+          ? 'Sign up or sign in to start Premium at $5/month.'
+          : 'Sign up or sign in to claim the founding $2/month rate.',
         type: 'info',
         duration: 2800,
         offset: 80,
@@ -496,7 +500,7 @@ async function onUpgrade() {
     }
     trackSubscriptionFunnel('checkout_redirect', { cta: 'solo_upgrade' })
     const url = await createCheckoutSession('monthly', authStore.user?.uid, {
-      foundingOffer: offerActive.value && isFoundingOfferActive(),
+      foundingOffer: !forceStandard && offerActive.value && isFoundingOfferActive(),
     })
     window.location.href = url
 
@@ -508,12 +512,21 @@ async function onUpgrade() {
       // Keep the frontend from advertising a stale promotion when the backend
       // is the source of truth for offer availability.
       stopPromoTimer()
-      errorMessage.value = 'The $2 founding rate is temporarily unavailable. You can continue with Premium at $5/month.'
+      foundingOfferUnavailable.value = true
+      errorMessage.value = 'The $2 founding rate is unavailable. You can continue with Premium at $5/month.'
     } else {
+      foundingOfferUnavailable.value = false
       errorMessage.value = e?.message || "We couldn't complete that action. Please try again later."
     }
     errorVisible.value = true
   }
+}
+
+function handleCheckoutErrorAction() {
+  if (foundingOfferUnavailable.value) {
+    return onUpgrade({ forceStandard: true })
+  }
+  return onUpgrade()
 }
 
 function handleTeamCta(plan = 'starter') {

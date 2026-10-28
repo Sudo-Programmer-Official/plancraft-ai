@@ -21,7 +21,7 @@
     <template #footer>
       <div class="payment-error-dialog__footer">
         <el-button class="retry-btn" type="primary" @click="emitRetry">
-          Retry
+          {{ retryLabel }}
         </el-button>
         <el-button class="close-btn" @click="visible = false">
           Close
@@ -40,7 +40,8 @@ const props = defineProps({
   message: { 
     type: String, 
     default: 'We couldn’t reach the payment service. Please try again later.' 
-  }
+  },
+  retryLabel: { type: String, default: 'Retry' },
 })
 
 const emit = defineEmits(['update:modelValue', 'retry'])
@@ -115,7 +116,7 @@ function emitRetry() {
 }
 
 .retry-btn {
-  min-width: 6.5rem;
+  min-width: 8.5rem;
   border: 1px solid rgba(79, 70, 229, 0.35) !important;
   border-radius: 0.75rem !important;
   background: var(--pc-accent-fill, linear-gradient(135deg, #4f46e5, #7c3aed)) !important;
