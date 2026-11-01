@@ -39,17 +39,17 @@
         <div class="lp-container lp-hero__grid">
           <div class="lp-hero__copy">
             <p class="lp-chip">
-              <span>AI task planner</span>
+              <span>Your external memory</span>
               <ArrowRight :size="14" aria-hidden="true" />
-              <span>Next best move</span>
+              <span>Less to carry</span>
               <Sparkles :size="14" aria-hidden="true" class="lp-chip__spark" />
             </p>
             <h1 id="hero-title" class="lp-hero__title">
-              Turn scattered thoughts into a day you can actually finish.
+              Stop carrying every important thing in your head.
             </h1>
             <p class="lp-hero__lede">
-              Speak a task, a place you need to go, or a problem you need to solve. PlanCraftAI finds
-              the next best move, fits it into your day, and brings in live research only when it helps.
+              Capture a bill, renewal, follow-up, or idea once. PlanCraftAI turns it into a task,
+              remembers the next time, and brings it back when it matters.
             </p>
 
             <div class="lp-hero__ctas">
@@ -96,13 +96,47 @@
         </div>
       </section>
 
+      <!-- External memory -->
+      <section class="lp-section lp-section--memory" aria-labelledby="memory-title">
+        <div class="lp-container">
+          <div class="lp-memory">
+            <div class="lp-memory__copy">
+              <p class="lp-eyebrow">The problem isn't motivation</p>
+              <h2 id="memory-title">Your brain was never meant to be a calendar.</h2>
+              <p>
+                The credit-card bill. The annual renewal. The follow-up you meant to send. Important
+                things disappear when remembering them becomes another thing to remember.
+              </p>
+              <div class="lp-memory__quote">
+                <span class="lp-memory__quote-label">Say it once</span>
+                <strong>“Remind me every month to pay my credit card bill.”</strong>
+                <span>PlanCraft keeps the next reminder on your radar.</span>
+              </div>
+            </div>
+
+            <div class="lp-memory__examples" aria-label="Examples of things PlanCraft can remember">
+              <article v-for="item in memoryExamples" :key="item.title" class="lp-memory__card">
+                <span class="lp-memory__card-icon" :class="`lp-feature__icon--${item.tone}`" aria-hidden="true">
+                  <component :is="item.icon" :size="19" />
+                </span>
+                <div>
+                  <h3>{{ item.title }}</h3>
+                  <p>{{ item.meta }}</p>
+                </div>
+                <CircleCheck :size="18" aria-hidden="true" class="lp-memory__card-check" />
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- How it works -->
       <section id="how-it-works" class="lp-section">
         <div class="lp-container">
           <header class="lp-heading">
             <p class="lp-eyebrow">How it works</p>
-            <h2>From a thought to real progress.</h2>
-            <p>Turn your ideas into a plan in seconds.</p>
+            <h2>Capture once. PlanCraft remembers the next step.</h2>
+            <p>Turn a passing thought into a reliable reminder in seconds.</p>
           </header>
 
           <ol class="lp-steps">
@@ -152,8 +186,8 @@
         <div class="lp-container">
           <header class="lp-heading">
             <p class="lp-eyebrow">Everything you need</p>
-            <h2>A complete system to get things done.</h2>
-            <p>Capture, plan, focus, and follow through, with AI by your side.</p>
+            <h2>A calmer system for what you don't want to forget.</h2>
+            <p>Capture, schedule, repeat, and follow through without keeping the whole system in your head.</p>
           </header>
 
           <ul class="lp-features">
@@ -395,8 +429,8 @@
               </div>
             </div>
             <div class="lp-cta__copy">
-              <h2>Stop carrying your entire day in your head.</h2>
-              <p>Start free today and turn your thoughts into real progress.</p>
+              <h2>Stop using your brain as a reminder app.</h2>
+              <p>Capture it once and let PlanCraftAI carry the follow-up.</p>
             </div>
             <div class="lp-cta__actions">
               <button type="button" class="lp-btn lp-btn--light" @click="startGuestPlanner('footer_cta')">
@@ -488,36 +522,57 @@ const premiumPriceNote = computed(() => {
 const installHint = ref('')
 const currentYear = new Date().getFullYear()
 
-const trustPoints = ['No credit card needed', 'Next actions, not just lists', 'Live research when you ask']
+const trustPoints = ['No credit card needed', 'Recurring reminders', 'Your tasks stay under your control']
+
+const memoryExamples = [
+  {
+    icon: markRaw(Bell),
+    tone: 'amber',
+    title: 'Credit card bill',
+    meta: 'Every month · remind me before it is due',
+  },
+  {
+    icon: markRaw(CalendarDays),
+    tone: 'sky',
+    title: 'Car registration',
+    meta: 'Once a year · bring it back before it becomes urgent',
+  },
+  {
+    icon: markRaw(PenLine),
+    tone: 'violet',
+    title: 'Follow up with Alex',
+    meta: 'Next Tuesday · keep it out of my head until then',
+  },
+]
 
 const howItWorks = [
   {
     shot: 'voice-capture',
     label: 'Voice capture',
     alt: 'PlanCraftAI capture sheet asking “What do you need to do?” with a microphone button',
-    title: 'Speak naturally',
-    desc: '“Remind me tomorrow at 8 AM to finish the design system.”',
+    title: 'Say what you need to remember',
+    desc: '“Remind me every month to pay my credit card bill five days before it is due.”',
   },
   {
     shot: 'task-created',
     label: 'Task created',
     alt: 'A PlanCraftAI task with its time, category, reminder and Focus and Help me actions',
-    title: 'PlanCraft understands',
-    desc: 'AI turns your words into a task with the right time, context and reminder.',
+    title: 'PlanCraft makes it reliable',
+    desc: 'AI turns your words into a task with the right time, recurrence and reminder already attached.',
   },
   {
     shot: 'reminder',
     label: 'Reminder',
     alt: 'A PlanCraftAI reminder for “Finish design system” at 2:00 PM with Focus and Snooze buttons',
-    title: 'Get reminded',
-    desc: 'Push notifications, WhatsApp or a call, right when it’s time.',
+    title: 'It comes back when it matters',
+    desc: 'The reminder returns on your list and through your chosen channels, so the obligation is not living in your head.',
   },
 ]
 
 const featureGrid = [
   { icon: markRaw(Mic), tone: 'violet', title: 'Voice capture', desc: 'Turn speech into tasks instantly.' },
   { icon: markRaw(Sparkles), tone: 'blue', title: 'AI planning', desc: 'Break work down and plan a realistic day.' },
-  { icon: markRaw(Bell), tone: 'amber', title: 'Smart reminders', desc: 'Get nudged at the right time, on the right channel.' },
+  { icon: markRaw(Bell), tone: 'amber', title: 'Smart reminders', desc: 'Get nudged before important things slip away.' },
   { icon: markRaw(CalendarDays), tone: 'sky', title: 'Calendar sync', desc: 'Fit tasks around your real schedule.' },
   { icon: markRaw(Timer), tone: 'green', title: 'Focus mode', desc: 'Stay on one task and build real progress.' },
   { icon: markRaw(Search), tone: 'pink', title: 'AI task help', desc: 'Research and next steps for any task.' },
@@ -595,6 +650,11 @@ const useCases = [
     href: '/voice-reminder-app',
   },
   {
+    title: 'Bills, Renewals & Follow-ups',
+    desc: 'Keep recurring obligations and important follow-ups visible, so remembering is no longer the work.',
+    href: '/recurring-reminder-app',
+  },
+  {
     title: 'Task Intelligence',
     desc: 'Get a next best action, live research with citations, and practical context without leaving the task you are trying to finish.',
     href: '#intelligence',
@@ -629,6 +689,16 @@ const faqs = [
     question: 'Is there an AI app for reminders and follow-ups?',
     answer:
       'Yes. PlanCraftAI works as a voice reminder app and recurring reminder system, sending smart nudges, follow-ups, and recap-style reminders tied to real tasks.',
+  },
+  {
+    question: 'What can I use recurring reminders for?',
+    answer:
+      'Use them for bills, subscriptions, renewals, medication, maintenance, routines, and follow-ups. Capture the obligation once, choose when it repeats, and let PlanCraftAI bring it back when it matters.',
+  },
+  {
+    question: 'Do I have to keep rebuilding the same reminder?',
+    answer:
+      'No. Recurring tasks are designed for obligations that come back. Set the cadence once, then complete each occurrence as it appears on your list.',
   },
   {
     question: 'Does PlanCraftAI integrate with Google Calendar?',
@@ -675,7 +745,7 @@ const structuredData = [
     sameAs: [IOS_APP_URL, ANDROID_APP_URL],
     screenshot: `${BASE_URL}/plancraftai-post-one.png`,
     description:
-      'PlanCraftAI is an AI task planner and personal action assistant for voice capture, realistic daily planning, next best actions, live task research, focus sessions, and smart reminders.',
+      'PlanCraftAI is an external memory for bills, renewals, follow-ups, voice capture, realistic daily planning, focus sessions, and smart reminders.',
     audience: {
       '@type': 'Audience',
       audienceType: 'People who want to turn tasks into clear next actions and follow-through',
@@ -693,7 +763,7 @@ const structuredData = [
     name: 'PlanCraftAI',
     url: BASE_URL,
     description:
-      'An AI task planner that turns scattered thoughts into next actions, realistic plans, live research, and follow-through.',
+      'An external-memory task planner that turns scattered thoughts into reminders, recurring obligations, next actions, and follow-through.',
     inLanguage: 'en-US',
     publisher: { '@type': 'Organization', name: 'Sudo Programmer Inc.', url: BASE_URL },
   },
@@ -734,9 +804,9 @@ const structuredData = [
 ]
 
 useSeoMeta({
-  title: 'PlanCraftAI | AI Task Planner, Next Actions & Live Intelligence',
+  title: 'PlanCraftAI | Your External Memory for Important Things',
   description:
-    'Turn scattered thoughts into next best actions with PlanCraftAI: an AI task planner for voice capture, realistic daily planning, live task research, Google Maps, Focus, and smart reminders.',
+    'Capture bills, renewals, follow-ups, and ideas once. PlanCraftAI remembers the next time with recurring tasks and smart reminders.',
   keywords: [
     'PlanCraft AI',
     'AI task planner',
@@ -1167,6 +1237,123 @@ onMounted(() => {
   50% {
     transform: rotate(-3deg) translateY(-8px);
   }
+}
+
+/* ---------- External memory ---------- */
+.lp-section--memory {
+  padding-top: 28px;
+  background: #fff;
+}
+
+.lp-memory {
+  display: grid;
+  gap: 32px;
+  align-items: center;
+  padding: 28px;
+  border: 1px solid #e0e7ff;
+  border-radius: 28px;
+  background:
+    radial-gradient(90% 120% at 0% 0%, rgba(224, 231, 255, 0.86), transparent 65%),
+    linear-gradient(135deg, #fff 0%, #f8f7ff 100%);
+  box-shadow: 0 22px 54px -42px rgba(67, 56, 202, 0.55);
+}
+
+@media (min-width: 900px) {
+  .lp-memory {
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: 56px;
+    padding: 48px 56px;
+  }
+}
+
+.lp-memory__copy h2 {
+  max-width: 30rem;
+  margin: 0;
+  font-size: clamp(1.7rem, 3.4vw, 2.45rem);
+  line-height: 1.12;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.lp-memory__copy > p:not(.lp-eyebrow) {
+  max-width: 34rem;
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.lp-memory__quote {
+  display: grid;
+  gap: 6px;
+  margin-top: 24px;
+  padding: 16px 18px;
+  border-left: 3px solid var(--brand);
+  border-radius: 0 16px 16px 0;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.lp-memory__quote-label {
+  color: var(--brand-strong);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.lp-memory__quote strong {
+  color: var(--ink);
+  font-size: 0.98rem;
+  line-height: 1.45;
+}
+
+.lp-memory__quote > span:last-child {
+  color: var(--subtle);
+  font-size: 0.82rem;
+}
+
+.lp-memory__examples {
+  display: grid;
+  gap: 12px;
+}
+
+.lp-memory__card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(224, 231, 255, 0.95);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.lp-memory__card-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+}
+
+.lp-memory__card h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.94rem;
+  font-weight: 750;
+}
+
+.lp-memory__card p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.lp-memory__card-check {
+  flex: none;
+  margin-left: auto;
+  color: #16a34a;
 }
 
 /* ---------- Sections ---------- */
