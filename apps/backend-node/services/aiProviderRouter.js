@@ -190,7 +190,9 @@ Rules:
 - Preserve the user's intent; do not invent dates, times, or subtasks.
 - Use the supplied timezone for relative dates.
 - Keep titles short and actionable.
-- Return one task for a simple request and multiple tasks only when the user clearly asks for a breakdown.
+- Return one task only for a single objective.
+- If the request contains multiple independent actions, deliverables, subjects, comma/and-separated items, or numbered/bulleted instructions, return one short task per item even when the user does not say "split" or "break it down".
+- For a long paragraph, extract each distinct actionable step into its own task and keep only useful supporting context in details.
 - Do not include markdown, explanations, workspace history, journal content, or memory.`
 }
 

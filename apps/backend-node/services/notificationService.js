@@ -356,6 +356,60 @@ async function loadNativePushTarget(userId) {
   }
 }
 
+function isInvalidNativePushTokenError(error) {
+  const code = String(error?.code || error?.errorInfo?.code || '').toLowerCase()
+  const message = String(error?.message || error?.errorInfo?.message || '').toLowerCase()
+  return [
+    'messaging/invalid-argument',
+    'messaging/registration-token-not-registered',
+    'messaging/invalid-recipient',
+  ].includes(code) || /not a valid fcm registration token|registration token is not valid|token is not registered/.test(message)
+}
+
+async function deactivateInvalidNativePushTarget(userId, target, error) {
+  if (!userId || !target?.deviceId) return
+  const userRef = db.collection('users').doc(String(userId))
+  const now = new Date().toISOString()
+  const writes = []
+
+  if (target.deviceId !== 'legacy') {
+    writes.push(
+      userRef.collection('nativePushDevices').doc(String(target.deviceId)).set(
+        {
+          active: false,
+          invalidatedAt: now,
+          invalidationReason: String(error?.code || error?.message || 'invalid_token').slice(0, 200),
+        },
+        { merge: true },
+      ),
+    )
+  }
+
+  const profileSnap = await userRef.get()
+  const profile = profileSnap.exists ? profileSnap.data() || {} : {}
+  if (
+    target.deviceId === 'legacy' ||
+    String(profile.pushTokenDeviceId || '') === String(target.deviceId)
+  ) {
+    writes.push(
+      userRef.set(
+        {
+          pushToken: null,
+          pushPermissionState: 'invalid',
+          pushTokenUpdatedAt: now,
+        },
+        { merge: true },
+      ),
+    )
+  }
+
+  await Promise.all(writes)
+  console.warn('[Notification] deactivated invalid native push token', {
+    userId,
+    deviceId: target.deviceId,
+  })
+}
+
 function pickRecipientForChannel(channel, contacts = {}) {
   if (channel === "whatsapp")
     return contacts.whatsapp || contacts.sms || contacts.voice || null;
@@ -836,6 +890,24 @@ async function sendViaChannel(
           { sound },
         ),
       ));
+
+      await Promise.all(
+        nativeResults.map((result, index) => {
+          if (result.status !== 'rejected' || !isInvalidNativePushTokenError(result.reason)) {
+            return null
+          }
+          return deactivateInvalidNativePushTarget(
+            userId,
+            nativeTarget[index],
+            result.reason,
+          ).catch((error) => {
+            console.warn(
+              '[Notification] failed to deactivate invalid native push token',
+              error?.message || error,
+            )
+          })
+        }),
+      )
 
       return {
         pwa: pwaResult,

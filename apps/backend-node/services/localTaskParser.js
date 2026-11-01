@@ -33,6 +33,44 @@ function hasMultipleActions(value) {
   return /\band\b/.test(lower) && actionMatches.length > 1
 }
 
+function startsWithActionVerb(value) {
+  const firstWord = cleanWhitespace(value).toLowerCase().split(/\s+/)[0]
+  return ACTION_VERBS.includes(firstWord)
+}
+
+/**
+ * Detect the common "do X, Y, and Z" shape without asking an AI provider to
+ * make a decision that can be made reliably from the user's words. We only
+ * expand short list items and avoid items that start with another action verb;
+ * the latter are multi-action sentences that should be handled by the model.
+ */
+function splitActionList(value) {
+  const match = cleanWhitespace(value).match(/^([a-z]+)\s+(.+)$/i)
+  if (!match || !ACTION_VERBS.includes(match[1].toLowerCase())) return null
+
+  const action = match[1]
+  const remainder = match[2].replace(/[.!?]+$/, '').trim()
+  if (!remainder) return null
+
+  let parts = null
+  if (/,/.test(remainder)) {
+    parts = remainder
+      .split(/\s*,\s*/)
+      .map((part) => part.replace(/^(?:and|or)\s+/i, '').trim())
+      .filter(Boolean)
+  } else {
+    const conjunction = remainder.match(/^(.+?)\s+(?:and|&)\s+(.+)$/i)
+    if (conjunction) parts = [conjunction[1].trim(), conjunction[2].trim()]
+  }
+
+  if (!parts || parts.length < 2 || parts.length > 6) return null
+  if (parts.some((part) => !part || startsWithActionVerb(part) || part.split(/\s+/).length > 12)) {
+    return null
+  }
+
+  return parts.map((part) => `${action} ${part}`)
+}
+
 function chronoReference(now, timezone) {
   const localNow = dayjs(now || new Date()).tz(timezone || "UTC")
   // Chrono treats the Date object as local calendar data. Build a UTC Date whose
@@ -118,12 +156,24 @@ export function parseTaskLocally(input, { timezone = "UTC", now = null, maxItems
   const original = cleanWhitespace(input)
   const stripped = stripCommandPrefix(original)
 
+  const schedule = parseSchedule(stripped, { timezone, now })
+  const titleInput = cleanWhitespace(schedule ? stripped.replace(schedule.text, " ") : stripped)
+  const listTitles = splitActionList(titleInput)
+  if (listTitles?.length) {
+    return {
+      confident: true,
+      tasks: listTitles
+        .slice(0, Math.max(1, maxItems))
+        .map((title) => taskFromTitle(title, original, schedule)),
+      reminderTime: schedule?.reminderTime || null,
+    }
+  }
+
   if (!stripped || !startsWithAction(stripped) || hasMultipleActions(stripped) || COMPLEX_REQUEST.test(stripped)) {
     return { confident: false, tasks: [], reminderTime: null }
   }
 
-  const schedule = parseSchedule(stripped, { timezone, now })
-  const title = cleanWhitespace(schedule ? stripped.replace(schedule.text, " ") : stripped).replace(/[,.!?]+$/, "")
+  const title = titleInput.replace(/[,.!?]+$/, "")
   if (!title || title.split(/\s+/).length < 2) {
     return { confident: false, tasks: [], reminderTime: null }
   }

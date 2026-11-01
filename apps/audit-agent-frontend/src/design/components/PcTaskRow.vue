@@ -100,6 +100,7 @@ defineEmits(['toggle', 'open'])
 }
 
 .pc-task-row__line {
+  min-width: 0;
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -111,14 +112,14 @@ defineEmits(['toggle', 'open'])
 }
 
 .pc-task-row__title {
+  flex: 1 1 auto;
   min-width: 0;
   color: var(--pc-text);
   font-size: var(--pc-text-body);
   font-weight: 500;
   text-align: left;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .pc-task-row--done .pc-task-row__title {

@@ -28,6 +28,25 @@ test("local parser leaves multi-action requests for a provider", () => {
   assert.equal(result.confident, false)
 })
 
+test("local parser expands a short action list into separate tasks", () => {
+  const result = parseTaskLocally("Learn springboard apps, AI, and algorithm patterns", options)
+  assert.equal(result.confident, true)
+  assert.deepEqual(result.tasks.map((task) => task.title), [
+    "Learn springboard apps",
+    "Learn AI",
+    "Learn algorithm patterns",
+  ])
+})
+
+test("local parser expands action lists after a natural-language prefix", () => {
+  const result = parseTaskLocally("I want to learn springboard apps, AI, and algorithm patterns", options)
+  assert.deepEqual(result.tasks.map((task) => task.title), [
+    "learn springboard apps",
+    "learn AI",
+    "learn algorithm patterns",
+  ])
+})
+
 test("router uses the deterministic safe fallback when no provider is configured", async () => {
   const previous = process.env.AI_TASK_PROVIDER_ORDER
   const keys = ["GEMINI_API_KEY", "GROQ_API_KEY", "OPENROUTER_API_KEY"]
