@@ -123,10 +123,9 @@ ALLOW_DEV_ANY_ORIGIN=1
 OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-4o-mini
 OPENAI_TRANSCRIBE_MODEL=gpt-4o-mini-transcribe
-# Optional task-parser providers. Task parsing is local-first and does not
-# use OpenAI unless it is explicitly added to AI_TASK_PROVIDER_ORDER.
-# Review each provider's data-use policy before enabling free-tier routing.
-AI_TASK_PROVIDER_ORDER=gemini,groq,openrouter
+# Task parsing is local-first, then uses OpenAI for dependable multi-action
+# extraction. The other providers are optional fallbacks.
+AI_TASK_PROVIDER_ORDER=openai,gemini,groq,openrouter
 AI_TASK_PROVIDER_TIMEOUT_MS=15000
 GEMINI_API_KEY=
 GEMINI_TASK_MODEL=gemini-2.5-flash-lite

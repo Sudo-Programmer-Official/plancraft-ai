@@ -1,7 +1,15 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { buildSafeTaskFallback, parseTaskLocally } from "../services/localTaskParser.js"
-import { routeTaskParse } from "../services/aiProviderRouter.js"
+import {
+  buildSafeTaskFallback,
+  minimumExpectedTaskCount,
+  parseTaskLocally,
+} from "../services/localTaskParser.js"
+import {
+  buildTaskPrompt,
+  providerOrder,
+  routeTaskParse,
+} from "../services/aiProviderRouter.js"
 
 const options = {
   timezone: "America/New_York",
@@ -23,9 +31,69 @@ test("local parser does not turn a reflection into a task", () => {
   assert.deepEqual(result.tasks, [])
 })
 
-test("local parser leaves multi-action requests for a provider", () => {
+test("local parser splits independent actions with different verbs", () => {
   const result = parseTaskLocally("Call the dentist and email my manager", options)
-  assert.equal(result.confident, false)
+  assert.equal(result.confident, true)
+  assert.deepEqual(result.tasks.map((task) => task.title), [
+    "Call the dentist",
+    "email my manager",
+  ])
+})
+
+test("local parser splits a morning list into every independent task", () => {
+  const result = parseTaskLocally(
+    "I need to call the dentist, email my manager, and buy groceries tomorrow morning",
+    options,
+  )
+  assert.equal(result.confident, true)
+  assert.deepEqual(result.tasks.map((task) => task.title), [
+    "call the dentist",
+    "email my manager",
+    "buy groceries",
+  ])
+  assert.deepEqual(result.tasks.map((task) => task.date), [
+    "2026-09-30",
+    "2026-09-30",
+    "2026-09-30",
+  ])
+})
+
+test("multi-action detection requires the provider to return every action", () => {
+  assert.equal(
+    minimumExpectedTaskCount(
+      "In the morning, call the dentist, email my manager, and buy groceries",
+      options,
+    ),
+    3,
+  )
+})
+
+test("multi-action provider prompt explicitly forbids collapsing tasks", () => {
+  const prompt = buildTaskPrompt({
+    input: "Call the dentist, email my manager, and buy groceries",
+    timezone: options.timezone,
+    now: options.now,
+    maxItems: 6,
+  })
+  assert.match(prompt, /Count the independent action units/i)
+  assert.match(prompt, /Never merge several independent actions/i)
+  assert.match(prompt, /must produce three task objects/i)
+})
+
+test("OpenAI is preferred for multi-action requests when configured", () => {
+  const previousOrder = process.env.AI_TASK_PROVIDER_ORDER
+  const previousOpenAiKey = process.env.OPENAI_API_KEY
+  process.env.AI_TASK_PROVIDER_ORDER = "gemini,groq,openrouter"
+  process.env.OPENAI_API_KEY = "test-key"
+
+  try {
+    assert.deepEqual(providerOrder({ preferOpenAI: true }).slice(0, 2), ["openai", "gemini"])
+  } finally {
+    if (previousOrder === undefined) delete process.env.AI_TASK_PROVIDER_ORDER
+    else process.env.AI_TASK_PROVIDER_ORDER = previousOrder
+    if (previousOpenAiKey === undefined) delete process.env.OPENAI_API_KEY
+    else process.env.OPENAI_API_KEY = previousOpenAiKey
+  }
 })
 
 test("local parser expands a short action list into separate tasks", () => {
@@ -44,6 +112,19 @@ test("local parser expands action lists after a natural-language prefix", () => 
     "learn springboard apps",
     "learn AI",
     "learn algorithm patterns",
+  ])
+})
+
+test("router keeps a common multi-action request multi-task without a provider", async () => {
+  const result = await routeTaskParse({
+    input: "Call the dentist, email my manager, and buy groceries",
+    ...options,
+  })
+  assert.equal(result.parser, "local")
+  assert.deepEqual(result.tasks.map((task) => task.title), [
+    "Call the dentist",
+    "email my manager",
+    "buy groceries",
   ])
 })
 

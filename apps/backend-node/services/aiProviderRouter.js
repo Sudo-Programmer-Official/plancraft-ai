@@ -1,6 +1,10 @@
 import OpenAI from "openai"
 import dayjs from "../utils/dayjs.js"
-import { buildSafeTaskFallback, parseTaskLocally } from "./localTaskParser.js"
+import {
+  buildSafeTaskFallback,
+  minimumExpectedTaskCount,
+  parseTaskLocally,
+} from "./localTaskParser.js"
 
 const PROVIDER_CONFIG = {
   gemini: {
@@ -25,21 +29,30 @@ const PROVIDER_CONFIG = {
   },
 }
 
-// Keep production task parsing on providers with an explicit, predictable model.
-// OpenRouter remains available when deliberately added through AI_TASK_PROVIDER_ORDER.
-const DEFAULT_PROVIDER_ORDER = ["gemini", "groq"]
+// OpenAI is the reliable default for multi-action parsing. The cheaper providers
+// remain available for explicitly configured single-task traffic and fallback.
+const DEFAULT_PROVIDER_ORDER = ["openai", "gemini", "groq", "openrouter"]
 
 function providerTimeoutMs() {
   const value = Number(process.env.AI_TASK_PROVIDER_TIMEOUT_MS || 15000)
   return Number.isFinite(value) && value > 0 ? value : 15000
 }
 
-function providerOrder() {
+export function providerOrder({ preferOpenAI = false } = {}) {
   const configured = process.env.AI_TASK_PROVIDER_ORDER || process.env.TASK_PARSE_PROVIDERS
-  const order = configured
+  let order = configured
     ? configured.split(",").map((provider) => provider.trim().toLowerCase()).filter(Boolean)
     : DEFAULT_PROVIDER_ORDER
-  return [...new Set(order)].filter((provider) => PROVIDER_CONFIG[provider])
+  order = [...new Set(order)].filter((provider) => PROVIDER_CONFIG[provider])
+
+  // A provider order set for cost reasons must not make multi-action requests
+  // silently collapse to one task. When OpenAI is configured, prefer it for
+  // requests that clearly contain several independent actions.
+  if (preferOpenAI && process.env.OPENAI_API_KEY) {
+    order = ["openai", ...order.filter((provider) => provider !== "openai")]
+  }
+
+  return order
 }
 
 function providerHeaders(provider) {
@@ -170,7 +183,7 @@ function logUsage({ provider, model, latencyMs, inputChars, usage, fallbackReaso
   }))
 }
 
-function taskPrompt({ input, timezone, now, maxItems }) {
+export function buildTaskPrompt({ input, timezone, now, maxItems }) {
   const localNow = dayjs(now || new Date()).tz(timezone || "UTC").format("YYYY-MM-DD HH:mm:ss z")
   return `You convert one user request into task JSON for PlanCraft AI.
 
@@ -191,7 +204,10 @@ Rules:
 - Use the supplied timezone for relative dates.
 - Keep titles short and actionable.
 - Return one task only for a single objective.
-- If the request contains multiple independent actions, deliverables, subjects, comma/and-separated items, or numbered/bulleted instructions, return one short task per item even when the user does not say "split" or "break it down".
+- Count the independent action units in the request before writing JSON.
+- If the request contains multiple independent actions, deliverables, subjects, comma/and-separated items, or numbered/bulleted instructions, return one short task object per item even when the user does not say "split" or "break it down".
+- Never merge several independent actions into one summary task title.
+- For example, "Call the dentist, email my manager, and buy groceries" must produce three task objects: one for calling, one for emailing, and one for buying groceries.
 - For a long paragraph, extract each distinct actionable step into its own task and keep only useful supporting context in details.
 - Do not include markdown, explanations, workspace history, journal content, or memory.`
 }
@@ -217,14 +233,18 @@ async function requestProvider(provider, { input, timezone, now, maxItems }) {
       temperature: 0,
       messages: [
         { role: "system", content: "You are a precise JSON task parser." },
-        { role: "user", content: taskPrompt({ input, timezone, now, maxItems }) },
+        { role: "user", content: buildTaskPrompt({ input, timezone, now, maxItems }) },
       ],
     }, { timeout: providerTimeoutMs() })
     const usage = usageFromResponse(response)
     const parsed = parseJson(extractResponseText(response))
     const tasks = normalizeModelTasks(parsed, maxItems, provider)
-    if (!tasks) {
-      const error = normalizeProviderError(provider, configured.model, Object.assign(new Error("Provider returned invalid task JSON"), { code: "INVALID_OUTPUT" }))
+    const expectedTaskCount = minimumExpectedTaskCount(input, { maxItems })
+    if (!tasks || tasks.length < expectedTaskCount) {
+      const message = tasks
+        ? `Provider returned ${tasks.length} task(s); expected at least ${expectedTaskCount}`
+        : "Provider returned invalid task JSON"
+      const error = normalizeProviderError(provider, configured.model, Object.assign(new Error(message), { code: "INVALID_OUTPUT" }))
       logUsage({ provider, model: configured.model, latencyMs: Date.now() - startedAt, inputChars: String(input || "").length, usage, fallbackReason: "INVALID_OUTPUT", success: false })
       return { error }
     }
@@ -254,7 +274,8 @@ export async function routeTaskParse({ input, maxItems = 6, timezone = "UTC", no
   }
 
   const failures = []
-  for (const provider of providerOrder()) {
+  const expectedTaskCount = minimumExpectedTaskCount(input, { maxItems })
+  for (const provider of providerOrder({ preferOpenAI: expectedTaskCount > 1 })) {
     const result = await requestProvider(provider, { input, timezone, now, maxItems })
     if (result.skipped) continue
     if (!result.error) {

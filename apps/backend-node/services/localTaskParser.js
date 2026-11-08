@@ -11,6 +11,7 @@ const ACTION_VERBS = [
 const COMMAND_PREFIX = /^(?:(?:please\s+)?(?:remind|remember)(?:\s+me)?\s+to\s+|(?:please|can you|could you)\s+|(?:i|we)\s+(?:need|have|want)\s+to\s+|don't\s+forget\s+to\s+|task:\s*)/i
 const DATE_WORDS = /\b(?:today|tomorrow|tonight|tonight|this\s+(?:morning|afternoon|evening|week)|next\s+(?:week|monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b/i
 const COMPLEX_REQUEST = /\b(?:split|break\s+down|across\s+the\s+next|prioritize|step[- ]by[- ]step|several|multiple|each\s+(?:day|evening|morning))\b/i
+const ACTION_VERB_PATTERN = ACTION_VERBS.join("|")
 
 function cleanWhitespace(value) {
   return String(value || "").replace(/\s+/g, " ").replace(/\s+([,.!?])/g, "$1").trim()
@@ -28,14 +29,30 @@ function startsWithAction(value) {
 function hasMultipleActions(value) {
   const lower = cleanWhitespace(value).toLowerCase()
   if (/\b(?:and then|then|also|after that|first|second|lastly)\b/.test(lower)) return true
+  return minimumExpectedTaskCount(value) > 1
+}
 
-  const actionMatches = ACTION_VERBS.filter((verb) => new RegExp(`\\b${verb}\\b`, "i").test(lower))
-  return /\band\b/.test(lower) && actionMatches.length > 1
+function actionVerbAtStart(value) {
+  const firstWord = cleanWhitespace(value).toLowerCase().split(/\s+/)[0]
+  return ACTION_VERBS.includes(firstWord) ? firstWord : null
 }
 
 function startsWithActionVerb(value) {
-  const firstWord = cleanWhitespace(value).toLowerCase().split(/\s+/)[0]
-  return ACTION_VERBS.includes(firstWord)
+  return !!actionVerbAtStart(value)
+}
+
+function splitExplicitActionConjunction(value) {
+  const normalized = cleanWhitespace(value)
+  if (!normalized) return []
+
+  const delimiter = new RegExp(
+    `\\s+(?:and then|then|also|and)\\s+(?=(?:${ACTION_VERB_PATTERN})\\b)`,
+    "ig",
+  )
+  return normalized
+    .split(delimiter)
+    .map((part) => part.replace(/^(?:and|or)\s+/i, "").trim())
+    .filter(Boolean)
 }
 
 /**
@@ -56,19 +73,42 @@ function splitActionList(value) {
   if (/,/.test(remainder)) {
     parts = remainder
       .split(/\s*,\s*/)
-      .map((part) => part.replace(/^(?:and|or)\s+/i, '').trim())
+      .flatMap((part) => splitExplicitActionConjunction(part))
       .filter(Boolean)
   } else {
-    const conjunction = remainder.match(/^(.+?)\s+(?:and|&)\s+(.+)$/i)
-    if (conjunction) parts = [conjunction[1].trim(), conjunction[2].trim()]
+    parts = splitExplicitActionConjunction(remainder)
+    if (parts.length < 2) {
+      const conjunction = remainder.match(/^(.+?)\s+(?:and|&)\s+(.+)$/i)
+      if (conjunction) parts = [conjunction[1].trim(), conjunction[2].trim()]
+    }
   }
 
   if (!parts || parts.length < 2 || parts.length > 6) return null
-  if (parts.some((part) => !part || startsWithActionVerb(part) || part.split(/\s+/).length > 12)) {
+  if (parts.some((part) => !part || part.split(/\s+/).length > 12)) {
     return null
   }
 
-  return parts.map((part) => `${action} ${part}`)
+  const firstPartIsAction = startsWithActionVerb(parts[0])
+  const remainingPartsAreActions = parts.slice(1).every(startsWithActionVerb)
+  if (firstPartIsAction && parts.every(startsWithActionVerb)) return parts
+  if (!firstPartIsAction && remainingPartsAreActions) return [`${action} ${parts[0]}`, ...parts.slice(1)]
+  if (parts.every((part) => !startsWithActionVerb(part))) return parts.map((part) => `${action} ${part}`)
+  return null
+}
+
+export function minimumExpectedTaskCount(input, { maxItems = 6 } = {}) {
+  const normalized = cleanWhitespace(stripCommandPrefix(input))
+  if (!normalized) return 1
+
+  const actionMatches = normalized.match(new RegExp(`\\b(?:${ACTION_VERB_PATTERN})\\b`, "gi")) || []
+  const numberedItems = normalized.match(/(?:^|\s)(?:\d+[.)]|[-•])\s+/g) || []
+  const hasActionSeparator =
+    /\b(?:and|then|also|after that|first|second|third|lastly)\b/i.test(normalized) ||
+    /[,;\n]/.test(normalized) ||
+    numberedItems.length > 1
+
+  if (actionMatches.length < 2 || !hasActionSeparator) return 1
+  return Math.min(Math.max(1, Number(maxItems) || 6), actionMatches.length)
 }
 
 function chronoReference(now, timezone) {
