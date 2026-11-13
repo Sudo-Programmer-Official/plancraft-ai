@@ -127,6 +127,7 @@ import actionInboxRoutes from "./routes/actionInboxRoutes.js";
 import nlpProxyRoutes from "./routes/nlpProxyRoutes.js";
 import intelligenceGoalRoutes from "./routes/intelligenceGoalRoutes.js";
 import intelligenceAgentRoutes from "./routes/intelligenceAgentRoutes.js";
+import mcpRoutes from "./routes/mcpRoutes.js";
 
 dotenv.config();
 
@@ -247,6 +248,10 @@ app.get('/api/stripe/webhook-health', (req, res) => {
 // JSON parser for all other routes
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// MCP is an authenticated adapter over the existing backend services. It is
+// disabled until explicitly enabled in the deployment environment.
+app.use("/mcp", mcpRoutes);
 
 if (fs.existsSync(integrationsDir)) {
   app.use("/integrations", express.static(integrationsDir));

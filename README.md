@@ -139,9 +139,14 @@ GOALS_SERVICE_URL=http://localhost:4502/api/goals
 APP_JWT_SECRET=replace-me
 GPT_ACTION_CLIENT_ID=plancraft-gpt
 GPT_ACTION_CLIENT_SECRET=replace-me
+MCP_ENABLED=0
 ```
 
 Add Firebase Admin credentials plus any integration credentials you need for reminders, billing, calendar sync, or mobile auth.
+
+### MCP endpoint
+
+The backend includes an authenticated MCP Streamable HTTP endpoint at `/mcp`. It is disabled by default. Set `MCP_ENABLED=1` only after configuring the intended client authentication. The endpoint accepts a verified Firebase ID token or a scoped existing app token in `Authorization: Bearer ...`; MCP tools never accept an arbitrary user identity. The first tool set exposes workspace discovery, task reads, task creation, completion, and rescheduling through the existing Firebase-authenticated service layer. Public OAuth discovery for third-party MCP hosts should be added before opening this endpoint broadly.
 
 ### Goals service
 
