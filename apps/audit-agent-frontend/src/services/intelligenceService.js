@@ -76,13 +76,12 @@ export const INTELLIGENCE_AGENT_TEMPLATES = [
   },
 ]
 
-export async function fetchIntelligenceBrief({ agentIds, customAgentIds = [], question, interests, goalContext, surface = 'desk' } = {}) {
+export async function fetchIntelligenceBrief({ agentIds, customAgentIds = [], question, interests, surface = 'desk' } = {}) {
   const response = await nlpClient.post('/intelligence/brief', {
     agentIds,
     customAgentIds,
     question: String(question || '').trim(),
     interests: String(interests || '').trim(),
-    goalContext: goalContext || null,
     surface,
   })
   return response?.data || {}
@@ -140,18 +139,3 @@ export async function deleteIntelligenceAgent(agentId) {
   if (!agentId) throw new Error('deleteIntelligenceAgent requires agentId')
   return api.delete(`/intelligence/agents/${encodeURIComponent(agentId)}`)
 }
-
-export async function fetchIntelligenceGoals() {
-  const response = await api.get('/intelligence/goals')
-  return Array.isArray(response?.data?.goals) ? response.data.goals : []
-}
-
-export async function linkIntelligenceTask(goalId, linkedTasks) {
-  if (!goalId) return null
-  const response = await api.patch(`/intelligence/goals/${encodeURIComponent(goalId)}`, {
-    linkedTasks,
-    source: 'intelligence',
-  })
-  return response?.data?.goal || null
-}
-

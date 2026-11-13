@@ -17,7 +17,7 @@
               </div>
               <h1 class="mt-4 text-3xl font-semibold tracking-tight text-pc-text sm:text-4xl">Your intelligence desk</h1>
               <p class="mt-3 max-w-2xl text-sm leading-6 text-pc-text-muted sm:text-base">
-                Turn live external signals into a clearer next move for the goals already on your planner.
+                Turn live external signals into a clearer next move.
               </p>
             </div>
             <button
@@ -99,36 +99,6 @@
               </button>
             </div>
           </div>
-          <div v-if="goals.length" class="mb-5 rounded-2xl border border-pc-accent-border bg-pc-accent-soft/50 p-4">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div class="min-w-0">
-                <span class="eyebrow">Optional goal context</span>
-                <p class="mt-1 text-sm text-pc-text-muted">Only choose a goal when this agent’s research directly supports it. Goal context is saved per tab.</p>
-              </div>
-              <label class="sm:w-80">
-                <span class="sr-only">Choose a goal to watch</span>
-                <select
-                  v-model="selectedGoalId"
-                  class="w-full rounded-xl border border-pc-border-strong bg-pc-surface px-3 py-2.5 text-sm font-medium text-pc-text outline-none focus:border-pc-accent"
-                >
-                  <option value="">No goal context</option>
-                  <option v-for="goal in goals" :key="goal.goalId || goal.id" :value="goal.goalId || goal.id">
-                    {{ goal.title || 'Untitled goal' }}
-                  </option>
-                </select>
-              </label>
-            </div>
-            <div v-if="selectedGoal" class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-pc-accent-text">
-              <span class="font-semibold">{{ selectedGoal.title }}</span>
-              <span v-if="selectedGoal.targetDate">Target {{ formatGoalTargetDate(selectedGoal.targetDate) }}</span>
-              <span v-if="selectedGoal.category">{{ selectedGoal.category }}</span>
-            </div>
-            <p v-else class="mt-3 text-xs text-pc-text-subtle">This brief is independent of your planner goals.</p>
-          </div>
-          <div v-else class="mb-5 rounded-2xl border border-dashed border-pc-border-strong bg-pc-surface px-4 py-3 text-sm text-pc-text-muted">
-            Create a goal to turn this desk into a personalized watchlist. You can still explore the wider tech landscape below.
-          </div>
-
           <div class="flex flex-col gap-4 lg:flex-row lg:items-end">
             <label class="min-w-0 flex-1">
               <span class="eyebrow">Ask the desk</span>
@@ -139,7 +109,7 @@
                   type="text"
                   maxlength="500"
                   class="min-w-0 flex-1 bg-transparent text-sm text-pc-text outline-none placeholder:text-pc-text-subtle"
-                  :placeholder="selectedGoal ? 'What changed that could affect this goal?' : 'What is the best tech news today, and where is the money flowing?'"
+                  placeholder="What is the best tech news today, and where is the money flowing?"
                   @keyup.enter="refreshBrief"
                 />
               </div>
@@ -296,37 +266,6 @@
                 <ArrowUpRight :size="14" class="shrink-0 transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden="true" />
               </a>
             </div>
-          </div>
-        </section>
-
-        <section v-if="brief.suggestedTasks?.length" class="rounded-3xl border border-pc-accent-border bg-pc-accent-soft/40 p-5 shadow-pc-card sm:p-6">
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p class="eyebrow text-pc-accent-text">Signal → action</p>
-              <h2 class="mt-2 text-xl font-semibold text-pc-text">Suggested next moves</h2>
-              <p class="mt-1 text-sm text-pc-text-muted">Nothing is added automatically. Approve the moves that belong on your planner.</p>
-            </div>
-            <span class="rounded-full border border-pc-accent-border bg-pc-surface px-3 py-1.5 text-xs text-pc-accent-text">{{ brief.suggestedTasks.length }} suggestions</span>
-          </div>
-          <div class="mt-5 grid gap-3 lg:grid-cols-2">
-            <article v-for="task in brief.suggestedTasks" :key="`${task.title}-${task.date || 'open'}`" class="rounded-2xl border border-pc-border bg-pc-surface p-4">
-              <div class="flex items-start justify-between gap-3">
-                <div>
-                  <h3 class="text-sm font-semibold text-pc-text">{{ task.title }}</h3>
-                  <p v-if="task.details" class="mt-2 text-sm leading-6 text-pc-text-muted">{{ task.details }}</p>
-                  <p v-if="task.reason" class="mt-2 text-xs leading-5 text-pc-accent-text">Why it matters: {{ task.reason }}</p>
-                </div>
-                <button
-                  type="button"
-                  class="shrink-0 rounded-lg border border-pc-accent-border px-3 py-2 text-xs font-semibold text-pc-accent-text transition hover:bg-pc-accent-soft disabled:cursor-not-allowed disabled:opacity-60"
-                  :disabled="addingTaskTitle === task.title || addedTaskTitles.includes(task.title)"
-                  @click="addSuggestedTask(task)"
-                >
-                  {{ addedTaskTitles.includes(task.title) ? 'Added' : addingTaskTitle === task.title ? 'Adding…' : 'Add task' }}
-                </button>
-              </div>
-              <p v-if="task.date" class="mt-3 text-xs text-pc-text-subtle">Suggested date: {{ task.date }}</p>
-            </article>
           </div>
         </section>
 
@@ -584,18 +523,15 @@ import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { useIsPremium } from '@/composables/useIsPremium'
-import { addTaskToFirebase } from '@/services/firebaseService'
 import {
   createIntelligenceAgent,
   deleteIntelligenceAgent,
   fetchIntelligenceBrief,
   fetchIntelligenceAgents,
-  fetchIntelligenceGoals,
   generateIntelligenceAgentDraft,
   INTELLIGENCE_FREE_RUNS,
   INTELLIGENCE_AGENTS,
   INTELLIGENCE_AGENT_TEMPLATES,
-  linkIntelligenceTask,
   updateIntelligenceAgent,
 } from '@/services/intelligenceService'
 
@@ -615,13 +551,10 @@ function loadPreferences() {
       agentIds: Array.isArray(saved.agentIds) && saved.agentIds.length ? saved.agentIds : defaultAgentIds,
       allAgentIds: Array.isArray(saved.allAgentIds) && saved.allAgentIds.length ? saved.allAgentIds : (Array.isArray(saved.agentIds) && saved.agentIds.length ? saved.agentIds : defaultAgentIds),
       interests: typeof saved.interests === 'string' ? saved.interests : '',
-      goalContextByAgent: saved.goalContextByAgent && typeof saved.goalContextByAgent === 'object' && !Array.isArray(saved.goalContextByAgent)
-        ? saved.goalContextByAgent
-        : {},
       activeAgentId: typeof saved.activeAgentId === 'string' ? saved.activeAgentId : 'all',
     }
   } catch {
-    return { agentIds: defaultAgentIds, allAgentIds: defaultAgentIds, interests: '', goalContextByAgent: {}, activeAgentId: 'all' }
+    return { agentIds: defaultAgentIds, allAgentIds: defaultAgentIds, interests: '', activeAgentId: 'all' }
   }
 }
 
@@ -633,10 +566,8 @@ const selectedAgentIds = ref([...savedPreferences.agentIds])
 const allDeskAgentIds = ref([...savedPreferences.allAgentIds])
 const activeAgentId = ref(savedPreferences.activeAgentId || 'all')
 const interests = ref(savedPreferences.interests)
-const goals = ref([])
 const customAgents = ref([])
 const customAgentLimit = ref(10)
-const goalContextByAgent = ref({ ...savedPreferences.goalContextByAgent })
 const question = ref('')
 const brief = ref(null)
 const briefsByTab = ref({})
@@ -649,8 +580,6 @@ const intelligenceUsage = ref({
   period: 'month',
 })
 const intelligenceUsageLoaded = ref(false)
-const addingTaskTitle = ref('')
-const addedTaskTitles = ref([])
 const showAgentBuilder = ref(false)
 const editingAgentId = ref('')
 const agentSaving = ref(false)
@@ -667,16 +596,6 @@ const agentForm = reactive({
   prompt: '',
   outputStyle: 'brief',
 })
-const selectedGoalId = computed({
-  get: () => goalContextByAgent.value[activeAgentId.value] || '',
-  set: (value) => {
-    const next = { ...goalContextByAgent.value }
-    if (value) next[activeAgentId.value] = value
-    else delete next[activeAgentId.value]
-    goalContextByAgent.value = next
-  },
-})
-const selectedGoal = computed(() => goals.value.find((goal) => (goal.goalId || goal.id) === selectedGoalId.value) || null)
 const availableAgents = computed(() => [...INTELLIGENCE_AGENTS, ...customAgents.value])
 const intelligenceTabs = computed(() => [
   { id: 'all', label: 'All desks', description: 'A combined view across selected agents.' },
@@ -695,33 +614,18 @@ const freeRunLabel = computed(() => {
   return `${remaining} free run${remaining === 1 ? '' : 's'} left this month`
 })
 
-watch([selectedAgentIds, interests, selectedGoalId, activeAgentId], () => {
+watch([selectedAgentIds, interests, activeAgentId], () => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       agentIds: selectedAgentIds.value,
       allAgentIds: allDeskAgentIds.value,
       interests: interests.value,
-      goalContextByAgent: goalContextByAgent.value,
       activeAgentId: activeAgentId.value,
     }))
   } catch {
     // Preference persistence is optional; the brief still works in private mode.
   }
 }, { deep: true })
-
-async function loadGoals() {
-  if (!authStore.user?.uid) return
-  try {
-    goals.value = await fetchIntelligenceGoals()
-    const goalIds = new Set(goals.value.map((goal) => goal.goalId || goal.id).filter(Boolean))
-    goalContextByAgent.value = Object.fromEntries(
-      Object.entries(goalContextByAgent.value).filter(([, goalId]) => goalIds.has(goalId)),
-    )
-  } catch (err) {
-    // The desk remains useful as an exploration surface if goals are unavailable.
-    console.warn('[Intelligence] goals unavailable', err?.message || err)
-  }
-}
 
 async function loadAgents() {
   if (!authStore.user?.uid) return
@@ -951,24 +855,6 @@ function formatTime(value) {
   }
 }
 
-function formatGoalTargetDate(value) {
-  const raw = String(value || '').trim()
-  if (!raw) return ''
-  try {
-    const datePart = raw.match(/^\d{4}-\d{2}-\d{2}/)?.[0]
-    const date = new Date(datePart ? `${datePart}T00:00:00Z` : raw)
-    if (Number.isNaN(date.getTime())) return raw
-    return new Intl.DateTimeFormat(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      timeZone: 'UTC',
-    }).format(date)
-  } catch {
-    return raw
-  }
-}
-
 function sourceDomain(value) {
   try {
     return new URL(value).hostname.replace(/^www\./, '')
@@ -989,14 +875,6 @@ async function refreshBrief() {
       question: question.value,
       interests: interests.value,
       surface: 'desk',
-      goalContext: selectedGoal.value
-        ? {
-            title: selectedGoal.value.title,
-            description: selectedGoal.value.description,
-            category: selectedGoal.value.category,
-            targetDate: selectedGoal.value.targetDate,
-          }
-        : null,
     })
     if (brief.value?.usage) {
       intelligenceUsage.value = {
@@ -1020,55 +898,9 @@ async function refreshBrief() {
   }
 }
 
-async function addSuggestedTask(task) {
-  const title = String(task?.title || '').trim()
-  if (!title || addingTaskTitle.value || addedTaskTitles.value.includes(title)) return
-  addingTaskTitle.value = title
-  try {
-    const savedTask = await addTaskToFirebase({
-      title,
-      details: [task.details, task.reason ? `Why it matters: ${task.reason}` : ''].filter(Boolean).join('\n\n'),
-      date: task.date || null,
-      category: selectedGoal.value?.category || 'Work',
-      source: 'intelligence',
-      goalId: selectedGoalId.value || null,
-      goalTitle: selectedGoal.value?.title || null,
-      goalTargetDate: selectedGoal.value?.targetDate || null,
-    })
-    let goalLinked = true
-    const goalId = selectedGoalId.value || null
-    if (goalId && savedTask?.id && selectedGoal.value) {
-      try {
-        const linkedTasks = Array.isArray(selectedGoal.value.linkedTasks)
-          ? selectedGoal.value.linkedTasks
-          : []
-        if (!linkedTasks.includes(savedTask.id)) {
-          const updatedGoal = await linkIntelligenceTask(goalId, [...linkedTasks, savedTask.id])
-          if (updatedGoal) {
-            goals.value = goals.value.map((goal) => (
-              (goal.goalId || goal.id) === goalId ? updatedGoal : goal
-            ))
-          }
-        }
-      } catch (linkError) {
-        goalLinked = false
-        console.warn('[Intelligence] task created but goal link failed', linkError?.message || linkError)
-      }
-    }
-    addedTaskTitles.value = [...addedTaskTitles.value, title]
-    ElMessage[goalLinked ? 'success' : 'warning'](
-      goalLinked ? 'Task added to your planner' : 'Task added, but could not link it to the goal',
-    )
-  } catch (err) {
-    ElMessage.error(err?.message || 'Could not add that task')
-  } finally {
-    addingTaskTitle.value = ''
-  }
-}
-
 onMounted(async () => {
   await refreshPremium({ minIntervalMs: 15000 })
-  await Promise.all([loadGoals(), loadAgents()])
+  await loadAgents()
 })
 </script>
 

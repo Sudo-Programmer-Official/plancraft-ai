@@ -6,7 +6,6 @@ import { db } from './firebaseAdmin.js'
 const MAX_AGENTS = 4
 const MAX_QUESTION_LENGTH = 500
 const MAX_INTERESTS_LENGTH = 300
-const MAX_GOAL_FIELD_LENGTH = 500
 const DEFAULT_CACHE_TTL_MS = 60 * 60 * 1000
 const MAX_CACHE_ENTRIES = 500
 const INTELLIGENCE_CACHE_COLLECTION = 'intelligence_cache'
@@ -102,44 +101,6 @@ function unique(values = []) {
   return [...new Set(values.filter(Boolean))]
 }
 
-function normalizeGoalContext(value) {
-  if (!value || typeof value !== 'object') return null
-  const title = cleanText(value.title, 180)
-  if (!title) return null
-  return {
-    title,
-    description: cleanText(value.description, MAX_GOAL_FIELD_LENGTH),
-    category: cleanText(value.category, 100),
-    targetDate: cleanText(value.targetDate, 40),
-  }
-}
-
-function parseJsonSafely(text, fallback = null) {
-  const raw = cleanText(text, 12000)
-  if (!raw) return fallback
-  try {
-    const first = raw.indexOf('{')
-    const last = raw.lastIndexOf('}')
-    return first !== -1 && last > first ? JSON.parse(raw.slice(first, last + 1)) : JSON.parse(raw)
-  } catch {
-    return fallback
-  }
-}
-
-function normalizeSuggestedTasks(value) {
-  if (!Array.isArray(value)) return []
-  return value
-    .filter((task) => task && typeof task === 'object')
-    .map((task) => ({
-      title: cleanText(task.title, 180),
-      details: cleanText(task.details || task.description, 1000),
-      reason: cleanText(task.reason, 500),
-      date: /^\d{4}-\d{2}-\d{2}$/.test(String(task.date || '').trim()) ? String(task.date).trim() : null,
-    }))
-    .filter((task) => task.title)
-    .slice(0, 5)
-}
-
 function cacheTtlMs() {
   const parsed = Number(process.env.INTELLIGENCE_CACHE_TTL_MS)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_CACHE_TTL_MS
@@ -220,18 +181,15 @@ export function buildIntelligenceCacheKey({
   agentIds,
   customAgentIds = [],
   customAgentVersions = [],
-  goalContext = null,
 } = {}) {
-  const normalizedGoal = normalizeGoalContext(goalContext)
   const payload = {
-    version: 2,
+    version: 3,
     question: cleanText(question, MAX_QUESTION_LENGTH).toLowerCase(),
     interests: cleanText(interests, MAX_INTERESTS_LENGTH).toLowerCase(),
     agentIds: (Array.isArray(agentIds) ? normalizeRequestedAgentIds(agentIds) : normalizeAgentIds(agentIds)).sort(),
     customAgents: normalizeCustomAgentIds(customAgentIds)
       .map((id, index) => `${id}:${cleanText(customAgentVersions[index], 120)}`)
       .sort(),
-    goalContext: normalizedGoal,
   }
   return createHash('sha256').update(JSON.stringify(payload)).digest('hex')
 }
@@ -241,15 +199,13 @@ export function buildIntelligenceSpecialistCacheKey({
   agentVersion = '',
   question = '',
   interests = '',
-  goalContext = null,
 } = {}) {
   const payload = {
-    version: 2,
+    version: 3,
     agentId: cleanText(agentId, 40),
     agentVersion: cleanText(agentVersion, 120),
     question: cleanText(question, MAX_QUESTION_LENGTH).toLowerCase(),
     interests: cleanText(interests, MAX_INTERESTS_LENGTH).toLowerCase(),
-    goalContext: normalizeGoalContext(goalContext),
   }
   return createHash('sha256').update(JSON.stringify(payload)).digest('hex')
 }
@@ -296,20 +252,12 @@ function normalizeCustomAgentIds(value) {
     .slice(0, MAX_AGENTS)
 }
 
-export function buildAgentQuery(profile, { question = '', interests = '', goalContext = null } = {}) {
+export function buildAgentQuery(profile, { question = '', interests = '' } = {}) {
   const parts = [profile.searchQuery]
   const cleanQuestion = cleanText(question, MAX_QUESTION_LENGTH)
   const cleanInterests = cleanText(interests, MAX_INTERESTS_LENGTH)
   if (cleanQuestion) parts.push(`Answer this user question as part of the research: ${cleanQuestion}`)
   if (cleanInterests) parts.push(`Prioritize these user interests when relevant: ${cleanInterests}`)
-  if (goalContext?.title) {
-    parts.push(
-      `This research supports the PlanCraft goal "${goalContext.title}". Find recent signals that could materially affect progress on this goal, and explain the practical implication for the person pursuing it`,
-    )
-    if (goalContext.description) parts.push(`Goal context: ${goalContext.description}`)
-    if (goalContext.category) parts.push(`Goal category: ${goalContext.category}`)
-    if (goalContext.targetDate) parts.push(`Goal target date: ${goalContext.targetDate}`)
-  }
   return parts.join('. ')
 }
 
@@ -455,7 +403,7 @@ async function getSpecialistResult({ profile, query, researchContext }) {
   }
 }
 
-async function synthesizeBrief(results, { question = '', interests = '', goalContext = null } = {}) {
+async function synthesizeBrief(results, { question = '', interests = '' } = {}) {
   const packets = results
     .map((result) => [
       `SPECIALIST: ${result.label}`,
@@ -464,19 +412,14 @@ async function synthesizeBrief(results, { question = '', interests = '', goalCon
     ].join('\n'))
     .join('\n\n---\n\n')
 
-  const goalMode = Boolean(goalContext?.title)
   const generalTaskMode = results.some((result) => result.id === 'general-task-helper')
   const frontierMode = results.some((result) => result.id === 'tech-frontier')
   const prompt = [
-    goalMode
-      ? `Create a concise goal watchlist brief for the PlanCraft goal "${goalContext.title}".`
-      : generalTaskMode
+    generalTaskMode
         ? 'Create a concise, task-specific research answer that helps the user make progress now.'
       : 'Create a concise morning intelligence brief for a tech-focused user.',
     'Use only the specialist research packets below; do not add outside facts.',
-    goalMode
-      ? 'Lead with the 3 to 5 most important external signals, explain exactly why each matters to this goal, and identify a practical next move only when the evidence supports it.'
-      : generalTaskMode
+    generalTaskMode
         ? 'Lead with the most useful current facts or resources for this task, then give a short ordered list of practical next steps. Do not force a technology or market angle when the task does not need one.'
       : 'Lead with the 3 to 5 most important signals, explain why each matters to a builder or operator, and call out disagreements or low-confidence items.',
     frontierMode
@@ -484,16 +427,6 @@ async function synthesizeBrief(results, { question = '', interests = '', goalCon
       : '',
     'For capital flows, describe movement and implications without recommending investments or securities.',
     'Include exact dates when the packets provide them. Keep the answer under 700 words.',
-    goalMode
-      ? [
-          'Return ONLY valid JSON with this shape: {"brief":"...","suggestedTasks":[{"title":"...","details":"...","reason":"...","date":null}]}',
-          'suggestedTasks must contain at most 5 concrete, user-approvable planner tasks. Use date only as YYYY-MM-DD when the research gives a clear deadline; otherwise use null.',
-          'Do not invent facts, dates, people, companies, or commitments. If no task is justified, return an empty suggestedTasks array.',
-        ].join(' ')
-      : '',
-    goalMode && goalContext.description ? `Goal context: ${goalContext.description}` : '',
-    goalMode && goalContext.category ? `Goal category: ${goalContext.category}` : '',
-    goalMode && goalContext.targetDate ? `Goal target date: ${goalContext.targetDate}` : '',
     question ? `User question: ${cleanText(question, MAX_QUESTION_LENGTH)}` : '',
     interests ? `User interests: ${cleanText(interests, MAX_INTERESTS_LENGTH)}` : '',
     packets,
@@ -512,12 +445,7 @@ async function synthesizeBrief(results, { question = '', interests = '', goalCon
       ],
       timeoutMs: 60000,
     })
-    if (!goalMode) return { text: cleanText(raw, 9000), suggestedTasks: [] }
-    const parsed = parseJsonSafely(raw, {})
-    return {
-      text: cleanText(parsed?.brief || raw, 9000),
-      suggestedTasks: normalizeSuggestedTasks(parsed?.suggestedTasks),
-    }
+    return { text: cleanText(raw, 9000), suggestedTasks: [] }
   } catch (error) {
     console.warn('[Intelligence] synthesis failed', error?.message || error)
     return {
@@ -532,11 +460,9 @@ export async function createIntelligenceBrief({
   interests = '',
   agentIds,
   customAgents = [],
-  goalContext: rawGoalContext = null,
 } = {}) {
   const normalizedQuestion = cleanText(question, MAX_QUESTION_LENGTH)
   const normalizedInterests = cleanText(interests, MAX_INTERESTS_LENGTH)
-  const goalContext = normalizeGoalContext(rawGoalContext)
   const fixedProfiles = (Array.isArray(agentIds) ? normalizeRequestedAgentIds(agentIds) : normalizeAgentIds(agentIds))
     .map((id) => AGENT_PROFILES[id])
   const profiles = [
@@ -548,7 +474,6 @@ export async function createIntelligenceBrief({
       const query = buildAgentQuery(profile, {
         question: normalizedQuestion,
         interests: normalizedInterests,
-        goalContext,
       })
       const startedAt = Date.now()
       const specialist = await getSpecialistResult({
@@ -557,7 +482,6 @@ export async function createIntelligenceBrief({
         researchContext: {
           question: normalizedQuestion,
           interests: normalizedInterests,
-          goalContext,
           agentVersion: profile.agentVersion,
         },
       })
@@ -590,7 +514,6 @@ export async function createIntelligenceBrief({
   const synthesis = await synthesizeBrief(results, {
     question: normalizedQuestion,
     interests: normalizedInterests,
-    goalContext,
   })
   const sources = results.flatMap((result) => result.sources).filter((source, index, all) => (
     all.findIndex((candidate) => candidate.url === source.url) === index
@@ -602,7 +525,6 @@ export async function createIntelligenceBrief({
     interests: normalizedInterests,
     synthesis: synthesis.text,
     suggestedTasks: synthesis.suggestedTasks,
-    goal: goalContext,
     agents: results,
     sources,
     failures,

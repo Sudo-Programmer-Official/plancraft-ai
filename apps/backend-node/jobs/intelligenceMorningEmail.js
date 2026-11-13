@@ -188,7 +188,6 @@ async function createScheduledBrief(userId, agentId) {
     agentIds: [],
     customAgentIds: customAgents.map((agent) => agent.id),
     customAgentVersions,
-    goalContext: null,
   }
   const cacheKey = buildIntelligenceCacheKey(cacheInput)
   const cached = await getSharedCachedIntelligenceBrief(cacheKey)

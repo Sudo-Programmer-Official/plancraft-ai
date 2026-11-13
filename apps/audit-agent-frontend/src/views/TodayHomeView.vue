@@ -713,8 +713,6 @@ async function runTaskResearch() {
       question,
       interests,
       surface: 'task',
-      // Task research is explicitly user-initiated and does not inherit a goal.
-      goalContext: null,
     })
     const freshResult = { ...result, agentId: agent.id, agentLabel: agent.label || agent.name, persisted: false }
     taskResearchResult.value = freshResult

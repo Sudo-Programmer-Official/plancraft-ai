@@ -630,7 +630,6 @@ router.post('/intelligence/brief', async (req, res) => {
       interests: req.body?.interests,
       agentIds: req.body?.agentIds,
       customAgentIds: req.body?.customAgentIds,
-      goalContext: req.body?.goalContext,
       surface: String(req.body?.surface || 'desk').trim().toLowerCase(),
     }
     const access = await getIntelligenceAccess(req.user?.uid)
