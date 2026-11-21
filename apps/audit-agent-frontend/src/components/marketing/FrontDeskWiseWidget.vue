@@ -8,7 +8,7 @@ import { onBeforeUnmount, onMounted } from 'vue'
 const SITE_KEY = 'fdw_6c8bebe2b5439f052687c03d26431a52b958'
 const LOADER_ID = 'frontdeskwise-widget-loader'
 const LOADER_SRC = 'https://www.frontdeskwise.com/widget.js'
-const API_BASE = 'https://www.frontdeskwise.com'
+const API_BASE = 'https://api.frontdeskwise.com'
 const SHELL_SRC = 'https://www.frontdeskwise.com/widget-shell.js'
 
 function removeWidget() {
