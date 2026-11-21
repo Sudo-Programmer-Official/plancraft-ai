@@ -466,6 +466,8 @@
         </nav>
       </div>
     </footer>
+
+    <FrontDeskWiseWidget />
   </div>
 </template>
 
@@ -491,6 +493,7 @@ import {
   Trash2,
 } from 'lucide-vue-next'
 import ScreenshotSlot from '@/components/marketing/ScreenshotSlot.vue'
+import FrontDeskWiseWidget from '@/components/marketing/FrontDeskWiseWidget.vue'
 import { useSeoMeta } from '@/composables/useSeoMeta'
 import { EVENTS, trackEvent, trackGuestStartFromLanding } from '@/services/analytics'
 import { useAuthStore } from '@/stores/authStore'
